@@ -4,8 +4,165 @@
 use super::*;
 use crate::config::ops::resolve_primary_cloud_provider_string;
 use crate::core::runtime::DispatchCtx;
-#[cfg(not(test))]
 use crate::inference::provider::factory::access_gates::verify_session_active;
+use tinyagents_harness::host::{
+    BuildOpts, ModelBuildGate, ModelBuildRequest, ModelFactory, ModelPurpose,
+};
+use tinyinference_llm::model::{ModelRequestDefaults, ProfileOverrideModel, ResolvedModelRoute};
+
+/// OpenHuman's host policy and construction adapter for a harness turn.
+///
+/// The harness owns turn assembly; this adapter resolves OpenHuman provider
+/// configuration and enforces product access policy for each requested model.
+pub(crate) struct OpenHumanModelFactory<'a> {
+    pub(crate) ctx: &'a DispatchCtx,
+    pub(crate) config: &'a Config,
+    pub(crate) primary_provider: Option<&'a str>,
+    pub(crate) egress: &'a EgressLedger,
+    pub(crate) thread_id: Option<&'a str>,
+}
+
+impl OpenHumanModelFactory<'_> {
+    fn provider_for(&self, request: &ModelBuildRequest) -> String {
+        match request.purpose {
+            ModelPurpose::Primary | ModelPurpose::Summarization => self
+                .primary_provider
+                .map(str::to_owned)
+                .unwrap_or_else(|| provider_for_role(&request.role, self.config)),
+            ModelPurpose::WorkloadTier(_) => provider_for_role(&request.role, self.config),
+        }
+    }
+
+    fn injected(&self, request: &ModelBuildRequest) -> Option<Arc<dyn ChatModel<()>>> {
+        let local = self.ctx.host_overrides()?;
+        let route = request.route.as_deref();
+        match request.purpose {
+            ModelPurpose::Primary => local.model_for(&request.role),
+            ModelPurpose::Summarization => local
+                .role_models
+                .get("summarization")
+                .cloned()
+                .or_else(|| local.model_for(&request.role)),
+            ModelPurpose::WorkloadTier(_) => route
+                .and_then(|route| local.role_models.get(route))
+                .or_else(|| local.role_models.get(&request.role))
+                .cloned(),
+        }
+    }
+
+    fn build_request(
+        &self,
+        request: &ModelBuildRequest,
+    ) -> anyhow::Result<(Arc<dyn ChatModel<()>>, ResolvedModelRoute)> {
+        let role = request.role.as_str();
+        let pin = request.model_pin.as_deref().unwrap_or("");
+        let provider = self.provider_for(request);
+        if let Some(model) = self.injected(request) {
+            let profile = model.profile().cloned().unwrap_or_default();
+            let route = ResolvedModelRoute::new(
+                profile.provider.as_deref().unwrap_or("injected"),
+                profile.model.as_deref().unwrap_or(pin),
+                request.route.as_deref().unwrap_or(role),
+            );
+            return Ok((model, route));
+        }
+
+        if resolves_to_managed_backend(role, self.config)
+            || matches!(request.purpose, ModelPurpose::Primary | ModelPurpose::Summarization)
+                && provider.trim() == PROVIDER_OPENHUMAN
+        {
+            let resolved = self.ctx.resolved();
+            let extensions = resolved
+                .as_deref()
+                .map(crate::core::runtime::CoreContext::extensions);
+            let (model, concrete) = super::managed_backend::make_openhuman_backend_model_for_thread_in(
+                extensions,
+                role,
+                self.config,
+                (!pin.is_empty()).then_some(pin),
+                request.opts.native_tools,
+                self.thread_id,
+                self.egress,
+            )?;
+            let concrete = if concrete.trim().is_empty() { pin } else { &concrete };
+            return Ok((
+                model,
+                ResolvedModelRoute::new(PROVIDER_OPENHUMAN, concrete, request.route.as_deref().unwrap_or(role)),
+            ));
+        }
+
+        let (model, route_provider, resolved_model) = if let Some(result) =
+            try_create_claude_agent_sdk_chat_model_from_string(role, &provider, self.config, self.egress)
+        {
+            let model = result?;
+            let concrete = if pin.is_empty() { model.profile().and_then(|p| p.model.clone()).unwrap_or_default() } else { pin.to_owned() };
+            (model, CLAUDE_AGENT_SDK_PROVIDER.to_owned(), concrete)
+        } else if let Some(result) = try_create_claude_code_chat_model_from_string(
+            role, &provider, self.config, (!pin.is_empty()).then_some(pin), self.egress,
+        ) {
+            let (model, _) = result?;
+            (model, "claude-code".to_owned(), pin.to_owned())
+        } else if let Some(result) = try_create_local_runtime_chat_model(role, self.config, self.egress) {
+            let (model, resolved) = result?;
+            let provider = model.profile().and_then(|p| p.provider.clone()).unwrap_or_else(|| "local".into());
+            (model, provider, resolved)
+        } else if let Some(result) = try_create_cloud_slug_chat_model_with_native_tools_for(
+            role, self.config, request.opts.native_tools, self.egress,
+            self.ctx.resolved().as_deref().map(crate::core::runtime::CoreContext::extensions),
+        ) {
+            let (model, resolved) = result?;
+            let provider = provider.trim().split(':').next().unwrap_or(provider.trim()).to_owned();
+            (model, provider, resolved)
+        } else {
+            let extensions = self.ctx.resolved().as_deref().map(crate::core::runtime::CoreContext::extensions);
+            return Err(unresolved_chat_model_error_for(role, &provider, self.config, self.egress, extensions));
+        };
+
+        let route = ResolvedModelRoute::new(
+            route_provider,
+            resolved_model,
+            request.route.as_deref().unwrap_or(role),
+        );
+        Ok((model, route))
+    }
+}
+
+impl ModelBuildGate for OpenHumanModelFactory<'_> {
+    fn check(&self, request: &ModelBuildRequest) -> anyhow::Result<()> {
+        // Explicit host model injection is authoritative and has no provider
+        // construction, credential, or egress side effect to gate.
+        if self.injected(request).is_some() {
+            return Ok(());
+        }
+        let provider = self.provider_for(request);
+        enforce_local_only_inference(&request.role, &provider)?;
+        crate::inference::provider::factory::access_gates::verify_provider_session(
+            self.config,
+            &provider,
+        )?;
+        Ok(())
+    }
+}
+
+impl ModelFactory<()> for OpenHumanModelFactory<'_> {
+    fn build(
+        &self,
+        request: &ModelBuildRequest,
+    ) -> anyhow::Result<(Arc<dyn ChatModel<()>>, ResolvedModelRoute)> {
+        let (model, route) = self.build_request(request)?;
+        let opts = ModelRequestDefaults {
+            model: (!route.model.is_empty()).then(|| route.model.clone()),
+            temperature: request.opts.temperature,
+        };
+        let model = if let Some(profile) = model.profile().cloned() {
+            Arc::new(ProfileOverrideModel::new(model, profile).with_defaults(opts))
+                as Arc<dyn ChatModel<()>>
+        } else {
+            model
+        };
+        Ok((model, route))
+    }
+}
 
 /// Build an `Arc<dyn ChatModel>` for the given workload role, under `ctx`.
 ///
