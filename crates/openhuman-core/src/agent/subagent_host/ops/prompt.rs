@@ -28,11 +28,7 @@ pub(crate) fn compose_subagent_system_prompt(
     let framed = format!(
         "{}\n\n{}",
         base_prompt.trim_end(),
-        tinyagents_orchestration::subagent::subagent_framing(
-            role,
-            spawn_depth,
-            task_prompt,
-        )
+        tinyagents_orchestration::subagent::subagent_framing(role, spawn_depth, task_prompt,)
     );
     append_artifact_offload_contract(framed, agent_id, visible_tool_names)
 }

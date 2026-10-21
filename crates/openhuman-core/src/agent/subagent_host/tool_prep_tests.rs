@@ -45,14 +45,17 @@ fn explicitly_scoped_nested_spawn_is_retained_only_with_host_grant() {
         vec![0],
         "an explicit host grant should preserve the definition's named spawn tool"
     );
-    assert!(filter_tool_indices_with_nested_spawn(
-        &tools,
-        &scope,
-        &["spawn_subagent".to_owned()],
-        None,
-        true,
-    )
-    .is_empty(), "the definition denylist must still win over the grant");
+    assert!(
+        filter_tool_indices_with_nested_spawn(
+            &tools,
+            &scope,
+            &["spawn_subagent".to_owned()],
+            None,
+            true,
+        )
+        .is_empty(),
+        "the definition denylist must still win over the grant"
+    );
 }
 
 #[test]
