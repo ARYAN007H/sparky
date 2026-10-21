@@ -41,6 +41,7 @@ use crate::artifacts::ArtifactKind;
 use crate::security::approval::ApprovalChatContext;
 use crate::tools::host_extensions::tool_call_id;
 use tinyagents_harness::tinyinference_video::ProgressFn;
+use tinystoragedrivers_api::BlobStore;
 
 use super::progress::{video_status_observer, JobStateSlot};
 
@@ -90,7 +91,7 @@ pub struct MediaArtifactTool<T: Tool> {
     workspace_dir: PathBuf,
     /// Visible folder each generated file is moved into (#5505).
     files_dir: crate::artifacts::FileRoots,
-    blobs: Option<Arc<dyn tinystoragedrivers::BlobStore>>,
+    blobs: Option<Arc<dyn BlobStore>>,
     allowed_references: Option<super::tools::MediaReferenceAllowlist>,
     /// Builds the inner tool for one call around that call's poll observer.
     /// Set for the video tool, whose `WaitPolicy::progress` hook is fixed at
@@ -128,7 +129,7 @@ impl<T: Tool> MediaArtifactTool<T> {
     /// backing store. This keeps TinyAgents' blob-backed output contract
     /// separate from the host's visible Files-folder artifact store.
     #[must_use]
-    pub fn with_blobs(mut self, blobs: Arc<dyn tinystoragedrivers::BlobStore>) -> Self {
+    pub fn with_blobs(mut self, blobs: Arc<dyn BlobStore>) -> Self {
         self.blobs = Some(blobs);
         self
     }

@@ -136,7 +136,7 @@ fn workspace_of(checkpoint_dir: &Path) -> PathBuf {
 /// Legacy migration sources and destination documents in one acting scope.
 pub(super) struct LifecycleStore {
     kv: StateKv,
-    documents: std::sync::Arc<dyn tinystoragedrivers::DocumentStore>,
+    documents: std::sync::Arc<dyn tinystoragedrivers_api::DocumentStore>,
 }
 
 impl LifecycleStore {
