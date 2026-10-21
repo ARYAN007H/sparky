@@ -113,21 +113,6 @@ async fn inspect_storage_config(check_id: &str, config: StorageConfig, depth: u8
                 )]
             }
         }
-        StorageConfig::Composite { records, blobs } => {
-            let mut findings =
-                Box::pin(inspect_storage_config(check_id, *records, depth + 1)).await;
-            findings.extend(match *blobs {
-                tinystoragedrivers::BlobConfig::Backend(config) => {
-                    Box::pin(inspect_storage_config(check_id, config, depth + 1)).await
-                }
-                tinystoragedrivers::BlobConfig::S3 { .. } => vec![Finding::skipped(
-                    check_id,
-                    "The S3 blob backend has no bounded read-only connectivity probe.",
-                    "Check the configured S3 endpoint with its provider's read-only diagnostics.",
-                )],
-            });
-            findings
-        }
         #[allow(unreachable_patterns)]
         _ => vec![Finding::skipped(
             check_id,

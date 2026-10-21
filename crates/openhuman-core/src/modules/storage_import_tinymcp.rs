@@ -86,6 +86,7 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
     }
 
     let marker = marker_id(data_dir);
+    let marker_for_claim = marker.clone();
     let data_dir = data_dir.to_path_buf();
     let scope = super::storage_host::current_module_scope(ctx, MODULE_ID)
         .map_err(|error| anyhow!("resolve the module scope: {:?}", error.kind()))?;
@@ -93,7 +94,7 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
         ctx,
         MODULE_ID,
         MARKER_COLLECTION,
-        &marker,
+        &marker_for_claim,
         move |scoped| {
             crate::storage::block_on_anyhow(async move {
                 if super::storage_import_support::already_imported(

@@ -466,17 +466,7 @@ fn missing_storage_feature(config: &StorageConfig) -> Option<&'static str> {
         StorageConfig::MongoDb { .. } => {
             (!cfg!(feature = "storage-mongodb")).then_some("storage-mongodb")
         }
-        StorageConfig::Composite { records, blobs } => {
-            missing_storage_feature(records).or_else(|| missing_blob_feature(blobs))
-        }
         _ => None,
-    }
-}
-
-fn missing_blob_feature(config: &BlobConfig) -> Option<&'static str> {
-    match config {
-        BlobConfig::S3 { .. } => (!cfg!(feature = "storage-s3")).then_some("storage-s3"),
-        BlobConfig::Backend(config) => missing_storage_feature(config),
     }
 }
 
