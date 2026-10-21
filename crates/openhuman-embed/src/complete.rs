@@ -664,13 +664,15 @@ impl Completer {
                 call: budget.call,
             });
         // The spend ledger is an explicit argument of the call, not an ambient scope.
-        let budget = budget.as_ref().map(|budget| {
+        let oneshot_budget = budget.as_ref().map(|budget| {
             tinyagents_harness::cost::ModelBudget::new(budget.ledger.clone(), budget.call)
         });
         let call = tinyagents_harness::oneshot::complete_once_controlled(
             model,
             wire_request,
-            tinyagents_harness::oneshot::OneshotOptions { budget },
+            tinyagents_harness::oneshot::OneshotOptions {
+                budget: oneshot_budget,
+            },
             self.observers.physical_dispatch.clone(),
             self.dispatch_admission.clone(),
         );
