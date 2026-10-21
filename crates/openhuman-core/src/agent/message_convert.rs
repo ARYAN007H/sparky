@@ -26,8 +26,8 @@ use crate::inference::provider::ChatResponse;
 use tinyagents_runtime::transcript::reasoning_from_content;
 #[cfg(test)]
 use tinyagents_runtime::transcript::{
-    message_to_display_transcript as message_to_chat_message,
-    message_to_native_transcript as message_to_native_chat_message, REASONING_EXT_KEY,
+    REASONING_EXT_KEY, message_to_display_transcript as message_to_chat_message,
+    message_to_native_transcript as message_to_native_chat_message,
 };
 use tinyagents_session::transcript::TranscriptMessage;
 
@@ -215,9 +215,7 @@ pub(crate) fn user_message_from_parts(
                     mime_type: media.content_type.clone(),
                 }));
             }
-            tinychannels_bus::ContentPart::File {
-                media, caption, ..
-            } => {
+            tinychannels_bus::ContentPart::File { media, caption, .. } => {
                 let path = media
                     .path
                     .clone()
@@ -258,8 +256,6 @@ pub(crate) fn user_message_from_parts(
         }
     }
     Ok(Message::User(UserMessage { content }))
-}
-
 }
 
 /// The inverse of [`user_message_from_text`]: a user message's text with each
