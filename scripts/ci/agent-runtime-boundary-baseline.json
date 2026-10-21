@@ -134,55 +134,6 @@
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/inference/provider/factory/managed_backend.rs",
-    "line": 40,
-    "text": ".with_thread_id(thread_id),",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/inference/provider/openhuman_backend_model_calls.rs",
-    "line": 51,
-    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/inference/provider/openhuman_backend_model_calls.rs",
-    "line": 78,
-    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
-    "occurrence": 2
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/inference/provider/openhuman_backend_model.rs",
-    "line": 141,
-    "text": "pub fn with_thread_id(mut self, thread_id: Option<impl AsRef<str>>) -> Self {",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/inference/provider/openhuman_backend_model.rs",
-    "line": 480,
-    "text": "fn with_thread_id(request: ModelRequest, thread_id: Option<&str>) -> ModelRequest {",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/integrations/composio/bus/trigger_subscriber.rs",
-    "line": 10,
-    "text": "use crate::agent::turn_origin::with_origin;",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/integrations/composio/bus/trigger_subscriber.rs",
-    "line": 198,
-    "text": "if let Err(e) = with_origin(origin, apply_decision(&ctx, run, &envelope)).await",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/integrations/task_sources/route.rs",
     "line": 21,
     "text": "use crate::security::turn_origin::with_origin;",
@@ -315,48 +266,6 @@
     "occurrence": 1
   },
   {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_calls.rs",
-    "line": 12,
-    "text": "use super::managed_reasoning::{apply_reasoning_hint, with_thread_id};",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_calls.rs",
-    "line": 109,
-    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_calls.rs",
-    "line": 136,
-    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
-    "occurrence": 2
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_model.rs",
-    "line": 95,
-    "text": "pub fn with_thread_id(mut self, thread_id: Option<impl AsRef<str>>) -> Self {",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_reasoning.rs",
-    "line": 67,
-    "text": "pub(super) fn with_thread_id(request: ModelRequest, thread_id: Option<&str>) -> ModelRequest {",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/mod.rs",
-    "line": 76,
-    "text": ".with_thread_id(request.thread_id);",
-    "occurrence": 1
-  },
-  {
     "rule": "openhuman-upstream-reexport",
     "path": "crates/openhuman-core/src/tools/registry/mod.rs",
     "line": 18,
@@ -434,20 +343,6 @@
     "occurrence": 1
   },
   {
-    "rule": "tinyagents-moved-symbol-alias",
-    "path": "vendor/tinyagents/crates/tinyagents-runtime/src/hooks.rs",
-    "line": 122,
-    "text": "pub type SessionHookFuture<'a, T> = tinyagents_hooks::SessionHookFuture<'a, T, RuntimeError>;",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-tool-calling-facade",
-    "path": "vendor/tinyagents/crates/tinyagents-harness/src/agent_loop/dialect.rs",
-    "line": 23,
-    "text": "use tinytools_agent::dialect::{CodeDialect, CodeStyle, PFormatDialect, ToolCallFormat};",
-    "occurrence": 1
-  },
-  {
     "rule": "tinyagents-tool-calling-facade",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/agent_loop/dialect.rs",
     "line": 24,
@@ -463,20 +358,6 @@
   },
   {
     "rule": "tinyagents-tool-calling-facade",
-    "path": "vendor/tinyagents/crates/tinyagents-harness/src/agent_loop/dialect/dialect_tests.rs",
-    "line": 64,
-    "text": "use tinytools_agent::dialect::CodeStyle;",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-tool-calling-facade",
-    "path": "vendor/tinyagents/crates/tinyagents-harness/src/agent_loop/tool_call_wrapper.rs",
-    "line": 25,
-    "text": "use tinytools_agent::repair::args::ARGUMENT_KEYS;",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-tool-calling-facade",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/agent_loop/tools.rs",
     "line": 2747,
     "text": "use tinytools_agent::repair::args;",
@@ -484,65 +365,9 @@
   },
   {
     "rule": "tinyagents-tool-calling-facade",
-    "path": "vendor/tinyagents/crates/tinyagents-harness/src/close_tests.rs",
-    "line": 8,
-    "text": "use tinytools_agent::dialect::NativeDialect;",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-tool-calling-facade",
-    "path": "vendor/tinyagents/crates/tinyagents-harness/src/close.rs",
-    "line": 17,
-    "text": "use tinytools_agent::dialect::{DialectResponse, ToolDialect};",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-tool-calling-facade",
-    "path": "vendor/tinyagents/crates/tinyagents-harness/src/dialect.rs",
-    "line": 8,
-    "text": "use tinytools_agent::dialect::ToolCallFormat;",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-tool-calling-facade",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/lib.rs",
     "line": 130,
     "text": "pub use tinytools_agent;",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-tool-calling-facade",
-    "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/prompt_relaxed_tests.rs",
-    "line": 12,
-    "text": "use tinytools_agent::repair::json::{normalize_leaked_quote_tokens, quote_bare_keys};",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-tool-calling-facade",
-    "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/prompt.rs",
-    "line": 21,
-    "text": "use tinytools_agent::repair::json::recover_whole_object;",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-tool-calling-facade",
-    "path": "vendor/tinyagents/crates/tinyagents-session/src/transcript/jsonl.rs",
-    "line": 14,
-    "text": "use tinytools_agent::dialect::{",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-tool-calling-facade",
-    "path": "vendor/tinyagents/crates/tinyagents-session/src/transcript/typed_rows_tests.rs",
-    "line": 11,
-    "text": "use tinytools_agent::dialect::{NativeToolCall, encode_assistant_envelope, encode_tool_envelope};",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-tool-calling-facade",
-    "path": "vendor/tinyagents/crates/tinyagents-session/src/transcript/types.rs",
-    "line": 5,
-    "text": "use tinytools_agent::dialect::{",
     "occurrence": 1
   },
   {
@@ -554,13 +379,6 @@
   },
   {
     "rule": "tinyagents-upstream-reexport",
-    "path": "vendor/tinyagents/crates/tinyagents-graph/src/orchestration.rs",
-    "line": 7,
-    "text": "pub use tinyagents_tasks::*;",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-upstream-reexport",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/discover/mod.rs",
     "line": 35,
     "text": "pub use tinytools::rank::{Bm25Index, tokenize};",
@@ -568,30 +386,9 @@
   },
   {
     "rule": "tinyagents-upstream-reexport",
-    "path": "vendor/tinyagents/crates/tinyagents-orchestration/src/status/mod.rs",
-    "line": 20,
-    "text": "pub use tinyagents_tasks::NoEquivalentStatus;",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-upstream-reexport",
-    "path": "vendor/tinyagents/crates/tinyagents-orchestration/src/subagent/policy.rs",
-    "line": 19,
-    "text": "pub use tinyagents_graph::{SubAgentBudget, SubAgentPolicy};",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-upstream-reexport",
     "path": "vendor/tinyagents/crates/tinyagents-registry/src/lib.rs",
     "line": 35,
     "text": "pub use tinyagents_harness::error::{Result, TinyAgentsError};",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-upstream-reexport",
-    "path": "vendor/tinyagents/crates/tinyagents-runtime/src/lib.rs",
-    "line": 10,
-    "text": "pub use tinyagents_hooks::command as command_hooks;",
     "occurrence": 1
   },
   {
@@ -606,13 +403,6 @@
     "path": "vendor/tinyagents/crates/tinyagents-session/src/lib.rs",
     "line": 117,
     "text": "pub use tinyagents_harness::error::{Result, TinyAgentsError};",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-upstream-reexport",
-    "path": "vendor/tinyagents/crates/tinyagents-session/src/port/mod.rs",
-    "line": 69,
-    "text": "pub use tinyagents_harness::store::{AppendStore, Store};",
     "occurrence": 1
   }
 ]
