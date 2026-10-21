@@ -263,9 +263,8 @@ pub(crate) fn authorize(
                 "ttl": false,
                 "max_key_len": 0,
             }))),
-            Object::Streams | Object::Secrets | Object::Queues | Object::Kv => {
-                Err(Denied::Object)
-            }
+            Object::Streams | Object::Secrets | Object::Queues => Err(Denied::Object),
+            Object::Kv => Ok(Plan::Answer(serde_json::json!({ "capabilities": [] }))),
         };
     }
     // `BusStorage::connect` asks every module's host for queue features, so a
@@ -496,7 +495,7 @@ fn queues(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Plan,
     match selector {
         "Features" => Ok(forward("")),
         "EnsureQueue" | "Enqueue" | "Receive" | "Ack" | "Nack" | "Extend" | "Stats"
-        | "ListDead" | "Redrive" | "Purge" => {
+        | "DeadLetters" | "Redrive" | "Purge" => {
             let name = text(request, "queue")?;
             let declaration = grant
                 .queues

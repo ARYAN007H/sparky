@@ -248,7 +248,13 @@ impl StorageHost {
             Ok(plan) => plan,
             Err(denied) => {
                 call.record("", denied.label());
-                return Err(HostError::Denied(denied.label()));
+                return Err(match denied {
+                    super::storage_grants::Denied::QueueNotGranted => {
+                        failure(StorageKind::NotFound)
+                    }
+                    super::storage_grants::Denied::QueueSpec => failure(StorageKind::Conflict),
+                    _ => HostError::Denied(denied.label()),
+                });
             }
         };
         Ok(Admitted {
