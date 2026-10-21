@@ -25,20 +25,29 @@ pub use key_source::{
 
 /// There is no encrypted-file initialization in a build without `secret-file`.
 pub fn init_master_key() -> Result<(), String> {
+    if super::store::effective_backend_kind() == super::store::BackendKind::EncryptedFile {
+        return Err(
+            "encrypted file secret backend is disabled; enable the secret-file feature".into(),
+        );
+    }
     Ok(())
 }
 
 /// Storage-backed encryption needs a host key source when `secret-file` is off.
 pub(crate) fn storage_master_key() -> Result<[u8; KEY_LEN], String> {
-    Err("encrypted secret key storage is disabled; enable the secret-file feature".into())
+    let source = key_source::installed_master_key_source()
+        .ok_or_else(|| "no host master key source is installed".to_string())?;
+    key_source::load_or_mint_master_key(source.as_ref())
+        .map(|key| *key)
+        .map_err(|error| error.to_string())
 }
 
 pub(crate) fn storage_master_key_resolvable() -> bool {
-    false
+    key_source::installed_master_key_source().is_some()
 }
 
 pub(crate) fn master_key_available() -> bool {
-    false
+    key_source::installed_master_key_source().is_some()
 }
 
 pub(crate) fn resolvable(loaded: bool, env: bool, host: bool, key_file: bool) -> bool {
