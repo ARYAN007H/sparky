@@ -11,7 +11,7 @@ There is no flow here, only a rule about direction. Domains depend on `util`;
 `util` depends on no domain. No file in this folder has a `use crate::` line.
 A helper that needs a `Config`, a `Tool`, a workspace or security policy
 belongs in the domain that owns those things. Domains import LLM-facing text
-sanitization directly from `tinytools_std::sanitize`.
+sanitization directly from `tinytools::sanitize`.
 
 ```text
   agent  memory  tools  inference  config  integrations  mcp  ...
