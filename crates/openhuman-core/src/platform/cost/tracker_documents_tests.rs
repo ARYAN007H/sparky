@@ -43,7 +43,7 @@ fn a_record_is_written_once() {
 
 #[test]
 fn scopes_do_not_see_each_others_costs() {
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let alice = docs_in(&storage, "alice");
     let bob = docs_in(&storage, "bob");
     alice.add(&record("a/model", 1.0, 0)).unwrap();
@@ -66,7 +66,8 @@ fn a_legacy_jsonl_ledger_is_imported_once_and_set_aside() {
         ),
     )
     .unwrap();
-    let docs = docs_in(&MemoryStorage::new(), "local");
+    let storage = memory_backend();
+    let docs = docs_in(storage.as_ref(), "local");
     assert_eq!(docs.import_legacy(&path).unwrap(), 2);
     assert_eq!(docs.all().unwrap().len(), 2);
     assert!(!path.exists());
@@ -88,7 +89,8 @@ fn a_legacy_import_skips_ids_already_stored_or_repeated() {
         format!("{}\n{}\n{}\n", line(&first), line(&second), line(&second)),
     )
     .unwrap();
-    let docs = docs_in(&MemoryStorage::new(), "local");
+    let storage = memory_backend();
+    let docs = docs_in(storage.as_ref(), "local");
     docs.add(&first).unwrap();
     assert_eq!(docs.import_legacy(&path).unwrap(), 1);
     assert_eq!(docs.all().unwrap().len(), 2);
@@ -106,7 +108,8 @@ fn an_earlier_set_aside_ledger_is_kept_and_bad_utf8_lines_are_skipped() {
     let earlier = dir.path().join("costs.jsonl.migrated");
     std::fs::write(&earlier, "earlier").unwrap();
 
-    let docs = docs_in(&MemoryStorage::new(), "local");
+    let storage = memory_backend();
+    let docs = docs_in(storage.as_ref(), "local");
     assert_eq!(docs.import_legacy(&path).unwrap(), 1);
     assert!(!path.exists());
     assert_eq!(std::fs::read_to_string(&earlier).unwrap(), "earlier");
@@ -120,6 +123,7 @@ fn a_ledger_another_core_already_set_aside_counts_as_done() {
     assert!(set_aside(&path).is_ok());
     // An unreadable ledger (here a directory) fails the import instead.
     std::fs::create_dir_all(&path).unwrap();
-    let docs = docs_in(&MemoryStorage::new(), "local");
+    let storage = memory_backend();
+    let docs = docs_in(storage.as_ref(), "local");
     assert!(docs.import_legacy(&path).is_err());
 }
