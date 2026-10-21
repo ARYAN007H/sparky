@@ -242,14 +242,13 @@ fn a_waiting_process_runs_once_the_holder_releases() {
 #[cfg(feature = "storage-sqlite")]
 fn a_long_import_keeps_its_claim_alive() {
     let (_dir, _backend, repo) = sqlite_repo();
-    let now = chrono::Utc::now().timestamp_millis();
     let rival_repo = repo.clone();
-    let rival_ran = with_claim_at(&repo, OWNER, "m", now, 90, |_| {
+    let rival_ran = with_claim_ttl(&repo, OWNER, "m", 1_000, |_| {
         let mut took_over = false;
-        for _ in 0..8 {
+        for _ in 0..26 {
             std::thread::sleep(Duration::from_millis(50));
             let at = chrono::Utc::now().timestamp_millis();
-            took_over |= with_claim_at(&rival_repo, OWNER, "m", at, 90, |_| Ok(()))
+            took_over |= with_claim_at(&rival_repo, OWNER, "m", at, 1_000, |_| Ok(()))
                 .unwrap()
                 .is_some();
         }
