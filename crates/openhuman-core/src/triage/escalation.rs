@@ -256,7 +256,7 @@ async fn dispatch_target_agent(
 
     tracing::debug!(agent_id = %agent_id, "[triage::escalation] dispatching direct agent turn");
 
-    let outcome = subagent_host::run_subagent(
+    let outcome = crate::inference::host_runtime::ops::agent_chat_for(
         definition,
         prompt,
         SubagentRunOptions {
