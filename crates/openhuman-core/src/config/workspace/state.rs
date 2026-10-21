@@ -12,7 +12,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use tinystoragedrivers::{Scope, StorageBackend, StorageConfig};
+use tinystoragedrivers::{StorageBackend, StorageConfig};
 use tinystoragedrivers_api::KvStore;
 use tinystoragedrivers_types::{Cursor, Precondition};
 
@@ -51,7 +51,7 @@ impl WatcherStateStore {
 
     fn from_backend(backend: Arc<dyn StorageBackend>) -> Result<Self> {
         let storage = backend
-            .for_scope(&Scope::local())
+            .for_scope(&crate::storage::Scope::local())
             .map_err(anyhow::Error::from)
             .context("open watcher scope")?;
         Ok(Self {

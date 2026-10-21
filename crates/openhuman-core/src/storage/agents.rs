@@ -29,7 +29,7 @@ use std::future::Future;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use serde_json::{json, Value};
-use tinystoragedrivers::{CollectionSpec, Precondition, Query, Scope};
+use tinystoragedrivers::{CollectionSpec, Precondition, Query};
 
 use super::schema_support::key_of;
 use super::{block_on, installed, DocumentStoreExt, StorageBackend};
@@ -98,7 +98,11 @@ fn record_in(backend: Arc<dyn StorageBackend>, agent: &str) {
     }
     let id = agent.to_string();
     let result = block_on(async move {
-        let docs = Arc::clone(backend.for_scope(&Scope::local())?.documents());
+        let docs = Arc::clone(
+            backend
+                .for_scope(&super::Scope::local())?
+                .documents(),
+        );
         docs.ensure_collection(&CollectionSpec::new(AGENTS)).await?;
         docs.put(
             AGENTS,
@@ -126,7 +130,11 @@ fn record_in(backend: Arc<dyn StorageBackend>, agent: &str) {
 /// Agent ids recorded in the backend by this or an earlier process.
 fn recorded(backend: Arc<dyn StorageBackend>) -> Vec<String> {
     let result = block_on(async move {
-        let docs = Arc::clone(backend.for_scope(&Scope::local())?.documents());
+        let docs = Arc::clone(
+            backend
+                .for_scope(&super::Scope::local())?
+                .documents(),
+        );
         docs.ensure_collection(&CollectionSpec::new(AGENTS)).await?;
         let stored = docs.query_all(AGENTS, &Query::all()).await?;
         Ok(stored
