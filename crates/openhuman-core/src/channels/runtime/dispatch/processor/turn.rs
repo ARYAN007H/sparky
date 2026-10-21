@@ -93,20 +93,9 @@ pub(crate) async fn process_channel_runtime_message(
     let msg = prepared.message;
     let history_key = prepared.history_key;
     let canonical_session_key = prepared.session_key.clone();
+    let prepared_thread_id = prepared.thread_id.clone();
     let mut envelope = prepared.envelope;
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
-    let native_message_input = if typed_envelope_input {
-        match super::native_media::resolve_typed_message(&ctx, &envelope, &prepared.thread_id).await
-        {
-            Ok(input) => input,
-            Err(error) => {
-                tracing::warn!("[dispatch] typed native media was rejected: {error}");
-                return;
-            }
-        }
-    } else {
-        None
-    };
     let remote_reset_scope = tinychannels_bus::module_remote::RemoteSessionScope {
         channel: envelope.channel.clone(),
         conversation: envelope.conversation.clone(),
@@ -384,6 +373,28 @@ pub(crate) async fn process_channel_runtime_message(
             }
         }
         None => None,
+    };
+    let native_message_input = if typed_envelope_input {
+        let Some(host) = selected_host.as_ref() else {
+            tracing::warn!("[dispatch] typed native media has no selected host agent");
+            return;
+        };
+        match super::native_media::resolve_typed_message(
+            &ctx,
+            &host.config,
+            &envelope,
+            &prepared_thread_id,
+        )
+        .await
+        {
+            Ok(input) => input,
+            Err(error) => {
+                tracing::warn!("[dispatch] typed native media was rejected: {error}");
+                return;
+            }
+        }
+    } else {
+        None
     };
     let channel_session = selected_host.as_ref().and_then(|host| {
         let account_id = envelope
