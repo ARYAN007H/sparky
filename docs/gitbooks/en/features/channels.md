@@ -67,7 +67,7 @@ OpenHuman has 15 channel providers. 14 are built into the shipped desktop app. W
 
 WhatsApp also has an experimental peer-to-peer variant behind the `whatsapp-web` feature. Channels that use a webhook receive messages by HTTP push, so they need an HTTPS endpoint that the provider can reach.
 
-Telegram has the most features. It supports typing indicators and live draft updates, and it is the only channel with its own approval surface, so approval prompts can be answered inline. Discord adds native threaded replies, and Lark threads too. Web supports rich text and stays entirely local.
+Telegram has the most features. It supports typing indicators and live draft updates, and it is the only channel with its own approval surface, so approval prompts can be answered inline. Discord adds native threaded replies. Media, voice, and addressing support varies by provider and configured capabilities. Web supports rich text and stays entirely local.
 
 ### Email
 
