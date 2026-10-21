@@ -1,7 +1,7 @@
 //! A one-shot compiled CLI call waits for its registered async child and
 //! reports child failure as a failed call.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::fs::File;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
@@ -81,7 +81,10 @@ fn set_mock_behavior(origin: &str, behavior: Value) {
         .json(&json!({ "behavior": behavior, "mode": "replace" }))
         .send()
         .expect("configure mock behavior");
-    assert!(response.status().is_success(), "mock behavior setup: {response}");
+    assert!(
+        response.status().is_success(),
+        "mock behavior setup: {response}"
+    );
 }
 
 fn mock_requests(origin: &str) -> Value {
@@ -102,7 +105,9 @@ fn primary_llm_probes(origin: &str) -> Vec<(String, bool)> {
         .iter()
         .filter(|entry| {
             entry["method"].as_str() == Some("POST")
-                && entry["url"].as_str().is_some_and(|url| url.contains("chat/completions"))
+                && entry["url"]
+                    .as_str()
+                    .is_some_and(|url| url.contains("chat/completions"))
         })
         .filter_map(|entry| {
             let body: Value = serde_json::from_str(entry["body"].as_str()?).ok()?;
@@ -113,8 +118,12 @@ fn primary_llm_probes(origin: &str) -> Vec<(String, bool)> {
                 }
                 message["content"].as_str().map(str::to_owned).or_else(|| {
                     message["content"].as_array().map(|parts| {
-                        parts.iter().filter_map(|part| part["text"].as_str())
-                            .collect::<Vec<_>>().join(" ")
+                        parts
+                            .iter()
+                            .filter(|part| part["type"] == "text")
+                            .filter_map(|part| part["text"].as_str())
+                            .collect::<Vec<_>>()
+                            .join(" ")
                     })
                 })
             })?;
@@ -268,13 +277,16 @@ fn one_shot_cli_waits_for_and_returns_its_spawned_child_result() {
     );
     let response: Value = serde_json::from_str(stdout.trim())
         .unwrap_or_else(|error| panic!("CLI stdout is not JSON ({error}): {stdout}"));
+    let result = response["result"]
+        .as_str()
+        .expect("agent_chat CLI response result string");
     assert!(
-        response.to_string().contains(CHILD_RESULT),
-        "successful CLI response must include the awaited child result, got {response}"
+        result.contains(CHILD_RESULT),
+        "successful CLI result must include the awaited child result, got {result}"
     );
     assert!(
-        response.to_string().contains(ROOT_RESULT),
-        "root response did not complete after child settlement: {response}"
+        result.contains(ROOT_RESULT),
+        "root result did not complete after child settlement: {result}"
     );
 
     // The one-shot request has no thread/session metadata, so the mock has no
@@ -283,7 +295,9 @@ fn one_shot_cli_waits_for_and_returns_its_spawned_child_result() {
     // the child rule emits CHILD_RESULT; root completion emits ROOT_RESULT.
     let probes = primary_llm_probes(&origin);
     assert!(
-        probes.iter().any(|(probe, streaming)| probe.contains(CHILD_PROMPT) && *streaming),
+        probes
+            .iter()
+            .any(|(probe, streaming)| probe.contains(CHILD_PROMPT) && *streaming),
         "no actual streaming primary LLM request carried the child prompt: {probes:#?}"
     );
 
@@ -337,7 +351,9 @@ fn one_shot_cli_waits_for_and_returns_its_spawned_child_result() {
     );
     let failure_probes = primary_llm_probes(&origin);
     assert!(
-        failure_probes.iter().any(|(probe, streaming)| probe.contains(FAILURE_PROMPT) && *streaming),
+        failure_probes
+            .iter()
+            .any(|(probe, streaming)| probe.contains(FAILURE_PROMPT) && *streaming),
         "failure case did not issue its distinct actual child request: {failure_probes:#?}"
     );
     assert!(
