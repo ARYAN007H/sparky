@@ -48,7 +48,7 @@ pub(super) fn resolve_local_runtime_key(
 fn catalog_request(
     config: &crate::config::Config,
     entry: Option<&crate::config::schema::cloud_providers::CloudProviderCreds>,
-) -> Result<crate::inference::registry::CatalogRequest, String> {
+) -> Result<crate::inference::registry::CatalogHostRequest, String> {
     let service_key = "providers.list_models";
     let slug = entry.map(|e| e.slug.trim()).unwrap_or_default();
     let provider_key = match entry {
@@ -70,10 +70,22 @@ fn catalog_request(
         }
         None => crate::config::build_runtime_proxy_client_with_timeouts(service_key, 30, 10),
     };
-    Ok(crate::inference::registry::CatalogRequest {
-        provider_key,
-        client,
-    })
+    Ok(crate::inference::registry::CatalogHostRequest { provider_key, client })
+}
+
+async fn run_registered_catalog(
+    provider_id: &str,
+    config: &crate::config::Config,
+    request: crate::inference::registry::CatalogHostRequest,
+    catalog: tinyinference_llm::providers::overrides::CatalogEntry<crate::inference::registry::ProviderContext>,
+) -> Result<crate::core::Outcome<serde_json::Value>, String> {
+    let context = crate::inference::registry::ProviderContext::for_catalog(config, request);
+    let call = context.catalog.as_ref().expect("catalog context");
+    let logs = Arc::clone(&call.logs);
+    let listing = (catalog.list)(tinyinference_llm::providers::overrides::CatalogRequest { context }).await?;
+    let logs = std::mem::take(&mut *logs.lock().unwrap_or_else(std::sync::PoisonError::into_inner));
+    log::debug!("[providers][list_models] provider_id={provider_id} served by native provider catalog");
+    Ok(crate::core::Outcome::new(listing, logs))
 }
 
 /// The empty listing the managed provider answers with when no hosted catalog
@@ -120,7 +132,7 @@ pub async fn list_configured_models_from_config(
             .iter()
             .find(|e| e.id == provider_id || e.slug == provider_id);
         let request = catalog_request(config, entry)?;
-        return (catalog.list)(config.clone(), request).await;
+        return run_registered_catalog(&provider_id, config, request, catalog).await;
     }
     if provider_id == crate::inference::provider::factory::PROVIDER_OPENHUMAN {
         return Ok(no_managed_catalog());
@@ -146,7 +158,7 @@ pub async fn list_configured_models_from_config(
         ) {
             Some(catalog) => {
                 let request = catalog_request(config, Some(&entry))?;
-                (catalog.list)(config.clone(), request).await
+                run_registered_catalog(PROVIDER_OPENHUMAN, config, request, catalog).await
             }
             None => Ok(no_managed_catalog()),
         };

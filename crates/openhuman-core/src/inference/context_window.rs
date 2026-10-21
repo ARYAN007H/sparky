@@ -231,12 +231,15 @@ pub(crate) fn model_limits_request_for(
             .map(|route| route.model.as_str())
             .filter(|model| !model.is_empty())
             .unwrap_or(model);
+        let context = crate::inference::registry::ProviderContext::new(
+            config, &crate::security::egress::EgressLedger::none(),
+        );
         return crate::inference::registry::catalog_for(
             extensions,
             crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         )
         .and_then(|entry| entry.limits)
-        .and_then(|limits| limits(model, config));
+        .and_then(|limits| limits(model, &context));
     }
 
     let route = route?;
@@ -256,12 +259,15 @@ pub(crate) fn model_limits_request_for(
         } else {
             route.model.trim()
         };
+        let context = crate::inference::registry::ProviderContext::new(
+            config, &crate::security::egress::EgressLedger::none(),
+        );
         return crate::inference::registry::catalog_for(
             extensions,
             crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         )
         .and_then(|entry| entry.limits)
-        .and_then(|limits| limits(model, config));
+        .and_then(|limits| limits(model, &context));
     }
     let resolution = crate::inference::provider::factory::resolve_cloud_slug_for(
         role,
