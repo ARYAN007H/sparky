@@ -114,6 +114,7 @@ async fn handle_linked_runtime_command(
     msg: &ChannelMessage,
     target_channel: Option<&Arc<ChannelHandle>>,
     linked: &crate::channels::runtime::test_support::LinkedTelegramRuntime,
+    canonical_conversation_id: Option<&str>,
 ) -> bool {
     use tinychannels_bus::module_inbound::{ChannelInboundSource, PrepareChannelInboundRequest};
     use tinychannels_bus::module_remote::RemoteSessionScope;
@@ -139,7 +140,9 @@ async fn handle_linked_runtime_command(
                     message_id: msg.id.clone(),
                     reply_to_id: msg.reply_to_id.clone(),
                     conversation: tinychannels_bus::ConversationRef {
-                        id: msg.reply_target.clone(),
+                        id: canonical_conversation_id
+                            .unwrap_or(&msg.reply_target)
+                            .to_owned(),
                         topic_id: msg.topic_id.clone(),
                         ..Default::default()
                     },
@@ -547,7 +550,8 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
         sender_name: None,
     };
 
-    let handled = handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked).await;
+    let handled =
+        handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked, None).await;
     assert!(handled);
 
     let sent = channel_state.sent.lock().unwrap();
@@ -577,7 +581,7 @@ async fn handle_runtime_command_without_target_channel_still_consumes_command() 
         sender_name: None,
     };
 
-    let handled = handle_linked_runtime_command(&mut ctx, &msg, None, &linked).await;
+    let handled = handle_linked_runtime_command(&mut ctx, &msg, None, &linked, None).await;
     assert!(handled);
 }
 
@@ -600,7 +604,8 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
         sender_name: None,
     };
 
-    let handled = handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked).await;
+    let handled =
+        handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked, None).await;
     assert!(handled);
 
     let sent = channel_state.sent.lock().unwrap();
@@ -636,7 +641,8 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
         sender_name: None,
     };
 
-    let handled = handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked).await;
+    let handled =
+        handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked, None).await;
     assert!(handled);
 
     let sent = channel_state.sent.lock().unwrap();
@@ -670,7 +676,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         thread_ts: Some("42".into()),
         sender_name: None,
     };
-    assert!(handle_linked_runtime_command(&mut ctx, &new_msg, Some(&channel), &linked).await);
+    assert!(handle_linked_runtime_command(&mut ctx, &new_msg, Some(&channel), &linked, None).await);
     set_route_selection(
         &ctx,
         sender_key,
@@ -706,7 +712,9 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         thread_ts: Some("42".into()),
         sender_name: None,
     };
-    assert!(handle_linked_runtime_command(&mut ctx, &status_msg, Some(&channel), &linked).await);
+    assert!(
+        handle_linked_runtime_command(&mut ctx, &status_msg, Some(&channel), &linked, None).await
+    );
 
     let sessions_msg = ChannelMessage {
         reply_to_id: None,
@@ -720,7 +728,9 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         thread_ts: Some("42".into()),
         sender_name: None,
     };
-    assert!(handle_linked_runtime_command(&mut ctx, &sessions_msg, Some(&channel), &linked).await);
+    assert!(
+        handle_linked_runtime_command(&mut ctx, &sessions_msg, Some(&channel), &linked, None).await
+    );
 
     let sent = channel_state.sent.lock().unwrap();
     assert_eq!(sent.len(), 3);
@@ -764,21 +774,30 @@ async fn handle_runtime_command_telegram_new_uses_module_storage() {
         sender: "alice".into(),
         // This fixture supplies the same canonical conversation reference the
         // inbound module preparation boundary provides to command handling.
-        reply_target: "-200".into(),
+        reply_target: "-200:42".into(),
         content: "/new".into(),
         channel: "telegram".into(),
         timestamp: 0,
         thread_ts: Some("100".into()),
         sender_name: None,
     };
-    assert!(handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked).await);
+    assert!(
+        handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked, Some("-200")).await
+    );
     let topic_only_msg = ChannelMessage {
         id: "101".into(),
         thread_ts: None,
         ..msg.clone()
     };
     assert!(
-        handle_linked_runtime_command(&mut ctx, &topic_only_msg, Some(&channel), &linked).await
+        handle_linked_runtime_command(
+            &mut ctx,
+            &topic_only_msg,
+            Some(&channel),
+            &linked,
+            Some("-200"),
+        )
+        .await
     );
     let sent = linked
         .provider_request_bodies("/bottoken/sendMessage")
