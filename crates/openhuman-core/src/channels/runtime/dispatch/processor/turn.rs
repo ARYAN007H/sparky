@@ -383,7 +383,7 @@ pub(crate) async fn process_channel_runtime_message(
             &host.config,
             &envelope,
             &canonical_session_key,
-            &enriched_message,
+            &channel_context,
         )
         .await
         {

@@ -35,7 +35,7 @@ pub(super) async fn resolve_typed_message(
     config: &crate::config::Config,
     envelope: &ChannelInboundEnvelope,
     thread_id: &str,
-    enriched_message: &str,
+    channel_context: &str,
 ) -> Result<Option<ResolvedNativeMessage>, String> {
     if !requires_typed_preparation(envelope) {
         return Ok(None);
@@ -174,14 +174,9 @@ pub(super) async fn resolve_typed_message(
         staged_parts.push(staged);
     }
 
-    let model_parts = parts
-        .iter()
-        .filter(|part| matches!(part, ContentPart::Image { .. } | ContentPart::File { .. }))
-        .cloned()
-        .collect::<Vec<_>>();
     let message = match crate::agent::message_convert::user_message_from_parts(
-        enriched_message,
-        &model_parts,
+        channel_context,
+        &parts,
     ) {
         Ok(message) => message,
         Err(error) => {
