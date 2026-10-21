@@ -25,6 +25,8 @@ fn get_thing(opened: &Opened, id: &'static str) -> Option<i64> {
 }
 
 #[test]
+// Persistence test: this pins the host's real default driver and on-disk
+// workspace layout, so it intentionally opens the SQLite backend.
 fn an_uninstalled_call_opens_the_default_for_its_workspace() {
     let dir = tempfile::tempdir().unwrap();
     let opened = open("things", dir.path()).unwrap();
@@ -41,6 +43,7 @@ fn an_uninstalled_call_opens_the_default_for_its_workspace() {
 }
 
 #[test]
+// Persistence test: separate workspace defaults must remain isolated on disk.
 fn workspaces_do_not_share_a_default() {
     let one = tempfile::tempdir().unwrap();
     let two = tempfile::tempdir().unwrap();
@@ -51,6 +54,8 @@ fn workspaces_do_not_share_a_default() {
 }
 
 #[test]
+// Persistence test: forgetting the process cache models a restart and must
+// reopen the same durable workspace data.
 fn forgetting_a_workspace_reopens_the_same_data() {
     let dir = tempfile::tempdir().unwrap();
     let first = open("things", dir.path()).unwrap();
