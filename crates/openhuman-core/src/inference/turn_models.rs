@@ -185,12 +185,14 @@ fn build_turn_models_crate(
                     .cloned(),
             });
             #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
-            let injected = injected.or_else(crate::inference::provider::factory::test_provider_override::current);
+            let injected = injected
+                .or_else(crate::inference::provider::factory::test_provider_override::current);
+            let is_injected = injected.is_some();
             let profile = model.profile().cloned().unwrap_or_default();
             let selected_model = profile.model.as_deref().filter(|value| !value.is_empty()).unwrap_or("unknown");
             let provider = profile.provider.as_deref().unwrap_or("unknown");
-            if let Some(injected) = injected {
-                crate::attachments::provider::wrap_injected(ctx, injected, Arc::new(config.clone()))
+            if is_injected {
+                crate::attachments::provider::wrap_injected(ctx, model, Arc::new(config.clone()))
             } else {
                 crate::attachments::provider::wrap(
                     ctx,
