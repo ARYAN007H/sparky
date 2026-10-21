@@ -65,6 +65,13 @@ impl StateKv {
     ///
     /// When the backend cannot be opened or the scope cannot be resolved.
     pub fn open(workspace_dir: &Path, owner: &'static str, ns: &'static str) -> Result<Self> {
+        // State-file adoption uses TSD's cross-process conditional writes.
+        // The ordinary unit-test fallback is the in-memory backend, which
+        // deliberately does not claim that capability; use the same durable
+        // SQLite default as production for this path when available.
+        #[cfg(all(test, feature = "storage-sqlite"))]
+        super::local::use_persistent_default_for_test(workspace_dir);
+
         let repo = Repo::current_for(workspace_dir, "storage::state_kv", collections)?;
         Ok(Self { repo, owner, ns })
     }
