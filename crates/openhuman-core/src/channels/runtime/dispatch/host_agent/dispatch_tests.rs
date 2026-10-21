@@ -525,7 +525,21 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
     assert_eq!(prepared.message.channel, "telegram");
 
     let _installed = InstalledResolver::new(resolver);
-    let mut turn = tokio::spawn(process_channel_message(ctx, message("slow native turn")));
+    let inbound_message = prepared.message.clone();
+    let mut turn = tokio::spawn(
+        crate::channels::runtime::dispatch::process_channel_runtime_message(
+            ctx,
+            crate::channels::runtime::dispatch::RuntimeChannelMessage {
+                message: inbound_message,
+                inbound_envelope: Some(prepared.envelope.clone()),
+                authenticated_relay: false,
+                prepared_inbound: Some(prepared),
+                imported_history: Vec::new(),
+                legacy_history: None,
+                progressive_target: None,
+            },
+        ),
+    );
     tokio::select! {
         result = &mut turn => panic!(
             "channel pipeline completed before a model request: result={result:?}, sent={:#?}, provider_requests={:#?}",
