@@ -18,14 +18,11 @@ pub struct SubagentScope {
     pub extended_policy: bool,
 }
 
-/// A shared `call_id → tool_name` map. The model adapter's `ThinkingForwarder`
-/// writes it when a tool call *starts* (the crate `ToolDelta` has no `tool_name`
-/// field, so the start-event/name half of the tool-arg contract can't ride the
-/// crate stream and stays on the out-of-band forwarder path — see
-/// [`crate::inference::provider::model::ThinkingForwarder`]). The bridge reads it to label the
-/// incremental tool-argument fragments it now projects off the crate stream
-/// (`MessageDelta.tool_call`), preserving the UI's `ToolCallArgsDelta`
-/// `tool_name` contract without the forwarder emitting those fragments itself.
+/// A shared `call_id → tool_name` map. The adapter writes it when a tool call
+/// *starts* because the crate's `ToolDelta` has no `tool_name` field. The
+/// bridge reads it to label incremental tool-argument fragments projected from
+/// the crate stream (`MessageDelta.tool_call`), preserving the UI's
+/// `ToolCallArgsDelta` `tool_name` contract.
 pub(crate) type ToolNameMap = Arc<Mutex<std::collections::HashMap<String, String>>>;
 
 /// Shared `call_id → (success, classified failure, elapsed_ms, output_chars,
