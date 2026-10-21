@@ -174,7 +174,7 @@ async fn process_channel_message_cancels_scoped_typing_task() {
             topic_id: None,
             id: "typing-msg".to_string(),
             sender: "alice".to_string(),
-            reply_target: "chat-typing".to_string(),
+            reply_target: "42".to_string(),
             content: "hello".to_string(),
             channel: "test-channel".to_string(),
             timestamp: 1,

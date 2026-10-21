@@ -78,6 +78,10 @@ async fn process_channel_message_executes_native_tool_calls() {
 #[tokio::test]
 async fn process_channel_message_handles_models_command_without_llm_call() {
     let _bus_guard = super::common::use_real_agent_handler().await;
+    let _module_storage = crate::channels::module_fixture::install_memory_storage();
+    let _module_client = crate::channels::module_fixture::client().await;
+    crate::core::bus::init().await.expect("bus init");
+    let _builtins = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let channel_impl = Arc::new(TestChannel::new("telegram"));
     let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
@@ -366,5 +370,9 @@ async fn process_channel_message_reports_configured_max_tool_iterations_limit() 
     let sent_messages = channel_impl.sent_messages.lock().await;
     assert_eq!(sent_messages.len(), 1);
     assert!(sent_messages[0].starts_with("chat-iter-fail:"));
-    assert!(sent_messages[0].contains("⚠️ Error: Agent exceeded maximum tool iterations (3)"));
+    assert!(
+        sent_messages[0].contains("maximum number of tool steps")
+            && sent_messages[0].contains("retry the same question in this thread"),
+        "the user-facing max-iteration copy should explain the cap and allow retrying: {sent_messages:?}"
+    );
 }
