@@ -132,10 +132,6 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         threads.to_string().contains("fixture-thread"),
         "thread owner did not read its historical profile record: {threads}"
     );
-    assert!(
-        flows.to_string().contains("fixture-flow"),
-        "flow owner did not read its historical profile record: {flows}"
-    );
 
     assert!(
         profile.join("storage.db").is_file(),
@@ -202,6 +198,13 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
                     "approval owner did not read the v1 database record"
                 );
                 assert_eq!(approvals[0].request_id, "fixture-approval");
+                let flows = openhuman_core::flows::ops::flows_list(&config)
+                    .await
+                    .unwrap();
+                assert!(
+                    serde_json::to_string(&flows.value).unwrap().contains("fixture-flow"),
+                    "flow owner did not read the v1 database record: {flows:?}"
+                );
                 },
             )
             .await;
