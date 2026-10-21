@@ -81,18 +81,27 @@ test("a moved line is not a new site, a new line is", () => {
   assert.equal(compare(grown, before).added.length, 1);
 });
 
-test("passes on a matching baseline and skips test files", () => {
+test("passes on a matching baseline and skips test files and test support helpers", () => {
   const files = {
     [`${SRC}/a.rs`]: "tokio::spawn(f);\n",
     [`${SRC}/a_tests.rs`]: "tokio::spawn(f);\n",
+    [`${SRC}/inference/provider/model_listing_test_support.rs`]: "tokio::spawn(f);\n",
+    [`${SRC}/inference/provider/catalog_listing.rs`]: "Config::load_or_init();\n",
     [`${SRC}/core/runtime/spawn.rs`]: "tokio::spawn(f);\n",
   };
   const first = run(files, null, ["--write-baseline"]);
   assert.equal(first.status, 0, first.out);
-  assert.equal(first.after.length, 1, "only the non-test, non-helper site");
+  assert.equal(first.after.length, 2, "only ordinary production sites are scanned");
+  assert.deepEqual(
+    first.after.map(({ path, rule }) => ({ path, rule })),
+    [
+      { path: `${SRC}/a.rs`, rule: "bare-spawn" },
+      { path: `${SRC}/inference/provider/catalog_listing.rs`, rule: "ambient-config" },
+    ],
+  );
   const again = run(files, first.after);
   assert.equal(again.status, 0, again.out);
-  assert.match(again.out, /ratchet holds \(1 /);
+  assert.match(again.out, /ratchet holds \(2 /);
 });
 
 test("fails on a new site and names the fix", () => {

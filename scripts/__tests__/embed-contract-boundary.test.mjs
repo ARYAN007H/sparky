@@ -96,3 +96,59 @@ test("Embed preserves native persisted codecs without admitting core facades", (
     assert.match(rejected.output, /openhuman-upstream-reexport/);
   }
 });
+
+test("a builder method named with_thread_id is not a task-local accessor", () => {
+  const result = check({
+    "crates/openhuman-tinyhumans/src/inference/managed_model.rs":
+      "let model = builder.with_thread_id(thread_id);\n",
+  });
+  assert.equal(result.status, 0, result.output);
+});
+
+test("task-local with_thread_id calls, imports, and declarations remain forbidden", () => {
+  for (const source of [
+    "let request = with_thread_id(request, thread_id);\n",
+    "use crate::turn_context::with_thread_id;\n",
+    "fn with_thread_id(request: Request) -> Request { request }\n",
+  ]) {
+    const result = check({ "crates/openhuman-core/src/example.rs": source });
+    assert.equal(result.status, 1, result.output);
+    assert.match(result.output, /openhuman-task-local/);
+  }
+});
+
+test("Embed preserves the exact native dispatch-budget and observer contracts", () => {
+  const budget = "pub use tinyagents_harness::cost::{\n" +
+    " ControlledDispatchError, DispatchModelOptions, DispatchRefusal, DispatchRefusalReason,\n" +
+    " PhysicalDispatchAdmission, PhysicalDispatchPermit,\n" +
+    "};\n";
+  const observer = "pub use tinyagents_harness::observability::{\n" +
+    " PhysicalDispatchMetadata, PhysicalDispatchObserver, PhysicalDispatchOutcome,\n" +
+    " PhysicalDispatchStatus, PhysicalDispatchTerminal, PhysicalDispatchUsage,\n" +
+    "};\n";
+  const allowed = check({
+    "crates/openhuman-embed/src/budget.rs": budget,
+    "crates/openhuman-embed/src/complete.rs": observer,
+  });
+  assert.equal(allowed.status, 0, allowed.output);
+
+  for (const files of [
+    {
+      "crates/openhuman-embed/src/budget.rs": budget.replace(
+        "PhysicalDispatchAdmission, PhysicalDispatchPermit,",
+        "PhysicalDispatchAdmission, PhysicalDispatchPermit, UnreviewedType,",
+      ),
+    },
+    {
+      "crates/openhuman-embed/src/complete.rs": observer.replace(
+        "PhysicalDispatchStatus, PhysicalDispatchTerminal, PhysicalDispatchUsage,",
+        "PhysicalDispatchStatus, PhysicalDispatchTerminal, PhysicalDispatchUsage, UnreviewedType,",
+      ),
+    },
+    { "crates/openhuman-core/src/agent/tinyagents/budget.rs": budget },
+  ]) {
+    const rejected = check(files);
+    assert.equal(rejected.status, 1, rejected.output);
+    assert.match(rejected.output, /openhuman-upstream-reexport/);
+  }
+});
