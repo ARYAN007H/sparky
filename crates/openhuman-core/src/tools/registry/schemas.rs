@@ -40,7 +40,7 @@ pub(crate) fn all_bound_controller_entries() -> Vec<ControllerEntry> {
         )),
         ControllerEntry::bound(BoundRegisteredController::typed(
             schemas("get"),
-            parse_get_reject_padded,
+            parse_get,
             run_get,
         )),
         ControllerEntry::bound(BoundRegisteredController::typed(
@@ -151,17 +151,6 @@ fn parse_list(_params: Map<String, Value>) -> Result<(), String> {
 
 fn parse_get(params: Map<String, Value>) -> Result<String, String> {
     required_tool_id(&params).map(str::to_owned)
-}
-
-fn parse_get_reject_padded(params: Map<String, Value>) -> Result<String, String> {
-    if params
-        .get("tool_id")
-        .and_then(Value::as_str)
-        .is_some_and(|tool_id| tool_id.trim() != tool_id)
-    {
-        return Err("padded IDs are rejected".to_string());
-    }
-    parse_get(params)
 }
 
 fn parse_diagnostics(_params: Map<String, Value>) -> Result<(), String> {
