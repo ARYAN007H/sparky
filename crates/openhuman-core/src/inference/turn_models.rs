@@ -130,6 +130,7 @@ fn build_turn_models_crate(
         primary_provider: primary_override,
         egress: &egress,
         thread_id,
+        attach_host_attachments: true,
     };
     let opts = tinyagents_harness::host::BuildOpts {
         native_tools: true,
@@ -184,51 +185,7 @@ fn build_turn_models_crate(
         .workload_requests(workload_requests)
         .summarization(role, Some(model.to_owned()))
         .summarization_opts(opts)
-        .build()?
-        .map_models(|purpose, model| {
-            let injected = ctx.host_overrides().and_then(|local| match purpose {
-                tinyagents_harness::host::ModelPurpose::Primary => local.model_for(role),
-                tinyagents_harness::host::ModelPurpose::Summarization => local
-                    .role_models
-                    .get("summarization")
-                    .cloned()
-                    .or_else(|| local.model_for(role)),
-                tinyagents_harness::host::ModelPurpose::WorkloadTier(route) => {
-                    let role = crate::inference::provider_model::role_for_provider_model_for(
-                        extensions,
-                        &provider_route,
-                        route,
-                    );
-                    local
-                        .role_models
-                        .get(route)
-                        .or_else(|| local.role_models.get(role))
-                        .cloned()
-                }
-            });
-            #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
-            let injected = injected
-                .or_else(crate::inference::provider::factory::test_provider_override::current);
-            let is_injected = injected.is_some();
-            let profile = model.profile().cloned().unwrap_or_default();
-            let selected_model = profile
-                .model
-                .as_deref()
-                .filter(|value| !value.is_empty())
-                .unwrap_or("unknown");
-            let provider = profile.provider.as_deref().unwrap_or("unknown");
-            if is_injected {
-                crate::attachments::provider::wrap_injected(ctx, model, Arc::new(config.clone()))
-            } else {
-                crate::attachments::provider::wrap(
-                    ctx,
-                    model,
-                    Arc::new(config.clone()),
-                    selected_model,
-                    provider,
-                )
-            }
-        });
+        .build()?;
     let mut registrations = built.registrations("primary").into_iter();
     let primary = registrations.next().expect("turn set contains a primary").1;
     let routes = registrations.collect();
@@ -631,6 +588,7 @@ impl TurnModelSource {
                 primary_provider: cn.primary_override.as_deref(),
                 egress: &egress,
                 thread_id,
+                attach_host_attachments: true,
             };
             let opts = tinyagents_harness::host::BuildOpts {
                 native_tools: true,
@@ -645,19 +603,8 @@ impl TurnModelSource {
                 opts,
             };
             tinyagents_harness::host::ModelBuildGate::check(&factory, &request)?;
-            let (model, route) = tinyagents_harness::host::ModelFactory::build(&factory, &request)?;
-            let provider = model
-                .profile()
-                .and_then(|profile| profile.provider.as_deref())
-                .unwrap_or("unknown")
-                .to_owned();
-            return Ok(crate::attachments::provider::wrap(
-                &ctx,
-                model,
-                cn.config.clone(),
-                &route.model,
-                &provider,
-            ));
+            let (model, _) = tinyagents_harness::host::ModelFactory::build(&factory, &request)?;
+            return Ok(model);
         }
         Err(anyhow::anyhow!("turn model source is missing a model"))
     }

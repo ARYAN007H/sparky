@@ -31,6 +31,7 @@ async fn turn_factory_checks_privacy_then_explicit_host_session_before_building_
         primary_provider: Some(PROVIDER_OPENHUMAN),
         egress: &egress,
         thread_id: None,
+        attach_host_attachments: false,
     };
 
     crate::core::runtime::CoreContext::scope(ambient_library, async {
