@@ -1,7 +1,7 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
-use tokio::sync::{oneshot, Notify};
+use tokio::sync::{Notify, oneshot};
 
 #[tokio::test]
 async fn canceled_waiter_closes_handle_returned_by_in_flight_typing_start() {

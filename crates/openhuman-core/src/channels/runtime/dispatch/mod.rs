@@ -17,14 +17,14 @@ mod processor;
 mod routing;
 
 pub(crate) use processor::progressive::{
-    delivery_succeeded, hosted_relay_target, NativeProgressiveTarget,
+    NativeProgressiveTarget, delivery_succeeded, hosted_relay_target,
 };
 
 #[cfg(test)]
 pub(crate) use processor::process_channel_message;
 pub(crate) use processor::{
-    process_channel_runtime_message, reset_durable_channel_session, run_message_dispatch_loop,
-    RuntimeChannelMessage,
+    RuntimeChannelMessage, process_channel_runtime_message, reset_durable_channel_session,
+    run_message_dispatch_loop,
 };
 
 // `channel_has_approval_surface` stays pub(crate) on processor; re-export so
@@ -40,7 +40,7 @@ pub(crate) use helpers::build_channel_context_block;
 use helpers::select_acknowledgment_reaction;
 
 #[cfg(test)]
-use routing::{build_visible_tool_set, AgentScoping};
+use routing::{AgentScoping, build_visible_tool_set};
 
 #[cfg(any(test, debug_assertions))]
 use tinychannels_bus as traits;
