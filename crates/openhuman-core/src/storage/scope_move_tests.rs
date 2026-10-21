@@ -3,6 +3,8 @@ use super::*;
 use crate::storage::Precondition;
 #[cfg(feature = "legacy-import")]
 use serde_json::json;
+#[cfg(feature = "legacy-import")]
+use std::io::Read;
 use tinystoragedrivers_testkit::MemoryBackend;
 use tinystoragedrivers_types::Meta;
 
@@ -254,7 +256,7 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     .unwrap();
 
     let source_db = legacy::v1_db(&target);
-    let before = sha256(&source_db);
+    let before = hash_file(&source_db);
     let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
     let first = crate::storage::import::run_all(&backend, &config);
     let moved = first
@@ -312,7 +314,16 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     })
     .unwrap();
     assert!(after.is_empty());
-    assert_eq!(sha256(&source_db), before);
+    assert_eq!(hash_file(&source_db), before);
+}
+
+#[cfg(feature = "legacy-import")]
+fn hash_file(path: &Path) -> Vec<u8> {
+    let mut file = std::fs::File::open(path).unwrap();
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).unwrap();
+    use sha2::Digest;
+    sha2::Sha256::digest(bytes).to_vec()
 }
 
 #[tokio::test]
