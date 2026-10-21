@@ -353,20 +353,6 @@ pub enum DomainEvent {
         /// `workspace_dir` does not match their own workspace binding.
         workspace_dir: std::path::PathBuf,
     },
-    /// A reaction event was received from a channel transport.
-    ChannelReactionReceived {
-        channel: String,
-        sender: String,
-        target_message_id: String,
-        emoji: String,
-    },
-    /// A reaction update was sent to a channel transport.
-    ChannelReactionSent {
-        channel: String,
-        target_message_id: String,
-        emoji: String,
-        success: bool,
-    },
     /// A channel connected successfully.
     ChannelConnected { channel: String },
     /// A channel disconnected.
@@ -1379,8 +1365,6 @@ impl DomainEvent {
             Self::ChannelInboundMessage { .. }
             | Self::ChannelMessageReceived { .. }
             | Self::ChannelMessageProcessed { .. }
-            | Self::ChannelReactionReceived { .. }
-            | Self::ChannelReactionSent { .. }
             | Self::ChannelConnected { .. }
             | Self::ChannelDisconnected { .. } => "channel",
 
@@ -1512,8 +1496,6 @@ impl DomainEvent {
             Self::ChannelInboundMessage { .. } => "ChannelInboundMessage",
             Self::ChannelMessageReceived { .. } => "ChannelMessageReceived",
             Self::ChannelMessageProcessed { .. } => "ChannelMessageProcessed",
-            Self::ChannelReactionReceived { .. } => "ChannelReactionReceived",
-            Self::ChannelReactionSent { .. } => "ChannelReactionSent",
             Self::ChannelConnected { .. } => "ChannelConnected",
             Self::ChannelDisconnected { .. } => "ChannelDisconnected",
             Self::CronJobTriggered { .. } => "CronJobTriggered",
