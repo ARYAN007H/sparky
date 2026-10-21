@@ -25,7 +25,7 @@ pub(crate) struct TurnModels {
     pub(crate) error_slot: tinyinference_llm::model::ModelErrorSlot,
     /// Native owner set retained so its route and primary error slots are
     /// applied after host decorators such as the turn budget.
-    native_model_set: Option<tinyagents_harness::host::TurnModelSet<()>>,
+    pub(crate) native_model_set: Option<tinyagents_harness::host::TurnModelSet<()>>,
     /// Provider telemetry id (`{provider_id}.{model}` in Langfuse), captured from
     /// the source `Provider` at build time. Carried here (issue #4249, Phase 3 /
     /// Motion A) so the harness turn path no longer reads it off a raw
