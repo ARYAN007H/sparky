@@ -1,3 +1,5 @@
+#![cfg(feature = "storage-sqlite")]
+
 //! Model-based tests: random acquire / renew / release / clock / crash runs
 //! across 2–4 nodes on one `MemoryStorage`, checked step by step against a
 //! small reference model of the lease rules, plus the safety invariants:
@@ -7,8 +9,6 @@
 //! - a crashed holder's lease is taken by another node only after it
 //!   expires, and the taker sees `previous_unclean`;
 //! - a renew (or release) after the record moved on is always `Lost`.
-
-#![cfg(feature = "storage-sqlite")]
 
 use super::*;
 
