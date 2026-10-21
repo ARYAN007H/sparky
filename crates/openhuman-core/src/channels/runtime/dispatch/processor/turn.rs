@@ -22,6 +22,24 @@ use super::super::host_agent::{self, HostRoute};
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 use super::RuntimeChannelMessage;
 
+fn inbound_console_preview(
+    envelope: &tinychannels_bus::ChannelInboundEnvelope,
+    text: &str,
+) -> String {
+    let contains_audio = envelope.parts.iter().any(|part| {
+        matches!(
+            part,
+            tinychannels_bus::ContentPart::VoiceNote { .. }
+                | tinychannels_bus::ContentPart::Audio { .. }
+        )
+    });
+    if contains_audio {
+        "[voice message]".to_owned()
+    } else {
+        truncate_with_ellipsis(text, 80)
+    }
+}
+
 pub(crate) async fn process_channel_runtime_message(
     ctx: Arc<ChannelRuntimeContext>,
     runtime_msg: RuntimeChannelMessage,
@@ -58,6 +76,7 @@ pub(crate) async fn process_channel_runtime_message(
                 PrepareChannelInboundRequest {
                     source,
                     namespace: "main".into(),
+                    preparation_mode: Default::default(),
                     session_policy: Default::default(),
                 },
             )
@@ -75,13 +94,27 @@ pub(crate) async fn process_channel_runtime_message(
     let history_key = prepared.history_key;
     let canonical_session_key = prepared.session_key.clone();
     let mut envelope = prepared.envelope;
+    tracing::debug!(
+        provider_matches_account = envelope
+            .channel
+            .account_id
+            .as_deref()
+            .is_some_and(|account| tinychannels_bus::provider_id(account) == envelope.channel.id),
+        account_present = envelope
+            .channel
+            .account_id
+            .as_deref()
+            .is_some_and(|account| !account.trim().is_empty()),
+        conversation_present = !envelope.conversation.id.trim().is_empty(),
+        message_present = !envelope.message_id.trim().is_empty(),
+        "prepared inbound scope for native channel turn"
+    );
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
     let remote_reset_scope = tinychannels_bus::module_remote::RemoteSessionScope {
         channel: envelope.channel.clone(),
         conversation: envelope.conversation.clone(),
         session_key: canonical_session_key.clone(),
     };
-    crate::channels::host::voice::record_inbound_envelope(&envelope);
     let native_target = if let Some(target) = progressive_target {
         Some(target)
     } else {
@@ -107,7 +140,7 @@ pub(crate) async fn process_channel_runtime_message(
         "  💬 [{}] from {}: {}",
         msg.channel,
         msg.sender,
-        truncate_with_ellipsis(&msg.content, 80)
+        inbound_console_preview(&envelope, &msg.content)
     );
 
     BUS.publish(DomainEvent::ChannelMessageReceived {
@@ -388,6 +421,7 @@ pub(crate) async fn process_channel_runtime_message(
     let execution = match selected_host {
         Some(host) => {
             let request_id = format!("{}:{}:{}", msg.channel, msg.id, uuid::Uuid::new_v4());
+            crate::channels::host::voice::record_inbound_envelope(&envelope, &tenant, &request_id);
             let trusted = Arc::new(crate::agent::turn_host::TrustedAgentTurn {
                 host_agent: host,
                 channel: msg.channel.clone(),
@@ -618,3 +652,7 @@ pub(crate) async fn process_channel_runtime_message(
         workspace_dir: ctx.workspace_dir.as_ref().clone(),
     });
 }
+
+#[cfg(test)]
+#[path = "turn_tests.rs"]
+mod tests;

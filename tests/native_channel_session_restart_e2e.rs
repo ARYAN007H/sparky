@@ -16,6 +16,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use axum::body::Bytes;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -40,6 +41,11 @@ struct MockState {
     update_offsets: Mutex<Vec<i64>>,
     completions: Mutex<Vec<Value>>,
     sent_messages: Mutex<Vec<Value>>,
+    transcription_uploads: Mutex<Vec<Vec<u8>>>,
+    voice_file_requests: Mutex<Vec<String>>,
+    voice_download_requests: Mutex<usize>,
+    speech_requests: Mutex<Vec<String>>,
+    sent_voice_uploads: Mutex<Vec<Vec<u8>>>,
 }
 
 struct MockServers {
@@ -62,12 +68,20 @@ async fn start_mock_servers() -> MockServers {
         .route("/botsession-restart-token/sendChatAction", post(ok))
         .route("/botsession-restart-token/deleteWebhook", post(ok))
         .route("/botsession-restart-token/getMe", get(get_me))
+        .route("/botsession-restart-token/getFile", post(get_voice_file))
+        .route(
+            "/file/botsession-restart-token/voice/input.oga",
+            get(download_voice_file),
+        )
+        .route("/botsession-restart-token/sendVoice", post(send_voice))
         .with_state(Arc::clone(&state));
     let inference_app = Router::new()
         .route("/v1/chat/completions", post(chat_completion))
         .route("/v1/models", get(models))
         .route("/auth/me", get(auth_me))
         .route("/settings", get(auth_me))
+        .route("/openai/v1/audio/transcriptions", post(transcribe_voice))
+        .route("/openai/v1/audio/speech", post(synthesize_voice))
         .with_state(Arc::clone(&state));
     let (telegram, telegram_task) = serve(telegram_app).await;
     let (inference, inference_task) = serve(inference_app).await;
@@ -144,6 +158,70 @@ async fn get_me() -> Json<Value> {
     Json(json!({ "ok": true, "result": { "id": 9, "is_bot": true, "username": "test_bot" } }))
 }
 
+async fn get_voice_file(
+    State(state): State<Arc<MockState>>,
+    Json(body): Json<Value>,
+) -> Json<Value> {
+    state
+        .voice_file_requests
+        .lock()
+        .expect("voice file requests")
+        .push(
+            body.get("file_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned(),
+        );
+    Json(json!({ "ok": true, "result": { "file_path": "voice/input.oga", "file_size": 2575 } }))
+}
+
+async fn download_voice_file(State(state): State<Arc<MockState>>) -> impl IntoResponse {
+    *state
+        .voice_download_requests
+        .lock()
+        .expect("voice download requests") += 1;
+    (
+        [(axum::http::header::CONTENT_TYPE, "audio/ogg")],
+        include_bytes!("../vendor/tinychannels/src/providers/telegram/fixtures/sine-ogg-opus.ogg")
+            .as_slice(),
+    )
+}
+
+async fn send_voice(State(state): State<Arc<MockState>>, body: Bytes) -> Json<Value> {
+    state
+        .sent_voice_uploads
+        .lock()
+        .expect("voice uploads")
+        .push(body.to_vec());
+    Json(json!({ "ok": true, "result": { "message_id": 700, "chat": { "id": 42 } } }))
+}
+
+async fn transcribe_voice(State(state): State<Arc<MockState>>, body: Bytes) -> Json<Value> {
+    state
+        .transcription_uploads
+        .lock()
+        .expect("STT uploads")
+        .push(body.to_vec());
+    Json(json!({ "text": "the dictated voice request" }))
+}
+
+async fn synthesize_voice(
+    State(state): State<Arc<MockState>>,
+    Json(body): Json<Value>,
+) -> Json<Value> {
+    state.speech_requests.lock().expect("TTS requests").push(
+        body.get("text")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
+    );
+    let audio = base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        include_bytes!("../vendor/tinyvoice/crates/tinyvoice/tests/fixtures/voice-envelope.wav"),
+    );
+    Json(json!({ "audio_base64": audio, "audio_mime": "audio/wav" }))
+}
+
 async fn chat_completion(State(state): State<Arc<MockState>>, Json(body): Json<Value>) -> Response {
     let index = {
         let mut completions = state.completions.lock().expect("model requests");
@@ -195,6 +273,19 @@ fn message_update_for(update_id: i64, message_id: i64, chat_id: i64, text: &str)
     })
 }
 
+fn voice_update(update_id: i64, message_id: i64) -> Value {
+    json!({
+        "update_id": update_id,
+        "message": {
+            "message_id": message_id,
+            "date": 1_800_000_000,
+            "from": { "id": 42, "is_bot": false, "first_name": "Ada" },
+            "chat": { "id": 42, "type": "private", "first_name": "Ada" },
+            "voice": { "file_id": "fixture-voice-file", "file_unique_id": "fixture-voice", "duration": 1, "mime_type": "audio/ogg" }
+        }
+    })
+}
+
 fn push_update(state: &MockState, update_id: i64, message_id: i64, text: &str) {
     state
         .updates
@@ -237,6 +328,9 @@ enabled = false
 bot_token = "{BOT_TOKEN}"
 allowed_users = ["42", "43"]
 mention_only = false
+
+[channel_voice]
+reply_mode = "mirror"
 
 [[cloud_providers]]
 id = "p_session_restart"
@@ -296,6 +390,7 @@ fn start_core(
     inference: &str,
     module_source_dir: &Path,
     log_path: &Path,
+    voice_enabled: bool,
 ) -> (CoreProcess, String) {
     let port = std::net::TcpListener::bind("127.0.0.1:0")
         .expect("reserve core port")
@@ -348,6 +443,7 @@ fn start_core(
             ]
             .map(|name| (format!("OPENHUMAN_COMPONENT_{name}"), "0")),
         )
+        .env("OPENHUMAN_COMPONENT_VOICE", if voice_enabled { "1" } else { "0" })
         .stdout(Stdio::from(stdout))
         .stderr(Stdio::from(stderr))
         .spawn()
@@ -373,18 +469,25 @@ async fn wait_until(label: &str, mut condition: impl FnMut() -> bool) {
 async fn wait_for_new_session_reply(state: &MockState) {
     let deadline = Instant::now() + Duration::from_secs(45);
     loop {
-        let sent = state.sent_messages.lock().expect("Telegram sent messages");
-        if sent.iter().any(|body| {
-            body["text"]
-                .as_str()
-                .is_some_and(|text| text.contains("Started new session"))
-        }) {
+        let (has_reply, sent_snapshot) = {
+            let sent = state.sent_messages.lock().expect("Telegram sent messages");
+            (
+                sent.iter().any(|body| {
+                    body["text"]
+                        .as_str()
+                        .is_some_and(|text| text.contains("Started new session"))
+                }),
+                sent.clone(),
+            )
+        };
+        if has_reply {
             return;
         }
         if Instant::now() >= deadline {
-            panic!("timed out waiting for Telegram /new reply; outbound bodies: {sent:#?}");
+            panic!(
+                "timed out waiting for Telegram /new reply; outbound bodies: {sent_snapshot:#?}"
+            );
         }
-        drop(sent);
         sleep(Duration::from_millis(50)).await;
     }
 }
@@ -508,6 +611,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         &mocks.inference,
         &module_source_dir,
         &logs.join("first.log"),
+        false,
     );
     wait_healthy(&first_rpc, &mut first, &logs.join("first.log")).await;
     let first_pid = first.child.id();
@@ -597,6 +701,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         &mocks.inference,
         &module_source_dir,
         &logs.join("second.log"),
+        false,
     );
     assert_ne!(
         first_pid,
@@ -646,4 +751,144 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
     assert!(!model_saw_user_text(other_chat_request, AFTER_RESET_TEXT));
     wait_for_completion(&mocks.state, 5).await;
     second.stop();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[cfg(feature = "voice")]
+async fn telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_modules() {
+    let tmp = tempfile::tempdir().expect("temporary core home");
+    let home = std::fs::canonicalize(tmp.path()).expect("canonicalize temporary home");
+    let workspace = home.join("workspace");
+    let logs = home.join("logs");
+    std::fs::create_dir_all(&logs).expect("create logs");
+    let module_source_dir = std::env::var_os("OPENHUMAN_TEST_MODULE_SOURCE_DIR")
+        .map(std::path::PathBuf::from)
+        .expect("build TinyChannels and TinyVoice and set OPENHUMAN_TEST_MODULE_SOURCE_DIR");
+    for module in ["tinychannels", "tinyvoice"] {
+        assert!(
+            module_source_dir
+                .join(module)
+                .join("modules.toml")
+                .is_file(),
+            "compiled {module} descriptor missing from {}",
+            module_source_dir.display()
+        );
+    }
+
+    let mocks = start_mock_servers().await;
+    write_config(&home, &workspace, &mocks.inference);
+    let (mut core, rpc) = start_core(
+        &home,
+        &workspace,
+        &mocks.telegram,
+        &mocks.inference,
+        &module_source_dir,
+        &logs.join("voice.log"),
+        true,
+    );
+    wait_healthy(&rpc, &mut core, &logs.join("voice.log")).await;
+    mocks
+        .state
+        .updates
+        .lock()
+        .expect("Telegram updates")
+        .push_back(voice_update(200, 20));
+
+    wait_until("voice note reaches inference", || {
+        !mocks
+            .state
+            .completions
+            .lock()
+            .expect("model requests")
+            .is_empty()
+    })
+    .await;
+
+    let requests = mocks
+        .state
+        .completions
+        .lock()
+        .expect("model requests")
+        .clone();
+    assert_eq!(
+        requests.len(),
+        1,
+        "one inbound voice update produces one agent turn"
+    );
+    assert!(
+        model_saw_user_text(&requests[0], "the dictated voice request"),
+        "the model receives the transcript produced by the scoped cloud STT callback; file requests={:?}, downloads={}, transcription uploads={}",
+        mocks.state.voice_file_requests.lock().expect("voice file requests"),
+        mocks.state.voice_download_requests.lock().expect("voice download requests"),
+        mocks.state.transcription_uploads.lock().expect("STT uploads").len()
+    );
+    assert_eq!(
+        mocks
+            .state
+            .transcription_uploads
+            .lock()
+            .expect("STT uploads")
+            .len(),
+        1,
+        "Telegram voice media is downloaded and transcribed once"
+    );
+    assert!(
+        mocks
+            .state
+            .transcription_uploads
+            .lock()
+            .expect("STT uploads")[0]
+            .windows(4)
+            .any(|window| window == b"OggS"),
+        "the cloud STT mock receives the downloaded audio multipart payload"
+    );
+    assert_eq!(
+        mocks
+            .state
+            .voice_file_requests
+            .lock()
+            .expect("voice file requests")
+            .as_slice(),
+        &["fixture-voice-file"],
+        "the real Telegram voice file ID is resolved before scoped transcription"
+    );
+    wait_until("mirror reply reaches Telegram sendVoice", || {
+        !mocks
+            .state
+            .sent_voice_uploads
+            .lock()
+            .expect("voice uploads")
+            .is_empty()
+    })
+    .await;
+    assert_eq!(
+        mocks
+            .state
+            .speech_requests
+            .lock()
+            .expect("TTS requests")
+            .as_slice(),
+        &["mock reply 1"]
+    );
+    assert!(
+        mocks
+            .state
+            .sent_voice_uploads
+            .lock()
+            .expect("voice uploads")[0]
+            .windows(4)
+            .any(|window| window == b"OggS"),
+        "TinyVoice converts the WAV TTS response to Ogg before Telegram sendVoice"
+    );
+    let voice_log = std::fs::read_to_string(logs.join("voice.log"))
+        .expect("read captured core log after voice delivery");
+    assert!(
+        voice_log.contains("[voice message]"),
+        "captured core log should retain the content-free voice preview"
+    );
+    assert!(
+        !voice_log.contains("the dictated voice request"),
+        "voice transcripts must not be written to the core log"
+    );
+    core.stop();
 }
