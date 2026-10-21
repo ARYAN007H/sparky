@@ -53,6 +53,7 @@ fn workspaces_do_not_share_a_default() {
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 // Persistence test: forgetting the process cache models a restart and must
 // reopen the same durable workspace data.
 fn forgetting_a_workspace_reopens_the_same_data() {

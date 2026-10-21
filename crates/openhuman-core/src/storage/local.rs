@@ -53,11 +53,11 @@ type WorkspaceBackend = Arc<tokio::sync::OnceCell<Arc<dyn StorageBackend>>>;
 static WORKSPACES: LazyLock<Mutex<HashMap<PathBuf, WorkspaceBackend>>> =
     LazyLock::new(Mutex::default);
 
-#[cfg(test)]
+#[cfg(all(test, feature = "storage-sqlite"))]
 static TEST_WORKSPACE_URLS: LazyLock<Mutex<HashMap<PathBuf, String>>> =
     LazyLock::new(Mutex::default);
 
-#[cfg(test)]
+#[cfg(all(test, feature = "storage-sqlite"))]
 pub(super) fn use_persistent_default_for_test(workspace_dir: &Path) {
     TEST_WORKSPACE_URLS
         .lock()
@@ -135,7 +135,7 @@ async fn open_default_backend(workspace_dir: PathBuf) -> Result<Arc<dyn StorageB
     #[cfg(test)]
     await_test_backend_open_gate().await;
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "storage-sqlite"))]
     {
         let persistent_url = TEST_WORKSPACE_URLS
             .lock()
@@ -153,7 +153,10 @@ async fn open_default_backend(workspace_dir: PathBuf) -> Result<Arc<dyn StorageB
                 format!("open the default storage for {}", workspace_dir.display())
             });
         }
+    }
 
+    #[cfg(test)]
+    {
         let backend: Arc<dyn StorageBackend> =
             Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
         super::boot::prepare_and_migrate(&backend).await?;
