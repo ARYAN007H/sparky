@@ -447,6 +447,7 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
     std::env::set_var("HOME", workspace);
     std::env::set_var("USERPROFILE", workspace);
     std::env::set_var("OPENHUMAN_WORKSPACE", workspace);
+    std::env::set_var("OPENHUMAN_MODULE_SOURCE", "linked");
     let fixture = desktop_workspace(workspace);
     let before = tree(workspace);
     assert!(
