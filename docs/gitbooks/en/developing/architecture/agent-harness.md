@@ -93,7 +93,7 @@ Some settings remain runtime-wide for every agent (the live autonomy policy's
 config sub-agents re-read); the crate README lists them under "Still
 runtime-wide".
 
-Every agent turn runs through the published [`tinyagents`](https://crates.io/crates/tinyagents) harness. There are three entry points: `Agent::turn`, the channel and CLI bus path, and `run_subagent`. All of them go through the adapter seam in [`crates/openhuman-core/src/agent/tinyagents/`](https://github.com/tinyhumansai/openhuman/tree/main/crates/openhuman-core/src/agent/tinyagents) (`TurnSpec::run`). Context trimming is `MessageTrimMiddleware`, and cancellation is the tinyagents steering channel. Policy stop hooks (budget, thread-goal and iteration caps) use the upstream `tinyagents-hooks` `StopHookMiddleware` and pause the run on the first stop vote. The channel route forwards live `AgentProgress` like the chat route. The shared `TurnProgress` seam lives in `agent/session_host/tool_progress.rs`.
+Every agent turn runs through the published [`tinyagents`](https://crates.io/crates/tinyagents) harness. Entry points include `Agent::turn`, the channel and CLI bus path, detached async sub-agent dispatch, and direct triage turns through `agent_chat_for`. They converge on the adapter seam in [`crates/openhuman-core/src/agent/tinyagents/`](https://github.com/tinyhumansai/openhuman/tree/main/crates/openhuman-core/src/agent/tinyagents) (`TurnSpec::run`). Context trimming is `MessageTrimMiddleware`, and cancellation is the tinyagents steering channel. Policy stop hooks (budget, thread-goal and iteration caps) use the upstream `tinyagents-hooks` `StopHookMiddleware` and pause the run on the first stop vote. The channel route forwards live `AgentProgress` like the chat route. The shared `TurnProgress` seam lives in `agent/session_host/tool_progress.rs`.
 
 Concurrent work uses separate async sub-agent requests. Detached sub-agent
 tasks retain host policy, progress, and product projections; TinyAgents owns
@@ -474,7 +474,7 @@ Why the rules.
 Enforcement. Two layers:
 
 1. Loader-time (static). `tinyagents_definition::DefinitionSet::validate_tier_hierarchy` runs over the merged registry (built-ins + workspace TOMLs) and refuses to boot a registry that lists a same-tier or worker-with-subagents entry. Built-in archetypes are checked during loading; user-shipped TOMLs are checked at workspace load.
-2. Runtime depth gate (dynamic). Independent of tier, the sub-agent runner caps total spawn chain depth at `MAX_SPAWN_DEPTH = 3` via a task-local counter incremented across `run_subagent`, surfaced as a `SpawnDepthExceeded` agent error. This makes a user-shipped TOML that drops the tier annotation still unable to recurse past three hops.
+2. Runtime depth gate (dynamic). Independent of tier, child execution caps total spawn chain depth at `MAX_SPAWN_DEPTH = 3` via a task-local counter, surfaced as a `SpawnDepthExceeded` agent error. This makes a user-shipped TOML that drops the tier annotation still unable to recurse past three hops.
 
 > Status: the loader-time tier check, `agent_tier` field, and runtime depth-counter task-local are live. Depth is bounded by both the static loader contract and the runtime `MAX_SPAWN_DEPTH = 3` guard.
 

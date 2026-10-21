@@ -1,4 +1,5 @@
 use super::*;
+use crate::agent::subagent_host::{spawn_async_via_driver_tool_with_jobs, SubagentRunStatus};
 
 #[tokio::test]
 async fn prepared_subagent_runs_through_driver_jobs_dispatcher() {
@@ -16,14 +17,31 @@ async fn prepared_subagent_runs_through_driver_jobs_dispatcher() {
             .with_thread("driver-spawn-thread"),
     );
 
-    let (outcome, job_id) = run_subagent_via_driver_tool(
+    let jobs = tinyagents_harness_tools::subagents::SubAgentJobRegistry::new();
+    let (completed_tx, completed_rx) = tokio::sync::oneshot::channel();
+    let completed_tx = Arc::new(std::sync::Mutex::new(Some(completed_tx)));
+    let task_id = spawn_async_via_driver_tool_with_jobs(
         &parent,
         make_def_named_tools(&[]),
         "return the requested result".into(),
         options,
+        jobs.clone(),
+        move |_target, result, effects| {
+            let completed_tx = Arc::clone(&completed_tx);
+            Box::pin(async move {
+                if let Some(sender) = completed_tx.lock().unwrap().take() {
+                    let _ = sender.send((result, effects));
+                }
+            })
+        },
     )
     .await
-    .expect("driver-backed spawn should complete");
+    .expect("detached driver spawn should register");
+    let (outcome, _effects) = tokio::time::timeout(std::time::Duration::from_secs(5), completed_rx)
+        .await
+        .expect("detached driver should complete")
+        .expect("completion callback sends the host result");
+    let outcome = outcome.expect("driver-backed child should complete");
 
     assert!(matches!(outcome.status, SubagentRunStatus::Completed));
     assert_eq!(outcome.output, "driver result");
@@ -32,10 +50,7 @@ async fn prepared_subagent_runs_through_driver_jobs_dispatcher() {
         "host must retain generated task ID"
     );
     assert_eq!(provider.captured.lock().len(), 1, "child provider must run");
-    let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
-    >(&parent.data.dispatch_ctx());
-    let job = jobs.get(&job_id).expect("driver tool registered the job");
+    let job = jobs.get(&task_id).expect("driver tool registered the job");
     assert_eq!(job.agent, "test");
     assert_eq!(
         job.status,
@@ -501,15 +516,33 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     sibling_options.run_context = parent.data.clone();
     let mut sibling = make_def_named_tools(&[]);
     sibling.id = "live-sibling".into();
-    let sibling = run_subagent_via_driver_tool(
+    let (sibling_tx, sibling_rx) = tokio::sync::oneshot::channel();
+    let sibling_tx = Arc::new(std::sync::Mutex::new(Some(sibling_tx)));
+    spawn_async_via_driver_tool_with_jobs(
         &parent,
         sibling,
         "complete independently".into(),
         sibling_options,
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry::new(),
+        move |_target, result, effects| {
+            let sibling_tx = Arc::clone(&sibling_tx);
+            Box::pin(async move {
+                if let Some(sender) = sibling_tx.lock().unwrap().take() {
+                    let _ = sender.send((result, effects));
+                }
+            })
+        },
     )
     .await
     .expect("sibling driver remains usable");
-    assert!(matches!(sibling.0.status, SubagentRunStatus::Completed));
+    let (sibling, _effects) = tokio::time::timeout(std::time::Duration::from_secs(5), sibling_rx)
+        .await
+        .expect("sibling driver should complete")
+        .expect("sibling completion callback sends the result");
+    assert!(matches!(
+        sibling.expect("sibling child completes").status,
+        SubagentRunStatus::Completed
+    ));
     assert_eq!(provider.captured.lock().len(), 2);
 }
 
@@ -534,11 +567,13 @@ async fn stopped_parent_thread_rejects_a_new_driver_spawn_before_execution() {
         "stopped-driver-thread",
     );
 
-    let result = run_subagent_via_driver_tool(
+    let result = spawn_async_via_driver_tool_with_jobs(
         &parent,
         make_def_named_tools(&[]),
         "return the requested result".into(),
         options,
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry::new(),
+        |_target, _result, _effects| Box::pin(async {}),
     )
     .await;
 

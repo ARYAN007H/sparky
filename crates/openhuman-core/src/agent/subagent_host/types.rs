@@ -89,8 +89,8 @@ pub enum SubagentRunStatus {
     /// The sub-agent completed normally with a final response.
     Completed,
     /// The sub-agent called `ask_user_clarification` and is waiting
-    /// for the orchestrator to relay the user's answer via
-    /// `continue_subagent`.
+    /// for the orchestrator to relay the user's answer via a same-key async
+    /// spawn.
     AwaitingUser {
         question: String,
         options: Option<Vec<String>>,
@@ -102,8 +102,8 @@ pub enum SubagentRunStatus {
         /// failure in the runner was logged at `warn` and then reported as an
         /// ordinary `AwaitingUser` anyway. The orchestrator relayed a question
         /// and a `task_id`, and the failure only surfaced much later, when the
-        /// user had already answered and `continue_subagent` found nothing on
-        /// disk. Carrying the outcome here is what makes a failed write
+        /// user had already answered and the next spawn found nothing on disk.
+        /// Carrying the outcome here is what makes a failed write
         /// visible at pause time rather than at resume time (#5928).
         ///
         /// `None` does not mean resumption is impossible: a sub-agent with a

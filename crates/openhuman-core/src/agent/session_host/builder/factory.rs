@@ -141,6 +141,22 @@ impl OpenHumanSessionHost {
         host: Option<&super::HostTools>,
         session_id: Option<&str>,
     ) -> Result<Self> {
+        Self::build_session_agent_inner_with_turn_model_source(
+            ctx, config, agent_id, target_def, host_only, host, session_id, None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn build_session_agent_inner_with_turn_model_source(
+        ctx: &DispatchCtx,
+        config: &Config,
+        agent_id: &str,
+        target_def: Option<&crate::agent_registry::host_definition::AgentDefinition>,
+        host_only: bool,
+        host: Option<&super::HostTools>,
+        session_id: Option<&str>,
+        turn_model_source: Option<(crate::agent::tinyagents::TurnModelSource, String)>,
+    ) -> Result<Self> {
         let workspace_descriptor: Option<tinytools::WorkspaceDescriptor> = None;
 
         let runtime: Arc<dyn host_runtime::RuntimeAdapter> = Arc::from(
@@ -211,78 +227,14 @@ impl OpenHumanSessionHost {
             crate::tools::filter_tools_by_user_preference(&mut tools, &enabled_tools);
         }
 
-        // Route the main agent's chat through the unified per-workload
-        // factory so the user's "Reasoning" routing in the AI settings
-        // panel (e.g. `reasoning_provider = "anthropic:claude-..."`)
-        // actually takes effect. The factory returns a (Provider, model)
-        // tuple — the resolved model wins over the legacy `default_model`
-        // fallback so explicit picks like `anthropic:claude-sonnet-4-5`
-        // actually use claude-sonnet-4-5 end to end (sending the abstract
-        // "hint:reasoning" tier name to Anthropic would 404).
-        //
-        // When `reasoning_provider` is unset or `"cloud"`, the factory
-        // resolves to the primary cloud (OpenHuman by default), so the
-        // baseline behaviour is identical to the legacy
-        // `create_intelligent_routing_provider` path.
-        //
-        // The ReliableProvider retry/backoff + model-fallback wrapper is
-        // re-layered on top of the factory's resolved backend below (issue
-        // #4249, 1c). `model_routes` translation and intelligent local/cloud
-        // task hinting now live in the unified routing layer (router.rs) rather
-        // than a per-session wrapper, so they are not re-wrapped here.
-        // The Master OpenHumanSessionHost's definition selects the coding workload so the
-        // default user-facing turn has a model suitable for the direct
-        // inspect → edit → verify loop. Legacy/no-definition callers retain
-        // the configured chat default. Other specialised roles still select
-        // their model in the sub-agent runner.
-        // Only the explicit `hint:<role>` form routes to a specialised
-        // workload — legacy tier literals like `hint:reasoning` (which the
-        // bootstrap historically pinned as `default_model` for everyone)
-        // fall through to `chat`. This preserves `config.chat_provider` for
-        // legacy callers. A built-in Master OpenHumanSessionHost has an explicit
-        // `hint:coding`, while existing pre-registry callers continue using
-        // `config.default_model` unchanged.
-        let provider_role =
-            provider_role_for_definition(config.default_model.as_deref(), target_def);
-        // Retry/backoff is now owned by the crate `RetryPolicy` at the harness
-        // model call (issue #4249, Phase 3a) — see `tinyagents::run_policy_for`.
-        // The turn path therefore no longer wraps the resolved provider in
-        // `ReliableProvider`; wrapping it here plus the crate retry would
-        // double-retry every transient error. Cross-route fallback is likewise
-        // the crate registry `FallbackPolicy`, so `config.reliability.*` no longer
-        // layers on the turn path (it still governs the non-seam provider paths).
-        let (resolved_chat_model, mut model_name) =
-            crate::inference::provider::create_chat_model_with_model_id_in(
+        let (provider_role, model_name, supports_native) =
+            super::factory_resolution::resolve_session_model(
                 ctx,
-                provider_role,
                 config,
-                config.default_temperature,
+                agent_id,
+                target_def,
+                turn_model_source.as_ref(),
             )?;
-        let supports_native = resolved_chat_model
-            .profile()
-            .is_none_or(|profile| profile.tool_calling);
-        log::info!(
-            "[session-builder] agent_id={} provider_role={} resolved_model={} supports_native_tools={}",
-            agent_id,
-            provider_role,
-            model_name,
-            supports_native
-        );
-        let target_agent_id = target_def
-            .map(|def| def.id.as_str())
-            .unwrap_or("orchestrator");
-        let target_is_lead = target_def
-            .map(|def| !def.subagents.is_empty())
-            .unwrap_or(true);
-        if let Some(pinned_model) = config.configured_agent_model(target_agent_id, target_is_lead) {
-            log::debug!(
-                "[session-builder] agent_id={} using config-level model pin model={}",
-                target_agent_id,
-                pinned_model
-            );
-            model_name = pinned_model.to_string();
-        }
-
         // Resolve the user-configured vision flag for the (now-final) model while
         // the full `Config` / `model_registry` is in scope — the turn engine only
         // sees `MultimodalConfig`. Stored on the session and surfaced to the image
@@ -770,7 +722,6 @@ impl OpenHumanSessionHost {
             super::host_only::session_policy(host_only, &tools, merged_host_tools.policy);
         let withheld_tool_names = merged_host_tools.withheld;
         let mut builder = OpenHumanSessionHost::builder()
-            .crate_native_provider(ctx, provider_role, Arc::clone(&base_config))
             .tools(tools)
             .synthesized_tools(delegation_tools)
             .visible_tool_names(visible)
@@ -792,6 +743,10 @@ impl OpenHumanSessionHost {
             .agent_definition_name(agent_id.to_string())
             .omit_memory_context(effective_omit_memory_context)
             .tokenjuice_compression(effective_tokenjuice_compression);
+        builder = match turn_model_source {
+            Some((source, _)) => builder.turn_model_source(source),
+            None => builder.crate_native_provider(ctx, provider_role, Arc::clone(&base_config)),
+        };
         if let Some(ps) = payload_summarizer {
             builder = builder.payload_summarizer(ps);
         }
@@ -909,5 +864,3 @@ pub(super) fn resolve_target_definition(
         agent_id
     ))
 }
-
-use super::factory_resolution::provider_role_for_definition;

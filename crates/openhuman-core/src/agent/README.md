@@ -188,7 +188,7 @@ The `agent_id` argument selects an allowlisted `AgentDefinition`; the same
  orchestration/tools/spawn_subagent.rs
    | read ParentExecutionContext (run context `parent`, harness/fork_context.rs)
    v
- subagent_host::run_subagent_with_parent
+   registered async sub-agent dispatcher
    | resolve definition, model, narrowed tools, narrowed prompt,
    | workspace/sandbox, SubagentScope for progress
    v
@@ -258,8 +258,8 @@ The caller wraps the event in a `TriggerEnvelope`, `run_triage` sends a
 zero-tool `trigger_triage` turn over `agent.run_turn` (cloud first, one
 retry, then a local model arm, else `Deferred`), and `apply_decision` acts
 on the parsed `drop` / `acknowledge` / `react` / `escalate` decision.
-`react` and `escalate` pass the approval gate and then run `trigger_reactor`
-or `orchestrator` through `subagent_host::run_subagent`. Cron jobs do not go
+`react` and `escalate` pass the approval gate and run `trigger_reactor` or
+`orchestrator` as direct one-shot agent turns under the triage context. Cron jobs do not go
 through triage. See [triage/README.md](triage/README.md).
 
 ## Layout
@@ -344,8 +344,8 @@ Persistence, setup and RPC:
 - `ParentExecutionContext` ([`harness/fork_context.rs`](./harness/fork_context.rs)): explicit parent
   state a sub-agent reads from the run context (`parent`); `orchestration::parent_context::build_root_parent`
   builds one for runs with no parent turn.
-- `run_subagent`, `run_subagent_with_parent`, `SubagentRunOptions`
-  ([`subagent_host/lifecycle.rs`](./subagent_host/lifecycle.rs), [`subagent_host/types.rs`](./subagent_host/types.rs)).
+- `OpenHumanSubagentHost`, `SubagentRunOptions`
+  ([`subagent_host/lifecycle.rs`](./subagent_host/lifecycle.rs), [`subagent_host/types.rs`](./subagent_host/types.rs)); async delegation is dispatched through the registered subagent tools.
 - `run_triage`, `apply_decision`, `TriggerEnvelope` (`triage/`).
 - `SystemPromptBuilder` ([`crate::prompts::composition`](../prompts/composition.rs)) is the product adapter over TinyAgents prompt composition.
 - `AgentTurnOrigin` and `with_origin` (`turn_origin.rs`).

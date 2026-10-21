@@ -1,7 +1,7 @@
 //! Sub-agent execution entry points.
 //!
-//! The public runner lives in [`run_subagent`]. It dispatches to
-//! [`runner::run_typed_mode`] (narrow prompt + filtered tools) which builds a
+//! The registered dispatcher reaches this adapter, which dispatches to
+//! [`runner::run_typed_mode`] (narrow prompt + filtered tools) to build a
 //! brand-new system prompt and a filtered tool list for the requested
 //! archetype, then drives the turn through the tinyagents harness
 //! ([`graph::run_subagent_via_graph`]) until the model returns without
@@ -13,7 +13,7 @@
 //! | ------------------- | -------------------------------------------------------------- |
 //! | `provider.rs`       | `resolve_subagent_source`, `user_is_signed_in_to_composio`       |
 //! | `prompt.rs`         | Child role framing and artifact-offload contract |
-//! | `runner.rs`         | `run_subagent`, `run_typed_mode`                               |
+//! | `runner.rs`         | direct host execution and `run_typed_mode`                   |
 //! | `graph.rs`          | `run_subagent_via_graph` — the sub-agent turn graph + tools    |
 //! | `checkpoint.rs`     | `SubagentCheckpoint` — cap-hit summary                         |
 //! | `pause_checkpoint.rs` | `is_safe_task_id` — validates model-provided checkpoint names |

@@ -1,4 +1,5 @@
 use super::*;
+use crate::agent::subagent_host::SubagentRunOutcome;
 use tinyagents_definition::{ModelSpec, ToolScope};
 use tinytools::Tool;
 
@@ -245,6 +246,22 @@ fn tool_response(name: &str, args: &str) -> ModelResponse {
     }
 }
 
+/// Run the direct host adapter against an explicit root context in unit tests.
+async fn run_host_from_test_options(
+    definition: &AgentDefinition,
+    input: &str,
+    options: SubagentRunOptions,
+) -> Result<SubagentRunOutcome, SubagentRunError> {
+    let mut root_data = options.run_context.clone();
+    let root_config = root_data.root_run_config("subagent-host-test");
+    let parent = root_data.into_tinyagents(root_config);
+    Box::pin(
+        crate::agent::subagent_host::OpenHumanSubagentHost::new(definition.clone(), options)
+            .run(&parent, input.to_owned()),
+    )
+    .await
+}
+
 /// Build a minimal `ParentExecutionContext` suitable for runner tests.
 /// Uses a no-op memory backend so we don't have to spin up a real one.
 /// `options` with `parent` bound as the run's explicit parent execution
@@ -294,7 +311,7 @@ fn make_parent(
 }
 
 // ── Runtime spawn-hierarchy (tier) gate (issue #4098) ───────────────────────
-// `tier_gate_decision` is the pure decision the runtime gate in `run_subagent`
+// `tier_gate_decision` is the pure decision the runtime gate in child execution
 // applies to each delegation hop. Tested directly so the deny/allow/skip
 // table is covered without standing up a global registry or a live spawn.
 
