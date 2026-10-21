@@ -3,10 +3,10 @@
 //! Before the storage ports a workspace kept its conversation state in three
 //! shapes: a SQLite `session_db/sessions.db` (session history, the run ledger,
 //! entry trees), JSONL transcripts under `session_raw/`, and per-turn
-//! snapshots as JSON under `memory/conversations/turn_states/`. TinyAgents owns
-//! those formats and the importer that reads them
-//! (`tinyagents_session::legacy`): read-only, id-preserving, only-if-absent.
-//! This module is the host's side of it:
+//! snapshots as JSON under `memory/conversations/turn_states/`. OpenHuman owns
+//! the historical file readers and imports their decoded public records into
+//! TinyAgents' current storage ports. The readers are read-only, id-preserving,
+//! and only-if-absent. This module handles:
 //!
 //! - **Quiescence.** The importer refuses a database with a WAL or journal
 //!   sidecar, so `sessions.db` is first copied to a consistent scratch
