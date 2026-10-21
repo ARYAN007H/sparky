@@ -166,11 +166,16 @@ fn an_import_claimed_by_another_process_waits_for_it_and_does_not_repeat_it() {
     let finisher = {
         let (markers, step) = (markers.clone(), step.clone());
         std::thread::spawn(move || {
-            crate::storage::import_state::with_claim(&markers, MARKER_OWNER, &step.clone(), || {
+            crate::storage::import_state::with_claim(
+                &markers,
+                MARKER_OWNER,
+                &step.clone(),
+                |_| {
                 held_tx.send(()).unwrap();
                 std::thread::sleep(std::time::Duration::from_millis(400));
                 crate::storage::import_state::set_done(&markers, MARKER_OWNER, &step)
-            })
+                },
+            )
             .unwrap()
             .expect("the first claimant runs");
         })

@@ -42,22 +42,23 @@ fn load_claim(repo: &Repo, owner: &str, step: &str) -> Option<Claim> {
 #[test]
 fn claim_runs_the_body_and_releases_while_retaining_its_epoch() {
     let repo = repo();
-    let ran = with_claim(&repo, OWNER, "m", || Ok(7)).unwrap();
+    let ran = with_claim(&repo, OWNER, "m", |_| Ok(7)).unwrap();
     assert_eq!(ran, Some(7));
     let released = load_claim(&repo, OWNER, "m").unwrap();
     assert_eq!(released.epoch, 1);
     assert!(released.holder.is_none());
-    assert_eq!(with_claim(&repo, OWNER, "m", || Ok(8)).unwrap(), Some(8));
+    assert_eq!(with_claim(&repo, OWNER, "m", |_| Ok(8)).unwrap(), Some(8));
     assert_eq!(load_claim(&repo, OWNER, "m").unwrap().epoch, 2);
 }
 
 #[test]
 fn claim_is_released_when_the_body_fails() {
     let repo = repo();
-    let result: Result<Option<()>> = with_claim(&repo, OWNER, "m", || Err(anyhow::anyhow!("boom")));
+    let result: Result<Option<()>> =
+        with_claim(&repo, OWNER, "m", |_| Err(anyhow::anyhow!("boom")));
     assert!(result.is_err());
     assert!(load_claim(&repo, OWNER, "m").unwrap().holder.is_none());
-    assert_eq!(with_claim(&repo, OWNER, "m", || Ok(1)).unwrap(), Some(1));
+    assert_eq!(with_claim(&repo, OWNER, "m", |_| Ok(1)).unwrap(), Some(1));
 }
 
 #[test]
@@ -67,7 +68,7 @@ fn a_second_process_skips_while_the_first_is_importing() {
     let (finish_tx, finish_rx) = mpsc::channel::<()>();
     let holder_repo = repo.clone();
     let holder = std::thread::spawn(move || {
-        with_claim(&holder_repo, OWNER, "m", || {
+        with_claim(&holder_repo, OWNER, "m", |_| {
             started_tx.send(()).unwrap();
             finish_rx.recv().unwrap();
             Ok("first")
@@ -78,7 +79,7 @@ fn a_second_process_skips_while_the_first_is_importing() {
 
     let mut second_ran = false;
     let now = chrono::Utc::now().timestamp_millis();
-    let second = with_claim_at(&repo, OWNER, "m", now, CLAIM_TTL_MS, || {
+    let second = with_claim_at(&repo, OWNER, "m", now, CLAIM_TTL_MS, |_| {
         second_ran = true;
         Ok("second")
     })
@@ -89,7 +90,7 @@ fn a_second_process_skips_while_the_first_is_importing() {
     finish_tx.send(()).unwrap();
     assert_eq!(holder.join().unwrap(), Some("first"));
     assert_eq!(
-        with_claim(&repo, OWNER, "m", || Ok("third")).unwrap(),
+        with_claim(&repo, OWNER, "m", |_| Ok("third")).unwrap(),
         Some("third")
     );
 }
@@ -110,7 +111,7 @@ fn many_racing_processes_run_the_body_once_at_a_time() {
             );
             std::thread::spawn(move || {
                 barrier.wait();
-                with_claim(&repo, OWNER, "m", || {
+                with_claim(&repo, OWNER, "m", |_| {
                     use std::sync::atomic::Ordering::SeqCst;
                     if active.fetch_add(1, SeqCst) != 0 {
                         overlap.store(true, SeqCst);
@@ -211,7 +212,7 @@ fn a_waiting_process_runs_once_the_holder_releases() {
     let (started_tx, started_rx) = mpsc::channel::<()>();
     let holder_repo = repo.clone();
     let holder = std::thread::spawn(move || {
-        with_claim(&holder_repo, OWNER, "m", || {
+        with_claim(&holder_repo, OWNER, "m", |_| {
             started_tx.send(()).unwrap();
             std::thread::sleep(Duration::from_millis(400));
             Ok("first")
@@ -220,7 +221,7 @@ fn a_waiting_process_runs_once_the_holder_releases() {
     });
     started_rx.recv().unwrap();
     let began = Instant::now();
-    let second = with_claim(&repo, OWNER, "m", || Ok("second")).unwrap();
+    let second = with_claim(&repo, OWNER, "m", |_| Ok("second")).unwrap();
     assert_eq!(second, Some("second"));
     assert!(began.elapsed() >= Duration::from_millis(200));
     assert_eq!(holder.join().unwrap(), Some("first"));
@@ -231,12 +232,12 @@ fn a_long_import_keeps_its_claim_alive() {
     let repo = repo();
     let now = chrono::Utc::now().timestamp_millis();
     let rival_repo = repo.clone();
-    let rival_ran = with_claim_at(&repo, OWNER, "m", now, 90, || {
+    let rival_ran = with_claim_at(&repo, OWNER, "m", now, 90, |_| {
         let mut took_over = false;
         for _ in 0..8 {
             std::thread::sleep(Duration::from_millis(50));
             let at = chrono::Utc::now().timestamp_millis();
-            took_over |= with_claim_at(&rival_repo, OWNER, "m", at, 90, || Ok(()))
+            took_over |= with_claim_at(&rival_repo, OWNER, "m", at, 90, |_| Ok(()))
                 .unwrap()
                 .is_some();
         }
