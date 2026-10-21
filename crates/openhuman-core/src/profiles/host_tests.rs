@@ -252,15 +252,6 @@ fn profile(name: &str) -> ProfileId {
     ProfileId::for_user(name, crate::profiles::ProfileIdMode::Raw).unwrap()
 }
 
-fn raw_profile_agent_add() -> tinyflows_bus::schedule::StoreOperation {
-    tinyflows_bus::schedule::StoreOperation::AddAgent {
-        spec: tinyflows_bus::schedule::AgentJobSpec::new(
-            tinyflows_bus::schedule::Schedule::Every { every_ms: 600_000 },
-            "profile quota transition probe",
-        ),
-    }
-}
-
 struct RestoreInstalledStorage(Option<Arc<dyn crate::storage::StorageBackend>>);
 
 impl Drop for RestoreInstalledStorage {
