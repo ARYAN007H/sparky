@@ -143,7 +143,7 @@ pub(crate) struct LinkedTelegramRuntime {
     _storage: crate::channels::module_fixture_tests::MemoryStorageGuard,
     _workspace: tempfile::TempDir,
     server: MockServer,
-    runtime: crate::channels::runtime::startup::ModuleRuntimeTestGuard,
+    runtime: crate::channels::runtime::ModuleRuntimeTestGuard,
 }
 
 impl LinkedTelegramRuntime {
@@ -165,8 +165,7 @@ impl LinkedTelegramRuntime {
 }
 
 /// Prepare an actual linked TinyChannels module with mocked Telegram HTTP.
-pub(crate) async fn linked_telegram_runtime(
-) -> LinkedTelegramRuntime {
+pub(crate) async fn linked_telegram_runtime() -> LinkedTelegramRuntime {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
@@ -178,8 +177,8 @@ pub(crate) async fn linked_telegram_runtime(
     let env = crate::config::test_env::EnvVarGuard::locked_async()
         .await
         .with("OPENHUMAN_TELEGRAM_BOT_API_BASE", server.uri());
-    let storage = crate::channels::module_fixture_tests::install_memory_storage();
-    crate::channels::module_fixture_tests::client().await;
+    let storage = crate::channels::module_fixture::install_memory_storage();
+    crate::channels::module_fixture::client().await;
 
     let workspace = tempfile::tempdir().expect("temporary module workspace");
     let mut config = crate::config::Config::default();
@@ -197,12 +196,10 @@ pub(crate) async fn linked_telegram_runtime(
         mention_only: false,
     });
     let (dispatch, _receiver) = tokio::sync::mpsc::channel(4);
-    let runtime = crate::channels::runtime::startup::prepare_module_runtime_for_test(
-        Arc::new(config),
-        dispatch,
-    )
-    .await
-    .expect("linked TinyChannels runtime should prepare");
+    let runtime =
+        crate::channels::runtime::prepare_module_runtime_for_test(Arc::new(config), dispatch)
+            .await
+            .expect("linked TinyChannels runtime should prepare");
 
     LinkedTelegramRuntime {
         _env: env,

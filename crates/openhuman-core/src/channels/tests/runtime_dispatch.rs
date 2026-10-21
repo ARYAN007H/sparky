@@ -1,5 +1,7 @@
 use super::super::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
-use super::super::runtime::test_support::{run_dispatch_harness, DispatchHarnessOptions};
+use super::super::runtime::test_support::{
+    linked_telegram_runtime, run_dispatch_harness, DispatchHarnessOptions,
+};
 use super::super::runtime::{
     process_channel_message, run_message_dispatch_loop, RuntimeChannelMessage,
 };
@@ -190,11 +192,15 @@ async fn message_dispatch_processes_messages_in_parallel() {
 #[tokio::test]
 async fn process_channel_message_cancels_scoped_typing_task() {
     let _bus_guard = use_real_agent_handler().await;
-    let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let linked = linked_telegram_runtime().await;
+    let channel = linked
+        .channels()
+        .get("telegram")
+        .expect("linked TinyChannels fixture should expose Telegram")
+        .clone();
 
     let mut channels_by_name = HashMap::new();
-    channels_by_name.insert(channel.name().to_string(), channel);
+    channels_by_name.insert("test-channel".to_string(), channel);
 
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
@@ -242,10 +248,23 @@ async fn process_channel_message_cancels_scoped_typing_task() {
     )
     .await;
 
-    let starts = channel_impl.start_typing_calls.load(Ordering::SeqCst);
-    let stops = channel_impl.stop_typing_calls.load(Ordering::SeqCst);
-    assert_eq!(starts, 1, "start_typing should be called once");
-    assert_eq!(stops, 1, "stop_typing should be called once");
+    let requests = linked.provider_request_paths().await;
+    assert_eq!(
+        requests
+            .iter()
+            .filter(|path| path.ends_with("/sendChatAction"))
+            .count(),
+        2,
+        "the module-backed provider should receive one typing start and stop"
+    );
+    assert_eq!(
+        requests
+            .iter()
+            .filter(|path| path.ends_with("/sendMessage"))
+            .count(),
+        1,
+        "the module-backed provider should receive the completed reply"
+    );
 }
 
 /// Integration test that proves channel dispatch actually routes through
