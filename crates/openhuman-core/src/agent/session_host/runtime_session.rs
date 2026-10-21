@@ -7,6 +7,8 @@
 
 #[path = "runtime_session_attachment_input.rs"]
 mod attachment_input;
+#[path = "runtime_session_enrichment.rs"]
+mod enrichment;
 mod memory_ingest;
 mod permanent;
 mod post_commit;
@@ -24,7 +26,7 @@ use tinyagents_runtime::{
     CommitReceipt, ResumePreparation, SessionBuilder, SessionTerminal, ToolSnapshot,
     TranscriptTarget, TurnPreparation,
 };
-use tinyinference_llm::message::{ContentBlock, Message, UserMessage};
+use tinyinference_llm::message::Message;
 
 use super::announcement_notes::{
     integration_announcement_note, mcp_announcement_note, skill_announcement_note,
@@ -63,41 +65,6 @@ pub(super) struct OpenHumanSessionState {
     /// accounting). The next turn awaits it before loading the goal
     /// (`post_commit::await_pending`).
     pending_post_commit: Option<tokio::task::JoinHandle<()>>,
-}
-
-/// Keep host-added context while retaining already-resolved, ordered media
-/// blocks on a trusted typed user input. The string enrichment path remains
-/// authoritative for text-only turns.
-fn enriched_typed_user_input(
-    original: &Message,
-    original_user_message: &str,
-    enriched: &str,
-) -> Result<Option<Message>, ()> {
-    let Message::User(user) = original else {
-        return Ok(None);
-    };
-    let has_typed_media = user.content.iter().any(|block| {
-        matches!(
-            block,
-            ContentBlock::Image(_)
-                | ContentBlock::Audio(_)
-                | ContentBlock::Video(_)
-                | ContentBlock::Document(_)
-        )
-    });
-    if !has_typed_media {
-        return Ok(None);
-    }
-    // `enrich_request` only prepends host context and the turn preamble to
-    // `original_user_message`. If that invariant changes, fail the turn rather
-    // than downgrade trusted typed media into a string.
-    let host_prefix = enriched.strip_suffix(original_user_message).ok_or(())?;
-    let mut content = Vec::with_capacity(user.content.len() + 1);
-    if !host_prefix.is_empty() {
-        content.push(ContentBlock::Text(host_prefix.to_owned()));
-    }
-    content.extend(user.content.iter().cloned());
-    Ok(Some(Message::User(UserMessage { content })))
 }
 
 /// Owned host-only inputs used by the async runtime preparation hook.
@@ -899,7 +866,7 @@ impl OpenHumanSessionHost {
                             )),
                         );
                         options.run_context.data.memory_turn = memory_turn;
-                        request.input = match enriched_typed_user_input(
+                        request.input = match enrichment::enriched_typed_user_input(
                             &original_input,
                             &original_user_message,
                             &enriched,
@@ -1063,6 +1030,10 @@ mod juice_tests;
 mod parent_snapshot;
 #[path = "prelude_integrations.rs"]
 mod prelude_integrations;
+
+#[cfg(test)]
+#[path = "runtime_session_enrichment_tests.rs"]
+mod enrichment_tests;
 
 #[cfg(test)]
 #[path = "runtime_session_tests.rs"]
