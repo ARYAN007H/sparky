@@ -33,7 +33,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         },
     );
 
-    let subscriber = ChannelTurnStateSubscriber::new(workspace.clone());
+    let subscriber = ChannelTurnStateSubscriber::with_config(Arc::new(linked.config().clone()));
     let event_core = ctx
         .core
         .as_ref()
