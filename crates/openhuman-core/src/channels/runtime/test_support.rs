@@ -14,6 +14,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tinychannels_bus::ChannelMessage;
@@ -122,11 +123,8 @@ pub struct DispatchHarnessObservation {
     pub start_typing_calls: usize,
     pub stop_typing_calls: usize,
     pub received_event_envelope: Option<tinychannels_bus::ChannelInboundEnvelope>,
-    pub handler_history_roles: Vec<String>,
-    pub handler_history_text: String,
-    pub handler_provider_name: String,
-    pub handler_channel_name: String,
-    pub handler_had_progress: bool,
+    /// Requests observed at the real `ChatModel` boundary.
+    pub model_calls: Vec<HarnessModelCall>,
 }
 
 /// A real linked TinyChannels runtime backed by a loopback provider endpoint.
@@ -297,20 +295,9 @@ impl Tool for HarnessTool {
     }
 }
 
-/// Acquire the shared agent-handler guard. Hold the returned guard across any
-/// call that re-registers `AGENT_RUN_TURN_METHOD` (the harness, or
-/// `start_channels`) so concurrent registrations cannot race in the same
-/// process.
-pub async fn lock_agent_handler() -> tokio::sync::MutexGuard<'static, ()> {
-    crate::core::bus_testing::BUS_HANDLER_LOCK.lock().await
-}
-
 pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHarnessObservation {
-    // `init_global` + `register_native_global` mutate process-global state, so
-    // concurrent harness runs (and concurrent `start_channels` calls) in the
-    // same process can overwrite each other's handlers mid-run and produce
-    // flaky assertions. Serialize the whole run (handler registration through
-    // observation capture) behind the shared agent-handler lock.
+    // The real agent handler and global registries are process-wide. Serialize
+    // the whole harness run so concurrent tests cannot replace them mid-turn.
     let _agent_handler_guard = crate::agent::bus::use_real_agent_handler().await;
 
     crate::core::bus::init().await.expect("bus init");
