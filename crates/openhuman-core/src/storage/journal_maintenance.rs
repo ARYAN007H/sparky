@@ -10,8 +10,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tinyagents_harness::observability::{DriverStatusStore, JournalMaintenanceReport};
-use tinyagents_harness::HarnessStatusStore;
-use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, Scope, StorageBackend};
+use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, StorageBackend};
+
+use crate::storage::Scope;
 
 /// How often the sweep wakes.
 pub const SWEEP_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
