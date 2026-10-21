@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use super::super::progress::{ProgressProjection, INFERENCE_HEARTBEAT_SECS};
@@ -8,7 +9,7 @@ use crate::agent::queued_turn::QueuedPayload;
 use crate::core::runtime::DispatchCtx;
 use tinyagents_harness::progress::AgentProgress;
 use tinyagents_harness::turn_runner::TurnRequest;
-use tokio::sync::{mpsc, watch};
+use tokio::sync::{mpsc, watch, Mutex as AsyncMutex};
 
 /// Aborts a task when dropped.
 pub(super) struct AbortOnDrop(pub(super) tokio::task::JoinHandle<()>);
