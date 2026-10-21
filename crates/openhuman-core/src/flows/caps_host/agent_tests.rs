@@ -592,11 +592,9 @@ async fn headless_child_at_depth_cap_gets_readable_spawn_refusal() {
     )
     .expect("build the headless depth-cap root");
     agent.set_agent_definition_name("orchestrator".to_string());
-    agent.set_host_env(crate::agent::turn_env::HostTurnEnv {
-        spawn_depth_limit: Some(1),
-        core: Some(std::sync::Arc::downgrade(&core)),
-        ..Default::default()
-    });
+    let mut host_env = agent.host_env().clone();
+    host_env.spawn_depth_limit = Some(1);
+    agent.set_host_env(host_env);
     agent.enable_headless_descendant_settlement();
 
     let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
