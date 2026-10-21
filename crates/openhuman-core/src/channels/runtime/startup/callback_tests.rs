@@ -54,6 +54,10 @@ impl RecordingChannel {
             progressive_requests: tokio::sync::Mutex::new(Vec::new()),
         }
     }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl RecordingChannel {
