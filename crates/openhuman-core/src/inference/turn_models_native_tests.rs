@@ -343,7 +343,7 @@ async fn injected_turn_without_profile_keeps_conservative_capabilities() {
         )
         .host_overrides(Arc::new(overrides)),
     );
-    let ctx = DispatchCtx::new(context);
+    let ctx = DispatchCtx::new(context.clone());
     let models = CoreContext::scope(context, async {
         TurnModelSource::new_crate_native(&ctx, "chat", Arc::new(Default::default()))
             .build("hint:chat", 0.2, None, None)

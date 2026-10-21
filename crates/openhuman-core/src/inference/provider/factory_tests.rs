@@ -13,7 +13,9 @@ fn with_library_test_context<T>(f: impl FnOnce() -> T) -> T {
     crate::core::runtime::CoreContext::sync_scope(context, f)
 }
 
-async fn with_library_test_context_async<F: std::future::Future>(f: impl FnOnce() -> F) -> F::Output {
+async fn with_library_test_context_async<F: std::future::Future>(
+    f: impl FnOnce() -> F,
+) -> F::Output {
     let context = crate::core::runtime::CoreContext::for_test_with_host_kind(
         crate::core::types::HostKind::Library,
         crate::core::runtime::DomainSet::full(),
