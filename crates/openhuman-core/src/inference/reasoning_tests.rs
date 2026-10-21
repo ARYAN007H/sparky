@@ -1,4 +1,7 @@
 use super::*;
+use crate::agent::tinyagents::thread_reasoning::{
+    apply_requested_effort, parse_reasoning_effort, set_thread_effort, thread_effort,
+};
 
 #[test]
 fn parses_wire_tokens_and_aliases() {
