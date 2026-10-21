@@ -32,18 +32,16 @@ fn declared_collections() -> Vec<CollectionSpec> {
     collections.extend(tinyagents_session::port::drivers::collections());
     collections.extend(tinyagents_graph::storage::collections());
     collections.extend(tinyagents_tasks::storage::collections());
-    collections.extend(crate::security::approval::storage_schema::collection_specs());
-    collections.extend(crate::security::devices::storage_schema::collection_specs());
-    collections.extend(crate::desktop::notifications::storage_schema::collection_specs());
-    collections.extend(crate::integrations::task_sources::storage_schema::collection_specs());
-    collections.extend(crate::artifacts::storage_schema::collection_specs());
-    collections.extend(crate::platform::cost::storage_schema::collection_specs());
-    collections.extend(crate::config::schema::load::source::storage_schema::collection_specs());
-    collections.extend(crate::profiles::storage_schema::collection_specs());
-    collections.extend(crate::threads::store::storage_schema::collection_specs());
-    collections.extend(
-        crate::agent::orchestration::subagent_sessions::storage_schema::collection_specs(),
-    );
+    collections.extend(crate::security::approval::collection_specs());
+    collections.extend(crate::security::devices::collection_specs());
+    collections.extend(crate::desktop::notifications::collection_specs());
+    collections.extend(crate::integrations::task_sources::collection_specs());
+    collections.extend(crate::artifacts::collection_specs());
+    collections.extend(crate::platform::cost::collection_specs());
+    collections.extend(crate::config::schema::config_storage_collections());
+    collections.extend(crate::profiles::collection_specs());
+    collections.extend(crate::threads::store::collection_specs());
+    collections.extend(crate::agent::orchestration::subagent_sessions::collection_specs());
     collections.extend(super::agents::collection_specs());
 
     #[cfg(feature = "skills")]
