@@ -3,12 +3,12 @@
 //! still goes to the orchestrator over the bus.
 
 use super::*;
-use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
+use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, mock_agent_run_turn};
 use crate::agent::host_agents::{self, HostAgent, HostAgentResolver};
-use crate::channels::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
+use crate::channels::context::{CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext};
 use crate::channels::runtime::process_channel_message;
 use crate::core::runtime::{CoreContext, DomainSet};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -492,14 +492,46 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
         .expect("the test owns the runtime context")
         .message_timeout_secs = timeout;
 
+    let fixture_client = crate::channels::module_fixture::client().await;
+    let prepared: tinychannels_bus::module_inbound::PreparedChannelInbound = fixture_client
+        .call_confidential(
+            "tinychannels",
+            tinychannels_bus::methods::PREPARE_CHANNEL_INBOUND,
+            (
+                tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
+                    source: tinychannels_bus::module_inbound::ChannelInboundSource::Legacy {
+                        message: message("slow native turn"),
+                        envelope: None,
+                    },
+                    namespace: "main".into(),
+                    preparation_mode: Default::default(),
+                    session_policy: Default::default(),
+                },
+            ),
+        )
+        .await
+        .expect("the linked module prepares the exact inbound message");
+    assert_eq!(prepared.message.channel, "telegram");
+
     let _installed = InstalledResolver::new(resolver);
     let mut turn = tokio::spawn(process_channel_message(ctx, message("slow native turn")));
-    tokio::time::timeout(
-        std::time::Duration::from_secs(15),
-        request_arrived.notified(),
-    )
-    .await
-    .expect("the real SessionHost model request reaches the delayed provider");
+    tokio::select! {
+        result = &mut turn => panic!(
+            "channel pipeline completed before a model request: result={result:?}, sent={:#?}, provider_requests={:#?}",
+            channel.sent.lock().unwrap(),
+            server.received_requests().await.unwrap(),
+        ),
+        arrived = tokio::time::timeout(
+            std::time::Duration::from_secs(15),
+            request_arrived.notified(),
+        ) => if arrived.is_err() {
+            panic!(
+                "no model request reached the delayed provider; sent={:#?}, provider_requests={:#?}",
+                channel.sent.lock().unwrap(),
+                server.received_requests().await.unwrap(),
+            );
+        },
+    }
     assert!(
         request_path
             .lock()
