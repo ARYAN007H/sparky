@@ -319,7 +319,7 @@ async fn cached_models_and_help_responses_render_expected_text() {
 fn model_command_messages_use_thread_aware_history_keys() {
     let msg = ChannelMessage {
         reply_to_id: None,
-        topic_id: Some("42".into()),
+        topic_id: None,
         id: "1".into(),
         sender: "alice".into(),
         reply_target: "room".into(),
@@ -548,7 +548,7 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
         content: "/status".into(),
         channel: "telegram".into(),
         timestamp: 0,
-        thread_ts: None,
+        thread_ts: Some("42".into()),
         sender_name: None,
     };
 
@@ -632,14 +632,14 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
     let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let msg = ChannelMessage {
         reply_to_id: None,
-        topic_id: None,
+        topic_id: Some("42".into()),
         id: "1".into(),
         sender: "alice".into(),
         reply_target: "chat-remote".into(),
         content: "/sessions".into(),
         channel: "telegram".into(),
         timestamp: 0,
-        thread_ts: Some("42".into()),
+        thread_ts: None,
         sender_name: None,
     };
 

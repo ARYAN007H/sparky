@@ -113,7 +113,6 @@ async fn handle_runtime_command_telegram_new_uses_module_storage() {
         .map(|(_, channel)| Arc::clone(channel))
         .expect("linked runtime should expose its Telegram module handle");
     let msg = ChannelMessage {
-        reply_to_id: None,
         topic_id: Some("42".into()),
         id: "200".into(),
         reply_to_id: Some("100".into()),
