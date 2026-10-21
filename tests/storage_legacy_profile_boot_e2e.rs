@@ -217,7 +217,7 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         openhuman_core::storage::open(&url).await
     })
     .unwrap();
-    let scope = openhuman_core::storage::Scope::local().unwrap();
+    let scope = openhuman_core::storage::Scope::local();
     let scoped = backend.for_scope(&scope).unwrap();
     let secrets = openhuman_core::storage::secrets::over(
         &scoped,

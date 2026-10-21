@@ -212,7 +212,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // local scope: the profile directory itself supplied user isolation.
     // Their owners must continue to read them after the real v1-to-v2 boot
     // migration.
-    let user_scope = backend.for_scope(&Scope::local()?)?;
+    let user_scope = backend.for_scope(&Scope::local())?;
     put(
         user_scope.documents(),
         "approvals",
