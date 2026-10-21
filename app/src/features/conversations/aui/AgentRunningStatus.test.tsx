@@ -1,5 +1,5 @@
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -115,6 +115,25 @@ describe('AgentRunningStatus while compacting', () => {
     expect(screen.getByTestId('agent-running-status-thinking')).toHaveTextContent(
       'Summarizing earlier conversation'
     );
+  });
+
+  it('counts the elapsed time once a second has passed', () => {
+    vi.useFakeTimers();
+    try {
+      renderStatus({
+        inferenceStatusByThread: {
+          [THREAD_ID]: { phase: 'compacting', iteration: 1, maxIterations: 0 },
+        },
+      });
+      act(() => {
+        vi.advanceTimersByTime(2500);
+      });
+      expect(screen.getByTestId('agent-running-status-thinking')).toHaveTextContent(
+        /Summarizing earlier conversation · \d/
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('thinks again once the next model call starts', () => {

@@ -604,3 +604,73 @@ async fn session_screens_the_new_input_but_not_a_replayed_tool_results_row() {
         "a blocked input never reaches the model"
     );
 }
+
+/// A root turn over its compaction trigger says so before the model call the
+/// summary is for: on a long chat the summary can hold that call for minutes.
+#[tokio::test]
+async fn a_root_turn_reports_its_compaction_before_the_model_call() {
+    use crate::progress::AgentProgress;
+
+    let (progress, mut events) = tokio::sync::mpsc::channel(256);
+    let model: Arc<dyn ChatModel<()>> =
+        Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
+            "summary", "done", "done",
+        ]));
+    let mut history = vec![TranscriptMessage::system("system-compacting")];
+    for round in 0..6 {
+        history.push(TranscriptMessage::user(format!(
+            "request {round}: {}",
+            "earlier detail ".repeat(40)
+        )));
+        history.push(TranscriptMessage::assistant(format!(
+            "answer {round}: {}",
+            "earlier result ".repeat(40)
+        )));
+    }
+    history.push(TranscriptMessage::user("continue"));
+
+    TurnSpec {
+        run_context: root_context("compacting", "/tmp/compacting", progress),
+        turn_models: TurnModelSource::from_model(model)
+            .build("root-test-model", 0.0, None, None)
+            .expect("scripted turn models build"),
+        provider_id: "test".to_string(),
+        model: "root-test-model",
+        history,
+        tool_sets: vec![Arc::new(Vec::new())],
+        allowed: Some(Default::default()),
+        max_iterations: 2,
+        context_window: None,
+        run_queue: None,
+        message_run_queue: None,
+        early_exit_tools: &[],
+        pause_at_cap: false,
+        max_output_tokens: None,
+        context_mw: TurnContextMiddleware {
+            autocompact_enabled: true,
+            compaction: crate::config::CompactionSettings {
+                trigger_tokens: Some(200),
+                strategy: crate::config::CompactionStrategy::Summary,
+            },
+            ..TurnContextMiddleware::default()
+        },
+        tool_policy: None,
+        defer_turn_completed_to_caller: true,
+        subagent_scope: None,
+        deterministic_cacheable: false,
+    }
+    .run_hosted(hosted_base(), "main".to_string())
+    .await
+    .expect("hosted root succeeds");
+
+    let mut kinds = Vec::new();
+    while let Ok(event) = events.try_recv() {
+        match event {
+            AgentProgress::ContextCompacting => kinds.push("compacting"),
+            AgentProgress::IterationStarted { .. } => kinds.push("iteration"),
+            _ => {}
+        }
+    }
+    assert_eq!(kinds.first(), Some(&"compacting"), "{kinds:?}");
+    assert!(kinds.contains(&"iteration"), "{kinds:?}");
+}
