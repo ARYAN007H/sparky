@@ -580,7 +580,7 @@ fn a_corrupt_legacy_file_fails_without_a_marker_and_is_retried() {
 fn a_run_that_skipped_records_leaves_no_marker_so_it_is_retried() {
     let dir = TempDir::new().unwrap();
     let backend = backend();
-    let skipped = marked(&backend, dir.path(), "skipdomain", || Ok(Some((3, 2, 1)))).unwrap();
+    let skipped = marked(&backend, dir.path(), "skipdomain", |_| Ok(Some((3, 2, 1)))).unwrap();
     assert_eq!(
         skipped,
         Outcome::Incomplete {
@@ -590,7 +590,7 @@ fn a_run_that_skipped_records_leaves_no_marker_so_it_is_retried() {
         }
     );
     // No marker: the next boot runs the body again instead of `AlreadyDone`.
-    let again = marked(&backend, dir.path(), "skipdomain", || Ok(Some((3, 3, 0)))).unwrap();
+    let again = marked(&backend, dir.path(), "skipdomain", |_| Ok(Some((3, 3, 0)))).unwrap();
     assert_eq!(
         again,
         Outcome::Imported {
@@ -598,6 +598,6 @@ fn a_run_that_skipped_records_leaves_no_marker_so_it_is_retried() {
             written: 3
         }
     );
-    let done = marked(&backend, dir.path(), "skipdomain", || Ok(Some((3, 3, 0)))).unwrap();
+    let done = marked(&backend, dir.path(), "skipdomain", |_| Ok(Some((3, 3, 0)))).unwrap();
     assert_eq!(done, Outcome::AlreadyDone);
 }
