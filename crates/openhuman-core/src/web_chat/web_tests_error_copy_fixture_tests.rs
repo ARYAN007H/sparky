@@ -275,7 +275,7 @@ fn loop_guard_halt_summaries_are_byte_identical() {
     use crate::agent::tinyagents::middleware::repeated_failure::{
         user_actionable_escalation, OpenHumanCopyProvider,
     };
-    use tinyagents_hooks::stop::{self, TerminalInferenceFailureKind as TerminalInferenceFailure};
+    use tinyagents_hooks::stop;
     assert_eq!(
         stop::halt_summary::budget(&OpenHumanCopyProvider, "delegate", "boom").summary,
         "Stopping: the `delegate` step failed because the account is out of inference budget/credits \u{2014} every retry hits the same wall. Add credits to your account (or, when using a custom/BYO provider, top up that provider's own account) and try again. Details:\nboom"
