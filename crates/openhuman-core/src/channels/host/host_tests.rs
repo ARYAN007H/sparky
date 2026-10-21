@@ -297,7 +297,7 @@ async fn event_sink_routes_channel_reactions_to_domain_bus() {
         .await
         .is_ok());
     assert!(sink
-        .publish(
+        .publish_host(
             "channel",
             "reaction_sent",
             serde_json::json!({

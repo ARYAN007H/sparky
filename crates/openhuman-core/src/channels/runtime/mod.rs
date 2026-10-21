@@ -3,8 +3,6 @@
 pub(crate) mod dispatch;
 pub(crate) mod session;
 mod startup;
-#[cfg(test)]
-mod supervision;
 
 pub(crate) use startup::hydrate_channel_credentials;
 pub(crate) use startup::prepare_runtime_limits;
@@ -24,5 +22,3 @@ pub mod test_support;
 // Re-exported for `channels::tests` only; omit in normal lib builds to avoid unused-import warnings.
 #[cfg(test)]
 pub(crate) use dispatch::run_message_dispatch_loop;
-#[cfg(test)]
-pub(crate) use supervision::spawn_supervised_listener;
