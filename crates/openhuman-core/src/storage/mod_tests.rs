@@ -91,12 +91,14 @@ fn install_installed_and_clear() {
     assert!(slot.installed().is_none());
     let backend: Arc<dyn StorageBackend> = Arc::new(tinystoragedrivers::MemoryStorage::new());
     assert!(slot.install(Arc::clone(&backend)).is_none());
-    assert!(slot
-        .installed()
-        .is_some_and(|got| Arc::ptr_eq(&got, &backend)));
-    assert!(slot
-        .install(Arc::new(tinystoragedrivers::MemoryStorage::new()))
-        .is_some());
+    assert!(
+        slot.installed()
+            .is_some_and(|got| Arc::ptr_eq(&got, &backend))
+    );
+    assert!(
+        slot.install(Arc::new(tinystoragedrivers::MemoryStorage::new()))
+            .is_some()
+    );
     assert!(slot.clear());
     assert!(!slot.clear());
 }
@@ -104,9 +106,11 @@ fn install_installed_and_clear() {
 #[test]
 fn agent_scopes_sit_under_the_local_tenant() {
     assert_eq!(scope_for_agent("agent-7").as_str(), "local/agent:agent-7");
-    assert!(scope_for_agent("has a space")
-        .as_str()
-        .starts_with("local/agent:~"));
+    assert!(
+        scope_for_agent("has a space")
+            .as_str()
+            .starts_with("local/agent:~")
+    );
 }
 
 #[test]
@@ -144,9 +148,11 @@ fn a_profile_scopes_storage_over_its_agents() {
     let odd = scope_for_profile("has a space");
     assert!(odd.as_str().starts_with("u:~"), "{odd}");
     assert_ne!(odd, scope_for_profile("has  a space"));
-    assert!(scope_for_profile(&"x".repeat(400))
-        .as_str()
-        .starts_with("u:~"));
+    assert!(
+        scope_for_profile(&"x".repeat(400))
+            .as_str()
+            .starts_with("u:~")
+    );
 }
 
 #[test]

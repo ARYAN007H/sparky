@@ -24,6 +24,7 @@ use tinyagents_session::threads::{
     CreateConversationThread, CrossThreadHit, DriverConversationStore, ThreadMessage,
     ThreadMessagePatch,
 };
+use tinyagents_storage_kit::{Scope as AgentScope, ScopedStorage};
 
 use crate::core::runtime::DispatchCtx;
 use crate::storage::documents::Repo;
@@ -81,7 +82,7 @@ fn describe(error: &ConversationError, subject: Subject<'_>) -> String {
             let text = inner.to_string();
             match (subject.thread, subject.message) {
                 (Some(t), Some(m)) if text.contains("message") => {
-                    return format!("message {m} not found in thread {t}")
+                    return format!("message {m} not found in thread {t}");
                 }
                 (Some(t), _) => return format!("thread {t} not found"),
                 _ => {}
@@ -110,7 +111,10 @@ pub(crate) fn import_legacy_into(
         .map_err(|e| format!("{LOG_PREFIX} open the storage scope: {e}"))?;
     let repo = Repo::on(backend, &scope, DOMAIN, super::legacy_import::collections)
         .map_err(|e| format!("{LOG_PREFIX} {e:#}"))?;
-    let store = DriverConversationStore::new(scoped.clone());
+    let store = DriverConversationStore::new(ScopedStorage::new(
+        scoped.clone(),
+        AgentScope::new(scope.as_str()).map_err(|e| format!("{LOG_PREFIX} invalid scope: {e}"))?,
+    ));
     let docs = Arc::clone(scoped.documents());
     storage::block_on(async move {
         DriverConversationStore::prepare_schema(docs.as_ref()).await?;
@@ -150,7 +154,11 @@ impl ConversationStore {
             .map_err(|e| format!("{LOG_PREFIX} open the storage scope: {e}"))?;
         let repo = Repo::on(&backend, &scope, DOMAIN, super::legacy_import::collections)
             .map_err(|e| format!("{LOG_PREFIX} {e:#}"))?;
-        let store = DriverConversationStore::new(scoped.clone());
+        let store = DriverConversationStore::new(ScopedStorage::new(
+            scoped.clone(),
+            AgentScope::new(scope.as_str())
+                .map_err(|e| format!("{LOG_PREFIX} invalid scope: {e}"))?,
+        ));
         repo.once_per_backend("schema", || {
             let docs = Arc::clone(scoped.documents());
             storage::block_on(async move {

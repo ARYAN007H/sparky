@@ -24,13 +24,14 @@ use tinyflows_bus::catalog::{
 use tinystoragedrivers::StorageBackend;
 use tinystoragedrivers_api::DocumentStore;
 use tinystoragedrivers_types::{
-    Capability, CollectionSpec, Filter, Page, Precondition, Query, Scope, StorageError, Versioned,
+    Capability, CollectionSpec, Filter, Page, Precondition, Query, StorageError, Versioned,
     WriteOptions,
 };
 
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use crate::modules::tinyflows as module;
+use crate::storage::Scope;
 
 /// A callback scope captured from a dispatch, with no ambient identity or
 /// backend handle retained. The workspace backend is resolved for each call.

@@ -8,17 +8,16 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, Precondition, Scope, StorageBackend};
 use tinystoragedrivers_api::DocumentStore;
 use tinystoragedrivers_types::{
     Filter, Key, Scope as DriverScope, Version, Versioned, WriteCondition, WriteOptions,
 };
 
-use super::lease::{
-    validate_key, LeaseError, LeaseGrant, LeaseRecord, LeaseStore, CLUSTER_SCOPE, LEASE_COLLECTION,
-};
 use super::StorageError;
+use super::lease::{
+    CLUSTER_SCOPE, LEASE_COLLECTION, LeaseError, LeaseGrant, LeaseRecord, LeaseStore, validate_key,
+};
 
 /// The owner namespace of the host's process-placement lease documents.
 pub const LEASE_OWNER: &str = "profiles";
@@ -178,7 +177,9 @@ impl DocumentLeases {
     }
 
     fn id(key: &str) -> Result<String, StorageError> {
-        Ok(Key::new(format!("{LEASE_OWNER}/{key}"))?.as_str().to_owned())
+        Ok(Key::new(format!("{LEASE_OWNER}/{key}"))?
+            .as_str()
+            .to_owned())
     }
 
     async fn read(&self, key: &str) -> Result<Option<Versioned<LeaseBody>>, StorageError> {

@@ -33,7 +33,7 @@ use tinystoragedrivers_types::{Capability, CollectionSpec, Query, StorageError};
 
 use crate::storage::documents::Repo;
 use crate::storage::import_state;
-use crate::storage::{Storage, state_kv::StateKv};
+use crate::storage::{DocumentStoreExt, Storage, state_kv::StateKv};
 
 /// The `tsd.kv` owner and namespace of the state values.
 const KV_OWNER: &str = "composio";

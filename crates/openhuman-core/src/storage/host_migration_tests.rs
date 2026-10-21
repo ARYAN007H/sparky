@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinystoragedrivers::schema::Migrations;
 use tinystoragedrivers::{
     DocumentStore, DocumentStoreExt, Kv, MemoryStorage, Precondition, Query, Scope, ScopedStorage,
@@ -242,10 +242,12 @@ async fn the_host_domains_v1_records_arrive_in_the_v2_collections() {
         get(&docs, "task_sources.ingested", "src/ext").await["ingested_ms"],
         8000
     );
-    assert!(get(&docs, "artifacts.records", "art-1")
-        .await
-        .get("created_at")
-        .is_none());
+    assert!(
+        get(&docs, "artifacts.records", "art-1")
+            .await
+            .get("created_at")
+            .is_none()
+    );
     assert_eq!(
         get(&docs, "artifacts.args", "art-1").await,
         json!({ "prompt": "x" })
@@ -254,9 +256,11 @@ async fn the_host_domains_v1_records_arrive_in_the_v2_collections() {
         get(&docs, "artifacts.versions", "art-1").await["versions"][0]["created_ms"],
         1
     );
-    assert!(get(&docs, "cost.records", "c1").await["usage"]
-        .get("timestamp")
-        .is_none());
+    assert!(
+        get(&docs, "cost.records", "c1").await["usage"]
+            .get("timestamp")
+            .is_none()
+    );
     assert_eq!(
         get(&docs, "config.documents", "local").await,
         json!({ "toml_enc": "enc2:00" })
@@ -304,17 +308,21 @@ async fn the_host_domains_v1_records_arrive_in_the_v2_collections() {
 
     // The older builds' markers are finished imports now.
     let migrations = Migrations::new(&scoped);
-    assert!(migrations
-        .done("storage", &step_id("storage_import", "approval@abcd"))
-        .await
-        .unwrap());
-    assert!(migrations
-        .done(
-            "threads",
-            &step_id("threads_import", "legacy-conversations:k")
-        )
-        .await
-        .unwrap());
+    assert!(
+        migrations
+            .done("storage", &step_id("storage_import", "approval@abcd"))
+            .await
+            .unwrap()
+    );
+    assert!(
+        migrations
+            .done(
+                "threads",
+                &step_id("threads_import", "legacy-conversations:k")
+            )
+            .await
+            .unwrap()
+    );
 
     // A second boot has nothing left to do.
     let again = prepare_and_migrate(&backend).await.unwrap();

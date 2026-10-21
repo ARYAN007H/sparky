@@ -31,7 +31,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Utc};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Filter, Precondition, Query, Sort, Versioned};
 
@@ -40,13 +40,13 @@ use super::types::{
     NotificationStatus,
 };
 use crate::config::Config;
-use crate::storage::documents::{compare_and_swap, text, update_or_insert, Repo};
+use crate::storage::documents::{Repo, compare_and_swap, text, update_or_insert};
 use crate::storage::{DocumentStore, DocumentStoreExt, StorageError};
 
 #[cfg(feature = "legacy-import")]
 use super::storage_schema::legacy_collections;
 use super::storage_schema::specs;
-pub(super) use super::storage_schema::{core_id, CORE, DEDUP, NOTIFICATIONS, SETTINGS};
+pub(super) use super::storage_schema::{CORE, DEDUP, NOTIFICATIONS, SETTINGS, core_id};
 use crate::storage::schema_support::key_of;
 
 /// The `workspace` key of core notifications in the per-workspace default
@@ -235,10 +235,10 @@ async fn claim_content(
             .and_then(Value::as_i64);
         if skip_recent && last.is_some_and(|last| last >= window_start) {
             previous = None;
-            return Ok(None);
+            return None;
         }
         previous = Some(last);
-        Ok(Some(json!({ "last_ms": now_ms })))
+        Some(json!({ "last_ms": now_ms }))
     })
     .await?;
     Ok(previous)

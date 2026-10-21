@@ -56,7 +56,7 @@ fn the_schema_composes_under_its_owner() {
 
 #[tokio::test]
 async fn migrate_cluster_moves_v1_leases_into_tsd_leases_and_keeps_their_epoch() {
-    use crate::storage::lease::{DocumentLeases, LeaseStore, LEASE_OWNER};
+    use crate::storage::lease::{DocumentLeases, LEASE_OWNER, LeaseStore};
     let backend = MemoryStorage::new();
     let scoped = backend.for_scope(&Scope::cluster()).unwrap();
     let docs = scoped.documents();
@@ -85,7 +85,7 @@ async fn migrate_cluster_moves_v1_leases_into_tsd_leases_and_keeps_their_epoch()
     migrate_cluster(&scoped).await.unwrap();
     assert!(docs.get("leases", "alice").await.unwrap().is_none());
     assert!(docs.get("leases", "bob").await.unwrap().is_none());
-    let id = tinystoragedrivers::Key::of([LEASE_OWNER, "alice"]).unwrap();
+    let id = crate::storage::schema_support::key_of_parts([LEASE_OWNER, "alice"]).unwrap();
     let moved = docs.get("tsd.leases", id.as_str()).await.unwrap().unwrap();
     assert_eq!(
         moved.doc,

@@ -84,7 +84,7 @@ const ROWS: &[Row] = &[
         secrets: &[],
         queues: None,
     },
-    // The inbound event queues keep their pipeline state in `teq.*`
+    // The inbound event queues keep their pipeline state under the `teq` owner
     // collections and their work in the queues the configured manifest
     // declares (the shipped `queues.json` unless `[inbound] queues_path`).
     #[cfg(feature = "inbound-queues")]
@@ -136,7 +136,7 @@ pub(super) fn grant_for(module_id: &str) -> Option<StorageGrant> {
     let row = ROWS.iter().find(|row| row.module == module_id)?;
     let queues = row.queues.and_then(|source| source());
     let collections = module_collections(row.owner);
-    let mut secret_prefixes: Vec<String> = row.secrets.iter().map(|s| (*s).to_owned()).collect();
+    let secret_prefixes: Vec<String> = row.secrets.iter().map(|s| (*s).to_owned()).collect();
     // Collection declarations are now the owner contracts' only published
     // storage inventory. Stream/blob/secret grants remain explicit below
     // until their bus contracts expose equivalent pure descriptors.

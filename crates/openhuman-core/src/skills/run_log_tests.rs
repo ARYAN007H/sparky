@@ -16,17 +16,21 @@ fn run_cancel_registry_roundtrip() {
 
 #[test]
 fn noisy_events_are_skipped_steps_are_kept() {
-    assert!(format_event(&AgentProgress::TextDelta {
-        delta: "hi".into(),
-        iteration: 1
-    })
-    .is_none());
+    assert!(
+        format_event(&AgentProgress::TextDelta {
+            delta: "hi".into(),
+            iteration: 1
+        })
+        .is_none()
+    );
     // Content (prompt/reply) rides its own event and is never logged here.
-    assert!(format_event(&AgentProgress::TurnContent {
-        input: Some("secret prompt".into()),
-        output: Some("secret reply".into()),
-    })
-    .is_none());
+    assert!(
+        format_event(&AgentProgress::TurnContent {
+            input: Some("secret prompt".into()),
+            output: Some("secret reply".into()),
+        })
+        .is_none()
+    );
     let line = format_event(&AgentProgress::ToolCallStarted {
         call_id: "c1".into(),
         tool_name: "memory_search".into(),

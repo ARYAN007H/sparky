@@ -3,9 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 use super::state::{LayoutError, LayoutState, Step};
-use super::{legacy, Target};
-use crate::config::schema::profile_layout::LayoutVersion;
+use super::{Target, legacy};
 use crate::config::Config;
+use crate::config::schema::profile_layout::LayoutVersion;
 
 /// The schema version one owner has reached in the profile's database.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

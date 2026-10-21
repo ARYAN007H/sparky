@@ -10,7 +10,7 @@
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyeventqueues_bus::storage::{SHIPPED_PIPELINE_JSON, SHIPPED_QUEUES_JSON};
 use tinyeventqueues_bus::{Lane, PipelineConfig};
 use tinystoragedrivers::QueueConfig;
@@ -167,7 +167,7 @@ pub fn module_config(config: &Config) -> Value {
         }
     };
     tracing::debug!(
-        queues = resolved.manifest.queues.len(),
+        queues = resolved.manifest.queues().len(),
         backend = %resolved.backend,
         "[inbound] configuring the tinyeventqueues module"
     );

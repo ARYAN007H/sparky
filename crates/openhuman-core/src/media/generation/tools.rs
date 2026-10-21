@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyagents_harness::media::{GenerateImageTool, GenerateVideoTool, MediaOutput};
 use tinyagents_harness::tinyinference_image::ImageGenerator;
 use tinyagents_harness::tinyinference_video::{VideoGenerator, WaitPolicy};
@@ -104,7 +104,11 @@ fn media_tools_from_with_allowlist(
 ) -> Vec<Box<dyn Tool>> {
     let files = files_dir.into();
     let generators = Arc::new(generators);
-    let output = MediaOutput::new(action_dir).with_reference_policy(reference_policy(
+    let Some(blobs) = crate::storage::sessions::artifact_blobs_for(workspace_dir) else {
+        log::warn!("[media] scoped blob storage unavailable; media tools are not registered");
+        return Vec::new();
+    };
+    let output = MediaOutput::new(action_dir, blobs).with_reference_policy(reference_policy(
         action_dir,
         workspace_dir,
         Arc::clone(&allowed_artifacts),
@@ -288,7 +292,7 @@ impl Tool for MediaListModelsTool {
                 Err(error) => {
                     return Ok(ToolResult::error(format!(
                         "Listing image models failed: {error}"
-                    )))
+                    )));
                 }
             }
         }
@@ -308,7 +312,7 @@ impl Tool for MediaListModelsTool {
                 Err(error) => {
                     return Ok(ToolResult::error(format!(
                         "Listing video models failed: {error}"
-                    )))
+                    )));
                 }
             }
         }

@@ -14,11 +14,11 @@
 
 use anyhow::Result;
 use serde_json::Value;
-use tinystoragedrivers::{CollectionSpec, Key, Storage};
+use tinystoragedrivers::{CollectionSpec, Storage};
 
 use crate::storage::schema_support::{
-    key_of, map_legacy_collection, Body, LegacySourceRecord as SourceRecord,
-    LegacyTargetRecord as TargetRecord,
+    Body, LegacySourceRecord as SourceRecord, LegacyTargetRecord as TargetRecord, key_of,
+    key_of_parts, map_legacy_collection,
 };
 
 /// The v2 collection: one document per profile.
@@ -115,9 +115,7 @@ pub(crate) fn upgrade_lease_records(
                 }
                 Ok(TargetRecord::new(
                     "openhuman.leases",
-                    Key::of(["profiles", record.id.as_str()])?
-                        .as_str()
-                        .to_owned(),
+                    key_of_parts(["profiles", record.id.as_str()])?,
                     Value::Object(body),
                 ))
             })

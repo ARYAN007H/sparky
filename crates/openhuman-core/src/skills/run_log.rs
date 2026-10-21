@@ -23,7 +23,7 @@ use tokio_util::sync::CancellationToken;
 use crate::progress::AgentProgress;
 use crate::storage::StorageError;
 
-pub use tinyskills::run_log::{detect_repeated_line, RunLogSlice, RunOutcome};
+pub use tinyskills::run_log::{RunLogSlice, RunOutcome, detect_repeated_line};
 use tinyskills::run_log::{parse_runs, parse_terminal_outcome, short, truncate};
 
 type RunLogStore = tinyskills_drivers::StreamRunLogStore;
@@ -169,7 +169,7 @@ pub fn read_run_log_slice(
     let store = run_log_store(workspace).map_err(io_error)?;
     crate::storage::block_on(async move {
         store
-            .read_slice(id, offset, max_bytes)
+            .read_slice(&id, offset, max_bytes)
             .await
             .map_err(|error| StorageError::backend(error.to_string()))
     })

@@ -27,12 +27,12 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Digest;
-use tinystoragedrivers::{CollectionSpec, Cursor, ErrorKind, Precondition, Scope, StorageError};
+use tinystoragedrivers::{CollectionSpec, Cursor, ErrorKind, Precondition, StorageError};
 use tinystoragedrivers_api::KvStore;
 
 use super::documents::Repo;
 use super::import_state;
-use super::Storage;
+use super::{Scope, Storage};
 
 /// The `tsd.migrations` step kind of a state-file import.
 const IMPORT_KIND: &str = "state_file";

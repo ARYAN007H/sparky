@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 use super::archive::{self, Source};
 use super::plan::{self, Action, Plan};
 use super::state::{LayoutError, LayoutState, Lock, Step};
-use super::{db, legacy, DryRun, Noop, Outcome, Report, Target};
-use crate::config::schema::profile_layout::{LayoutVersion, PROFILE_LAYOUT_MARKER};
+use super::{DryRun, Noop, Outcome, Report, Target, db, legacy};
 use crate::config::Config;
+use crate::config::schema::profile_layout::{LayoutVersion, PROFILE_LAYOUT_MARKER};
 
 /// How a migration runs.
 #[derive(Debug, Clone, Default)]

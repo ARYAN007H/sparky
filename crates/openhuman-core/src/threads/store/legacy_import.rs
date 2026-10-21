@@ -11,12 +11,13 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use tinyagents_session::threads::{
     ConversationPersistence, CreateConversationThread, DriverConversationStore, ThreadMessage,
 };
+use tinyagents_storage_kit::{Scope as AgentScope, ScopedStorage};
 use tinystoragedrivers::CollectionSpec;
 
 use crate::storage::documents::Repo;
@@ -146,10 +147,7 @@ fn fold_threads(root: &Path) -> Result<Vec<CreateConversationThread>> {
 ///
 /// A legacy file that cannot be read, or a storage failure; the next call
 /// retries (a thread or message already imported is skipped).
-pub(super) fn import_once(
-    workspace_dir: &Path,
-    repo: &Repo,
-) -> Result<()> {
+pub(super) fn import_once(workspace_dir: &Path, repo: &Repo) -> Result<()> {
     let root = super::backend::legacy_root(workspace_dir);
     let source = crate::storage::source_key(&root);
     let step = import_state::step_id(IMPORT_KIND, &format!("{MARKER_PREFIX}:{source}"));
@@ -159,7 +157,7 @@ pub(super) fn import_once(
             Ok(_) => return Ok(()),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
             Err(error) => {
-                return Err(anyhow::Error::new(error).context("stat the legacy threads log"))
+                return Err(anyhow::Error::new(error).context("stat the legacy threads log"));
             }
         }
         if import_state::is_done(repo, OWNER, &step)? {
@@ -178,7 +176,11 @@ pub(super) fn import_once(
                     &root, &thread.id,
                 ))?);
             }
-            let store = DriverConversationStore::new(claimed_repo.scoped().clone());
+            let agent_scope = AgentScope::new(crate::storage::Scope::local().as_str())?;
+            let store = DriverConversationStore::new(ScopedStorage::new(
+                claimed_repo.scoped().clone(),
+                agent_scope,
+            ));
             let (threads_n, messages_n) =
                 crate::storage::block_on_anyhow(
                     async move { copy(&store, threads, messages).await },

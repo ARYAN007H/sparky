@@ -29,12 +29,12 @@ use serde_json::Value;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinystoragedrivers::{CollectionSpec, Query, Sort};
 
-use super::storage_schema::{spec, SESSIONS};
+use super::storage_schema::{SESSIONS, spec};
 use super::types::{DurableSubagentSession, DurableSubagentStatus};
+use crate::storage::DocumentStoreExt;
 use crate::storage::documents::Repo;
 use crate::storage::import_state;
 use crate::storage::schema_support::{key_of, ms_rfc3339, rfc3339_ms};
-use crate::storage::DocumentStoreExt;
 
 /// The `tsd.migrations` owner of the legacy-file import.
 const OWNER: &str = "subagents";
@@ -233,7 +233,7 @@ impl Docs {
         let id = key_of(subagent_session_id)?;
         let updated = self.0.run(|docs| async move {
             crate::storage::documents::update_document(&docs, SESSIONS, &id, move |current| {
-                let stored: StoredSession = serde_json::from_value(current)
+                let stored: StoredSession = serde_json::from_value(current.clone())
                     .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
                 let mut session = DurableSubagentSession::from(stored);
                 if !update(&mut session, chrono::Utc::now().to_rfc3339()) {

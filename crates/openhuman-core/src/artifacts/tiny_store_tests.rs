@@ -154,16 +154,20 @@ async fn deleting_an_artifact_removes_its_card() {
         .await
         .unwrap();
     let id = saved.record.id;
-    assert!(super::super::store::get_artifact(&workspace, &id)
-        .await
-        .is_ok());
+    assert!(
+        super::super::store::get_artifact(&workspace, &id)
+            .await
+            .is_ok()
+    );
 
     let (removed, notice) = artifacts.delete(&id).await.unwrap();
     assert!(removed);
     assert!(notice.is_none(), "{notice:?}");
-    assert!(super::super::store::get_artifact(&workspace, &id)
-        .await
-        .is_err());
+    assert!(
+        super::super::store::get_artifact(&workspace, &id)
+            .await
+            .is_err()
+    );
 }
 
 struct NoopPublisher;

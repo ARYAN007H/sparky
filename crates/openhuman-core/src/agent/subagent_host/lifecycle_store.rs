@@ -156,7 +156,7 @@ impl LifecycleStore {
         let kv = StateKv::open(&workspace_of(checkpoint_dir), OWNER, NS).map_err(failure)?;
         if import_files {
             let legacy = checkpoint_dir.join("lifecycle");
-            kv.import_once(IMPORT, || import_legacy(&kv, &legacy))
+            kv.import_once(IMPORT, |_| import_legacy(&kv, &legacy))
                 .map_err(failure)?;
         }
         let opened = crate::storage::local::open("subagents", &workspace_of(checkpoint_dir))

@@ -445,20 +445,24 @@ pub async fn import_legacy_tinyjuice_savings(
     #[cfg(all(feature = "modules", feature = "legacy-import"))]
     {
         let file = storage_import_tinyjuice_savings::legacy_file(workspace_dir);
+        let client = client.clone();
         import_once(
             ctx,
             "tinyjuice-savings",
             storage_grant_schemas::tinyjuice::MODULE_ID,
             &file,
-            storage_import_tinyjuice_savings::import_legacy(ctx, &file, |aggregate| async move {
-                client
-                    .call::<bool>(
-                        "tinyjuice",
-                        tinyjuice_bus::names::methods::IMPORT_SAVINGS,
-                        (aggregate,),
-                    )
-                    .await
-                    .map_err(|e| anyhow::anyhow!("ImportSavings: {e}"))
+            storage_import_tinyjuice_savings::import_legacy(ctx, &file, move |aggregate| {
+                let client = client.clone();
+                async move {
+                    client
+                        .call::<bool>(
+                            "tinyjuice",
+                            tinyjuice_bus::names::methods::IMPORT_SAVINGS,
+                            (aggregate,),
+                        )
+                        .await
+                        .map_err(|e| anyhow::anyhow!("ImportSavings: {e}"))
+                }
             }),
         )
         .await;

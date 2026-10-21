@@ -129,7 +129,37 @@ pub fn time_ms(body: &Value, field: &str) -> Option<i64> {
 ///
 /// When `part` is empty.
 pub fn key_of(part: &str) -> Result<String, StorageError> {
-    Key::of([part]).map(|key| key.as_str().to_owned())
+    key_of_parts([part])
+}
+
+/// Builds a validated key from logical parts without allowing a part to
+/// introduce a separator or the reserved leading hash marker.
+pub fn key_of_parts<'a>(parts: impl IntoIterator<Item = &'a str>) -> Result<String, StorageError> {
+    let mut encoded = String::new();
+    for (index, part) in parts.into_iter().enumerate() {
+        if part.is_empty() {
+            return Err(StorageError::invalid_input("key parts must not be empty"));
+        }
+        if index != 0 {
+            encoded.push('/');
+        }
+        for ch in part.chars() {
+            match ch {
+                '%' => encoded.push_str("%25"),
+                '/' => encoded.push_str("%2F"),
+                '\0' => encoded.push_str("%00"),
+                '~' => encoded.push_str("%7E"),
+                _ => encoded.push(ch),
+            }
+        }
+    }
+    Key::new(encoded).map(|key| key.as_str().to_owned())
+}
+
+/// Creates an opaque id for a newly generated owner record.
+#[must_use]
+pub fn fresh_key() -> String {
+    uuid::Uuid::new_v4().simple().to_string()
 }
 
 /// `camelCase` as `snake_case`: `authorId` -> `author_id`.

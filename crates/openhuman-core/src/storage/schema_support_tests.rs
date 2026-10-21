@@ -29,6 +29,19 @@ fn a_natural_key_escapes_separators() {
 }
 
 #[test]
+fn composite_keys_round_trip_reserved_and_unicode_parts() {
+    let encoded = key_of_parts(["a/b", "c%~é"]).unwrap();
+    assert_eq!(encoded, "a%2Fb/c%25%7Eé");
+    assert_eq!(Key::new(encoded).unwrap().split().unwrap(), ["a/b", "c%~é"]);
+    assert!(key_of_parts(["a", ""]).is_err());
+}
+
+#[test]
+fn fresh_record_key_is_accepted_by_the_storage_key_type() {
+    assert!(Key::new(fresh_key()).is_ok());
+}
+
+#[test]
 fn keys_convert_at_every_depth_and_back() {
     let renames = [("createdAtMillis", "created_ms")];
     let camel = json!({

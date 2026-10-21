@@ -20,8 +20,8 @@ use std::time::UNIX_EPOCH;
 
 use tinybus::ObjectPath;
 use tinycomputer_bus::site_memory::{
-    ForgetSiteRequest, ForgetSiteResponse, LoadSiteRequest, LoadSiteResponse, SaveSiteRequest,
-    SaveSiteResponse, SiteMemory, INTERFACE, OBJECT_PATH,
+    ForgetSiteRequest, ForgetSiteResponse, INTERFACE, LoadSiteRequest, LoadSiteResponse,
+    OBJECT_PATH, SaveSiteRequest, SaveSiteResponse, SiteMemory,
 };
 
 /// Largest site file read or written: anything bigger was not written here.
@@ -74,7 +74,7 @@ impl SiteStore {
         let kv = crate::storage::state_kv::StateKv::open(workspace, "computer", "site_memory")
             .map_err(storage_error)?;
         let legacy = sites_dir(workspace);
-        kv.import_once("sites_dir", || import_legacy(&kv, &legacy))
+        kv.import_once("sites_dir", |_| import_legacy(&kv, &legacy))
             .map_err(storage_error)?;
         Ok(Self { kv })
     }

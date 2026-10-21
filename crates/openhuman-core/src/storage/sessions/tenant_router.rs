@@ -16,7 +16,9 @@ use tinyagents_harness::store::SchemaAdmission;
 use tinyagents_session::port::{AgentStorageFactory, AgentStores, SessionStoreProvider};
 use tinyagents_session::DriverSessionStores;
 use tinyagents_storage_kit::{Blocking, Scope as PortScope, ScopedStorage};
-use tinystoragedrivers::{Scope, StorageBackend, StorageError};
+use tinystoragedrivers::{StorageBackend, StorageError};
+
+use crate::storage::Scope;
 
 /// Session stores over one backend, routed to a per-tenant provider.
 pub struct TenantSessionStores {
@@ -92,14 +94,15 @@ impl TenantSessionStores {
             return (Arc::clone(provider), agent);
         }
         let backend = Arc::clone(&self.backend);
+        let tenant_for_factory = tenant.clone();
         let factory: AgentStorageFactory = Arc::new(move |agent_id| {
             let owner_scope =
-                crate::storage::scope::Scope::new(tenant.as_str())?.agent(agent_id)?;
+                crate::storage::scope::Scope::new(tenant_for_factory.as_str())?.agent(agent_id)?;
             let scope = PortScope::new(owner_scope.as_str())?;
             let storage = backend.for_scope(&owner_scope)?;
-            super::super::block_on(async {
-                crate::storage::boot::prepare_scope(&storage).await?;
-                Ok(())
+            let prepare_storage = storage.clone();
+            super::super::block_on(async move {
+                crate::storage::boot::prepare_scope(&prepare_storage).await
             })?;
             Ok(ScopedStorage::new(storage, scope))
         });
@@ -143,22 +146,24 @@ impl SessionStoreProvider for TenantSessionStores {
 
     fn bind_actor(
         &self,
-        backend: Arc<dyn StorageBackend>,
+        factory: AgentStorageFactory,
     ) -> Result<Option<Arc<dyn SessionStoreProvider>>, StorageError> {
-        self.bind_actor_with_schema_admission(backend, self.admission)
+        self.bind_actor_with_schema_admission(factory, self.admission)
     }
 
     fn bind_actor_with_schema_admission(
         &self,
-        backend: Arc<dyn StorageBackend>,
+        factory: AgentStorageFactory,
         admission: SchemaAdmission,
     ) -> Result<Option<Arc<dyn SessionStoreProvider>>, StorageError> {
-        Ok(Some(Arc::new(Self::with_admission(
-            backend,
-            self.bridge.clone(),
-            self.recover_on_open,
-            admission,
-        ))))
+        Ok(Some(Arc::new(
+            DriverSessionStores::with_bridge_and_schema_admission(
+                factory,
+                self.bridge.clone(),
+                admission,
+            )
+            .recover_on_open(self.recover_on_open),
+        )))
     }
 
     fn run_ledger_for_agent(

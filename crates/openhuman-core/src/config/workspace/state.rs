@@ -12,7 +12,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use tinystoragedrivers::{Scope, StorageBackend, StorageConfig};
+use tinystoragedrivers::{StorageBackend, StorageConfig};
 use tinystoragedrivers_api::KvStore;
 use tinystoragedrivers_types::{Cursor, Precondition};
 
@@ -51,7 +51,7 @@ impl WatcherStateStore {
 
     fn from_backend(backend: Arc<dyn StorageBackend>) -> Result<Self> {
         let storage = backend
-            .for_scope(&Scope::local())
+            .for_scope(&crate::storage::Scope::local())
             .map_err(anyhow::Error::from)
             .context("open watcher scope")?;
         Ok(Self {
@@ -79,7 +79,7 @@ impl WatcherStateStore {
         let path = path.to_string_lossy().into_owned();
         let key = key_for(&path);
         let kv = Arc::clone(&self.kv);
-        crate::storage::block_on(async move {
+        crate::storage::block_on_anyhow(async move {
             loop {
                 let current = kv.get(&key).await?;
                 let (mtime_secs, expected) = match current {
@@ -100,7 +100,7 @@ impl WatcherStateStore {
                     Err(error) if error.kind() == tinystoragedrivers_types::ErrorKind::Conflict => {
                         continue;
                     }
-                    Err(error) => return Err(error),
+                    Err(error) => return Err(error.into()),
                 }
             }
         })
@@ -126,7 +126,7 @@ impl WatcherStateStore {
     /// Load every non-deleted state in stable key order.
     pub fn load_all(&self) -> Result<Vec<FileState>> {
         let kv = Arc::clone(&self.kv);
-        crate::storage::block_on(async move {
+        crate::storage::block_on_anyhow(async move {
             let mut cursor: Option<Cursor> = None;
             let mut states = Vec::new();
             loop {

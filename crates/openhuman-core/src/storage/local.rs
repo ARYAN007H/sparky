@@ -21,9 +21,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 
-use super::{current_scope, installed, Scope, Storage, StorageBackend};
+use super::{Scope, Storage, StorageBackend, current_scope, installed};
 
 /// A backend and the scope a store's records live under in it.
 #[derive(Clone)]

@@ -119,10 +119,12 @@ fn reset_recorded_empties_the_cache() {
     let backend = memory_backend();
     record_in(Arc::clone(&backend), "agents-test-reset");
     reset_recorded();
-    assert!(!RECORDED
-        .lock()
-        .unwrap()
-        .contains(&(backend_key(&backend), "agents-test-reset".to_string())));
+    assert!(
+        !RECORDED
+            .lock()
+            .unwrap()
+            .contains(&(backend_key(&backend), "agents-test-reset".to_string()))
+    );
 }
 
 #[tokio::test]

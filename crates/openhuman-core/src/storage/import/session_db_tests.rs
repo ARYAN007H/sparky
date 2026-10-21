@@ -2,7 +2,7 @@ use super::*;
 
 use std::path::Path;
 
-use crate::storage::rusqlite::{params, Connection};
+use crate::storage::rusqlite::{Connection, params};
 
 fn classic_session_file(path: &Path) {
     let connection = Connection::open(path).unwrap();
@@ -124,7 +124,9 @@ fn rejects_a_database_without_classic_session_tables() {
 
     let error = SessionDatabase::read(&path).unwrap_err();
 
-    assert!(error
-        .to_string()
-        .contains("none of the classic session database tables"));
+    assert!(
+        error
+            .to_string()
+            .contains("none of the classic session database tables")
+    );
 }
