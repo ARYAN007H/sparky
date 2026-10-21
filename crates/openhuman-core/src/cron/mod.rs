@@ -23,6 +23,7 @@ pub(crate) mod bus_host;
     deprecated,
     reason = "v21 ChannelMessage/SendMessage shims stay until the native channel path moves to canonical v22 content"
 )]
+#[cfg(feature = "channels")]
 pub mod channel_bridge;
 pub(crate) mod client;
 pub mod completion_owner;

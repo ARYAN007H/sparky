@@ -17,10 +17,9 @@ use crate::core::runtime::DispatchCtx;
 use crate::web_chat::{publish_web_channel_event, WebChannelEvent};
 use anyhow::{anyhow, Result};
 use std::path::Path;
-use {
-    crate::cron::channel_bridge, tinyflows_bus::schedule::types::CronJob,
-    tinyflows_bus::schedule::types::DeliveryStatus, tinyflows_bus::schedule::types::JobOrigin,
-};
+use tinyflows_bus::schedule::types::{CronJob, DeliveryStatus, JobOrigin};
+#[cfg(feature = "channels")]
+use crate::cron::channel_bridge;
 
 /// What a scheduled run replies when it has nothing worth sending.
 pub(crate) const NO_REPLY: &str = "NO_REPLY";
@@ -237,6 +236,13 @@ pub(crate) async fn deliver_to_origin(
             channel_session,
             ..
         } => {
+            #[cfg(not(feature = "channels"))]
+            {
+                let _ = (channel, reply_target, channel_session);
+                return Err(anyhow!("channel delivery requires the channels feature"));
+            }
+            #[cfg(feature = "channels")]
+            {
             let identity = channel_session
                 .as_deref()
                 .ok_or_else(|| anyhow!("channel origin has no durable session identity"))?;
@@ -274,6 +280,7 @@ pub(crate) async fn deliver_to_origin(
                 "[cron] origin delivery sent to channel"
             );
             Ok(DeliveryStatus::Delivered)
+            }
         }
     }
 }
