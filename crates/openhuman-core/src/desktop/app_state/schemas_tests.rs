@@ -102,6 +102,7 @@ fn deserialize_update_local_state_params_with_null_clears_value() {
     let mut m = Map::new();
     m.insert("encryptionKey".into(), serde_json::Value::Null);
     m.insert("onboardingTasks".into(), serde_json::Value::Null);
+    m.insert("keyringConsent".into(), serde_json::Value::Null);
     let params: UpdateLocalStateParams =
         serde_json::from_value(serde_json::Value::Object(m)).unwrap();
     assert_eq!(params.encryption_key, Some(None));
@@ -113,7 +114,7 @@ fn deserialize_update_local_state_params_with_null_clears_value() {
 fn update_local_state_patch_preserves_camel_case_tristate_and_nested_defaults() {
     let missing: UpdateLocalStateParams = serde_json::from_value(serde_json::json!({})).unwrap();
     assert_eq!(missing.encryption_key, None);
-    assert_eq!(missing.onboarding_tasks, None);
+    assert!(missing.onboarding_tasks.is_none());
     assert_eq!(missing.keyring_consent, None);
 
     let params: UpdateLocalStateParams = serde_json::from_value(serde_json::json!({
@@ -135,8 +136,18 @@ fn update_local_state_patch_preserves_camel_case_tristate_and_nested_defaults() 
     }))
     .unwrap();
 
+    let snake_case_only: UpdateLocalStateParams = serde_json::from_value(serde_json::json!({
+        "encryption_key": "ignored",
+        "onboarding_tasks": {"accessibility_permission_granted": true},
+        "keyring_consent": {"storage_mode": "ignored"}
+    }))
+    .unwrap();
+    assert!(snake_case_only.encryption_key.is_none());
+    assert!(snake_case_only.onboarding_tasks.is_none());
+    assert!(snake_case_only.keyring_consent.is_none());
+
     assert_eq!(
-        params.encryption_key.as_deref(),
+        params.encryption_key.as_ref().map(|value| value.as_deref()),
         Some(Some("  keep whitespace  "))
     );
     let tasks = params.onboarding_tasks.as_ref().unwrap().as_ref().unwrap();
@@ -147,6 +158,25 @@ fn update_local_state_patch_preserves_camel_case_tristate_and_nested_defaults() 
     let consent = params.keyring_consent.as_ref().unwrap().as_ref().unwrap();
     assert_eq!(consent.storage_mode, "");
     assert_eq!(consent.consented_at_ms, Some(17));
+
+    let defaults: UpdateLocalStateParams = serde_json::from_value(serde_json::json!({
+        "onboardingTasks": {},
+        "keyringConsent": {}
+    }))
+    .unwrap();
+    let tasks = defaults
+        .onboarding_tasks
+        .as_ref()
+        .unwrap()
+        .as_ref()
+        .unwrap();
+    assert!(!tasks.accessibility_permission_granted);
+    assert!(tasks.enabled_tools.is_empty());
+    assert!(tasks.connected_sources.is_empty());
+    assert_eq!(tasks.updated_at_ms, None);
+    let consent = defaults.keyring_consent.as_ref().unwrap().as_ref().unwrap();
+    assert_eq!(consent.storage_mode, "");
+    assert_eq!(consent.consented_at_ms, None);
 }
 
 #[test]
