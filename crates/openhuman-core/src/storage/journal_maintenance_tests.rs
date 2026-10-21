@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::storage::test_support::{sqlite_backend, SqliteBackend};
+use std::sync::Arc;
 use tinyagents_harness::events::{AgentEvent, EventSink, HarnessRunStatus};
 use tinyagents_harness::ids::{ComponentId, HarnessPhase, RunId};
 use tinyagents_harness::observability::replay::read_run_events_page;
@@ -202,10 +203,14 @@ async fn zero_retention_days_keeps_sealed_journals_forever() {
 #[tokio::test]
 async fn dormant_or_expired_profile_fences_receive_no_journal_maintenance_writes() {
     let profile_root = tempfile::tempdir().unwrap();
-    let profile_host = crate::profiles::ProfileHost::new(
+    let fixture = backend();
+    let backend = Arc::clone(&fixture.backend);
+    let profile_host = crate::profiles::ProfileHost::with_backend(
         crate::core::runtime::SaasConfig::new(profile_root.path()),
         crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None),
-    );
+        Some(Arc::clone(&backend)),
+    )
+    .unwrap();
     let profile_id = crate::profiles::ProfileId::for_user(
         "journal-dormant",
         crate::profiles::ProfileIdMode::Raw,
@@ -213,8 +218,6 @@ async fn dormant_or_expired_profile_fences_receive_no_journal_maintenance_writes
     .unwrap();
     profile_host.provision(&profile_id).await.unwrap();
 
-    let fixture = backend();
-    let backend = &fixture.backend;
     let profile_scope = crate::storage::scope_for_profile(profile_id.as_str());
     let profile_journal = journal_in_scope(&backend, &profile_scope);
     seed(&profile_journal, "run.foreign", 1).await;
