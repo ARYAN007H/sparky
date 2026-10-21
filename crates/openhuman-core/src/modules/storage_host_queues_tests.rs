@@ -9,6 +9,7 @@ use tinybus::broker::Broker;
 use tinybus::transport::memory::MemoryBus;
 use tinybus::Connection;
 use tinystoragedrivers::ErrorKind;
+use tinystoragedrivers_testkit::MemoryBackend as MemoryStorage;
 use tinystoragedrivers_types::{NewMessage, QueueSpec};
 
 fn manifest() -> Arc<QueueManifest> {
