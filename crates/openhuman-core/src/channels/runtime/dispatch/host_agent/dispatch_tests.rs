@@ -306,6 +306,21 @@ async fn delayed_provider(delay: std::time::Duration) -> MockServer {
     server
 }
 
+struct InstalledResolver(Arc<dyn HostAgentResolver>);
+
+impl InstalledResolver {
+    fn new(resolver: Arc<dyn HostAgentResolver>) -> Self {
+        host_agents::install(Arc::clone(&resolver));
+        Self(resolver)
+    }
+}
+
+impl Drop for InstalledResolver {
+    fn drop(&mut self) {
+        host_agents::clear_if(&self.0);
+    }
+}
+
 /// An agent turn is a deep future; run it the way hosts do, on workers with
 /// the documented stack.
 fn on_agent_runtime(test: impl std::future::Future<Output = ()> + Send + 'static) {
@@ -417,9 +432,26 @@ async fn bound_channel_runs_its_host_agent() {
     );
 }
 
-#[tokio::test(start_paused = true)]
-async fn native_host_agent_turn_enforces_the_configured_channel_deadline() {
-    let _slot = host_agents::tests::lock();
+#[test]
+fn native_host_agent_turn_enforces_the_configured_channel_deadline() {
+    std::thread::Builder::new()
+        .name("channel-deadline-test".into())
+        .stack_size(crate::core::runtime::AGENT_WORKER_STACK_BYTES)
+        .spawn(|| {
+            let _slot = host_agents::tests::lock();
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .start_paused(true)
+                .build()
+                .unwrap();
+            runtime.block_on(native_host_agent_turn_enforces_the_configured_channel_deadline_inner());
+        })
+        .unwrap()
+        .join()
+        .expect("channel deadline runtime thread");
+}
+
+async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner() {
     let _bus = crate::agent::bus::use_real_agent_handler().await;
     let _storage = crate::channels::module_fixture::install_memory_storage();
     crate::channels::module_fixture::client().await;
@@ -448,7 +480,7 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline() {
         .expect("the test owns the runtime context")
         .message_timeout_secs = timeout;
 
-    host_agents::install(Arc::clone(&resolver));
+    let _installed = InstalledResolver::new(resolver);
     let turn = tokio::spawn(process_channel_message(ctx, message("slow native turn")));
     let mut requests = Vec::new();
     for _ in 0..1_000 {
@@ -473,8 +505,7 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline() {
     let sent = channel.sent.lock().unwrap().clone();
     assert_eq!(sent.len(), 1, "the timed-out turn emits one terminal reply");
     assert!(
-        sent[0].content.contains("time budget")
-            || sent[0].content.contains("time limit"),
+        sent[0].content.contains("past its time budget"),
         "the response is the classified timeout notice: {sent:#?}"
     );
 
@@ -485,5 +516,4 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline() {
         1,
         "the delayed model response cannot deliver after timeout cleanup"
     );
-    host_agents::clear_if(&resolver);
 }
