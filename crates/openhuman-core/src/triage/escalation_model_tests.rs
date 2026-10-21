@@ -311,6 +311,7 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
         request_id: None,
     });
     let mut disclosures = 0;
+    let mut observed_destinations = Vec::new();
     loop {
         match tokio::time::timeout(Duration::from_secs(3), rx.recv())
             .await
@@ -318,7 +319,20 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
         {
             Some(crate::core::events::DomainEvent::ExternalTransferPending {
                 descriptor, ..
-            }) if descriptor.service == model_marker => disclosures += 1,
+            }) if descriptor.service == model_marker => {
+                disclosures += 1;
+                observed_destinations.push((descriptor.provider_slug, descriptor.service));
+            }
+            Some(crate::core::events::DomainEvent::ExternalTransferPending {
+                descriptor, ..
+            }) if descriptor.provider_slug == "openhuman"
+                && matches!(
+                    descriptor.reason,
+                    crate::security::egress::EgressReason::Inference
+                ) =>
+            {
+                observed_destinations.push((descriptor.provider_slug, descriptor.service));
+            }
             Some(crate::core::events::DomainEvent::ExternalTransferPending {
                 descriptor, ..
             }) if descriptor.service == sentinel => break,
@@ -326,7 +340,9 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
             None => panic!("event bus closed before egress sentinel"),
         }
     }
-    println!("direct source model disclosure count: {disclosures}");
+    println!(
+        "direct source inference egress count={disclosures}, destinations={observed_destinations:?}"
+    );
     assert_eq!(
         disclosures, 1,
         "one direct inference turn should disclose its model destination once"
