@@ -187,4 +187,3 @@ pub async fn inference_diagnostics(config: &Config) -> Result<Outcome<Value>, St
     }
     result
 }
-

@@ -121,7 +121,10 @@ fn native_usage_round_trip_preserves_submicro_usd_and_charge_state_in_cost_rows(
     );
     let recovered = tinyinference_llm::usage::usage_info_from_response(&response)
         .expect("provider usage survives response conversion");
-    assert_eq!(recovered.charged_amount_usd.to_bits(), billed.charged_amount_usd.to_bits());
+    assert_eq!(
+        recovered.charged_amount_usd.to_bits(),
+        billed.charged_amount_usd.to_bits()
+    );
     assert!(recovered.charge_reported);
     assert!(!recovered.cost_is_estimate);
     record_provider_usage(&DispatchCtx::ambient(), REPORTED_MODEL, &recovered);
