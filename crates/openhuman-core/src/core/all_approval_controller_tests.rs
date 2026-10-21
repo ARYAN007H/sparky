@@ -120,9 +120,7 @@ fn raw_approval_security_registry_matches_its_independent_contract() {
         ("state", "ApprovalGateBootState", true),
         ("result", "FlowPreauthorizationResult", true),
     ];
-    for (index, (schema, (name, reference, required))) in
-        schemas.iter().zip(outputs).enumerate()
-    {
+    for (index, (schema, (name, reference, required))) in schemas.iter().zip(outputs).enumerate() {
         assert_eq!(
             schema.outputs.len(),
             1,

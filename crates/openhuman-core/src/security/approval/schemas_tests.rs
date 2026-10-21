@@ -205,6 +205,42 @@ fn decide_parser_preserves_parse_order_raw_values_and_four_decisions() {
         parse_decide(Map::from_iter([("request_id".into(), json!(null))])).unwrap_err(),
         "invalid 'request_id': expected string, got null"
     );
+    for (value, kind) in [
+        (json!(null), "null"),
+        (json!(false), "bool"),
+        (json!(7), "number"),
+        (json!([]), "array"),
+        (json!({}), "object"),
+    ] {
+        assert_eq!(
+            parse_decide(Map::from_iter([
+                ("request_id".into(), value),
+                ("decision".into(), json!(false)),
+                ("agent_id".into(), json!(false)),
+            ]))
+            .unwrap_err(),
+            format!("invalid 'request_id': expected string, got {kind}"),
+            "request_id parsing precedes decision and agent_id errors"
+        );
+    }
+    for (value, kind) in [
+        (json!(null), "null"),
+        (json!(false), "bool"),
+        (json!(7), "number"),
+        (json!([]), "array"),
+        (json!({}), "object"),
+    ] {
+        assert_eq!(
+            parse_decide(Map::from_iter([
+                ("request_id".into(), json!("id")),
+                ("decision".into(), value),
+                ("agent_id".into(), json!(false)),
+            ]))
+            .unwrap_err(),
+            format!("invalid 'decision': expected string, got {kind}"),
+            "decision type validation precedes the invalid agent_id"
+        );
+    }
 }
 
 #[test]
@@ -262,7 +298,13 @@ fn preauthorize_parser_preserves_flow_and_tool_strings_without_normalizing() {
         parse_preauthorize_flow(Map::from_iter([("tool_names".into(), json!([]))])).unwrap_err(),
         "missing required param 'flow_id'"
     );
-    for value in [json!(null), json!(true), json!(7), json!("tools"), json!({})] {
+    for value in [
+        json!(null),
+        json!(true),
+        json!(7),
+        json!("tools"),
+        json!({}),
+    ] {
         let kind = value_kind(&value);
         assert_eq!(
             parse_preauthorize_flow(Map::from_iter([
