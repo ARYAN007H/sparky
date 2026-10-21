@@ -9,10 +9,11 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::storage::{DocumentStore, ErrorKind, Precondition, Storage};
+use crate::storage::{DocumentStore, Precondition, Storage};
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 use sha2::Digest;
+use tinystoragedrivers::ErrorKind;
 use tinystoragedrivers_types::WriteOptions;
 
 /// The module's scope of the installed backend, or `None` when the process

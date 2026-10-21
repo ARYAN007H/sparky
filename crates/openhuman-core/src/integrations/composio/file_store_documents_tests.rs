@@ -154,9 +154,10 @@ fn an_unchanged_update_writes_nothing_and_returns_its_result() {
 fn the_import_marker_is_a_migrations_entry_and_stops_a_second_import() {
     let docs = docs_in(&MemoryStorage::new(), "local");
     assert!(!docs.legacy_imported(path()).unwrap());
-    assert!(docs
-        .import_if_absent(path(), serde_json::json!({ "gmail": 5 }))
-        .unwrap());
+    assert!(
+        docs.import_if_absent(path(), serde_json::json!({ "gmail": 5 }))
+            .unwrap()
+    );
     assert!(docs.legacy_imported(path()).unwrap());
     let loaded: BTreeMap<String, u32> = docs.load(path()).unwrap();
     assert_eq!(loaded["gmail"], 5);

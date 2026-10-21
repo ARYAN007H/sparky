@@ -34,20 +34,19 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use tinyagents_session::DriverSessionStores;
 use tinyagents_session::port::TurnStates;
-use tinyagents_session::run_ledger::{ImportCounts, LegacyDatabaseReport, LegacySessionImport};
 use tinyagents_session::run_ledger::RunLedgerStore;
+use tinyagents_session::run_ledger::{ImportCounts, LegacyDatabaseReport, LegacySessionImport};
 use tinyagents_session::transcript::{
-    DisplayMessage, DisplayRecord, SessionRef, TranscriptHistory,
-    TranscriptMessage, TranscriptMeta, TranscriptPartial, TranscriptTurn, decode_transcript_jsonl,
-    session_stem,
+    DisplayMessage, DisplayRecord, SessionRef, TranscriptHistory, TranscriptMessage,
+    TranscriptMeta, TranscriptPartial, TranscriptTurn, decode_transcript_jsonl, session_stem,
 };
 use tinyagents_session::turn_state::TurnState;
 
 use super::tinyflows::{finish, marked};
 use super::{Outcome, Report, Snapshot};
 use crate::config::Config;
-use crate::storage::sessions::DEFAULT_AGENT;
 use crate::storage::StorageBackend;
+use crate::storage::sessions::DEFAULT_AGENT;
 
 /// The marker name of the session import.
 pub const SESSIONS_DOMAIN: &str = "sessions";
