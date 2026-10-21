@@ -40,6 +40,9 @@ const NATIVE_FILE_BYTES: &[u8] = b"native file bytes for typed admission";
 struct MockState {
     updates: Mutex<VecDeque<Value>>,
     update_offsets: Mutex<Vec<i64>>,
+    served_update_ids: Mutex<Vec<i64>>,
+    file_requests: Mutex<Vec<String>>,
+    file_downloads: Mutex<Vec<String>>,
     completions: Mutex<Vec<Value>>,
     sent_messages: Mutex<Vec<Value>>,
 }
@@ -115,7 +118,17 @@ async fn get_updates(State(state): State<Arc<MockState>>, Json(body): Json<Value
             .and_then(Value::as_i64)
             .is_some_and(|id| id >= offset)
     });
-    Json(json!({ "ok": true, "result": updates.iter().cloned().collect::<Vec<_>>() }))
+    let result = updates.iter().cloned().collect::<Vec<_>>();
+    state
+        .served_update_ids
+        .lock()
+        .expect("served Telegram updates")
+        .extend(
+            result
+                .iter()
+                .filter_map(|update| update.get("update_id").and_then(Value::as_i64)),
+        );
+    Json(json!({ "ok": true, "result": result }))
 }
 
 async fn send_message(State(state): State<Arc<MockState>>, Json(body): Json<Value>) -> Json<Value> {
@@ -132,11 +145,19 @@ async fn send_message(State(state): State<Arc<MockState>>, Json(body): Json<Valu
     Json(json!({ "ok": true, "result": { "message_id": id, "chat": { "id": 42 } } }))
 }
 
-async fn get_file(Json(body): Json<Value>) -> Json<Value> {
+async fn get_file(
+    State(state): State<Arc<MockState>>,
+    Json(body): Json<Value>,
+) -> Json<Value> {
     let file_id = body
         .get("file_id")
         .and_then(Value::as_str)
         .unwrap_or_default();
+    state
+        .file_requests
+        .lock()
+        .expect("Telegram getFile requests")
+        .push(file_id.to_owned());
     let (path, bytes) = match file_id {
         "typed-image-file" => ("photos/native.png", NATIVE_IMAGE_PNG),
         "typed-document-file" => ("documents/native.txt", NATIVE_FILE_BYTES),
@@ -145,7 +166,15 @@ async fn get_file(Json(body): Json<Value>) -> Json<Value> {
     Json(json!({ "ok": true, "result": { "file_path": path, "file_size": bytes.len() } }))
 }
 
-async fn download_file(path: axum::extract::Path<String>) -> Response {
+async fn download_file(
+    State(state): State<Arc<MockState>>,
+    path: axum::extract::Path<String>,
+) -> Response {
+    state
+        .file_downloads
+        .lock()
+        .expect("Telegram file downloads")
+        .push(path.0.clone());
     let (content_type, bytes) = match path.0.as_str() {
         "photos/native.png" => ("image/png", NATIVE_IMAGE_PNG),
         "documents/native.txt" => ("text/plain", NATIVE_FILE_BYTES),
@@ -499,8 +528,23 @@ async fn wait_for_completion(state: &MockState, count: usize) {
                 .lock()
                 .expect("Telegram sent messages")
                 .clone();
+            let served_update_ids = state
+                .served_update_ids
+                .lock()
+                .expect("served Telegram updates")
+                .clone();
+            let file_requests = state
+                .file_requests
+                .lock()
+                .expect("Telegram getFile requests")
+                .clone();
+            let file_downloads = state
+                .file_downloads
+                .lock()
+                .expect("Telegram file downloads")
+                .clone();
             panic!(
-                "timed out waiting for model request {count}; observed {model_requests} model requests, Telegram offsets {offsets:?}, and outbound bodies {sent_messages:#?}"
+                "timed out waiting for model request {count}; observed {model_requests} model requests, Telegram offsets {offsets:?}, served updates {served_update_ids:?}, getFile requests {file_requests:?}, file downloads {file_downloads:?}, and outbound bodies {sent_messages:#?}"
             );
         }
         sleep(Duration::from_millis(50)).await;
