@@ -583,9 +583,7 @@ async fn run_typed_mode(
         tinyagents_harness::context::AgentsMdContent::default()
     };
 
-    let connected_identities_md =
-        crate::integrations::render_connected_identities_async(&options.run_context.dispatch_ctx())
-            .await;
+    let connected_identities_md = options.run_context.connected_identities_md().await;
     let prompt_ctx = PromptContext {
         workspace_dir: &parent.workspace_dir,
         model_name: &model,
