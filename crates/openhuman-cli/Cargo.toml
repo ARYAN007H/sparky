@@ -176,7 +176,7 @@ path = "../../tests/components_e2e.rs"
 # reads its historical records through their owning domains.
 name = "storage_legacy_profile_boot_e2e"
 path = "../../tests/storage_legacy_profile_boot_e2e.rs"
-required-features = ["storage-sqlite", "modules", "flows"]
+required-features = ["storage-sqlite", "modules", "flows", "linked-modules"]
 
 [[test]]
 name = "embedded_server_shutdown_e2e"
