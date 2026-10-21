@@ -44,7 +44,7 @@ use chat_model::{unresolved_chat_model_error_for, with_default_temperature};
 #[cfg(test)]
 use cloud_slug::try_create_cloud_slug_chat_model;
 use cloud_slug::{
-    resolve_cloud_slug_for, try_create_cloud_slug_chat_model_from_string,
+    try_create_cloud_slug_chat_model_from_string,
     try_create_cloud_slug_chat_model_from_string_with_native_tools_for,
 };
 use local_runtime::{try_create_local_runtime_chat_model_from_string, OptionalChatModelResult};
