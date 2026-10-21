@@ -136,7 +136,9 @@ impl ChannelHealthCheck {
                 };
                 let label = channel_label(&self.provider);
                 match report.state {
-                    ChannelHealthState::Healthy => Finding::pass(&self.id, format!("{label} is healthy.")),
+                    ChannelHealthState::Healthy => {
+                        Finding::pass(&self.id, format!("{label} is healthy."))
+                    }
                     ChannelHealthState::Unhealthy => Finding::error(
                         &self.id,
                         format!("{label} is unhealthy (auth/config/network)."),

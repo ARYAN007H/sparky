@@ -4,8 +4,8 @@ use async_trait::async_trait;
 
 use super::contract::{DoctorCtx, DoctorOptions, FindingSeverity};
 use super::runner;
-use crate::config::schema::StorageConfig;
 use crate::config::Config;
+use crate::config::schema::StorageConfig;
 
 struct DownMemoryEngine {
     inner: tinymemory_api::conformance::ReferenceEngine,

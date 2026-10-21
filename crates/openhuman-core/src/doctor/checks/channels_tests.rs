@@ -1,8 +1,8 @@
 use super::*;
 use crate::doctor::contract::{DoctorCtx, FindingSeverity};
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 use tinychannels_bus::{ChannelHealthReport, ChannelHealthState, HttpProxyPolicy};
 

@@ -143,14 +143,18 @@ async fn writable_probe_succeeds_and_leaves_the_selected_workspace_unchanged() {
 
     let report = run_only(config, "workspace/writable").await;
 
-    assert!(report
-        .checks_run
-        .iter()
-        .any(|id| id == "workspace/writable"));
-    assert!(!report
-        .findings
-        .iter()
-        .any(|finding| finding.check_id == "doctor/selection"));
+    assert!(
+        report
+            .checks_run
+            .iter()
+            .any(|id| id == "workspace/writable")
+    );
+    assert!(
+        !report
+            .findings
+            .iter()
+            .any(|finding| finding.check_id == "doctor/selection")
+    );
     assert!(report.findings.iter().any(|finding| {
         finding.check_id == "workspace/writable" && finding.severity == FindingSeverity::Pass
     }));
@@ -177,14 +181,18 @@ async fn read_only_workspace_is_reported_by_the_native_writable_check() {
         before, after,
         "the static probe must clean up its scratch file"
     );
-    assert!(report
-        .checks_run
-        .iter()
-        .any(|id| id == "workspace/writable"));
-    assert!(!report
-        .findings
-        .iter()
-        .any(|finding| finding.check_id == "doctor/selection"));
+    assert!(
+        report
+            .checks_run
+            .iter()
+            .any(|id| id == "workspace/writable")
+    );
+    assert!(
+        !report
+            .findings
+            .iter()
+            .any(|finding| finding.check_id == "doctor/selection")
+    );
     let finding = report
         .findings
         .iter()
@@ -270,10 +278,12 @@ async fn workspace_layout_finding_uses_the_registered_native_id() {
     let report = run_only(config, "workspace/layout").await;
 
     assert!(report.checks_run.iter().any(|id| id == "workspace/layout"));
-    assert!(!report
-        .findings
-        .iter()
-        .any(|finding| finding.check_id == "doctor/selection"));
+    assert!(
+        !report
+            .findings
+            .iter()
+            .any(|finding| finding.check_id == "doctor/selection")
+    );
     assert!(report.findings.iter().any(|finding| {
         finding.check_id == "workspace/layout" && finding.severity == FindingSeverity::Warn
     }));

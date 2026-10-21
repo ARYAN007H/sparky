@@ -1,14 +1,14 @@
 use super::*;
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::core::runtime::{CoreContext, DomainSet};
 use crate::core::slots::Extensions;
 use crate::memory::engine::{Binding, EngineHealth};
 use crate::memory::engine_registry::{
-    register_memory_engine_in, register_memory_health_probe_in, EngineEntry, EngineFuture,
-    ReadOnlyHealthProbe,
+    EngineEntry, EngineFuture, ReadOnlyHealthProbe, register_memory_engine_in,
+    register_memory_health_probe_in,
 };
 
 #[tokio::test]
