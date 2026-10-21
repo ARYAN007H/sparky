@@ -39,9 +39,13 @@ pub const SCOPE_SWEEP_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 ///
 /// This is a maintenance primitive, not an automatic policy: the caller must
 /// arrange that blob writers and reference creation cannot race the check and
-/// delete (or use immutable keys). The age grace period must exceed the maximum
-/// time from writing a blob until its durable reference is visible. This
-/// function is deliberately not called by [`sweep_all`].
+/// delete. One safe arrangement is uniquely allocated immutable keys, a grace
+/// interval longer than the maximum write-to-durable-reference delay, and a
+/// rule forbidding later references to already-eligible keys. Otherwise the
+/// caller must coordinate the whole check/delete window with writers. The age
+/// grace period must exceed the maximum time from writing a blob until its
+/// durable reference is visible. This function is deliberately not called by
+/// [`sweep_all`].
 ///
 /// Only blobs with a known `written_at_ms` strictly less than `older_than_ms`
 /// are considered. Unknown ages and entries at the cutoff are retained. Pages

@@ -294,6 +294,32 @@ async fn orphan_sweep_pages_and_preserves_referenced_blobs() {
 }
 
 #[tokio::test]
+async fn orphan_sweep_checks_references_only_for_eligible_blobs() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tinystoragedrivers_api::BlobStore;
+    use tinystoragedrivers_testkit::memory_storage;
+    use tinystoragedrivers_types::Scope;
+
+    let storage = memory_storage(&Scope::local());
+    let blobs = storage.blobs();
+    blobs.put("cleanup/a", vec![1], None).await.unwrap();
+    blobs.put("cleanup/b", vec![2], None).await.unwrap();
+    let checked = AtomicUsize::new(0);
+
+    let removed = sweep_unreferenced_blobs(blobs.as_ref(), "cleanup/", 0, |_| {
+        checked.fetch_add(1, Ordering::SeqCst);
+        async { Ok(false) }
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(removed, 0);
+    assert_eq!(checked.load(Ordering::SeqCst), 0);
+    assert!(blobs.get("cleanup/a").await.unwrap().is_some());
+    assert!(blobs.get("cleanup/b").await.unwrap().is_some());
+}
+
+#[tokio::test]
 async fn orphan_sweep_stops_on_reference_error_after_preserving_prior_progress() {
     use tinystoragedrivers_api::BlobStore;
     use tinystoragedrivers_testkit::memory_storage;
