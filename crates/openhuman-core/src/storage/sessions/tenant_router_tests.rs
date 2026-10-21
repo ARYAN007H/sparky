@@ -1,8 +1,8 @@
 use super::*;
-use crate::storage::MemoryStorage;
+use crate::storage::test_support::memory_backend;
 
 fn stores() -> TenantSessionStores {
-    TenantSessionStores::new(Arc::new(MemoryStorage::new()), false).expect("bridge")
+    TenantSessionStores::new(memory_backend(), false).expect("bridge")
 }
 
 #[test]

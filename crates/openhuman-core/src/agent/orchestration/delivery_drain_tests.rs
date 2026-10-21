@@ -17,7 +17,7 @@ const SHORT: Duration = Duration::from_millis(20);
 fn live_fence() -> (Arc<dyn LeaseStore>, Arc<LeaseFence>) {
     let backend = memory_backend();
     let leases: Arc<dyn LeaseStore> =
-        Arc::new(DocumentLeases::cluster(&backend, "node-a", None, TTL).unwrap());
+        Arc::new(DocumentLeases::cluster(backend.as_ref(), "node-a", None, TTL).unwrap());
     let fence = Arc::new(LeaseFence::new(
         Arc::clone(&leases),
         "alice",
@@ -102,7 +102,7 @@ async fn losing_the_lease_during_the_delay_cuts_the_drain_short() {
 async fn an_expired_grant_fences_the_drain_without_a_latch() {
     let backend = memory_backend();
     let leases: Arc<dyn LeaseStore> =
-        Arc::new(DocumentLeases::cluster(&backend, "node-a", None, TTL).unwrap());
+        Arc::new(DocumentLeases::cluster(backend.as_ref(), "node-a", None, TTL).unwrap());
     // Renewals stopped landing: the grant ran out by this node's clock.
     let fence = Arc::new(LeaseFence::new(
         Arc::clone(&leases),
