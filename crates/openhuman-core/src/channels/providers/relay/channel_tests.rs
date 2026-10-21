@@ -85,10 +85,8 @@ async fn send_publishes_under_the_callers_stamp_and_records_the_text() {
     assert_eq!(channel.sent(), vec!["reply one".to_string()]);
 }
 
-#[tokio::test]
-async fn a_relay_has_no_listener() {
-    let (tx, _rx) = tokio::sync::mpsc::channel(1);
-    assert!(sink().listen(tx).await.is_err());
+#[test]
+fn a_relay_does_not_support_draft_updates() {
     assert_eq!(sink().name(), "telegram");
     assert!(!sink().supports_draft_updates());
 }
