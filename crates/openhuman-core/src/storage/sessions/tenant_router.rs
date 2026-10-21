@@ -97,6 +97,10 @@ impl TenantSessionStores {
                 .agent(agent_id)?;
             let scope = PortScope::new(owner_scope.as_str())?;
             let storage = backend.for_scope(&owner_scope)?;
+            super::super::block_on(async {
+                crate::storage::boot::prepare_scope(&storage).await?;
+                Ok(())
+            })?;
             Ok(ScopedStorage::new(storage, scope))
         });
         let provider = Arc::new(
