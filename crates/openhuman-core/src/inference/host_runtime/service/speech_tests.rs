@@ -1,4 +1,112 @@
 use super::*;
+use crate::core::Outcome;
+use crate::voice::{SttProvider, SttResult};
+use async_trait::async_trait;
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use std::sync::{Arc, Mutex};
+
+#[test]
+fn file_transcription_errors_keep_the_host_path_context() {
+    let missing = restore_host_file_error(
+        "[voice-stt] failed to read audio file: No such file or directory (os error 2)".into(),
+        "/tmp/missing.wav",
+    );
+    assert_eq!(
+        missing,
+        "failed to read audio file /tmp/missing.wav: No such file or directory (os error 2)"
+    );
+
+    let empty = restore_host_file_error("[voice-stt] audio file is empty".into(), "/tmp/empty.wav");
+    assert_eq!(empty, "audio file /tmp/empty.wav is empty");
+
+    assert_eq!(
+        restore_host_file_error("provider refused audio".into(), "/tmp/audio.wav"),
+        "provider refused audio"
+    );
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct CapturedAudio {
+    bytes: Vec<u8>,
+    mime_type: Option<String>,
+    file_name: Option<String>,
+}
+
+struct CapturingSttProvider(Arc<Mutex<Vec<CapturedAudio>>>);
+
+#[async_trait]
+impl SttProvider for CapturingSttProvider {
+    fn name(&self) -> &'static str {
+        "capturing-stt"
+    }
+
+    async fn transcribe(
+        &self,
+        _config: &Config,
+        audio_base64: &str,
+        mime_type: Option<&str>,
+        file_name: Option<&str>,
+        _language: Option<&str>,
+    ) -> Result<Outcome<SttResult>, String> {
+        self.0.lock().unwrap().push(CapturedAudio {
+            bytes: BASE64.decode(audio_base64).unwrap(),
+            mime_type: mime_type.map(str::to_owned),
+            file_name: file_name.map(str::to_owned),
+        });
+        Ok(Outcome::new(
+            SttResult {
+                text: "recognized speech".into(),
+                provider: "capturing-stt".into(),
+            },
+            Vec::new(),
+        ))
+    }
+}
+
+#[tokio::test]
+async fn native_transcription_helpers_preserve_audio_metadata_for_host_stt() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = Config::default();
+    let file_path = tmp.path().join("voice.wav");
+    std::fs::write(&file_path, b"file-audio").unwrap();
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let provider_calls = Arc::clone(&calls);
+    let provider = ConfiguredSttProvider {
+        config: &config,
+        provider_factory: Box::new(move |_| {
+            Ok(Box::new(CapturingSttProvider(Arc::clone(&provider_calls))) as Box<dyn SttProvider>)
+        }),
+    };
+
+    let file_text = tinyinference_voice::transcription::transcribe_file(&file_path, &provider)
+        .await
+        .unwrap();
+    let bytes_text = tinyinference_voice::transcription::transcribe_bytes(
+        b"buffer-audio",
+        Some(" .WEBM "),
+        &provider,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(file_text, "recognized speech");
+    assert_eq!(bytes_text, "recognized speech");
+    assert_eq!(
+        *calls.lock().unwrap(),
+        vec![
+            CapturedAudio {
+                bytes: b"file-audio".to_vec(),
+                mime_type: Some("audio/wav".into()),
+                file_name: Some("voice.wav".into()),
+            },
+            CapturedAudio {
+                bytes: b"buffer-audio".to_vec(),
+                mime_type: Some("audio/webm".into()),
+                file_name: Some("audio.webm".into()),
+            },
+        ]
+    );
+}
 
 fn enabled_config(tmp: &tempfile::TempDir) -> Config {
     let mut config = Config::default();

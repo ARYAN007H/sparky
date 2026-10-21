@@ -2,7 +2,6 @@
 //! vision, transcription, and speech. OpenHuman never downloads models or
 //! starts the runtime; it only probes and talks to the configured endpoint.
 
-use chrono::Utc;
 use std::sync::Arc;
 
 use crate::config::Config;
@@ -27,7 +26,7 @@ fn local_ai_status_snapshot(
     service: Arc<tinyinference_local::service::LocalAiService>,
     runtime: tinyinference_local::service::RuntimeConfig,
 ) -> (LocalAiStatus, Option<tokio::task::JoinHandle<()>>) {
-    let mut snapshot = service.status();
+    let snapshot = service.status_with_provider(&runtime);
     // `unreachable` is re-probed on every status poll so a runtime the user
     // starts later is picked up. The probe is read-only (`GET /api/tags` or
     // `GET /v1/models`); it never spawns a runtime or pulls a model.
@@ -40,15 +39,8 @@ fn local_ai_status_snapshot(
     } else {
         None
     };
-    // `LocalAiService` is a process-wide singleton whose cached `provider`
-    // field was set at first init from whichever config it saw. After an
-    // `inference_update_local_settings` call that swaps providers
-    // (e.g. ollama → lm_studio) the cached value is stale, so we overlay
-    // the current config's provider on the status snapshot before returning.
-    snapshot.provider =
-        tinyinference_local::provider::provider_from_name(&runtime.local_ai.provider)
-            .as_str()
-            .to_string();
+    // The service snapshot uses this call's configured provider, even though
+    // the process-wide service may have been initialized with another one.
     (snapshot, bootstrap_task)
 }
 
@@ -62,10 +54,7 @@ pub async fn local_ai_summarize(
 
     let service = local_ai::global(config);
     let runtime = crate::inference::local_runtime_config(config);
-    let status = service.status();
-    if !matches!(status.state.as_str(), "ready") {
-        service.bootstrap(&runtime).await;
-    }
+    service.ensure_ready(&runtime).await;
     let summary = service
         .summarize_interactive(&runtime, text, max_tokens)
         .await
@@ -84,10 +73,7 @@ pub async fn local_ai_prompt(
 
     let service = local_ai::global(config);
     let runtime = crate::inference::local_runtime_config(config);
-    let status = service.status();
-    if !matches!(status.state.as_str(), "ready") {
-        service.bootstrap(&runtime).await;
-    }
+    service.ensure_ready(&runtime).await;
     let output = service
         .prompt_interactive(
             &runtime,
@@ -139,14 +125,12 @@ pub async fn local_ai_transcribe(
     ))
 }
 
-/// Transcribes raw audio bytes by first saving them to a temporary file.
+/// Transcribes raw audio bytes through the configured STT provider.
 pub async fn local_ai_transcribe_bytes(
     config: &Config,
     audio_bytes: &[u8],
     extension: Option<String>,
 ) -> Result<Outcome<LocalAiSpeechResult>, String> {
-    let service = local_ai::global(config);
-
     let ext = extension
         .unwrap_or_else(|| "webm".to_string())
         .trim()
@@ -156,27 +140,9 @@ pub async fn local_ai_transcribe_bytes(
         return Err("Invalid audio extension".to_string());
     }
 
-    let voice_dir = std::env::temp_dir().join("openhuman_voice_input");
-    tokio::fs::create_dir_all(&voice_dir)
-        .await
-        .map_err(|e| format!("Failed to create voice input directory: {e}"))?;
-
-    let filename = format!(
-        "voice-{}-{}.{}",
-        Utc::now().timestamp_millis(),
-        uuid::Uuid::new_v4(),
-        ext
-    );
-    let file_path = voice_dir.join(filename);
-    tokio::fs::write(&file_path, audio_bytes)
-        .await
-        .map_err(|e| format!("Failed to write audio file: {e}"))?;
-
+    let service = local_ai::global(config);
     let output =
-        local_ai::service::transcribe(&service, config, file_path.to_string_lossy().as_ref()).await;
-    let _ = tokio::fs::remove_file(&file_path).await;
-
-    let output = output.map_err(|e| e.to_string())?;
+        local_ai::service::transcribe_bytes(&service, config, audio_bytes, Some(&ext)).await?;
     Ok(Outcome::single_log(
         output,
         "local ai transcription completed",
