@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use crate::config::Config;
 use crate::doctor::contract::{DoctorCheck, DoctorCtx, DoctorTier, Finding, FindingSeverity};
 use crate::storage::{StorageUrl, STORAGE_URL_VAR};
-use tinystoragedrivers::{BlobConfig, StorageConfig};
+use tinystoragedrivers::StorageConfig;
 
 const COMPONENTS_ID: &str = "components/referenced-but-disabled";
 const MODULE_FALLBACK_ID: &str = "modules/source-fallback";

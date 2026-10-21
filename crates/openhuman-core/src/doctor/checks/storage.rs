@@ -45,18 +45,11 @@ impl DoctorCheck for StorageConnect {
                 )];
             }
         };
-        inspect_storage_config(self.id(), parsed, 0).await
+        inspect_storage_config(self.id(), parsed).await
     }
 }
 
-async fn inspect_storage_config(check_id: &str, config: StorageConfig, depth: u8) -> Vec<Finding> {
-    if depth > 2 {
-        return vec![Finding::skipped(
-            check_id,
-            "The selected composite storage configuration is nested beyond the inspection limit.",
-            "Simplify the storage configuration and rerun doctor.",
-        )];
-    }
+async fn inspect_storage_config(check_id: &str, config: StorageConfig) -> Vec<Finding> {
     match config {
         StorageConfig::Sqlite { path } => {
             match tokio::task::spawn_blocking(move || sqlite_probe(&path)).await {
