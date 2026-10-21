@@ -76,7 +76,7 @@ impl Rig {
         self.backend.for_scope(&self.scope).unwrap()
     }
 
-    fn secrets(&self) -> crate::storage::secrets::DocumentSecrets {
+    fn secrets(&self) -> impl SecretStore {
         let scoped = self.scoped();
         crate::storage::secrets::over(&scoped, self.scope.clone(), keys())
     }

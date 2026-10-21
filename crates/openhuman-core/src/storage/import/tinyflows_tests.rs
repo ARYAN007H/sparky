@@ -87,7 +87,7 @@ fn tree(root: &Path) -> BTreeMap<String, String> {
 fn documents(
     backend: &Arc<dyn StorageBackend>,
     scope: &Scope,
-) -> Arc<dyn tinystoragedrivers::DocumentStore> {
+) -> Arc<dyn crate::storage::DocumentStore> {
     Arc::clone(backend.for_scope(scope).unwrap().documents())
 }
 

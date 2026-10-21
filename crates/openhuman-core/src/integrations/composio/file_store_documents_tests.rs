@@ -2,6 +2,7 @@ use super::*;
 use crate::config::Config;
 use crate::storage::Scope;
 use crate::storage::test_support::memory_backend;
+use crate::storage::state_kv::StateKv;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -142,9 +143,8 @@ fn values_are_tsd_kv_entries_that_kv_itself_reads_and_updates_in_place() {
     assert_eq!(bumped, 2);
 
     let scoped = storage.for_scope(&Scope::local()).unwrap();
-    let kv = tinystoragedrivers::Kv::ns(scoped.documents(), "composio", "state").unwrap();
-    let read: Option<BTreeMap<String, u32>> =
-        crate::storage::block_on(async move { kv.get(path()).await }).unwrap();
+    let kv = StateKv::over(&scoped, "composio", "state");
+    let read: Option<BTreeMap<String, u32>> = kv.get(path()).unwrap();
     assert_eq!(read.unwrap()["gmail"], 2);
 }
 
@@ -193,13 +193,8 @@ async fn v1_state_documents_move_into_kv_without_replacing_a_newer_value() {
         .await
         .unwrap();
     }
-    let kv = tinystoragedrivers::Kv::ns(raw, "composio", "state").unwrap();
-    for spec in tinystoragedrivers::primitives::collection_specs() {
-        raw.ensure_collection(&spec).await.unwrap();
-    }
-    kv.put("b.json", &serde_json::json!({ "n": 99 }))
-        .await
-        .unwrap();
+    let kv = StateKv::over(&scoped, "composio", "state");
+    kv.put("b.json", &serde_json::json!({ "n": 99 })).unwrap();
 
     assert_eq!(migrate_legacy_state(&scoped).await.unwrap(), 1);
     assert_eq!(
