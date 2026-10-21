@@ -314,14 +314,6 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
         .await
         .expect("cron timeout should settle the blocked run")
         .expect("cron scheduler task");
-    let runs = crate::cron::list_runs(&config, &job.id, 10).expect("read persisted run history");
-    assert_eq!(runs.len(), 1, "scheduler persisted one completed attempt");
-    assert_ne!(runs[0].status, "ok", "the configured deadline expired");
-    assert!(!runs[0]
-        .output
-        .as_deref()
-        .unwrap_or_default()
-        .contains("headless-cron-child-result"));
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
         &config.workspace_dir,
         &format!("cron:{}", job.id),
@@ -334,6 +326,11 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
         .try_list_owned(owner.as_str())
         .expect("inspect this Cron run's native descendants");
     assert_eq!(jobs.len(), 1, "one native child belongs to this Cron job");
+    assert_eq!(
+        jobs[0].status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Cancelled,
+        "the descendant is terminal when the scheduled run drains"
+    );
     let child = tokio::time::timeout(
         std::time::Duration::from_secs(2),
         registry.wait_owned(jobs[0].id.as_str(), owner),
@@ -341,14 +338,10 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
     .await
     .expect("root timeout cancellation reaches its child")
     .expect("the child remains available until its terminal state");
-    eprintln!(
-        "CRON_TIMEOUT_SETTLEMENT_DIAGNOSTIC spawn_calls={} accepted_followups={} child_calls={} invocation_dropped={} run_status={} child_status={:?}",
-        model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
-        model.accepted_followups.load(std::sync::atomic::Ordering::SeqCst),
-        model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
-        model.child_invocation_dropped.load(std::sync::atomic::Ordering::SeqCst),
-        runs[0].status,
+    assert_eq!(
         child.status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Cancelled,
+        "the bounded registry wait confirms terminal cancellation"
     );
     assert_eq!(
         model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
@@ -371,6 +364,15 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
             .load(std::sync::atomic::Ordering::SeqCst),
         "the root deadline dropped the child model future"
     );
+
+    let runs = crate::cron::list_runs(&config, &job.id, 10).expect("read persisted run history");
+    assert_eq!(runs.len(), 1, "scheduler persisted one completed attempt");
+    assert_ne!(runs[0].status, "ok", "the configured deadline expired");
+    assert!(!runs[0]
+        .output
+        .as_deref()
+        .unwrap_or_default()
+        .contains("headless-cron-child-result"));
     assert_eq!(
         child.status,
         tinyagents_orchestration::subagent::SubAgentJobStatus::Cancelled,
