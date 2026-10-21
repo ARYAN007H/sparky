@@ -37,7 +37,7 @@ use tinyagents_session::port::TurnStates;
 use tinyagents_session::run_ledger::{ImportCounts, LegacyDatabaseReport, LegacySessionImport};
 use tinyagents_session::transcript::{
     DisplayMessage, DisplayRecord, SessionRef, TranscriptHistory, TranscriptLocator,
-    TranscriptMeta, TranscriptPartial, TranscriptTurn, TurnUsage, decode_transcript_jsonl,
+    TranscriptMessage, TranscriptMeta, TranscriptPartial, TranscriptTurn, decode_transcript_jsonl,
     session_stem,
 };
 use tinyagents_session::turn_state::TurnState;
