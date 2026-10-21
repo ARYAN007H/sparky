@@ -3,10 +3,10 @@
 #[allow(unused_imports)] // Used by tests/raw_coverage outside the core unit-test crate.
 pub use super::dispatch::test_support::build_channel_context_block_for_test;
 use super::dispatch::{
-    process_channel_message, process_channel_runtime_message, RuntimeChannelMessage,
+    RuntimeChannelMessage, process_channel_message, process_channel_runtime_message,
 };
-use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::ChannelSystemPrompt;
+use crate::channels::context::ChannelRuntimeContext;
 use crate::config::{MultimodalConfig, MultimodalFileConfig, ReliabilityConfig};
 use crate::core::events::DomainEvent;
 use crate::inference::provider::ProviderRuntimeOptions;
@@ -17,8 +17,8 @@ use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tinychannels_bus::ChannelMessage;
 use tinychannels_bus::CHANNEL_MESSAGE_TIMEOUT_SECS;
+use tinychannels_bus::ChannelMessage;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
 use wiremock::matchers::{method, path};

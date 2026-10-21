@@ -191,7 +191,7 @@ async fn process_channel_message_cancels_scoped_typing_task() {
             .filter(|path| path.ends_with("/sendChatAction"))
             .count(),
         2,
-        "the module-backed provider should receive one typing start and stop"
+        "the module-backed provider should receive one typing start and stop; got {requests:?}"
     );
     assert_eq!(
         requests
@@ -199,7 +199,7 @@ async fn process_channel_message_cancels_scoped_typing_task() {
             .filter(|path| path.ends_with("/sendMessage"))
             .count(),
         1,
-        "the module-backed provider should receive the completed reply"
+        "the module-backed provider should receive the completed reply; got {requests:?}"
     );
 }
 
@@ -680,10 +680,8 @@ async fn dispatch_replies_with_timeout_notice_when_handler_exceeds_deadline() {
         ..Default::default()
     })
     .await;
-    assert!(
-        timed_out
-            .sends
-            .iter()
-            .any(|send| send.content.contains("Request timed out"))
-    );
+    assert!(timed_out.sends.iter().any(|send| {
+        send.content.contains("time budget")
+            && send.content.contains("retry your question in this thread")
+    }));
 }

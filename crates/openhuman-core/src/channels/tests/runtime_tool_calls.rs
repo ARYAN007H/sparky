@@ -1,6 +1,6 @@
 use super::super::context::{
-    conversation_history_key, ChannelRouteSelection, ChannelRuntimeContext,
-    CHANNEL_MESSAGE_TIMEOUT_SECS,
+    CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRouteSelection, ChannelRuntimeContext,
+    conversation_history_key,
 };
 use super::super::runtime::process_channel_message;
 use super::common::{
@@ -81,7 +81,8 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
     let _module_storage = crate::channels::module_fixture::install_memory_storage();
     let _module_client = crate::channels::module_fixture::client().await;
     crate::core::bus::init().await.expect("bus init");
-    let _builtins = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _builtins =
+        crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let channel_impl = Arc::new(TestChannel::new("telegram"));
     let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
@@ -147,7 +148,10 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
 
     let sent = channel_impl.sent_messages.lock().await;
     assert_eq!(sent.len(), 1);
-    assert!(sent[0].contains("Provider switched to `openhuman`"));
+    assert!(
+        sent[0].contains("Provider switched to `openhuman`"),
+        "the module-handled command should confirm its route change: {sent:?}"
+    );
 
     let route = runtime_ctx
         .route_overrides
