@@ -40,6 +40,19 @@ fn state(scope: &str) -> StateKv {
     )
 }
 
+#[cfg(feature = "storage-sqlite")]
+fn state_with_import_claims(scope: &str) -> (crate::storage::test_support::SqliteBackend, StateKv) {
+    let backend = crate::storage::test_support::sqlite_backend().unwrap();
+    let state = StateKv::on_backend(
+        &backend.backend,
+        &Scope::new(scope).unwrap(),
+        "test_owner",
+        "state",
+    )
+    .unwrap();
+    (backend, state)
+}
+
 #[test]
 fn a_missing_value_reads_as_none() {
     let kv = state("local");
@@ -128,11 +141,12 @@ fn update_applies_the_change_and_skips_an_unchanged_write() {
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn import_file_copies_a_legacy_file_once_and_leaves_it_in_place() {
     let dir = tempfile::tempdir().unwrap();
     let legacy = dir.path().join("jobs.json");
     std::fs::write(&legacy, r#"{"a": 1}"#).unwrap();
-    let kv = state("local");
+    let (_backend, kv) = state_with_import_claims("local");
     kv.import_file("jobs", &legacy).unwrap();
     assert_eq!(
         kv.get::<BTreeMap<String, u32>>("jobs").unwrap().unwrap()["a"],
@@ -155,20 +169,22 @@ fn import_file_copies_a_legacy_file_once_and_leaves_it_in_place() {
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn import_file_does_not_replace_an_existing_value() {
     let dir = tempfile::tempdir().unwrap();
     let legacy = dir.path().join("x.json");
     std::fs::write(&legacy, "7").unwrap();
-    let kv = state("local");
+    let (_backend, kv) = state_with_import_claims("local");
     kv.put("x", &1u32).unwrap();
     kv.import_file("x", &legacy).unwrap();
     assert_eq!(kv.get::<u32>("x").unwrap(), Some(1));
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn import_file_records_a_missing_or_corrupt_file_without_failing() {
     let dir = tempfile::tempdir().unwrap();
-    let kv = state("local");
+    let (_backend, kv) = state_with_import_claims("local");
     kv.import_file("none", &dir.path().join("missing.json"))
         .unwrap();
     let corrupt = dir.path().join("bad.json");
@@ -183,9 +199,10 @@ fn import_file_records_a_missing_or_corrupt_file_without_failing() {
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn typed_import_quarantines_invalid_json_and_wrong_legacy_shapes() {
     let dir = tempfile::tempdir().unwrap();
-    let kv = state("local");
+    let (_backend, kv) = state_with_import_claims("local");
     let cases: [(&str, &[u8]); 2] = [
         ("malformed", b"{not json"),
         ("wrong_shape", br#"{"a":"not a number"}"#),
@@ -208,12 +225,13 @@ fn typed_import_quarantines_invalid_json_and_wrong_legacy_shapes() {
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn typed_import_keeps_valid_legacy_file_and_does_not_resurrect_deleted_value() {
     let dir = tempfile::tempdir().unwrap();
     let legacy = dir.path().join("valid.json");
     let bytes = br#"{"a":7}"#;
     std::fs::write(&legacy, bytes).unwrap();
-    let kv = state("local");
+    let (_backend, kv) = state_with_import_claims("local");
 
     kv.import_file_quarantining::<BTreeMap<String, u32>>("valid", &legacy)
         .unwrap();
@@ -231,6 +249,7 @@ fn typed_import_keeps_valid_legacy_file_and_does_not_resurrect_deleted_value() {
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn typed_quarantine_validation_is_cached_per_backend_scope_name_and_type() {
     COUNTED_A_DESERIALIZATIONS.store(0, Ordering::SeqCst);
     COUNTED_B_DESERIALIZATIONS.store(0, Ordering::SeqCst);
@@ -240,9 +259,14 @@ fn typed_quarantine_validation_is_cached_per_backend_scope_name_and_type() {
     std::fs::write(&first_legacy, r#"{"ok":true}"#).unwrap();
     std::fs::write(&second_legacy, r#"{"ok":true}"#).unwrap();
 
-    let backend: std::sync::Arc<dyn StorageBackend> =
-        std::sync::Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
-    let local = StateKv::on_backend(&backend, &Scope::local(), "test_owner", "state").unwrap();
+    let backend = crate::storage::test_support::sqlite_backend().unwrap();
+    let local = StateKv::on_backend(
+        &backend.backend,
+        &Scope::local(),
+        "test_owner",
+        "state",
+    )
+    .unwrap();
     local
         .import_file_quarantining::<CountedA>("first", &first_legacy)
         .unwrap();
@@ -270,7 +294,7 @@ fn typed_quarantine_validation_is_cached_per_backend_scope_name_and_type() {
     );
 
     let another_scope = StateKv::on_backend(
-        &backend,
+        &backend.backend,
         &Scope::new("another").unwrap(),
         "test_owner",
         "state",
