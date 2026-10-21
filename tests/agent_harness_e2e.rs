@@ -17,6 +17,8 @@ mod env_guard;
 mod linked_modules;
 #[path = "support/scripted_stack.rs"]
 mod scripted_stack;
+#[path = "support/tinyhumans_boot.rs"]
+mod tinyhumans_boot;
 use env_guard::EnvVarGuard;
 use scripted_stack::{
     assert_no_jsonrpc_error, current_user, lock_or_recover, text_completion, tool_calls_completion,
@@ -700,6 +702,10 @@ async fn boot_stack() -> Stack {
 const SUPERVISED_AUTONOMY_CONFIG: &str = "[autonomy]\nenabled = true\nlevel = \"supervised\"\n";
 
 async fn boot_stack_with_config(extra_config: &str) -> Stack {
+    // This in-process host needs the same TinyHumans backend transport that
+    // the CLI binary receives during normal startup.
+    tinyhumans_boot::boot();
+
     // Ensure the global AgentDefinitionRegistry is populated with built-in
     // archetypes (orchestrator, vision_agent, task_manager_agent, etc.) before
     // the RPC stack starts. Without this the session builder cannot build
@@ -2081,14 +2087,16 @@ async fn concurrent_async_subagents_overlap_inner() {
     // the orchestrator's reply for the queue, which is why nothing below keys
     // on a script index.
     reset_script(vec![
+        // These text-only canary tasks use flow_discovery; vision_agent
+        // requires an image attachment.
         tool_calls_completion(&[
             (
                 "spawn_subagent",
-                json!({ "agent_id": "vision_agent", "prompt": "Find PARALLEL_ALPHA_CANARY" }),
+                json!({ "agent_id": "flow_discovery", "prompt": "Find PARALLEL_ALPHA_CANARY" }),
             ),
             (
                 "spawn_subagent",
-                json!({ "agent_id": "vision_agent", "prompt": "Find PARALLEL_BETA_CANARY" }),
+                json!({ "agent_id": "flow_discovery", "prompt": "Find PARALLEL_BETA_CANARY" }),
             ),
         ]),
         text_completion("Spawned two workers; results will arrive as they land."),
@@ -4931,7 +4939,7 @@ async fn cancelling_a_running_background_subagent_settles_it_inner() {
     reset_script(vec![
         tool_calls_completion(&[(
             "spawn_subagent",
-            json!({ "agent_id": "vision_agent", "prompt": "Find CANCEL_E2E_CANARY" }),
+            json!({ "agent_id": "flow_discovery", "prompt": "Find CANCEL_E2E_CANARY" }),
         )]),
         text_completion("Spawned a worker; its result will arrive later."),
         text_completion("worker would have finished here"),
