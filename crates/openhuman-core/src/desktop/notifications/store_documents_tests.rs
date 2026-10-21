@@ -325,10 +325,10 @@ fn an_unparseable_raw_payload_reads_as_a_string() {
 #[test]
 fn scopes_keep_notifications_apart() {
     let storage = memory_backend();
-    docs_in(&storage, "alice")
+    docs_in(storage.as_ref(), "alice")
         .insert(&note("a", "slack", "hi", 0), true)
         .unwrap();
-    let bob = docs_in(&storage, "bob");
+    let bob = docs_in(storage.as_ref(), "bob");
     assert!(bob.list(10, 0, None, None).unwrap().is_empty());
     assert!(!bob
         .exists_recent("slack", Some("acct"), "New message", "hi")

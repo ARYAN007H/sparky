@@ -44,8 +44,8 @@ fn a_record_is_written_once() {
 #[test]
 fn scopes_do_not_see_each_others_costs() {
     let storage = memory_backend();
-    let alice = docs_in(&storage, "alice");
-    let bob = docs_in(&storage, "bob");
+    let alice = docs_in(storage.as_ref(), "alice");
+    let bob = docs_in(storage.as_ref(), "bob");
     alice.add(&record("a/model", 1.0, 0)).unwrap();
     assert_eq!(alice.all().unwrap().len(), 1);
     assert!(bob.all().unwrap().is_empty());

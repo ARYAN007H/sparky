@@ -18,7 +18,7 @@ fn repo(storage: &dyn StorageBackend, scope: &str) -> Repo {
 #[test]
 fn run_declares_the_collections_and_returns_the_result() {
     let storage = memory_backend();
-    let repo = repo(&storage, "local");
+    let repo = repo(storage.as_ref(), "local");
     repo.run(|docs| async move {
         docs.put(
             THINGS,
@@ -40,7 +40,7 @@ fn run_declares_the_collections_and_returns_the_result() {
 #[test]
 fn storage_errors_name_the_domain() {
     let storage = memory_backend();
-    let error = repo(&storage, "local")
+    let error = repo(storage.as_ref(), "local")
         .run(|_| async { Err::<(), _>(StorageError::conflict("raced")) })
         .unwrap_err();
     assert!(error.to_string().starts_with("[test] storage:"), "{error}");
@@ -49,7 +49,7 @@ fn storage_errors_name_the_domain() {
 #[test]
 fn compare_and_swap_applies_declines_and_skips_missing() {
     let storage = memory_backend();
-    let repo = repo(&storage, "local");
+    let repo = repo(storage.as_ref(), "local");
     let (closed, declined, missing) = repo
         .run(|docs| async move {
             docs.put(
@@ -79,7 +79,7 @@ fn compare_and_swap_applies_declines_and_skips_missing() {
 #[test]
 fn concurrent_swaps_apply_once() {
     let storage = memory_backend();
-    let repo = repo(&storage, "local");
+    let repo = repo(storage.as_ref(), "local");
     repo.run(|docs| async move {
         docs.put(
             THINGS,
@@ -115,14 +115,14 @@ fn concurrent_swaps_apply_once() {
 #[test]
 fn scopes_do_not_see_each_other() {
     let storage = memory_backend();
-    repo(&storage, "alice")
+    repo(storage.as_ref(), "alice")
         .run(|docs| async move {
             docs.put(THINGS, "a", json!({}), Precondition::Absent)
                 .await
                 .map(|_| ())
         })
         .unwrap();
-    let seen = repo(&storage, "bob")
+    let seen = repo(storage.as_ref(), "bob")
         .run(|docs| async move { docs.get(THINGS, "a").await })
         .unwrap();
     assert!(seen.is_none());

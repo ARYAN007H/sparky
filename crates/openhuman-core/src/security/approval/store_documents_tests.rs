@@ -72,7 +72,7 @@ fn a_request_is_decided_exactly_once() {
 #[test]
 fn concurrent_deciders_never_both_win() {
     let storage = memory_backend();
-    let store = docs_in(&storage, "local");
+    let store = docs_in(storage.as_ref(), "local");
     store
         .insert_pending(&pending("race", 0, None), "s")
         .unwrap();
@@ -265,8 +265,8 @@ fn flow_trust_grants_list_and_revoke() {
 #[test]
 fn scopes_keep_users_apart() {
     let storage = memory_backend();
-    let alice = docs_in(&storage, "alice");
-    let bob = docs_in(&storage, "bob");
+    let alice = docs_in(storage.as_ref(), "alice");
+    let bob = docs_in(storage.as_ref(), "bob");
     alice.insert_pending(&pending("r", 0, None), "s").unwrap();
     alice.insert_flow_trust("flow-1", "shell").unwrap();
     assert!(bob.list_pending().unwrap().is_empty());
