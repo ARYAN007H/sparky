@@ -90,7 +90,7 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
     let context = crate::core::runtime::CoreContext::for_test_with_extensions(
         crate::core::runtime::DomainSet::full(),
         None,
-        extensions,
+        extensions.clone(),
     );
 
     assert_eq!(
@@ -117,6 +117,16 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
             .window,
             Some(77_777),
             "an explicit process-only projection does not borrow ambient context"
+        );
+        let empty_extensions = Extensions::new();
+        assert_ne!(
+            crate::inference::context_window::project_context_window_for_model(
+                "scoped/model",
+                Some(Some(&empty_extensions))
+            )
+            .window,
+            Some(77_777),
+            "an explicit empty context does not borrow the ambient provider registration"
         );
         assert_eq!(
             crate::inference::registry::provider_default_model(
