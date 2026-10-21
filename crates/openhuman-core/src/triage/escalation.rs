@@ -254,12 +254,7 @@ async fn dispatch_target_agent(
         .get(agent_id)
         .ok_or_else(|| anyhow!("agent definition `{agent_id}` not found in registry"))?;
 
-    tracing::debug!(
-        agent_id = %agent_id,
-        model = %parent_ctx.model_name,
-        tool_count = parent_ctx.all_tools.len(),
-        "[triage::escalation] dispatching run_subagent with parent context"
-    );
+    tracing::debug!(agent_id = %agent_id, "[triage::escalation] dispatching direct agent turn");
 
     let outcome = subagent_host::run_subagent(
         definition,
