@@ -70,12 +70,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
             namespace: "tool_registry",
             function: "get",
             description: "Look up one tool registry entry by stable tool_id.",
-            inputs: vec![FieldSchema {
-                name: "tool_id",
-                ty: TypeSchema::String,
-                comment: "Stable registry id, for example `memory.recall` or `tools.web_search`.",
-                required: true,
-            }],
+            inputs: vec![],
             outputs: vec![FieldSchema {
                 name: "tool",
                 ty: TypeSchema::Json,
