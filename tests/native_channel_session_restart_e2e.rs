@@ -222,7 +222,13 @@ async fn ok() -> Json<Value> {
 }
 
 async fn models() -> Json<Value> {
-    Json(json!({ "data": [{ "id": "session-model", "object": "model" }] }))
+    Json(json!({
+        "data": [{
+            "id": "gpt-4o",
+            "object": "model",
+            "input_modalities": ["text", "image", "pdf"]
+        }]
+    }))
 }
 
 async fn auth_me() -> Json<Value> {
@@ -408,8 +414,8 @@ fn write_config(home: &Path, workspace: &Path, inference: &str) {
     std::fs::create_dir_all(&openhuman_dir).expect("create OpenHuman config dir");
     std::fs::create_dir_all(workspace).expect("create workspace");
     let config = format!(
-        r#"default_model = "mock:session-model"
-chat_provider = "mock:session-model"
+        r#"default_model = "openai:gpt-4o"
+chat_provider = "openai:gpt-4o"
 api_url = "{inference}"
 default_temperature = 0.0
 
@@ -435,11 +441,11 @@ reply_mode = "mirror"
 
 [[cloud_providers]]
 id = "p_session_restart"
-slug = "mock"
+slug = "openai"
 label = "Session restart mock"
 endpoint = "{inference}/v1"
 auth_style = "none"
-default_model = "session-model"
+default_model = "gpt-4o"
 "#
     );
     std::fs::write(openhuman_dir.join("config.toml"), &config).expect("write config");
@@ -511,7 +517,7 @@ fn start_core(
             "RUST_LOG",
             "tinychannels=debug,tinychannels::remote=debug,tinychannels_module=debug,tinychannels_module::service=debug,tinystoragedrivers=debug,openhuman::storage_host=info,openhuman_core::channels=debug",
         )
-        .env("OPENHUMAN_MODEL", "mock:session-model")
+        .env("OPENHUMAN_MODEL", "openai:gpt-4o")
         .env("OPENHUMAN_BACKEND_API_KEY", MOCK_API_KEY)
         .env("BACKEND_URL", inference)
         .env("OPENHUMAN_API_URL", inference)
