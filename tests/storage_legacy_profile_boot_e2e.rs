@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use sha2::{Digest, Sha256};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use tinystoragedrivers::secrets::DerivedKeys;
 use zeroize::Zeroizing;
 
@@ -299,7 +299,11 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         .unwrap()
         .unwrap();
     assert_eq!(secret.as_slice(), b"historical-secret-value");
-    assert_eq!(fixture_sha256(), fixture_hash, "boot modified the checked-in source fixture");
+    assert_eq!(
+        fixture_sha256(),
+        fixture_hash,
+        "boot modified the checked-in source fixture"
+    );
 
     // A second desktop boot must not replay the archived v1 database over an
     // owner deletion made after migration.
@@ -356,5 +360,9 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     .join()
     .unwrap();
     drop(rebooted);
-    assert_eq!(fixture_sha256(), fixture_hash, "reboot modified the checked-in source fixture");
+    assert_eq!(
+        fixture_sha256(),
+        fixture_hash,
+        "reboot modified the checked-in source fixture"
+    );
 }
