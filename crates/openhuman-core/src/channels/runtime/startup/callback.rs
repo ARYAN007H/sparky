@@ -262,6 +262,8 @@ impl ChannelHostCallbacks {
     ) -> Result<tinychannels_bus::HostStoreVoiceMediaResult> {
         let serialized_len = serde_json::to_vec(&request).map_or(usize::MAX, |bytes| bytes.len());
         tracing::debug!(
+            direction = ?request.direction,
+            base64_len = request.audio_base64.len(),
             serialized_within_limit = serialized_len <= MAX_VOICE_MEDIA_BYTES,
             "scoped channel voice media callback entered"
         );
