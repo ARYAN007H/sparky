@@ -678,17 +678,22 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
         tokio::time::advance(std::time::Duration::from_secs(2)).await;
         turn.await.expect("native channel turn task completes");
     }
-    let terminal_sends = provider_server
+    let provider_requests = provider_server
         .received_requests()
         .await
-        .expect("mock Telegram requests")
+        .expect("mock Telegram requests");
+    let provider_paths = provider_requests
+        .iter()
+        .map(|request| request.url.path().to_owned())
+        .collect::<Vec<_>>();
+    let terminal_sends = provider_requests
         .into_iter()
         .filter(|request| request.url.path() == "/bottoken/sendMessage")
         .collect::<Vec<_>>();
     assert_eq!(
         terminal_sends.len(),
         1,
-        "the timed-out turn emits exactly one terminal provider send"
+        "the timed-out turn emits exactly one terminal provider send; observed requests: {provider_paths:?}"
     );
     let terminal_body: serde_json::Value =
         serde_json::from_slice(&terminal_sends[0].body).expect("Telegram send JSON");
