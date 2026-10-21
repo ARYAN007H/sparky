@@ -107,6 +107,7 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
             .session_agent("relay-agent"),
     );
     let dispatch_ctx = crate::core::runtime::DispatchCtx::new(core_context);
+    let stub_dispatch = dispatch_ctx.clone();
     let seen = Arc::new(Mutex::new(Seen::default()));
     let stub_seen = Arc::clone(&seen);
     let relayed_thread = params("m1", "x").thread_id();
@@ -114,7 +115,7 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
         let mut seen = stub_seen.lock().unwrap();
         seen.busy
             .push(crate::agent::orchestration::busy_guard::is_busy(
-                &dispatch_ctx,
+                &stub_dispatch,
                 &relayed_thread,
             ));
         seen.histories.push(
