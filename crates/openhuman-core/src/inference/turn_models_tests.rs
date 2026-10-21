@@ -177,16 +177,12 @@ async fn explicit_provider_string_turn_source_uses_scoped_managed_model() {
         provider,
         scoped_model_entry("explicit-provider-model", false),
     );
-    let explicit_context = CoreContext::for_test_with_host_kind(
+    let explicit_context = CoreContext::for_test_with_host_kind_and_extensions(
         HostKind::Library,
         DomainSet::full(),
         None,
+        explicit_extensions,
     );
-    let explicit_context = {
-        let mut context = Arc::try_unwrap(explicit_context).ok().unwrap();
-        context.extensions = explicit_extensions;
-        Arc::new(context)
-    };
     let ambient_context = CoreContext::for_test_with_host_kind(
         HostKind::Library,
         DomainSet::full(),

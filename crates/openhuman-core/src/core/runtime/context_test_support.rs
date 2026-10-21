@@ -51,7 +51,26 @@ impl CoreContext {
         workspace_dir: Option<std::path::PathBuf>,
         extensions: crate::core::slots::Extensions,
     ) -> Arc<CoreContext> {
-        let mut ctx = Arc::try_unwrap(Self::for_test(domains, workspace_dir))
+        Self::for_test_with_host_kind_and_extensions(
+            HostKind::Cli,
+            domains,
+            workspace_dir,
+            extensions,
+        )
+    }
+
+    /// Test-only constructor with explicit host policy and scoped registrations.
+    pub(crate) fn for_test_with_host_kind_and_extensions(
+        host_kind: HostKind,
+        domains: crate::core::runtime::DomainSet,
+        workspace_dir: Option<std::path::PathBuf>,
+        extensions: crate::core::slots::Extensions,
+    ) -> Arc<CoreContext> {
+        let mut ctx = Arc::try_unwrap(Self::for_test_with_host_kind(
+            host_kind,
+            domains,
+            workspace_dir,
+        ))
             .ok()
             .unwrap();
         ctx.extensions = extensions;
