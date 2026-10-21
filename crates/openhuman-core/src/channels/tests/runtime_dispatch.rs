@@ -138,7 +138,7 @@ async fn process_channel_message_cancels_scoped_typing_task() {
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert("telegram".to_string(), channel);
 
-    let runtime_ctx = Arc::new(ChannelRuntimeContext {
+    let mut runtime_ctx = ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
         module_objects: Arc::new(HashMap::new()),
@@ -159,13 +159,18 @@ async fn process_channel_message_cancels_scoped_typing_task() {
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
         provider_runtime_options: provider::ProviderRuntimeOptions::default(),
-        workspace_dir: Arc::new(std::env::temp_dir()),
+        workspace_dir: Arc::new(linked.config().workspace_dir.clone()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
         core: None,
-    });
+    };
+    let _core = crate::channels::runtime::test_support::bind_test_core_context(
+        &mut runtime_ctx,
+        linked.config(),
+    );
+    let runtime_ctx = Arc::new(runtime_ctx);
 
     process_channel_message(
         runtime_ctx,
@@ -190,8 +195,8 @@ async fn process_channel_message_cancels_scoped_typing_task() {
             .iter()
             .filter(|path| path.ends_with("/sendChatAction"))
             .count(),
-        2,
-        "the module-backed provider should receive one typing start and stop; got {requests:?}"
+        1,
+        "a short turn should send the immediate typing action; stop cancels the local refresher without provider I/O: {requests:?}"
     );
     assert_eq!(
         requests
