@@ -449,9 +449,11 @@ fn import_one(
         return Ok(Outcome::NoSource);
     }
 
-    let claimed = super::import_state::with_claim(&markers, MARKER_OWNER, &step, || {
+    let claimed = super::import_state::with_claim(&markers, MARKER_OWNER, &step, |condition| {
+        let claimed_markers = markers.conditioned(condition)?;
+        let claimed_repo = repo.conditioned(condition)?;
         // Another process may have finished between our check and the claim.
-        if super::import_state::is_done(&markers, MARKER_OWNER, &step)? {
+        if super::import_state::is_done(&claimed_markers, MARKER_OWNER, &step)? {
             return Ok(Outcome::AlreadyDone);
         }
         let snapshot = Snapshot::of(&legacy, source.db)
@@ -479,7 +481,7 @@ fn import_one(
         let total = found.len();
         let (found, specs) = upgrade(source.owner, found)
             .with_context(|| format!("[{domain}] bring the legacy records to schema v2"))?;
-        let written = repo.run(move |docs| async move {
+        let written = claimed_repo.run(move |docs| async move {
             for spec in &specs {
                 docs.ensure_collection(spec).await?;
             }
@@ -513,7 +515,7 @@ fn import_one(
             Ok(written)
         })?;
 
-        super::import_state::set_done(&markers, MARKER_OWNER, &step)?;
+        super::import_state::set_done(&claimed_markers, MARKER_OWNER, &step)?;
         Ok(Outcome::Imported {
             found: total,
             written,
