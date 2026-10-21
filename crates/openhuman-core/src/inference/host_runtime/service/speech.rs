@@ -51,9 +51,10 @@ pub async fn transcribe_with_prompt(
     let provider_name = effective_stt_provider(config);
     debug!("{LOG_PREFIX} configured STT dispatch provider={provider_name} path={audio_path}");
     let provider = selected_stt_provider(config, &provider_name);
-    let text = tinyinference_voice::transcription::transcribe_file(Path::new(audio_path), &provider)
-        .await
-        .map_err(|error| restore_host_file_error(error, audio_path))?;
+    let text =
+        tinyinference_voice::transcription::transcribe_file(Path::new(audio_path), &provider)
+            .await
+            .map_err(|error| restore_host_file_error(error, audio_path))?;
     debug!(
         "{LOG_PREFIX} configured STT complete (provider={} elapsed_ms={})",
         provider_name,
