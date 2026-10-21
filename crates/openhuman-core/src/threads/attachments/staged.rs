@@ -32,6 +32,7 @@ pub(crate) use native::{
 #[path = "staged/native.rs"]
 mod native;
 pub(super) use native::read_staged_file_bounded;
+use native::{STAGED_COLLECTION, STAGED_DOMAIN, STAGED_TTL_SECS};
 
 pub(super) fn staged_doc_id(opaque_id: &str) -> Result<String, String> {
     let uuid = uuid::Uuid::parse_str(opaque_id)

@@ -1,8 +1,9 @@
 use std::time::Duration;
 
-use super::progress::{ProgressProjection, INFERENCE_HEARTBEAT_SECS};
-use super::turn_activity::TurnActivity;
-use super::types::WebChatTaskResult;
+use super::super::progress::{ProgressProjection, INFERENCE_HEARTBEAT_SECS};
+use super::super::turn_activity::TurnActivity;
+use super::super::types::WebChatTaskResult;
+use super::{TurnSignal, WorkTracker};
 use crate::agent::queued_turn::QueuedPayload;
 use crate::core::runtime::DispatchCtx;
 use tinyagents_harness::progress::AgentProgress;

@@ -295,7 +295,7 @@ fn native_attachment_byte_limit(part: &ContentPart, config: &crate::config::Conf
         .min(tinychannels_bus::module_media::MEDIA_UPLOAD_MAX_BYTES)
 }
 
-pub(super) async fn read_staged_file_bounded(
+pub(in crate::threads::attachments) async fn read_staged_file_bounded(
     path: &std::path::Path,
     root: &std::path::Path,
     limit: usize,
