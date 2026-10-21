@@ -9,7 +9,7 @@ pub mod schemas;
 mod storage_schema;
 pub mod store;
 mod store_documents;
-pub(crate) use storage_schema::collection_specs;
+pub(crate) use storage_schema::{collection_specs, upgrade_records};
 pub mod tiny_store;
 pub mod types;
 pub mod version_documents;

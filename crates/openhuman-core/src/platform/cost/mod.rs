@@ -9,7 +9,7 @@ pub mod scope;
 mod storage_schema;
 pub mod tools;
 pub mod tracker;
-pub(crate) use storage_schema::collection_specs;
+pub(crate) use storage_schema::{collection_specs, upgrade_records};
 mod tracker_documents;
 pub mod types;
 
