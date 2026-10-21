@@ -27,7 +27,7 @@ use std::sync::{LazyLock, Mutex, Weak};
 
 use anyhow::{Context, Result};
 
-use super::{MARKER_OWNER, Outcome, Report, marker_spec, marker_step};
+use super::{marker_spec, marker_step, Outcome, Report, MARKER_OWNER};
 use crate::config::Config;
 use crate::storage::documents::Repo;
 use crate::storage::import_state;
@@ -358,9 +358,18 @@ async fn migrate_owner_stores(
     backend: Arc<dyn StorageBackend>,
     config: Config,
 ) -> (Vec<Report>, bool) {
-    let scopes = crate::storage::boot::scopes_to_migrate(&backend).await;
-    #[cfg(feature = "flows")]
-    let local = Scope::local();
+    // v2 has no global scope registry. Prepare only the owner scopes whose
+    // legacy stores this importer can actually discover: the workspace and
+    // agent cron directories. The catalog remains workspace-local.
+    let local = crate::storage::tenant_scope(None);
+    let mut scopes = vec![local.clone()];
+    scopes.extend(
+        agent_cron_dirs(&config.workspace_dir)
+            .into_iter()
+            .map(|(agent, _)| crate::storage::scope_for_agent(&agent)),
+    );
+    scopes.sort_by(|left, right| left.as_str().cmp(right.as_str()));
+    scopes.dedup();
     #[cfg(feature = "flows")]
     let mut local_catalog_ready = false;
     #[cfg(not(feature = "flows"))]
@@ -374,7 +383,7 @@ async fn migrate_owner_stores(
         // second import change the database.
         if matches!(
             scope.parsed().map(|parsed| parsed.principal),
-            Ok(Some(tinystoragedrivers::Principal::Module(_)))
+            Ok(Some(crate::storage::Principal::Module(_)))
         ) {
             continue;
         }

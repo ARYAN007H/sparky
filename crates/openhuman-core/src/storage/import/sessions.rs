@@ -32,12 +32,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use tinyagents_session::DriverSessionStores;
 use tinyagents_session::legacy::{
-    ImportCounts, LegacyDatabaseReport, QuiescentSource, SourceOwner, import_transcripts,
-    import_turn_states,
+    import_transcripts, import_turn_states, ImportCounts, LegacyDatabaseReport, QuiescentSource,
+    SourceOwner,
 };
-use tinyagents_session::transcript::{SessionRef, session_stem};
+use tinyagents_session::transcript::{session_stem, SessionRef};
+use tinyagents_session::DriverSessionStores;
 
 use super::tinyflows::{finish, marked};
 use super::{Outcome, Report, Snapshot};

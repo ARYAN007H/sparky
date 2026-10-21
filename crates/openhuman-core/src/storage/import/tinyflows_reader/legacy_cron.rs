@@ -14,7 +14,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use tinyflows_bus::schedule::types::{
@@ -22,7 +22,7 @@ use tinyflows_bus::schedule::types::{
     SessionTarget,
 };
 
-use super::legacy_db::{LegacyDb, column_or};
+use super::legacy_db::{column_or, LegacyDb};
 use super::report::ImportReport;
 
 /// What `jobs.db` held, decoded.

@@ -62,14 +62,13 @@ where
     Fut: Future<Output = Result<()>>,
 {
     let mut batches = BatchSender::default();
-    if let Some(sqlite_path) = sqlite_path
-        && let Some(db) = LegacyDb::open(sqlite_path)?
-    {
-        let tables = db.tables().await?;
-        if tables.contains("checkpoints") {
-            let mut offset = 0_i64;
-            loop {
-                let rows = db
+    if let Some(sqlite_path) = sqlite_path {
+        if let Some(db) = LegacyDb::open(sqlite_path)? {
+            let tables = db.tables().await?;
+            if tables.contains("checkpoints") {
+                let mut offset = 0_i64;
+                loop {
+                    let rows = db
                     .read("checkpoints", move |connection| {
                         let mut statement = connection.prepare(
                             "SELECT CASE WHEN length(CAST(record AS BLOB)) <= ?1 THEN CAST(record AS BLOB) END, seq FROM checkpoints ORDER BY seq LIMIT ?2 OFFSET ?3",
@@ -87,12 +86,12 @@ where
                             .collect::<std::result::Result<Vec<_>, _>>()
                     })
                     .await?;
-                if rows.is_empty() {
-                    break;
-                }
-                offset += rows.len() as i64;
-                for (raw, sequence) in rows {
-                    let record = match raw.and_then(|bytes| String::from_utf8(bytes).ok()) {
+                    if rows.is_empty() {
+                        break;
+                    }
+                    offset += rows.len() as i64;
+                    for (raw, sequence) in rows {
+                        let record = match raw.and_then(|bytes| String::from_utf8(bytes).ok()) {
                         Some(raw_json) => LegacyImportRecord::Checkpoint { raw_json },
                         None => LegacyImportRecord::Invalid {
                             record_kind: LegacyImportKind::Checkpoint,
@@ -100,14 +99,14 @@ where
                             message: "checkpoint source record exceeds the import byte limit or is not UTF-8".into(),
                         },
                     };
-                    batches.push(record, &mut send).await?;
+                        batches.push(record, &mut send).await?;
+                    }
                 }
             }
-        }
-        if tables.contains("checkpoint_writes") {
-            let mut offset = 0_i64;
-            loop {
-                let rows = db.read("checkpoint writes", move |connection| {
+            if tables.contains("checkpoint_writes") {
+                let mut offset = 0_i64;
+                loop {
+                    let rows = db.read("checkpoint writes", move |connection| {
                     let mut statement = connection.prepare(
                         "WITH source_rows AS (SELECT rowid, thread_id, namespace, checkpoint_id, task_id, idx, node, channel, payload, length(COALESCE(CAST(thread_id AS BLOB), X'')) + length(COALESCE(CAST(namespace AS BLOB), X'')) + length(COALESCE(CAST(checkpoint_id AS BLOB), X'')) + length(COALESCE(CAST(task_id AS BLOB), X'')) + length(COALESCE(CAST(node AS BLOB), X'')) + length(COALESCE(CAST(channel AS BLOB), X'')) + length(COALESCE(CAST(payload AS BLOB), X'')) AS raw_bytes FROM checkpoint_writes) SELECT rowid, raw_bytes <= ?1, CASE WHEN raw_bytes <= ?1 THEN CAST(thread_id AS BLOB) END, CASE WHEN raw_bytes <= ?1 THEN CAST(namespace AS BLOB) END, CASE WHEN raw_bytes <= ?1 THEN CAST(checkpoint_id AS BLOB) END, CASE WHEN raw_bytes <= ?1 THEN CAST(task_id AS BLOB) END, idx, CASE WHEN raw_bytes <= ?1 THEN CAST(node AS BLOB) END, CASE WHEN raw_bytes <= ?1 THEN CAST(channel AS BLOB) END, CASE WHEN raw_bytes <= ?1 THEN CAST(payload AS BLOB) END FROM source_rows ORDER BY rowid LIMIT ?2 OFFSET ?3",
                     )?;
@@ -134,54 +133,56 @@ where
                     )?;
                     mapped.collect::<std::result::Result<Vec<_>, _>>()
                 }).await?;
-                if rows.is_empty() {
-                    break;
-                }
-                offset += rows.len() as i64;
-                for (
-                    row_id,
-                    within_limit,
-                    thread,
-                    namespace,
-                    checkpoint,
-                    task,
-                    idx,
-                    node,
-                    channel,
-                    payload,
-                ) in rows
-                {
-                    let record = if within_limit {
-                        let decoded = (|| {
-                            Some(LegacySqliteCheckpointWrite {
-                                thread_id: String::from_utf8(thread?).ok()?,
-                                namespace_json: String::from_utf8(namespace?).ok()?,
-                                checkpoint_id: String::from_utf8(checkpoint?).ok()?,
-                                task_id: String::from_utf8(task?).ok()?,
-                                idx,
-                                node: String::from_utf8(node?).ok()?,
-                                channel: String::from_utf8(channel?).ok()?,
-                                payload_json: String::from_utf8(payload?).ok()?,
-                            })
-                        })();
-                        decoded.map_or_else(
-                            || LegacyImportRecord::Invalid {
+                    if rows.is_empty() {
+                        break;
+                    }
+                    offset += rows.len() as i64;
+                    for (
+                        row_id,
+                        within_limit,
+                        thread,
+                        namespace,
+                        checkpoint,
+                        task,
+                        idx,
+                        node,
+                        channel,
+                        payload,
+                    ) in rows
+                    {
+                        let record = if within_limit {
+                            let decoded = (|| {
+                                Some(LegacySqliteCheckpointWrite {
+                                    thread_id: String::from_utf8(thread?).ok()?,
+                                    namespace_json: String::from_utf8(namespace?).ok()?,
+                                    checkpoint_id: String::from_utf8(checkpoint?).ok()?,
+                                    task_id: String::from_utf8(task?).ok()?,
+                                    idx,
+                                    node: String::from_utf8(node?).ok()?,
+                                    channel: String::from_utf8(channel?).ok()?,
+                                    payload_json: String::from_utf8(payload?).ok()?,
+                                })
+                            })();
+                            decoded.map_or_else(
+                                || LegacyImportRecord::Invalid {
+                                    record_kind: LegacyImportKind::Write,
+                                    identity: Some(format!("row:{row_id}")),
+                                    message:
+                                        "checkpoint write row contains a missing or non-UTF-8 field"
+                                            .into(),
+                                },
+                                LegacyImportRecord::SqliteCheckpointWrite,
+                            )
+                        } else {
+                            LegacyImportRecord::Invalid {
                                 record_kind: LegacyImportKind::Write,
                                 identity: Some(format!("row:{row_id}")),
-                                message:
-                                    "checkpoint write row contains a missing or non-UTF-8 field"
-                                        .into(),
-                            },
-                            LegacyImportRecord::SqliteCheckpointWrite,
-                        )
-                    } else {
-                        LegacyImportRecord::Invalid {
-                            record_kind: LegacyImportKind::Write,
-                            identity: Some(format!("row:{row_id}")),
-                            message: "checkpoint write row exceeds the import byte limit".into(),
-                        }
-                    };
-                    batches.push(record, &mut send).await?;
+                                message: "checkpoint write row exceeds the import byte limit"
+                                    .into(),
+                            }
+                        };
+                        batches.push(record, &mut send).await?;
+                    }
                 }
             }
         }
