@@ -21,7 +21,8 @@ fn sqlite_repo() -> (tempfile::TempDir, Arc<dyn StorageBackend>, Repo) {
     let dir = tempfile::tempdir().unwrap();
     let database = dir.path().join("claims.sqlite");
     let url = format!("sqlite:{}", database.display());
-    let backend = crate::storage::block_on(crate::storage::open(&url)).unwrap();
+    let backend =
+        crate::storage::block_on(async move { crate::storage::open(&url).await }).unwrap();
     let repo = Repo::on(&backend, &Scope::local(), "claim-test", spec).unwrap();
     (dir, backend, repo)
 }
@@ -137,7 +138,8 @@ fn many_racing_processes_run_the_body_once_at_a_time() {
         .collect();
     let ran = handles
         .into_iter()
-        .filter(|handle| handle.join().unwrap())
+        .map(|handle| handle.join().unwrap())
+        .filter(|ran| *ran)
         .count();
     assert!(ran >= 1, "somebody imports");
     assert!(!overlap.load(std::sync::atomic::Ordering::SeqCst));

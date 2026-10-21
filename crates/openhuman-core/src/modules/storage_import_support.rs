@@ -16,19 +16,110 @@ use sha2::Digest;
 use tinystoragedrivers::ErrorKind;
 use tinystoragedrivers_types::WriteOptions;
 
+/// Storage and profile admission captured from the import caller's context.
+/// Keeping the profile alive prevents eviction until all writes using the
+/// captured lease fence have completed.
+pub(super) struct CapturedModuleStorage {
+    pub(super) backend: Arc<dyn crate::storage::StorageBackend>,
+    pub(super) scope: crate::storage::Scope,
+    pub(super) _profile: Option<Arc<crate::profiles::Profile>>,
+}
+
+fn capture_module_storage(
+    ctx: &crate::core::runtime::DispatchCtx,
+    module_id: &str,
+) -> Result<Option<CapturedModuleStorage>> {
+    let Some(installed) = crate::storage::installed() else {
+        return Ok(None);
+    };
+    let scope = super::storage_host::current_module_scope(ctx, module_id)
+        .map_err(|error| anyhow!("resolve the module scope: {:?}", error.kind()))?;
+    let tenant = ctx
+        .tenant()
+        .map_err(|error| anyhow!("resolve the import caller's tenant: {error}"))?;
+    let Some(profile_id) = tenant.profile else {
+        return Ok(Some(CapturedModuleStorage {
+            backend: installed,
+            scope,
+            _profile: None,
+        }));
+    };
+
+    let caller_context = ctx
+        .resolved()
+        .ok_or_else(|| anyhow!("profile import has no admitted caller context"))?;
+    let host = crate::profiles::host()
+        .ok_or_else(|| anyhow!("profile import has no active profile host"))?;
+    let id = crate::profiles::ProfileId::parse(&profile_id)
+        .map_err(|error| anyhow!("invalid caller profile id: {error}"))?;
+    Ok(Some(capture_profile_module_storage(
+        &host,
+        &id,
+        &profile_id,
+        &caller_context,
+        scope,
+    )?))
+}
+
+pub(super) fn capture_profile_module_storage(
+    host: &crate::profiles::ProfileHost,
+    id: &crate::profiles::ProfileId,
+    profile_id: &str,
+    caller_context: &Arc<crate::core::runtime::CoreContext>,
+    scope: crate::storage::Scope,
+) -> Result<CapturedModuleStorage> {
+    let profile = host
+        .get(id)
+        .ok_or_else(|| anyhow!("caller profile is no longer open"))?;
+    require_profile_context(profile.context(), caller_context, profile_id)?;
+    let backend = host
+        .storage_backend_for(&profile)
+        .map_err(|error| {
+            anyhow!(
+                "capture the caller profile's storage fence: {:?}",
+                error.kind()
+            )
+        })?
+        .ok_or_else(|| anyhow!("profile storage is unavailable for this import"))?;
+    Ok(CapturedModuleStorage {
+        backend,
+        scope,
+        _profile: Some(profile),
+    })
+}
+
+/// Rejects work from an old context after a profile has been reopened under a
+/// different lease. Callers must capture the backend from this same profile
+/// before starting a claim, then retain the profile for the whole operation.
+pub(super) fn require_profile_context(
+    admitted: &Arc<crate::core::runtime::CoreContext>,
+    caller: &Arc<crate::core::runtime::CoreContext>,
+    profile_id: &str,
+) -> Result<()> {
+    if admitted.profile() == Some(profile_id)
+        && caller.profile() == Some(profile_id)
+        && admitted.shares_profile_admission(caller)
+    {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "caller context is not the currently admitted context for profile {profile_id}"
+        ))
+    }
+}
+
 /// The module's scope of the installed backend, or `None` when the process
 /// runs without a storage backend (the module is then not using this storage).
 pub(super) fn module_scope(
     ctx: &crate::core::runtime::DispatchCtx,
     module_id: &str,
 ) -> Result<Option<Storage>> {
-    let Some(backend) = crate::storage::installed() else {
+    let Some(captured) = capture_module_storage(ctx, module_id)? else {
         return Ok(None);
     };
-    let scope = super::storage_host::current_module_scope(ctx, module_id)
-        .map_err(|error| anyhow!("resolve the module scope: {:?}", error.kind()))?;
-    let scoped = backend
-        .for_scope(&scope)
+    let scoped = captured
+        .backend
+        .for_scope(&captured.scope)
         .map_err(|error| anyhow!("open the module scope: {:?}", error.kind()))?;
     Ok(Some(scoped))
 }
@@ -47,11 +138,14 @@ pub(super) fn with_module_claim<T>(
 where
     T: Send + 'static,
 {
-    let Some(backend) = crate::storage::installed() else {
+    let Some(captured) = capture_module_storage(ctx, module_id)? else {
         return Ok(None);
     };
-    let scope = super::storage_host::current_module_scope(ctx, module_id)
-        .map_err(|error| anyhow!("resolve the module scope: {:?}", error.kind()))?;
+    let CapturedModuleStorage {
+        backend,
+        scope,
+        _profile: profile,
+    } = captured;
     let repo = crate::storage::documents::Repo::on(
         &backend,
         &scope,
@@ -65,6 +159,10 @@ where
         crate::storage::import_state::HOST_OWNER,
         &crate::storage::import_state::step_id(marker_kind, marker_id),
         move |condition| {
+            // Keep the admitted profile context alive across claim, payload,
+            // and completion writes; the backend itself holds its exact
+            // captured fence and never performs a later registry lookup.
+            let _profile = profile;
             let scoped_backend = crate::storage::import_state::backend_with_condition(
                 claim_backend,
                 condition.clone(),
