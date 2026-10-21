@@ -337,6 +337,7 @@ fn spawn_tool_schema_closes_only_reachable_specialist_packs() {
         "propose_workflow",
         "generate_presentation",
         "edit",
+        "composio_execute",
         "wallet_status",
     ]);
     let spawn = crate::agent::orchestration::tools::SpawnSubagentTool::scoped(vec![
@@ -354,15 +355,13 @@ fn spawn_tool_schema_closes_only_reachable_specialist_packs() {
         .chain(std::iter::once(&spawn as &dyn tinytools::Tool))
         .collect();
 
-    let core = crate::core::runtime::CoreContext::for_test(
-        crate::core::runtime::DomainSet::full(),
-        None,
-    )
-    .derive_with(crate::core::runtime::ContextOverlay::new(
-        crate::config::Config::default(),
-        crate::core::runtime::DomainSet::full(),
-        super::super::ToolGroups::packed(),
-    ));
+    let core =
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None)
+            .derive_with(crate::core::runtime::ContextOverlay::new(
+                crate::config::Config::default(),
+                crate::core::runtime::DomainSet::full(),
+                super::super::ToolGroups::packed(),
+            ));
     let closed = crate::core::runtime::CoreContext::sync_scope(core, || {
         closed_by_direct_handoff("orchestrator", &tools)
     });
@@ -373,6 +372,10 @@ fn spawn_tool_schema_closes_only_reachable_specialist_packs() {
     assert!(
         !closed.contains(&"edit"),
         "auxiliary coding-pack owners must not close the Master Agent's coding family: {closed:?}"
+    );
+    assert!(
+        !closed.contains(&"composio_execute"),
+        "an incidental workflow_builder owner must not route connected-service actions away from the Master Agent: {closed:?}"
     );
     assert!(!closed.contains(&"wallet_status"), "{closed:?}");
 }

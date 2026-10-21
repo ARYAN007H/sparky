@@ -176,9 +176,7 @@ pub fn closed_by_direct_handoff(agent_id: &str, tools: &[&dyn Tool]) -> Vec<&'st
                 .iter()
                 .find(|(pack_id, _)| *pack_id == pack.id)
                 .is_some_and(|(_, owners)| {
-                    owners
-                        .iter()
-                        .any(|owner| reachable_owners.contains(*owner))
+                    owners.iter().any(|owner| reachable_owners.contains(*owner))
                 })
         })
         .flat_map(|pack| pack.tools.iter().copied())
