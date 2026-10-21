@@ -91,7 +91,7 @@ pub fn sqlite_backend_in(
     let url = url.into();
     let backend = block_on_anyhow({
         let url = url.clone();
-        async move { crate::storage::open(&url).await }
+        async move { crate::storage::open(&url).await.map_err(Into::into) }
     })?;
     Ok(SqliteBackend {
         _directory: directory,

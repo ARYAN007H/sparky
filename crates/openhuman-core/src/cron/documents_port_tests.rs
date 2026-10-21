@@ -143,10 +143,11 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
         );
     }
     assert_eq!(
-        tinyflows_storage::Counters::new(docs)
-            .next("cron", "runs")
+        docs.get("tsd.counters", "cron/runs")
             .await
-            .unwrap(),
+            .unwrap()
+            .expect("the imported counter remains readable")
+            .doc["next"],
         8
     );
     for progress in [

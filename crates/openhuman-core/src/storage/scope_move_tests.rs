@@ -223,7 +223,8 @@ async fn canonical_cluster_scope_import_converts_profiles_and_leases_in_place() 
 #[test]
 fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     use crate::storage::layout::{Target, legacy};
-    use crate::storage::{self, CollectionSpec, DocumentStoreExt, Precondition, Query, Scope};
+    use crate::storage::{self, CollectionSpec, DocumentStoreExt, Precondition, Scope};
+    use tinystoragedrivers::Query;
 
     let dir = tempfile::tempdir().unwrap();
     let target = Target::new(dir.path(), "alice");
@@ -253,7 +254,7 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
             Precondition::Absent,
         )
         .await?;
-        Ok::<_, anyhow::Error>(())
+        Ok::<_, crate::storage::StorageError>(())
     })
     .unwrap();
 
@@ -299,7 +300,7 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     storage::block_on(async {
         destination
             .documents()
-            .delete("scope_move_fixture", "stable-id", Precondition::Any)
+            .delete("scope_move_fixture", "stable-id", Precondition::None)
             .await
     })
     .unwrap();
@@ -309,8 +310,8 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
         .find(|report| report.domain == IMPORT_DOMAIN)
         .unwrap();
     assert_eq!(
-        outcome.outcome,
-        Ok(crate::storage::import::Outcome::AlreadyDone)
+        outcome.outcome.unwrap(),
+        crate::storage::import::Outcome::AlreadyDone
     );
     let after = storage::block_on(async {
         destination
@@ -340,8 +341,8 @@ fn boot_import_reports_no_source_for_a_workspace_without_legacy_storage() {
         .find(|report| report.domain == IMPORT_DOMAIN)
         .expect("scope migration is in the boot importer pipeline");
     assert_eq!(
-        report.outcome,
-        Ok(crate::storage::import::Outcome::NoSource)
+        report.outcome.unwrap(),
+        crate::storage::import::Outcome::NoSource
     );
 }
 
