@@ -168,7 +168,10 @@ where
         return false;
     }
     let current = get_route_selection(ctx, sender_key);
-    let reply_thread = msg.thread_ts.clone().or_else(|| msg.topic_id.clone());
+    // Telegram's legacy `thread_ts` is the inbound provider message id used
+    // for reply targeting; forum topic routing is already encoded in
+    // `reply_target` and must not be reused as a reply-to id.
+    let reply_thread = msg.thread_ts.clone();
     let history_len =
         durable_channel_history_len(ctx, &current, &msg.channel, durable_session_key.as_deref())
             .await;

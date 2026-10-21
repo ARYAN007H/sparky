@@ -140,7 +140,7 @@ async fn handle_linked_runtime_command(
                     reply_to_id: msg.reply_to_id.clone(),
                     conversation: tinychannels_bus::ConversationRef {
                         id: msg.reply_target.clone(),
-                        topic_id: msg.topic_id.clone().or_else(|| msg.thread_ts.clone()),
+                        topic_id: msg.topic_id.clone(),
                         ..Default::default()
                     },
                     sender: tinychannels_bus::SenderRef {
@@ -751,28 +751,53 @@ async fn handle_runtime_command_telegram_new_uses_module_storage() {
     let linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
     let workspace = linked.config().workspace_dir.clone();
     let mut ctx = runtime_context(workspace);
-    let channel_state = Arc::new(TestChannel::new("recording"));
-    let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
+    let channel = linked
+        .channels()
+        .into_iter()
+        .find(|(name, _)| tinychannels_bus::provider_id(name) == "telegram")
+        .map(|(_, channel)| channel)
+        .expect("linked runtime should expose its Telegram module handle");
     let msg = ChannelMessage {
         reply_to_id: None,
-        topic_id: None,
-        id: "1".into(),
+        topic_id: Some("42".into()),
+        id: "100".into(),
         sender: "alice".into(),
-        reply_target: "chat-remote".into(),
+        reply_target: "-200:42".into(),
         content: "/new".into(),
         channel: "telegram".into(),
         timestamp: 0,
-        thread_ts: Some("42".into()),
+        thread_ts: Some("100".into()),
         sender_name: None,
     };
     assert!(handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked).await);
-    let sent = channel_state.sent.lock().unwrap();
-    assert_eq!(sent.len(), 1);
-    assert!(sent[0].content.contains("Started new session"));
+    let topic_only_msg = ChannelMessage {
+        id: "101".into(),
+        thread_ts: None,
+        ..msg.clone()
+    };
     assert!(
-        sent[0]
-            .content
+        handle_linked_runtime_command(&mut ctx, &topic_only_msg, Some(&channel), &linked).await
+    );
+    let sent = linked
+        .provider_request_bodies("/bottoken/sendMessage")
+        .await;
+    assert_eq!(sent.len(), 2);
+    assert_eq!(sent[0]["chat_id"], "-200");
+    assert_eq!(sent[0]["message_thread_id"], "42");
+    assert_eq!(sent[0]["reply_to_message_id"], 100);
+    assert!(
+        sent[0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("Started new session")
+    );
+    assert!(
+        sent[0]["text"]
+            .as_str()
+            .unwrap()
             .contains("Durable conversation history reset")
     );
-    assert_eq!(sent[0].thread_ts.as_deref(), Some("42"));
+    assert_eq!(sent[1]["chat_id"], "-200");
+    assert_eq!(sent[1]["message_thread_id"], "42");
+    assert!(sent[1].get("reply_to_message_id").is_none());
 }
