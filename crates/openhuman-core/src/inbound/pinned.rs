@@ -29,7 +29,7 @@ use async_trait::async_trait;
 use tinyeventqueues_bus::Turn;
 
 use super::events::{external_of, ExternalItem};
-use super::results::{ResultStatus, Results, Stored};
+use super::results::{BlockedEvent, ResultStatus, Results, Stored};
 use crate::config::schema::InboundSourceConfig;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
@@ -118,6 +118,50 @@ pub fn render_prompt(
              {events}"
         ),
     }
+}
+
+/// Split `items` into those the prompt-injection guard lets through and those
+/// it blocks. Each event's text is screened on its own with the guard
+/// `inference.agent_chat` applies to the whole message, so one injected
+/// event is left out instead of failing its batch; the reason is the guard's
+/// verdict and rule codes, never the text.
+fn screen(items: Vec<ExternalItem>) -> (Vec<ExternalItem>, Vec<BlockedEvent>) {
+    use crate::security::prompt_injection::{
+        enforce_prompt_input, PromptEnforcementAction, PromptEnforcementContext,
+    };
+    let mut kept = Vec::with_capacity(items.len());
+    let mut blocked = Vec::new();
+    for item in items {
+        let decision = enforce_prompt_input(
+            &item.text,
+            PromptEnforcementContext {
+                source: "inbound.pinned",
+                request_id: Some(&item.id),
+                user_id: None,
+                session_id: Some("inbound"),
+            },
+        );
+        let verdict = match decision.action {
+            PromptEnforcementAction::Allow => {
+                kept.push(item);
+                continue;
+            }
+            PromptEnforcementAction::Blocked => "blocked",
+            PromptEnforcementAction::ReviewBlocked => "flagged for review",
+        };
+        let codes: Vec<&str> = decision.reasons.iter().map(|r| r.code.as_str()).collect();
+        let reason = if codes.is_empty() {
+            verdict.to_owned()
+        } else {
+            format!("{verdict}: {}", codes.join(", "))
+        };
+        tracing::info!(event_id = %item.id, reason = %reason, "[inbound] event kept out of the pinned prompt");
+        blocked.push(BlockedEvent {
+            event_id: item.id,
+            reason,
+        });
+    }
+    (kept, blocked)
 }
 
 /// Turns being run, so a redelivery and a resume never run one twice at
@@ -224,12 +268,18 @@ impl Pinned {
             return Delivered::Running;
         };
         let items: Vec<ExternalItem> = turn.events.iter().filter_map(external_of).collect();
+        let event_ids: Vec<String> = items.iter().map(|item| item.id.clone()).collect();
+        let (items, blocked) = screen(items);
         let key = turn.events.first().map_or_else(
             || turn.conversation_key.clone(),
             |e| e.conversation_key.clone(),
         );
-        let event_ids = items.iter().map(|item| item.id.clone()).collect();
-        let message = render_prompt(name, &key, source, &items);
+        // Nothing left to run: the turn completes empty, without the model.
+        let message = if items.is_empty() {
+            String::new()
+        } else {
+            render_prompt(name, &key, source, &items)
+        };
         let fresh = Stored::running(
             &turn.turn_id,
             name,

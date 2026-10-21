@@ -89,11 +89,24 @@ pub struct InboundResult {
     pub error: Option<String>,
     /// The source's ids of the events the turn carried, in order.
     pub event_ids: Vec<String>,
+    /// The events the prompt-injection guard kept out of the agent's prompt.
+    #[serde(default)]
+    pub blocked: Vec<BlockedEvent>,
     /// When the turn was first started, Unix epoch milliseconds.
     pub created_ms: u64,
     /// When it completed or failed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completed_ms: Option<u64>,
+}
+
+/// An event the prompt-injection guard kept out of a turn's prompt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BlockedEvent {
+    /// The source's id of the event.
+    pub event_id: String,
+    /// The guard's verdict and rule codes (`blocked: instruction_override`);
+    /// never the event's text.
+    pub reason: String,
 }
 
 /// A result as stored: the wire form, the message the agent was given (so a
@@ -133,12 +146,22 @@ impl Stored {
                 text: None,
                 error: None,
                 event_ids,
+                blocked: Vec::new(),
                 created_ms,
                 completed_ms: None,
             },
             message: message.to_owned(),
             acked: false,
         }
+    }
+}
+
+impl Stored {
+    /// With `blocked` recorded as kept out of the prompt.
+    #[must_use]
+    pub fn with_blocked(mut self, blocked: Vec<BlockedEvent>) -> Self {
+        self.result.blocked = blocked;
+        self
     }
 }
 
