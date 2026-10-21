@@ -56,4 +56,3 @@ fn chat_provider_local_and_byok_strings_resolve_to_workload() {
         }
     }
 }
-

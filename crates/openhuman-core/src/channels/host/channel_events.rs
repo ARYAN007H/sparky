@@ -1,9 +1,9 @@
 //! Host-owned approval routing and turn events over the channel module.
 use crate::channels::capabilities::capabilities_for;
 use crate::channels::runtime::ChannelHandle;
-use crate::channels::SendMessage;
 #[cfg(test)]
 use crate::channels::ChannelSendExt;
+use crate::channels::SendMessage;
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;

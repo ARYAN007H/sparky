@@ -55,10 +55,7 @@ impl ChannelHandle {
         }
     }
 
-    pub(crate) async fn send(
-        &self,
-        message: &tinychannels_bus::SendMessage,
-    ) -> anyhow::Result<()> {
+    pub(crate) async fn send(&self, message: &tinychannels_bus::SendMessage) -> anyhow::Result<()> {
         match self {
             Self::Module(channel) => channel.send_prepared(message).await,
             Self::Relay(channel) => channel.send(message).await,
@@ -74,22 +71,26 @@ impl ChannelHandle {
 
     pub(crate) async fn start_typing(&self, recipient: &str) -> anyhow::Result<()> {
         match self {
-            Self::Module(channel) => channel
-                .interact(tinychannels_bus::ChannelInteraction::StartTyping {
-                    recipient: recipient.to_owned(),
-                })
-                .await,
+            Self::Module(channel) => {
+                channel
+                    .interact(tinychannels_bus::ChannelInteraction::StartTyping {
+                        recipient: recipient.to_owned(),
+                    })
+                    .await
+            }
             Self::Relay(_) => Ok(()),
         }
     }
 
     pub(crate) async fn stop_typing(&self, recipient: &str) -> anyhow::Result<()> {
         match self {
-            Self::Module(channel) => channel
-                .interact(tinychannels_bus::ChannelInteraction::StopTyping {
-                    recipient: recipient.to_owned(),
-                })
-                .await,
+            Self::Module(channel) => {
+                channel
+                    .interact(tinychannels_bus::ChannelInteraction::StopTyping {
+                        recipient: recipient.to_owned(),
+                    })
+                    .await
+            }
             Self::Relay(_) => Ok(()),
         }
     }
@@ -152,7 +153,7 @@ pub(crate) async fn prepare_runtime_limits(
 pub(crate) use credentials::hydrate_channel_credentials;
 pub use start_channels::start_channels;
 pub(crate) use start_channels::start_channels_with_session;
-pub(crate) use turn_parts::{PromptToolDescs, build_channel_turn_parts, runtime_context};
+pub(crate) use turn_parts::{build_channel_turn_parts, runtime_context, PromptToolDescs};
 
 // Re-exported at module scope (rather than left as private `pub(super)`
 // items reached only through their owning submodule) so the `#[path]` test
@@ -161,7 +162,7 @@ pub(crate) use turn_parts::{PromptToolDescs, build_channel_turn_parts, runtime_c
 #[cfg(test)]
 use crate::config::Config;
 #[cfg(test)]
-use chat_workload::{ChatWorkloadResolution, resolve_chat_workload};
+use chat_workload::{resolve_chat_workload, ChatWorkloadResolution};
 #[cfg(any(test, debug_assertions))]
 use credentials::resolve_yuanbao_app_secret;
 #[cfg(test)]

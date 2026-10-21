@@ -317,4 +317,3 @@ async fn event_sink_routes_channel_reactions_to_domain_bus() {
         .await
         .is_ok());
 }
-

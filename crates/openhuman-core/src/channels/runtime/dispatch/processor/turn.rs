@@ -5,9 +5,9 @@ use crate::channels::context::{is_context_window_overflow_error, ChannelRuntimeC
 #[cfg(test)]
 use crate::channels::routes::get_or_create_turn_model_source;
 use crate::channels::routes::{get_route_selection, handle_runtime_command_with_reset};
-use crate::channels::SendMessage;
 #[cfg(test)]
 use crate::channels::ChannelSendExt;
+use crate::channels::SendMessage;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::util::truncate_with_ellipsis;

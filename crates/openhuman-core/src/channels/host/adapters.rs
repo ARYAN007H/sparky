@@ -205,4 +205,3 @@ async fn publish_event(domain: &str, kind: &str, payload: serde_json::Value) -> 
     }
     Ok(())
 }
-
