@@ -17,17 +17,22 @@ owner models and writer transformations from `2d3e22636e^`:
 - `profiles/types.rs::ProfileMeta` is written to the `cluster` scope's
   `profiles` collection with `created_at` removed from the body and retained
   as TSD `created_ms` metadata, matching `ProfileRegistry::body_of`.
-- `security/approval` writes a pending `approvals` record under `profile:u1`;
+- The isolated desktop profile database stores owner documents in the
+  historical `local` scope; the profile directory itself supplied user
+  isolation. `security/approval` writes a pending `approvals` record there;
   the boot owner converter must retain it as `approvals.requests`.
-- `threads/store` writes a legacy `threads_transcript_keys` record under
-  `profile:u1`; the boot owner converter must retain it as
+- `threads/store` writes a legacy `threads_transcript_keys` record in that
+  scope; the boot owner converter must retain it as
   `threads.transcript_keys`.
-- The TinyFlows catalog writes a `flows_definitions` record under `local`, the
-  operator catalog scope. Desktop boot must migrate it through the TinyFlows
+- The TinyFlows catalog writes a `flows_definitions` record in the same
+  per-profile database. Desktop boot must migrate it through the TinyFlows
   catalog owner and the public `flows_list` operation must return it.
-- `secrets` contains an encrypted `fixture-secret` document under `profile:u1`
+- `secrets` contains an encrypted `fixture-secret` document in the same scope
   using the fixture-only master key `[0x5a; 32]`; the integration test reads it
   with TinyStorage's `DocumentSecrets` API after desktop boot.
+- The generator also emits the retired workspace conversation log at
+  `legacy-workspace/memory/conversations/threads.jsonl`; the host E2E copies it
+  to the profile workspace and confirms the thread owner imports it read-only.
 
 The host E2E test copies this database to an existing profile's
 `users/u1/workspace/storage/storage.db`, boots the desktop host with layout
@@ -44,5 +49,6 @@ or product dependency. Regenerate a fresh database at a caller-selected path:
 cargo run --locked --manifest-path crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/generator/Cargo.toml -- /absolute/path/to/storage.db
 ```
 
-Regenerating also refreshes the checked-in database SHA-256; verify the value
-with `sha256sum` and keep it in sync with the integration test's fixture.
+The checked-in database SHA-256 is
+`0519e2d0d32ec3690182a243f7ea1469f66c6a4c160a94718c391ca3cde701b1`.
+Regenerate and verify it with `sha256sum` when updating the fixture.
