@@ -67,15 +67,24 @@ fn session_file_discovery_never_follows_symlinks_outside_legacy_roots() {
     let external = dir.path().join("outside.jsonl");
     std::fs::write(&external, "{}\n").unwrap();
     symlink(&external, raw.join("external.jsonl")).unwrap();
+    let outside_dir = dir.path().join("outside-dir");
+    std::fs::create_dir(&outside_dir).unwrap();
+    std::fs::write(outside_dir.join("thread.jsonl"), "{}\n").unwrap();
+    let linked_raw = workspace.join("linked-session-raw");
+    symlink(&outside_dir, &linked_raw).unwrap();
 
     let external_turn = dir.path().join("outside.json");
     std::fs::write(&external_turn, "{}").unwrap();
     let turn_dir = turns.join("thread");
     std::fs::create_dir(&turn_dir).unwrap();
     symlink(&external_turn, turn_dir.join("external.json")).unwrap();
+    let linked_turns = workspace.join("linked-turn-states");
+    symlink(&outside_dir, &linked_turns).unwrap();
 
     assert!(transcript_files(&raw).unwrap().is_empty());
     assert!(turn_state_files(&turns).unwrap().is_empty());
+    assert!(transcript_files(&linked_raw).is_err());
+    assert!(turn_state_files(&linked_turns).is_err());
 }
 
 /// Every file under `root` with a digest of its bytes.
