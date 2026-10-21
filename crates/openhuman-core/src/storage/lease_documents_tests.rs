@@ -5,10 +5,8 @@ use super::*;
 use std::time::Duration;
 
 use crate::storage::test_support::SqliteBackend;
-use crate::storage::{CollectionSpec, MemoryStorage, Scope};
-use tinystoragedrivers_types::Precondition;
-use crate::storage::MemoryStorage;
-use tinystoragedrivers::{CollectionSpec, Precondition, Scope};
+use crate::storage::test_support::memory_backend;
+use tinystoragedrivers_types::{CollectionSpec, Precondition, Scope};
 
 const TTL: Duration = Duration::from_millis(1_000);
 
@@ -24,22 +22,20 @@ fn node(storage: &SqliteBackend, id: &str) -> DocumentLeases {
 
 #[tokio::test]
 async fn doctor_holder_inspection_does_not_declare_the_lease_collection() {
-    let storage = MemoryStorage::new();
-    let leases = DocumentLeases::cluster(&storage, "a", None, TTL).unwrap();
+    let storage = memory_backend();
+    let leases = DocumentLeases::cluster(storage.as_ref(), "a", None, TTL).unwrap();
     let documents = storage
         .for_scope(&Scope::new(CLUSTER_SCOPE).unwrap())
         .unwrap();
     let spec = CollectionSpec::new(LEASE_COLLECTION);
 
     assert!(documents
-        .documents()
         .validate_collection_spec(&spec)
         .await
         .is_err());
     assert!(leases.holder_readonly("alice").await.unwrap().is_none());
     assert!(
         documents
-            .documents()
             .validate_collection_spec(&spec)
             .await
             .is_err(),

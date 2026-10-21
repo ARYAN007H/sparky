@@ -13,7 +13,6 @@ use tinystoragedrivers::{
     CollectionSpec, ErrorKind, ExpectedDocument, Filter, Precondition, ReadCheck, Storage,
     StorageBackend, StorageError, Versioned, WriteCondition, WriteOp,
 };
-use tinystoragedrivers_api::DocumentStore;
 
 use super::{DocumentStoreExt, documents::Repo};
 

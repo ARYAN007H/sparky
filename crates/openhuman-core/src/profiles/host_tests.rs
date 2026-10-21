@@ -742,5 +742,3 @@ mod migration_fence_tests;
 
 #[path = "host_fence_tests.rs"]
 mod fence_tests;
-#[path = "host_fence_tests.rs"]
-mod fence_tests;
