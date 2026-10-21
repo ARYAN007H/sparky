@@ -17,6 +17,11 @@ fn staged_bound_methods() -> Vec<&'static str> {
     methods.extend(["doctor.report", "doctor.models"]);
     methods.extend(["encrypt.secret", "decrypt.secret"]);
     methods.extend([
+        "keyring_consent.status",
+        "keyring_consent.decide",
+        "keyring_consent.retry_probe",
+    ]);
+    methods.extend([
         "approval.list_pending",
         "approval.list_recent_decisions",
         "approval.decide",
