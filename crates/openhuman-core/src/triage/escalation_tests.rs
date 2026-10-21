@@ -112,14 +112,17 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
     runtime
         .run_in(
             Arc::clone(runtime.context()),
-            apply_decision(
-                &ctx,
-                run_with_target(
-                    TriageAction::React,
-                    "trigger_reactor",
-                    "handle this trigger inline",
+            crate::security::turn_origin::with_origin(
+                crate::triage::local_trigger_origin(),
+                apply_decision(
+                    &ctx,
+                    run_with_target(
+                        TriageAction::React,
+                        "trigger_reactor",
+                        "handle this trigger inline",
+                    ),
+                    &envelope,
                 ),
-                &envelope,
             ),
         )
         .await
