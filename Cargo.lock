@@ -9490,7 +9490,8 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "tinyinference-core 0.5.0",
- "tinystoragedrivers-core",
+ "tinystoragedrivers-api",
+ "tinystoragedrivers-types",
  "tokio",
  "tracing",
 ]
@@ -9948,22 +9949,6 @@ dependencies = [
  "tinystoragedrivers-types",
  "tokio",
  "url",
- "zstd 0.13.3",
-]
-
-[[package]]
-name = "tinystoragedrivers-core"
-version = "1.0.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v1.0.0#141fd9ed0ad5d14a8fb5a1b3e837a719e81ac08d"
-dependencies = [
- "async-trait",
- "data-encoding",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "thiserror 2.0.21",
- "tokio",
- "ulid",
  "zstd 0.13.3",
 ]
 
