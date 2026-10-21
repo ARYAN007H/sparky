@@ -406,3 +406,7 @@ fn model_limits_client_with(
 #[cfg(test)]
 #[path = "context_window_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "context_window_discovery_tests.rs"]
+mod discovery_tests;

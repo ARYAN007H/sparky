@@ -17,7 +17,6 @@ mod chat_model;
 mod cloud_slug;
 mod cloud_spec;
 mod credentials;
-mod discovery;
 mod local_runtime;
 mod managed_backend;
 mod routing;
@@ -32,7 +31,8 @@ pub use credentials::{auth_key_for_slug, lookup_key_for_slug};
 pub(crate) use credentials::{
     openai_bearer_is_oauth, redact_endpoint_origin, resolve_codex_routing,
 };
-pub(crate) use discovery::{model_limits_request, model_limits_request_for};
+pub(crate) use cloud_slug::resolve_cloud_slug_for;
+pub(crate) use cloud_spec::{cloud_provider_spec, CloudCredentialResolver};
 pub(crate) use local_runtime::create_local_chat_model_from_string;
 pub(crate) use managed_backend::make_openhuman_backend_model;
 pub(crate) use routing::role_uses_implicit_cloud_fallback;
