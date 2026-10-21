@@ -66,12 +66,9 @@ fn raw_approval_security_registry_matches_its_independent_contract() {
         [].as_slice(),
         ["flow_id", "tool_names"].as_slice(),
     ]) {
+        let actual: Vec<_> = schema.inputs.iter().map(|field| field.name).collect();
         assert_eq!(
-            schema
-                .inputs
-                .iter()
-                .map(|field| field.name)
-                .collect::<Vec<_>>(),
+            actual.as_slice(),
             expected,
             "{}.{} input order",
             schema.namespace,
@@ -157,7 +154,7 @@ fn raw_approval_security_registry_matches_its_independent_contract() {
     entries[2]
         .decode_params(Map::from_iter([
             ("request_id".into(), json!("id")),
-            ("decision".into(), json!("unsupported")),
+            ("decision".into(), json!(1)),
         ]))
         .expect_err("bound schema decoder enforces string wire types");
     entries[4]
