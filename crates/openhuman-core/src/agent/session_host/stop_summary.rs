@@ -189,7 +189,10 @@ impl StopReasonKind {
         };
         tinyagents_harness::turn_stop::render_copy(
             &OpenHumanStopCopy,
-            &CopyRequest::TurnStop { key, operation: None },
+            &CopyRequest::TurnStop {
+                key,
+                operation: None,
+            },
         )
     }
 

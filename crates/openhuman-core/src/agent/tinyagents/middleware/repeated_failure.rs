@@ -16,9 +16,9 @@ use tinyagents_harness::middleware::{
 };
 use tinyagents_harness::no_progress::FailurePolicy;
 use tinyagents_harness::steering::SteeringHandle;
+use tinyagents_harness::turn_stop::CopyProvider;
 use tinyagents_hooks::stop::StopLatch;
 use tinyagents_hooks::stop::{self, TerminalInferenceFailureKind};
-use tinyagents_harness::turn_stop::CopyProvider;
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::ToolResult as TaToolResult;
 
@@ -31,7 +31,10 @@ use tinyinference_llm::failure::is_recoverable_failure_text as is_recoverable_to
 struct OpenHumanHaltCopy;
 
 impl CopyProvider for OpenHumanHaltCopy {
-    fn copy_override(&self, request: &tinyagents_harness::turn_stop::CopyRequest<'_>) -> Option<String> {
+    fn copy_override(
+        &self,
+        request: &tinyagents_harness::turn_stop::CopyRequest<'_>,
+    ) -> Option<String> {
         use tinyagents_harness::turn_stop::{CopyRequest, TurnStopCopyKey};
 
         match request {
@@ -78,11 +81,17 @@ pub(crate) fn user_actionable_escalation(tool: &str, error: &str) -> Option<Stri
     })
 }
 
-pub(crate) fn terminal_inference_failure_kind(result: &str) -> Option<TerminalInferenceFailureKind> {
+pub(crate) fn terminal_inference_failure_kind(
+    result: &str,
+) -> Option<TerminalInferenceFailureKind> {
     tinyagents_hooks::stop::terminal_inference_failure_kind(result)
 }
 
-pub(crate) fn terminal_inference_halt_summary(kind: TerminalInferenceFailureKind, tool: &str, error: &str) -> String {
+pub(crate) fn terminal_inference_halt_summary(
+    kind: TerminalInferenceFailureKind,
+    tool: &str,
+    error: &str,
+) -> String {
     match kind {
         TerminalInferenceFailureKind::BudgetExhausted => {
             stop::halt_summary::budget(&OpenHumanHaltCopy, tool, error).summary
@@ -97,7 +106,11 @@ pub(crate) fn recoverable_identical_halt_summary(tool: &str, count: u32, error: 
     stop::halt_summary::retry_exhausted(&OpenHumanHaltCopy, tool, count, error).summary
 }
 
-pub(crate) fn recoverable_no_progress_halt_summary(consecutive: u32, tool: &str, error: &str) -> String {
+pub(crate) fn recoverable_no_progress_halt_summary(
+    consecutive: u32,
+    tool: &str,
+    error: &str,
+) -> String {
     stop::halt_summary::no_progress(&OpenHumanHaltCopy, consecutive, tool, error).summary
 }
 
@@ -364,7 +377,8 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
                         class: match kind {
                             TerminalInferenceFailureKind::BudgetExhausted => "out_of_credits",
                             TerminalInferenceFailureKind::ProviderConfig => "provider_config",
-                        }.to_owned(),
+                        }
+                        .to_owned(),
                         operation: call.name.clone(),
                         summary,
                     }),

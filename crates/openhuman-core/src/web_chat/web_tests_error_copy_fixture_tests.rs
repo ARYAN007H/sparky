@@ -255,8 +255,9 @@ fn shared_budget_matcher_reproduces_each_legacy_matcher_on_the_corpus() {
         );
         let delegated = format!("All providers/models failed: {message}");
         assert_eq!(
-            crate::agent::tinyagents::middleware::repeated_failure::terminal_inference_failure_kind(&delegated)
-                == Some(tinyagents_hooks::stop::TerminalInferenceFailureKind::BudgetExhausted),
+            crate::agent::tinyagents::middleware::repeated_failure::terminal_inference_failure_kind(
+                &delegated
+            ) == Some(tinyagents_hooks::stop::TerminalInferenceFailureKind::BudgetExhausted),
             legacy_billing_matcher(message),
             "loop-guard matcher drifted on {message:?}"
         );
