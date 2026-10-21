@@ -3,7 +3,6 @@ use crate::core::all::{
     assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
     expect_schema_output_names, expect_schema_required_inputs,
 };
-use serde_json::json;
 // Additional names from the extracted schema handler modules.
 use super::handlers::{read_optional_u64, read_required, type_name};
 use crate::core::TypeSchema;
