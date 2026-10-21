@@ -6,7 +6,7 @@
 //! schema registry.
 
 use super::{StorageBackend, boot::prepare_and_migrate, schema::owner_collections};
-use crate::storage::Scope;
+use crate::storage::{DocumentStoreExt, Scope};
 
 #[tokio::test]
 async fn boot_prepares_every_composed_owner_collection_in_shared_scopes() {
