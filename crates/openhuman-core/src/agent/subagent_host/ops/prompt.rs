@@ -30,32 +30,8 @@ pub(crate) fn compose_subagent_system_prompt(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn prompt_framing_matches_the_child_spawn_surface() {
-        let nested = ["spawn_subagent".to_owned()].into_iter().collect();
-        let nested_prompt = compose_subagent_system_prompt(
-            "Worker instructions".into(),
-            "worker",
-            &nested,
-            "complete the task",
-            1,
-        );
-        assert!(nested_prompt.contains("You may delegate parts of the work"));
-        assert!(!nested_prompt.contains("You are a leaf worker"));
-
-        let leaf_prompt = compose_subagent_system_prompt(
-            "Worker instructions".into(),
-            "worker",
-            &HashSet::new(),
-            "complete the task",
-            1,
-        );
-        assert!(leaf_prompt.contains("You are a leaf worker"));
-    }
-}
+#[path = "prompt_tests.rs"]
+mod tests;
 
 /// Append the filesystem-offload contract (#3883), but only for a sub-agent
 /// that actually holds a file-write tool.
