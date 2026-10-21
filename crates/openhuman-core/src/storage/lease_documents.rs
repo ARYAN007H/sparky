@@ -13,7 +13,6 @@ use tinystoragedrivers_api::DocumentStore;
 use tinystoragedrivers_types::{
     Filter, Scope as DriverScope, Version, Versioned, WriteCondition, WriteOptions,
 };
-};
 
 use super::StorageError;
 use super::lease::{
