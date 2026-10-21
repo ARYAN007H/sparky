@@ -151,7 +151,7 @@ pub(super) async fn finalize_committed_turn(
                         .thread_id
                         .as_deref()
                         .unwrap_or_default();
-                    if let Err(error) = crate::threads::attachments::commit_native_channel_parts(
+                    match crate::threads::attachments::commit_native_channel_parts(
                         &dispatch,
                         thread_id,
                         &committed,
@@ -159,7 +159,14 @@ pub(super) async fn finalize_committed_turn(
                     )
                     .await
                     {
-                        tracing::warn!("[session-runtime] native attachment claim failed after commit: {error}");
+                        Ok(()) => {
+                            if let Some(lease) = receipt.options.context.native_staged_lease.as_ref() {
+                                lease.mark_committed();
+                            }
+                        }
+                        Err(error) => {
+                            tracing::warn!("[session-runtime] native attachment claim failed after commit: {error}");
+                        }
                     }
                 }
             }
