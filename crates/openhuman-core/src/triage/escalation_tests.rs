@@ -52,19 +52,9 @@ impl ChatModel<()> for TriageReplyModel {
     }
 }
 
-fn triage_test_model(
-    requests: Arc<Mutex<Vec<ModelRequest>>>,
-    builds: Arc<Mutex<Vec<String>>>,
-) -> crate::inference::registry::ChatModelEntry {
+fn triage_test_model(requests: Arc<Mutex<Vec<ModelRequest>>>) -> crate::inference::registry::ChatModelEntry {
     crate::inference::registry::ChatModelEntry {
-        build: Arc::new(move |request| {
-            builds.lock().unwrap().push(format!(
-                "role={} model_override={:?} default_model={:?} native_tool_calling={}",
-                request.role,
-                request.model_override,
-                request.default_model,
-                request.native_tool_calling
-            ));
+        build: Arc::new(move |_| {
             Ok((
                 Arc::new(TriageReplyModel {
                     requests: Arc::clone(&requests),
@@ -90,12 +80,11 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
     config.default_model = Some(crate::config::MODEL_MANAGED_DEFAULT.to_string());
 
     let requests = Arc::new(Mutex::new(Vec::new()));
-    let builds = Arc::new(Mutex::new(Vec::new()));
     let extensions = crate::core::slots::Extensions::new();
     crate::inference::registry::register_chat_model_in(
         &extensions,
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-        triage_test_model(Arc::clone(&requests), Arc::clone(&builds)),
+        triage_test_model(Arc::clone(&requests)),
     );
     let runtime = crate::core::runtime::CoreBuilder::new(crate::core::types::HostKind::Library)
         .services(crate::core::runtime::ServiceSet::none())
@@ -131,25 +120,6 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
     // Prove that the requested route reached the model before checking the
     // lifecycle boundary below, so a skipped dispatch cannot satisfy it.
     let requests = requests.lock().unwrap();
-    let build_summaries = builds.lock().unwrap();
-    eprintln!(
-        "triage diagnostic: model_requests={} provider_builds={:?}",
-        requests.len(),
-        *build_summaries
-    );
-    eprintln!(
-        "triage diagnostic: request_summaries={:?}",
-        requests
-            .iter()
-            .map(|request| (
-                request.messages.len(),
-                request
-                    .messages
-                    .iter()
-                    .any(|message| message.text().contains("handle this trigger inline")),
-            ))
-            .collect::<Vec<_>>()
-    );
     assert_eq!(requests.len(), 1, "triage should make one model request");
     assert!(
         requests[0]
