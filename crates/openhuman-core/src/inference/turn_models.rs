@@ -561,8 +561,7 @@ impl TurnModelSource {
                 opts,
             };
             tinyagents_harness::host::ModelBuildGate::check(&factory, &request)?;
-            let (model, route) =
-                tinyagents_harness::host::ModelFactory::build(&factory, &request)?;
+            let (model, route) = tinyagents_harness::host::ModelFactory::build(&factory, &request)?;
             let provider = model
                 .profile()
                 .and_then(|profile| profile.provider.as_deref())

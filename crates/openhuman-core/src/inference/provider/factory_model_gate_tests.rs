@@ -71,11 +71,12 @@ async fn turn_factory_checks_privacy_then_explicit_host_session_before_building_
                 true,
             )
             .expect("store isolated test session");
-        let built = tinyagents_harness::host::TurnModelSet::<()>::builder(&factory, &factory, "chat")
-            .primary_model_pin("factory-gate-order-sentinel-model")
-            .without_workload_tiers()
-            .build()
-            .expect("authorized managed turn builds");
+        let built =
+            tinyagents_harness::host::TurnModelSet::<()>::builder(&factory, &factory, "chat")
+                .primary_model_pin("factory-gate-order-sentinel-model")
+                .without_workload_tiers()
+                .build()
+                .expect("authorized managed turn builds");
         let _summarizer = built.summarizer();
         assert_eq!(builds.lock().expect("build counter").len(), 2);
 
@@ -103,7 +104,10 @@ async fn turn_factory_checks_privacy_then_explicit_host_session_before_building_
                 None => panic!("the bus closed before the test sentinel arrived"),
             }
         }
-        assert_eq!(disclosures, 1, "the turn ledger deduplicates primary and summary egress");
+        assert_eq!(
+            disclosures, 1,
+            "the turn ledger deduplicates primary and summary egress"
+        );
     })
     .await;
 }
