@@ -227,6 +227,7 @@ async fn native_turn_preserves_deepseek_route_metadata_after_cloud_resolution() 
         .primary_route();
     assert_eq!(route.provider, "deepseek");
     assert_eq!(route.model, "deepseek-chat");
+    assert_eq!(route.route, "hint:chat");
     let profile = models.primary.profile().expect("cloud model profile");
     assert_eq!(profile.provider.as_deref(), Some("deepseek"));
     assert_eq!(profile.model.as_deref(), Some("deepseek-chat"));
