@@ -509,22 +509,23 @@ pub(crate) async fn process_channel_runtime_message(
             );
             let delivered = if native_target.is_some() {
                 native_delivery_succeeded
+            } else if let Some(channel) = target_channel.as_ref() {
+                match channel
+                    .send_with_outbound_intent(
+                        &SendMessage::new(&response_text, &msg.reply_target)
+                            .in_thread(msg.thread_ts.clone()),
+                    )
+                    .await
+                {
+                    Ok(()) => true,
+                    Err(e) => {
+                        eprintln!("  ❌ Failed to reply on {}: {e}", channel.name());
+                        false
+                    }
+                }
             } else {
                 false
             };
-            if native_target.is_none() {
-                if let Some(channel) = target_channel.as_ref() {
-                    if let Err(e) = channel
-                        .send_with_outbound_intent(
-                            &SendMessage::new(&response_text, &msg.reply_target)
-                                .in_thread(msg.thread_ts.clone()),
-                        )
-                        .await
-                    {
-                        eprintln!("  ❌ Failed to reply on {}: {e}", channel.name());
-                    }
-                }
-            }
             (delivered, response_text, resolved_provider, resolved_model)
         }
         Err(e) => {

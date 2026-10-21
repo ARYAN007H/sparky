@@ -362,13 +362,15 @@ fn unrelated_processed_event(n: usize) -> DomainEvent {
     }
 }
 
-async fn resolved_route_ctx() -> Arc<ChannelRuntimeContext> {
-    let channel_impl = Arc::new(RecordingChannel::default());
+async fn resolved_route_ctx(send_error: Option<&str>) -> (Arc<ChannelRuntimeContext>, Arc<RecordingChannel>) {
+    let mut channel_state = RecordingChannel::default();
+    channel_state.send_error = send_error.map(str::to_owned);
+    let channel_impl = Arc::new(channel_state);
     let channel = Arc::new(ChannelHandle::Test(channel_impl));
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
 
-    Arc::new(ChannelRuntimeContext {
+    (Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
         module_objects: Arc::new(HashMap::new()),
@@ -393,10 +395,14 @@ async fn resolved_route_ctx() -> Arc<ChannelRuntimeContext> {
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
         core: None,
-    })
+    }), channel_impl)
 }
 
-async fn run_resolved_route_message(message_id: &str, noise_after: usize) {
+async fn run_resolved_route_message(
+    message_id: &str,
+    noise_after: usize,
+    send_error: Option<&str>,
+) {
     crate::core::bus::init().await.expect("bus init");
     let watcher = watch_for_channel_processed(message_id);
 
@@ -409,8 +415,9 @@ async fn run_resolved_route_message(message_id: &str, noise_after: usize) {
     })
     .await;
 
+    let (ctx, channel) = resolved_route_ctx(send_error).await;
     process_channel_message(
-        resolved_route_ctx().await,
+        ctx,
         traits::ChannelMessage {
             reply_to_id: None,
             topic_id: None,
@@ -449,15 +456,26 @@ async fn run_resolved_route_message(message_id: &str, noise_after: usize) {
     else {
         unreachable!("wait_for_channel_processed returns only ChannelMessageProcessed");
     };
-    assert!(success);
+    assert_eq!(success, send_error.is_none());
     assert_eq!(response, "CANNED_RESPONSE_FROM_RESOLVED_ROUTE");
     assert_eq!(provider, "actual-provider");
     assert_eq!(model, "actual-model");
+    let sends = channel.sent.lock().expect("test sends lock");
+    if send_error.is_some() {
+        assert!(sends.is_empty(), "a failed send must not be recorded as delivered");
+    } else {
+        assert_eq!(sends.len(), 1, "successful reply delivery must be recorded");
+    }
 }
 
 #[tokio::test]
 async fn channel_processed_event_records_resolved_agent_route() {
-    run_resolved_route_message("resolved-route-msg", 0).await;
+    run_resolved_route_message("resolved-route-msg", 0, None).await;
+}
+
+#[tokio::test]
+async fn channel_processed_event_reports_failed_reply_delivery() {
+    run_resolved_route_message("failed-reply-delivery-msg", 0, Some("send failed")).await;
 }
 
 /// Regression: the event used to be read only after the message finished, by
@@ -465,7 +483,7 @@ async fn channel_processed_event_records_resolved_agent_route() {
 /// bus ring, so the test failed only in the full parallel suite.
 #[tokio::test]
 async fn channel_processed_event_is_found_behind_a_flood_of_unrelated_events() {
-    run_resolved_route_message("resolved-route-flood-msg", 600).await;
+    run_resolved_route_message("resolved-route-flood-msg", 600, None).await;
 }
 
 /// Security regression for the `[FILE:…]` smuggling vector: a remote
