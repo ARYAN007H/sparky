@@ -507,7 +507,11 @@ impl TurnModelSource {
             // the wall-clock ceilings use endpoint-aware self-hosted detection.
             let (provider_id, native_tools, supports_vision, is_local, self_hosted, context_window) =
                 if let Some(profile) = injected_profile {
-                    let provider_id = profile.provider.as_deref().unwrap_or("injected").to_string();
+                    let provider_id = profile
+                        .provider
+                        .as_deref()
+                        .unwrap_or("injected")
+                        .to_string();
                     (
                         provider_id.clone(),
                         profile.tool_calling,
@@ -523,14 +527,15 @@ impl TurnModelSource {
                         context_window.or(profile.max_input_tokens),
                     )
                 } else {
-                    let is_local = tinyinference_local::profile::is_local_provider_string(
-                        &provider_string,
-                    );
+                    let is_local =
+                        tinyinference_local::profile::is_local_provider_string(&provider_string);
                     let self_hosted =
                         crate::agent::tinyagents::turn_policy::provider_is_self_hosted(
                             &provider_string,
-                            crate::agent::tinyagents::turn_policy::local_openai_endpoint(&cn.config)
-                                .as_deref(),
+                            crate::agent::tinyagents::turn_policy::local_openai_endpoint(
+                                &cn.config,
+                            )
+                            .as_deref(),
                         );
                     let provider_id = if provider_string == "openhuman"
                         || provider_string.is_empty()

@@ -71,8 +71,8 @@ impl CoreContext {
             domains,
             workspace_dir,
         ))
-            .ok()
-            .unwrap();
+        .ok()
+        .unwrap();
         ctx.extensions = extensions;
         Arc::new(ctx)
     }

@@ -263,11 +263,8 @@ async fn explicit_provider_string_turn_source_uses_scoped_managed_model() {
         None,
         explicit_extensions,
     );
-    let ambient_context = CoreContext::for_test_with_host_kind(
-        HostKind::Library,
-        DomainSet::full(),
-        None,
-    );
+    let ambient_context =
+        CoreContext::for_test_with_host_kind(HostKind::Library, DomainSet::full(), None);
     let dispatch = DispatchCtx::new(explicit_context);
     let mut config = crate::config::Config::default();
     config.chat_provider = Some("unconfigured:must-not-win".into());
@@ -293,8 +290,8 @@ async fn injected_turn_profile_is_authoritative_and_skips_unselected_routes() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
     use crate::core::types::HostKind;
-    use tinyinference_llm::model::ModelProfile;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use tinyinference_llm::model::ModelProfile;
 
     struct ProfiledModel {
         profile: ModelProfile,
