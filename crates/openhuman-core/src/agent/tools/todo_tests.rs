@@ -1,5 +1,5 @@
 use super::*;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinyagents_harness_tools::todos::{TodoItem, TodoStatus};
 
 /// Serialize tests that share the process-global scratch store. Same lock
