@@ -77,7 +77,6 @@ pub async fn migrate_cluster(scoped: &Storage) -> Result<()> {
         .documents()
         .ensure_collection(&CollectionSpec::new(REGISTRY_COLLECTION))
         .await?;
-    migrate_legacy_leases(scoped).await?;
     Ok(())
 }
 
