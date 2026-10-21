@@ -14,8 +14,6 @@ struct TerminalRecord {
     agent_id: String,
     #[serde(default)]
     elapsed_ms: u64,
-    #[serde(flatten)]
-    extensions: std::collections::BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(serde::Deserialize)]
@@ -358,29 +356,8 @@ impl OpenHumanPersistence {
                 outcome,
                 agent_id: String::new(),
                 elapsed_ms: 0,
-                extensions: Default::default(),
             })),
         }
-    }
-
-    fn into_outcome(record: TerminalRecord) -> SubagentOutcome {
-        let mut outcome = record.outcome;
-        if !record.agent_id.is_empty() {
-            outcome
-                .extensions
-                .entry("agent_id".into())
-                .or_insert_with(|| serde_json::Value::String(record.agent_id));
-        }
-        if record.elapsed_ms != 0 {
-            outcome
-                .extensions
-                .entry("elapsed_ms".into())
-                .or_insert_with(|| serde_json::json!(record.elapsed_ms));
-        }
-        for (key, value) in record.extensions {
-            outcome.extensions.entry(key).or_insert(value);
-        }
-        outcome
     }
 
     pub(super) fn terminal_outcome(
@@ -390,7 +367,7 @@ impl OpenHumanPersistence {
         if let Some(outcome) = self.store()?.terminal_outcome(key)? {
             return Ok(Some(outcome));
         }
-        Ok(self.read_terminal_record(key)?.map(Self::into_outcome))
+        Ok(self.read_terminal_record(key)?.map(|record| record.outcome))
     }
 
     pub(super) fn durable_host_metadata(
@@ -600,7 +577,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
         if let Some(outcome) = self.store()?.terminal_outcome(key)? {
             return Ok(Some(outcome));
         }
-        Ok(self.read_terminal_record(key)?.map(Self::into_outcome))
+        Ok(self.read_terminal_record(key)?.map(|record| record.outcome))
     }
     async fn load(&self, key: &SubagentTaskKey) -> Result<Option<SubagentResume>, SubagentError> {
         if self.load_terminal(key).await?.is_some() {

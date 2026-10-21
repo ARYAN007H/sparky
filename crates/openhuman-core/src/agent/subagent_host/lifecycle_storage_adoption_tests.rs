@@ -271,6 +271,7 @@ async fn assert_legacy_terminal_fixture(format: &str) {
         outcome,
         agent_id: String::new(),
         elapsed_ms: 0,
+        extensions: Default::default(),
     };
     let mut record = serde_json::to_value(record).unwrap();
     if format == "bare" {
