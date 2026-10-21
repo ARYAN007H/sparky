@@ -409,13 +409,30 @@ fn decode_transcript(
     Option<serde_json::Value>,
     Vec<DisplayRecord>,
 )> {
-    let text = std::fs::read_to_string(path)
+    let bytes = std::fs::read(path)
         .with_context(|| format!("read transcript {}", path.display()))?;
     let mut meta = None;
     let mut tools = None;
     let mut records = Vec::new();
     let mut seen_first = false;
-    for (line_number, line) in text.lines().enumerate() {
+    for (line_number, bytes) in bytes.split(|byte| *byte == b'\n').enumerate() {
+        let line = match std::str::from_utf8(bytes) {
+            Ok(line) => line,
+            Err(error) if !seen_first => {
+                anyhow::bail!(
+                    "first transcript record in {} is not valid UTF-8: {error}",
+                    path.display()
+                );
+            }
+            Err(error) => {
+                tracing::warn!(
+                    "[sessions] skipping invalid UTF-8 transcript line {} in {}: {error}",
+                    line_number + 1,
+                    path.display()
+                );
+                continue;
+            }
+        };
         let line = line.trim();
         if line.is_empty() {
             continue;
