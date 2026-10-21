@@ -13,7 +13,6 @@ fn is_unknown_provider_user_config(err: &str) -> bool {
     err.contains("no cloud provider with id or slug")
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
 pub async fn inference_get_client_config(ctx: &DispatchCtx) -> Result<Outcome<Value>, String> {
     debug!("{LOG_PREFIX} get_client_config:start");
     let result = config_rpc::load_and_get_client_config_snapshot(ctx).await;
@@ -124,9 +123,3 @@ pub async fn inference_list_models(provider_id: &str) -> Result<Outcome<Value>, 
     result
 }
 
-/// Snapshot of BYO provider auth failures (invalid / revoked key, 401 / 403)
-/// recorded this process. Backs the AI-settings provider-error notice so a
-/// key that breaks at runtime — most often in a silent background loop like
-/// memory summarization (TAURI-RUST-4RC) — is surfaced inline next to the key
-/// editor, not only in the notification center. Cleared when the user updates
-/// or removes the offending key.
