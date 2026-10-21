@@ -66,7 +66,10 @@ async fn route_for_agent_ref_selects_harness_for_definitions_else_fallback() {
 
     CoreContext::scope(context, async {
         assert_eq!(route_for_agent_ref("workflow_builder"), AgentRoute::Harness);
-        assert_eq!(route_for_agent_ref("task_manager_agent"), AgentRoute::Harness);
+        assert_eq!(
+            route_for_agent_ref("task_manager_agent"),
+            AgentRoute::Harness
+        );
         assert_eq!(
             route_for_agent_ref("totally_unknown_custom_agent_xyz"),
             AgentRoute::RegistryFallback
