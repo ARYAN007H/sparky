@@ -19,7 +19,7 @@
 use std::fmt::Write as _;
 
 use super::turn_checkpoint::CheckpointToolResult;
-use tinyagents_harness::turn_stop::TurnStop;
+use tinyagents_harness::turn_stop::{CopyRequest, TurnStop, TurnStopCopyKey};
 
 /// Longest error line shown for one tool, in characters.
 const ERROR_LINE_CHARS: usize = 120;
@@ -149,14 +149,41 @@ impl StopReasonKind {
     }
 
     /// English copy completing "I stopped this turn early because …".
-    pub(crate) fn copy(self) -> &'static str {
-        crate::inference::failure_copy::stop_summary_copy(self.key())
+    pub(crate) fn copy(self) -> String {
+        // Render through TinyAgents' neutral copy table while preserving the
+        // OpenHuman settings destinations for the two actionable classes.
+        let key = match self {
+            Self::Transient => TurnStopCopyKey::Transient,
+            Self::UncertainSideEffect => TurnStopCopyKey::UncertainSideEffect,
+            Self::Authentication => TurnStopCopyKey::Authentication,
+            Self::Permission => TurnStopCopyKey::Permission,
+            Self::Policy => TurnStopCopyKey::Policy,
+            Self::MissingProgram => TurnStopCopyKey::MissingProgram,
+            Self::NotFound => TurnStopCopyKey::NotFound,
+            Self::InvalidCalls => TurnStopCopyKey::InvalidCalls,
+            Self::Unavailable => TurnStopCopyKey::Unavailable,
+            Self::SiteRefused => TurnStopCopyKey::SiteRefused,
+            Self::RepeatedFailure => TurnStopCopyKey::RepeatedFailure,
+            Self::VariedFailures => TurnStopCopyKey::VariedFailures,
+            Self::RepeatingStep => TurnStopCopyKey::RepeatingStep,
+            Self::OutOfCredits => TurnStopCopyKey::OutOfCredits,
+            Self::ProviderConfig => TurnStopCopyKey::ProviderConfig,
+            Self::MissingConnection => TurnStopCopyKey::MissingConnection,
+            Self::Generic => TurnStopCopyKey::Generic,
+        };
+        tinyagents_harness::turn_stop::render_copy(
+            &crate::agent::tinyagents::host::OpenHumanCopyProvider,
+            &CopyRequest::TurnStop {
+                key,
+                operation: None,
+            },
+        )
     }
 
     /// Read the kind from a breaker stop note. The notes come from a fixed
     /// set of host and harness templates (`ClassifiedFailureTracker`,
     /// `NoProgressTracker`, `RepeatProgressMiddleware`,
-    /// `inference::failure_copy::halt`), so this matches
+    /// `agent::tinyagents::middleware::repeated_failure`), so this matches
     /// their fixed wording, never the tool output they quote.
     pub(crate) fn from_stop_note(note: &str) -> Self {
         let note = note.trim();

@@ -255,8 +255,8 @@ fn shared_budget_matcher_reproduces_each_legacy_matcher_on_the_corpus() {
         );
         let delegated = format!("All providers/models failed: {message}");
         assert_eq!(
-            crate::inference::failure_copy::terminal_inference_failure_kind(&delegated)
-                == Some(crate::inference::failure_copy::TerminalInferenceFailure::BudgetExhausted),
+            tinyagents_hooks::stop::terminal_inference_failure_kind(&delegated)
+                == Some(tinyagents_hooks::stop::TerminalInferenceFailureKind::BudgetExhausted),
             legacy_billing_matcher(message),
             "loop-guard matcher drifted on {message:?}"
         );
@@ -272,24 +272,23 @@ fn shared_budget_matcher_reproduces_each_legacy_matcher_on_the_corpus() {
 
 #[test]
 fn loop_guard_halt_summaries_are_byte_identical() {
-    use crate::inference::failure_copy::{
-        recoverable_identical_halt_summary, recoverable_no_progress_halt_summary,
-        terminal_inference_halt_summary, user_actionable_escalation, TerminalInferenceFailure,
-    };
+    use crate::agent::tinyagents::host::OpenHumanCopyProvider;
+    use crate::agent::tinyagents::middleware::repeated_failure::user_actionable_escalation;
+    use tinyagents_hooks::stop;
     assert_eq!(
-        terminal_inference_halt_summary(TerminalInferenceFailure::BudgetExhausted, "delegate", "boom"),
+        stop::halt_summary::budget(&OpenHumanCopyProvider, "delegate", "boom").summary,
         "Stopping: the `delegate` step failed because the account is out of inference budget/credits \u{2014} every retry hits the same wall. Add credits to your account (or, when using a custom/BYO provider, top up that provider's own account) and try again. Details:\nboom"
     );
     assert_eq!(
-        terminal_inference_halt_summary(TerminalInferenceFailure::ProviderConfig, "delegate", "boom"),
+        stop::halt_summary::provider_config(&OpenHumanCopyProvider, "delegate", "boom").summary,
         "Stopping: the `delegate` step failed because the configured model/provider rejected the request (e.g. an unknown model, a non-chat/embedding model, a missing credential, or a region block) \u{2014} retrying will not help. Fix the model or API key in Connections \u{2192} API keys \u{2192} LLM. Details:\nboom"
     );
     assert_eq!(
-        recoverable_identical_halt_summary("curl", 8, "boom"),
+        stop::halt_summary::retry_exhausted(&OpenHumanCopyProvider, "curl", 8, "boom").summary,
         "Stopping: the `curl` call was retried 8 times with identical arguments and kept failing \u{2014} repeating it will not help. Last error:\nboom\n\nThis looked recoverable at first, but the same call exhausted the extended transient-failure headroom. Report this back instead of retrying."
     );
     assert_eq!(
-        recoverable_no_progress_halt_summary(12, "curl", "boom"),
+        stop::halt_summary::no_progress(&OpenHumanCopyProvider, 12, "curl", "boom").summary,
         "Stopping: 12 recoverable-looking tool failures happened in a row with no successful progress. Last error (from `curl`):\nboom\n\nThe turn is still bounded by the iteration/cost limits, but this many consecutive transient failures means the goal is not currently reachable. Report this back instead of retrying."
     );
     assert_eq!(
@@ -300,10 +299,13 @@ fn loop_guard_halt_summaries_are_byte_identical() {
         user_actionable_escalation("gmail", "insufficient scope"),
         None
     );
-    let long = "x".repeat(700);
-    let summary =
-        terminal_inference_halt_summary(TerminalInferenceFailure::BudgetExhausted, "t", &long);
-    assert!(summary.ends_with(&format!("{}\n\u{2026} [truncated]", "x".repeat(600))));
+    let at_limit = "é".repeat(600);
+    let exact = stop::halt_summary::provider_config(&OpenHumanCopyProvider, "t", &at_limit).summary;
+    assert!(exact.ends_with(&format!("Details:\n{at_limit}")));
+    let over_limit = "🦀".repeat(601);
+    let truncated =
+        stop::halt_summary::provider_config(&OpenHumanCopyProvider, "t", &over_limit).summary;
+    assert!(truncated.ends_with(&format!("{}\n\u{2026} [truncated]", "🦀".repeat(600))));
 }
 
 // ── i18n key + params (follow-up of the copy table) ─────────────────────────
