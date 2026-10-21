@@ -1,4 +1,3 @@
-use super::local_runtime::try_create_local_runtime_chat_model;
 use super::*;
 use crate::security::egress::EgressLedger;
 
@@ -364,16 +363,23 @@ fn explicit_local_provider_string_routes_to_crate_native_model() {
 fn try_create_local_runtime_returns_none_for_managed_and_cloud() {
     let _guard = crate::inference::inference_test_guard();
     // Default config resolves to the managed backend, not a local runtime.
-    assert!(
-        try_create_local_runtime_chat_model("chat", &Config::default(), &EgressLedger::none())
-            .is_none()
-    );
+    assert!(super::local_runtime::try_create_local_runtime_chat_model(
+        "chat",
+        &Config::default(),
+        &EgressLedger::none(),
+    )
+    .is_none());
     // A BYOK cloud slug is not a local runtime either — it falls through to the
     // `Provider` path.
     let mut cloud = Config::default();
     cloud.cloud_providers.push(openai_entry("p_oai", "openai"));
     cloud.chat_provider = Some("openai:gpt-4o-mini".to_string());
-    assert!(try_create_local_runtime_chat_model("chat", &cloud, &EgressLedger::none()).is_none());
+    assert!(super::local_runtime::try_create_local_runtime_chat_model(
+        "chat",
+        &cloud,
+        &EgressLedger::none(),
+    )
+    .is_none());
 }
 
 #[test]
