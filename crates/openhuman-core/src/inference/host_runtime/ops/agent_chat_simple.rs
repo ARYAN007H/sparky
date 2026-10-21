@@ -6,7 +6,9 @@ use crate::agent_runs::agent_chat::guards::{
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::inference::provider as providers;
-use tinyinference_llm::model::{ChatModel, ModelRequestDefaults, ModelResponse, ProfileOverrideModel};
+use tinyinference_llm::model::{
+    ChatModel, ModelRequestDefaults, ModelResponse, ProfileOverrideModel,
+};
 
 /// A simplified chat interface that does not update the base configuration.
 pub async fn agent_chat_simple(
@@ -80,13 +82,12 @@ async fn simple_chat_with_model(
     temperature: f64,
     prompt: &str,
 ) -> Result<ModelResponse, String> {
-    let model: std::sync::Arc<dyn ChatModel<()>> =
-        std::sync::Arc::new(ProfileOverrideModel::new_preserving_profile(model).with_defaults(
-            ModelRequestDefaults {
-                model: Some(resolved_model),
-                temperature: Some(temperature),
-            },
-        ));
+    let model: std::sync::Arc<dyn ChatModel<()>> = std::sync::Arc::new(
+        ProfileOverrideModel::new_preserving_profile(model).with_defaults(ModelRequestDefaults {
+            model: Some(resolved_model),
+            temperature: Some(temperature),
+        }),
+    );
     tinyagents_harness::oneshot::simple_chat(model, Vec::new(), prompt.to_string()).await
 }
 
@@ -120,14 +121,10 @@ mod tests {
         });
         let model: Arc<dyn ChatModel<()>> = probe.clone();
 
-        let response = simple_chat_with_model(
-            model,
-            "resolved/provider-model".to_string(),
-            0.37,
-            "hello",
-        )
-        .await
-        .expect("simple chat response");
+        let response =
+            simple_chat_with_model(model, "resolved/provider-model".to_string(), 0.37, "hello")
+                .await
+                .expect("simple chat response");
 
         assert_eq!(response.text(), "reply");
         let request = probe
