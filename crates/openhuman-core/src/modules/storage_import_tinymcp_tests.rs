@@ -342,3 +342,136 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
     // closure owns it. Its backend is the exact context's fence wrapper.
     let _scoped = captured.backend.for_scope(&captured.scope).unwrap();
 }
+
+#[tokio::test]
+async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
+    use crate::core::runtime::{CoreContext, DomainSet, SaasConfig};
+    use crate::profiles::{ProfileHost, ProfileId, ProfileIdMode};
+    use crate::storage::import_state::{self, backend_with_condition};
+
+    fn host(
+        root: &std::path::Path,
+        backend: Arc<dyn StorageBackend>,
+        node_id: &str,
+    ) -> ProfileHost {
+        let mut saas = SaasConfig::new(root);
+        saas.node_id = Some(node_id.to_owned());
+        ProfileHost::with_backend(
+            saas,
+            CoreContext::for_test(DomainSet::full(), None),
+            Some(backend),
+        )
+        .unwrap()
+        .with_fences(Arc::new(crate::storage::fence::FenceRegistry::new(
+            crate::profiles::lease::now_ms,
+        )))
+    }
+
+    let root = tempfile::tempdir().unwrap();
+    let fixture = crate::storage::test_support::sqlite_backend().unwrap();
+    let backend: Arc<dyn StorageBackend> = Arc::clone(&fixture.backend);
+    let id = ProfileId::for_user("import-live-takeover", ProfileIdMode::Raw).unwrap();
+    let first = host(root.path(), Arc::clone(&backend), "import-first-node");
+    first.provision(&id).await.unwrap();
+    let profile_a = first.open(&id).await.unwrap();
+    let scope = crate::storage::scope_for_module(Some(id.as_str()), MODULE_ID).unwrap();
+    let captured = super::super::storage_import_support::capture_profile_module_storage(
+        &first,
+        &id,
+        id.as_str(),
+        profile_a.context(),
+        scope.clone(),
+    )
+    .unwrap();
+    let repo = crate::storage::documents::Repo::on(
+        &captured.backend,
+        &scope,
+        "storage_import",
+        import_state::collection_specs,
+    )
+    .unwrap();
+    let second = host(root.path(), Arc::clone(&backend), "import-second-node");
+    let lease_ttl = first.saas().lease_ttl();
+    let lease_store = crate::storage::lease::DocumentLeases::cluster(
+        backend.as_ref(),
+        "takeover-probe",
+        None,
+        lease_ttl,
+    )
+    .unwrap();
+
+    let attempt = import_state::with_claim(
+        &repo,
+        import_state::HOST_OWNER,
+        "legacy-module-import",
+        |condition| {
+            let claim_backend =
+                backend_with_condition(Arc::clone(&captured.backend), condition.clone());
+            let stale_storage = claim_backend
+                .for_scope(&scope)
+                .map_err(anyhow::Error::from)?;
+            crate::storage::block_on_anyhow(async {
+                stale_storage
+                    .documents()
+                    .ensure_collection(&CollectionSpec::new(SERVERS))
+                    .await?;
+
+                let ttl_ms: u64 = lease_ttl.as_millis().try_into().unwrap_or(u64::MAX);
+                let takeover_at =
+                    crate::profiles::lease::now_ms().saturating_add(ttl_ms.saturating_mul(2));
+                let stolen = lease_store.acquire(id.as_str(), takeover_at).await?;
+                lease_store.release(stolen).await?;
+
+                // A second host now acquires the same profile on the shared
+                // backend. The old captured handle must keep refusing writes.
+                let profile_b = second
+                    .open(&id)
+                    .await
+                    .map_err(|error| anyhow::anyhow!("open profile on takeover node: {error}"))?;
+                let new_backend = second
+                    .storage_backend_for(&profile_b)
+                    .map_err(anyhow::Error::from)?
+                    .expect("the takeover host uses shared storage");
+                let current_storage = new_backend.for_scope(&scope).map_err(anyhow::Error::from)?;
+
+                let stale_write = stale_storage
+                    .documents()
+                    .put(
+                        SERVERS,
+                        "after-takeover",
+                        json!({"server_id":"after-takeover"}),
+                        Precondition::Absent,
+                    )
+                    .await;
+                assert!(
+                    stale_write.is_err(),
+                    "the captured old epoch must reject payload writes"
+                );
+                let stale_marker = import_state::host_import_mark(
+                    &stale_storage,
+                    MARKER_COLLECTION,
+                    "after-takeover",
+                )
+                .await;
+                assert!(
+                    stale_marker.is_err(),
+                    "the old epoch must reject completion writes"
+                );
+
+                let current_write = current_storage
+                    .documents()
+                    .put(
+                        SERVERS,
+                        "current-node",
+                        json!({"server_id":"current-node"}),
+                        Precondition::Absent,
+                    )
+                    .await;
+                assert!(current_write.is_ok(), "the current lease remains writable");
+                Ok::<_, anyhow::Error>(())
+            })
+        },
+    )
+    .unwrap();
+    assert_eq!(attempt, Some(()));
+}
