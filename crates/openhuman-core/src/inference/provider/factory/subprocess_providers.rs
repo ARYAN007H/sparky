@@ -117,10 +117,17 @@ pub(super) fn try_create_claude_code_chat_model_from_string(
         ),
         egress,
     );
+    let documents = match crate::storage::local::open("claude_code::provider", &workspace)
+        .and_then(|opened| opened.scoped().map_err(anyhow::Error::from))
+    {
+        Ok(scoped) => Arc::clone(scoped.documents()),
+        Err(error) => return Some(Err(error)),
+    };
     let chat = match tinyagents_harness::providers::claude_code::ClaudeCodeProvider::from_env(
         effective_model,
         workspace,
         config.action_dir.clone(),
+        documents,
     ) {
         Ok(model) => Arc::new(model.with_mcp_provider(Arc::new(OpenHumanMcpEndpoint)))
             as Arc<dyn ChatModel<()>>,
