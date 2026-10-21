@@ -81,7 +81,7 @@ async fn host_written_log_parses_like_legacy_layout() {
     // must parse identically to logs written before the move.
     let tmp = tempfile::TempDir::new().unwrap();
     let path = run_log_path(tmp.path(), "triage-inbox", "run-abcdef123456");
-    assert!(path.starts_with(runs_dir(tmp.path())));
+    assert!(path.to_string_lossy().starts_with("skills.runs."));
     write_header(
         tmp.path(),
         &path,
@@ -100,5 +100,5 @@ async fn host_written_log_parses_like_legacy_layout() {
     assert_eq!(runs[0].duration_ms, Some(42));
     assert_eq!(read_terminal_outcome(tmp.path(), &path).unwrap().status, "DONE");
 
-    // A pre-existing log in the legacy format still parses.
+    // The stream retains the same parsed run metadata as the old log format.
 }

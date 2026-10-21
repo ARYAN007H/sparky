@@ -1,13 +1,13 @@
 //! Per-run streaming logs for `skills_run`.
 //!
-//! Each run writes a human-readable trace to
-//! `<workspace>/skills/.runs/<skill>_<UTC-ts>_<run>.log`: a header (skill,
-//! inputs, task prompt), one line per agent step (tool calls + results,
-//! sub-agent lifecycle, iteration boundaries) streamed live off the agent's
-//! [`AgentProgress`] channel, then a footer (status, duration, final output).
+//! Each run writes a human-readable trace to a host-owned storage stream: a
+//! header (skill, inputs, task prompt), one line per agent step (tool calls +
+//! results, sub-agent lifecycle, iteration boundaries) streamed live off the
+//! agent's [`AgentProgress`] channel, then a footer (status, duration, final
+//! output). The historical `log_path` field carries an opaque stream id.
 //!
-//! `.runs` is a sibling of the runtime skill *definitions* (`<workspace>/
-//! skills/<id>/`) so run logs never collide with a skill-id directory.
+//! The `skills.runs.` stream prefix keeps run logs separate from skill
+//! definitions and other host streams.
 use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
