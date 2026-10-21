@@ -622,8 +622,16 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
     let mut projected = Vec::new();
     let mut gateway_terminals = Vec::new();
     tokio::time::timeout(Duration::from_secs(5), async {
-        while projected.iter().filter(|e: &&crate::web_chat::WebChannelEvent| e.event_name() == "chat_message").count() < 2
-            || projected.iter().filter(|e: &&crate::web_chat::WebChannelEvent| e.event_name() == "chat_done").count() < 1
+        while projected
+            .iter()
+            .filter(|e: &&crate::web_chat::WebChannelEvent| e.event_name() == "chat_message")
+            .count()
+            < 2
+            || projected
+                .iter()
+                .filter(|e: &&crate::web_chat::WebChannelEvent| e.event_name() == "chat_done")
+                .count()
+                < 1
             || gateway_terminals.len() < 3
         {
             let event = web_events.recv().await.expect("web event bus");
@@ -676,8 +684,18 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
         "media:tenant7/thread42/voice1"
     );
 
-    assert_eq!(projected.iter().filter(|event| event.event_name() == "chat_done").count(), 1);
-    assert_eq!(gateway_terminals.len(), 3, "one provider terminal per typed send");
+    assert_eq!(
+        projected
+            .iter()
+            .filter(|event| event.event_name() == "chat_done")
+            .count(),
+        1
+    );
+    assert_eq!(
+        gateway_terminals.len(),
+        3,
+        "one provider terminal per typed send"
+    );
     let image_gateway = gateway_terminals
         .iter()
         .find(|event| {
@@ -706,8 +724,16 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
         voice_gateway_wire["structured"]["parts"][0]["part"]["kind"],
         "voice_note"
     );
-    assert_eq!(relay.sent().len(), 3, "provider output is delivered once per send");
-    assert_eq!(projected.len(), 3, "two media messages and one turn terminal");
+    assert_eq!(
+        relay.sent().len(),
+        3,
+        "provider output is delivered once per send"
+    );
+    assert_eq!(
+        projected.len(),
+        3,
+        "two media messages and one turn terminal"
+    );
 
     reply
         .close()
