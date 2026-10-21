@@ -419,9 +419,10 @@ async fn import_modules(workspace: &Path) {
     let mcp_import = modules::import_legacy_mcp(&ctx, workspace)
         .await
         .expect("import the legacy TinyMCP records");
-    assert!(
-        mcp_import.starts_with("Imported"),
-        "TinyMCP import should consume both legacy stores: {mcp_import}"
+    assert_eq!(
+        mcp_import,
+        "Imported { servers: 2, secrets: 1, audit: 2 }",
+        "TinyMCP import should consume both legacy stores"
     );
     modules::import_legacy_connectors(&ctx, workspace).await;
     #[cfg(feature = "web3")]
