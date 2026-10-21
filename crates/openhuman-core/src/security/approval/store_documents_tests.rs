@@ -1,6 +1,6 @@
 use super::*;
-use chrono::{Duration, Timelike};
 use crate::storage::{test_support::memory_backend, Scope, StorageBackend};
+use chrono::{Duration, Timelike};
 
 fn docs_in(storage: &dyn StorageBackend, scope: &str) -> Docs {
     Docs::new(&storage.for_scope(&Scope::new(scope).unwrap()).unwrap())
@@ -62,12 +62,10 @@ fn a_request_is_decided_exactly_once() {
         store.get_decision("r").unwrap(),
         Some(ApprovalDecision::ApproveOnce)
     );
-    assert!(
-        store
-            .decide("missing", ApprovalDecision::Deny)
-            .unwrap()
-            .is_none()
-    );
+    assert!(store
+        .decide("missing", ApprovalDecision::Deny)
+        .unwrap()
+        .is_none());
     assert!(store.list_pending().unwrap().is_empty());
 }
 
@@ -145,22 +143,18 @@ fn execution_is_recorded_after_a_decision_and_only_once() {
     );
     store.decide("r", ApprovalDecision::ApproveOnce).unwrap();
     let long = format!("token=sk-abcdefghijklmnopqrstuvwxyz {}", "e".repeat(800));
-    assert!(
-        store
-            .record_execution("r", ExecutionOutcome::Failure, Some(&long))
-            .unwrap()
-    );
+    assert!(store
+        .record_execution("r", ExecutionOutcome::Failure, Some(&long))
+        .unwrap());
     assert!(
         !store
             .record_execution("r", ExecutionOutcome::Success, None)
             .unwrap(),
         "the first outcome wins"
     );
-    assert!(
-        !store
-            .record_execution("missing", ExecutionOutcome::Success, None)
-            .unwrap()
-    );
+    assert!(!store
+        .record_execution("missing", ExecutionOutcome::Success, None)
+        .unwrap());
     let stored = store
         .run(|docs| async move { docs.get(APPROVALS, "r").await })
         .unwrap()
@@ -276,11 +270,10 @@ fn scopes_keep_users_apart() {
     alice.insert_pending(&pending("r", 0, None), "s").unwrap();
     alice.insert_flow_trust("flow-1", "shell").unwrap();
     assert!(bob.list_pending().unwrap().is_empty());
-    assert!(
-        bob.decide("r", ApprovalDecision::ApproveOnce)
-            .unwrap()
-            .is_none()
-    );
+    assert!(bob
+        .decide("r", ApprovalDecision::ApproveOnce)
+        .unwrap()
+        .is_none());
     assert!(!bob.is_flow_tool_trusted("flow-1", "shell").unwrap());
     assert_eq!(alice.list_pending().unwrap().len(), 1);
 }
@@ -331,12 +324,10 @@ fn sub_second_timestamps_order_and_expire_on_time() {
     let mut p = pending("late", 0, None);
     p.expires_at = Some(due);
     store.insert_pending(&p, "s").unwrap();
-    assert!(
-        store
-            .expire_stale(whole + Duration::milliseconds(100))
-            .unwrap()
-            .is_empty()
-    );
+    assert!(store
+        .expire_stale(whole + Duration::milliseconds(100))
+        .unwrap()
+        .is_empty());
     assert_eq!(store.expire_stale(due).unwrap().len(), 1);
 }
 
@@ -370,12 +361,10 @@ fn expiry_is_compared_in_epoch_milliseconds() {
     let mut p = pending("tight", 0, None);
     p.expires_at = Some(due);
     store.insert_pending(&p, "s").unwrap();
-    assert!(
-        store
-            .expire_stale(whole + Duration::milliseconds(2))
-            .unwrap()
-            .is_empty()
-    );
+    assert!(store
+        .expire_stale(whole + Duration::milliseconds(2))
+        .unwrap()
+        .is_empty());
     assert_eq!(store.expire_stale(due).unwrap().len(), 1);
 }
 

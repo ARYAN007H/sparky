@@ -1,9 +1,9 @@
 use super::*;
 use crate::core::runtime::{ContextOverlay, DomainSet};
+use crate::storage::test_support::memory_backend;
 use std::sync::Arc;
 use tinyagents_session::port::SessionStoreProvider;
 use tinyagents_session::turn_state::{TurnLifecycle, TurnState};
-use crate::storage::test_support::memory_backend;
 
 fn profile() -> ProfileId {
     ProfileId::for_user("recovering", crate::profiles::ProfileIdMode::Raw).unwrap()
