@@ -109,7 +109,7 @@ async fn subagent_failed_carries_parent_call_id() {
 }
 
 #[tokio::test]
-async fn awaiting_user_persists_a_task_key_checkpoint_without_legacy_resume_tool() {
+async fn awaiting_user_checkpoint_preserves_pause_details_without_a_retired_resume_tool() {
     let tmp = tempfile::TempDir::new().expect("temporary workspace");
     let workspace = tmp.path().join("workspace");
     let action_dir = tmp.path().join("action");
