@@ -30,6 +30,20 @@ fn every_row_has_a_valid_generated_grant() {
 }
 
 #[test]
+fn module_grants_exclude_storage_driver_owned_collections() {
+    for row in ROWS {
+        let collections = module_collections(row.owner);
+        assert!(
+            collections
+                .iter()
+                .all(|collection| !collection.name.starts_with("tsd.")),
+            "{} must not grant TSD internal collections",
+            row.module
+        );
+    }
+}
+
+#[test]
 fn the_registry_ids_exist() {
     for row in ROWS {
         assert!(
