@@ -383,7 +383,7 @@ impl SpawnSubagentTool {
                 message_run_queue: None,
             };
             if let Err(error) = crate::agent::subagent_host::resume_async_via_driver_tool(
-                &detached_parent,
+                detached_parent,
                 original_key,
                 checkpoint_resume,
                 definition.clone(),
@@ -437,7 +437,7 @@ impl SpawnSubagentTool {
             if session.status == DurableSubagentStatus::Running {
                 if let Some(ref running_task_id) = session.current_task_id {
                     match steer_reusable_session(
-                        &detached_parent,
+                        detached_parent,
                         &session.subagent_session_id,
                         follow_up_prompt.clone(),
                     )
@@ -558,7 +558,7 @@ impl SpawnSubagentTool {
                 task_id: task_id.clone(),
                 lifecycle_key: Some(
                     tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
-                        &detached_parent,
+                        detached_parent,
                         task_id.clone(),
                         parent_thread_id.clone(),
                     ),
@@ -683,7 +683,7 @@ impl SpawnSubagentTool {
             message_run_queue: None,
         };
         if let Err(error) = crate::agent::subagent_host::spawn_async_via_driver_tool(
-            &detached_parent,
+            detached_parent,
             definition.clone(),
             background_prompt,
             options,
