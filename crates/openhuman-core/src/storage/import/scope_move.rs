@@ -194,8 +194,8 @@ impl LegacyScopeInventory {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
-                    row.get::<_, u64>(2)?,
-                    row.get::<_, u64>(3)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
                     row.get::<_, bool>(4)?,
                     row.get::<_, Option<i64>>(5)?,
                 ))
@@ -203,6 +203,8 @@ impl LegacyScopeInventory {
             for row in rows {
                 let (scope, name, base, len, sealed, sealed_ms) = row?;
                 scopes.insert(scope.clone());
+                let base = u64::try_from(base).context("negative legacy stream base")?;
+                let len = u64::try_from(len).context("negative legacy stream length")?;
                 heads.insert((scope, name), (base, len, sealed, sealed_ms));
             }
         }
@@ -221,13 +223,14 @@ impl LegacyScopeInventory {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
-                    row.get::<_, u64>(2)?,
+                    row.get::<_, i64>(2)?,
                     row.get::<_, String>(3)?,
                 ))
             })?;
             for row in rows {
                 let (scope, name, seq, body) = row?;
                 scopes.insert(scope.clone());
+                let seq = u64::try_from(seq).context("negative legacy stream sequence")?;
                 stream_entries.entry((scope, name)).or_default().push((
                     seq,
                     serde_json::from_str(&body).context("decode legacy stream entry")?,
