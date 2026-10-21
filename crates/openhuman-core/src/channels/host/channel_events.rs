@@ -1,17 +1,17 @@
 //! Host-owned approval routing and turn events over the channel module.
+use crate::channels::SendMessage;
 use crate::channels::capabilities::capabilities_for;
 use crate::channels::runtime::ChannelHandle;
-use crate::channels::SendMessage;
 #[cfg(test)]
-use crate::channels::ChannelSendExt;
+use crate::channels::{Channel, ChannelSendExt};
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tinybus::module::ModuleClient;
 use tinybus::EventHandler;
-use tinychannels_bus::{approvals::ReplyContext, ChannelMessage};
+use tinybus::module::ModuleClient;
+use tinychannels_bus::{ChannelMessage, approvals::ReplyContext};
 
 /// Captures the account configuration and reply addresses used by approvals.
 pub struct ChannelApprovalSurfaceSubscriber {

@@ -24,7 +24,7 @@
 //!      starts failing.
 
 use super::super::context::{
-    conversation_history_key, ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS,
+    CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext, conversation_history_key,
 };
 use super::super::runtime::process_channel_message;
 use super::super::{Channel, SendMessage};

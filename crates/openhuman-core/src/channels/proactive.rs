@@ -14,10 +14,10 @@
 //! - The independent `web_chat::proactive` subscriber always delivers the web
 //!   destination, including when the external channels feature is disabled.
 
-use crate::channels::runtime::ChannelHandle;
 use crate::channels::SendMessage;
+use crate::channels::runtime::ChannelHandle;
 #[cfg(test)]
-use crate::channels::ChannelSendExt;
+use crate::channels::{Channel, ChannelSendExt};
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;

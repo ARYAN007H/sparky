@@ -90,12 +90,11 @@ fn timeout_and_history_keys_respect_channel_rules() {
 #[tokio::test]
 async fn overflow_detection_covers_edge_cases() {
     let ctx = runtime_context();
-    assert!(is_context_window_overflow_error(
-        &ctx,
-        &anyhow::anyhow!("Maximum context length exceeded")
-    )
-    .await
-    .unwrap());
+    assert!(
+        is_context_window_overflow_error(&ctx, &anyhow::anyhow!("Maximum context length exceeded"))
+            .await
+            .unwrap()
+    );
     assert!(
         !is_context_window_overflow_error(&ctx, &anyhow::anyhow!("network timeout"))
             .await

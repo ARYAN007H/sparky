@@ -5,8 +5,8 @@
 //! here logs request ids, sizes and durations; transcripts, reply text and
 //! audio are never logged.
 
-use crate::config::schema::{ChannelVoiceConfig, VoiceReplyMode};
 use crate::config::Config;
+use crate::config::schema::{ChannelVoiceConfig, VoiceReplyMode};
 use parking_lot::Mutex;
 use std::collections::VecDeque;
 use std::sync::Arc;

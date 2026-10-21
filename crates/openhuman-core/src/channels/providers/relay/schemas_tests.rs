@@ -25,9 +25,11 @@ fn the_controller_is_channel_relay_inbound() {
 
 #[test]
 fn the_controller_is_registered() {
-    assert!(crate::core::all::all_registered_controllers()
-        .iter()
-        .any(|c| c.rpc_method_name() == "openhuman.channel_relay_inbound"));
+    assert!(
+        crate::core::all::all_registered_controllers()
+            .iter()
+            .any(|c| c.rpc_method_name() == "openhuman.channel_relay_inbound")
+    );
 }
 
 #[tokio::test]

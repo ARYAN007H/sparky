@@ -3,13 +3,13 @@
 //! still goes to the orchestrator over the bus.
 
 use super::*;
-use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
+use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, mock_agent_run_turn};
 use crate::agent::host_agents::{self, HostAgent, HostAgentResolver};
-use crate::channels::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
+use crate::channels::context::{CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext};
 use crate::channels::runtime::process_channel_message;
 use crate::channels::{Channel, SendMessage};
 use crate::core::runtime::{CoreContext, DomainSet};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};

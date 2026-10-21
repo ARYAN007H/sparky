@@ -1,8 +1,8 @@
-use super::super::runtime::spawn_supervised_listener;
 use super::super::Channel;
+use super::super::runtime::spawn_supervised_listener;
 use super::common::AlwaysFailChannel;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tinychannels_bus as traits;
 
@@ -33,10 +33,12 @@ async fn supervised_listener_marks_error_and_restarts_on_failures() {
 
     assert_eq!(component["status"], "error");
     assert!(component["restart_count"].as_u64().unwrap_or(0) >= 1);
-    assert!(component["last_error"]
-        .as_str()
-        .unwrap_or("")
-        .contains("listen boom"));
+    assert!(
+        component["last_error"]
+            .as_str()
+            .unwrap_or("")
+            .contains("listen boom")
+    );
     assert!(calls.load(Ordering::SeqCst) >= 1);
 }
 

@@ -10,8 +10,8 @@ use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionReg
 use crate::agent::prompts::ConnectedIntegration;
 use crate::config::Config;
 use crate::integrations::composio::{
-    cached_active_integrations, fetch_connected_integrations_status,
-    FetchConnectedIntegrationsStatus,
+    FetchConnectedIntegrationsStatus, cached_active_integrations,
+    fetch_connected_integrations_status,
 };
 use crate::tools::orchestrator_tools;
 use std::collections::HashSet;

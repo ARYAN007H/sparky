@@ -1,7 +1,7 @@
 //! Disconnecting a channel: removing stored credentials and clearing its
 //! runtime config, optionally along with its memory chunks.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::config::Config;
 use crate::core::Outcome;
@@ -9,7 +9,7 @@ use crate::security::credentials;
 
 use super::memory::clear_channel_memory;
 use super::shared::credential_provider;
-use tinychannels_bus::controllers::{find_channel_definition, ChannelAuthMode};
+use tinychannels_bus::controllers::{ChannelAuthMode, find_channel_definition};
 
 /// Disconnect a channel by removing stored credentials.
 pub async fn disconnect_channel(
