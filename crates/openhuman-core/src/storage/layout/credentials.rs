@@ -122,10 +122,11 @@ pub async fn import(target: &Target) -> Result<Vec<String>, LayoutError> {
     let keys = storage::secrets::keys()
         .map_err(|e| LayoutError::Other(anyhow::anyhow!("master key for credentials: {e}")))?;
     let backend = super::legacy::open_v1(target).await?;
+    let scope = storage::tenant_scope(None);
     let scoped = backend
-        .for_scope(&storage::tenant_scope(None))
+        .for_scope(&scope)
         .map_err(|e| LayoutError::Other(anyhow::anyhow!("open the local scope: {e}")))?;
-    let secrets = storage::secrets::over(&scoped, keys);
+    let secrets = storage::secrets::over(&scoped, scope, keys);
     let mut imported = Vec::new();
     for (file, secret, bytes) in files {
         let stored = secrets.get(secret).await.map_err(|e| {

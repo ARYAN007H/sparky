@@ -36,8 +36,10 @@ fn storage_secrets_in(
     storage: &MemoryStorage,
     scope: &str,
 ) -> tinystoragedrivers::secrets::DocumentSecrets {
+    let owner_scope = Scope::new(scope).unwrap();
     crate::storage::secrets::over(
-        &storage.for_scope(&Scope::new(scope).unwrap()).unwrap(),
+        &storage.for_scope(&owner_scope).unwrap(),
+        owner_scope,
         Arc::new(DerivedKeys::new(Zeroizing::new([5; 32]))),
     )
 }
