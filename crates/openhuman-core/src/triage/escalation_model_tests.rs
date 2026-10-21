@@ -113,7 +113,7 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
     );
     let runtime = crate::core::runtime::CoreBuilder::new(crate::core::types::HostKind::Library)
         .services(crate::core::runtime::ServiceSet::none())
-        .domains(crate::core::runtime::DomainSet::none())
+        .domains(crate::core::runtime::DomainSet::harness())
         .tool_groups(crate::tools::toolpacks::ToolGroups::advertised())
         .config(config)
         .extensions(extensions)
@@ -289,7 +289,13 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
         .await
         .expect("direct target turn should complete");
 
-    assert_eq!(requests.lock().unwrap().len(), 1, "the model turn ran");
+    let requests = requests.lock().unwrap();
+    assert_eq!(requests.len(), 1, "the model turn ran");
+    assert_eq!(requests[0].1, model_marker, "the expected model served the turn");
+    assert!(requests[0].2.messages.iter().any(|message| {
+        message.text().contains("send this trigger reply")
+    }));
+    drop(requests);
     let sentinel = "triage-direct-source-egress-sentinel";
     BUS.publish(crate::core::events::DomainEvent::ExternalTransferPending {
         descriptor: EgressDescriptor::network_fetch(sentinel),
@@ -313,6 +319,7 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
             None => panic!("event bus closed before egress sentinel"),
         }
     }
+    println!("direct source model disclosure count: {disclosures}");
     assert_eq!(
         disclosures, 1,
         "one direct inference turn should disclose its model destination once"
