@@ -29,9 +29,9 @@ pub fn owner_collections() -> Result<Vec<CollectionSpec>, StorageError> {
 fn declared_collections() -> Vec<CollectionSpec> {
     let mut collections = Vec::new();
     collections.extend(tinyagents_harness::storage::collections());
-    collections.extend(tinyagents_session::port::drivers::collections());
+    collections.extend(tinyagents_session::port::collections());
     collections.extend(tinyagents_graph::storage::collections());
-    collections.extend(tinyagents_tasks::storage::collections());
+    collections.extend(tinyagents_tasks::collections());
     collections.extend(crate::security::approval::collection_specs());
     collections.extend(crate::security::devices::collection_specs());
     collections.extend(crate::desktop::notifications::collection_specs());
@@ -45,7 +45,7 @@ fn declared_collections() -> Vec<CollectionSpec> {
     collections.extend(super::agents::collection_specs());
 
     #[cfg(feature = "skills")]
-    collections.extend(tinyskills_drivers::schema::collections());
+    collections.extend(tinyskills_drivers::collections());
     #[cfg(feature = "modules")]
     {
         collections.extend(tinymcp_bus::storage::collection_specs());
