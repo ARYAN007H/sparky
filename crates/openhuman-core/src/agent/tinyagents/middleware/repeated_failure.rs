@@ -49,7 +49,7 @@ impl CopyProvider for OpenHumanHaltCopy {
     }
 }
 
-fn user_actionable_escalation(tool: &str, error: &str) -> Option<String> {
+pub(crate) fn user_actionable_escalation(tool: &str, error: &str) -> Option<String> {
     let lower = error.to_lowercase();
     let permission_or_scope_failure = lower.contains("[composio:error:insufficient_scope]")
         || lower.contains("[composio:error:trigger_permission]")
@@ -78,11 +78,11 @@ fn user_actionable_escalation(tool: &str, error: &str) -> Option<String> {
     })
 }
 
-fn terminal_inference_failure_kind(result: &str) -> Option<TerminalInferenceFailureKind> {
+pub(crate) fn terminal_inference_failure_kind(result: &str) -> Option<TerminalInferenceFailureKind> {
     tinyagents_hooks::stop::terminal_inference_failure_kind(result)
 }
 
-fn terminal_inference_halt_summary(kind: TerminalInferenceFailureKind, tool: &str, error: &str) -> String {
+pub(crate) fn terminal_inference_halt_summary(kind: TerminalInferenceFailureKind, tool: &str, error: &str) -> String {
     match kind {
         TerminalInferenceFailureKind::BudgetExhausted => {
             stop::halt_summary::budget(&OpenHumanHaltCopy, tool, error).summary
@@ -93,11 +93,11 @@ fn terminal_inference_halt_summary(kind: TerminalInferenceFailureKind, tool: &st
     }
 }
 
-fn recoverable_identical_halt_summary(tool: &str, count: u32, error: &str) -> String {
+pub(crate) fn recoverable_identical_halt_summary(tool: &str, count: u32, error: &str) -> String {
     stop::halt_summary::retry_exhausted(&OpenHumanHaltCopy, tool, count, error).summary
 }
 
-fn recoverable_no_progress_halt_summary(consecutive: u32, tool: &str, error: &str) -> String {
+pub(crate) fn recoverable_no_progress_halt_summary(consecutive: u32, tool: &str, error: &str) -> String {
     stop::halt_summary::no_progress(&OpenHumanHaltCopy, consecutive, tool, error).summary
 }
 

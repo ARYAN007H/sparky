@@ -255,8 +255,8 @@ fn shared_budget_matcher_reproduces_each_legacy_matcher_on_the_corpus() {
         );
         let delegated = format!("All providers/models failed: {message}");
         assert_eq!(
-            crate::inference::failure_copy::terminal_inference_failure_kind(&delegated)
-                == Some(crate::inference::failure_copy::TerminalInferenceFailure::BudgetExhausted),
+            crate::agent::tinyagents::middleware::repeated_failure::terminal_inference_failure_kind(&delegated)
+                == Some(tinyagents_hooks::stop::TerminalInferenceFailureKind::BudgetExhausted),
             legacy_billing_matcher(message),
             "loop-guard matcher drifted on {message:?}"
         );
@@ -272,10 +272,11 @@ fn shared_budget_matcher_reproduces_each_legacy_matcher_on_the_corpus() {
 
 #[test]
 fn loop_guard_halt_summaries_are_byte_identical() {
-    use crate::inference::failure_copy::{
+    use crate::agent::tinyagents::middleware::repeated_failure::{
         recoverable_identical_halt_summary, recoverable_no_progress_halt_summary,
-        terminal_inference_halt_summary, user_actionable_escalation, TerminalInferenceFailure,
+        terminal_inference_halt_summary, user_actionable_escalation,
     };
+    use tinyagents_hooks::stop::TerminalInferenceFailureKind as TerminalInferenceFailure;
     assert_eq!(
         terminal_inference_halt_summary(TerminalInferenceFailure::BudgetExhausted, "delegate", "boom"),
         "Stopping: the `delegate` step failed because the account is out of inference budget/credits \u{2014} every retry hits the same wall. Add credits to your account (or, when using a custom/BYO provider, top up that provider's own account) and try again. Details:\nboom"
