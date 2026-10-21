@@ -460,7 +460,7 @@ async fn dropped_scoped_media_read_lease_aborts_the_compiled_module_handle() {
         .expect("module opens a scoped read handle");
     let handle = read.handle.clone();
     crate::channels::runtime::dispatch::drop_media_read_lease_for_test(
-        crate::modules::client(config.clone()),
+        runtime.client.clone(),
         dispatch_ctx,
         read.handle,
     );
