@@ -408,6 +408,181 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
         .expect("hosted module runtime should close after the turn");
 }
 
+#[tokio::test]
+async fn dropped_scoped_media_read_lease_aborts_the_compiled_module_handle() {
+    let env_lock = EnvVarGuard::locked_async().await;
+    let server = MockServer::start().await;
+    let _env = env_lock.with("OPENHUMAN_TELEGRAM_BOT_API_BASE", server.uri());
+    let _storage = crate::channels::module_fixture::install_memory_storage();
+    crate::channels::module_fixture::client().await;
+
+    for endpoint in ["getUpdates", "deleteWebhook"] {
+        Mock::given(method("POST"))
+            .and(path(format!("/bottoken/{endpoint}")))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "ok": true,
+                "result": if endpoint == "getUpdates" { serde_json::json!([]) } else { serde_json::json!(true) }
+            })))
+            .mount(&server)
+            .await;
+    }
+
+    let workspace = tempfile::tempdir().expect("temporary module workspace");
+    let mut config = Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.modules.allow_download = false;
+    config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
+    config.channels_config.telegram = Some(tinychannels_bus::config::TelegramConfig {
+        bot_token: "token".into(),
+        chat_id: None,
+        allowed_users: vec!["42".into()],
+        stream_mode: Default::default(),
+        draft_update_interval_ms: 1,
+        silent_streaming: true,
+        mention_only: false,
+    });
+    let dispatch_ctx = crate::core::runtime::DispatchCtx::host_default();
+    let (dispatch, _receiver) = tokio::sync::mpsc::channel(4);
+    let mut runtime = ModuleChannelRuntime::prepare(
+        &dispatch_ctx,
+        Arc::new(config.clone()),
+        Arc::new(OnceLock::new()),
+        dispatch,
+    )
+    .await
+    .expect("compiled TinyBus module should prepare configured Telegram");
+    runtime.start(&config).await.expect("mock Telegram starts");
+
+    let scope = tinychannels_bus::HostVoiceScope {
+        configured_instance: "telegram".into(),
+        channel: tinychannels_bus::ChannelRef {
+            id: "telegram".into(),
+            account_id: Some("telegram".into()),
+        },
+        conversation: tinychannels_bus::ConversationRef {
+            kind: tinychannels_bus::ConversationKind::Dm,
+            id: "42".into(),
+            ..Default::default()
+        },
+        turn_id: "media-read-lease-test".into(),
+    };
+    let object = runtime.lease.object();
+    let bytes = vec![b'x'; tinychannels_bus::module_media::MEDIA_READ_CHUNK_BYTES + 1];
+    let begin: tinychannels_bus::MediaUploadHandle = object
+        .call_confidential(
+            tinychannels_bus::methods::BEGIN_MEDIA_UPLOAD,
+            (tinychannels_bus::MediaUploadBegin {
+                instance: "telegram".into(),
+                scope: scope.clone(),
+                kind: tinychannels_bus::MediaKind::Document,
+                content_type: "text/plain".into(),
+                file_name: Some("note.txt".into()),
+                duration_ms: None,
+                codec: None,
+                byte_count: bytes.len(),
+            },),
+        )
+        .await
+        .expect("module accepts a scoped upload");
+    let split = tinychannels_bus::module_media::MEDIA_UPLOAD_CHUNK_BYTES;
+    object
+        .call_confidential::<u32>(
+            tinychannels_bus::methods::APPEND_MEDIA_UPLOAD_CHUNK,
+            (tinychannels_bus::MediaUploadChunk {
+                handle: begin.clone(),
+                sequence: 0,
+                bytes: bytes[..split].to_vec(),
+            },),
+        )
+        .await
+        .expect("module accepts the upload bytes");
+    object
+        .call_confidential::<u32>(
+            tinychannels_bus::methods::APPEND_MEDIA_UPLOAD_CHUNK,
+            (tinychannels_bus::MediaUploadChunk {
+                handle: begin.clone(),
+                sequence: 1,
+                bytes: bytes[split..].to_vec(),
+            },),
+        )
+        .await
+        .expect("module accepts the final upload chunk");
+    let media: tinychannels_bus::MediaReference = object
+        .call_confidential(
+            tinychannels_bus::methods::FINISH_MEDIA_UPLOAD,
+            (tinychannels_bus::MediaUploadFinish(begin),),
+        )
+        .await
+        .expect("module persists an opaque scoped media reference");
+
+    let read: tinychannels_bus::MediaReadInfo = object
+        .call_confidential(
+            tinychannels_bus::methods::BEGIN_MEDIA_READ,
+            (tinychannels_bus::MediaReadBegin {
+                instance: "telegram".into(),
+                scope,
+                media,
+                max_bytes: bytes.len() as u64,
+            },),
+        )
+        .await
+        .expect("module opens a scoped read handle");
+    let first_chunk: tinychannels_bus::MediaReadChunkResult = object
+        .call_confidential(
+            tinychannels_bus::methods::READ_MEDIA_CHUNK,
+            (tinychannels_bus::MediaReadChunk {
+                handle: read.handle.clone(),
+                sequence: 0,
+            },),
+        )
+        .await
+        .expect("read handle is usable before lease drop");
+    assert!(!first_chunk.done);
+    let replay: tinychannels_bus::MediaReadChunkResult = object
+        .call_confidential(
+            tinychannels_bus::methods::READ_MEDIA_CHUNK,
+            (tinychannels_bus::MediaReadChunk {
+                handle: read.handle.clone(),
+                sequence: 0,
+            },),
+        )
+        .await
+        .expect("the module retains the last chunk for retry before lease drop");
+    assert_eq!(replay, first_chunk);
+    let handle = read.handle.clone();
+    crate::channels::runtime::dispatch::drop_media_read_lease_for_test(
+        runtime.lease.object().clone(),
+        dispatch_ctx,
+        read.handle,
+    );
+
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let chunk = object
+                .call_confidential::<tinychannels_bus::MediaReadChunkResult>(
+                    tinychannels_bus::methods::READ_MEDIA_CHUNK,
+                    (tinychannels_bus::MediaReadChunk {
+                        handle: handle.clone(),
+                        sequence: 0,
+                    },),
+                )
+                .await;
+            if let Err(error) = chunk {
+                assert_eq!(error, tinybus::module::ModuleCallError::ModuleFault);
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("dropping the lease eventually aborts the module read handle");
+
+    runtime
+        .close()
+        .await
+        .expect("module runtime closes cleanly");
+}
+
 async fn run_hosted_compiled_turn(
     object: &tinybus::module::ModuleObjectClient,
     channel: tinychannels_bus::ChannelRef,

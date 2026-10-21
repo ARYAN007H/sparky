@@ -190,6 +190,11 @@ pub(crate) fn user_message_from_parts(
     }
     for part in parts {
         match part {
+            tinychannels_bus::ContentPart::Text { text, .. } => {
+                if !text.is_empty() {
+                    content.push(ContentBlock::Text(text.clone()));
+                }
+            }
             tinychannels_bus::ContentPart::Image {
                 media,
                 caption,
@@ -210,9 +215,33 @@ pub(crate) fn user_message_from_parts(
                     mime_type: media.content_type.clone(),
                 }));
             }
+            tinychannels_bus::ContentPart::File { media, caption, .. } => {
+                let path = media
+                    .path
+                    .clone()
+                    .ok_or_else(|| "resolved media attachment has no trusted path".to_string())?;
+                if let Some(caption) = caption.as_ref().filter(|text| !text.is_empty()) {
+                    content.push(ContentBlock::Text(caption.clone()));
+                }
+                content.push(ContentBlock::Document(MediaRef::Path {
+                    path,
+                    media_type: media.content_type.clone(),
+                }));
+            }
+            tinychannels_bus::ContentPart::VoiceNote { voice_note } => {
+                let transcript = voice_note
+                    .transcript
+                    .as_ref()
+                    .filter(|transcript| {
+                        transcript.state == tinychannels_bus::VoiceTranscriptState::Complete
+                    })
+                    .map(|transcript| transcript.text.trim())
+                    .filter(|text| !text.is_empty())
+                    .ok_or_else(|| "voice transcript is unavailable".to_owned())?;
+                content.push(ContentBlock::Text(transcript.to_owned()));
+            }
             tinychannels_bus::ContentPart::Audio { media, .. }
-            | tinychannels_bus::ContentPart::Video { media, .. }
-            | tinychannels_bus::ContentPart::File { media, .. } => {
+            | tinychannels_bus::ContentPart::Video { media, .. } => {
                 let path = media
                     .path
                     .clone()
@@ -223,12 +252,19 @@ pub(crate) fn user_message_from_parts(
                 };
                 let block = match part {
                     tinychannels_bus::ContentPart::Audio { .. } => ContentBlock::Audio(media_ref),
-                    tinychannels_bus::ContentPart::Video { .. } => ContentBlock::Video(media_ref),
-                    _ => ContentBlock::Document(media_ref),
+                    _ => ContentBlock::Video(media_ref),
                 };
                 content.push(block);
             }
-            _ => return Err("resolved attachment has an unsupported kind".into()),
+            tinychannels_bus::ContentPart::Sticker { .. }
+            | tinychannels_bus::ContentPart::Location { .. }
+            | tinychannels_bus::ContentPart::Contact { .. }
+            | tinychannels_bus::ContentPart::Buttons { .. }
+            | tinychannels_bus::ContentPart::Poll { .. }
+            | tinychannels_bus::ContentPart::Presentation { .. }
+            | tinychannels_bus::ContentPart::Native { .. } => {
+                return Err("resolved attachment has an unsupported kind".into());
+            }
         }
     }
     Ok(Message::User(UserMessage { content }))

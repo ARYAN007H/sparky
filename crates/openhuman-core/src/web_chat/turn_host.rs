@@ -25,13 +25,12 @@ use tinyinference_llm::failure::is_empty_provider_response_text;
 use tokio::sync::{mpsc, watch, Mutex as AsyncMutex};
 
 use super::ops::{self, BudgetCorrelation};
-use super::progress::{ProgressProjection, INFERENCE_HEARTBEAT_SECS};
+use super::progress::ProgressProjection;
 use super::runner::{Admission, Shared};
 use super::session::{
     checkin_session_agent, checkout_session_agent, normalize_model_override, CheckoutPolicy,
 };
 use super::surface::TurnIds;
-use super::turn_activity::TurnActivity;
 use super::types::WebChatTaskResult;
 use super::web_errors::{
     inference_budget_exceeded_user_message, is_inference_budget_exceeded_error,
@@ -41,6 +40,12 @@ use crate::agent::turn_origin::AgentTurnOrigin;
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
 use tinyagents_harness::progress::AgentProgress;
+
+#[path = "turn_host_progress.rs"]
+mod progress_helpers;
+#[cfg(test)]
+use progress_helpers::spawn_heartbeat_with_interval;
+use progress_helpers::{settle_turn_snapshot, spawn_heartbeat, tap_progress, AbortOnDrop};
 
 /// How long a finished turn waits for its progress tap to forward every event
 /// the turn queued before the terminal `chat_done`/`chat_error` is published.
@@ -57,15 +62,6 @@ const PROGRESS_CHANNEL_CAPACITY: usize = 256;
 
 pub(super) struct WebHost {
     shared: Arc<Shared>,
-}
-
-/// Aborts a task when dropped.
-struct AbortOnDrop(tokio::task::JoinHandle<()>);
-
-impl Drop for AbortOnDrop {
-    fn drop(&mut self) {
-        self.0.abort();
-    }
 }
 
 impl WebHost {
@@ -340,6 +336,9 @@ impl WebHost {
                 run_queue: Some(queue),
                 cancellation,
                 turn_deadline: request.deadline,
+                native_staged_parts: Vec::new(),
+                native_staged_lease: None,
+                native_message_id: None,
                 // Also the turn's workspace, so attachment reads and
                 // delegated sub-agents use the upload folder (#7714).
                 workspace: thread_dir
@@ -587,105 +586,6 @@ async fn speak_and_publish(
             );
         }
     }
-}
-
-/// Settle the turn's own snapshot now the turn is over.
-///
-/// The projection marks the snapshot terminal on its way out, but it only
-/// finishes once the terminal event has been published, and a detached
-/// sub-agent may still hold a progress sender past the turn. A snapshot left
-/// `Streaming` on disk would hydrate a live "Thinking..." indicator under a
-/// reply that was already delivered. The turn has ended here by construction,
-/// so record that; a projection that later observes `TurnCompleted` overwrites
-/// it with `Completed`, terminal either way.
-fn settle_turn_snapshot(
-    config: &crate::config::Config,
-    request: &TurnRequest<QueuedPayload>,
-    completed: bool,
-) {
-    let lifecycle = if completed {
-        tinyagents_session::turn_state::TurnLifecycle::Completed
-    } else {
-        tinyagents_session::turn_state::TurnLifecycle::Interrupted
-    };
-    let now = chrono::Utc::now().to_rfc3339();
-    if let Err(err) = crate::agent::session_store::turn_states_for(&config.workspace_dir)
-        .settle_turn(&request.thread_id, &request.request_id, lifecycle, &now)
-    {
-        log::warn!(
-            "[web-channel] failed to settle turn snapshot client={} thread={} request_id={}: {err}",
-            request.payload.client_id,
-            request.thread_id,
-            request.request_id
-        );
-    }
-}
-
-/// Forward the agent's progress to the runner, folding each event into the
-/// idle record and the work tracker on the way. Signals `drained` once the
-/// parent's `TurnCompleted` was forwarded or the stream ended.
-fn tap_progress(
-    ctx: &DispatchCtx,
-    mut rx: mpsc::Receiver<AgentProgress>,
-    progress: mpsc::Sender<TurnSignal>,
-    activity: TurnActivity,
-    drained: watch::Sender<bool>,
-) -> tokio::task::JoinHandle<()> {
-    ctx.spawn(async move {
-        let mut work = WorkTracker::default();
-        while let Some(event) = rx.recv().await {
-            activity.observe(&event);
-            let completed = matches!(event, AgentProgress::TurnCompleted { .. });
-            if let Some(signal) = work.observe(&event) {
-                if progress.send(signal).await.is_err() {
-                    break;
-                }
-            }
-            if progress
-                .send(TurnSignal::Progress(Box::new(event)))
-                .await
-                .is_err()
-            {
-                break;
-            }
-            if completed {
-                let _ = drained.send(true);
-            }
-        }
-        let _ = drained.send(true);
-    })
-}
-
-/// The `inference_heartbeat` liveness beat for the turn's projection.
-fn spawn_heartbeat(
-    ctx: &DispatchCtx,
-    projection: Arc<AsyncMutex<ProgressProjection>>,
-) -> tokio::task::JoinHandle<()> {
-    spawn_heartbeat_with_interval(
-        ctx,
-        projection,
-        Duration::from_secs(INFERENCE_HEARTBEAT_SECS),
-    )
-}
-
-fn spawn_heartbeat_with_interval(
-    ctx: &DispatchCtx,
-    projection: Arc<AsyncMutex<ProgressProjection>>,
-    interval: Duration,
-) -> tokio::task::JoinHandle<()> {
-    ctx.spawn(async move {
-        let mut beat = tokio::time::interval(interval);
-        // Wall-clock cadence: a slow turn must not produce a burst of catch-up
-        // beats once it finally yields control.
-        beat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        // The first tick resolves at once; the first real beat lands one full
-        // interval after the turn begins.
-        beat.tick().await;
-        loop {
-            beat.tick().await;
-            projection.lock().await.heartbeat().await;
-        }
-    })
 }
 
 #[async_trait]

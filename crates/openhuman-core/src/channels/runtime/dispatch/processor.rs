@@ -16,9 +16,13 @@
 
 mod approval;
 mod bus_turn;
+mod native_media;
 pub(crate) mod progressive;
 mod reset;
 mod turn;
+
+#[cfg(test)]
+pub(crate) use native_media::drop_media_read_lease_for_test;
 
 use crate::channels::context::ChannelRuntimeContext;
 use std::sync::Arc;
