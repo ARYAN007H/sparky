@@ -191,7 +191,7 @@ impl RuntimeBuilder {
             _ => None,
         };
         if self.session_store.is_none() {
-            if storage_backend.is_some() {
+            if let Some(backend) = &storage_backend {
                 let stores = openhuman_core::storage::sessions::TenantSessionStores::new(
                     backend.clone(),
                     storage_info.recover_sessions_on_open(),
