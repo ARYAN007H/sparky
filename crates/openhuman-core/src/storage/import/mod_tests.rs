@@ -247,6 +247,163 @@ fn a_marker_row_an_older_build_wrote_counts_as_a_finished_import() {
     assert!(dump(&backend, &source, "devices.paired").is_empty());
 }
 
+#[cfg(feature = "storage-sqlite")]
+#[test]
+fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrection() {
+    use crate::profiles::{ProfileId, ProfileRegistry};
+    use crate::storage::layout::{Target, legacy};
+    use crate::storage::{self, Scope, scope_for_profile};
+    use sha2::Digest;
+    use tinystoragedrivers::Query;
+
+    let root = TempDir::new().unwrap();
+    let target = Target::new(root.path(), "u1");
+    std::fs::create_dir_all(target.workspace()).unwrap();
+    std::fs::create_dir_all(&target.profile_dir).unwrap();
+    let config_path = target.profile_dir.join("config.toml");
+    std::fs::write(&config_path, "# legacy profile fixture\n").unwrap();
+
+    // This checked-in file was produced by the historical public TSD v1
+    // writer. Copy it to the same profile workspace path the boot importer
+    // selects; do not synthesize rows in the test.
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src/storage/import/fixtures/legacy-v1-profile/storage.db");
+    let source_db = legacy::v1_db(&target);
+    std::fs::create_dir_all(source_db.parent().unwrap()).unwrap();
+    std::fs::copy(&fixture, &source_db).unwrap();
+    let source_hash = sha2::Sha256::digest(std::fs::read(&source_db).unwrap());
+
+    let destination_url = format!("sqlite:{}", target.storage_db().display());
+    let destination = crate::storage::test_support::sqlite_backend_in(
+        root,
+        destination_url.clone(),
+    )
+    .unwrap();
+    let backend = Arc::clone(&destination.backend);
+    let _installed = crate::storage::test_support::install_for_test(
+        &destination_url,
+        Arc::clone(&backend),
+    );
+    let config = Config {
+        config_path,
+        workspace_dir: target.workspace(),
+        storage: crate::config::StorageConfig {
+            url: Some(destination_url),
+            ..Default::default()
+        },
+        ..Config::default()
+    };
+
+    // The boot pipeline includes scope_move. The other importers have no
+    // source files in this fixture; this proof covers only historical TSD
+    // documents and the schema owners they enter through scope_move.
+    let first = run_all(&backend, &config);
+    let moved = first
+        .iter()
+        .find(|report| report.domain == crate::storage::scope_move::IMPORT_DOMAIN)
+        .expect("boot importer includes legacy scope movement");
+    assert_eq!(
+        moved.outcome.as_ref().unwrap(),
+        &Outcome::Imported {
+            found: 4,
+            written: 4
+        }
+    );
+
+    let profile_scope = backend.for_scope(&scope_for_profile("u1")).unwrap();
+    let profile_docs = Arc::clone(profile_scope.documents());
+    let (cost, artifact, args) = storage::block_on(async move {
+        let cost = profile_docs
+            .query_all("cost.records", &Query::all())
+            .await?;
+        let artifact = profile_docs
+            .query_all("artifacts.records", &Query::all())
+            .await?;
+        let args = profile_docs
+            .query_all("artifacts.args", &Query::all())
+            .await?;
+        Ok::<_, crate::storage::StorageError>((cost, artifact, args))
+    })
+    .unwrap();
+
+    // Reconstitute the typed owner records from their v2 stored bodies. These
+    // are the same timestamp restorations used by cost::storage_schema and
+    // artifacts::storage_schema before their serde model decoders run.
+    assert_eq!(cost.len(), 1);
+    let mut cost_body = cost[0].doc.clone();
+    let cost_ms = cost_body["ts_ms"].as_i64().unwrap();
+    cost_body["usage"]["timestamp"] = serde_json::json!(
+        chrono::DateTime::from_timestamp_millis(cost_ms)
+            .unwrap()
+            .to_rfc3339()
+    );
+    let cost_record: crate::platform::cost::types::CostRecord =
+        serde_json::from_value(cost_body).unwrap();
+    assert_eq!(cost_record.id, "cost-0001");
+    assert_eq!(cost_record.session_id, "session-fixture");
+    assert_eq!(cost_record.usage.model, "fixture-model");
+    assert_eq!(cost_record.usage.input_tokens, 12);
+    assert_eq!(cost_record.usage.output_tokens, 3);
+    assert_eq!(cost_record.usage.timestamp.timestamp_millis(), cost_ms);
+
+    assert_eq!(artifact.len(), 1);
+    let mut artifact_body = artifact[0].doc.clone();
+    let created_ms = artifact_body["created_ms"].as_i64().unwrap();
+    artifact_body["created_at"] = serde_json::json!(
+        chrono::DateTime::from_timestamp_millis(created_ms)
+            .unwrap()
+            .to_rfc3339()
+    );
+    let artifact_meta: crate::artifacts::types::ArtifactMeta =
+        serde_json::from_value(artifact_body).unwrap();
+    assert_eq!(artifact_meta.id, "artifact-1");
+    assert_eq!(artifact_meta.title, "Fixture plan");
+    assert_eq!(artifact_meta.thread_id.as_deref(), Some("thread-1"));
+    assert_eq!(artifact_meta.created_at.timestamp_millis(), created_ms);
+    assert_eq!(args.len(), 1);
+    assert_eq!(args[0].doc, serde_json::json!({"title":"Fixture plan", "format":"markdown"}));
+
+    let registry = ProfileRegistry::cluster(backend.as_ref()).unwrap();
+    let profile = storage::block_on(registry.get(&ProfileId::parse("u1").unwrap()))
+        .unwrap()
+        .unwrap();
+    assert_eq!(profile.profile_id.as_str(), "u1");
+    assert_eq!(profile.created_at, 1_738_548_306);
+    assert_eq!(profile.layout_version, 1);
+
+    assert_eq!(
+        sha2::Sha256::digest(std::fs::read(&source_db).unwrap()),
+        source_hash,
+        "boot import must leave the v1 source bytes unchanged"
+    );
+
+    let delete_scope = backend.for_scope(&Scope::new("u:u1").unwrap()).unwrap();
+    let docs = Arc::clone(delete_scope.documents());
+    storage::block_on(async move {
+        docs.delete("cost.records", &cost[0].id, Precondition::None)
+            .await
+    })
+    .unwrap();
+
+    let second = run_all(&backend, &config);
+    let moved = second
+        .iter()
+        .find(|report| report.domain == crate::storage::scope_move::IMPORT_DOMAIN)
+        .unwrap();
+    assert_eq!(moved.outcome.as_ref().unwrap(), &Outcome::AlreadyDone);
+    let docs = Arc::clone(backend.for_scope(&scope_for_profile("u1")).unwrap().documents());
+    let remaining = storage::block_on(async move {
+        docs.query_all("cost.records", &Query::all()).await
+    })
+    .unwrap();
+    assert!(remaining.is_empty(), "a deleted imported row must not return");
+    assert_eq!(
+        sha2::Sha256::digest(std::fs::read(&source_db).unwrap()),
+        source_hash,
+        "repeat boot import must still leave the v1 source bytes unchanged"
+    );
+}
+
 #[test]
 fn processes_importing_one_workspace_at_once_import_it_once() {
     let (_dir, config) = workspace();
