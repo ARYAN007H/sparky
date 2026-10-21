@@ -263,7 +263,9 @@ pub(crate) fn authorize(
                 "ttl": false,
                 "max_key_len": 0,
             }))),
-            Object::Streams | Object::Secrets | Object::Queues => Err(Denied::Object),
+            Object::Streams => Ok(Plan::Answer(serde_json::json!({ "capabilities": [] }))),
+            Object::Secrets => Ok(Plan::Answer(serde_json::json!({ "enumerable": false }))),
+            Object::Queues => Err(Denied::Object),
             Object::Kv => Ok(Plan::Answer(serde_json::json!({ "capabilities": [] }))),
         };
     }
