@@ -292,15 +292,20 @@ async fn provider() -> MockServer {
     server
 }
 
-async fn delayed_provider(delay: std::time::Duration) -> MockServer {
+async fn delayed_provider(
+    delay: std::time::Duration,
+    request_arrived: Arc<tokio::sync::Notify>,
+    request_path: Arc<Mutex<Option<String>>>,
+) -> MockServer {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
-        .and(path("/v1/chat/completions"))
-        .respond_with(
+        .respond_with(move |request: &wiremock::Request| {
+            *request_path.lock().expect("request path lock") = Some(request.url.path().to_string());
+            request_arrived.notify_one();
             ResponseTemplate::new(200)
                 .set_body_json(answer("this response arrives after the channel deadline"))
-                .set_delay(delay),
-        )
+                .set_delay(delay)
+        })
         .mount(&server)
         .await;
     server
@@ -441,7 +446,6 @@ fn native_host_agent_turn_enforces_the_configured_channel_deadline() {
             let _slot = host_agents::tests::lock();
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
-                .start_paused(true)
                 .build()
                 .unwrap();
             runtime
@@ -457,7 +461,14 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
     let _storage = crate::channels::module_fixture::install_memory_storage();
     crate::channels::module_fixture::client().await;
     let timeout = tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS;
-    let server = delayed_provider(std::time::Duration::from_secs(timeout + 1)).await;
+    let request_arrived = Arc::new(tokio::sync::Notify::new());
+    let request_path = Arc::new(Mutex::new(None));
+    let server = delayed_provider(
+        std::time::Duration::from_secs(timeout + 1),
+        Arc::clone(&request_arrived),
+        Arc::clone(&request_path),
+    )
+    .await;
     let tmp = tempfile::tempdir().unwrap();
     crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .unwrap();
@@ -482,27 +493,38 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
         .message_timeout_secs = timeout;
 
     let _installed = InstalledResolver::new(resolver);
-    let turn = tokio::spawn(process_channel_message(ctx, message("slow native turn")));
-    let mut requests = Vec::new();
-    for _ in 0..1_000 {
-        requests = server.received_requests().await.unwrap();
-        if requests
-            .iter()
-            .any(|request| request.url.path().ends_with("/chat/completions"))
-        {
-            break;
-        }
-        tokio::task::yield_now().await;
-    }
+    let mut turn = tokio::spawn(process_channel_message(ctx, message("slow native turn")));
+    tokio::time::timeout(
+        std::time::Duration::from_secs(15),
+        request_arrived.notified(),
+    )
+    .await
+    .expect("the real SessionHost model request reaches the delayed provider");
     assert!(
-        requests
-            .iter()
-            .any(|request| request.url.path().ends_with("/chat/completions")),
-        "the real SessionHost model request reached the delayed provider"
+        request_path
+            .lock()
+            .expect("request path lock")
+            .as_deref()
+            .is_some_and(|path| path.ends_with("/chat/completions")),
+        "the delayed request is a model completion: {request_path:?}"
     );
+    tokio::time::pause();
 
+    // The model response is delayed to timeout + 1s. Advancing two extra
+    // virtual seconds lets the old backstop-only behavior complete too, so
+    // the assertion distinguishes a missing channel timeout from setup.
     tokio::time::advance(std::time::Duration::from_secs(timeout)).await;
-    turn.await.expect("native channel turn task completes");
+    let completed_at_deadline = tokio::select! {
+        biased;
+        result = &mut turn => Some(result),
+        _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => None,
+    };
+    if let Some(result) = completed_at_deadline {
+        result.expect("native channel turn task completes");
+    } else {
+        tokio::time::advance(std::time::Duration::from_secs(2)).await;
+        turn.await.expect("native channel turn task completes");
+    }
     let sent = channel.sent.lock().unwrap().clone();
     assert_eq!(sent.len(), 1, "the timed-out turn emits one terminal reply");
     assert!(
