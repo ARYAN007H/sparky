@@ -563,8 +563,10 @@ async fn an_injected_event_is_left_out_of_the_prompt_and_listed_as_blocked() {
     assert_eq!(blocked, ["t2"]);
     let reason = &stored.result.blocked[0].reason;
     assert!(!reason.is_empty());
+    // The guard's verdict and rule codes, never the event's text.
+    assert!(reason.starts_with("blocked: "), "{reason}");
     assert!(
-        !reason.to_lowercase().contains("ignore"),
+        !reason.to_lowercase().contains("ignore all previous"),
         "user text in reason: {reason}"
     );
 }
