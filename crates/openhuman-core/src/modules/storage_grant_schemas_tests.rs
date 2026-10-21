@@ -23,10 +23,10 @@ fn every_row_has_a_valid_generated_grant() {
             .validate()
             .unwrap_or_else(|why| panic!("{}: {why}", row.module));
         assert!(grant.writable);
-        let items = module_items(row.owner);
+        let items = module_collections(row.owner);
         assert_eq!(
             grant.collections.len(),
-            items.collections.len(),
+            items.len(),
             "{}",
             row.module
         );
