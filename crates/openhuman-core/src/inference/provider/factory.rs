@@ -55,8 +55,8 @@ use cloud_slug::{
     try_create_cloud_slug_chat_model_with_native_tools_for,
 };
 use local_runtime::{
-    OptionalChatModelResult, try_create_local_runtime_chat_model,
-    try_create_local_runtime_chat_model_from_string,
+    try_create_local_runtime_chat_model, try_create_local_runtime_chat_model_from_string,
+    OptionalChatModelResult,
 };
 #[cfg(test)]
 pub(crate) use managed_backend::make_openhuman_backend_model_for_thread;
@@ -91,16 +91,16 @@ pub mod test_provider_override;
 #[path = "factory_tests.rs"]
 mod factory_tests;
 
-use crate::config::Config;
 use crate::config::schema::cloud_providers::AuthStyle;
+use crate::config::Config;
 use crate::security::credentials::AuthService;
 use crate::security::egress::EgressLedger;
 use std::sync::Arc;
 use tinyagents_harness::providers::claude_agent_sdk::ClaudeAgentSdkProvider;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse, ModelStream};
 use tinyinference_llm::providers::openai::codex::{
-    OPENAI_CODEX_ACCOUNT_HEADER, OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
-    openai_codex_client_version, openai_codex_user_agent,
+    openai_codex_client_version, openai_codex_user_agent, OPENAI_CODEX_ACCOUNT_HEADER,
+    OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
 };
 
 /// Sentinel meaning "use the OpenHuman backend session JWT".

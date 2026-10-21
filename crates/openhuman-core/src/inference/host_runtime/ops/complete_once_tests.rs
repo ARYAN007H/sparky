@@ -1,5 +1,5 @@
 use super::*;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::ResponseFormat;
 use tinyinference_llm::tool::ToolSchema;
