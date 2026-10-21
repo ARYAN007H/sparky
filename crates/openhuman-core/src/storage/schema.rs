@@ -72,32 +72,40 @@ fn declared_collections() -> Vec<CollectionSpec> {
 pub fn module_collections(owner: &str) -> Vec<CollectionSpec> {
     #[cfg(feature = "modules")]
     match owner {
-        "mcp" => return tinymcp_bus::storage::collection_specs(),
-        "channels" => return tinychannels_bus::storage::collections(),
-        "connectors" => return tinyconnectors_bus::storage::collections(),
+        "mcp" => return module_owned_collections(tinymcp_bus::storage::collection_specs()),
+        "channels" => return module_owned_collections(tinychannels_bus::storage::collections()),
+        "connectors" => {
+            return module_owned_collections(tinyconnectors_bus::storage::collections());
+        }
         "box" => {
-            return vec![
+            return module_owned_collections(vec![
                 CollectionSpec::new("box.boxes"),
                 CollectionSpec::new("box.jail_index"),
-            ];
+            ]);
         }
-        "juice" => return tinyjuice_bus::storage::collections(),
+        "juice" => return module_owned_collections(tinyjuice_bus::storage::collections()),
         _ => {}
     }
     #[cfg(feature = "web3")]
     if owner == "wallet" {
-        return tinywallet_bus::storage::collections();
+        return module_owned_collections(tinywallet_bus::storage::collections());
     }
     #[cfg(feature = "tinymemes")]
     if owner == "memes" {
-        return tinymemes_bus::storage::collections();
+        return module_owned_collections(tinymemes_bus::storage::collections());
     }
     #[cfg(feature = "inbound-queues")]
     if owner == "teq" {
-        return tinyeventqueues_bus::storage::collection_specs();
+        return module_owned_collections(tinyeventqueues_bus::storage::collection_specs());
     }
     let _ = owner;
     Vec::new()
+}
+
+/// A module may receive its own collections, never TSD's host-managed records.
+fn module_owned_collections(mut collections: Vec<CollectionSpec>) -> Vec<CollectionSpec> {
+    collections.retain(|collection| !collection.name.starts_with("tsd."));
+    collections
 }
 
 #[cfg(test)]
