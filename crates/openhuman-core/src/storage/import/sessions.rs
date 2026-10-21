@@ -99,10 +99,9 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
                 tasks: rows.tasks,
                 tool_effects: rows.tool_effects,
             };
-            let report = crate::storage::block_on(async move {
-                ledger.import_legacy_batch(batch).await
-            })?
-            .context("[sessions] import sessions.db")?;
+            let report =
+                crate::storage::block_on(async move { ledger.import_legacy_batch(batch).await })?
+                    .context("[sessions] import sessions.db")?;
             let (database_found, database_written) = database_totals(&report);
             found += database_found;
             written += database_written;
@@ -170,7 +169,10 @@ fn import_turn_states(dir: &Path, destination: &dyn TurnStates) -> Result<TurnSt
         {
             Ok(state) => state,
             Err(error) => {
-                tracing::warn!("[sessions] skipping unreadable turn state {}: {error}", path.display());
+                tracing::warn!(
+                    "[sessions] skipping unreadable turn state {}: {error}",
+                    path.display()
+                );
                 report.unreadable += 1;
                 continue;
             }
@@ -199,9 +201,14 @@ fn turn_state_files(dir: &Path) -> Result<Vec<PathBuf>> {
         if entry.file_type()?.is_dir() {
             let mut children = std::fs::read_dir(path)?.collect::<std::io::Result<Vec<_>>>()?;
             children.sort_by_key(std::fs::DirEntry::file_name);
-            files.extend(children.into_iter().map(|child| child.path()).filter(|path| {
-                path.extension().and_then(|extension| extension.to_str()) == Some("json")
-            }));
+            files.extend(
+                children
+                    .into_iter()
+                    .map(|child| child.path())
+                    .filter(|path| {
+                        path.extension().and_then(|extension| extension.to_str()) == Some("json")
+                    }),
+            );
         } else if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
             files.push(path);
         }
@@ -346,12 +353,36 @@ impl LegacyMessageLine {
             request_id: self.request_id.clone(),
             preserve_request_id: true,
             interrupted: self.interrupted,
-            tool_failure: self.failure.then(|| tinyagents_session::transcript::ToolFailure {
-                failed: true,
-                detail: self.failure_detail.clone(),
-            }),
+            tool_failure: self
+                .failure
+                .then(|| tinyagents_session::transcript::ToolFailure {
+                    failed: true,
+                    detail: self.failure_detail.clone(),
+                }),
         }
         .normalized();
+        let message = if let Some(origin) = &self.background {
+            let mut message = message;
+            let mut metadata = message
+                .extra_metadata
+                .take()
+                .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::new()));
+            if !metadata.is_object() {
+                let mut object = serde_json::Map::new();
+                object.insert("value".into(), metadata);
+                metadata = serde_json::Value::Object(object);
+            }
+            if let Some(object) = metadata.as_object_mut() {
+                object.insert(
+                    tinyagents_session::transcript::BACKGROUND_METADATA_KEY.into(),
+                    serde_json::to_value(origin).unwrap_or(serde_json::Value::Null),
+                );
+            }
+            message.extra_metadata = Some(metadata);
+            message
+        } else {
+            message
+        };
         DisplayMessage {
             message,
             interrupted: self.interrupted,
@@ -359,7 +390,9 @@ impl LegacyMessageLine {
             iteration: self.iteration,
             ts: self.ts,
             reasoning_content: self.reasoning_content.or_else(|| {
-                turn_usage.as_ref().and_then(|usage| usage.reasoning_content.clone())
+                turn_usage
+                    .as_ref()
+                    .and_then(|usage| usage.reasoning_content.clone())
             }),
             turn_usage,
             failure: self.failure,
@@ -369,20 +402,35 @@ impl LegacyMessageLine {
     }
 }
 
-fn decode_transcript(path: &Path) -> Result<(TranscriptMeta, Option<serde_json::Value>, Vec<DisplayRecord>)> {
+fn decode_transcript(
+    path: &Path,
+) -> Result<(
+    TranscriptMeta,
+    Option<serde_json::Value>,
+    Vec<DisplayRecord>,
+)> {
     let text = std::fs::read_to_string(path)
         .with_context(|| format!("read transcript {}", path.display()))?;
     let mut meta = None;
     let mut tools = None;
     let mut records = Vec::new();
+    let mut seen_first = false;
     for (line_number, line) in text.lines().enumerate() {
         let line = line.trim();
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
+        let first_record = !seen_first;
+        seen_first = true;
         let value: serde_json::Value = match serde_json::from_str(line) {
             Ok(value) => value,
-            Err(error) if line_number == 0 => return Err(error.into()),
+            Err(error) if first_record => return Err(error.into()),
             Err(error) => {
-                tracing::warn!("[sessions] skipping malformed transcript line {} in {}: {error}", line_number + 1, path.display());
+                tracing::warn!(
+                    "[sessions] skipping malformed transcript line {} in {}: {error}",
+                    line_number + 1,
+                    path.display()
+                );
                 continue;
             }
         };
@@ -390,29 +438,55 @@ fn decode_transcript(path: &Path) -> Result<(TranscriptMeta, Option<serde_json::
             match serde_json::from_value::<LegacyMetaLine>(value) {
                 Ok(line) => meta = Some(line.meta.into()),
                 Err(error) if meta.is_none() => return Err(error.into()),
-                Err(error) => tracing::warn!("[sessions] skipping malformed transcript metadata line {}: {error}", line_number + 1),
+                Err(error) => tracing::warn!(
+                    "[sessions] skipping malformed transcript metadata line {}: {error}",
+                    line_number + 1
+                ),
             }
         } else if value.get("kind").and_then(serde_json::Value::as_str) == Some("tools") {
             tools = value.get("tools").cloned();
         } else if value.get("kind").and_then(serde_json::Value::as_str) == Some("compaction") {
             #[derive(serde::Deserialize)]
-            struct Compaction { #[serde(default)] replacement: Vec<LegacyMessageLine>, #[serde(default)] ts: Option<String>, #[serde(default)] request_id: Option<String> }
+            struct Compaction {
+                #[serde(default)]
+                replacement: Vec<LegacyMessageLine>,
+                #[serde(default)]
+                ts: Option<String>,
+                #[serde(default)]
+                request_id: Option<String>,
+            }
             match serde_json::from_value::<Compaction>(value) {
                 Ok(compaction) => records.push(DisplayRecord::Compaction(CompactionMarker {
-                    replacement: compaction.replacement.into_iter().collect::<Vec<_>>().into_iter().map(|line| line.into_display()).collect(),
+                    replacement: compaction
+                        .replacement
+                        .into_iter()
+                        .collect::<Vec<_>>()
+                        .into_iter()
+                        .map(|line| line.into_display())
+                        .collect(),
                     ts: compaction.ts,
                     request_id: compaction.request_id,
                 })),
-                Err(error) => tracing::warn!("[sessions] skipping malformed compaction line {}: {error}", line_number + 1),
+                Err(error) => tracing::warn!(
+                    "[sessions] skipping malformed compaction line {}: {error}",
+                    line_number + 1
+                ),
             }
         } else {
             match serde_json::from_value::<LegacyMessageLine>(value) {
                 Ok(line) => records.push(DisplayRecord::Message(Box::new(line.into_display()))),
-                Err(error) => tracing::warn!("[sessions] skipping unknown transcript line {}: {error}", line_number + 1),
+                Err(error) => tracing::warn!(
+                    "[sessions] skipping unknown transcript line {}: {error}",
+                    line_number + 1
+                ),
             }
         }
     }
-    Ok((meta.context("transcript has no _meta record")?, tools, records))
+    Ok((
+        meta.context("transcript has no _meta record")?,
+        tools,
+        records,
+    ))
 }
 
 fn replay_transcript(
@@ -424,13 +498,31 @@ fn replay_transcript(
     let mut logical = Vec::<TranscriptMessage>::new();
     let mut group = Vec::<DisplayMessage>::new();
     let mut replayed = 0usize;
-    let flush = |logical: &mut Vec<TranscriptMessage>, group: &mut Vec<DisplayMessage>, replayed: &mut usize| -> Result<()> {
-        if group.is_empty() { return Ok(()); }
+    let flush = |logical: &mut Vec<TranscriptMessage>,
+                 group: &mut Vec<DisplayMessage>,
+                 replayed: &mut usize|
+     -> Result<()> {
+        if group.is_empty() {
+            return Ok(());
+        }
         let mut next = logical.clone();
         next.extend(group.iter().map(|message| message.message.clone()));
-        let usage = group.iter().rev().find_map(|message| message.turn_usage.as_ref());
-        let request_id = group.iter().rev().find_map(|message| message.request_id.as_deref());
-        history.append_turn(TranscriptTurn { prev: logical, next: &next, meta, turn_usage: usage, request_id, tools: None })?;
+        let usage = group
+            .iter()
+            .rev()
+            .find_map(|message| message.turn_usage.as_ref());
+        let request_id = group
+            .iter()
+            .rev()
+            .find_map(|message| message.request_id.as_deref());
+        history.append_turn(TranscriptTurn {
+            prev: logical,
+            next: &next,
+            meta,
+            turn_usage: usage,
+            request_id,
+            tools: None,
+        })?;
         *replayed += group.len();
         *logical = next;
         group.clear();
@@ -440,11 +532,30 @@ fn replay_transcript(
         match record {
             DisplayRecord::Message(message) if message.interrupted => {
                 flush(&mut logical, &mut group, &mut replayed)?;
-                let partial = TranscriptPartial { content: message.message.content.clone(), reasoning_content: message.reasoning_content.clone(), iteration: message.iteration };
-                history.append_turn_with_partial(TranscriptTurn { prev: &logical, next: &logical, meta, turn_usage: None, request_id: message.request_id.as_deref(), tools: None }, Some(&partial))?;
+                let partial = TranscriptPartial {
+                    content: message.message.content.clone(),
+                    reasoning_content: message.reasoning_content.clone(),
+                    iteration: message.iteration,
+                };
+                history.append_turn_with_partial(
+                    TranscriptTurn {
+                        prev: &logical,
+                        next: &logical,
+                        meta,
+                        turn_usage: None,
+                        request_id: message.request_id.as_deref(),
+                        tools: None,
+                    },
+                    Some(&partial),
+                )?;
             }
             DisplayRecord::Message(message) => {
-                if group.last().is_some_and(|last| last.request_id != message.request_id) { flush(&mut logical, &mut group, &mut replayed)?; }
+                if group
+                    .last()
+                    .is_some_and(|last| last.request_id != message.request_id)
+                {
+                    flush(&mut logical, &mut group, &mut replayed)?;
+                }
                 group.push(*message);
             }
             DisplayRecord::Compaction(marker) => {
@@ -455,15 +566,35 @@ fn replay_transcript(
                     .rev()
                     .find_map(|message| message.turn_usage.clone());
                 let request_id = marker.request_id.clone();
-                let next = marker.replacement.into_iter().map(|message| message.message).collect::<Vec<_>>();
-                history.append_turn(TranscriptTurn { prev: &logical, next: &next, meta, turn_usage: usage.as_ref(), request_id: request_id.as_deref(), tools: None })?;
+                let next = marker
+                    .replacement
+                    .into_iter()
+                    .map(|message| message.message)
+                    .collect::<Vec<_>>();
+                history.append_turn(TranscriptTurn {
+                    prev: &logical,
+                    next: &next,
+                    meta,
+                    turn_usage: usage.as_ref(),
+                    request_id: request_id.as_deref(),
+                    tools: None,
+                })?;
                 replayed += next.len();
                 logical = next;
             }
         }
     }
     flush(&mut logical, &mut group, &mut replayed)?;
-    if let Some(tools) = tools { history.append_turn(TranscriptTurn { prev: &logical, next: &logical, meta, turn_usage: None, request_id: None, tools: Some(tools) })?; }
+    if let Some(tools) = tools {
+        history.append_turn(TranscriptTurn {
+            prev: &logical,
+            next: &logical,
+            meta,
+            turn_usage: None,
+            request_id: None,
+            tools: Some(tools),
+        })?;
+    }
     Ok(replayed)
 }
 
@@ -572,7 +703,10 @@ fn import_transcript_groups(
             let (meta, tools, records) = match decode_transcript(&path) {
                 Ok(decoded) => decoded,
                 Err(error) => {
-                    tracing::warn!("[sessions] skipping unreadable transcript {}: {error}", path.display());
+                    tracing::warn!(
+                        "[sessions] skipping unreadable transcript {}: {error}",
+                        path.display()
+                    );
                     skipped += 1;
                     continue;
                 }
