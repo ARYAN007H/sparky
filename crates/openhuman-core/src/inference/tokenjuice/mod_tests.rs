@@ -49,11 +49,9 @@ async fn the_module_defers_a_summary_until_requested() {
     .await;
 
     assert_eq!(output.summarized_from_bytes, None);
-    assert!(
-        !output
-            .text
-            .contains("the rate limit is 60 requests a minute")
-    );
+    assert!(!output
+        .text
+        .contains("the rate limit is 60 requests a minute"));
     assert!(
         output.text.contains(tinyjuice_bus::tools::RETRIEVE),
         "the original stays retrievable: {}",
@@ -217,7 +215,10 @@ fn install_request_handle_mode_follows_every_switch_it_needs() {
         config.tokenjuice.repl_save_enabled = true;
         let request = install_request(&config);
         assert!(!request.options.repl_handle);
-        assert!(!request.options.repl_handle, "no handle means no copy is written");
+        assert!(
+            !request.options.repl_handle,
+            "no handle means no copy is written"
+        );
     }
 }
 

@@ -173,9 +173,7 @@ async fn files_a_blob_backed_generated_artifact() {
     let workspace = root.path().join("workspace");
     let files_dir = root.path().join("Files");
     let backend = crate::storage::test_support::memory_backend();
-    let scoped = backend
-        .for_scope(&crate::storage::Scope::local())
-        .unwrap();
+    let scoped = backend.for_scope(&crate::storage::Scope::local()).unwrap();
     let blobs: Arc<dyn BlobStore> = Arc::clone(scoped.blobs());
     let _output = MediaOutput::new(root.path(), Arc::clone(&blobs));
     let wrapped = MediaArtifactTool::new(
@@ -293,11 +291,13 @@ async fn removes_partial_destination_when_blob_read_fails() {
 
     let reader: tinyagents_storage_kit::blob::BlobReader = Box::pin(futures_util::stream::iter([
         Ok(bytes::Bytes::from_static(b"partial media")),
-        Err(tinystoragedrivers_types::StorageError::backend("reader failed")),
+        Err(tinystoragedrivers_types::StorageError::backend(
+            "reader failed",
+        )),
     ]));
     let error = copy_blob_to_file(&mut reader, &dest, "generated-media/fail.png")
-    .await
-    .unwrap_err();
+        .await
+        .unwrap_err();
 
     assert!(error.contains("failed to copy generated media blob"));
     assert!(!dest.exists());
@@ -308,9 +308,7 @@ async fn keeps_source_blob_when_artifact_finalization_fails() {
     let root = tempfile::tempdir().unwrap();
     let workspace = root.path().join("workspace");
     let backend = crate::storage::test_support::memory_backend();
-    let scoped = backend
-        .for_scope(&crate::storage::Scope::local())
-        .unwrap();
+    let scoped = backend.for_scope(&crate::storage::Scope::local()).unwrap();
     let blobs: Arc<dyn BlobStore> = Arc::clone(scoped.blobs());
     let key = "generated-media/finalize-failure.png";
     blobs

@@ -209,20 +209,18 @@ async fn canonical_cluster_scope_import_converts_profiles_and_leases_in_place() 
     assert_eq!(lease.meta.expires_ms, Some(10_000));
 
     let operator = backend.for_scope(&crate::storage::Scope::local()).unwrap();
-    assert!(
-        operator
-            .documents()
-            .get("profiles.registry", "alice")
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(operator
+        .documents()
+        .get("profiles.registry", "alice")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[cfg(feature = "legacy-import")]
 #[test]
 fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
-    use crate::storage::layout::{Target, legacy};
+    use crate::storage::layout::{legacy, Target};
     use crate::storage::{self, CollectionSpec, DocumentStoreExt, Precondition, Scope};
     use tinystoragedrivers::Query;
 

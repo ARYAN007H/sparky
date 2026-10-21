@@ -1,8 +1,8 @@
 use super::*;
 use crate::storage::test_support::sqlite_backend;
+use crate::storage::Scope;
 use serde_json::json;
 use std::sync::Arc;
-use crate::storage::Scope;
 use tinystoragedrivers::{Meta, Precondition};
 
 #[test]
@@ -104,8 +104,13 @@ async fn migrate_cluster_moves_v1_leases_into_tsd_leases_and_keeps_their_epoch()
 
     // The host's lease store reads the moved records: alice is still held,
     // bob's released record is taken over cleanly at the next epoch.
-    let b = DocumentLeases::cluster(backend.as_ref(), "node-b", None, std::time::Duration::from_secs(1))
-        .unwrap();
+    let b = DocumentLeases::cluster(
+        backend.as_ref(),
+        "node-b",
+        None,
+        std::time::Duration::from_secs(1),
+    )
+    .unwrap();
     let held = b.holder("alice").await.unwrap().unwrap();
     assert_eq!((held.owner.as_str(), held.epoch), ("node-a", 4));
     assert!(b.acquire("alice", 1_000).await.is_err());
