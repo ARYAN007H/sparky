@@ -107,6 +107,36 @@ struct LegacyProfileMeta {
     layout_version: u32,
 }
 
+/// The v1 `approvals` collection payload consumed by the approval schema step.
+#[derive(Serialize)]
+struct LegacyApprovalRequest {
+    tool_name: String,
+    action_summary: String,
+    args_redacted: String,
+    session_id: String,
+    created_at: DateTime<Utc>,
+    expires_at: DateTime<Utc>,
+    pending: bool,
+}
+
+/// The v1 TinyFlows catalog row consumed by its `flows_definitions` step.
+#[derive(Serialize)]
+struct LegacyFlowDefinition {
+    name: String,
+    graph_json: String,
+    enabled: bool,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    require_approval: bool,
+    incarnation: String,
+}
+
+/// The transcript-key payload in `threads_transcript_keys`.
+#[derive(Serialize)]
+struct LegacyTranscriptKey {
+    key: String,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = std::env::args_os()
@@ -216,19 +246,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // This is the approvals v1 owner document from the historic schema:
     // approvals.requests did not exist yet. The approvals owner's v2 schema
     // migration converts these RFC3339 timestamps and collection name.
+    let approval = LegacyApprovalRequest {
+        tool_name: "shell".into(),
+        action_summary: "Fixture approval".into(),
+        args_redacted: "{}".into(),
+        session_id: "fixture-session".into(),
+        created_at: DateTime::parse_from_rfc3339("2025-02-03T04:05:06Z")?.with_timezone(&Utc),
+        expires_at: DateTime::parse_from_rfc3339("2099-01-01T00:00:00Z")?.with_timezone(&Utc),
+        pending: true,
+    };
     put(
         user_scope.documents(),
         "approvals",
         "fixture-approval",
-        json!({
-            "tool_name": "shell",
-            "action_summary": "Fixture approval",
-            "args_redacted": "{}",
-            "session_id": "fixture-session",
-            "created_at": "2025-02-03T04:05:06Z",
-            "expires_at": "2099-01-01T00:00:00Z",
-            "pending": true
-        }),
+        serde_json::to_value(approval)?,
     )
     .await?;
     let thread_id = "fixture-thread";
@@ -275,24 +306,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         user_scope.documents(),
         "threads_transcript_keys",
         thread_id,
-        json!({"key": "fixture-transcript-key"}),
+        serde_json::to_value(LegacyTranscriptKey {
+            key: "fixture-transcript-key".into(),
+        })?,
     )
     .await?;
 
     let legacy_flow_scope = backend.for_scope(&Scope::local())?;
+    let flow = LegacyFlowDefinition {
+        name: "Fixture flow".into(),
+        graph_json: "{\"nodes\":[{\"id\":\"trigger\",\"kind\":\"trigger\",\"name\":\"Manual\"}],\"edges\":[]}".into(),
+        enabled: false,
+        created_at: DateTime::parse_from_rfc3339("2025-02-03T04:05:06Z")?.with_timezone(&Utc),
+        updated_at: DateTime::parse_from_rfc3339("2025-02-03T04:05:06Z")?.with_timezone(&Utc),
+        require_approval: false,
+        incarnation: "fixture-incarnation".into(),
+    };
     put(
         legacy_flow_scope.documents(),
         "flows_definitions",
         "fixture-flow",
-        json!({
-            "name": "Fixture flow",
-            "graph_json": "{\"nodes\":[{\"id\":\"trigger\",\"kind\":\"trigger\",\"name\":\"Manual\"}],\"edges\":[]}",
-            "enabled": false,
-            "created_at": "2025-02-03T04:05:06Z",
-            "updated_at": "2025-02-03T04:05:06Z",
-            "require_approval": false,
-            "incarnation": "fixture-incarnation"
-        }),
+        serde_json::to_value(flow)?,
     )
     .await?;
 
