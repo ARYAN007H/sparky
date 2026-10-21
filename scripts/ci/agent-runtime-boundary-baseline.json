@@ -343,6 +343,20 @@
     "occurrence": 1
   },
   {
+    "rule": "tinyagents-moved-symbol-alias",
+    "path": "vendor/tinyagents/crates/tinyagents-runtime/src/hooks.rs",
+    "line": 122,
+    "text": "pub type SessionHookFuture<'a, T> = tinyagents_hooks::SessionHookFuture<'a, T, RuntimeError>;",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-tool-calling-facade",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/agent_loop/dialect.rs",
+    "line": 23,
+    "text": "use tinytools_agent::dialect::{CodeDialect, CodeStyle, PFormatDialect, ToolCallFormat};",
+    "occurrence": 1
+  },
+  {
     "rule": "tinyagents-tool-calling-facade",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/agent_loop/dialect.rs",
     "line": 24,
@@ -358,6 +372,20 @@
   },
   {
     "rule": "tinyagents-tool-calling-facade",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/agent_loop/dialect/dialect_tests.rs",
+    "line": 64,
+    "text": "use tinytools_agent::dialect::CodeStyle;",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-tool-calling-facade",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/agent_loop/tool_call_wrapper.rs",
+    "line": 25,
+    "text": "use tinytools_agent::repair::args::ARGUMENT_KEYS;",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-tool-calling-facade",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/agent_loop/tools.rs",
     "line": 2747,
     "text": "use tinytools_agent::repair::args;",
@@ -365,9 +393,65 @@
   },
   {
     "rule": "tinyagents-tool-calling-facade",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/close_tests.rs",
+    "line": 8,
+    "text": "use tinytools_agent::dialect::NativeDialect;",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-tool-calling-facade",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/close.rs",
+    "line": 17,
+    "text": "use tinytools_agent::dialect::{DialectResponse, ToolDialect};",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-tool-calling-facade",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/dialect.rs",
+    "line": 8,
+    "text": "use tinytools_agent::dialect::ToolCallFormat;",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-tool-calling-facade",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/lib.rs",
     "line": 130,
     "text": "pub use tinytools_agent;",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-tool-calling-facade",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/prompt_relaxed_tests.rs",
+    "line": 12,
+    "text": "use tinytools_agent::repair::json::{normalize_leaked_quote_tokens, quote_bare_keys};",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-tool-calling-facade",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/prompt.rs",
+    "line": 21,
+    "text": "use tinytools_agent::repair::json::recover_whole_object;",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-tool-calling-facade",
+    "path": "vendor/tinyagents/crates/tinyagents-session/src/transcript/jsonl.rs",
+    "line": 14,
+    "text": "use tinytools_agent::dialect::{",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-tool-calling-facade",
+    "path": "vendor/tinyagents/crates/tinyagents-session/src/transcript/typed_rows_tests.rs",
+    "line": 11,
+    "text": "use tinytools_agent::dialect::{NativeToolCall, encode_assistant_envelope, encode_tool_envelope};",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-tool-calling-facade",
+    "path": "vendor/tinyagents/crates/tinyagents-session/src/transcript/types.rs",
+    "line": 5,
+    "text": "use tinytools_agent::dialect::{",
     "occurrence": 1
   },
   {
@@ -379,6 +463,13 @@
   },
   {
     "rule": "tinyagents-upstream-reexport",
+    "path": "vendor/tinyagents/crates/tinyagents-graph/src/orchestration.rs",
+    "line": 7,
+    "text": "pub use tinyagents_tasks::*;",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-upstream-reexport",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/discover/mod.rs",
     "line": 35,
     "text": "pub use tinytools::rank::{Bm25Index, tokenize};",
@@ -386,9 +477,30 @@
   },
   {
     "rule": "tinyagents-upstream-reexport",
+    "path": "vendor/tinyagents/crates/tinyagents-orchestration/src/status/mod.rs",
+    "line": 20,
+    "text": "pub use tinyagents_tasks::NoEquivalentStatus;",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-upstream-reexport",
+    "path": "vendor/tinyagents/crates/tinyagents-orchestration/src/subagent/policy.rs",
+    "line": 19,
+    "text": "pub use tinyagents_graph::{SubAgentBudget, SubAgentPolicy};",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-upstream-reexport",
     "path": "vendor/tinyagents/crates/tinyagents-registry/src/lib.rs",
     "line": 35,
     "text": "pub use tinyagents_harness::error::{Result, TinyAgentsError};",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-upstream-reexport",
+    "path": "vendor/tinyagents/crates/tinyagents-runtime/src/lib.rs",
+    "line": 10,
+    "text": "pub use tinyagents_hooks::command as command_hooks;",
     "occurrence": 1
   },
   {
@@ -403,6 +515,13 @@
     "path": "vendor/tinyagents/crates/tinyagents-session/src/lib.rs",
     "line": 117,
     "text": "pub use tinyagents_harness::error::{Result, TinyAgentsError};",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-upstream-reexport",
+    "path": "vendor/tinyagents/crates/tinyagents-session/src/port/mod.rs",
+    "line": 69,
+    "text": "pub use tinyagents_harness::store::{AppendStore, Store};",
     "occurrence": 1
   }
 ]
