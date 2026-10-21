@@ -20,8 +20,8 @@ use std::path::Path;
 
 use tinystoragedrivers::secrets::SecretStore as _;
 
-use super::state::LayoutError;
 use super::Target;
+use super::state::LayoutError;
 use crate::security::credentials::http_creds::{self, STORAGE_SECRET_NAME, STORE_FILENAME};
 use crate::security::credentials::profiles::{self, PROFILES_FILENAME, PROFILES_SECRET_NAME};
 use crate::storage;

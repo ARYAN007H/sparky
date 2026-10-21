@@ -5,7 +5,7 @@ use std::sync::{Arc, OnceLock};
 
 use parking_lot::Mutex;
 
-use super::{build_backend_at, SecretBackend};
+use super::{SecretBackend, build_backend_at};
 
 thread_local! {
     /// Workspace bound by [`ScopedWorkspace`] on this thread, if any.

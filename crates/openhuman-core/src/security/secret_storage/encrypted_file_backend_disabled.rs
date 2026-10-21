@@ -1,0 +1,85 @@
+//! Explicit unavailable adapter for builds that omit `secret-file`.
+//!
+//! The host keeps this type in the public facade so it can compile against a
+//! core built without the encrypted-file implementation. Selecting this
+//! backend fails closed at the first operation; it never falls back to
+//! plaintext or memory storage.
+
+use std::path::{Path, PathBuf};
+
+use crate::security::secret_storage::backend::SecretBackend;
+use crate::security::secret_storage::error::SecretStorageError;
+use crate::security::secret_storage::{crypto, file_store};
+use zeroize::Zeroizing;
+
+pub const MASTER_KEY_ENV: &str = "OPENHUMAN_KEYRING_MASTER_KEY";
+pub const MASTER_KEY_FILE_ENV: &str = "OPENHUMAN_KEYRING_MASTER_KEY_FILE";
+const KEY_LEN: usize = 32;
+
+#[path = "encrypted_file_backend/key_source.rs"]
+pub mod key_source;
+pub use key_source::{
+    MasterKeySource, clear_master_key_source, install_master_key_source,
+    installed_master_key_source,
+};
+
+/// There is no encrypted-file initialization in a build without `secret-file`.
+pub fn init_master_key() -> Result<(), String> {
+    Ok(())
+}
+
+/// Storage-backed encryption needs a host key source when `secret-file` is off.
+pub(crate) fn storage_master_key() -> Result<[u8; KEY_LEN], String> {
+    Err("encrypted secret key storage is disabled; enable the secret-file feature".into())
+}
+
+pub(crate) fn storage_master_key_resolvable() -> bool {
+    false
+}
+
+pub(crate) fn master_key_available() -> bool {
+    false
+}
+
+pub(crate) fn resolvable(loaded: bool, env: bool, host: bool, key_file: bool) -> bool {
+    loaded || env || host || key_file
+}
+
+pub(crate) fn secrets_file(workspace_dir: &Path) -> PathBuf {
+    workspace_dir.join("secrets.enc")
+}
+
+/// Placeholder that returns a specific unavailable error if selected.
+pub struct EncryptedFileBackend;
+
+impl EncryptedFileBackend {
+    /// Construct the unavailable adapter. Its path is intentionally unused.
+    #[must_use]
+    pub fn new(_workspace_dir: &Path) -> Self {
+        Self
+    }
+}
+
+impl SecretBackend for EncryptedFileBackend {
+    fn get(&self, _: &str) -> Result<Option<String>, SecretStorageError> {
+        Err(unavailable())
+    }
+
+    fn set(&self, _: &str, _: &str) -> Result<(), SecretStorageError> {
+        Err(unavailable())
+    }
+
+    fn delete(&self, _: &str) -> Result<(), SecretStorageError> {
+        Err(unavailable())
+    }
+
+    fn name(&self) -> &'static str {
+        "encrypted_file"
+    }
+}
+
+fn unavailable() -> SecretStorageError {
+    SecretStorageError::Backend(
+        "encrypted file secret backend is disabled; enable the secret-file feature".into(),
+    )
+}

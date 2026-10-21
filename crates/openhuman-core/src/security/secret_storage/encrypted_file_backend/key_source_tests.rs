@@ -58,10 +58,12 @@ fn host_key_write_requires_matching_readback() {
         wrong_readback: true,
         ..Default::default()
     };
-    assert!(load_or_mint_master_key(&source)
-        .unwrap_err()
-        .to_string()
-        .contains("verification failed"));
+    assert!(
+        load_or_mint_master_key(&source)
+            .unwrap_err()
+            .to_string()
+            .contains("verification failed")
+    );
 }
 
 #[test]
@@ -112,7 +114,7 @@ fn corrupt_workspace_key_is_never_replaced() {
 #[cfg(unix)]
 #[test]
 fn workspace_key_rejects_shared_permissions_and_symlinks() {
-    use std::os::unix::fs::{symlink, PermissionsExt};
+    use std::os::unix::fs::{PermissionsExt, symlink};
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("keyring/master.key");
     workspace_master_key(dir.path()).unwrap();

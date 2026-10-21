@@ -7,11 +7,7 @@ fn keys(byte: u8) -> Arc<dyn KeyProvider> {
 
 fn secrets_in(storage: &MemoryStorage, scope: &str, key: u8) -> DocumentSecrets {
     let scope = Scope::new(scope).unwrap();
-    over(
-        &storage.for_scope(&scope).unwrap(),
-        scope,
-        keys(key),
-    )
+    over(&storage.for_scope(&scope).unwrap(), scope, keys(key))
 }
 
 #[test]
