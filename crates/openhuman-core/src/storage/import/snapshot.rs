@@ -89,6 +89,7 @@ impl Snapshot {
                         collection: spec.name.clone(),
                         id: stored.id,
                         doc: stored.doc,
+                        created_ms: stored.meta.created_ms,
                     });
                 }
             }
