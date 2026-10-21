@@ -53,18 +53,26 @@ pub(crate) enum Outcome {
 /// Imports the index under `<workspace_dir>/jails` into the module's scope of
 /// the installed backend.
 pub(crate) async fn import_legacy(ctx: &DispatchCtx, workspace_dir: &Path) -> Result<Outcome> {
-    let Some(scoped) = support::module_scope(ctx, MODULE_ID)? else {
+    let base = workspace_dir.join(BASE_DIR);
+    let index = base.join(INDEX_FILE);
+    if !index.is_file() {
+        return Ok(Outcome::NoSource);
+    }
+    let marker = support::marker_id("tinybox", &base);
+    let result = support::with_module_claim(ctx, MODULE_ID, MARKER_COLLECTION, &marker, move |scoped| {
+        crate::storage::block_on_anyhow(async move { import_into(&scoped, &base).await })
+    })?;
+    let Some(result) = result else {
         return Ok(Outcome::NoBackend);
     };
-    import_into(&scoped, &workspace_dir.join(BASE_DIR)).await
+    Ok(match result {
+        support::ClaimedImport::AlreadyDone => Outcome::AlreadyDone,
+        support::ClaimedImport::Imported(outcome) => outcome,
+    })
 }
 
 async fn import_into(scoped: &Storage, base: &Path) -> Result<Outcome> {
     let docs = scoped.documents();
-    let marker = support::marker_id("tinybox", base);
-    if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {
-        return Ok(Outcome::AlreadyDone);
-    }
     let index = base.join(INDEX_FILE);
     if !index.is_file() {
         return Ok(Outcome::NoSource);
@@ -99,7 +107,6 @@ async fn import_into(scoped: &Storage, base: &Path) -> Result<Outcome> {
         _ => tracing::warn!("{LOG_PREFIX} skipped an index file that is not a JSON object"),
     }
 
-    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
     tracing::info!("{LOG_PREFIX} imported written={written}");
     Ok(Outcome::Imported { written })
 }

@@ -68,7 +68,28 @@ pub(crate) async fn import_legacy(
     let Some(scoped) = support::module_scope(ctx, MODULE_ID)? else {
         return Ok(Outcome::NoBackend);
     };
-    import_into(ctx, &scoped, root, ttl, SystemTime::now()).await
+    if !root.is_dir() {
+        return Ok(Outcome::NoSource);
+    }
+    let blobs = scoped.blobs();
+    if ttl.is_some() && !blobs.capabilities().contains(Capability::BlobTtl) {
+        return Ok(Outcome::Unsupported);
+    }
+    let marker = support::marker_id("ccr", root);
+    let root = root.to_owned();
+    let ctx_for_read = ctx.clone();
+    let result = support::with_module_claim(ctx, MODULE_ID, MARKER_COLLECTION, &marker, move |scoped| {
+        crate::storage::block_on_anyhow(async move {
+            import_into(&ctx_for_read, &scoped, &root, ttl, SystemTime::now()).await
+        })
+    })?;
+    let Some(result) = result else {
+        return Ok(Outcome::NoBackend);
+    };
+    Ok(match result {
+        support::ClaimedImport::AlreadyDone => Outcome::AlreadyDone,
+        support::ClaimedImport::Imported(outcome) => outcome,
+    })
 }
 
 /// One readable original: its token, text and age.
@@ -85,10 +106,6 @@ async fn import_into(
     ttl: Option<Duration>,
     now: SystemTime,
 ) -> Result<Outcome> {
-    let marker = support::marker_id("ccr", root);
-    if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {
-        return Ok(Outcome::AlreadyDone);
-    }
     if !root.is_dir() {
         return Ok(Outcome::NoSource);
     }
@@ -138,7 +155,6 @@ async fn import_into(
         imported += 1;
     }
 
-    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
     tracing::info!("{LOG_PREFIX} imported={imported} expired={expired} skipped={skipped}");
     Ok(Outcome::Imported {
         imported,

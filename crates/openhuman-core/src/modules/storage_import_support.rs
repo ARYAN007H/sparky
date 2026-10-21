@@ -8,9 +8,8 @@
 
 use std::path::Path;
 use std::sync::Arc;
-use std::future::Future;
 
-use crate::storage::{DocumentStore, ErrorKind, Precondition, Scope, Storage, StorageBackend};
+use crate::storage::{DocumentStore, ErrorKind, Precondition, Storage};
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 use sha2::Digest;

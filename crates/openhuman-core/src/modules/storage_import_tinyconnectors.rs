@@ -62,10 +62,26 @@ pub(crate) enum Outcome {
 /// Imports the legacy files under `state_dir` into the module's scope of the
 /// installed backend.
 pub(crate) async fn import_legacy(ctx: &DispatchCtx, state_dir: &Path) -> Result<Outcome> {
-    let Some(scoped) = support::module_scope(ctx, MODULE_ID)? else {
+    let prefs_dir = state_dir.join(PREFS_DIR);
+    let triggers_dir = state_dir.join(TRIGGERS_DIR);
+    if !prefs_dir.is_dir() && !triggers_dir.is_dir() {
+        return Ok(Outcome::NoSource);
+    }
+    let marker = support::marker_id("connectors", state_dir);
+    let state_dir = state_dir.to_owned();
+    let ctx_for_read = ctx.clone();
+    let result = support::with_module_claim(ctx, MODULE_ID, MARKER_COLLECTION, &marker, move |scoped| {
+        crate::storage::block_on_anyhow(async move {
+            import_into(&ctx_for_read, &scoped, &state_dir).await
+        })
+    })?;
+    let Some(result) = result else {
         return Ok(Outcome::NoBackend);
     };
-    import_into(ctx, &scoped, state_dir).await
+    Ok(match result {
+        support::ClaimedImport::AlreadyDone => Outcome::AlreadyDone,
+        support::ClaimedImport::Imported(outcome) => outcome,
+    })
 }
 
 /// A preference file: the toolkit key and its bare JSON value.
@@ -88,10 +104,6 @@ struct Legacy {
 
 async fn import_into(ctx: &DispatchCtx, scoped: &Storage, state_dir: &Path) -> Result<Outcome> {
     let docs = scoped.documents();
-    let marker = support::marker_id("connectors", state_dir);
-    if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {
-        return Ok(Outcome::AlreadyDone);
-    }
     let prefs_dir = state_dir.join(PREFS_DIR);
     let triggers_dir = state_dir.join(TRIGGERS_DIR);
     if !prefs_dir.is_dir() && !triggers_dir.is_dir() {
@@ -126,7 +138,6 @@ async fn import_into(ctx: &DispatchCtx, scoped: &Storage, state_dir: &Path) -> R
         triggers += support::append_if_empty(scoped, &day.stream, day.records).await?;
     }
 
-    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
     tracing::info!(
         "{LOG_PREFIX} imported prefs={prefs} triggers={triggers} skipped={}",
         legacy.skipped
