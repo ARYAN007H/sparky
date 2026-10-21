@@ -73,7 +73,7 @@ where
                         let mut statement = connection.prepare(
                             "SELECT CASE WHEN length(CAST(record AS BLOB)) <= ?1 THEN CAST(record AS BLOB) END, seq FROM checkpoints ORDER BY seq LIMIT ?2 OFFSET ?3",
                         )?;
-                        statement
+                        let rows = statement
                             .query_map(
                                 [MAX_IMPORT_RECORD_PAYLOAD_BYTES as i64, SQLITE_PAGE_ROWS, offset],
                                 |row| {
@@ -83,7 +83,8 @@ where
                                     ))
                                 },
                             )?
-                            .collect::<std::result::Result<Vec<_>, _>>()
+                            .collect::<std::result::Result<Vec<_>, _>>();
+                        rows
                     })
                     .await?;
                     if rows.is_empty() {
