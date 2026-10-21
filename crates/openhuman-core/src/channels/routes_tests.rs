@@ -751,11 +751,11 @@ async fn handle_runtime_command_telegram_new_uses_module_storage() {
     let linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
     let workspace = linked.config().workspace_dir.clone();
     let mut ctx = runtime_context(workspace);
-    let channel = linked
-        .channels()
-        .into_iter()
+    let channels = linked.channels();
+    let channel = channels
+        .iter()
         .find(|(name, _)| tinychannels_bus::provider_id(name) == "telegram")
-        .map(|(_, channel)| channel)
+        .map(|(_, channel)| Arc::clone(channel))
         .expect("linked runtime should expose its Telegram module handle");
     let msg = ChannelMessage {
         reply_to_id: None,
