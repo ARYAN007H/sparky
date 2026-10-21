@@ -156,5 +156,9 @@ pub fn checkpoint(path: &Path) -> Result<(), LayoutError> {
 }
 
 #[cfg(test)]
+#[path = "layout_db_tests.rs"]
+mod tests;
+
+#[cfg(test)]
 #[path = "db_tests.rs"]
 mod tests;
