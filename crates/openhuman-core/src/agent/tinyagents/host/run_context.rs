@@ -220,6 +220,10 @@ pub struct OpenHumanRunContext {
     /// This root run owns settlement of driver jobs before its host turn
     /// returns. Inherited by recursive child contexts, never by ordinary chat.
     pub(crate) headless_descendant_settlement: bool,
+    /// Stable owner scope for the whole headless descendant tree. Native child
+    /// runs get their own thread ids, but the root turn's settlement lease must
+    /// retain every descendant under one owner key.
+    pub(crate) headless_descendant_owner: Option<String>,
     /// Current-turn attachment placeholders forwarded to vision delegates.
     pub attachment_placeholders: Arc<Vec<String>>,
     /// Dispatch guard shared by synchronous delegates in this run.
@@ -359,6 +363,7 @@ impl OpenHumanRunContext {
             file_state_agent_id: None,
             tool_result_artifact_index: None,
             headless_descendant_settlement: false,
+            headless_descendant_owner: None,
             attachment_placeholders: Arc::new(Vec::new()),
             dispatch: None,
             task_recency_window: None,
@@ -552,6 +557,7 @@ impl OpenHumanRunContext {
         child.session_sidecar = Arc::new(Mutex::new(SessionTurnSidecar::default()));
         child.cancellation = tinyagents_harness::cancel::CancellationToken::new();
         child.headless_descendant_settlement = false;
+        child.headless_descendant_owner = None;
         child
     }
 

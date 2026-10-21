@@ -65,6 +65,14 @@ impl OpenHumanSessionHost {
         let mut context = OpenHumanRunContext::new().with_host_env(&host_env);
         context.hosted_base = self.hosted_base.clone();
         context.headless_descendant_settlement = headless;
+        let headless_owner = headless.then(|| {
+            crate::agent::tinyagents::tool_registration::subagent_owner_key(
+                &self.workspace_dir,
+                &self.event_session_id,
+                self.thread_id.as_deref(),
+            )
+        });
+        context.headless_descendant_owner = headless_owner.clone();
         context.untrusted_input_turn = self.untrusted_input;
         context.origin = origin.cloned();
         context.approval = approval;
@@ -89,11 +97,7 @@ impl OpenHumanSessionHost {
             let jobs = crate::core::runtime::slot_for::<
                 tinyagents_harness_tools::subagents::SubAgentJobRegistry,
             >(&dispatch);
-            let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
-                &self.workspace_dir,
-                &self.event_session_id,
-                self.thread_id.as_deref(),
-            );
+            let owner = headless_owner.expect("headless settlement has a root owner scope");
             Some(
                 jobs.retain_root_run_descendants(&root_config.run_id, owner)
                     .map_err(|error| {
