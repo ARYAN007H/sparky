@@ -27,7 +27,6 @@ pub(super) struct StagedAttachmentClaim {
 pub(crate) struct ResolvedNativeAttachment {
     pub(crate) path: String,
     pub(crate) mime: String,
-    pub(crate) name: String,
     pub(crate) bytes: Vec<u8>,
 }
 
@@ -472,17 +471,12 @@ pub(crate) async fn read_authorized_native_attachment(
         .content_type
         .clone()
         .ok_or_else(|| "native attachment MIME is unavailable".to_owned())?;
-    let name = media
-        .file_name
-        .clone()
-        .unwrap_or_else(|| "attachment".to_owned());
     let bytes = tokio::fs::read(path)
         .await
         .map_err(|_| "native attachment bytes are unavailable".to_owned())?;
     Ok(ResolvedNativeAttachment {
         path: entry.path.clone(),
         mime,
-        name,
         bytes,
     })
 }
@@ -566,9 +560,22 @@ pub(super) async fn validate_staged_files(
             .as_deref()
             .filter(|mime| !mime.is_empty())
             .ok_or_else(|| "staged attachment MIME type is missing".to_string())?;
-        if (is_image && !mime.starts_with("image/"))
+        let allowed_image_mime = matches!(
+            mime,
+            "image/png" | "image/jpeg" | "image/webp" | "image/gif"
+        );
+        let allowed_file_mime = config
+            .multimodal_files
+            .allowed_mime_types
+            .iter()
+            .any(|allowed| allowed == mime);
+        if (is_image && !allowed_image_mime)
+            || (!is_image && !allowed_file_mime)
             || !metadata.is_file()
             || metadata.len() > (if is_image { image_mb } else { file_mb } * 1024 * 1024) as u64
+            || media
+                .size_bytes
+                .is_some_and(|size_bytes| size_bytes != metadata.len())
         {
             return Err("staged attachment exceeds configured type or size limit".into());
         }
