@@ -203,7 +203,7 @@ picks the provider the same way a provider string does.
 | `registry.rs` | Registered provider ownership metadata; provider-neutral retry classification is supplied by TinyInference. |
 | `provider/fallback_diagnostics.rs` | Explains background-role fallback when it hits a provider with no credentials. |
 | [`provider/`](./provider/) | [`http_error.rs`](./provider/http_error.rs) (host reporter over `tinyinference_llm::failure::http`, `api_error`), `models/` (model catalog listing, local-runtime and OpenRouter entries), `factory/` (chat-model construction and cloud provider resolution). |
-| [`provider/types.rs`](./provider/types.rs) | Host DTOs kept at product and RPC boundaries: `ChatResponse`, `ProviderDelta`, `BilledUsage`, `AGENT_TURN_MAX_OUTPUT_TOKENS`. |
+| `ops/{status,oauth,models,sentiment}.rs` | Inference RPC operations grouped by product surface; sentiment prompts and provider response types come from TinyInference. |
 | `host_runtime/` | Product policy, RPC and speech bindings over `tinyinference_local`. See [`host_runtime/README.md`](host_runtime/README.md). |
 | `embedding_host/` | Embedding provider selection (managed, Voyage, OpenAI, Cohere, Ollama, custom, noop) and the `embeddings.*` RPC. See [`embedding_host/README.md`](embedding_host/README.md). |
 | `tokenjuice/` | Host adapter for the TinyJuice tool-output compression module, the `juice_retrieve` recovery tool, and the `tokenjuice.*` RPC. See [`tokenjuice/README.md`](tokenjuice/README.md). |
