@@ -126,7 +126,12 @@ impl Blocking {
         std::thread::Builder::new()
             .name("openhuman-storage".to_owned())
             .spawn(move || {
-                let runtime = tokio::runtime::Builder::new_current_thread()
+                // The bridge thread can be idle in `receiver.recv()` between
+                // sync calls. A current-thread runtime would stop polling its
+                // background tasks during that interval, so use a small
+                // multithread runtime dedicated to storage work.
+                let runtime = tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(2)
                     .enable_all()
                     .build();
                 match runtime {

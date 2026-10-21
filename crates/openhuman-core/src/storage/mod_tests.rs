@@ -173,6 +173,28 @@ async fn block_on_works_inside_a_multi_thread_runtime() {
     );
 }
 
+#[tokio::test(flavor = "current_thread")]
+async fn bridge_runtime_keeps_background_tasks_running_between_sync_calls() {
+    let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+    let (progress_tx, progress_rx) = std::sync::mpsc::channel();
+    block_on(async move {
+        tokio::spawn(async move {
+            if release_rx.await.is_ok() {
+                let _ = progress_tx.send(());
+            }
+        });
+        Ok(())
+    })
+    .unwrap();
+
+    // The bridge has returned to its blocking receive loop. Releasing the
+    // task from the caller must still let the dedicated runtime poll it.
+    release_tx.send(()).unwrap();
+    progress_rx
+        .recv_timeout(std::time::Duration::from_secs(2))
+        .expect("bridge runtime polled its background task while idle");
+}
+
 #[test]
 fn only_mongodb_is_shared_between_processes() {
     assert!(driver_is_shared("mongodb"));

@@ -49,7 +49,6 @@
 //! with `tinyflows-import`; see [`tinyflows`].
 
 pub mod live;
-#[cfg(feature = "legacy-import")]
 mod schemas;
 #[cfg(feature = "legacy-import")]
 pub mod sessions;
@@ -58,36 +57,36 @@ mod snapshot;
 #[cfg(feature = "legacy-import")]
 pub mod tinyflows;
 
-#[cfg(feature = "legacy-import")]
 pub use schemas::{
     all_session_import_controller_schemas, all_session_import_registered_controllers,
 };
 
 #[cfg(feature = "legacy-import")]
 use std::path::Path;
-#[cfg(feature = "legacy-import")]
 use std::sync::Arc;
 
+use anyhow::Result;
 #[cfg(feature = "legacy-import")]
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Context};
 #[cfg(feature = "legacy-import")]
 use sha2::Digest;
+use tinystoragedrivers::CollectionSpec;
 #[cfg(feature = "legacy-import")]
-use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
+use tinystoragedrivers::{ErrorKind, Precondition};
 
 #[cfg(feature = "legacy-import")]
 use super::documents::Repo;
 #[cfg(feature = "legacy-import")]
 use super::rusqlite;
 #[cfg(feature = "legacy-import")]
-use super::{block_on, StorageBackend};
-#[cfg(feature = "legacy-import")]
+use super::block_on;
+use super::StorageBackend;
 use crate::config::Config;
 #[cfg(feature = "legacy-import")]
 use rusqlite::Connection;
-#[cfg(feature = "legacy-import")]
 use serde_json::Value;
 
+#[cfg(feature = "legacy-import")]
 pub use snapshot::Snapshot;
 
 /// One legacy row as a document of the new layout.
@@ -254,6 +253,14 @@ pub async fn run(ctx: &crate::core::runtime::DispatchCtx, config: &Config) -> Ve
     }
 }
 
+/// Reports that the legacy import boundary is unavailable in this build.
+/// The stub keeps boot and rebind callers explicit: disabling the feature
+/// never makes a detected legacy source look successfully imported.
+#[cfg(not(feature = "legacy-import"))]
+pub async fn run(_ctx: &crate::core::runtime::DispatchCtx, _config: &Config) -> Vec<Report> {
+    unavailable_report()
+}
+
 /// Every importer, in order, over `backend` for `config`'s workspace; from
 /// synchronous code.
 #[cfg(feature = "legacy-import")]
@@ -262,6 +269,21 @@ pub fn run_all(backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Report
     reports.extend(tinyflows::run_with(backend, config));
     reports.extend(sessions::run_with(backend, config));
     reports
+}
+
+#[cfg(not(feature = "legacy-import"))]
+pub fn run_all(_backend: &Arc<dyn StorageBackend>, _config: &Config) -> Vec<Report> {
+    unavailable_report()
+}
+
+#[cfg(not(feature = "legacy-import"))]
+fn unavailable_report() -> Vec<Report> {
+    vec![Report {
+        domain: "legacy-import",
+        outcome: Err(anyhow::anyhow!(
+            "legacy storage import requires the `legacy-import` feature"
+        )),
+    }]
 }
 
 /// [`run`] over an explicit backend and source list, from synchronous code.
