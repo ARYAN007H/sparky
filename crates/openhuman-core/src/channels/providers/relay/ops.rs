@@ -56,16 +56,7 @@ impl LegacyHistoryImport {
             self.limit,
         )
         .await?;
-        Ok(rows
-            .into_iter()
-            .map(|row| match row.role.as_str() {
-                "user" => tinyagents_session::transcript::TranscriptMessage::user(row.content),
-                "assistant" => {
-                    tinyagents_session::transcript::TranscriptMessage::assistant(row.content)
-                }
-                _ => unreachable!("prior_turns only returns user and assistant rows"),
-            })
-            .collect())
+        Ok(rows)
     }
 }
 

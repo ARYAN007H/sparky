@@ -31,7 +31,7 @@ struct Row {
 
 const ROWS: [Row; 6] = [
     Row {
-        module: tinychannels::MODULE_ID,
+        module: "tinychannels",
         owner: "channels",
         secrets: &[],
     },
