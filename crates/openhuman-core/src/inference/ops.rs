@@ -5,6 +5,8 @@ mod oauth;
 mod sentiment;
 mod status;
 
+pub(super) use models::is_unknown_provider_user_config;
+pub(super) use status::{expected_test_provider_model_error_kind, InferenceTestChatModelResult};
 pub use models::{
     inference_get_client_config, inference_list_models, inference_update_local_settings,
     inference_update_model_settings,

@@ -9,7 +9,7 @@ use tracing::{debug, error, warn};
 
 const LOG_PREFIX: &str = "[inference::ops]";
 
-fn is_unknown_provider_user_config(err: &str) -> bool {
+pub(super) fn is_unknown_provider_user_config(err: &str) -> bool {
     err.contains("no cloud provider with id or slug")
 }
 

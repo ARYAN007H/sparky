@@ -14,7 +14,7 @@ pub struct InferenceTestChatModelResult {
     pub reply: String,
 }
 
-fn expected_test_provider_model_error_kind(
+pub(super) fn expected_test_provider_model_error_kind(
     err: &str,
 ) -> Option<crate::core::observability::ExpectedErrorKind> {
     crate::core::observability::expected_error_kind(err)
