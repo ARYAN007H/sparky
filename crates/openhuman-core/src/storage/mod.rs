@@ -73,9 +73,10 @@ pub use tinystoragedrivers::{
 };
 pub use tinystoragedrivers_api::{DocumentStore, Storage};
 
-/// SQLite is used only by the read-only compatibility importers while they
-/// consume historical per-domain files. It is not the process storage API.
-pub use tinystoragedrivers::sqlite::rusqlite;
+/// SQLite is used only by machine-local watcher metadata and read-only
+/// compatibility importers consuming historical files. The process storage
+/// API remains the `StorageBackend` facade above.
+pub use tinystoragedrivers_connect::sqlite::rusqlite;
 
 /// Typed conveniences for document consumers, including a bounded cursor
 /// walk for callers that need every matching record.

@@ -118,6 +118,7 @@ tinyagents-storage-kit = { path = "../../vendor/tinyagents/crates/tinyagents-sto
 # by default: the `storage-*` features below add them.
 tinystoragedrivers = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2", default-features = false }
 tinystoragedrivers-api = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2" }
+tinystoragedrivers-connect = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2", features = ["sqlite"] }
 tinystoragedrivers-types = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2" }
 # The host config and secret adapters use the driver's established `enc2`
 # codec and per-scope key provider while storing through the v2 SecretStore
