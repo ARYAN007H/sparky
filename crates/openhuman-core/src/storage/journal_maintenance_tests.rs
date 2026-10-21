@@ -5,10 +5,10 @@ use tinyagents_harness::observability::replay::read_run_events_page;
 use tinyagents_harness::observability::{AgentObservation, HarnessEventJournal, StoreEventJournal};
 use tinyagents_harness::store::{AppendStore, DriverAppendStore};
 use tinyagents_harness::HarnessStatusStore;
-use tinystoragedrivers_testkit::memory_storage;
+use tinystoragedrivers_testkit::memory_backend as test_memory_backend;
 
 fn backend() -> Arc<dyn StorageBackend> {
-    memory_storage(&Scope::local())
+    Arc::new(test_memory_backend())
 }
 
 fn journal(backend: &Arc<dyn StorageBackend>) -> StoreEventJournal<Arc<dyn AppendStore>> {
