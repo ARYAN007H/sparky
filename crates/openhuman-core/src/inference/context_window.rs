@@ -37,11 +37,6 @@ fn resolver() -> &'static ContextWindowResolver {
     RESOLVER.get_or_init(ContextWindowResolver::new)
 }
 
-/// The last provider-sourced window remembered for a route/model projection.
-pub(crate) fn remembered_window(provider: &str, model: &str) -> Option<u64> {
-    resolver().remembered_window(provider, model)
-}
-
 /// Resolves the window for `model` on the role's selected provider route.
 pub(crate) async fn resolve_context_window(
     role: &str,
@@ -252,9 +247,9 @@ pub(crate) fn project_context_window(
 /// or usage display from borrowing a learned limit from an unrelated provider.
 pub(crate) fn project_context_window_for_model(
     model: &str,
-    extensions: Option<&crate::core::slots::Extensions>,
+    extensions: Option<Option<&crate::core::slots::Extensions>>,
 ) -> ResolvedWindow {
-    let route = static_route_facts(model, extensions.map(Some));
+    let route = static_route_facts(model, extensions);
     resolver().project_for_route("", model, None, route)
 }
 

@@ -28,7 +28,8 @@ pub(crate) fn static_context_window_for_model_in(
     extensions: Option<&crate::core::slots::Extensions>,
     model: &str,
 ) -> Option<u64> {
-    crate::inference::context_window::project_context_window_for_model(model, extensions).window
+    crate::inference::context_window::project_context_window_for_model(model, Some(extensions))
+        .window
 }
 
 /// Whether the model resolved for a chat hint/agent/profile accepts image input
