@@ -119,6 +119,10 @@ tinyagents-storage-kit = { path = "../../vendor/tinyagents/crates/tinyagents-sto
 tinystoragedrivers = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2", default-features = false }
 tinystoragedrivers-api = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2" }
 tinystoragedrivers-types = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2" }
+# The host config and secret adapters use the driver's established `enc2`
+# codec and per-scope key provider while storing through the v2 SecretStore
+# port. The backend itself still supplies the port implementation.
+tinystoragedrivers-secrets = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2", default-features = false, features = ["document", "file"] }
 # The storage bus: the wire contract and the reference host server that the
 # `modules::storage_host` interface answers loaded modules with. Modules only.
 tinystoragedrivers-bus = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2", optional = true }
