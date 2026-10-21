@@ -166,6 +166,17 @@ pub(super) async fn run_agent_job_for_run(
                     // cron-triggered turns. `cron` is the channel so the
                     // event bus can filter from other flows (`cli`, `web`…).
                     agent.set_event_context(format!("cron:{}", job.id), "cron");
+                    agent.enable_headless_descendant_settlement();
+                    let timeout_secs = effective.agent.agent_timeout_secs;
+                    let deadline = tinyagents_harness::turn_deadline::TurnDeadline::starting_now(
+                        std::time::Duration::from_secs(timeout_secs),
+                    );
+                    let absolute_deadline = tokio::time::Instant::from_std(
+                        deadline.started() + deadline.backstop(),
+                    );
+                    let mut host_env = agent.host_env().clone();
+                    host_env.turn_deadline = Some(deadline);
+                    agent.set_host_env(host_env);
                     // A cron agent has no thread, so its first turn would fall
                     // back to `ResumeMode::LatestForAgent` and resume the newest
                     // unthreaded transcript for the agent name — some unrelated
@@ -210,7 +221,12 @@ pub(super) async fn run_agent_job_for_run(
                         }
                         None => Box::pin(turn),
                     };
-                    turn.await
+                    match tokio::time::timeout_at(absolute_deadline, turn).await {
+                        Ok(result) => result,
+                        Err(_) => Err(anyhow::anyhow!(
+                            "cron agent turn timed out after {timeout_secs}s"
+                        )),
+                    }
                 }
                 Err(e) => Err(e),
             }
