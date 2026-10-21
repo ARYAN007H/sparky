@@ -33,7 +33,7 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use base64::Engine as _;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyagents_harness::tinyinference_video::WaitPolicy;
 use tinytools::Tool;
 
@@ -212,7 +212,9 @@ async fn media_tools_deliver_images_and_videos_through_the_backend_proxy() {
         "media_list_models",
     ] {
         assert!(
-            registered.iter().any(|candidate| candidate.name() == expected),
+            registered
+                .iter()
+                .any(|candidate| candidate.name() == expected),
             "the host-registered media source must expose `{expected}`"
         );
     }
