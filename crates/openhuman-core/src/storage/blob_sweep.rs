@@ -17,8 +17,8 @@ use std::time::Duration;
 use tinystoragedrivers::{Scope, StorageBackend};
 use tinystoragedrivers_api::BlobStore;
 use tinystoragedrivers_types::{
-    is_reserved_blob_key, BlobListPage, Result as StorageResult, StorageError,
-    MAX_BLOB_LIST_PAGE_ITEMS, SEALED_BLOB_PREFIX,
+    BlobListPage, MAX_BLOB_LIST_PAGE_ITEMS, Result as StorageResult, SEALED_BLOB_PREFIX,
+    StorageError, is_reserved_blob_key,
 };
 
 /// How often the sweeper wakes. Lapsed blobs are already invisible to readers,
@@ -98,7 +98,9 @@ fn orphan_age_is_eligible(written_at_ms: Option<u64>, older_than_ms: u64) -> boo
 fn validate_orphan_sweep_prefix(prefix: &str, max_key_len: usize) -> StorageResult<()> {
     if prefix.is_empty()
         || prefix.len() > max_key_len
-        || prefix.bytes().any(|byte| byte == 0 || byte.is_ascii_control())
+        || prefix
+            .bytes()
+            .any(|byte| byte == 0 || byte.is_ascii_control())
         || SEALED_BLOB_PREFIX.starts_with(prefix)
         || prefix.starts_with(SEALED_BLOB_PREFIX)
         || prefix

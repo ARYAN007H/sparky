@@ -1,5 +1,5 @@
 use super::*;
-use crate::modules::storage_grants::{authorize, declared, Denied, Object, Plan};
+use crate::modules::storage_grants::{Denied, Object, Plan, authorize, declared};
 use serde_json::json;
 
 fn allowed(
@@ -24,12 +24,7 @@ fn every_row_has_a_valid_generated_grant() {
             .unwrap_or_else(|why| panic!("{}: {why}", row.module));
         assert!(grant.writable);
         let items = module_collections(row.owner);
-        assert_eq!(
-            grant.collections.len(),
-            items.len(),
-            "{}",
-            row.module
-        );
+        assert_eq!(grant.collections.len(), items.len(), "{}", row.module);
     }
     assert!(declared("not-a-module").is_none());
 }

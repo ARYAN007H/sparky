@@ -95,10 +95,12 @@ async fn module_blob_scopes_are_swept_alongside_the_acting_scope() {
 #[cfg(not(feature = "modules"))]
 #[test]
 fn no_module_blob_scopes_without_the_modules_feature() {
-    assert!(crate::modules::expiring_blob_module_scopes(
-        &crate::core::runtime::DispatchCtx::host_default()
-    )
-    .is_empty());
+    assert!(
+        crate::modules::expiring_blob_module_scopes(
+            &crate::core::runtime::DispatchCtx::host_default()
+        )
+        .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -223,7 +225,9 @@ fn orphan_sweep_age_is_strict_and_unknown_ages_are_retained() {
 fn orphan_sweep_refuses_empty_and_engine_owned_prefixes() {
     for prefix in ["", "_tsd/", "_tsd/sealed", "_tsd/sealed/stream/"] {
         assert_eq!(
-            validate_orphan_sweep_prefix(prefix, 1024).unwrap_err().kind(),
+            validate_orphan_sweep_prefix(prefix, 1024)
+                .unwrap_err()
+                .kind(),
             tinystoragedrivers_types::ErrorKind::InvalidInput,
             "prefix {prefix:?}"
         );
@@ -351,7 +355,7 @@ async fn orphan_sweep_stops_on_reference_error_after_preserving_prior_progress()
 async fn orphan_sweep_stops_on_listing_error_before_touching_blobs() {
     use std::sync::Arc;
     use tinystoragedrivers_api::BlobStore;
-    use tinystoragedrivers_testkit::{memory_storage, Failing, FaultPlan};
+    use tinystoragedrivers_testkit::{Failing, FaultPlan, memory_storage};
     use tinystoragedrivers_types::{ErrorKind, Scope};
 
     let storage = memory_storage(&Scope::local());
@@ -373,7 +377,7 @@ async fn orphan_sweep_stops_on_listing_error_before_touching_blobs() {
 async fn orphan_sweep_stops_on_delete_error_after_preserving_prior_progress() {
     use std::sync::Arc;
     use tinystoragedrivers_api::BlobStore;
-    use tinystoragedrivers_testkit::{memory_storage, Failing, FaultPlan};
+    use tinystoragedrivers_testkit::{Failing, FaultPlan, memory_storage};
     use tinystoragedrivers_types::{ErrorKind, Scope};
 
     let storage = memory_storage(&Scope::local());
