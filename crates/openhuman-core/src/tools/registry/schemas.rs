@@ -154,11 +154,14 @@ fn parse_get(params: Map<String, Value>) -> Result<String, String> {
 }
 
 fn parse_get_reject_padded(params: Map<String, Value>) -> Result<String, String> {
-    let tool_id = required_tool_id(&params)?;
-    if tool_id.trim() != tool_id {
+    if params
+        .get("tool_id")
+        .and_then(Value::as_str)
+        .is_some_and(|tool_id| tool_id.trim() != tool_id)
+    {
         return Err("padded IDs are rejected".to_string());
     }
-    Ok(tool_id.to_owned())
+    parse_get(params)
 }
 
 fn parse_diagnostics(_params: Map<String, Value>) -> Result<(), String> {
