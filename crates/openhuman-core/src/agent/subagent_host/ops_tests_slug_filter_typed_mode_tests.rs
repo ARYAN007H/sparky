@@ -1,5 +1,5 @@
 use super::*;
-use tinyagents_harness::context::{RunDepth, current_run_depth, with_run_depth};
+use tinyagents_harness::context::{current_run_depth, with_run_depth, RunDepth};
 
 #[test]
 fn filter_named_scope_keeps_only_named() {
@@ -125,16 +125,12 @@ async fn typed_mode_system_prompt_includes_subagent_role_contract() {
         .iter()
         .find(|m| m.role == "system")
         .expect("system message should be present");
-    assert!(
-        system_msg
-            .content
-            .contains("You are a subagent (depth 1) working for a parent agent, not the end user.")
-    );
-    assert!(
-        system_msg
-            .content
-            .contains("Your assignment: the actual task prompt")
-    );
+    assert!(system_msg
+        .content
+        .contains("You are a subagent (depth 1) working for a parent agent, not the end user."));
+    assert!(system_msg
+        .content
+        .contains("Your assignment: the actual task prompt"));
     for heading in [
         "Answer",
         "Evidence used",
@@ -148,11 +144,9 @@ async fn typed_mode_system_prompt_includes_subagent_role_contract() {
             "missing {heading} heading"
         );
     }
-    assert!(
-        system_msg.content.contains(
-            "Do not state unsupported facts; disclose truncated or partial tool results."
-        )
-    );
+    assert!(system_msg
+        .content
+        .contains("Do not state unsupported facts; disclose truncated or partial tool results."));
 }
 
 #[tokio::test]
