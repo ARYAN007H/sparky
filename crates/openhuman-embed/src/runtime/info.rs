@@ -132,6 +132,12 @@ impl StorageInfo {
             configured: true,
         }
     }
+
+    pub(super) fn recover_sessions_on_open(&self) -> bool {
+        self.driver
+            .as_deref()
+            .is_some_and(|driver| !openhuman_core::storage::driver_is_shared(driver))
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

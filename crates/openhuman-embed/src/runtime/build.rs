@@ -194,10 +194,7 @@ impl RuntimeBuilder {
             if storage_backend.is_some() {
                 let stores = openhuman_core::storage::sessions::TenantSessionStores::new(
                     backend.clone(),
-                    host_seams
-                        .storage_driver
-                        .as_deref()
-                        .is_some_and(|driver| !openhuman_core::storage::driver_is_shared(driver)),
+                    storage_info.recover_sessions_on_open(),
                 )
                 .map_err(|e| RuntimeError::Build(e.into()))?;
                 self.session_store = Some(Arc::new(stores));
