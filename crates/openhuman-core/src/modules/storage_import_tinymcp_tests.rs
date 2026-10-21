@@ -1,7 +1,7 @@
 use super::*;
 use crate::storage::{Scope, Storage};
-use tinystoragedrivers_testkit::memory_storage;
 use tinystoragedrivers_api::SecretStore;
+use tinystoragedrivers_testkit::memory_storage;
 
 /// The first-generation schema: no `transport`, `deployment_url`, `enabled` or
 /// `catalog_managed` column, which older installs never gained.
@@ -115,13 +115,14 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
     let env: std::collections::BTreeMap<String, String> = serde_json::from_slice(&stored).unwrap();
     assert_eq!(env["API_KEY"], "sk-secret");
     assert_eq!(env["REGION"], "eu");
-    assert!(rig
-        .scoped
-        .secrets()
-        .get("mcp_client_env/srv-2")
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        rig.scoped
+            .secrets()
+            .get("mcp_client_env/srv-2")
+            .await
+            .unwrap()
+            .is_none()
+    );
 
     let audit = rig
         .scoped
@@ -187,10 +188,12 @@ async fn the_legacy_files_are_left_untouched() {
     .unwrap();
     let after = [CLIENTS_DB, AUDIT_DB].map(|path| digest(&legacy.path().join(path)));
     assert_eq!(before, after);
-    assert!(!legacy
-        .path()
-        .join("mcp_clients/mcp_clients.db-wal")
-        .exists());
+    assert!(
+        !legacy
+            .path()
+            .join("mcp_clients/mcp_clients.db-wal")
+            .exists()
+    );
 }
 
 #[tokio::test]
@@ -271,14 +274,16 @@ async fn an_unreadable_file_writes_no_marker_so_the_next_start_retries() {
     )
     .unwrap();
     let rig = rig();
-    assert!(import_into(
-        &DispatchCtx::host_default(),
-        &rig.scoped,
-        rig.scoped.secrets().as_ref(),
-        dir.path()
-    )
-    .await
-    .is_err());
+    assert!(
+        import_into(
+            &DispatchCtx::host_default(),
+            &rig.scoped,
+            rig.scoped.secrets().as_ref(),
+            dir.path()
+        )
+        .await
+        .is_err()
+    );
     let done = crate::storage::import_state::host_import_done(
         &rig.scoped,
         MARKER_COLLECTION,

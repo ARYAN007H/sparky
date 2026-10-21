@@ -9,10 +9,10 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use crate::storage::{DocumentStore, ErrorKind, Precondition, Storage};
+use anyhow::{Result, anyhow};
 use serde_json::Value;
 use sha2::Digest;
-use crate::storage::{DocumentStore, ErrorKind, Precondition, Storage};
 
 /// The module's scope of the installed backend, or `None` when the process
 /// runs without a storage backend (the module is then not using this storage).

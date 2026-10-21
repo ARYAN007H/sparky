@@ -1,6 +1,6 @@
 use super::*;
-use std::time::Duration;
 use crate::storage::{Scope, Storage};
+use std::time::Duration;
 use tinystoragedrivers_testkit::memory_storage;
 
 const FRESH: &str = "00112233445566778899aabbccddeeff";

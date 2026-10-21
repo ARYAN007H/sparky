@@ -1,6 +1,6 @@
 use super::*;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::storage::{Scope, Storage};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tinystoragedrivers_testkit::memory_storage;
 
 const SNAPSHOT: &str = r#"{

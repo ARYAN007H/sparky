@@ -22,9 +22,9 @@
 
 use std::path::Path;
 
-use anyhow::{anyhow, Context, Result};
-use serde_json::{json, Value};
 use crate::storage::{CollectionSpec, Storage};
+use anyhow::{Context, Result, anyhow};
+use serde_json::{Value, json};
 
 use super::storage_grant_schemas::tinyconnectors::{
     MODULE_ID, PREFS_COLLECTION, TRIGGER_STREAM_PREFIX,
@@ -82,11 +82,7 @@ struct Legacy {
     skipped: usize,
 }
 
-async fn import_into(
-    ctx: &DispatchCtx,
-    scoped: &Storage,
-    state_dir: &Path,
-) -> Result<Outcome> {
+async fn import_into(ctx: &DispatchCtx, scoped: &Storage, state_dir: &Path) -> Result<Outcome> {
     let docs = scoped.documents();
     let marker = support::marker_id("connectors", state_dir);
     if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {

@@ -21,9 +21,9 @@
 
 use std::path::Path;
 
+use crate::storage::{CollectionSpec, Storage};
 use anyhow::{Context, Result};
 use serde_json::Value;
-use crate::storage::{CollectionSpec, Storage};
 
 use super::storage_grant_schemas::tinybox::{JAIL_INDEX_COLLECTION, MODULE_ID};
 use super::storage_import_support as support;

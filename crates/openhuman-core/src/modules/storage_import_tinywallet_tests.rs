@@ -1,6 +1,6 @@
 use super::*;
-use sha2::Digest;
 use crate::storage::{Scope, Storage};
+use sha2::Digest;
 use tinystoragedrivers_testkit::memory_storage;
 
 fn scoped() -> Storage {

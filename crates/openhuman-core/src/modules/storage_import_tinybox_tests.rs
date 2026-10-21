@@ -1,7 +1,7 @@
 use super::*;
+use crate::storage::{Precondition, Scope, Storage};
 use serde_json::json;
 use sha2::Digest;
-use crate::storage::{Precondition, Scope, Storage};
 use tinystoragedrivers_testkit::memory_storage;
 
 fn scoped() -> Storage {

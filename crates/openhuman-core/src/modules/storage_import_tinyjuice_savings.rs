@@ -21,9 +21,9 @@
 use std::future::Future;
 use std::path::{Path, PathBuf};
 
+use crate::storage::Storage;
 use anyhow::{Context, Result};
 use tinyjuice_bus::savings::SavingsAggregate;
-use crate::storage::Storage;
 
 use super::storage_grant_schemas::tinyjuice::MODULE_ID;
 use super::storage_import_support as support;

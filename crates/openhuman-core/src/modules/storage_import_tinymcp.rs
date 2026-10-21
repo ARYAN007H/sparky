@@ -29,10 +29,10 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context, Result};
-use serde_json::{json, Value};
-use sha2::Digest;
 use crate::storage::{CollectionSpec, DocumentStore, ErrorKind, Precondition, Storage};
+use anyhow::{Context, Result, anyhow};
+use serde_json::{Value, json};
+use sha2::Digest;
 use tinystoragedrivers_api::SecretStore;
 
 use crate::core::runtime::DispatchCtx;

@@ -20,10 +20,10 @@ use std::sync::Arc;
 use sha2::Digest;
 use tinystoragedrivers_types::{Capability, CollectionSpec, ErrorKind, WriteOptions};
 
+use super::scope::{scope_for_agent, scope_for_profile, tenant_scope};
 use crate::storage::{
     DocumentStore, DocumentStoreExt, Precondition, Scope, StorageBackend, StorageError,
 };
-use super::scope::{scope_for_agent, scope_for_profile, tenant_scope};
 
 /// The ids a hashed v1 scope can be matched against.
 #[derive(Debug, Default, Clone)]
@@ -318,9 +318,7 @@ pub async fn run_from_source(
 /// path to [`crate::storage::import::scope_move::LegacyScopeInventory::read`]
 /// and then pass that inventory to [`copy_inventory`].
 #[deprecated(note = "use an explicit read-only legacy scope inventory")]
-pub async fn run(
-    _backend: &Arc<dyn StorageBackend>,
-) -> Result<MoveReport, StorageError> {
+pub async fn run(_backend: &Arc<dyn StorageBackend>) -> Result<MoveReport, StorageError> {
     Err(StorageError::unsupported(
         Capability::CollectionEnumeration,
         "v2 backends do not enumerate legacy scopes; supply an explicit legacy database inventory",
