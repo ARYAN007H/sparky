@@ -25,6 +25,8 @@ pub(crate) type ChannelHandle = dyn tinychannels_runtime::Channel;
 pub(crate) enum ChannelHandle {
     Module(module_providers::ModuleChannel),
     Relay(std::sync::Arc<crate::channels::providers::relay::RelayChannel>),
+    #[cfg(debug_assertions)]
+    Test(std::sync::Arc<dyn tinychannels_runtime::Channel>),
 }
 
 #[cfg(not(test))]
@@ -33,6 +35,8 @@ impl ChannelHandle {
         match self {
             Self::Module(channel) => &channel.name,
             Self::Relay(channel) => channel.name(),
+            #[cfg(debug_assertions)]
+            Self::Test(channel) => channel.name(),
         }
     }
 
@@ -40,6 +44,8 @@ impl ChannelHandle {
         match self {
             Self::Module(channel) => channel.proactive_target(),
             Self::Relay(_) => None,
+            #[cfg(debug_assertions)]
+            Self::Test(channel) => channel.proactive_target(),
         }
     }
 
@@ -47,11 +53,18 @@ impl ChannelHandle {
         match self {
             Self::Module(channel) => channel.capabilities(),
             Self::Relay(_) => tinychannels_bus::ChannelCapabilities::unknown(),
+            #[cfg(debug_assertions)]
+            Self::Test(channel) => channel.capabilities(),
         }
     }
 
     pub(crate) fn supports_reactions(&self) -> bool {
-        matches!(self, Self::Module(channel) if channel.interaction.supports_reactions)
+        match self {
+            Self::Module(channel) => channel.interaction.supports_reactions,
+            Self::Relay(_) => false,
+            #[cfg(debug_assertions)]
+            Self::Test(channel) => channel.supports_reactions(),
+        }
     }
 
     pub(crate) async fn send(
@@ -61,6 +74,8 @@ impl ChannelHandle {
         match self {
             Self::Module(channel) => channel.send_prepared(message).await,
             Self::Relay(channel) => channel.send(message).await,
+            #[cfg(debug_assertions)]
+            Self::Test(channel) => channel.send(message).await,
         }
     }
 
@@ -79,6 +94,8 @@ impl ChannelHandle {
                 })
                 .await,
             Self::Relay(_) => Ok(()),
+            #[cfg(debug_assertions)]
+            Self::Test(channel) => channel.start_typing(recipient).await,
         }
     }
 
@@ -90,6 +107,8 @@ impl ChannelHandle {
                 })
                 .await,
             Self::Relay(_) => Ok(()),
+            #[cfg(debug_assertions)]
+            Self::Test(channel) => channel.stop_typing(recipient).await,
         }
     }
 
@@ -101,6 +120,8 @@ impl ChannelHandle {
         match self {
             Self::Module(channel) => channel.begin_typing_refresh(recipient, interval_secs).await,
             Self::Relay(_) => Ok(None),
+            #[cfg(debug_assertions)]
+            Self::Test(channel) => channel.begin_typing_refresh(recipient, interval_secs).await,
         }
     }
 
@@ -108,6 +129,8 @@ impl ChannelHandle {
         match self {
             Self::Module(channel) => channel.end_typing_refresh(handle).await,
             Self::Relay(_) => Ok(()),
+            #[cfg(debug_assertions)]
+            Self::Test(channel) => channel.end_typing_refresh(handle).await,
         }
     }
 }

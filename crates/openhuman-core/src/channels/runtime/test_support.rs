@@ -326,9 +326,19 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         supports_reactions: options.supports_reactions,
         state: Arc::clone(&state),
     });
+    #[cfg(test)]
     let channel: Arc<dyn Channel> = channel_impl;
+    #[cfg(test)]
     let mut channels_by_name = HashMap::new();
+    #[cfg(test)]
     channels_by_name.insert(options.channel_name.clone(), channel);
+    #[cfg(not(test))]
+    let mut channels_by_name = HashMap::new();
+    #[cfg(not(test))]
+    channels_by_name.insert(
+        options.channel_name.clone(),
+        Arc::new(crate::channels::runtime::ChannelHandle::Test(channel_impl)),
+    );
 
     let model: Arc<dyn ChatModel<()>> = Arc::new(HarnessModel);
     let mut provider_cache = HashMap::new();
