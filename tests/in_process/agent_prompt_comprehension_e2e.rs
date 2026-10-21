@@ -1030,9 +1030,17 @@ fn orchestrator_prompt_names_only_discoverable_delegates() {
         )
         .await;
         assert_no_jsonrpc_error(&resp, "channel_web_chat");
-        wait_for_terminal(&mut events).await;
-
+        let terminal = wait_for_terminal(&mut events).await;
         let requests = captured().clone();
+        assert_eq!(
+            terminal.get("event").and_then(Value::as_str),
+            Some("chat_done"),
+            "prompt-discovery turn ended with event={:?}, error_type={:?}, message={:?}; captured requests={}",
+            terminal.get("event").and_then(Value::as_str),
+            terminal.get("error_type").and_then(Value::as_str),
+            terminal.get("message").and_then(Value::as_str),
+            requests.len(),
+        );
         let orchestrator = requests
             .iter()
             .find(|r| system_text(r).contains("## Routing\n\nFirst match wins:"))
