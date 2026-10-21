@@ -149,7 +149,6 @@ fn fold_threads(root: &Path) -> Result<Vec<CreateConversationThread>> {
 pub(super) fn import_once(
     workspace_dir: &Path,
     repo: &Repo,
-    store: &DriverConversationStore,
 ) -> Result<()> {
     let root = super::backend::legacy_root(workspace_dir);
     let source = crate::storage::source_key(&root);
@@ -167,8 +166,9 @@ pub(super) fn import_once(
             log::debug!("{LOG_PREFIX} already imported");
             return Ok(());
         }
-        let claimed = import_state::with_claim(repo, OWNER, &step, || {
-            if import_state::is_done(repo, OWNER, &step)? {
+        let claimed = import_state::with_claim(repo, OWNER, &step, |condition| {
+            let claimed_repo = repo.conditioned(condition)?;
+            if import_state::is_done(&claimed_repo, OWNER, &step)? {
                 return Ok(());
             }
             let threads = fold_threads(&root)?;
@@ -178,12 +178,12 @@ pub(super) fn import_once(
                     &root, &thread.id,
                 ))?);
             }
-            let store = store.clone();
+            let store = DriverConversationStore::new(claimed_repo.scoped().clone());
             let (threads_n, messages_n) =
                 crate::storage::block_on_anyhow(
                     async move { copy(&store, threads, messages).await },
                 )?;
-            import_state::set_done(repo, OWNER, &step)?;
+            import_state::set_done(&claimed_repo, OWNER, &step)?;
             log::info!("{LOG_PREFIX} imported threads={threads_n} messages={messages_n}");
             Ok(())
         })?;

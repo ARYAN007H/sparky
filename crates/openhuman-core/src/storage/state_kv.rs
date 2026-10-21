@@ -320,12 +320,12 @@ impl StateKv {
         name: &str,
         legacy: &Path,
     ) -> Result<()> {
-        self.import_once(name, || {
+        self.import_once(name, |state| {
             match std::fs::read(legacy) {
                 Ok(bytes) if bytes.iter().all(u8::is_ascii_whitespace) => {}
                 Ok(bytes) => match serde_json::from_slice::<Value>(&bytes) {
                     Ok(value) if serde_json::from_value::<T>(value.clone()).is_ok() => {
-                        let wrote = self.insert_if_absent(name, &value)?;
+                        let wrote = state.insert_if_absent(name, &value)?;
                         log::debug!(
                             "[storage::state_kv] imported {}/{}/{name} (written={wrote})",
                             self.owner,
@@ -411,31 +411,37 @@ impl StateKv {
     /// # Errors
     ///
     /// A storage error, or whatever `body` returns.
-    pub fn import_once(&self, name: &str, body: impl FnOnce() -> Result<()>) -> Result<()> {
+    pub fn import_once(&self, name: &str, body: impl FnOnce(&StateKv) -> Result<()>) -> Result<()> {
         let key = format!("{}/{}/{name}", self.owner, self.ns);
         let step = import_state::step_id(IMPORT_KIND, &key);
         self.repo.once_per_backend(&key, || {
             if import_state::is_done(&self.repo, self.owner, &step)? {
                 return Ok(());
             }
-            import_state::with_claim(&self.repo, self.owner, &step, || {
-                if import_state::is_done(&self.repo, self.owner, &step)? {
+            import_state::with_claim(&self.repo, self.owner, &step, |condition| {
+                let claimed_repo = self.repo.conditioned(condition)?;
+                let claimed_state = Self {
+                    repo: claimed_repo.clone(),
+                    owner: self.owner,
+                    ns: self.ns,
+                };
+                if import_state::is_done(&claimed_repo, self.owner, &step)? {
                     return Ok(());
                 }
-                body()?;
-                import_state::set_done(&self.repo, self.owner, &step)
+                body(&claimed_state)?;
+                import_state::set_done(&claimed_repo, self.owner, &step)
             })?;
             Ok(())
         })
     }
 
     fn import_file_with(&self, name: &str, legacy: &Path, strict: bool) -> Result<()> {
-        self.import_once(name, || {
+        self.import_once(name, |state| {
             match std::fs::read(legacy) {
                 Ok(bytes) if bytes.iter().all(u8::is_ascii_whitespace) => {}
                 Ok(bytes) => match serde_json::from_slice::<Value>(&bytes) {
                     Ok(value) => {
-                        let wrote = self.insert_if_absent(name, &value)?;
+                        let wrote = state.insert_if_absent(name, &value)?;
                         log::debug!(
                             "[storage::state_kv] imported {}/{}/{name} (written={wrote})",
                             self.owner,

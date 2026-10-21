@@ -119,10 +119,12 @@ impl Docs {
     pub(super) fn import_if_absent(&self, name: &str, value: serde_json::Value) -> Result<bool> {
         log::debug!("[composio:store] document import id={name}");
         let step = import_step(name);
-        let state = self.state.clone();
-        let claimed = import_state::with_claim(&self.repo, IMPORT_OWNER, &step, move || {
+        let repo = self.repo.clone();
+        let claimed = import_state::with_claim(&repo, IMPORT_OWNER, &step, move |condition| {
+            let claimed_repo = repo.conditioned(condition)?;
+            let state = StateKv::over(claimed_repo.scoped(), KV_OWNER, KV_NS);
             let wrote = state.insert_if_absent(name, &value)?;
-            import_state::set_done(&self.repo, IMPORT_OWNER, &step)?;
+            import_state::set_done(&claimed_repo, IMPORT_OWNER, &step)?;
             Ok(wrote)
         })?;
         Ok(claimed.unwrap_or(false))

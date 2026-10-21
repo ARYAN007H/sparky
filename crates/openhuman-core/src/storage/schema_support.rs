@@ -24,6 +24,9 @@ pub(crate) struct LegacyTargetRecord {
     pub id: String,
     pub body: Value,
     pub created_ms: Option<i64>,
+    pub schema: Option<u32>,
+    pub expires_ms: Option<i64>,
+    pub updated_ms: Option<i64>,
 }
 
 impl LegacyTargetRecord {
@@ -33,11 +36,25 @@ impl LegacyTargetRecord {
             id: id.into(),
             body,
             created_ms: None,
+            schema: None,
+            expires_ms: None,
+            updated_ms: None,
         }
     }
 
     pub fn created_ms(mut self, created_ms: i64) -> Self {
         self.created_ms = Some(created_ms);
+        self
+    }
+
+    /// Carries source driver metadata through a body-shape conversion.
+    pub fn source_metadata(mut self, source: tinystoragedrivers::Meta) -> Self {
+        self.schema = (source.schema != 0).then_some(source.schema);
+        self.expires_ms = source.expires_ms;
+        self.updated_ms = Some(source.updated_ms);
+        if self.created_ms.is_none() && source.created_ms != 0 {
+            self.created_ms = Some(source.created_ms);
+        }
         self
     }
 }
@@ -60,8 +77,10 @@ where
                 id: record.id,
                 body: record.doc,
                 meta: tinystoragedrivers::Meta {
+                    schema: record.schema.unwrap_or_default(),
                     created_ms: record.created_ms.unwrap_or_default(),
-                    ..tinystoragedrivers::Meta::unknown()
+                    updated_ms: record.updated_ms.unwrap_or_default(),
+                    expires_ms: record.expires_ms,
                 },
             });
         } else {
@@ -73,6 +92,9 @@ where
         id: record.id,
         doc: record.body,
         created_ms: record.created_ms,
+        schema: record.schema,
+        expires_ms: record.expires_ms,
+        updated_ms: record.updated_ms,
     }));
     Ok(output)
 }

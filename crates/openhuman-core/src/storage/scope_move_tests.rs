@@ -1,6 +1,10 @@
 use super::*;
+#[cfg(feature = "legacy-import")]
+use crate::storage::Precondition;
+#[cfg(feature = "legacy-import")]
 use serde_json::json;
-use tinystoragedrivers::MemoryStorage;
+use tinystoragedrivers_testkit::MemoryBackend;
+use tinystoragedrivers_types::Meta;
 
 fn known() -> Known {
     Known {
@@ -56,74 +60,94 @@ fn v2_scopes_are_left_alone() {
 }
 
 #[tokio::test]
+#[cfg(feature = "legacy-import")]
 async fn a_v1_scope_moves_its_documents_streams_and_blobs() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
-    let old = backend
-        .for_scope(&Scope::new("alice~asha").unwrap())
-        .unwrap();
-    old.documents()
-        .put("notes", "n1", json!({"a": 1}), Precondition::None)
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
+    let source = "alice~asha";
+    let inventory = crate::storage::import::scope_move::LegacyScopeInventory {
+        scopes: vec![source.into()],
+        documents: vec![crate::storage::import::scope_move::LegacyDocument {
+            scope: source.into(),
+            collection: "notes".into(),
+            id: "n1".into(),
+            body: json!({"a": 1}),
+            meta: Meta {
+                schema: 4,
+                created_ms: 123,
+                updated_ms: 456,
+                expires_ms: None,
+            },
+        }],
+        streams: vec![crate::storage::import::scope_move::LegacyStream {
+            scope: source.into(),
+            name: "journal".into(),
+            base: 0,
+            sealed: false,
+            sealed_ms: None,
+            entries: vec![(0, json!({"k":1})), (1, json!({"k":2}))],
+        }],
+        blobs: vec![crate::storage::import::scope_move::LegacyBlob {
+            scope: source.into(),
+            key: "b/1".into(),
+            content_type: Some("text/plain".into()),
+            expires_ms: None,
+            bytes: b"hi".to_vec(),
+        }],
+    };
+    let report = copy_inventory(&backend, &known(), &inventory)
         .await
         .unwrap();
-    old.streams()
-        .append("journal", json!({"k": 1}))
-        .await
-        .unwrap();
-    old.streams()
-        .append("journal", json!({"k": 2}))
-        .await
-        .unwrap();
-    old.blobs()
-        .put("b/1", b"hi".to_vec(), Some("text/plain"))
-        .await
-        .unwrap();
-
-    let report = run(&backend).await.unwrap();
     assert_eq!(report.moved, 1);
     assert!(report.documents >= 1);
     assert_eq!(report.entries, 2);
     assert_eq!(report.blobs, 1);
+    assert_eq!(report.updated_times_not_restored, 1);
 
     let new = backend
         .for_scope(&scope_for_profile("alice").agent("asha").unwrap())
         .unwrap();
-    assert_eq!(
-        new.documents()
-            .get("notes", "n1")
-            .await
-            .unwrap()
-            .unwrap()
-            .doc,
-        json!({"a": 1})
-    );
+    let copied = new.documents().get("notes", "n1").await.unwrap().unwrap();
+    assert_eq!(copied.doc, json!({"a": 1}));
+    assert_eq!(copied.meta.schema, 4);
+    assert_eq!(copied.meta.created_ms, 123);
     assert_eq!(new.streams().len("journal").await.unwrap(), 2);
     assert_eq!(new.blobs().get("b/1").await.unwrap().unwrap().bytes, b"hi");
 
-    // The v1 scope is gone and a second run is a no-op.
-    let old = backend
-        .for_scope(&Scope::new("alice~asha").unwrap())
+    // The explicit source inventory remains available for operator review.
+    assert_eq!(inventory.documents.len(), 1);
+    assert_eq!(inventory.streams[0].entries.len(), 2);
+    // Repeating the typed copy preserves rows without appending stream entries.
+    let again = copy_inventory(&backend, &known(), &inventory)
+        .await
         .unwrap();
-    assert!(old.documents().get("notes", "n1").await.unwrap().is_none());
-    assert_eq!(old.streams().len("journal").await.unwrap(), 0);
-    let again = run(&backend).await.unwrap();
-    assert_eq!(again.moved, 0);
+    assert_eq!(again.entries, 0);
+    assert_eq!(new.streams().len("journal").await.unwrap(), 2);
 }
 
 #[tokio::test]
+#[cfg(feature = "legacy-import")]
 async fn a_record_already_in_the_target_wins_a_merge() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
     let target = backend.for_scope(&scope_for_agent("asha")).unwrap();
     target
         .documents()
         .put("notes", "n", json!({"from": "v2"}), Precondition::None)
         .await
         .unwrap();
-    let old = backend.for_scope(&Scope::new("asha").unwrap()).unwrap();
-    old.documents()
-        .put("notes", "n", json!({"from": "v1"}), Precondition::None)
+    let inventory = crate::storage::import::scope_move::LegacyScopeInventory {
+        scopes: vec!["asha".into()],
+        documents: vec![crate::storage::import::scope_move::LegacyDocument {
+            scope: "asha".into(),
+            collection: "notes".into(),
+            id: "n".into(),
+            body: json!({"from": "v1"}),
+            meta: Meta::default(),
+        }],
+        ..Default::default()
+    };
+    copy_inventory(&backend, &known(), &inventory)
         .await
         .unwrap();
-    run(&backend).await.unwrap();
     assert_eq!(
         target
             .documents()
@@ -134,4 +158,30 @@ async fn a_record_already_in_the_target_wins_a_merge() {
             .doc,
         json!({"from": "v2"})
     );
+}
+
+#[tokio::test]
+#[cfg(feature = "legacy-import")]
+async fn a_timestamped_stream_refuses_a_lossy_move_before_copying_entries() {
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
+    let inventory = crate::storage::import::scope_move::LegacyScopeInventory {
+        scopes: vec!["asha".into()],
+        streams: vec![crate::storage::import::scope_move::LegacyStream {
+            scope: "asha".into(),
+            name: "journal".into(),
+            base: 0,
+            sealed: true,
+            sealed_ms: Some(123),
+            entries: vec![(0, json!({"entry": 1}))],
+        }],
+        ..Default::default()
+    };
+
+    let error = copy_inventory(&backend, &known(), &inventory)
+        .await
+        .unwrap_err();
+
+    assert!(error.to_string().contains("seal timestamp"));
+    let target = backend.for_scope(&scope_for_agent("asha")).unwrap();
+    assert_eq!(target.streams().len("journal").await.unwrap(), 0);
 }

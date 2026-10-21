@@ -1,12 +1,11 @@
 use super::*;
+use crate::storage::{Precondition, Scope, Storage};
 use serde_json::json;
 use sha2::Digest;
-use tinystoragedrivers::{MemoryStorage, Precondition, Scope, StorageBackend};
+use tinystoragedrivers_testkit::memory_storage;
 
-fn scoped() -> ScopedStorage {
-    MemoryStorage::new()
-        .for_scope(&Scope::new("module:tinybox@local").unwrap())
-        .unwrap()
+fn scoped() -> Storage {
+    memory_storage(&Scope::new("module:tinybox@local").unwrap())
 }
 
 const INDEX: &str = r#"{"jails":{"j1":{"id":"j1","label":"build","dir":"/w/jails/j1","backend_at_create":"landlock","created_at_unix":10,"updated_at_unix":20,"notes":"keep"}}}"#;

@@ -1,11 +1,10 @@
 use super::*;
+use crate::storage::{Precondition, Scope, Storage};
 use sha2::Digest;
-use tinystoragedrivers::{MemoryStorage, Precondition, Scope, StorageBackend};
+use tinystoragedrivers_testkit::memory_storage;
 
-fn scoped() -> ScopedStorage {
-    MemoryStorage::new()
-        .for_scope(&Scope::new("module:tinyconnectors@local").unwrap())
-        .unwrap()
+fn scoped() -> Storage {
+    memory_storage(&Scope::new("module:tinyconnectors@local").unwrap())
 }
 
 /// A state directory as the pre-storage module left it.
@@ -92,11 +91,12 @@ async fn preferences_and_the_trigger_archive_move_into_the_modules_storage() {
     );
     let slack = docs.get(PREFS_COLLECTION, "slack").await.unwrap().unwrap();
     assert_eq!(slack.doc, json!({"value": true}));
-    assert!(docs
-        .get(PREFS_COLLECTION, "broken")
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        docs.get(PREFS_COLLECTION, "broken")
+            .await
+            .unwrap()
+            .is_none()
+    );
 
     let streams = scoped.streams();
     let first = streams
@@ -145,12 +145,14 @@ async fn a_second_run_is_a_noop_even_after_the_module_changed_the_data() {
             .unwrap(),
         Outcome::AlreadyDone
     );
-    assert!(scoped
-        .documents()
-        .get(PREFS_COLLECTION, "gmail")
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        scoped
+            .documents()
+            .get(PREFS_COLLECTION, "gmail")
+            .await
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -235,12 +237,14 @@ async fn an_unreadable_preference_file_is_retried_instead_of_marked_done() {
             .await
             .is_err()
     );
-    assert!(scoped
-        .documents()
-        .get(PREFS_COLLECTION, "gmail")
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        scoped
+            .documents()
+            .get(PREFS_COLLECTION, "gmail")
+            .await
+            .unwrap()
+            .is_none()
+    );
 
     std::fs::remove_file(legacy.path().join(PREFS_DIR).join("bad.json")).unwrap();
     assert!(matches!(

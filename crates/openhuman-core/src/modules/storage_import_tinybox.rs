@@ -21,9 +21,9 @@
 
 use std::path::Path;
 
+use crate::storage::{CollectionSpec, Storage};
 use anyhow::{Context, Result};
 use serde_json::Value;
-use tinystoragedrivers::{CollectionSpec, ScopedStorage};
 
 use super::storage_grant_schemas::tinybox::{JAIL_INDEX_COLLECTION, MODULE_ID};
 use super::storage_import_support as support;
@@ -59,7 +59,7 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, workspace_dir: &Path) -> Re
     import_into(&scoped, &workspace_dir.join(BASE_DIR)).await
 }
 
-async fn import_into(scoped: &ScopedStorage, base: &Path) -> Result<Outcome> {
+async fn import_into(scoped: &Storage, base: &Path) -> Result<Outcome> {
     let docs = scoped.documents();
     let marker = support::marker_id("tinybox", base);
     if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {

@@ -10,8 +10,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tinyagents_harness::observability::{DriverStatusStore, JournalMaintenanceReport};
-use tinyagents_harness::HarnessStatusStore;
-use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, Scope, StorageBackend};
+use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, StorageBackend};
+
+use crate::storage::Scope;
 
 /// How often the sweep wakes.
 pub const SWEEP_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
@@ -55,13 +56,126 @@ pub async fn maintain_once(
     now_ms: i64,
 ) -> Result<MaintenanceSummary, crate::storage::StorageError> {
     let retention_ms = u64::from(retention_days).saturating_mul(DAY_MS);
-    // Keep these handles alive for the entire pass. An open profile handle
-    // keeps its host slot in use, which prevents its lease fence from being
-    // retired while this pass writes to that profile's scope.
-    let (_hosted_profiles, scopes) = known_scopes()?;
-    maintain_scopes(backend, scopes, retention_ms, now_ms).await
+    let work = known_scope_work(backend)?;
+    maintain_work_items(work, retention_ms, now_ms).await
 }
 
+struct ScopeWorkItem {
+    backend: Arc<dyn StorageBackend>,
+    scope: Scope,
+    // Retains the open host slot. The captured backend separately pins the
+    // exact lease epoch and carries its condition on every mutation.
+    _profile: Option<Arc<crate::profiles::Profile>>,
+}
+
+fn known_scope_work(
+    backend: &Arc<dyn StorageBackend>,
+) -> Result<Vec<ScopeWorkItem>, crate::storage::StorageError> {
+    let mut base_scopes = BTreeSet::new();
+    if !crate::core::runtime::mode::is_saas() {
+        base_scopes.insert(Scope::local());
+    }
+
+    for (agent, context) in crate::storage::agents::contexts() {
+        let dispatch = crate::core::runtime::DispatchCtx::new(context);
+        if let Ok(tenant) = dispatch.tenant() {
+            if tenant.profile.is_none() {
+                if let Some(agent) = tenant.agent.or(Some(agent)) {
+                    base_scopes.insert(crate::storage::scope_for_agent(&agent));
+                }
+            }
+        }
+    }
+
+    if !crate::core::runtime::mode::is_saas() {
+        for module in crate::modules::registry::ALL {
+            if let Ok(scope) = Scope::local().module(module.id) {
+                base_scopes.insert(scope);
+            }
+        }
+    }
+
+    let mut work = base_scopes
+        .into_iter()
+        .map(|scope| ScopeWorkItem {
+            backend: Arc::clone(backend),
+            scope,
+            _profile: None,
+        })
+        .collect::<Vec<_>>();
+
+    if let Some(host) = crate::profiles::host::host() {
+        work.extend(captured_profile_work(
+            host.as_ref(),
+            host.hosted_profiles(),
+            super::fence::system_now_ms(),
+        )?);
+    }
+    Ok(work)
+}
+
+fn captured_profile_work(
+    host: &crate::profiles::ProfileHost,
+    profiles: Vec<Arc<crate::profiles::Profile>>,
+    now_ms: u64,
+) -> Result<Vec<ScopeWorkItem>, crate::storage::StorageError> {
+    let mut work = Vec::new();
+    for profile in profiles {
+        if profile.lease_fence().check_local(now_ms).is_err() {
+            continue;
+        }
+        let Some(profile_backend) = host.storage_backend_for(&profile)? else {
+            // File leases have no shared storage backend to maintain.
+            continue;
+        };
+        let base = crate::storage::scope_for_profile(profile.id.as_str());
+        let mut profile_scopes = BTreeSet::from([base.clone()]);
+        for module in crate::modules::registry::ALL {
+            if let Ok(scope) = base.module(module.id) {
+                profile_scopes.insert(scope);
+            }
+        }
+        work.extend(profile_scopes.into_iter().map(|scope| ScopeWorkItem {
+            backend: Arc::clone(&profile_backend),
+            scope,
+            _profile: Some(Arc::clone(&profile)),
+        }));
+    }
+    Ok(work)
+}
+
+async fn maintain_work_items(
+    work: Vec<ScopeWorkItem>,
+    retention_ms: u64,
+    now_ms: i64,
+) -> Result<MaintenanceSummary, crate::storage::StorageError> {
+    let mut summary = MaintenanceSummary::default();
+    for item in work {
+        match maintain_scope(&item.backend, &item.scope, retention_ms, now_ms).await {
+            Ok(report) => {
+                summary.scopes += 1;
+                summary.backfilled += report.backfilled as u64;
+                summary.deleted += report.deleted as u64;
+                summary.conflicts += report.conflicts as u64;
+            }
+            Err(error) => tracing::warn!(
+                scope = item.scope.as_str(),
+                %error,
+                "{LOG} owner journal maintenance failed; retrying on the next sweep"
+            ),
+        }
+    }
+    tracing::debug!(
+        scopes = summary.scopes,
+        backfilled = summary.backfilled,
+        deleted = summary.deleted,
+        conflicts = summary.conflicts,
+        "{LOG} pass complete"
+    );
+    Ok(summary)
+}
+
+#[cfg(test)]
 async fn maintain_scopes(
     backend: &Arc<dyn StorageBackend>,
     scopes: Vec<Scope>,
@@ -162,6 +276,7 @@ async fn maintain_scope(
 /// opens them; sweeping their scopes directly could mutate a profile leased
 /// by another host. Cluster scope is intentionally excluded: harness run
 /// journals have historically been tenant/local data, not cluster data.
+#[cfg(test)]
 fn known_scopes(
 ) -> Result<(Vec<Arc<crate::profiles::Profile>>, Vec<Scope>), crate::storage::StorageError> {
     let mut scopes = BTreeSet::new();
@@ -200,6 +315,7 @@ fn known_scopes(
 /// Retain only profile handles whose lease is still live and enumerate their
 /// tenant/module scopes. Keeping the handles alive prevents release while the
 /// caller is using those scopes.
+#[cfg(test)]
 fn profile_scope_snapshot(
     profiles: Vec<Arc<crate::profiles::Profile>>,
     now_ms: u64,

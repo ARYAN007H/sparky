@@ -107,7 +107,8 @@ fn requests_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {
                 )
                 .build();
             Ok(TargetRecord::new(APPROVALS, key_of(&record.id)?, body)
-                .created_ms(record.meta.created_ms))
+                .created_ms(record.meta.created_ms)
+                .source_metadata(record.meta))
         })
         .collect()
 }
@@ -129,7 +130,8 @@ fn flow_trust_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {
                 .build();
             Some(
                 TargetRecord::new(FLOW_TRUST, trust_id(flow_id, tool_name), body)
-                    .created_ms(record.meta.created_ms),
+                    .created_ms(record.meta.created_ms)
+                    .source_metadata(record.meta),
             )
         })
         .collect())

@@ -61,7 +61,8 @@ fn paired_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {
                 )
                 .build();
             Ok(TargetRecord::new(DEVICES, key_of(&record.id)?, body)
-                .created_ms(record.meta.created_ms))
+                .created_ms(record.meta.created_ms)
+                .source_metadata(record.meta))
         })
         .collect()
 }

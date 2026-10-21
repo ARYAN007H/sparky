@@ -292,16 +292,9 @@ pub async fn open(url: &str) -> Result<Arc<dyn StorageBackend>, StorageError> {
     // Every opened backend checks the process's lease fences on write; with
     // no fence registered (every single-user host) that is a pass-through.
     let backend = tinystoragedrivers::open(&parsed).await?;
-    // Schema, scope move and migrations run on the raw backend, before any
-    // lease fence exists to refuse them.
-    let report = boot::prepare_and_migrate(&backend).await?;
-    if !report.failures.is_empty() {
-        tracing::warn!(
-            target: "openhuman::storage",
-            failures = report.failures.len(),
-            "[storage] opened with unfinished migrations; they retry at the next boot"
-        );
-    }
+    // Prepare the composed owner collections before installing lease fences.
+    // Legacy physical-source migration is handled separately by importers.
+    boot::prepare_and_migrate(&backend).await?;
     Ok(fenced_backend::wrap(backend))
 }
 

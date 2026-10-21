@@ -266,13 +266,14 @@ impl Docs {
         sessions: &[DurableSubagentSession],
     ) -> Result<()> {
         let step = import_step(source);
-        let claimed = import_state::with_claim(&self.0, OWNER, &step, || {
+        let claimed = import_state::with_claim(&self.0, OWNER, &step, |condition| {
+            let claimed_repo = self.0.conditioned(condition)?;
             // The process that held the claim before us may have finished.
-            if self.legacy_imported(source)? {
+            if import_state::is_done(&claimed_repo, OWNER, &step)? {
                 return Ok(());
             }
-            self.save(sessions)?;
-            import_state::set_done(&self.0, OWNER, &step)
+            Self(claimed_repo.clone()).save(sessions)?;
+            import_state::set_done(&claimed_repo, OWNER, &step)
         })?;
         if claimed.is_none() {
             log::debug!(
