@@ -4,8 +4,11 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use tinystoragedrivers::secrets::{DerivedKeys, DocumentSecrets, SecretStore};
-use tinystoragedrivers::{CollectionSpec, Precondition, Scope, StorageConfig, WriteOptions};
+use tinystoragedrivers::{
+    CollectionSpec, Precondition, Scope, StorageConfig, StreamStore, WriteOptions,
+};
 use zeroize::Zeroizing;
 
 const PROFILE_ID: &str = "u1";
@@ -228,8 +231,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }),
     )
     .await?;
+    let thread_id = "fixture-thread";
+    let incarnation = "fixture-incarnation";
+    let thread_digest = hex(&Sha256::digest(thread_id.as_bytes()));
     put(
-        user_scope.documents(),
+        docs,
+        "conversation_threads_v1",
+        &thread_digest,
+        json!({
+            "schema": 1,
+            "incarnation": incarnation,
+            "deleted": false,
+            "visible_end": 1,
+            "thread": {
+                "id": thread_id,
+                "title": "Fixture thread",
+                "isActive": true,
+                "messageCount": 1,
+                "lastMessageAt": "2025-02-03T04:05:07Z",
+                "createdAt": "2025-02-03T04:05:06Z",
+                "labels": []
+            }
+        }),
+    )
+    .await?;
+    user_scope
+        .streams()
+        .append(
+            &format!("conversation_messages_v1:{thread_digest}:{incarnation}"),
+            json!({
+                "schema": 1,
+                "incarnation": incarnation,
+                "message": {
+                    "id": "fixture-message",
+                    "content": "historical profile message",
+                    "type": "text",
+                    "extraMetadata": null,
+                    "sender": "user",
+                    "createdAt": "2025-02-03T04:05:07Z"
+                }
+            }),
+        )
+        .await?;
+    put(
+        docs,
         "threads_transcript_keys",
         "fixture-thread",
         json!({"transcript_key": "fixture-transcript-key"}),
@@ -261,34 +306,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .set("fixture-secret", b"historical-secret-value")
         .await?;
 
-    // Threads predate the v1 storage database and remain in the workspace's
-    // read-only JSONL conversation files. Emit a thread and its message beside
-    // storage.db so the host integration fixture exercises the real legacy
-    // thread importer while preserving a message through the boot migration.
-    let conversations = path
-        .parent()
-        .ok_or("storage.db output must have a parent directory")?
-        .join("legacy-workspace/memory/conversations");
-    std::fs::create_dir_all(conversations.join("threads"))?;
-    std::fs::write(
-        conversations.join("threads.jsonl"),
-        "{\"op\":\"upsert\",\"thread_id\":\"fixture-thread\",\"title\":\"Fixture thread\",\"created_at\":\"2025-02-03T04:05:06Z\"}\n",
-    )?;
-    let thread_id_hex: String = "fixture-thread"
-        .bytes()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
-    std::fs::write(
-        conversations
-            .join("threads")
-            .join(format!("{thread_id_hex}.jsonl")),
-        "{\"id\":\"fixture-message\",\"content\":\"historical profile message\",\"type\":\"text\",\"extraMetadata\":null,\"sender\":\"user\",\"createdAt\":\"2025-02-03T04:05:07Z\"}\n",
-    )?;
     backend
         .checkpoint(tinystoragedrivers::Checkpoint::Truncate)
         .await?;
     println!("written {}", path.display());
     Ok(())
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 async fn put(
