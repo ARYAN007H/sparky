@@ -9865,9 +9865,11 @@ dependencies = [
  "mongodb",
  "object_store",
  "rusqlite",
+ "serde_json",
  "tinystoragedrivers-types",
  "tokio",
  "url",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -9902,6 +9904,7 @@ dependencies = [
  "serde_json",
  "tinystoragedrivers-api",
  "tinystoragedrivers-connect",
+ "tinystoragedrivers-document",
  "tinystoragedrivers-types",
 ]
 
