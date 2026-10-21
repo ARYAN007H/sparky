@@ -126,16 +126,11 @@ async fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     );
     assert!(credential.to_string().contains("u1"), "profile credential was not installed: {credential}");
     let threads = rpc(&base, "openhuman.threads_list");
-    let approvals = rpc(&base, "openhuman.approval_list_pending");
     let flows = rpc(&base, "openhuman.flows_list");
 
     assert!(
         threads.to_string().contains("fixture-thread"),
         "thread owner did not read its historical profile record: {threads}"
-    );
-    assert!(
-        approvals.to_string().contains("fixture-approval"),
-        "approval owner did not read its historical profile record: {approvals}"
     );
     assert!(
         flows.to_string().contains("fixture-flow"),
@@ -148,6 +143,49 @@ async fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         source_bytes,
         "boot must leave the historical v1 storage.db byte-for-byte unchanged"
     );
+
+    // The desktop's root context is unscoped; profile-owned records are read
+    // through the same owners under the active profile context they belong to.
+    let workspace = profile.join("workspace");
+    let mut config = openhuman_core::config::Config::default();
+    config.config_path = profile.join("config.toml");
+    config.workspace_dir = workspace.clone();
+    let runtime = openhuman_core::core::runtime::CoreBuilder::new(
+        openhuman_core::core::types::HostKind::TauriShell,
+    )
+    .boot_mode(openhuman_core::core::runtime::CoreBootMode::Inspection)
+    .token(openhuman_core::core::runtime::TokenSource::Fixed(
+        std::sync::Arc::new("legacy-profile-inspection-token".to_owned()),
+    ))
+    .services(openhuman_core::core::runtime::ServiceSet::none())
+    .config(config.clone())
+    .build()
+    .await
+    .unwrap();
+    let profile_context = runtime.context().derive_with(
+        openhuman_core::core::runtime::ContextOverlay::new(
+            config.clone(),
+            openhuman_core::core::runtime::DomainSet::full(),
+            openhuman_core::tools::toolpacks::ToolGroups::none(),
+        )
+        .profile("u1"),
+    );
+    openhuman_core::core::runtime::CoreContext::scope(profile_context, async {
+        let dispatch = openhuman_core::core::runtime::DispatchCtx::ambient();
+        let thread_store = openhuman_core::threads::store::ConversationStore::new(
+            dispatch,
+            workspace.clone(),
+        );
+        assert_eq!(
+            thread_store.transcript_key("fixture-thread").unwrap().as_deref(),
+            Some("fixture-transcript-key"),
+            "thread owner did not read the v1 database transcript key"
+        );
+        let approvals = openhuman_core::security::approval::store::list_pending(&config).unwrap();
+        assert_eq!(approvals.len(), 1, "approval owner did not read the v1 database record");
+        assert_eq!(approvals[0].request_id, "fixture-approval");
+    })
+    .await;
 
     // Read the confidential record with TinyStorage's document-secret owner
     // API after the desktop boot has installed and migrated the profile DB.
