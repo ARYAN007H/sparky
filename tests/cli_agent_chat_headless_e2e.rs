@@ -159,7 +159,12 @@ fn run_cli(
     let params = json!({ "message": "Delegate this request to a child and report its exact result", "model_override": "e2e-mock-model" });
     let mut child = ChildGuard(
         Command::new(env!("CARGO_BIN_EXE_openhuman-core"))
-            .args(["call", "--method", "inference.agent_chat", "--params"])
+            .args([
+                "call",
+                "--method",
+                "openhuman.inference_agent_chat",
+                "--params",
+            ])
             .arg(params.to_string())
             .env("HOME", home)
             .env("USERPROFILE", home)
