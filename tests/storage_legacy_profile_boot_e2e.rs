@@ -228,6 +228,23 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
                         dispatch,
                         owner_workspace,
                     );
+                    let approvals =
+                        openhuman_core::security::approval::store::list_pending(&config).unwrap();
+                    assert_eq!(
+                        approvals.len(),
+                        1,
+                        "approval owner did not read the v1 database record"
+                    );
+                    assert_eq!(approvals[0].request_id, "fixture-approval");
+                    let flows = openhuman_core::flows::ops::flows_list(&config)
+                        .await
+                        .unwrap();
+                    assert!(
+                        serde_json::to_string(&flows.value)
+                            .unwrap()
+                            .contains("fixture-flow"),
+                        "flow owner did not read the v1 database record: {flows:?}"
+                    );
                     let listed = thread_store.list_threads().unwrap();
                     assert_eq!(
                         listed.len(),
@@ -250,23 +267,6 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
                     );
                     assert_eq!(messages[0].id, "fixture-message");
                     assert_eq!(messages[0].content, "historical profile message");
-                    let approvals =
-                        openhuman_core::security::approval::store::list_pending(&config).unwrap();
-                    assert_eq!(
-                        approvals.len(),
-                        1,
-                        "approval owner did not read the v1 database record"
-                    );
-                    assert_eq!(approvals[0].request_id, "fixture-approval");
-                    let flows = openhuman_core::flows::ops::flows_list(&config)
-                        .await
-                        .unwrap();
-                    assert!(
-                        serde_json::to_string(&flows.value)
-                            .unwrap()
-                            .contains("fixture-flow"),
-                        "flow owner did not read the v1 database record: {flows:?}"
-                    );
                 },
             )
             .await;
