@@ -33,7 +33,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use tinyagents_session::DriverSessionStores;
-use tinyagents_session::port::TurnStates;
+use tinyagents_session::port::{SessionStoreProvider, TurnStates};
 use tinyagents_session::run_ledger::RunLedgerStore;
 use tinyagents_session::run_ledger::{ImportCounts, LegacyDatabaseReport, LegacySessionImport};
 use tinyagents_session::transcript::{
@@ -489,7 +489,7 @@ fn push_jsonl(out: &mut Vec<(String, PathBuf)>, path: PathBuf) {
 /// Imports the transcripts, each into the scope of the agent its stem names.
 /// Returns `(found, written, skipped)`.
 pub(crate) fn import_transcript_groups(
-    provider: &DriverSessionStores,
+    provider: &dyn SessionStoreProvider,
     workspace: &Path,
 ) -> Result<(usize, usize, usize)> {
     let raw = workspace.join("session_raw");
