@@ -21,26 +21,23 @@ owner models and writer transformations from `2d3e22636e^`:
   historical `local` scope; the profile directory itself supplied user
   isolation. `security/approval` writes a pending `approvals` record there;
   the boot owner converter must retain it as `approvals.requests`.
-- `threads/store` writes a legacy `threads_transcript_keys` record in that
-  scope; the boot owner converter must retain it as
-  `threads.transcript_keys`.
+- The thread owner records a transcript key and a committed thread/message in
+  the historical SQLite database. The fixture uses TSD's public v1 document
+  and stream writers, and the desktop owner APIs must read those records after
+  boot.
 - The TinyFlows catalog writes a `flows_definitions` record in the same
   per-profile database. Desktop boot must migrate it through the TinyFlows
   catalog owner and the public `flows_list` operation must return it.
 - `secrets` contains an encrypted `fixture-secret` document in the same scope
   using the fixture-only master key `[0x5a; 32]`; the integration test reads it
   with TinyStorage's `DocumentSecrets` API after desktop boot.
-- The generator also emits the retired workspace conversation log and its
-  `fixture-thread` message under `legacy-workspace/memory/conversations/`; the
-  host E2E copies them to the profile workspace and confirms the thread owner
-  imports both through its read-only legacy importer.
 
 The host E2E test copies this database to an existing profile's
 `users/u1/workspace/storage/storage.db`, boots the desktop host with layout
 auto-migration enabled, then restores the migration archive to a separate
-temporary directory and compares the archived database byte-for-byte with the
-fixture. It reads thread messages, approvals, secrets, and flows from the
-migrated profile through their owner APIs. The focused core import test
+temporary directory, verifies the archive includes the original storage path,
+and opens its database. It reads thread messages, approvals, secrets, and
+flows from the migrated profile through their owner APIs. The focused core import test
 continues to verify the owner schema conversions for cost, artifacts, and
 profile metadata, as well as non-resurrection after deletion.
 
@@ -51,4 +48,6 @@ or product dependency. Regenerate a fresh database at a caller-selected path:
 cargo run --locked --manifest-path crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/generator/Cargo.toml -- /absolute/path/to/storage.db
 ```
 
-Regenerate the fixture and verify its SHA-256 with `sha256sum` when updating it.
+The checked-in database SHA-256 is
+`1eef4893bc406f7bcc500c4c42fecc6a87a2e03bc496767b846deec93705fa81`.
+Regenerate and verify it with `sha256sum` when updating the fixture.
