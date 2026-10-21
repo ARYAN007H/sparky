@@ -509,7 +509,10 @@ fn queues(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Plan,
                     .cloned()
                     .and_then(|value| serde_json::from_value::<tinystoragedrivers::QueueSpec>(value).ok())
                     .ok_or(Denied::Malformed)?;
-                if spec != declaration.spec() {
+                let declared = declaration.spec();
+                if spec.max_attempts != declared.max_attempts
+                    || spec.dedupe_window_ms != declared.dedupe_window_ms
+                {
                     return Err(Denied::QueueSpec);
                 }
             }

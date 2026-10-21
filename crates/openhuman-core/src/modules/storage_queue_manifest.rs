@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use tinystoragedrivers::queue::{QueueSpec, validate_queue_name};
+use tinystoragedrivers_types::QueueSpec;
 
 /// A validated version-1 queue manifest supplied by the host.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,11 +67,13 @@ impl QueueManifest {
         }
         let mut names = BTreeMap::new();
         for queue in &self.queues {
-            validate_queue_name(&queue.name).map_err(|error| error.to_string())?;
+            validate_name(&queue.name)?;
             if queue.owner.as_ref().is_some_and(|owner| owner.trim().is_empty()) {
                 return Err(format!("queue {:?} owner must not be empty", queue.name));
             }
-            queue.spec().validate().map_err(|error| error.to_string())?;
+            if queue.max_attempts == 0 {
+                return Err(format!("queue {:?} must allow at least one attempt", queue.name));
+            }
             if queue.visibility_ms == Some(0) {
                 return Err(format!("queue {:?} visibility_ms must be positive", queue.name));
             }
@@ -91,6 +93,18 @@ impl QueueManifest {
     pub(crate) fn queues(&self) -> &[QueueDeclaration] {
         &self.queues
     }
+}
+
+fn validate_name(name: &str) -> Result<(), String> {
+    if name.is_empty()
+        || name.len() > 64
+        || !name
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._-".contains(&byte))
+    {
+        return Err(format!("invalid queue name {name:?}"));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
