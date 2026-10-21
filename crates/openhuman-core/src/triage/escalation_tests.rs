@@ -210,6 +210,115 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
 }
 
 #[tokio::test]
+async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_disclosure() {
+    use crate::core::bus::BUS;
+    use crate::security::egress::EgressDescriptor;
+    use std::time::Duration;
+
+    let _events_guard = test_events_guard().await;
+    crate::core::bus::init().await.expect("bus init");
+    let mut rx = BUS.get().expect("event bus").receiver();
+    let temp = tempfile::tempdir().expect("isolated triage workspace");
+    let workspace = temp.path().join("workspace");
+    let mut config = Config {
+        workspace_dir: workspace.clone(),
+        config_path: temp.path().join("config.toml"),
+        action_dir: temp.path().join("actions"),
+        ..Config::default()
+    };
+    let model_marker = "triage-direct-source-egress-marker";
+    config.default_model = Some(model_marker.to_string());
+
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let builds = Arc::new(Mutex::new(Vec::new()));
+    let extensions = crate::core::slots::Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &extensions,
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        triage_test_model(Arc::clone(&requests), Arc::clone(&builds), None),
+    );
+    let runtime = crate::core::runtime::CoreBuilder::new(crate::core::types::HostKind::Library)
+        .services(crate::core::runtime::ServiceSet::none())
+        .domains(crate::core::runtime::DomainSet::none())
+        .config(config.clone())
+        .extensions(extensions)
+        .build()
+        .await
+        .expect("isolated core runtime");
+    let ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(runtime.context()));
+    let definition = AgentDefinitionRegistry::builtins_only()
+        .get("trigger_reactor")
+        .expect("built-in trigger reactor exists")
+        .clone();
+    let source = crate::agent::tinyagents::TurnModelSource::new_crate_native(
+        &ctx,
+        "chat",
+        Arc::new(config.clone()),
+    );
+
+    runtime
+        .run_in(
+            Arc::clone(runtime.context()),
+            crate::security::turn_origin::with_origin(
+                crate::triage::local_trigger_origin(),
+                crate::inference::host_runtime::ops::agent_chat_for_with_turn_model_source(
+                    &mut config,
+                    crate::inference::host_runtime::ops::AgentChatTarget::Definition {
+                        definition: &definition,
+                        host: None,
+                        seed: None,
+                        usage: None,
+                        host_only: false,
+                        untrusted_input: false,
+                        shape: None,
+                        observer: None,
+                        attachments: &[],
+                    },
+                    "send this trigger reply",
+                    None,
+                    Some(definition.temperature),
+                    None,
+                    None,
+                    None,
+                    crate::inference::host_runtime::ops::AgentChatEnv::default(),
+                    Some((source, model_marker.to_string())),
+                ),
+            ),
+        )
+        .await
+        .expect("direct target turn should complete");
+
+    assert_eq!(requests.lock().unwrap().len(), 1, "the model turn ran");
+    let sentinel = "triage-direct-source-egress-sentinel";
+    BUS.publish(crate::core::events::DomainEvent::ExternalTransferPending {
+        descriptor: EgressDescriptor::network_fetch(sentinel),
+        thread_id: None,
+        client_id: None,
+        request_id: None,
+    });
+    let mut disclosures = 0;
+    loop {
+        match tokio::time::timeout(Duration::from_secs(3), rx.recv())
+            .await
+            .expect("event bus sentinel should arrive")
+        {
+            Some(crate::core::events::DomainEvent::ExternalTransferPending {
+                descriptor, ..
+            }) if descriptor.service == model_marker => disclosures += 1,
+            Some(crate::core::events::DomainEvent::ExternalTransferPending {
+                descriptor, ..
+            }) if descriptor.service == sentinel => break,
+            Some(_) => continue,
+            None => panic!("event bus closed before egress sentinel"),
+        }
+    }
+    assert_eq!(
+        disclosures, 1,
+        "one direct inference turn should disclose its model destination once"
+    );
+}
+
+#[tokio::test]
 async fn react_dispatch_falls_back_to_parent_model_when_hint_route_cannot_build() {
     let _events_guard = test_events_guard().await;
     let temp = tempfile::tempdir().expect("isolated triage workspace");
