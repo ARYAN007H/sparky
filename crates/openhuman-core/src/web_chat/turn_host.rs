@@ -31,6 +31,7 @@ use super::session::{
     checkin_session_agent, checkout_session_agent, normalize_model_override, CheckoutPolicy,
 };
 use super::surface::TurnIds;
+use super::types::WebChatTaskResult;
 use super::web_errors::{
     inference_budget_exceeded_user_message, is_inference_budget_exceeded_error,
 };
