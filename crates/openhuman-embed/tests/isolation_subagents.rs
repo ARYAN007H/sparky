@@ -251,7 +251,9 @@ fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers() {
                     body.get("messages")
                         .and_then(|messages| messages.as_array())
                         .map(|messages| messages.iter().map(|message| (
-                            message.get("role").and_then(serde_json::Value::as_str),
+                            message.get("role")
+                                .and_then(serde_json::Value::as_str)
+                                .map(str::to_owned),
                             message.get("content").map_or(0, |content| content.to_string().len()),
                         )).collect::<Vec<_>>())
                         .unwrap_or_default()
