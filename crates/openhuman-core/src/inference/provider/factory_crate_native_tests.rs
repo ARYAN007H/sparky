@@ -209,6 +209,38 @@ async fn one_shot_chat_models_preserve_factory_temperature_as_request_default() 
     );
 }
 
+#[tokio::test]
+async fn one_shot_cloud_sentinel_resolves_the_configured_byok_provider() {
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let _env = crate::config::TEST_ENV_LOCK.lock().await;
+    let tmp = tempfile::tempdir().expect("isolated workspace");
+    let mut config = config_with_providers_in_tempdir(
+        &tmp,
+        vec![openai_entry("p_openai", "openai")],
+    );
+    config.chat_provider = Some("openai:gpt-4o-mini".into());
+    store_byo_key(&config, "openai", "sk-fixture");
+    let library = crate::core::runtime::CoreContext::for_test_with_host_kind(
+        crate::core::types::HostKind::Library,
+        crate::core::runtime::DomainSet::full(),
+        Some(tmp.path().join("library")),
+    );
+
+    crate::core::runtime::CoreContext::scope(library, async {
+        for provider in ["cloud", ""] {
+            let (_, model) = create_chat_model_from_string_with_model_id(
+                "chat",
+                provider,
+                &config,
+                0.2,
+            )
+            .expect("sentinel resolves to the configured BYOK route");
+            assert_eq!(model, "gpt-4o-mini");
+        }
+    })
+    .await;
+}
+
 // ── Motion B (#4727): managed-backend crate-native routing ──────────────────
 // `create_chat_model` must route the managed OpenHuman backend through the
 // crate-native `TinyHumansModel`, whose profile advertises the capabilities

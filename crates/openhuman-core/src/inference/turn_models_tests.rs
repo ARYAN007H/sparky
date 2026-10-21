@@ -288,6 +288,85 @@ async fn explicit_provider_string_turn_source_uses_scoped_managed_model() {
 }
 
 #[tokio::test]
+async fn injected_turn_profile_is_authoritative_and_skips_unselected_routes() {
+    use crate::agent::host_overrides::HostOverrides;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    use crate::core::slots::Extensions;
+    use crate::core::types::HostKind;
+    use tinyinference_llm::model::ModelProfile;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct ProfiledModel {
+        profile: ModelProfile,
+    }
+    #[async_trait]
+    impl ChatModel<()> for ProfiledModel {
+        fn profile(&self) -> Option<&ModelProfile> {
+            Some(&self.profile)
+        }
+        async fn invoke(
+            &self,
+            _state: &(),
+            _request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            Ok(ModelResponse::assistant("injected"))
+        }
+    }
+
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let builds = Arc::new(AtomicUsize::new(0));
+    let count = Arc::clone(&builds);
+    let extensions = Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &extensions,
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        crate::inference::registry::ChatModelEntry {
+            build: Arc::new(move |_| {
+                count.fetch_add(1, Ordering::SeqCst);
+                Ok((Arc::new(NamedModel("unselected")), "unselected".into()))
+            }),
+            probe: None,
+            models: None,
+        },
+    );
+    let root = CoreContext::for_test_with_host_kind_and_extensions(
+        HostKind::Library,
+        DomainSet::full(),
+        None,
+        extensions,
+    );
+    let mut profile = ModelProfile::default();
+    profile.provider = Some("ollama:injected".into());
+    profile.tool_calling = true;
+    profile.modalities.image_in = true;
+    profile.max_input_tokens = Some(123_456);
+    let mut overrides = HostOverrides::default();
+    overrides.model = Some(Arc::new(ProfiledModel { profile }));
+    let context = root.derive_with(
+        ContextOverlay::new(
+            crate::config::Config {
+                chat_provider: Some("openhuman".into()),
+                ..Default::default()
+            },
+            DomainSet::full(),
+            Default::default(),
+        )
+        .host_overrides(Arc::new(overrides)),
+    );
+    let ctx = DispatchCtx::new(context);
+    let models = TurnModelSource::new_crate_native(&ctx, "chat", Arc::new(Default::default()))
+        .build("hint:chat", 0.2, None, None)
+        .expect("host injected model builds");
+
+    assert_eq!(models.provider_id(), "ollama:injected");
+    assert!(models.native_tools());
+    assert!(models.supports_vision());
+    assert!(models.is_local());
+    assert_eq!(models.context_window(), Some(123_456));
+    assert_eq!(builds.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
 async fn explicit_turn_context_without_provider_does_not_borrow_ambient_provider() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
