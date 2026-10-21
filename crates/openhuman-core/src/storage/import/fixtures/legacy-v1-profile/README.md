@@ -34,4 +34,5 @@ or product dependency. Regenerate a fresh database at a caller-selected path:
 cargo run --locked --manifest-path crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/generator/Cargo.toml -- /absolute/path/to/storage.db
 ```
 
-The checked-in database SHA-256 is recorded here after generation.
+The checked-in database SHA-256 is
+`df0d66c4763f7ab95b71242ebcb75479caf56b863e5893dea228124952c90a40`.
