@@ -61,7 +61,9 @@ impl InvocationStorageBinding {
         let host = connection
             .unique_name()
             .ok_or_else(|| anyhow::anyhow!("module runtime connection has no unique bus name"))?;
-        let serial = NEXT_INVOCATION.fetch_add(1, Ordering::Relaxed);
+        let serial = NEXT_INVOCATION
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next| next.checked_add(1))
+            .map_err(|_| anyhow::anyhow!("invocation storage address space is exhausted"))?;
         let object_root = ObjectPath::new(format!(
             "{}/call-{serial}",
             tinystoragedrivers_busproxy::INVOCATION_OBJECT_ROOT
