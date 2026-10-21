@@ -557,6 +557,8 @@ storage-s3 = ["tinystoragedrivers/s3"]
 # Always on (the dependency enables `file`); kept so existing feature lists
 # and the forwarding chain keep resolving.
 storage-file = ["tinystoragedrivers/file"]
+# Process keyring `secrets.enc` backend, separate from the storage driver.
+secret-file = ["tinystoragedrivers-secrets/file"]
 # THE CONTRIBUTOR SET — not the product set.
 #
 # This list is what a bare `cargo check`, `cargo test` and rust-analyzer
@@ -589,7 +591,7 @@ storage-file = ["tinystoragedrivers/file"]
 # costs no new native builds. It matches `scripts/ci/product-features.txt`. This
 # does NOT move the kernel floor: that profile is
 # `--no-default-features --features flows` and never reads this list.
-default = ["media", "skills", "flows", "mcp", "channels", "http-server", "scheduler-gate", "file-logging", "modules", "tinymemes", "inbound-queues"]
+default = ["media", "skills", "flows", "mcp", "channels", "http-server", "scheduler-gate", "file-logging", "modules", "tinymemes", "inbound-queues", "secret-file"]
 # The core's domain-owned HTTP surfaces (#5048): the `/v1` OpenAI-compatible
 # router (`inference::http`), the `openhuman text-input run` dev server, and the MCP
 # Streamable-HTTP transport (`mcp::server::http`, additionally gated by `mcp`).
