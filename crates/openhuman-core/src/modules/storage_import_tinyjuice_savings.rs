@@ -86,6 +86,10 @@ where
     F: FnOnce(SavingsAggregate) -> Fut,
     Fut: Future<Output = Result<bool>>,
 {
+    let marker = support::marker_id("savings", file);
+    if support::already_imported(scoped, MARKER_KIND, &marker).await? {
+        return Ok(Outcome::AlreadyDone);
+    }
     if std::fs::symlink_metadata(file).is_err() {
         return Ok(Outcome::NoSource);
     }
@@ -109,6 +113,7 @@ where
             false
         }
     };
+    support::mark_imported(scoped, MARKER_KIND, &marker).await?;
     log::debug!("{LOG_PREFIX} adopted={adopted}");
     Ok(Outcome::Imported { adopted })
 }

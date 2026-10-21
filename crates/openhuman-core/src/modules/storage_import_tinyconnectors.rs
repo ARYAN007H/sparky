@@ -104,6 +104,10 @@ struct Legacy {
 }
 
 async fn import_into(ctx: &DispatchCtx, scoped: &Storage, state_dir: &Path) -> Result<Outcome> {
+    let marker = support::marker_id("connectors", state_dir);
+    if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {
+        return Ok(Outcome::AlreadyDone);
+    }
     let docs = scoped.documents();
     let prefs_dir = state_dir.join(PREFS_DIR);
     let triggers_dir = state_dir.join(TRIGGERS_DIR);
@@ -139,6 +143,7 @@ async fn import_into(ctx: &DispatchCtx, scoped: &Storage, state_dir: &Path) -> R
         triggers += support::append_if_empty(scoped, &day.stream, day.records).await?;
     }
 
+    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
     tracing::info!(
         "{LOG_PREFIX} imported prefs={prefs} triggers={triggers} skipped={}",
         legacy.skipped

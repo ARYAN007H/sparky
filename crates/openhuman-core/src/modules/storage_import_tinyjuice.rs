@@ -107,6 +107,10 @@ async fn import_into(
     ttl: Option<Duration>,
     now: SystemTime,
 ) -> Result<Outcome> {
+    let marker = support::marker_id("ccr", root);
+    if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {
+        return Ok(Outcome::AlreadyDone);
+    }
     if !root.is_dir() {
         return Ok(Outcome::NoSource);
     }
@@ -156,6 +160,7 @@ async fn import_into(
         imported += 1;
     }
 
+    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
     tracing::info!("{LOG_PREFIX} imported={imported} expired={expired} skipped={skipped}");
     Ok(Outcome::Imported {
         imported,

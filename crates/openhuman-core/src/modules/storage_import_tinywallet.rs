@@ -73,6 +73,10 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, workspace_dir: &Path) -> Re
 }
 
 async fn import_into(ctx: &DispatchCtx, scoped: &Storage, workspace_dir: &Path) -> Result<Outcome> {
+    let marker = support::marker_id("x402", workspace_dir);
+    if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {
+        return Ok(Outcome::AlreadyDone);
+    }
     let ledger = workspace_dir.join(LEDGER_FILE);
     if !ledger.is_file() {
         return Ok(Outcome::NoSource);
@@ -89,6 +93,7 @@ async fn import_into(ctx: &DispatchCtx, scoped: &Storage, workspace_dir: &Path) 
     let payments = support::append_if_empty(scoped, PAYMENTS_STREAM, records)
         .await
         .map_err(|error| anyhow!("import the payments: {error:#}"))?;
+    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
     tracing::info!("{LOG_PREFIX} imported payments={payments} skipped={skipped}");
     Ok(Outcome::Imported { payments, skipped })
 }
