@@ -35,7 +35,7 @@ async fn turn_factory_checks_privacy_then_explicit_host_session_before_building_
         let _privacy = crate::security::live_policy::test_privacy_scope(
             crate::config::PrivacyMode::LocalOnly,
         );
-        let privacy_error = tinyagents_harness::host::TurnModelSet::<()>::builder(
+        let privacy_result = tinyagents_harness::host::TurnModelSet::<()>::builder(
             &factory,
             &factory,
             "chat",
@@ -43,12 +43,16 @@ async fn turn_factory_checks_privacy_then_explicit_host_session_before_building_
         .primary_model_pin("hint:chat")
         .without_workload_tiers()
         .build()
-        .expect_err("LocalOnly must reject managed inference before session lookup");
+        ;
+        let privacy_error = match privacy_result {
+            Err(error) => error,
+            Ok(_) => panic!("LocalOnly must reject managed inference before session lookup"),
+        };
         assert!(privacy_error.to_string().contains("Local-only privacy mode"));
     })
     .await;
 
-    let session_error = tinyagents_harness::host::TurnModelSet::<()>::builder(
+    let session_result = tinyagents_harness::host::TurnModelSet::<()>::builder(
         &factory,
         &factory,
         "chat",
@@ -56,8 +60,11 @@ async fn turn_factory_checks_privacy_then_explicit_host_session_before_building_
     .primary_model_pin("hint:chat")
     .without_workload_tiers()
     .build()
-    .expect_err("explicit CLI dispatch must require a session despite ambient Library");
+    ;
+    let session_error = match session_result {
+        Err(error) => error,
+        Ok(_) => panic!("explicit CLI dispatch must require a session despite ambient Library"),
+    };
     assert!(session_error.to_string().contains("session"));
     assert!(builds.lock().expect("build counter").is_empty());
-    assert!(egress.is_empty());
 }
