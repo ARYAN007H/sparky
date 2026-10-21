@@ -79,10 +79,8 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
     let scoped = backend
         .for_scope(&scope)
         .map_err(|error| anyhow!("open the module scope: {:?}", error.kind()))?;
-    let keys = crate::storage::secrets::keys()
-        .map_err(|error| anyhow!("no key provider for module secrets: {:?}", error.kind()))?;
     let secrets = scoped.secrets();
-    import_into(ctx, &scoped, &secrets, data_dir).await
+    import_into(ctx, &scoped, secrets.as_ref(), data_dir).await
 }
 
 async fn import_into(
