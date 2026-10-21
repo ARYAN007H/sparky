@@ -151,6 +151,10 @@ pub struct OpenHumanSecurityGate {
     /// The owning turn's dispatch context, read from the turn's run context
     /// when the gate is built; `None` falls back to the calling task's.
     dispatch: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
+    /// Only a root that owns settlement of its headless child tree may use
+    /// recursive delegation as orchestration control under the Cron policy.
+    /// The Cron origin check remains mandatory at authorization time.
+    headless_descendant_settlement: bool,
 }
 
 impl OpenHumanSecurityGate {
@@ -170,7 +174,14 @@ impl OpenHumanSecurityGate {
             screens_input: true,
             approval: ApprovalTurnContext::default(),
             dispatch: None,
+            headless_descendant_settlement: false,
         }
+    }
+
+    /// Marks the gate as part of a host-owned headless root turn.
+    pub(crate) fn with_headless_descendant_settlement(mut self, enabled: bool) -> Self {
+        self.headless_descendant_settlement = enabled;
+        self
     }
 
     /// Binds the owning turn's dispatch context.
@@ -529,7 +540,7 @@ impl OpenHumanSecurityGate {
         // actions. Keep cron agent turns within a read-only tool capability.
         // This check precedes the shell shortcut and all approval settings,
         // including installations where the approval gate is disabled.
-        if matches!(
+        let is_cron_turn = matches!(
             self.turn_origin(),
             Some(
                 crate::security::turn_origin::AgentTurnOrigin::TrustedAutomation {
@@ -537,10 +548,15 @@ impl OpenHumanSecurityGate {
                     ..
                 }
             )
-        ) && (call.tool_name == SHELL_TOOL
-            || tool.permission_level_with_args(&call.arguments) > PermissionLevel::ReadOnly
-            || tool.external_effect_with_args(&call.arguments))
-        {
+        );
+        let is_headless_spawn_control = self.headless_descendant_settlement
+            && call.tool_name == "spawn_subagent";
+        let is_cron_denial = is_cron_turn
+            && (call.tool_name == SHELL_TOOL
+                || tool.external_effect_with_args(&call.arguments)
+                || (tool.permission_level_with_args(&call.arguments) > PermissionLevel::ReadOnly
+                    && !is_headless_spawn_control));
+        if is_cron_denial {
             return Ok(GateDecision::deny(format!(
                 "{} Scheduled agent turns may use read-only tools only; '{}' needs a live user action.",
                 tinytools::status::POLICY_DENIED_MARKER,
