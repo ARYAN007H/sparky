@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 
-use crate::agent::harness::fork_context::ParentExecutionContext;
+use crate::agent::subagent_host::ParentExecutionContext;
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
 

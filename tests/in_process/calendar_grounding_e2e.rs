@@ -166,7 +166,7 @@ async fn test_subagent_has_current_date_context() -> Result<()> {
     let _ =
         openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
 
-    let parent = openhuman_core::agent::harness::ParentExecutionContext {
+    let parent = openhuman_core::agent::subagent_host::ParentExecutionContext {
         agent_definition_id: "orchestrator".into(),
         allowed_subagent_ids: ["summarizer".to_string()].into_iter().collect(),
         turn_model_source: openhuman_core::agent::tinyagents::TurnModelSource::from_model(model),

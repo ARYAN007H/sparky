@@ -581,7 +581,7 @@ impl tinyinference_llm::model::ChatModel<()> for TwoTurnModel {
 
 pub(super) fn core_backed_live_parent(
     workspace: &std::path::Path,
-    parent: crate::agent::harness::ParentExecutionContext,
+    parent: crate::agent::subagent_host::ParentExecutionContext,
     session_id: &str,
     thread_id: &str,
 ) -> (

@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use crate::agent::harness::fork_context::ParentExecutionContext;
+use crate::agent::subagent_host::ParentExecutionContext;
 use crate::agent::prompts::render_subagent_system_prompt_with_format;
 use crate::agent::prompts::{PromptContext, SubagentRenderOptions};
 use crate::agent::session_host::dedup_visible_tool_specs;

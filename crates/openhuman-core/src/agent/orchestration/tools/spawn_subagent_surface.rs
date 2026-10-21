@@ -328,7 +328,7 @@ impl SpawnSubagentTool {
         args: serde_json::Value,
         options: ToolCallOptions,
         tool_context: Option<&dyn ToolRunContext>,
-        parent: crate::agent::harness::ParentExecutionContext,
+        parent: crate::agent::subagent_host::ParentExecutionContext,
     ) -> anyhow::Result<ToolResult> {
         let live_parent = super::live_parent_run_context("direct-async-subagent", parent);
         let detached_parent =

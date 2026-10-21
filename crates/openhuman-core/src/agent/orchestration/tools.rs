@@ -19,7 +19,7 @@ mod tools_e2e_tests;
 #[cfg(test)]
 pub(crate) fn live_parent_run_context(
     kind: &str,
-    parent: crate::agent::harness::ParentExecutionContext,
+    parent: crate::agent::subagent_host::ParentExecutionContext,
 ) -> tinyagents_harness::context::RunContext<crate::agent::tinyagents::host::OpenHumanRunContext> {
     crate::agent::tinyagents::host::OpenHumanRunContext::new()
         .with_host_env(&parent.host_env)

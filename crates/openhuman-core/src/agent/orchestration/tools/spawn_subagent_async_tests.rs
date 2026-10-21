@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::harness::fork_context::ParentExecutionContext;
+use crate::agent::subagent_host::ParentExecutionContext;
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::config::AgentConfig;
 use std::collections::HashSet;

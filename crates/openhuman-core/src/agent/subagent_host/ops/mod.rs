@@ -44,7 +44,7 @@ pub(super) use super::tool_prep::filter_tool_indices;
 #[cfg(test)]
 pub(super) use super::types::{SubagentMode, SubagentRunError, SubagentRunOptions};
 #[cfg(test)]
-pub(super) use crate::agent::harness::fork_context::ParentExecutionContext;
+pub(super) use crate::agent::subagent_host::ParentExecutionContext;
 #[cfg(test)]
 pub(super) use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
 #[cfg(test)]
