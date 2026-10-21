@@ -17,6 +17,7 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::ops::Deref;
 
 use tinyinference_embeddings::EmbeddingModel;
 use tinyinference_llm::model::discover::DiscoveryRequest;
@@ -43,6 +44,14 @@ pub struct ProviderContext {
     pub egress: EgressLedger,
 }
 
+impl Deref for ProviderContext {
+    type Target = Config;
+
+    fn deref(&self) -> &Self::Target {
+        &self.config
+    }
+}
+
 impl ProviderContext {
     fn new(config: &Config, egress: &EgressLedger) -> Self {
         Self { config: config.clone(), egress: egress.clone() }
@@ -57,6 +66,14 @@ pub type ReadinessProbe = tinyinference_llm::providers::overrides::ReadinessProb
 
 /// Native provider metadata specialized to OpenHuman's host context.
 pub type ProviderModelHooks = tinyinference_llm::providers::overrides::ProviderModelMetadata<ProviderContext>;
+
+fn provider_overrides(extensions: Option<Extensions>) -> tinyinference_llm::providers::overrides::ProviderOverrides<ProviderContext> {
+    tinyinference_llm::providers::overrides::ProviderOverrides::new(
+        move |provider_id| CHAT_MODELS.get_for(extensions.as_ref(), provider_id),
+        |_| None,
+        |_| None,
+    )
+}
 
 /// A provider-neutral semantic category for a backend error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,7 +166,12 @@ pub fn unregister_chat_model(provider_id: &str) -> bool {
 
 /// The registered chat-model provider, if any.
 pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry> {
-    CHAT_MODELS.get(provider_id)
+    let overrides = tinyinference_llm::providers::overrides::ProviderOverrides::new(
+        |id| CHAT_MODELS.get(id),
+        |_| None,
+        |_| None,
+    );
+    overrides.chat_entry(provider_id)
 }
 
 /// The chat-model provider selected by an explicit context, falling back only
@@ -158,7 +180,7 @@ pub(crate) fn chat_model_for(
     extensions: Option<&Extensions>,
     provider_id: &str,
 ) -> Option<ChatModelEntry> {
-    CHAT_MODELS.get_for(extensions, provider_id)
+    provider_overrides(extensions.cloned()).chat_entry(provider_id)
 }
 
 /// The registered provider's model hooks, if it has any.
