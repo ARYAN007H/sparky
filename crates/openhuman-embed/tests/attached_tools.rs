@@ -318,14 +318,20 @@ fn attaching_before_first_turn_preserves_and_executes_native_tools() {
                 .mount(&provider).await;
             let runtime = Runtime::builder()
                 .config(offline_config()).workspace(Workspace::Ephemeral)
-                .backend_url(backend.uri()).build().await.unwrap();
+                .backend_url(backend.uri()).build().await.unwrap_or_else(|error| {
+                    eprintln!("attached_tools runtime build failed: {error:#}");
+                    panic!("runtime build failed");
+                });
             let agent = runtime.agent(AgentSpec::new("fresh-attached")
                 .provider(Provider::openai_compatible(format!("{}/v1",provider.uri()),"fixture").model("fixture"))
                 .definition(AgentDefinitionSpec::new().system_prompt("ORIGINAL_FRESH_HOST_PROMPT")
                     .tools(ToolScopeSpec::Wildcard))).unwrap();
             let attachment: HostTools = Arc::new(|_| HostTurnTools::advertised(vec![Box::new(Marker("hivemind_message"))]));
             agent.attach_tools("hivemind", attachment).unwrap();
-            agent.run("Run the native tool").await.unwrap();
+            agent.run("Run the native tool").await.unwrap_or_else(|error| {
+                eprintln!("attached_tools agent run failed: {error:#}");
+                panic!("agent run failed");
+            });
             let requests = chat_requests(&provider).await;
             assert_eq!(requests.len(), 2);
             let first: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
