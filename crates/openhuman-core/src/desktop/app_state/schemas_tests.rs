@@ -106,4 +106,59 @@ fn deserialize_update_local_state_params_with_null_clears_value() {
         serde_json::from_value(serde_json::Value::Object(m)).unwrap();
     assert_eq!(params.encryption_key, Some(None));
     assert!(matches!(params.onboarding_tasks, Some(None)));
+    assert_eq!(params.keyring_consent, Some(None));
+}
+
+#[test]
+fn update_local_state_patch_preserves_camel_case_tristate_and_nested_defaults() {
+    let missing: UpdateLocalStateParams = serde_json::from_value(serde_json::json!({})).unwrap();
+    assert_eq!(missing.encryption_key, None);
+    assert_eq!(missing.onboarding_tasks, None);
+    assert_eq!(missing.keyring_consent, None);
+
+    let params: UpdateLocalStateParams = serde_json::from_value(serde_json::json!({
+        "encryptionKey": "  keep whitespace  ",
+        "onboardingTasks": {
+            "accessibilityPermissionGranted": false,
+            "enabledTools": [],
+            "connectedSources": [],
+            "updatedAtMs": null,
+            "unknownNestedField": true
+        },
+        "keyringConsent": {
+            "storageMode": "",
+            "consentedAtMs": 17,
+            "unknownNestedField": true
+        },
+        "unknownOuterField": {"ignored": true},
+        "encryption_key": "snake_case_is_not_an_alias"
+    }))
+    .unwrap();
+
+    assert_eq!(
+        params.encryption_key.as_deref(),
+        Some(Some("  keep whitespace  "))
+    );
+    let tasks = params.onboarding_tasks.as_ref().unwrap().as_ref().unwrap();
+    assert!(!tasks.accessibility_permission_granted);
+    assert!(tasks.enabled_tools.is_empty());
+    assert!(tasks.connected_sources.is_empty());
+    assert_eq!(tasks.updated_at_ms, None);
+    let consent = params.keyring_consent.as_ref().unwrap().as_ref().unwrap();
+    assert_eq!(consent.storage_mode, "");
+    assert_eq!(consent.consented_at_ms, Some(17));
+}
+
+#[test]
+fn update_local_state_patch_rejects_wrong_nested_and_outer_types() {
+    for value in [
+        serde_json::json!({"encryptionKey": false}),
+        serde_json::json!({"onboardingTasks": []}),
+        serde_json::json!({"keyringConsent": {"consentedAtMs": "17"}}),
+    ] {
+        assert!(
+            serde_json::from_value::<UpdateLocalStateParams>(value).is_err(),
+            "malformed app_state patch types are rejected"
+        );
+    }
 }
