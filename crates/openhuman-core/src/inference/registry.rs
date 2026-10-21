@@ -14,22 +14,19 @@
 //! The tables know nothing about what a provider talks to. With nothing
 //! registered every consult point behaves exactly as before.
 
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::ops::Deref;
 
 use tinyinference_embeddings::EmbeddingModel;
-use tinyinference_llm::model::discover::DiscoveryRequest;
+use tinyinference_llm::providers::overrides::{
+    BoxFuture, CatalogEntry, CatalogLimits, CatalogRequest, ChatModelEntry, ChatModelFactory,
+    ChatModelRequest, EmbeddingFactory, EmbeddingRequest, ProviderModelMetadata,
+    ProviderOverrides, ReadinessProbe,
+};
 
 use crate::config::Config;
 use crate::core::slots::{Extensions, HookSlot};
-use crate::core::Outcome;
 use crate::security::approval::ApprovalChatContext;
 use crate::security::egress::EgressLedger;
-
-/// A boxed `Send` future.
-pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 
 // ---------------------------------------------------------------------------
 // Chat models
@@ -38,40 +35,52 @@ pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 /// Host state supplied to a native TinyInference provider callback.
 #[derive(Clone)]
 pub struct ProviderContext {
-    /// Configuration selected by the host for this call.
+    /// Configuration selected by the host for this provider call.
     pub config: Config,
-    /// Egress ledger selected by the host for this call.
+    /// Egress ledger selected by the host for this provider call.
     pub egress: EgressLedger,
+    /// Credential and disclosure data for an embedding factory call.
+    pub embedding: Option<EmbeddingCallContext>,
+    /// Request data and log sink for a catalog listing call.
+    pub catalog: Option<CatalogCallContext>,
 }
 
-impl Deref for ProviderContext {
-    type Target = Config;
+#[derive(Clone)]
+pub struct EmbeddingCallContext {
+    pub config: Option<Config>,
+    pub chat: Option<ApprovalChatContext>,
+    pub state_dir: std::path::PathBuf,
+    pub secrets_encrypt: bool,
+}
 
-    fn deref(&self) -> &Self::Target {
-        &self.config
-    }
+#[derive(Clone)]
+pub struct CatalogCallContext {
+    pub request: CatalogHostRequest,
+    pub logs: Arc<std::sync::Mutex<Vec<String>>>,
+}
+
+#[derive(Clone)]
+pub struct CatalogHostRequest {
+    pub provider_key: String,
+    pub client: reqwest::Client,
 }
 
 impl ProviderContext {
     fn new(config: &Config, egress: &EgressLedger) -> Self {
-        Self { config: config.clone(), egress: egress.clone() }
+        Self { config: config.clone(), egress: egress.clone(), embedding: None, catalog: None }
     }
 }
 
-/// Native TinyInference chat registration types used by the host.
-pub type ChatModelEntry = tinyinference_llm::providers::overrides::ChatModelEntry<ProviderContext>;
-pub type ChatModelFactory = tinyinference_llm::providers::overrides::ChatModelFactory<ProviderContext>;
-pub type ChatModelRequest<'a> = tinyinference_llm::providers::overrides::ChatModelRequest<'a, ProviderContext>;
-pub type ReadinessProbe = tinyinference_llm::providers::overrides::ReadinessProbe<ProviderContext>;
+pub use tinyinference_llm::providers::overrides::{
+    ChatModelEntry, ChatModelFactory, ChatModelRequest, EmbeddingFactory, EmbeddingRequest,
+    ProviderModelMetadata, ProviderOverrides, ReadinessProbe,
+};
 
-/// Native provider metadata specialized to OpenHuman's host context.
-pub type ProviderModelHooks = tinyinference_llm::providers::overrides::ProviderModelMetadata<ProviderContext>;
-
-pub(crate) fn provider_overrides(extensions: Option<Extensions>) -> tinyinference_llm::providers::overrides::ProviderOverrides<ProviderContext> {
-    tinyinference_llm::providers::overrides::ProviderOverrides::new(
+pub(crate) fn provider_overrides(extensions: Option<Extensions>) -> ProviderOverrides<ProviderContext> {
+    ProviderOverrides::new(
         move |provider_id| CHAT_MODELS.get_for(extensions.as_ref(), provider_id),
-        |_| None,
-        |_| None,
+        move |provider_id| EMBEDDINGS.get_for(extensions.as_ref(), provider_id),
+        move |provider_id| CATALOGS.get_for(extensions.as_ref(), provider_id),
     )
 }
 
@@ -142,10 +151,10 @@ pub fn classify_backend_error(
         .map(|classifier| classifier(provider, error))
 }
 
-static CHAT_MODELS: HookSlot<ChatModelEntry> = HookSlot::new("inference::chat_models");
+static CHAT_MODELS: HookSlot<ChatModelEntry<ProviderContext>> = HookSlot::new("inference::chat_models");
 
 /// Registers the chat-model provider `provider_id` for the whole process.
-pub fn register_chat_model(provider_id: impl Into<String>, entry: ChatModelEntry) {
+pub fn register_chat_model(provider_id: impl Into<String>, entry: ChatModelEntry<ProviderContext>) {
     CHAT_MODELS.register(provider_id, entry);
 }
 
@@ -165,7 +174,7 @@ pub fn unregister_chat_model(provider_id: &str) -> bool {
 }
 
 /// The registered chat-model provider, if any.
-pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry> {
+pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry<ProviderContext>> {
     let overrides = tinyinference_llm::providers::overrides::ProviderOverrides::new(
         |id| CHAT_MODELS.get(id), |_| None, |_| None,
     );
@@ -177,12 +186,12 @@ pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry> {
 pub(crate) fn chat_model_for(
     extensions: Option<&Extensions>,
     provider_id: &str,
-) -> Option<ChatModelEntry> {
+) -> Option<ChatModelEntry<ProviderContext>> {
     provider_overrides(extensions.cloned()).chat_entry(provider_id)
 }
 
 /// The registered provider's model hooks, if it has any.
-pub(crate) fn provider_model_hooks(provider_id: &str) -> Option<ProviderModelHooks> {
+pub(crate) fn provider_model_hooks(provider_id: &str) -> Option<ProviderModelMetadata<ProviderContext>> {
     chat_model(provider_id)?.models
 }
 
@@ -376,60 +385,16 @@ pub(crate) fn normalize_config(config: &mut Config) -> bool {
 // Embeddings
 // ---------------------------------------------------------------------------
 
-/// What a registered embedding factory is asked to build.
-pub struct EmbeddingRequest<'a> {
-    /// The configuration in force, when the caller has one (the credential-only
-    /// constructors do not).
-    pub config: Option<&'a Config>,
-    /// The embedding model id.
-    pub model: &'a str,
-    /// The vector dimensionality.
-    pub dimensions: usize,
-    /// The chat turn the call is made in, so disclosures reach that chat.
-    pub chat: Option<ApprovalChatContext>,
-    /// The directory the caller's credentials live in (the config's credential
-    /// scope, or the process default when the caller has no config).
-    pub state_dir: std::path::PathBuf,
-    /// Whether that credential store is encrypted at rest.
-    pub secrets_encrypt: bool,
-}
-
-/// Builds an embedding model.
-pub type EmbeddingFactory = Arc<
-    dyn for<'a> Fn(
-            &EmbeddingRequest<'a>,
-        ) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
-        + Send
-        + Sync,
->;
-
-static EMBEDDINGS: HookSlot<EmbeddingFactory> = HookSlot::new("inference::embeddings");
+static EMBEDDINGS: HookSlot<EmbeddingFactory<ProviderContext>> = HookSlot::new("inference::embeddings");
 
 /// Registers the embedding provider `provider_id` for the whole process.
-pub fn register_embedding<F>(provider_id: impl Into<String>, factory: F)
-where
-    F: for<'a> Fn(
-            &EmbeddingRequest<'a>,
-        ) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
-        + Send
-        + Sync
-        + 'static,
-{
-    EMBEDDINGS.register(provider_id, Arc::new(factory));
+pub fn register_embedding(provider_id: impl Into<String>, factory: EmbeddingFactory<ProviderContext>) {
+    EMBEDDINGS.register(provider_id, factory);
 }
 
-/// Registers the embedding provider `provider_id` for the context built from
-/// `extensions`.
-pub fn register_embedding_in<F>(extensions: &Extensions, provider_id: impl Into<String>, factory: F)
-where
-    F: for<'a> Fn(
-            &EmbeddingRequest<'a>,
-        ) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
-        + Send
-        + Sync
-        + 'static,
-{
-    EMBEDDINGS.register_in(extensions, provider_id, Arc::new(factory));
+/// Registers the embedding provider `provider_id` for the context built from `extensions`.
+pub fn register_embedding_in(extensions: &Extensions, provider_id: impl Into<String>, factory: EmbeddingFactory<ProviderContext>) {
+    EMBEDDINGS.register_in(extensions, provider_id, factory);
 }
 
 /// Removes the process-wide embedding provider `provider_id`.
@@ -446,45 +411,10 @@ pub(crate) fn embedding(provider_id: &str) -> Option<EmbeddingFactory> {
 // Model catalogs
 // ---------------------------------------------------------------------------
 
-/// What the core resolved for the `cloud_providers` entry a listing serves,
-/// handed to the catalog so it honours the same per-entry settings every
-/// other provider listing does.
-#[derive(Clone)]
-pub struct CatalogRequest {
-    /// The key stored for the entry's slug (empty when none): the credential
-    /// a catalog falls back to when there is no live session.
-    pub provider_key: String,
-    /// The HTTP client for the entry: the entry's CA bundle when it has one,
-    /// else the runtime proxy client, under the `providers.list_models`
-    /// service key.
-    pub client: reqwest::Client,
-}
-
-/// Lists a provider's models: the same envelope `list_configured_models`
-/// returns (`{ "models": [...] }`).
-pub type CatalogListing = Arc<
-    dyn Fn(Config, CatalogRequest) -> BoxFuture<Result<Outcome<serde_json::Value>, String>>
-        + Send
-        + Sync,
->;
-
-/// Where to ask for one model's limits: `(model, config)`; `None` when the
-/// provider has no listing for it.
-pub type CatalogLimits = Arc<dyn Fn(&str, &Config) -> Option<DiscoveryRequest> + Send + Sync>;
-
-/// A registered model catalog.
-#[derive(Clone)]
-pub struct CatalogEntry {
-    /// The `list_configured_models` listing.
-    pub list: CatalogListing,
-    /// The limits-discovery request, when the provider has one.
-    pub limits: Option<CatalogLimits>,
-}
-
-static CATALOGS: HookSlot<CatalogEntry> = HookSlot::new("inference::catalogs");
+static CATALOGS: HookSlot<CatalogEntry<ProviderContext>> = HookSlot::new("inference::catalogs");
 
 /// Registers the model catalog for `provider_id` for the whole process.
-pub fn register_catalog(provider_id: impl Into<String>, entry: CatalogEntry) {
+pub fn register_catalog(provider_id: impl Into<String>, entry: CatalogEntry<ProviderContext>) {
     CATALOGS.register(provider_id, entry);
 }
 
@@ -504,14 +434,14 @@ pub fn unregister_catalog(provider_id: &str) -> bool {
 }
 
 /// The registered catalog, if any.
-pub(crate) fn catalog(provider_id: &str) -> Option<CatalogEntry> {
+pub(crate) fn catalog(provider_id: &str) -> Option<CatalogEntry<ProviderContext>> {
     CATALOGS.get(provider_id)
 }
 
 pub(crate) fn catalog_for(
     extensions: Option<&Extensions>,
     provider_id: &str,
-) -> Option<CatalogEntry> {
+) -> Option<CatalogEntry<ProviderContext>> {
     CATALOGS.get_for(extensions, provider_id)
 }
 
