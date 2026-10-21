@@ -20,8 +20,8 @@ use tinystoragedrivers_types::{
 };
 
 use super::{
-    StorageError,
     fence::{FenceRegistry, LeaseFence},
+    StorageError,
 };
 
 fn check(fence: &LeaseFence, clock: &FenceRegistry) -> Result<()> {

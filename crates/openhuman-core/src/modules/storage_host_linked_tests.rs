@@ -6,8 +6,8 @@ use tinybus::transport::memory::MemoryBus;
 use tinybus::{BusName, Connection};
 use tinystoragedrivers::secrets::{DerivedKeys, KeyProvider};
 use tinystoragedrivers::{Scope, StorageError};
-use tinystoragedrivers_testkit::MemoryBackend as MemoryStorage;
 use tinystoragedrivers_bus::{SecretNameRequest, SecretValue, SetSecretRequest};
+use tinystoragedrivers_testkit::MemoryBackend as MemoryStorage;
 use zeroize::Zeroizing;
 
 use super::super::storage_grants::StorageGrant;

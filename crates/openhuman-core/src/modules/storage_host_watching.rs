@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
-use tinystoragedrivers_api::{DocumentStore, DocumentWatch, Storage, StorageBackend, async_trait};
+use tinystoragedrivers_api::{async_trait, DocumentStore, DocumentWatch, Storage, StorageBackend};
 use tinystoragedrivers_testkit::MemoryBackend;
 use tinystoragedrivers_types::{
     Capabilities, Capability, CollectionSpec, Filter, Page, Precondition, Query, Result, Scope,

@@ -15,6 +15,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tinystoragedrivers::{Scope, StorageBackend};
+use tinystoragedrivers_api::BlobStore;
+use tinystoragedrivers_types::{
+    is_reserved_blob_key, BlobListPage, Key, Result as StorageResult, StorageError,
+    MAX_BLOB_LIST_PAGE_ITEMS, SEALED_BLOB_PREFIX,
+};
 
 /// How often the sweeper wakes. Lapsed blobs are already invisible to readers,
 /// so this only bounds how long their bytes linger.
@@ -29,6 +34,118 @@ pub const FIRST_SWEEP_DELAY: Duration = Duration::from_secs(5 * 60);
 /// and the next tick. A timed-out scope counts as a failed sweep and is
 /// retried on the next tick.
 pub const SCOPE_SWEEP_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+
+/// Delete old user blobs after the caller confirms each key is unreferenced.
+///
+/// This is a maintenance primitive, not an automatic policy: the caller must
+/// arrange that blob writers and reference creation cannot race the check and
+/// delete (or use immutable keys). The age grace period must exceed the maximum
+/// time from writing a blob until its durable reference is visible. This
+/// function is deliberately not called by [`sweep_all`].
+///
+/// Only blobs with a known `written_at_ms` strictly less than `older_than_ms`
+/// are considered. Unknown ages and entries at the cutoff are retained. Pages
+/// are bounded and key ordered. An error stops the sweep; deletions from prior
+/// entries remain applied and the caller can retry after resolving the error.
+///
+/// # Errors
+/// Returns an error for an invalid or engine-owned prefix, invalid listing
+/// data, unsupported paging, a listing/deletion error, or a reference-check
+/// error.
+pub async fn sweep_unreferenced_blobs<F, Fut>(
+    blobs: &dyn BlobStore,
+    prefix: &str,
+    older_than_ms: u64,
+    mut is_referenced: F,
+) -> StorageResult<u64>
+where
+    F: FnMut(String) -> Fut,
+    Fut: std::future::Future<Output = StorageResult<bool>>,
+{
+    validate_orphan_sweep_prefix(prefix)?;
+    let mut after: Option<String> = None;
+    let mut removed = 0_u64;
+    loop {
+        let page = blobs
+            .list_page(prefix, after.as_deref(), MAX_BLOB_LIST_PAGE_ITEMS)
+            .await?;
+        validate_orphan_sweep_page(prefix, after.as_deref(), &page)?;
+        for entry in page.items {
+            if !orphan_age_is_eligible(entry.written_at_ms, older_than_ms)
+                || is_referenced(entry.meta.key.clone()).await?
+            {
+                continue;
+            }
+            if blobs.delete(&entry.meta.key).await? {
+                removed = removed.saturating_add(1);
+            }
+        }
+        let Some(next_after) = page.next_after else {
+            return Ok(removed);
+        };
+        after = Some(next_after);
+    }
+}
+
+fn orphan_age_is_eligible(written_at_ms: Option<u64>, older_than_ms: u64) -> bool {
+    written_at_ms.is_some_and(|written_at_ms| written_at_ms < older_than_ms)
+}
+
+fn validate_orphan_sweep_prefix(prefix: &str) -> StorageResult<()> {
+    let key = Key::new(prefix.to_owned())?;
+    if key.as_str().is_empty()
+        || SEALED_BLOB_PREFIX.starts_with(prefix)
+        || prefix.starts_with(SEALED_BLOB_PREFIX)
+        || prefix
+            .trim_end_matches('/')
+            .split('/')
+            .any(|segment| segment.is_empty() || segment == "." || segment == "..")
+    {
+        return Err(StorageError::invalid_input(
+            "orphan sweep requires a nonempty user blob prefix",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_orphan_sweep_page(
+    prefix: &str,
+    after: Option<&str>,
+    page: &BlobListPage,
+) -> StorageResult<()> {
+    if page.items.len() > MAX_BLOB_LIST_PAGE_ITEMS {
+        return Err(StorageError::backend(
+            "orphan sweep listing page exceeded its requested bound",
+        ));
+    }
+    let mut previous = after;
+    for entry in &page.items {
+        let key = entry.meta.key.as_str();
+        if !key.starts_with(prefix)
+            || Key::new(key.to_owned()).is_err()
+            || is_reserved_blob_key(key)
+            || previous.is_some_and(|previous| key <= previous)
+        {
+            return Err(StorageError::backend(
+                "orphan sweep listing returned an invalid key",
+            ));
+        }
+        previous = Some(key);
+    }
+    if let Some(cursor) = &page.next_after {
+        if page
+            .items
+            .last()
+            .is_none_or(|entry| entry.meta.key != *cursor)
+            || after.is_some_and(|after| cursor.as_str() <= after)
+        {
+            return Err(StorageError::backend(
+                "orphan sweep listing cursor did not advance",
+            ));
+        }
+    }
+    Ok(())
+}
 
 /// Reclaims the lapsed blobs of `scope`, returning how many went. A failure
 /// or a sweep past [`SCOPE_SWEEP_TIMEOUT`] is logged and counts as zero.
