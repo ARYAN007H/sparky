@@ -29,6 +29,24 @@ test('allows public facades and bus contracts', () => {
   assert.deepEqual(findOwnershipViolations(source, 'crates/openhuman-core/src/example_tests.rs'), []);
 });
 
+test('limits reasoned implementation exceptions to their named host test', () => {
+  const source = [
+    'use tinymemory_tools::lifecycle::turn::TurnPack;',
+    'use tinymemory_tools::lifecycle::window::Window;',
+  ].join('\n');
+
+  assert.deepEqual(
+    findOwnershipViolations(source, 'crates/openhuman-core/src/memory/lifecycle/adapter_tests.rs'),
+    [],
+  );
+  assert.deepEqual(
+    findOwnershipViolations(source, 'crates/openhuman-core/src/example_tests.rs').map(
+      ({ path }) => path,
+    ),
+    ['tinymemory_tools::lifecycle::turn::', 'tinymemory_tools::lifecycle::window::'],
+  );
+});
+
 test('rejects other known module implementation paths', () => {
   const source = [
     'use tinyinference_local::service::LocalAiService;',
