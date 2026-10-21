@@ -75,6 +75,8 @@ fn config(tmp: &tempfile::TempDir, agent_id: Option<&str>) -> Config {
         config_path: tmp.path().join("config.toml"),
         ..Config::default()
     };
+    config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
+    config.modules.allow_download = false;
     config.local_ai.runtime_enabled = false;
     config.memory.conversations.enabled = false;
     config.agent.session_dual_write = false;
@@ -90,6 +92,8 @@ fn config(tmp: &tempfile::TempDir, agent_id: Option<&str>) -> Config {
 
 #[tokio::test]
 async fn a_binding_no_agent_answers_is_refused_not_sent_to_the_orchestrator() {
+    let _storage = crate::channels::module_fixture::install_memory_storage();
+    crate::channels::module_fixture::client().await;
     let calls = Arc::new(AtomicUsize::new(0));
     let stub_calls = Arc::clone(&calls);
     let _bus = mock_agent_run_turn(move |_req: AgentTurnRequest| {
@@ -124,6 +128,10 @@ async fn a_binding_no_agent_answers_is_refused_not_sent_to_the_orchestrator() {
 
 #[tokio::test]
 async fn an_unbound_channel_still_runs_the_orchestrator() {
+    let _storage = crate::channels::module_fixture::install_memory_storage();
+    crate::channels::module_fixture::client().await;
+    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+        .unwrap();
     let calls = Arc::new(AtomicUsize::new(0));
     let stub_calls = Arc::clone(&calls);
     let _bus = mock_agent_run_turn(move |req: AgentTurnRequest| {
@@ -495,7 +503,7 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
         .expect("the test owns the runtime context")
         .message_timeout_secs = timeout;
 
-    let fixture_client = crate::channels::module_fixture::client().await;
+    let fixture_client = crate::channels::context::module_client(&ctx).await;
     let prepared: tinychannels_bus::module_inbound::PreparedChannelInbound = fixture_client
         .call_confidential(
             "tinychannels",
