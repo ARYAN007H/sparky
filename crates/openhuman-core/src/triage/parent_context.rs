@@ -19,18 +19,11 @@ const LOG_TARGET: &str = "agent_orchestration::parent_context";
 /// Build a root [`ParentExecutionContext`] from a config-built [`Agent`].
 ///
 /// Mirrors `triage::escalation::dispatch_target_agent` — the proven path for
-/// running sub-agents without an enclosing agent turn. The caller supplies the
-/// identity fields that distinguish one orchestration surface from another:
-///
-/// - `agent_definition_id` — labels the root parent (e.g. `"workflow_engine"`);
-///   surfaced in spawn metadata / logs.
-/// - `channel` — the logical channel the spawned work belongs to (e.g.
-///   `"workflow"`).
-/// - `session_prefix` — the `session_id` is `"{session_prefix}-{uuid}"`, keeping
-///   each surface's sessions namespaced and greppable.
-///
+/// running sub-agents without an enclosing agent turn. Triage supplies its
+/// identity fields (`"triage"` for the definition, channel, and session prefix),
+/// which labels the root parent in spawn metadata and namespaces its session.
 /// Every other field is inherited verbatim from the config-built agent, so the
-/// spawned children behave exactly like a normal sub-agent dispatch.
+/// spawned child behaves exactly like a normal sub-agent dispatch.
 pub(crate) async fn build_root_parent(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
@@ -41,7 +34,7 @@ pub(crate) async fn build_root_parent(
     // Sub-agent spawns resolve their definition through the global
     // agent-definition registry, so it MUST be initialised before any spawn.
     // The full runtime boot (`bootstrap_core_runtime`) does this, but these
-    // engines can also be reached from contexts that only built the HTTP router
+    // Triage can also be reached from contexts that only built the HTTP router
     // (e.g. the JSON-RPC e2e harness) — so init defensively here. `OnceLock`
     // makes this idempotent: a no-op when the registry is already loaded.
     if crate::agent_registry::host_definition::AgentDefinitionRegistry::global().is_none() {
