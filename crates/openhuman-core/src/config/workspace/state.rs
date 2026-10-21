@@ -68,10 +68,8 @@ impl WatcherStateStore {
             deleted: false,
         })?;
         let kv = Arc::clone(&self.kv);
-        crate::storage::block_on(async move {
-            kv.put(&key, value).await.map(|_| ())
-        })
-        .context("write watcher state")?;
+        crate::storage::block_on(async move { kv.put(&key, value).await.map(|_| ()) })
+            .context("write watcher state")?;
         Ok(())
     }
 

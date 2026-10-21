@@ -19,7 +19,10 @@ fn record_and_retrieve_mtime() {
 #[test]
 fn unknown_path_returns_none() {
     let store = open_store(backend());
-    assert_eq!(store.last_mtime(Path::new("/vault/missing.md")).unwrap(), None);
+    assert_eq!(
+        store.last_mtime(Path::new("/vault/missing.md")).unwrap(),
+        None
+    );
 }
 
 #[test]
