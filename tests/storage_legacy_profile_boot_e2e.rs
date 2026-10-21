@@ -109,7 +109,10 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     let home = tempfile::tempdir().unwrap();
     let (profile, source) = seed_existing_profile(home.path());
     let source_bytes = std::fs::read(&source).unwrap();
-    assert_eq!(source_bytes, FIXTURE, "profile seed must match the checked-in historical database");
+    assert_eq!(
+        source_bytes, FIXTURE,
+        "profile seed must match the checked-in historical database"
+    );
 
     let (_server, base) = start(home.path());
     let credential = rpc_with_params(
@@ -166,9 +169,10 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     let manifest = openhuman_core::storage::layout::archive::restore(&archive, restored.path())
         .expect("migration archive should verify and restore");
     assert!(
-        manifest.files.iter().any(|file| {
-            file.path == "workspace/storage/storage.db" && file.size > 0
-        }),
+        manifest
+            .files
+            .iter()
+            .any(|file| { file.path == "workspace/storage/storage.db" && file.size > 0 }),
         "archive manifest must record the historical storage.db: {:?}",
         manifest
             .files
@@ -177,11 +181,14 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
             .collect::<Vec<_>>()
     );
     let archived_db = restored.path().join("workspace/storage/storage.db");
-    assert!(archived_db.is_file(), "archive must contain the migrated historical database");
+    assert!(
+        archived_db.is_file(),
+        "archive must contain the migrated historical database"
+    );
     let archive_url = format!("sqlite:{}", archived_db.display());
-    openhuman_core::storage::block_on(async move {
-        openhuman_core::storage::open(&archive_url).await
-    })
+    openhuman_core::storage::block_on(
+        async move { openhuman_core::storage::open(&archive_url).await },
+    )
     .expect("archived historical database must remain readable");
 
     // The profile's V2 workspace resolves its default backend to the exact
