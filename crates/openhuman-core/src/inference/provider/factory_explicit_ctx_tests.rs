@@ -78,35 +78,19 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
         .await
         .expect("simple chat uses its explicit model entry");
         assert_eq!(simple_chat.value, "context-a-one-shot");
-        for (chat, _, _) in [
-            create_turn_chat_model_with_native_tools_and_route(
-                &dispatch,
-                "chat",
-                &config,
-                "hint:chat",
-                0.0,
-                true,
-                &crate::security::egress::EgressLedger::none(),
-            )
-            .expect("role-routed turn uses explicit model entry"),
-            create_turn_chat_model_from_string_with_native_tools_and_route(
-                &dispatch,
-                "chat",
-                "openhuman",
-                &config,
-                "hint:chat",
-                0.0,
-                true,
-                &crate::security::egress::EgressLedger::none(),
-            )
-            .expect("explicit managed turn uses explicit model entry"),
-        ] {
-            let response = chat
-                .invoke(&(), ModelRequest::new(vec![Message::user("probe")]))
-                .await
-                .expect("fixture response");
-            assert_eq!(response.text(), "context-a-one-shot");
-        }
+        let turn = crate::inference::turn_models::TurnModelSource::new_crate_native(
+            &dispatch,
+            "chat",
+            Arc::new(config.clone()),
+        )
+        .build("hint:chat", 0.0, None, None)
+        .expect("turn set uses explicit model entry");
+        let response = turn
+            .primary
+            .invoke(&(), ModelRequest::new(vec![Message::user("probe")]))
+            .await
+            .expect("fixture response");
+        assert_eq!(response.text(), "context-a-one-shot");
         probe_inference_readiness(&dispatch, "chat", &config)
             .await
             .expect("explicit model entry is ready");
@@ -244,38 +228,19 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
             let one_shot = create_chat_model_with_model_id_in(&dispatch, "chat", &config, 0.0)
                 .map(|(_, model)| model)
                 .unwrap_or_else(|error| format!("ERR: {error}"));
-            let role_turn = create_turn_chat_model_with_native_tools_and_route(
+            let turn = crate::inference::turn_models::TurnModelSource::new_crate_native(
                 &dispatch,
                 "chat",
-                &config,
-                "hint:chat",
-                0.0,
-                true,
-                &crate::security::egress::EgressLedger::none(),
+                Arc::new(config.clone()),
             )
+            .build("hint:chat", 0.0, None, None)
             .ok()
-            .map(|(model, _, _)| model);
-            let string_turn = create_turn_chat_model_from_string_with_native_tools_and_route(
-                &dispatch,
-                "chat",
-                "p_hosted:fixture/model-v1",
-                &config,
-                "hint:chat",
-                0.0,
-                true,
-                &crate::security::egress::EgressLedger::none(),
-            )
-            .ok()
-            .map(|(model, _, _)| model);
-            let role_turn = match role_turn {
+            .map(|models| models.primary);
+            let turn_response = match turn {
                 Some(model) => response(model).await,
-                None => "ERR: role turn construction failed".to_string(),
+                None => "ERR: turn set construction failed".to_string(),
             };
-            let string_turn = match string_turn {
-                Some(model) => response(model).await,
-                None => "ERR: explicit turn construction failed".to_string(),
-            };
-            (one_shot, role_turn, string_turn, request.endpoint)
+            (one_shot, turn_response, request.endpoint)
         })
         .await;
         outcomes.push(observed);
