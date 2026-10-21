@@ -30,7 +30,7 @@ notification ingest); those build a `TriggerEnvelope` and call in.
    `TriggerEvaluated` for every action. `drop`/`acknowledge` do no further
    work. `react`/`escalate` first pass `ApprovalGate::intercept_audited` with
    tool key `triage.react` / `triage.escalate`, then build a root
-   `ParentExecutionContext` (`orchestration::parent_context::build_root_parent`)
+   `ParentExecutionContext` (`parent_context::build_root_parent`)
    and run `trigger_reactor` or `orchestrator` as a direct one-shot agent turn
    under the triage context.
 4. Origin ([`origin.rs`](./origin.rs)): every caller scopes an `AgentTurnOrigin` around

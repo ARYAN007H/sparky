@@ -1,25 +1,9 @@
-//! Shared root [`ParentExecutionContext`] builder for controller-spawned
-//! orchestration tasks.
+//! Root [`ParentExecutionContext`] builder for triage escalation.
 //!
-//! Background host tasks that spawn real sub-agents have **no** enclosing agent
-//! turn on the stack, so there is no live parent execution context for the spawn
-//! to inherit — a naive spawn fails with `NoParentContext`.
-//!
-//! The fix (proven in `triage::escalation::dispatch_target_agent`) is to build a
-//! *root* [`ParentExecutionContext`] from a config-built [`Agent`] and hand it,
-//! explicitly, to the loop that spawns. Every `spawn_agent` call then names this
-//! root, inheriting a real provider, tool registry, memory, and model — the same
-//! construction path `agent_chat` uses.
-//!
-//! [`with_root_parent`] is the single blessed entry point that builds the root
-//! and passes it to the surface's closure, so a surface can neither hand-roll the
-//! parent nor forget to supply one. Every background orchestration surface goes
-//! through it.
-//!
-//! This was originally inlined in the workflow engine; #3374 PR4 lifted it here
-//! so each surface reuses the exact same construction (and the single
-//! registry-initialisation defense) rather than carrying a second copy of the
-//! ~20-field context literal that could drift.
+//! Triage escalation has no enclosing agent turn on the stack, so there is no
+//! live parent execution context for its sub-agent dispatch to inherit. This
+//! builds the root context from a config-built [`Agent`] using the same path as
+//! `agent_chat`, including a real provider, tool registry, memory, and model.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -35,18 +19,11 @@ const LOG_TARGET: &str = "agent_orchestration::parent_context";
 /// Build a root [`ParentExecutionContext`] from a config-built [`Agent`].
 ///
 /// Mirrors `triage::escalation::dispatch_target_agent` — the proven path for
-/// running sub-agents without an enclosing agent turn. The caller supplies the
-/// identity fields that distinguish one orchestration surface from another:
-///
-/// - `agent_definition_id` — labels the root parent (e.g. `"workflow_engine"`);
-///   surfaced in spawn metadata / logs.
-/// - `channel` — the logical channel the spawned work belongs to (e.g.
-///   `"workflow"`).
-/// - `session_prefix` — the `session_id` is `"{session_prefix}-{uuid}"`, keeping
-///   each surface's sessions namespaced and greppable.
-///
+/// running sub-agents without an enclosing agent turn. Triage supplies its
+/// identity fields (`"triage"` for the definition, channel, and session prefix),
+/// which labels the root parent in spawn metadata and namespaces its session.
 /// Every other field is inherited verbatim from the config-built agent, so the
-/// spawned children behave exactly like a normal sub-agent dispatch.
+/// spawned child behaves exactly like a normal sub-agent dispatch.
 pub(crate) async fn build_root_parent(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
@@ -56,8 +33,8 @@ pub(crate) async fn build_root_parent(
 ) -> Result<ParentExecutionContext> {
     // Sub-agent spawns resolve their definition through the global
     // agent-definition registry, so it MUST be initialised before any spawn.
-    // The full runtime boot (`bootstrap_core_runtime`) does this, but these
-    // engines can also be reached from contexts that only built the HTTP router
+    // The full runtime boot (`bootstrap_core_runtime`) does this, but triage can
+    // also be reached from contexts that only built the HTTP router
     // (e.g. the JSON-RPC e2e harness) — so init defensively here. `OnceLock`
     // makes this idempotent: a no-op when the registry is already loaded.
     if crate::agent_registry::host_definition::AgentDefinitionRegistry::global().is_none() {
@@ -119,49 +96,3 @@ pub(crate) async fn build_root_parent(
         host_env: agent.host_env().clone(),
     })
 }
-
-/// Build (or accept) the parent execution context for a **controller-spawned
-/// background orchestration surface** that has no enclosing agent turn (the
-/// cron jobs), then run
-/// `run(parent)` with it.
-///
-/// Folds [`build_root_parent`] and the hand-off into one call so a surface
-/// cannot supply a hand-rolled parent, and cannot *forget* to supply one and
-/// have every nested `spawn_subagent` die at runtime with
-/// [`SubagentRunError::NoParentContext`](crate::agent::subagent_host::SubagentRunError::NoParentContext).
-/// The parent is a value the closure receives and passes to the spawns it makes
-/// (the host sub-agent dispatch path); nothing reads it ambiently.
-///
-/// `parent_override` is the explicit injection point for a parent the caller
-/// already has (a test driving a surface under a mock parent, and thus a mock
-/// provider, hermetically): when `Some`, it is used unchanged and no root is
-/// built. Production surfaces pass `None` and a root is built from `config`.
-///
-/// Returns the closure's output on success, or the [`build_root_parent`] error
-/// when the root context can't be constructed — the caller decides how to
-/// degrade (fail the run, or fall back to an un-grounded path).
-pub(crate) async fn with_root_parent<F, Fut>(
-    ctx: &crate::core::runtime::DispatchCtx,
-    parent_override: Option<ParentExecutionContext>,
-    config: &Config,
-    agent_definition_id: &str,
-    channel: &str,
-    session_prefix: &str,
-    run: F,
-) -> Result<Fut::Output>
-where
-    F: FnOnce(ParentExecutionContext) -> Fut,
-    Fut: std::future::Future,
-{
-    let parent = match parent_override {
-        Some(parent) => parent,
-        None => {
-            build_root_parent(ctx, config, agent_definition_id, channel, session_prefix).await?
-        }
-    };
-    Ok(run(parent).await)
-}
-
-#[cfg(test)]
-#[path = "builder_tests.rs"]
-mod tests;
