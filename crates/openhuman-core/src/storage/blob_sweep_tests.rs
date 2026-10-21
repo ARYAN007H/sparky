@@ -1,7 +1,9 @@
 use super::*;
 use std::{ops::Range, sync::Arc, time::Duration};
-use tinystoragedrivers_api::{BlobStore, Storage, StorageBackend};
-use tinystoragedrivers_types::{Blob, BlobMeta, Capabilities, Capability, Result, Scope, StorageError};
+use tinystoragedrivers_api::{BlobReader, BlobStore, BlobStream, Storage, StorageBackend};
+use tinystoragedrivers_types::{
+    Blob, BlobMeta, Capabilities, Capability, Result, Scope, StorageError,
+};
 
 /// The TSD testkit memory engine uses its real clock; tests wait on the
 /// backend's observable expiry instead of mutating a process-global clock.
@@ -87,7 +89,7 @@ async fn sweeping_through_the_fenced_backend_reaches_the_driver() {
     let inner = backend_with_clock();
     let scope = Scope::local();
     put_expiring(&inner, &scope, "gone", 10).await;
-    now.store(2_000, Ordering::SeqCst);
+    wait_until_expired(&inner, &scope, "gone").await;
     let fenced: Arc<dyn StorageBackend> =
         Arc::new(super::super::fenced_backend::FencedBackend::new(
             inner,
@@ -166,32 +168,67 @@ async fn sweep_profiles_reaches_the_modules_scopes_for_that_profile() {
     );
 }
 
-/// A backend whose sweep never completes.
+/// A blob handle whose sweep never completes, backed by the real testkit
+/// engine for all other operations.
+#[derive(Debug)]
+struct HungBlobs(Arc<dyn BlobStore>);
+
+#[async_trait::async_trait]
+impl BlobStore for HungBlobs {
+    fn capabilities(&self) -> Capabilities {
+        self.0.capabilities()
+    }
+    fn max_key_len(&self) -> usize {
+        self.0.max_key_len()
+    }
+    async fn put(&self, key: &str, bytes: Vec<u8>, content_type: Option<&str>) -> Result<BlobMeta> {
+        self.0.put(key, bytes, content_type).await
+    }
+    async fn get(&self, key: &str) -> Result<Option<Blob>> {
+        self.0.get(key).await
+    }
+    async fn get_range(&self, key: &str, range: Range<u64>) -> Result<Option<Vec<u8>>> {
+        self.0.get_range(key, range).await
+    }
+    async fn head(&self, key: &str) -> Result<Option<BlobMeta>> {
+        self.0.head(key).await
+    }
+    async fn delete(&self, key: &str) -> Result<bool> {
+        self.0.delete(key).await
+    }
+    async fn list(&self, prefix: &str) -> Result<Vec<BlobMeta>> {
+        self.0.list(prefix).await
+    }
+    async fn sweep_expired(&self) -> Result<u64> {
+        std::future::pending().await
+    }
+}
+
+/// A backend that exposes real testkit handles except for a pending blob sweep.
 #[derive(Debug)]
 struct HungSweep(Arc<dyn StorageBackend>);
 
 #[async_trait::async_trait]
 impl StorageBackend for HungSweep {
-    fn driver(&self) -> &'static str {
-        self.0.driver()
-    }
-    fn capabilities(&self) -> tinystoragedrivers::Capabilities {
+    fn capabilities(&self) -> Capabilities {
         self.0.capabilities()
     }
-    fn for_scope(
-        &self,
-        scope: &Scope,
-    ) -> tinystoragedrivers::Result<tinystoragedrivers::ScopedStorage> {
-        self.0.for_scope(scope)
-    }
-    async fn sweep_expired_blobs(&self, _scope: &Scope) -> tinystoragedrivers::Result<u64> {
-        std::future::pending().await
+    fn for_scope(&self, scope: &Scope) -> Result<Storage> {
+        let storage = self.0.for_scope(scope)?;
+        Ok(Storage::new(
+            Arc::clone(storage.documents()),
+            Arc::clone(storage.streams()),
+            Arc::clone(storage.kv()),
+            Arc::new(HungBlobs(Arc::clone(storage.blobs()))),
+            Arc::clone(storage.queues()),
+            Arc::clone(storage.secrets()),
+        ))
     }
 }
 
 #[tokio::test(start_paused = true)]
 async fn a_hung_scope_sweep_times_out_and_counts_as_zero() {
-    let (_now, inner) = backend_with_clock();
+    let inner = backend_with_clock();
     let hung = HungSweep(inner);
     let removed = sweep_scope_within(&hung, &Scope::local(), Duration::from_secs(30)).await;
     assert_eq!(removed, 0);
