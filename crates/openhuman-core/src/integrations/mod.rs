@@ -13,9 +13,7 @@ pub mod composio;
 mod connected_identities;
 pub(crate) mod recorded_tools;
 pub mod task_sources;
-pub use connected_identities::{
-    render_connected_identities, render_connected_identities_async,
-};
+pub use connected_identities::{render_connected_identities, render_connected_identities_async};
 
 // Product prompt metadata shared by connector discovery and agent surfaces.
 pub use crate::agent::prompts::{

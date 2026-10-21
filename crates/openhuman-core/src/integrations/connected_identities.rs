@@ -25,9 +25,7 @@ pub fn render_connected_identities(ctx: &crate::core::runtime::DispatchCtx) -> S
 
 /// Render connected identities from an async caller without blocking a Tokio
 /// worker. Turn preparation should use this path while composing a new prompt.
-pub async fn render_connected_identities_async(
-    ctx: &crate::core::runtime::DispatchCtx,
-) -> String {
+pub async fn render_connected_identities_async(ctx: &crate::core::runtime::DispatchCtx) -> String {
     render_section(ctx).await
 }
 
