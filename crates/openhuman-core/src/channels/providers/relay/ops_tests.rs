@@ -154,6 +154,30 @@ struct RelayAgentResolver {
     thread_id: String,
 }
 
+struct ResolverInstallGuard {
+    installed: Arc<dyn HostAgentResolver>,
+    previous: Option<Arc<dyn HostAgentResolver>>,
+}
+
+impl ResolverInstallGuard {
+    fn new(installed: Arc<dyn HostAgentResolver>) -> Self {
+        let previous = host_agents::install(Arc::clone(&installed));
+        Self {
+            installed,
+            previous,
+        }
+    }
+}
+
+impl Drop for ResolverInstallGuard {
+    fn drop(&mut self) {
+        host_agents::clear_if(&self.installed);
+        if let Some(previous) = self.previous.take() {
+            host_agents::install(previous);
+        }
+    }
+}
+
 impl HostAgentResolver for RelayAgentResolver {
     fn resolve(&self, agent_id: &str) -> Option<HostAgent> {
         (agent_id == "relay-agent").then(|| {
@@ -258,7 +282,7 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
         seen: Arc::clone(&seen),
         thread_id: relayed_thread.clone(),
     });
-    host_agents::install(Arc::clone(&resolver));
+    let _resolver = ResolverInstallGuard::new(resolver);
     let workspace = config.workspace_dir.clone();
     let mut events = crate::web_chat::subscribe_web_channel_events();
 
@@ -283,7 +307,6 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
         );
     }
 
-    assert!(host_agents::clear_if(&resolver));
     assert_eq!(
         seen.turns.load(Ordering::SeqCst),
         2,
@@ -324,10 +347,27 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
         .map(|request| serde_json::from_slice(&request.body).unwrap())
         .collect();
     assert!(chats.len() >= 4, "{chats:#?}");
-    let serialized = serde_json::to_string(&chats[2..]).unwrap();
-    assert!(serialized.contains("first question"), "{serialized}");
-    assert!(serialized.contains("answer 1"), "{serialized}");
-    assert!(serialized.contains("second question"), "{serialized}");
+    assert_eq!(
+        chats.len(),
+        4,
+        "one tool call and one answer per turn: {chats:#?}"
+    );
+    let second_messages = chats[2]["messages"].as_array().expect("messages array");
+    let second_content: Vec<&str> = second_messages
+        .iter()
+        .filter_map(|message| message["content"].as_str())
+        .collect();
+    assert!(
+        second_content
+            .iter()
+            .any(|text| text.contains("first question"))
+    );
+    assert!(second_content.contains(&"answer 1"));
+    assert!(
+        second_content
+            .iter()
+            .any(|text| text.contains("second question"))
+    );
 
     let thread = params("m1", "x").thread_id();
     let messages =
@@ -403,13 +443,17 @@ async fn invalid_or_repeated_messages_start_no_turn() {
 
 #[tokio::test]
 async fn relay_preflight_failure_uses_trusted_channel_locale_without_running_agent() {
-    let agent_runs = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let observed_runs = Arc::clone(&agent_runs);
-    let _bus = mock_agent_run_turn(move |_request: AgentTurnRequest| {
-        observed_runs.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        async { Ok(AgentTurnResponse::new("unexpected answer")) }
-    })
-    .await;
+    struct CountingResolver(AtomicUsize);
+    impl HostAgentResolver for CountingResolver {
+        fn resolve(&self, _agent_id: &str) -> Option<HostAgent> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            None
+        }
+    }
+
+    let _slot = host_agents::tests::lock();
+    let resolver = Arc::new(CountingResolver(AtomicUsize::new(0)));
+    let resolver_guard = ResolverInstallGuard::new(resolver.clone());
 
     let tmp = tempfile::tempdir().unwrap();
     let mut config = config(&tmp);
@@ -433,7 +477,8 @@ async fn relay_preflight_failure_uses_trusted_channel_locale_without_running_age
     )
     .await;
 
-    assert_eq!(agent_runs.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert_eq!(resolver.0.load(Ordering::SeqCst), 0);
     assert_eq!(replies, vec!["Algo salió mal. Inténtalo de nuevo."]);
     assert!(!replies[0].contains("COMPONENT_DISABLED"));
+    drop(resolver_guard);
 }
