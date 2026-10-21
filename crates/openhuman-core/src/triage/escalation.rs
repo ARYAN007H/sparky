@@ -254,14 +254,16 @@ async fn dispatch_target_agent(
         .get(agent_id)
         .ok_or_else(|| anyhow!("agent definition `{agent_id}` not found in registry"))?;
 
-    let configured_model = config
-        .configured_agent_model(agent_id, !definition.subagents.is_empty())
-        .map(str::to_owned);
-    let model_override = configured_model.or_else(|| match &definition.model {
-        tinyagents_definition::ModelSpec::Hint(role) => Some(format!("hint:{role}")),
-        tinyagents_definition::ModelSpec::Exact(model) => Some(model.clone()),
-        tinyagents_definition::ModelSpec::Inherit => Some(parent_ctx.model_name.clone()),
-    });
+    let (turn_model_source, model) = crate::agent::subagent_host::resolve_subagent_source(
+        &definition.model,
+        &definition.id,
+        Some(&config),
+        parent_ctx.turn_model_source.clone(),
+        parent_ctx.model_name.clone(),
+        !definition.subagents.is_empty(),
+        None,
+        definition.temperature,
+    );
 
     // Synchronous child runs strip nested delegation tools regardless of the
     // target definition's allowlist. Keep that same authority boundary.
@@ -272,12 +274,12 @@ async fn dispatch_target_agent(
 
     tracing::debug!(
         agent_id = %agent_id,
-        model = ?model_override,
+        model = %model,
         tool_count = parent_ctx.all_tools.len(),
         "[triage::escalation] dispatching direct agent turn"
     );
 
-    let outcome = crate::inference::host_runtime::ops::agent_chat_for(
+    let outcome = crate::inference::host_runtime::ops::agent_chat_for_with_turn_model_source(
         &mut config,
         crate::inference::host_runtime::ops::AgentChatTarget::Definition {
             definition: &direct_definition,
@@ -291,7 +293,7 @@ async fn dispatch_target_agent(
             attachments: &[],
         },
         prompt,
-        model_override,
+        None,
         Some(direct_definition.temperature),
         None,
         None,
@@ -300,6 +302,7 @@ async fn dispatch_target_agent(
             host: parent_ctx.host_env.clone(),
             ..Default::default()
         },
+        Some((turn_model_source, model)),
     )
     .await
     .map_err(|e| anyhow!("agent_chat_for({agent_id}) failed: {e}"))?;
