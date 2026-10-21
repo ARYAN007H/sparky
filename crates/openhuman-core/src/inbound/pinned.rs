@@ -17,6 +17,14 @@
 //! | still running at the budget | accepted; the run finishes in its task and stores its result either way |
 //! | the turn already finished | accepted without running again |
 //!
+//! Each event's text is screened first with the prompt-injection guard
+//! `inference.agent_chat` applies ([`screen`]): a blocked event is left out of
+//! the prompt and listed on the result as `blocked` (`{event_id, reason}`), so
+//! one injected event never fails or holds back its batch. A batch with every
+//! event blocked completes with empty text without calling the model. The
+//! whole-message guard still runs on the rendered prompt; should it fire,
+//! the turn fails and is retried like any other failure.
+//!
 //! A turn left `running` by a process that stopped mid-run is run again at the
 //! next start ([`Pinned::resume`]) from the message it stored. One process
 //! never runs one turn twice at once (a redelivery racing a resume).
@@ -288,7 +296,8 @@ impl Pinned {
             event_ids,
             &message,
             now_ms(),
-        );
+        )
+        .with_blocked(blocked);
         let stored = match self.results.start(&fresh) {
             Ok(stored) => stored,
             Err(error) => return Delivered::Failed(format!("results unavailable: {error:#}")),
@@ -344,11 +353,17 @@ impl Pinned {
                 agent_id: result.agent_id.clone(),
                 message: stored.message.clone(),
             };
-            let text = this
-                .agent
-                .run(&task_ctx, &run)
-                .await
-                .map_err(|error| format!("{error:#}"))?;
+            let text = if run.message.is_empty() {
+                // Every event was kept out of the prompt: complete empty,
+                // without calling the model.
+                tracing::info!(turn = %run.turn_id, "[inbound] every event blocked; completing without the agent");
+                String::new()
+            } else {
+                this.agent
+                    .run(&task_ctx, &run)
+                    .await
+                    .map_err(|error| format!("{error:#}"))?
+            };
             this.results
                 .finish(&run.turn_id, Ok(text), now_ms())
                 .map_err(|error| format!("result not stored: {error:#}"))?;
