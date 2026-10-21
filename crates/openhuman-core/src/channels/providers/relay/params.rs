@@ -4,9 +4,9 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use tinychannels_bus::ChannelMessage;
 #[cfg(test)]
 use tinychannels_runtime::channel::derive_inbound_thread_id;
-use tinychannels_bus::ChannelMessage;
 
 /// Longest channel name: `telegram`, `imessage`, `discord`, ...
 pub const MAX_CHANNEL_LEN: usize = 32;

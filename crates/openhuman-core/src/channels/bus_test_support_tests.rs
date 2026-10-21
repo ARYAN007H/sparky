@@ -1,9 +1,9 @@
 //! Debug-build seams for raw integration coverage of channel inbound helpers.
 
-use tinychannels_runtime::channel::derive_inbound_thread_id;
 use tinychannels::delivery::progressive::{
-    extract_message_id, latest_thinking_snippet, StreamingState,
+    StreamingState, extract_message_id, latest_thinking_snippet,
 };
+use tinychannels_runtime::channel::derive_inbound_thread_id;
 
 pub fn extract_message_id_for_test(resp: &serde_json::Value) -> Option<String> {
     extract_message_id(resp)
