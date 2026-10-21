@@ -13,7 +13,9 @@ use tinyinference_embeddings::verify::{
     effective_embedder_slug, verify_custom_endpoint, VerifyRejection,
 };
 
-fn probe_rejection_outcome(reject: tinyinference_embeddings::probe::EmbeddingProbeRejection) -> Outcome<serde_json::Value> {
+fn probe_rejection_outcome(
+    reject: tinyinference_embeddings::probe::EmbeddingProbeRejection,
+) -> Outcome<serde_json::Value> {
     let mut body = serde_json::json!({ "error": reject.error, "message": reject.message });
     if let Some(detail) = reject.detail {
         body["detail"] = serde_json::Value::String(detail);
@@ -21,7 +23,9 @@ fn probe_rejection_outcome(reject: tinyinference_embeddings::probe::EmbeddingPro
     Outcome::new(body, vec![reject.summary.to_string()])
 }
 
-fn model_rejection_outcome(reject: tinyinference_embeddings::served_models::ModelNotServed) -> Outcome<serde_json::Value> {
+fn model_rejection_outcome(
+    reject: tinyinference_embeddings::served_models::ModelNotServed,
+) -> Outcome<serde_json::Value> {
     let mut body = serde_json::json!({
         "error": reject.error,
         "message": reject.message,

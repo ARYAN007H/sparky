@@ -5,7 +5,7 @@ use crate::core::Outcome;
 
 use super::{resolve_api_key, LOG_PREFIX};
 use crate::inference::embedding_host::factory::{
-    credential_resolver, managed_factory, settings, create_embedding_provider_with_config,
+    create_embedding_provider_with_config, credential_resolver, managed_factory, settings,
 };
 use tinyinference_embeddings::verify::test_embedding_connection;
 use tinyinference_providers::route::split_custom_provider;

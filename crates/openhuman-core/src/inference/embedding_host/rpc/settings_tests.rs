@@ -170,11 +170,11 @@ async fn custom_verification_keeps_model_guidance_and_rejects_the_save() {
 
     assert_eq!(outcome.value["error"], "EMBEDDINGS_NO_MODEL_LOADED");
     assert_eq!(outcome.value["requested_model"], "bge-m3");
+    assert_eq!(outcome.value["suggested_model"], "text-embedding-bge-m3");
     assert_eq!(
-        outcome.value["suggested_model"],
-        "text-embedding-bge-m3"
+        persisted.memory.embedding_provider,
+        "custom:http://127.0.0.1:1/v1"
     );
-    assert_eq!(persisted.memory.embedding_provider, "custom:http://127.0.0.1:1/v1");
     assert_eq!(persisted.memory.embedding_dimensions, 4);
     server.abort();
 }
@@ -186,20 +186,39 @@ async fn settings_reports_native_effective_embedder_resolution() {
     config.config_path = tmp.path().join("config.toml");
 
     config.embeddings_provider = Some("none".to_string());
-    assert_eq!(get_settings(&config).await.unwrap().value["effective_provider"], "none");
+    assert_eq!(
+        get_settings(&config).await.unwrap().value["effective_provider"],
+        "none"
+    );
 
     config.embeddings_provider = Some("ollama:nomic-embed-text".to_string());
     config.memory.embedding_provider = "openai".to_string();
-    assert_eq!(get_settings(&config).await.unwrap().value["effective_provider"], "ollama");
+    assert_eq!(
+        get_settings(&config).await.unwrap().value["effective_provider"],
+        "ollama"
+    );
 
     config.embeddings_provider = Some("openhuman".to_string());
     config.memory.embedding_provider = "custom:https://example.test/v1".to_string();
-    assert_eq!(get_settings(&config).await.unwrap().value["effective_provider"], "custom");
+    assert_eq!(
+        get_settings(&config).await.unwrap().value["effective_provider"],
+        "custom"
+    );
 
     config.memory.embedding_provider = "managed".to_string();
-    tokio::fs::write(tmp.path().join("auth-profiles.json"), "{}").await.unwrap();
-    assert_eq!(get_settings(&config).await.unwrap().value["effective_provider"], "cloud");
+    tokio::fs::write(tmp.path().join("auth-profiles.json"), "{}")
+        .await
+        .unwrap();
+    assert_eq!(
+        get_settings(&config).await.unwrap().value["effective_provider"],
+        "cloud"
+    );
 
-    tokio::fs::remove_file(tmp.path().join("auth-profiles.json")).await.unwrap();
-    assert_eq!(get_settings(&config).await.unwrap().value["effective_provider"], "unconfigured");
+    tokio::fs::remove_file(tmp.path().join("auth-profiles.json"))
+        .await
+        .unwrap();
+    assert_eq!(
+        get_settings(&config).await.unwrap().value["effective_provider"],
+        "unconfigured"
+    );
 }
