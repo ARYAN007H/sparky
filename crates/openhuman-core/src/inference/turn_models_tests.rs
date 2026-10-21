@@ -6,8 +6,6 @@ use tinyagents_harness::host::{ModelResolveRequest, ModelResolver};
 use tinyinference_llm::message::ContentBlock;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 
-
-
 use super::TurnModels;
 use crate::agent::tinyagents::TurnModelSource;
 use tinyagents_harness::host::PrebuiltModelResolver as TurnModelResolver;
@@ -118,9 +116,6 @@ async fn explicit_turn_context_uses_its_model_and_capabilities_over_ambient_cont
     })
     .await;
 }
-
-
-
 
 #[tokio::test]
 async fn explicit_turn_context_without_provider_does_not_borrow_ambient_provider() {
