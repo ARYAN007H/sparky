@@ -62,11 +62,39 @@ fn put_get_list_delete_round_trip() {
 
 #[test]
 fn scopes_do_not_see_each_others_state() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
+    let backend: std::sync::Arc<dyn StorageBackend> =
+        std::sync::Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
     let alice = StateKv::on_backend(&backend, &Scope::new("alice").unwrap(), "test_owner", "state").unwrap();
     let bob = StateKv::on_backend(&backend, &Scope::new("bob").unwrap(), "test_owner", "state").unwrap();
     alice.put("x", &1u32).unwrap();
     assert!(bob.get::<u32>("x").unwrap().is_none());
+}
+
+#[test]
+fn opaque_keys_and_json_values_round_trip_without_human_memory_sanitization() {
+    let backend: std::sync::Arc<dyn StorageBackend> =
+        std::sync::Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
+    let scope = Scope::local();
+    let state = StateKv::on_backend(&backend, &scope, "persona", "cursor").unwrap();
+    let other = StateKv::on_backend(&backend, &scope, "persona", "other").unwrap();
+    let key = "/Users/alice@example.com/skills/private-token:sk_live_abcd";
+    let value = serde_json::json!({
+        "path": key,
+        "api_key": "sk_live_abcd",
+        "null": null,
+        "number": 1.25
+    });
+
+    state.put(key, &value).unwrap();
+
+    assert_eq!(state.get::<Value>(key).unwrap(), Some(value.clone()));
+    assert_eq!(
+        state.list::<Value>("/Users/alice@example.com/").unwrap(),
+        vec![(key.to_owned(), value)]
+    );
+    assert!(other.get::<Value>(key).unwrap().is_none());
+    assert!(state.delete(key).unwrap());
+    assert!(state.get::<Value>(key).unwrap().is_none());
 }
 
 #[test]
