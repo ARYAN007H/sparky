@@ -188,9 +188,13 @@ unique among live processes.
 | `DocumentLeases` | a thin adapter over tinystoragedrivers' `Leases` (`tsd.leases`, owner `profiles`, scope `cluster`); the record, CAS loop, epoch rules and fence are tsd's | clustered nodes on a driver with cross-process CAS |
 | `LocalLeases` | an exclusive `fs2` flock on `<root>/<sha256(key) hex>/.lease`, record in `.lease.json` beside it; no expiry, the OS drops the lock when the process dies | hosts without a backend |
 
-The move from the v1 `leases` collection runs once per cluster scope
-(`profiles::storage_schema::migrate_legacy_leases`) and is a stop-the-world
-cutover like the rest of schema v2: every node must run this version.
+The v1 `leases` conversion is retained as a typed transform in
+`profiles::storage_schema::upgrade_lease_records`. A host legacy-importer must
+read the old profile lease records and import the transformed records into the
+`openhuman.leases` collection in `cluster` scope before clustered profile
+serving relies on them. The v2 boot path does not scan or mutate legacy
+collections; until the host importer performs that cutover, old lease rows
+remain untouched and are not visible to `DocumentLeases`.
 
 Keys are 1 to 200 bytes of ASCII letters, digits and `- _ . @`, not starting
 with `.`, so they are safe as directory names and document ids. The scope

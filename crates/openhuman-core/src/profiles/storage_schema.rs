@@ -114,7 +114,7 @@ pub(crate) fn upgrade_lease_records(
                     body.insert("released".into(), true.into());
                 }
                 Ok(TargetRecord::new(
-                    "host.leases",
+                    "openhuman.leases",
                     key_of(&record.id)?,
                     Value::Object(body),
                 ))
