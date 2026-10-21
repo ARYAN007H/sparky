@@ -233,6 +233,9 @@ impl ChannelVoiceHost {
         let channel = request.scope.configured_instance.as_str();
         let voice_cfg = &self.config.channel_voice;
         check_outbound_length(voice_cfg, channel, &request.text)?;
+        crate::modules::ops::ensure_loaded(&self.config, "tinyvoice")
+            .await
+            .map_err(anyhow::Error::msg)?;
         let request_id = uuid::Uuid::new_v4();
         let started = Instant::now();
         let voice = request

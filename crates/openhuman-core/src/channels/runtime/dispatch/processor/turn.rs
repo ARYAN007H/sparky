@@ -22,6 +22,24 @@ use super::super::host_agent::{self, HostRoute};
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 use super::RuntimeChannelMessage;
 
+fn inbound_console_preview(
+    envelope: &tinychannels_bus::ChannelInboundEnvelope,
+    text: &str,
+) -> String {
+    let contains_audio = envelope.parts.iter().any(|part| {
+        matches!(
+            part,
+            tinychannels_bus::ContentPart::VoiceNote { .. }
+                | tinychannels_bus::ContentPart::Audio { .. }
+        )
+    });
+    if contains_audio {
+        "[voice message]".to_owned()
+    } else {
+        truncate_with_ellipsis(text, 80)
+    }
+}
+
 pub(crate) async fn process_channel_runtime_message(
     ctx: Arc<ChannelRuntimeContext>,
     runtime_msg: RuntimeChannelMessage,
@@ -106,7 +124,7 @@ pub(crate) async fn process_channel_runtime_message(
         "  💬 [{}] from {}: {}",
         msg.channel,
         msg.sender,
-        truncate_with_ellipsis(&msg.content, 80)
+        inbound_console_preview(&envelope, &msg.content)
     );
 
     BUS.publish(DomainEvent::ChannelMessageReceived {
@@ -618,3 +636,7 @@ pub(crate) async fn process_channel_runtime_message(
         workspace_dir: ctx.workspace_dir.as_ref().clone(),
     });
 }
+
+#[cfg(test)]
+#[path = "turn_tests.rs"]
+mod tests;
