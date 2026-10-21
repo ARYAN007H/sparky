@@ -12,7 +12,6 @@ use std::sync::{
     Arc,
 };
 use std::time::Duration;
-use tinystoragedrivers_api::StorageBackend as _;
 use tinystoragedrivers_types::{CollectionSpec, NewMessage, Precondition, QueueSpec, Scope};
 
 const TTL: Duration = Duration::from_secs(30);

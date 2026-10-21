@@ -15,8 +15,6 @@ pub(crate) fn memory_locator() -> Arc<dyn TranscriptLocator> {
 /// agent IDs share this fixture's isolated scope so legacy transcript grouping
 /// can be exercised without weakening production scope selection.
 pub(crate) fn memory_session_provider() -> Arc<dyn SessionStoreProvider> {
-    use tinystoragedrivers_api::StorageBackend as _;
-
     let backend = crate::storage::test_support::memory_backend();
     let factory: AgentStorageFactory = Arc::new(move |_| {
         let scope = tinystoragedrivers_types::Scope::new("transcript-fixture")

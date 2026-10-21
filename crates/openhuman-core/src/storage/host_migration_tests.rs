@@ -5,7 +5,7 @@
 //! source readers or prove a migration; it only relied on the retired global
 //! schema registry.
 
-use super::{StorageBackend, boot::prepare_and_migrate, schema::owner_collections};
+use super::{boot::prepare_and_migrate, schema::owner_collections};
 use crate::storage::{DocumentStoreExt, Scope};
 
 #[tokio::test]

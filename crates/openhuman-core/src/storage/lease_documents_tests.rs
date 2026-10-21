@@ -6,7 +6,6 @@ use std::time::Duration;
 
 use crate::storage::test_support::SqliteBackend;
 use crate::storage::test_support::memory_backend;
-use crate::storage::lease::LeaseStore as _;
 use tinystoragedrivers_types::{CollectionSpec, Precondition, Scope};
 
 const TTL: Duration = Duration::from_millis(1_000);

@@ -533,7 +533,6 @@ fn records_the_previous_release_wrote_as_documents_are_imported_and_win_over_leg
     let source = devices();
     let db = dir.path().join(source.db);
     {
-        use tinystoragedrivers::StorageBackend as _;
         let url = format!("sqlite:{}", db.display());
         let storage =
             crate::storage::block_on(async move { crate::storage::open(&url).await }).unwrap();

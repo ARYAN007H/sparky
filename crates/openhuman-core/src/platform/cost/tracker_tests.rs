@@ -573,7 +573,7 @@ fn empty_ledger_sums_are_not_negative_zero() {
 
 #[test]
 fn the_ledger_dispatches_to_documents_when_a_backend_is_pinned() {
-    use crate::storage::{Scope, StorageBackend};
+    use crate::storage::Scope;
     let storage = crate::storage::test_support::memory_backend();
     let docs_for = |scope: &str| {
         super::super::tracker_documents::CostDocs::over(

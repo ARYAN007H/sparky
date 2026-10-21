@@ -1,6 +1,5 @@
 use super::*;
 use crate::storage::test_support::{memory_backend, sqlite_backend};
-use crate::storage::StorageBackend;
 use tinystoragedrivers_types::{CollectionSpec, Precondition, Scope};
 
 fn meta(id: &str, created_at: u64) -> ProfileMeta {

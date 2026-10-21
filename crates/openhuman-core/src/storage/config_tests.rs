@@ -90,9 +90,6 @@ async fn the_default_url_opens_in_directory_mode() {
     )
     .await
     .unwrap();
-    drop(docs);
-    drop(scoped);
-    drop(backend);
     // Directory mode: the directory holds the database file.
     assert!(dir.path().join(DEFAULT_DIR).exists());
     let reopened = crate::storage::open(&url).await.unwrap();
@@ -190,9 +187,6 @@ async fn the_v2_default_opens_one_storage_db_file_beside_config_toml() {
         )
         .await
         .unwrap();
-    drop(documents);
-    drop(scoped);
-    drop(backend);
     assert!(
         layout.storage_db.is_file(),
         "{} should be a database file",

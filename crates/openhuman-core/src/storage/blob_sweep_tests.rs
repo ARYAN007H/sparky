@@ -323,7 +323,6 @@ fn orphan_sweep_rejects_malformed_or_nonadvancing_listing_pages() {
 
 #[tokio::test]
 async fn orphan_sweep_pages_and_preserves_referenced_blobs() {
-    use tinystoragedrivers_api::BlobStore;
     use tinystoragedrivers_testkit::memory_storage;
     use tinystoragedrivers_types::Scope;
 
@@ -351,7 +350,6 @@ async fn orphan_sweep_pages_and_preserves_referenced_blobs() {
 #[tokio::test]
 async fn orphan_sweep_checks_references_only_for_eligible_blobs() {
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use tinystoragedrivers_api::BlobStore;
     use tinystoragedrivers_testkit::memory_storage;
     use tinystoragedrivers_types::Scope;
 
@@ -376,7 +374,6 @@ async fn orphan_sweep_checks_references_only_for_eligible_blobs() {
 
 #[tokio::test]
 async fn orphan_sweep_stops_on_reference_error_after_preserving_prior_progress() {
-    use tinystoragedrivers_api::BlobStore;
     use tinystoragedrivers_testkit::memory_storage;
     use tinystoragedrivers_types::Scope;
 
@@ -405,7 +402,6 @@ async fn orphan_sweep_stops_on_reference_error_after_preserving_prior_progress()
 #[tokio::test]
 async fn orphan_sweep_stops_on_listing_error_before_touching_blobs() {
     use std::sync::Arc;
-    use tinystoragedrivers_api::BlobStore;
     use tinystoragedrivers_testkit::{memory_storage, Failing, FaultPlan};
     use tinystoragedrivers_types::{ErrorKind, Scope};
 
@@ -427,7 +423,6 @@ async fn orphan_sweep_stops_on_listing_error_before_touching_blobs() {
 #[tokio::test]
 async fn orphan_sweep_stops_on_delete_error_after_preserving_prior_progress() {
     use std::sync::Arc;
-    use tinystoragedrivers_api::BlobStore;
     use tinystoragedrivers_testkit::{memory_storage, Failing, FaultPlan};
     use tinystoragedrivers_types::{ErrorKind, Scope};
 

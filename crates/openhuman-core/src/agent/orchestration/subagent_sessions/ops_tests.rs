@@ -536,7 +536,7 @@ fn closed_session_is_not_reusable() {
 #[test]
 fn an_equal_millisecond_live_close_persists_and_a_stale_snapshot_cannot_reopen_it() {
     use crate::agent::orchestration::subagent_sessions::store_documents::{with_override, Docs};
-    use crate::storage::{test_support::memory_backend, Scope, StorageBackend};
+    use crate::storage::{test_support::memory_backend, Scope};
 
     let storage = memory_backend();
     let docs = Docs::over(&storage.for_scope(&Scope::new("local").unwrap()).unwrap());
