@@ -261,7 +261,7 @@ pub(crate) async fn discard_native_channel_parts(
     if parts.is_empty() {
         return Ok(());
     }
-    let entries = read_staged_entries(ctx, thread_id, parts, config).await?;
+    let entries = read_staged_entries_for_cleanup(ctx, thread_id, parts, config).await?;
     discard_staged_entries(ctx, thread_id, config, entries).await
 }
 

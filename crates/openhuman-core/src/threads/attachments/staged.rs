@@ -81,6 +81,25 @@ pub(super) async fn read_staged_entries(
     requested: &[ContentPart],
     config: &crate::config::Config,
 ) -> Result<Vec<StoredAttachment>, String> {
+    read_staged_entries_with_canceled_cleanup(ctx, thread_id, requested, config, false).await
+}
+
+pub(super) async fn read_staged_entries_for_cleanup(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+    requested: &[ContentPart],
+    config: &crate::config::Config,
+) -> Result<Vec<StoredAttachment>, String> {
+    read_staged_entries_with_canceled_cleanup(ctx, thread_id, requested, config, true).await
+}
+
+async fn read_staged_entries_with_canceled_cleanup(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+    requested: &[ContentPart],
+    config: &crate::config::Config,
+    allow_canceled_cleanup: bool,
+) -> Result<Vec<StoredAttachment>, String> {
     validate_opaque_parts(requested)?;
     let tenant = tenant_for(ctx)?;
     let repo = staged_repo(ctx, &config.workspace_dir)?;
@@ -97,10 +116,11 @@ pub(super) async fn read_staged_entries(
         }
         if manifest.expires_at < chrono::Utc::now().timestamp()
             && manifest.claim.as_ref().is_none_or(|claim| claim.canceled)
+            && !allow_canceled_cleanup
         {
             return Err("staged attachment is missing or expired".into());
         }
-        if manifest.claim.as_ref().is_some_and(|claim| claim.canceled) {
+        if manifest.claim.as_ref().is_some_and(|claim| claim.canceled) && !allow_canceled_cleanup {
             return Err("staged attachment was canceled".into());
         }
         if &manifest.attachment.part != part {
