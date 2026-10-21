@@ -27,9 +27,7 @@ fn route_local_kind(
 ) -> Option<tinyinference_providers::route::LocalProviderKind> {
     local_kind.map(|kind| match kind {
         LocalProviderKind::Ollama => tinyinference_providers::route::LocalProviderKind::Ollama,
-        LocalProviderKind::LmStudio => {
-            tinyinference_providers::route::LocalProviderKind::LmStudio
-        }
+        LocalProviderKind::LmStudio => tinyinference_providers::route::LocalProviderKind::LmStudio,
         LocalProviderKind::Mlx => tinyinference_providers::route::LocalProviderKind::Mlx,
         LocalProviderKind::Omlx => tinyinference_providers::route::LocalProviderKind::Omlx,
         LocalProviderKind::LocalOpenai => {
@@ -151,7 +149,14 @@ pub(crate) async fn resolve_context_window_with(
     let local_kind = tinyinference_local::profile::kind_from_provider_string(provider);
     let route = route_input(role, provider, model, config, None, local_kind);
     resolver()
-        .resolve_for_route_with_fetcher(provider, model, local_kind, route, cache, fetcher)
+        .resolve_for_route_with_fetcher(
+            provider,
+            model,
+            route_local_kind(local_kind),
+            route,
+            cache,
+            fetcher,
+        )
         .await
 }
 
