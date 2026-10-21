@@ -74,12 +74,65 @@ pub(crate) enum Outcome {
 /// Imports the legacy files under `data_dir` into the module's scope of the
 /// installed backend.
 pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<Outcome> {
-    let Some(backend) = crate::storage::installed() else {
+    if crate::storage::installed().is_none() {
         return Ok(Outcome::NoBackend);
-    };
+    }
+    let clients = data_dir.join(CLIENTS_DB);
+    let audit = data_dir.join(AUDIT_DB);
+    if !clients.exists() && !audit.exists() {
+        return Ok(Outcome::NoSource);
+    }
+
+    let marker = marker_id(data_dir);
+    let data_dir = data_dir.to_path_buf();
     let scope = super::storage_host::current_module_scope(ctx, MODULE_ID)
         .map_err(|error| anyhow!("resolve the module scope: {:?}", error.kind()))?;
-    import_into(&backend, &scope, data_dir, None).await
+    let imported = super::storage_import_support::with_module_claim(
+        ctx,
+        MODULE_ID,
+        MARKER_COLLECTION,
+        &marker,
+        move |scoped| {
+            crate::storage::block_on_anyhow(async move {
+                if super::storage_import_support::already_imported(
+                    &scoped,
+                    MARKER_COLLECTION,
+                    &marker,
+                )
+                .await?
+                {
+                    return Ok(Outcome::AlreadyDone);
+                }
+                let clients = data_dir.join(CLIENTS_DB);
+                let audit = data_dir.join(AUDIT_DB);
+                let (legacy_servers, legacy_audit) = tokio::task::spawn_blocking(move || {
+                    let servers = if clients.exists() {
+                        read_servers(&clients)?
+                    } else {
+                        Vec::new()
+                    };
+                    let audit_rows = if audit.exists() {
+                        read_audit(&audit)?
+                    } else {
+                        Vec::new()
+                    };
+                    Ok::<_, anyhow::Error>((servers, audit_rows))
+                })
+                .await
+                .context("the legacy reader panicked")??;
+                let outcome = import_payload(&scoped, &scope, legacy_servers, legacy_audit, None)
+                    .await?;
+                super::storage_import_support::mark_imported(
+                    &scoped,
+                    MARKER_COLLECTION,
+                    &marker,
+                )
+                .await?;
+                Ok(outcome)
+            })
+        },
+    )?;
+    Ok(imported.unwrap_or(Outcome::InProgress))
 }
 
 async fn import_into(
