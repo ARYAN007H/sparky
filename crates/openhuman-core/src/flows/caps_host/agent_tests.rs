@@ -302,12 +302,15 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         })
         .collect::<Vec<_>>();
     eprintln!(
-        "NESTED_FLOW_POLICY_DIAGNOSTIC worker_calls={} schema={:?} nested_spawn_calls={} worker_jobs={:?} grandchild_jobs={} spawn_events={:?}",
+        "NESTED_FLOW_POLICY_DIAGNOSTIC worker_calls={} schema={:?} nested_spawn_calls={} worker_jobs={:?} grandchild_jobs={:?} spawn_events={:?}",
         model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
         model.child_schema_names.lock().unwrap(),
         model.nested_spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
         child_runs,
-        grandchild_jobs.len(),
+        grandchild_jobs
+            .iter()
+            .map(|job| (&job.status, job.output.as_deref().is_some_and(|s| s.contains("headless-flow-grandchild-result"))))
+            .collect::<Vec<_>>(),
         nested_spawn_outcomes,
     );
     let grandchild_run_id = grandchild_jobs
