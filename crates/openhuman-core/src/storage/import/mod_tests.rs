@@ -252,7 +252,7 @@ fn a_marker_row_an_older_build_wrote_counts_as_a_finished_import() {
 async fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrection() {
     use crate::profiles::{ProfileId, ProfileRegistry};
     use crate::storage::layout::{Target, legacy};
-    use crate::storage::{self, Scope, scope_for_profile};
+    use crate::storage::{self, Scope};
     use sha2::Digest;
     use tinystoragedrivers::Query;
 
@@ -387,7 +387,7 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     // conversion performed during boot.
     let owner_docs = Arc::clone(
         backend
-            .for_scope(&scope_for_profile("u1"))
+            .for_scope(&Scope::local())
             .unwrap()
             .documents(),
     );
@@ -415,7 +415,7 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
         "boot import must leave the v1 source bytes unchanged"
     );
 
-    let delete_scope = backend.for_scope(&Scope::new("u:u1").unwrap()).unwrap();
+    let delete_scope = backend.for_scope(&Scope::local()).unwrap();
     let docs = Arc::clone(delete_scope.documents());
     storage::block_on(async move {
         docs.delete("cost.records", &cost[0].id, Precondition::None)
@@ -431,7 +431,7 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     assert_eq!(moved.outcome.as_ref().unwrap(), &Outcome::AlreadyDone);
     let docs = Arc::clone(
         backend
-            .for_scope(&scope_for_profile("u1"))
+            .for_scope(&Scope::local())
             .unwrap()
             .documents(),
     );
