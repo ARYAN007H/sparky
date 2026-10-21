@@ -78,7 +78,7 @@ pub(super) async fn resolve_typed_message(
             _ => {}
         }
     }
-    if image_count > max_images {
+    if (config.multimodal.max_images == 0 && image_count > 0) || image_count > max_images {
         return Err("native image attachments exceed their count limit".into());
     }
     if file_count > max_files {
@@ -174,7 +174,27 @@ pub(super) async fn resolve_typed_message(
         staged_parts.push(staged);
     }
 
-    let message = crate::agent::message_convert::user_message_from_parts(enriched_message, &parts)?;
+    let model_parts = parts
+        .iter()
+        .filter(|part| matches!(part, ContentPart::Image { .. } | ContentPart::File { .. }))
+        .cloned()
+        .collect::<Vec<_>>();
+    let message = match crate::agent::message_convert::user_message_from_parts(
+        enriched_message,
+        &model_parts,
+    ) {
+        Ok(message) => message,
+        Err(error) => {
+            let _ = crate::threads::attachments::discard_native_channel_parts(
+                host_dispatch,
+                thread_id,
+                config,
+                &staged_parts,
+            )
+            .await;
+            return Err(error);
+        }
+    };
     Ok(Some(ResolvedNativeMessage {
         message,
         staged_parts,

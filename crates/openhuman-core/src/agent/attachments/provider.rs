@@ -221,7 +221,8 @@ impl AttachmentModel {
                 .count();
             let (max_images, _) = self.config.multimodal.effective_limits();
             let (max_files, _, _) = self.config.multimodal_files.effective_limits();
-            if images > max_images
+            if (self.config.multimodal.max_images == 0 && images > 0)
+                || images > max_images
                 || files > max_files
                 || self.config.multimodal_files.max_files == 0 && images + files > 0
             {

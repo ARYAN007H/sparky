@@ -575,6 +575,8 @@ pub(crate) async fn run(
         }
     };
     runtime.shared.begin_delivery_wait(&request_id);
+    let cleanup_staged_parts = staged_parts.clone();
+    let cleanup_config = trusted.host_agent.config.clone();
     let request = TurnRequest {
         scope: ScopeKey {
             agent_id: trusted.host_agent.definition.id.clone(),
@@ -603,6 +605,18 @@ pub(crate) async fn run(
         Err(tinyagents_harness::turn_runner::TurnRunnerError::Queued)
     );
     let result = runner_result.map_err(|error| error.to_string());
+    if !queued && result.is_err() && !cleanup_staged_parts.is_empty() {
+        if let Err(error) = crate::threads::attachments::discard_native_channel_parts(
+            dispatch,
+            &thread_id,
+            &cleanup_config,
+            &cleanup_staged_parts,
+        )
+        .await
+        {
+            tracing::warn!("[channels::dispatch] failed to clean rejected native media staging");
+        }
+    }
     if queued {
         runtime.shared.abandon_delivery_wait(&request_id);
     }
