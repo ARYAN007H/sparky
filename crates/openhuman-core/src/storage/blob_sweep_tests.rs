@@ -95,10 +95,12 @@ async fn module_blob_scopes_are_swept_alongside_the_acting_scope() {
 #[cfg(not(feature = "modules"))]
 #[test]
 fn no_module_blob_scopes_without_the_modules_feature() {
-    assert!(crate::modules::expiring_blob_module_scopes(
-        &crate::core::runtime::DispatchCtx::host_default()
-    )
-    .is_empty());
+    assert!(
+        crate::modules::expiring_blob_module_scopes(
+            &crate::core::runtime::DispatchCtx::host_default()
+        )
+        .is_empty()
+    );
 }
 
 #[tokio::test]

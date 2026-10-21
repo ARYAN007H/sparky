@@ -168,11 +168,21 @@ fn capabilities_are_answered_for_an_object_the_grant_does_not_hold() {
         Err(Denied::Object)
     );
     assert_eq!(
-        authorize(&documents_only, Object::Streams, "Len", &json!({ "stream": "x" })),
+        authorize(
+            &documents_only,
+            Object::Streams,
+            "Len",
+            &json!({ "stream": "x" })
+        ),
         Err(Denied::Object)
     );
     assert_eq!(
-        authorize(&documents_only, Object::Secrets, "Get", &json!({ "name": "x" })),
+        authorize(
+            &documents_only,
+            Object::Secrets,
+            "Get",
+            &json!({ "name": "x" })
+        ),
         Err(Denied::Object)
     );
 }

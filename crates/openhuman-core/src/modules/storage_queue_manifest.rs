@@ -53,14 +53,19 @@ impl QueueManifest {
     pub(crate) fn from_json(text: &str) -> Result<Self, String> {
         let mut manifest: Self = serde_json::from_str(text).map_err(|error| error.to_string())?;
         manifest.validate()?;
-        manifest.queues.sort_by(|left, right| left.name.cmp(&right.name));
+        manifest
+            .queues
+            .sort_by(|left, right| left.name.cmp(&right.name));
         Ok(manifest)
     }
 
     /// Validate a value assembled by host code.
     pub(crate) fn validate(&self) -> Result<(), String> {
         if self.version != 1 {
-            return Err(format!("unsupported queue manifest version {}", self.version));
+            return Err(format!(
+                "unsupported queue manifest version {}",
+                self.version
+            ));
         }
         if self.schema.as_ref().is_some_and(String::is_empty) {
             return Err("queue manifest $schema must not be empty".to_owned());
@@ -68,14 +73,24 @@ impl QueueManifest {
         let mut names = BTreeMap::new();
         for queue in &self.queues {
             validate_name(&queue.name)?;
-            if queue.owner.as_ref().is_some_and(|owner| owner.trim().is_empty()) {
+            if queue
+                .owner
+                .as_ref()
+                .is_some_and(|owner| owner.trim().is_empty())
+            {
                 return Err(format!("queue {:?} owner must not be empty", queue.name));
             }
             if queue.max_attempts == 0 {
-                return Err(format!("queue {:?} must allow at least one attempt", queue.name));
+                return Err(format!(
+                    "queue {:?} must allow at least one attempt",
+                    queue.name
+                ));
             }
             if queue.visibility_ms == Some(0) {
-                return Err(format!("queue {:?} visibility_ms must be positive", queue.name));
+                return Err(format!(
+                    "queue {:?} visibility_ms must be positive",
+                    queue.name
+                ));
             }
             if names.insert(queue.name.as_str(), ()).is_some() {
                 return Err(format!("queue {:?} is declared more than once", queue.name));
@@ -98,9 +113,9 @@ impl QueueManifest {
 fn validate_name(name: &str) -> Result<(), String> {
     if name.is_empty()
         || name.len() > 64
-        || !name
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._-".contains(&byte))
+        || !name.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._-".contains(&byte)
+        })
     {
         return Err(format!("invalid queue name {name:?}"));
     }

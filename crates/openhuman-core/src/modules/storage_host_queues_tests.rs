@@ -4,12 +4,12 @@
 //! holds no queues at all, while that module still connects.
 
 use super::*;
+use crate::modules::storage_queue_manifest::QueueManifest;
+use tinybus::Connection;
 use tinybus::broker::Broker;
 use tinybus::transport::memory::MemoryBus;
-use tinybus::Connection;
-use crate::modules::storage_queue_manifest::QueueManifest;
-use tinystoragedrivers_types::{NewMessage, QueueSpec};
 use tinystoragedrivers::ErrorKind;
+use tinystoragedrivers_types::{NewMessage, QueueSpec};
 
 fn manifest() -> Arc<QueueManifest> {
     Arc::new(
@@ -106,11 +106,13 @@ async fn a_module_granted_a_manifest_enqueues_receives_and_acks_over_the_bus() {
     assert_eq!(leased.len(), 1);
     assert_eq!(leased[0].payload, json!({"n": 1}));
     assert!(queues.ack("inbox", &leased[0].receipt).await.unwrap());
-    assert!(queues
-        .receive("inbox", 4, 30_000, "test")
-        .await
-        .unwrap()
-        .is_empty());
+    assert!(
+        queues
+            .receive("inbox", 4, 30_000, "test")
+            .await
+            .unwrap()
+            .is_empty()
+    );
 
     // The messages live in the module's own scope on the host backend.
     let scope = module_scope(None, "alpha").unwrap();

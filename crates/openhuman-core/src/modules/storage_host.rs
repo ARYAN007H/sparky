@@ -45,15 +45,15 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::Value;
 use tinybus::BusName;
-use tinystoragedrivers::secrets::{DocumentSecrets, KeyProvider};
 use tinystoragedrivers::BlobReader;
+use tinystoragedrivers::secrets::{DocumentSecrets, KeyProvider};
 use tinystoragedrivers_bus::{
     BlobKeyRequest, BlobStreamHead, PutBlobStreamRequest, StorageFailure, StorageKind,
 };
 use tinystoragedrivers_busproxy::{Admission, HostFailure, StorageServer};
 
 use self::endpoint::HostEndpoint;
-use super::storage_grants::{authorize, declared, filter_reply, Object, Plan, StorageGrant};
+use super::storage_grants::{Object, Plan, StorageGrant, authorize, declared, filter_reply};
 use crate::storage::{Scope, StorageBackend, StorageError};
 
 /// The largest blob a module may send by `PutStream`. The body is bounded per
@@ -443,14 +443,14 @@ impl StorageHost {
                     .ensure_queue(&declaration.name, &declaration.spec())
                     .await
                     .map_err(|error| {
-                    tracing::warn!(
-                        target: "openhuman::storage_host",
-                        module,
-                        queue = %declaration.name,
-                        %error,
-                        "[storage_host] could not declare a granted queue"
-                    );
-                    BindError::Backend(StorageKind::Backend)
+                        tracing::warn!(
+                            target: "openhuman::storage_host",
+                            module,
+                            queue = %declaration.name,
+                            %error,
+                            "[storage_host] could not declare a granted queue"
+                        );
+                        BindError::Backend(StorageKind::Backend)
                     })?;
             }
             tracing::debug!(

@@ -1,5 +1,5 @@
 use super::*;
-use crate::modules::storage_grants::{authorize, declared, Denied, Object, Plan};
+use crate::modules::storage_grants::{Denied, Object, Plan, authorize, declared};
 use serde_json::json;
 
 fn allowed(

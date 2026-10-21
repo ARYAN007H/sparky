@@ -26,8 +26,8 @@ fn rejects_unknown_fields_duplicate_names_and_invalid_future_versions() {
 
 #[test]
 fn allows_old_manifest_defaults_but_rejects_zero_attempts_or_visibility() {
-    let manifest = QueueManifest::from_json(r#"{"version":1,"queues":[{"name":"legacy"}]}"#)
-        .unwrap();
+    let manifest =
+        QueueManifest::from_json(r#"{"version":1,"queues":[{"name":"legacy"}]}"#).unwrap();
     assert_eq!(manifest.get("legacy").unwrap().spec().max_attempts, 8);
     for text in [
         r#"{"version":1,"queues":[{"name":"q","max_attempts":0}]}"#,
