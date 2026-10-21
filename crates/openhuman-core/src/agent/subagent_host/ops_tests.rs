@@ -249,6 +249,19 @@ fn tool_response(name: &str, args: &str) -> ModelResponse {
 /// Uses a no-op memory backend so we don't have to spin up a real one.
 /// `options` with `parent` bound as the run's explicit parent execution
 /// context, the way a spawning tool or orchestration surface supplies it.
+async fn run_host_from_test_options(
+    definition: &AgentDefinition,
+    input: &str,
+    options: SubagentRunOptions,
+) -> Result<SubagentRunOutcome, SubagentRunError> {
+    let mut root_data = options.run_context.clone();
+    let root_config = root_data.root_run_config("subagent-host-test");
+    let parent = root_data.into_tinyagents(root_config);
+    crate::agent::subagent_host::OpenHumanSubagentHost::new(definition.clone(), options)
+        .run(&parent, input.to_owned())
+        .await
+}
+
 fn with_parent(
     parent: ParentExecutionContext,
     mut options: SubagentRunOptions,

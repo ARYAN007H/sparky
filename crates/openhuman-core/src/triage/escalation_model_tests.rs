@@ -500,7 +500,7 @@ async fn escalate_dispatch_preserves_orchestrator_tools_without_child_delegation
         .iter()
         .map(|tool| tool.name.as_str())
         .collect();
-    assert!(tool_names.contains(&"read_workspace_state"));
+    assert!(tool_names.contains(&"file_read"));
     assert!(
         !tool_names
             .iter()

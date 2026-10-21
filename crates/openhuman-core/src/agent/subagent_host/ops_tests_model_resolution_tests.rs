@@ -1,9 +1,8 @@
 use super::*;
-use crate::agent::subagent_host::run_subagent;
 use crate::agent::subagent_host::{
-    run_subagent_via_driver_tool, spawn_async_via_driver_tool_with_jobs, SubagentRunStatus,
+    SubagentRunStatus, run_subagent_via_driver_tool, spawn_async_via_driver_tool_with_jobs,
 };
-use tinyagents_harness::context::{current_run_depth, with_run_depth, RunDepth};
+use tinyagents_harness::context::{RunDepth, current_run_depth, with_run_depth};
 
 struct BlockingSubagentCloseTool {
     started: tokio::sync::mpsc::Sender<()>,
@@ -46,7 +45,7 @@ async fn runner_rejects_spawn_beyond_max_depth() {
                 max_depth: MAX_SPAWN_DEPTH,
             },
             async {
-                run_subagent(
+                run_host_from_test_options(
                     &def,
                     "x",
                     with_parent(parent.clone(), SubagentRunOptions::default()),
@@ -87,7 +86,7 @@ async fn typed_mode_model_override_pins_exact_model_for_spawn() {
     def.model = ModelSpec::Inherit;
 
     let _ = (async {
-        run_subagent(
+        run_host_from_test_options(
             &def,
             "use the pinned model",
             with_parent(
@@ -131,7 +130,7 @@ async fn typed_mode_emits_child_progress_events_when_sink_attached() {
 
     let def = make_def_named_tools(&["file_read"]);
     let outcome = (async {
-        run_subagent(
+        run_host_from_test_options(
             &def,
             "read x",
             with_parent(parent, SubagentRunOptions::default()),
@@ -211,7 +210,7 @@ async fn typed_mode_forwards_child_text_and_thinking_deltas() {
 
     let def = make_def_named_tools(&[]);
     let outcome = (async {
-        run_subagent(
+        run_host_from_test_options(
             &def,
             "answer me",
             with_parent(parent, SubagentRunOptions::default()),
@@ -289,7 +288,7 @@ async fn typed_mode_progress_emission_is_a_noop_without_sink() {
     assert!(parent.on_progress.is_none());
     let def = make_def_named_tools(&[]);
     let outcome = (async {
-        run_subagent(
+        run_host_from_test_options(
             &def,
             "x",
             with_parent(parent.clone(), SubagentRunOptions::default()),
@@ -613,7 +612,7 @@ fn nested_subagent_dispatch_runs_on_a_constrained_worker_stack() {
                 .get()
                 .cloned()
                 .expect("parent set before the run");
-            let outcome = run_subagent(
+            let outcome = run_host_from_test_options(
                 &self.inner_def,
                 "inner go",
                 with_parent(parent, SubagentRunOptions::default()),
@@ -657,7 +656,7 @@ fn nested_subagent_dispatch_runs_on_a_constrained_worker_stack() {
         let outer_def = make_def_named_tools(&["delegate_inner"]);
 
         (async {
-            run_subagent(
+            run_host_from_test_options(
                 &outer_def,
                 "outer go",
                 with_parent(parent.clone(), SubagentRunOptions::default()),
