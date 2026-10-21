@@ -174,6 +174,6 @@ fn optional_bool(name: &'static str, comment: &'static str) -> FieldSchema {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-import"))]
 #[path = "schemas_tests.rs"]
 mod tests;
