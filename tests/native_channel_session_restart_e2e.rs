@@ -484,7 +484,9 @@ async fn wait_for_new_session_reply(state: &MockState) {
             return;
         }
         if Instant::now() >= deadline {
-            panic!("timed out waiting for Telegram /new reply; outbound bodies: {sent_snapshot:#?}");
+            panic!(
+                "timed out waiting for Telegram /new reply; outbound bodies: {sent_snapshot:#?}"
+            );
         }
         sleep(Duration::from_millis(50)).await;
     }
