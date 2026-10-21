@@ -25,7 +25,7 @@ pub(super) struct StagedAttachmentClaim {
 }
 
 pub(crate) use native::{
-    commit_native_channel_parts, discard_native_channel_parts, native_parts_in_committed_message,
+    commit_native_channel_parts, native_parts_in_committed_message,
     read_authorized_native_attachment, stage_native_channel_part, NativeStagedLease,
 };
 #[path = "staged/native.rs"]
