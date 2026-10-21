@@ -1,13 +1,24 @@
 use super::*;
+#[cfg(feature = "storage-sqlite")]
+use crate::storage::test_support::sqlite_backend;
+#[cfg(feature = "storage-sqlite")]
+use std::sync::Arc;
 
+#[cfg(feature = "storage-sqlite")]
 #[tokio::test]
 async fn the_operators_cron_limits_bind_every_profile_whatever_its_config_says() {
     let tmp = tempfile::tempdir().unwrap();
+    let fixture = sqlite_backend().unwrap();
     let mut saas = SaasConfig::new(tmp.path());
     saas.cron.agent_jobs_only = true;
     saas.cron.min_interval_secs = 900;
     saas.cron.max_active_jobs = 3;
-    let host = ProfileHost::new(saas, CoreContext::for_test(DomainSet::full(), None));
+    let host = ProfileHost::with_backend(
+        saas,
+        CoreContext::for_test(DomainSet::full(), None),
+        Some(Arc::clone(&fixture.backend)),
+    )
+    .unwrap();
     let id = profile("alice");
     host.provision(&id).await.unwrap();
     // The user's own file tries to switch the mode off.
@@ -30,13 +41,20 @@ async fn the_operators_cron_limits_bind_every_profile_whatever_its_config_says()
     }
 }
 
+#[cfg(feature = "storage-sqlite")]
 #[tokio::test]
 async fn provisioning_installs_the_cron_cap_in_the_profile_scope() {
     let tmp = tempfile::tempdir().unwrap();
+    let fixture = sqlite_backend().unwrap();
     let mut saas = SaasConfig::new(tmp.path());
     saas.cron.agent_jobs_only = true;
     saas.cron.max_active_jobs = 1;
-    let host = ProfileHost::new(saas, CoreContext::for_test(DomainSet::full(), None));
+    let host = ProfileHost::with_backend(
+        saas,
+        CoreContext::for_test(DomainSet::full(), None),
+        Some(Arc::clone(&fixture.backend)),
+    )
+    .unwrap();
     let id = profile("cron-cap-provisioned");
     host.provision(&id).await.unwrap();
     let config = host.provisioned_config(&id).await.unwrap();
@@ -62,20 +80,29 @@ async fn provisioning_installs_the_cron_cap_in_the_profile_scope() {
         .contains("Failed to insert cron agent job"));
 }
 
+#[cfg(feature = "storage-sqlite")]
 #[tokio::test]
 async fn opening_an_existing_profile_adopts_the_enforced_cron_cap() {
     let tmp = tempfile::tempdir().unwrap();
+    let fixture = sqlite_backend().unwrap();
     let id = profile("cron-cap-adopt-existing");
-    let unenforced = ProfileHost::new(
+    let unenforced = ProfileHost::with_backend(
         SaasConfig::new(tmp.path()),
         CoreContext::for_test(DomainSet::full(), None),
-    );
+        Some(Arc::clone(&fixture.backend)),
+    )
+    .unwrap();
     unenforced.provision(&id).await.unwrap();
 
     let mut saas = SaasConfig::new(tmp.path());
     saas.cron.agent_jobs_only = true;
     saas.cron.max_active_jobs = 1;
-    let enforced = ProfileHost::new(saas, CoreContext::for_test(DomainSet::full(), None));
+    let enforced = ProfileHost::with_backend(
+        saas,
+        CoreContext::for_test(DomainSet::full(), None),
+        Some(Arc::clone(&fixture.backend)),
+    )
+    .unwrap();
     assert!(!enforced.provision(&id).await.unwrap());
     let _profile = enforced.open(&id).await.unwrap();
     let config = enforced.provisioned_config(&id).await.unwrap();
