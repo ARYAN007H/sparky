@@ -203,7 +203,7 @@ fn is_hosted_slug(slug: &str) -> bool {
 }
 
 fn provider_credential_present_read_only(config: &Config, slug: &str) -> bool {
-    use crate::security::credentials::{AuthService, profiles::AuthProfileKind};
+    use crate::security::credentials::{profiles::AuthProfileKind, AuthService};
 
     let key = crate::inference::provider::factory::auth_key_for_slug(slug);
     for provider in [key.as_str(), slug] {

@@ -42,11 +42,9 @@ fn environment_check_resolves_git_and_curl_from_path_without_running_them() {
             && finding.severity == FindingSeverity::Pass
             && finding.config_path.as_deref() == Some("PATH/curl")
     }));
-    assert!(
-        findings
-            .iter()
-            .all(|finding| !finding.message.contains("/isolated/home"))
-    );
+    assert!(findings
+        .iter()
+        .all(|finding| !finding.message.contains("/isolated/home")));
     assert!(
         !marker.exists(),
         "static environment checks must not spawn tools"

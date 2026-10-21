@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tinyconnectors_bus::{
-    ComposioConnectedIntegrationsMode, ComposioConnectedIntegrationsResponse,
-    ComposioListConnectedIntegrationsRequest, names::methods,
+    names::methods, ComposioConnectedIntegrationsMode, ComposioConnectedIntegrationsResponse,
+    ComposioListConnectedIntegrationsRequest,
 };
 
 use crate::config::Config;
@@ -97,20 +97,9 @@ impl DoctorCheck for ComposioCheck {
             )
         } else {
             match self.probe.list_existing(ctx.config()).await {
-                Ok(Some(())) => Finding::pass(
-                    self.id(),
-                    "The existing Composio connector answered a read-only connection check.",
-                ),
-                Ok(None) => Finding::skipped(
-                    self.id(),
-                    "No matching ready Composio connector is available for the selected configuration.",
-                    "Open Integrations normally, then rerun doctor.",
-                ),
-                Err(()) => Finding::error(
-                    self.id(),
-                    "The ready Composio connector could not complete its read-only check.",
-                    "Check the Composio connection in Integrations, then rerun doctor.",
-                ),
+                Ok(Some(())) => Finding::pass(self.id(), "The existing Composio connector answered a read-only connection check."),
+                Ok(None) => Finding::skipped(self.id(), "No matching ready Composio connector is available for the selected configuration.", "Open Integrations normally, then rerun doctor."),
+                Err(()) => Finding::error(self.id(), "The ready Composio connector could not complete its read-only check.", "Check the Composio connection in Integrations, then rerun doctor."),
             }
         };
         vec![finding]

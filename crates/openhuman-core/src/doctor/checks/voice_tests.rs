@@ -1,8 +1,8 @@
 use super::*;
 use crate::doctor::contract::{DoctorCtx, FindingSeverity};
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 
 struct FixedVoiceStatus {
@@ -90,11 +90,9 @@ async fn voice_checks_inspect_the_selected_config_without_starting_audio_runtime
     })
     .await;
     assert_eq!(findings.len(), 2);
-    assert!(
-        findings
-            .iter()
-            .all(|finding| finding.severity == FindingSeverity::Pass)
-    );
+    assert!(findings
+        .iter()
+        .all(|finding| finding.severity == FindingSeverity::Pass));
     assert_eq!(calls.load(Ordering::SeqCst), 2);
     assert_eq!(
         *probe.workspace.lock().unwrap(),

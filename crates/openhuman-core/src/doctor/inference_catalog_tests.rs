@@ -1,19 +1,19 @@
 use super::{
-    DoctorOptions, FindingSeverity, ModelProbeOutcome,
     ops::{doctor_models, doctor_report_with_options},
+    DoctorOptions, FindingSeverity, ModelProbeOutcome,
 };
-use crate::config::Config;
 use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
+use crate::config::Config;
 use axum::{
-    Json, Router,
     extract::State,
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
+    Json, Router,
 };
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 use std::time::Duration;
 
@@ -217,8 +217,8 @@ fn register_test_inspection_catalog(
     endpoint: String,
 ) -> Arc<AtomicUsize> {
     use crate::inference::registry::{
-        InspectionCatalogError, InspectionCatalogListing, PreparedInspectionCatalog,
-        register_inspection_catalog_in,
+        register_inspection_catalog_in, InspectionCatalogError, InspectionCatalogListing,
+        PreparedInspectionCatalog,
     };
 
     let requests = Arc::new(AtomicUsize::new(0));
@@ -517,10 +517,10 @@ async fn a_slow_provider_times_out_without_blocking_the_other_catalog() {
 
 #[tokio::test]
 async fn doctor_models_uses_read_only_http_without_calling_the_mutable_catalog() {
-    use crate::core::Outcome;
     use crate::core::runtime::{CoreContext, DomainSet};
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{CatalogEntry, CatalogListing, register_catalog_in};
+    use crate::core::Outcome;
+    use crate::inference::registry::{register_catalog_in, CatalogEntry, CatalogListing};
 
     let (endpoint, server) =
         spawn_catalog_server(StatusCode::OK, catalog_body(&["must-not-be-used"]), true).await;
