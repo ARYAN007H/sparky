@@ -108,11 +108,9 @@ pub(super) fn subagent_transcripts_in(
 /// Creates an intentionally isolated, process-lifetime transcript store for
 /// a detached SaaS task whose carried tenant context has already been dropped.
 /// It never opens the installed operator/profile backend.
-fn detached_memory_transcripts(
-    fallback_agent: &str,
-) -> anyhow::Result<Arc<dyn TranscriptLocator>> {
-    let backend = crate::storage::block_on(crate::storage::open("memory"))
-        .map_err(anyhow::Error::msg)?;
+fn detached_memory_transcripts(fallback_agent: &str) -> anyhow::Result<Arc<dyn TranscriptLocator>> {
+    let backend =
+        crate::storage::block_on(crate::storage::open("memory")).map_err(anyhow::Error::msg)?;
     let factory_backend = Arc::clone(&backend);
     let factory: tinyagents_session::port::AgentStorageFactory = Arc::new(move |agent_id| {
         let scope = crate::storage::scope_for_agent(agent_id);
@@ -122,8 +120,8 @@ fn detached_memory_transcripts(
             (*scope).clone(),
         ))
     });
-    let provider = tinyagents_session::DriverSessionStores::new(factory)
-        .map_err(anyhow::Error::msg)?;
+    let provider =
+        tinyagents_session::DriverSessionStores::new(factory).map_err(anyhow::Error::msg)?;
     Ok(provider
         .try_for_agent(fallback_agent)
         .map_err(anyhow::Error::msg)?
