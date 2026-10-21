@@ -310,7 +310,11 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
         .iter()
         .find(|report| report.domain == crate::storage::scope_move::IMPORT_DOMAIN)
         .expect("boot importer includes legacy scope movement");
-    assert_eq!(moved.outcome.as_ref().unwrap(), &Outcome::AlreadyDone);
+    assert_eq!(
+        moved.outcome.as_ref().unwrap(),
+        &Outcome::AlreadyDone,
+        "scope migration should not repeat after layout migration: {moved:?}"
+    );
 
     let profile_scope = backend
         .for_scope(&crate::storage::scope_for_profile("u1"))
