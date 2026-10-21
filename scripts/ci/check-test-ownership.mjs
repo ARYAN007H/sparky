@@ -116,21 +116,46 @@ export function findOwnershipViolations(source, filePath) {
   const violations = [];
   const tokens = tokenizeUseTrees(source);
   const importedPaths = [];
+  const useTreeRanges = [];
 
   for (let index = 0; index < tokens.length; index += 1) {
     if (tokens[index].value !== 'use') continue;
-    const [paths] = readUseTree(tokens, index + 1);
+    const [paths, end] = readUseTree(tokens, index + 1);
     importedPaths.push(...paths);
+    useTreeRanges.push([index + 1, end]);
   }
 
   for (const denied of DENIED_PATHS) {
-    if (allowed?.has(denied.path)) continue;
     const deniedSegments = denied.path.split('::').filter(Boolean);
-    for (const importedPath of importedPaths) {
-      if (deniedSegments.every((segment, index) => importedPath[index]?.value === segment)) {
-        const line = source.slice(0, importedPath[0].start).split('\n').length;
-        violations.push({ line, path: denied.path, reason: denied.reason });
+    const reportedLines = new Set();
+
+    if (!allowed?.has(denied.path)) {
+      for (const importedPath of importedPaths) {
+        if (deniedSegments.every((segment, index) => importedPath[index]?.value === segment)) {
+          reportedLines.add(source.slice(0, importedPath[0].start).split('\n').length);
+        }
       }
+    }
+
+    for (let index = 0; index < tokens.length; index += 1) {
+      if (useTreeRanges.some(([start, end]) => index >= start && index < end)) continue;
+      if (tokens[index].value !== deniedSegments[0]) continue;
+
+      let cursor = index;
+      let matches = true;
+      for (let segmentIndex = 1; segmentIndex < deniedSegments.length; segmentIndex += 1) {
+        if (tokens[cursor + 1]?.value !== '::' || tokens[cursor + 2]?.value !== deniedSegments[segmentIndex]) {
+          matches = false;
+          break;
+        }
+        cursor += 2;
+      }
+
+      if (matches) reportedLines.add(source.slice(0, tokens[index].start).split('\n').length);
+    }
+
+    for (const line of reportedLines) {
+      violations.push({ line, path: denied.path, reason: denied.reason });
     }
   }
 
@@ -139,7 +164,7 @@ export function findOwnershipViolations(source, filePath) {
 
 function tokenizeUseTrees(source) {
   const tokens = [];
-  const tokenPattern = /::|[A-Za-z_][A-Za-z0-9_]*|[{};,=*]/g;
+  const tokenPattern = /::|[A-Za-z_][A-Za-z0-9_]*|[^\s]/g;
   for (const match of source.matchAll(tokenPattern)) {
     tokens.push({ value: match[0], start: match.index });
   }
