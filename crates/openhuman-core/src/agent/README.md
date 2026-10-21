@@ -205,7 +205,8 @@ The child gets a filtered tool list (the definition's `tools`,
 `disallowed_tools`, `skill_filter`), its own system prompt, and often a
 cheaper model. Its progress shows up on the parent's channel as
 `SubagentSpawned`, `SubagentToolCallStarted`, `SubagentTextDelta` and the
-other `Subagent*` variants. Spawn depth is capped by
+other `Subagent*` variants. Native child agents are leaf turns unless their
+host explicitly grants depth-bounded nested spawning. Spawn depth is capped by
 `tinyagents::budget::MAX_SPAWN_DEPTH`. Detached runs are tracked through TinyAgents'
 `DetachedTaskRegistry` and can be steered through the shared
 `SteeringRegistry` ([`tinyagents/host/steering.rs`](./tinyagents/host/steering.rs)).
