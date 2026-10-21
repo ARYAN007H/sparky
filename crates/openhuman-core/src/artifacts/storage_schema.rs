@@ -13,11 +13,14 @@
 //! [`args_of_body`] reads either form back.
 
 use serde_json::{json, Value};
-use tinystoragedrivers::schema::{Schema, ScopeClass, SourceRecord, Step, TargetRecord};
-use tinystoragedrivers::{CollectionSpec, IndexSpec, Result};
+use anyhow::Result;
+use tinystoragedrivers::{CollectionSpec, IndexSpec};
 
 use super::types::ArtifactMeta;
-use crate::storage::schema_support::{camel_keys, key_of, owner, snake_keys, time_ms};
+use crate::storage::schema_support::{
+    camel_keys, key_of, map_legacy_collection, snake_keys, time_ms,
+    LegacySourceRecord as SourceRecord, LegacyTargetRecord as TargetRecord,
+};
 
 pub(super) const RECORDS: &str = "artifacts.records";
 pub(super) const ARGS: &str = "artifacts.args";
@@ -25,7 +28,6 @@ pub(super) const VERSIONS: &str = "artifacts.versions";
 pub(super) const LEGACY_RECORDS: &str = "artifacts";
 pub(super) const LEGACY_ARGS: &str = "artifact_args";
 pub(super) const LEGACY_VERSIONS: &str = "artifact_versions";
-const SCHEMA: u32 = 2;
 
 /// The v2 names of the `*AtMillis` fields of `tiny_artifacts::ArtifactRecord`.
 const RECORD_TIME_KEYS: [(&str, &str); 4] = [
@@ -35,16 +37,13 @@ const RECORD_TIME_KEYS: [(&str, &str); 4] = [
     ("publishedAtMillis", "published_ms"),
 ];
 
-/// What the artifact stores keep and the steps from the v1 collections.
-#[must_use]
-pub fn storage_schema() -> Schema {
-    Schema::new(owner("artifacts"))
-        .collection_with(SCHEMA, records_spec(), ScopeClass::Tenant)
-        .collection_with(SCHEMA, CollectionSpec::new(ARGS), ScopeClass::Tenant)
-        .collection_with(SCHEMA, CollectionSpec::new(VERSIONS), ScopeClass::Tenant)
-        .step(Step::new("records_v2", RECORDS, 1, SCHEMA, records_v2).source(LEGACY_RECORDS))
-        .step(Step::new("args_v2", ARGS, 1, SCHEMA, args_v2).source(LEGACY_ARGS))
-        .step(Step::new("versions_v2", VERSIONS, 1, SCHEMA, versions_v2).source(LEGACY_VERSIONS))
+/// Converts artifact legacy documents into the current owner shapes.
+pub(crate) fn upgrade_records(
+    records: Vec<crate::storage::import::Record>,
+) -> Result<Vec<crate::storage::import::Record>> {
+    let records = map_legacy_collection(records, LEGACY_RECORDS, records_v2)?;
+    let records = map_legacy_collection(records, LEGACY_ARGS, args_v2)?;
+    map_legacy_collection(records, LEGACY_VERSIONS, versions_v2)
 }
 
 pub(super) fn records_spec() -> CollectionSpec {

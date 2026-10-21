@@ -14,37 +14,29 @@
 //! time a registry opens the shared backend.
 
 use serde_json::Value;
-use tinystoragedrivers::schema::{
-    MigrateOptions, Registry, Schema, ScopeClass, SourceRecord, Step, TargetRecord,
-};
-use tinystoragedrivers::{CollectionSpec, Result, ScopedStorage};
+use anyhow::Result;
+use tinystoragedrivers::{CollectionSpec, Storage};
 
-use crate::storage::schema_support::{key_of, owner, Body};
+use crate::storage::schema_support::{
+    key_of, map_legacy_collection, Body, LegacySourceRecord as SourceRecord,
+    LegacyTargetRecord as TargetRecord,
+};
 
 /// The v2 collection: one document per profile.
 pub const REGISTRY_COLLECTION: &str = "profiles.registry";
 /// The v1 name.
 pub(super) const LEGACY_REGISTRY_COLLECTION: &str = "profiles";
-const SCHEMA: u32 = 2;
 
 /// Collections owned by the profile registry.
 pub(crate) fn collection_specs() -> Vec<CollectionSpec> {
     vec![CollectionSpec::new(REGISTRY_COLLECTION)]
 }
 
-/// What the profile registry keeps and the step from the v1 collection.
-#[must_use]
-pub fn storage_schema() -> Schema {
-    Schema::new(owner("profiles"))
-        .collection_with(
-            SCHEMA,
-            CollectionSpec::new(REGISTRY_COLLECTION),
-            ScopeClass::Cluster,
-        )
-        .step(
-            Step::new("registry_v2", REGISTRY_COLLECTION, 1, SCHEMA, registry_v2)
-                .source(LEGACY_REGISTRY_COLLECTION),
-        )
+/// Converts legacy profile records into the current registry shape.
+pub(crate) fn upgrade_records(
+    records: Vec<crate::storage::import::Record>,
+) -> Result<Vec<crate::storage::import::Record>> {
+    map_legacy_collection(records, LEGACY_REGISTRY_COLLECTION, registry_v2)
 }
 
 fn registry_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {
@@ -81,13 +73,11 @@ fn registry_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {
 ///
 /// A storage error; the registry then reads the unmigrated records as absent
 /// until the next open retries.
-pub async fn migrate_cluster(scoped: &ScopedStorage) -> Result<()> {
-    let registry = Registry::compose([storage_schema()])?;
+pub async fn migrate_cluster(scoped: &Storage) -> Result<()> {
     scoped
         .documents()
         .ensure_collection(&CollectionSpec::new(REGISTRY_COLLECTION))
         .await?;
-    registry.migrate(scoped, &MigrateOptions::new()).await?;
     migrate_legacy_leases(scoped).await?;
     Ok(())
 }
@@ -128,7 +118,7 @@ fn lease_v2(old: &Value) -> Option<Value> {
 /// # Errors
 ///
 /// A storage error; the records not yet moved stay for the next open.
-pub async fn migrate_legacy_leases(scoped: &ScopedStorage) -> Result<usize> {
+pub async fn migrate_legacy_leases(scoped: &Storage) -> Result<usize> {
     use tinystoragedrivers::{Capability, DocumentStoreExt, Key, Precondition, Query};
     let docs = scoped.documents();
     // A driver that cannot list collections is asked for the records
