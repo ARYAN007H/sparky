@@ -433,9 +433,9 @@ fn opt_named_belt_into_discovery(scope: &mut tinyagents_definition::ToolScope) {
     }
 }
 
-    /// Lets a named-scope agent reach only the child agents it explicitly owns.
-    /// Apply the existing inherited-roster policy first and exclude HostOnly
-    /// agents, whose named empty belt is a hard prohibition on acting tools.
+/// Lets a named-scope agent reach only the child agents it explicitly owns.
+/// Apply the existing inherited-roster policy first and exclude HostOnly
+/// agents, whose named empty belt is a hard prohibition on acting tools.
 fn opt_named_belt_into_spawn(scope: &mut tinyagents_definition::ToolScope) {
     use tinyagents_definition::ToolScope;
     const SPAWN_SUBAGENT: &str = "spawn_subagent";
