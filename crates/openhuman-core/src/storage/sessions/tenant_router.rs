@@ -93,8 +93,8 @@ impl TenantSessionStores {
         }
         let backend = Arc::clone(&self.backend);
         let factory: AgentStorageFactory = Arc::new(move |agent_id| {
-            let owner_scope = crate::storage::scope::Scope::new(tenant.as_str())?
-                .agent(agent_id)?;
+            let owner_scope =
+                crate::storage::scope::Scope::new(tenant.as_str())?.agent(agent_id)?;
             let scope = PortScope::new(owner_scope.as_str())?;
             let storage = backend.for_scope(&owner_scope)?;
             super::super::block_on(async {
