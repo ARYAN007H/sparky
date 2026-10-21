@@ -11,10 +11,10 @@
 //! `<workspace>/artifacts/tool-results` on read; that directory is a cache the
 //! sweep below keeps bounded.
 
-use std::path::Path;
 use crate::agent::harness::tool_result_artifacts::{new_tool_result_store, HostArtifactStore};
 use crate::security::policy::tool_result_artifacts_dir;
 use crate::storage::sessions::artifact_blobs_for;
+use std::path::Path;
 
 /// How long a tool-result artifact survives: the blob lifetime handed to
 /// drivers with blob TTL, and the age past which another session's
