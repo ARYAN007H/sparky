@@ -54,7 +54,10 @@ fn reads_completed_versions_from_a_read_only_database_snapshot() {
 
     let (versions, last) = read(&db).unwrap();
 
-    assert_eq!(versions, vec![("profiles".into(), 2), ("threads".into(), 3)]);
+    assert_eq!(
+        versions,
+        vec![("profiles".into(), 2), ("threads".into(), 3)]
+    );
     assert_eq!(last, Some(300));
     assert_eq!(std::fs::read(&db).unwrap(), original);
 }

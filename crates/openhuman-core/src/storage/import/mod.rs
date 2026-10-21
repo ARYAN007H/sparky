@@ -48,10 +48,10 @@
 //! tinyflows stores (cron jobs, the flow catalog and checkpoints) are copied
 //! with `tinyflows-import`; see [`tinyflows`].
 
-pub mod live;
-mod schemas;
 #[cfg(feature = "legacy-import")]
 pub(crate) mod layout_status;
+pub mod live;
+mod schemas;
 #[cfg(feature = "legacy-import")]
 pub mod sessions;
 #[cfg(feature = "legacy-import")]
