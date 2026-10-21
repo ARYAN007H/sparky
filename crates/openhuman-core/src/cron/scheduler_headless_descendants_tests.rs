@@ -98,7 +98,7 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
         )
         .definitions(definitions),
     );
-    let dispatch = crate::core::runtime::DispatchCtx::new(core);
+    let dispatch = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&core));
     let mut job = test_job("");
     job.job_type = JobType::Agent;
     job.agent_id = Some("orchestrator".into());
@@ -108,8 +108,16 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
     let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
     *model.child_started.lock().unwrap() = Some(child_started_tx);
     let run = tokio::spawn(async move {
-        super::super::agent_run::run_agent_job_for_run(&dispatch, &config, &job, "cron-run-test")
-            .await
+        crate::core::runtime::CoreContext::scope(
+            core,
+            Box::pin(super::super::agent_run::run_agent_job_for_run(
+                &dispatch,
+                &config,
+                &job,
+                "cron-run-test",
+            )),
+        )
+        .await
     });
     match tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx).await {
         Ok(Ok(())) => {}
