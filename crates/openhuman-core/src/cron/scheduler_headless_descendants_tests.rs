@@ -21,6 +21,83 @@ struct CronChildModel {
     child_release: tokio::sync::Notify,
 }
 
+fn scheduled_agent_fixture(timeout_secs: u64) -> (
+    TempDir,
+    Config,
+    std::sync::Arc<crate::core::runtime::CoreContext>,
+    crate::core::runtime::DispatchCtx,
+    tinyflows_bus::schedule::types::CronJob,
+) {
+    let temp = TempDir::new().expect("cron workspace");
+    let mut config = Config::default();
+    config.workspace_dir = temp.path().join("workspace");
+    config.action_dir = config.workspace_dir.clone();
+    config.default_model = Some("test-model".into());
+    config.chat_provider = Some("omlx:test-model".into());
+    config.agent.agent_timeout_secs = timeout_secs;
+    config.reliability.scheduler_retries = 0;
+    std::fs::create_dir_all(&config.workspace_dir).expect("workspace");
+
+    let definitions = Arc::new(
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only(),
+    );
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config.clone(),
+    )
+    .derive_with(
+        crate::core::runtime::ContextOverlay::new(
+            config.clone(),
+            crate::core::runtime::DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .definitions(definitions),
+    );
+    let dispatch = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&core));
+    let job = crate::cron::add_agent_job(
+        &config,
+        Some("headless child test".into()),
+        tinyflows_bus::schedule::types::Schedule::Every {
+            every_ms: 3_600_000,
+        },
+        "Delegate this scheduled task to its worker.",
+        SessionTarget::Isolated,
+        Some("test-model".into()),
+        None,
+        false,
+    )
+    .expect("persist scheduled agent job");
+    crate::cron::store::force_next_run_for_test(
+        &config,
+        &job.id,
+        chrono::Utc::now() - chrono::Duration::seconds(1),
+    )
+    .expect("make the job due");
+    (temp, config, core, dispatch, job)
+}
+
+async fn dispatch_scheduled_agent(
+    core: std::sync::Arc<crate::core::runtime::CoreContext>,
+    dispatch: crate::core::runtime::DispatchCtx,
+    config: Config,
+) {
+    let security = Arc::new(SecurityPolicy::from_config(
+        &config.autonomy,
+        &config.workspace_dir,
+        &config.action_dir,
+    ));
+    let mut dispatcher = JobDispatcher::new(&dispatch, &config, &security);
+    crate::core::runtime::CoreContext::scope(
+        core,
+        Box::pin(async move {
+            let dispatched = dispatcher.tick(&config).await.expect("scheduler tick");
+            assert_eq!(dispatched, 1, "the persisted due job is dispatched");
+            dispatcher.drain().await;
+        }),
+    )
+    .await;
+}
+
 #[async_trait]
 impl ChatModel<()> for CronChildModel {
     fn profile(&self) -> Option<&ModelProfile> {
@@ -102,72 +179,13 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
     });
     let _model =
         crate::inference::provider::factory::test_provider_override::install_model(model.clone());
-    let temp = TempDir::new().expect("cron workspace");
-    let mut config = Config::default();
-    config.workspace_dir = temp.path().join("workspace");
-    config.action_dir = config.workspace_dir.clone();
-    config.default_model = Some("test-model".into());
-    config.chat_provider = Some("omlx:test-model".into());
-    config.reliability.scheduler_retries = 0;
-    std::fs::create_dir_all(&config.workspace_dir).expect("workspace");
-
-    let definitions =
-        Arc::new(crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only());
-    let core = crate::core::runtime::CoreContext::for_test_with_config(
-        crate::core::runtime::DomainSet::full(),
-        config.clone(),
-    )
-    .derive_with(
-        crate::core::runtime::ContextOverlay::new(
-            config.clone(),
-            crate::core::runtime::DomainSet::full(),
-            crate::tools::toolpacks::ToolGroups::none(),
-        )
-        .definitions(definitions),
-    );
-    let dispatch = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&core));
-    let job = crate::cron::add_agent_job(
-        &config,
-        Some("headless child test".into()),
-        tinyflows_bus::schedule::types::Schedule::Every {
-            every_ms: 3_600_000,
-        },
-        "Delegate this scheduled task to its worker.",
-        SessionTarget::Isolated,
-        Some("test-model".into()),
-        None,
-        false,
-    )
-    .expect("persist scheduled agent job");
-    crate::cron::store::force_next_run_for_test(
-        &config,
-        &job.id,
-        chrono::Utc::now() - chrono::Duration::seconds(1),
-    )
-    .expect("make the job due");
+    let (_temp, config, core, dispatch, job) = scheduled_agent_fixture(900);
 
     let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
     *model.child_started.lock().unwrap() = Some(child_started_tx);
-    let security = Arc::new(SecurityPolicy::from_config(
-        &config.autonomy,
-        &config.workspace_dir,
-        &config.action_dir,
-    ));
-    let mut dispatcher = JobDispatcher::new(&dispatch, &config, &security);
     let scheduler_config = config.clone();
     let run = tokio::spawn(async move {
-        crate::core::runtime::CoreContext::scope(
-            core,
-            Box::pin(async move {
-                let dispatched = dispatcher
-                    .tick(&scheduler_config)
-                    .await
-                    .expect("scheduler tick");
-                assert_eq!(dispatched, 1, "the persisted due job is dispatched");
-                dispatcher.drain().await;
-            }),
-        )
-        .await
+        dispatch_scheduled_agent(core, dispatch, scheduler_config).await
     });
     match tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx).await {
         Ok(Ok(())) => {}
