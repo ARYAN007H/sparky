@@ -417,6 +417,7 @@ fn model_limits_client_uses_provider_ca_and_falls_back_to_proxy() {
         move |service, timeout, connect_timeout| {
             proxy_record.lock().unwrap().push((
                 "proxy".to_string(),
+                String::new(),
                 service.to_string(),
                 timeout,
                 connect_timeout,
@@ -434,7 +435,13 @@ fn model_limits_client_uses_provider_ca_and_falls_back_to_proxy() {
                 5,
                 3
             ),
-            ("proxy".to_string(), MODEL_LIMITS_SERVICE.to_string(), 5, 3)
+            (
+                "proxy".to_string(),
+                String::new(),
+                MODEL_LIMITS_SERVICE.to_string(),
+                5,
+                3
+            )
         ]
     );
 }

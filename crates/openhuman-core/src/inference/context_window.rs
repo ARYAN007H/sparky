@@ -11,9 +11,9 @@ use std::sync::OnceLock;
 use tinyinference_llm::model::context_window::{
     ContextWindowResolver, ContextWindowRouteInput, ManagedDefaultWindow, ResolvedWindow,
 };
-use tinyinference_llm::model::discover::{
-    DiscoveryRequest, ModelLimitsCache, ModelListingFetcher, model_limits_cache,
-};
+use tinyinference_llm::model::discover::model_limits_cache;
+#[cfg(test)]
+use tinyinference_llm::model::discover::{ModelLimitsCache, ModelListingFetcher};
 use tinyinference_local::profile::LocalProviderKind;
 
 use crate::config::Config;
@@ -77,6 +77,20 @@ async fn resolve_context_window_inner(
 ) -> ResolvedWindow {
     let local_kind = tinyinference_local::profile::kind_from_provider_string(provider);
     let route = route_input(role, provider, model, config, extensions, local_kind);
+    #[cfg(test)]
+    {
+        return resolver()
+            .resolve_for_route_with_fetcher(
+                provider,
+                model,
+                local_kind,
+                route,
+                model_limits_cache(),
+                &OfflineFetcher,
+            )
+            .await;
+    }
+    #[cfg(not(test))]
     resolver()
         .resolve_for_route(
             provider,
@@ -87,6 +101,25 @@ async fn resolve_context_window_inner(
             || model_limits_client(config, provider),
         )
         .await
+}
+
+/// Unit-test callers never reach a provider unless they explicitly inject a
+/// fetcher through `resolve_context_window_with`.
+#[cfg(test)]
+struct OfflineFetcher;
+
+#[cfg(test)]
+#[async_trait::async_trait]
+impl ModelListingFetcher for OfflineFetcher {
+    async fn get_json(
+        &self,
+        url: &str,
+        _headers: &[(String, String)],
+    ) -> tinyinference_llm::Result<serde_json::Value> {
+        Err(tinyinference_llm::Error::Catalog(format!(
+            "offline in unit tests: {url}"
+        )))
+    }
 }
 
 /// Test seam that injects an offline listing fetcher while preserving the
@@ -186,6 +219,7 @@ fn static_route_facts(
 
 /// Builds the host-configured model-listing client lazily, only when the
 /// native resolver determines discovery can run.
+#[cfg(not(test))]
 fn model_limits_client(config: &Config, provider: &str) -> reqwest::Client {
     model_limits_client_with(
         config,
