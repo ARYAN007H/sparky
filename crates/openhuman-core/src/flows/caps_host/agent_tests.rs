@@ -36,13 +36,17 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
 
     const CHILD_PROMPT: &str = "headless-flow-child-result-marker";
     const GRANDCHILD_PROMPT: &str = "headless-flow-grandchild-result-marker";
+    const GREAT_GRANDCHILD_PROMPT: &str = "headless-flow-great-grandchild-result-marker";
 
     struct FlowChildModel {
         spawn_calls: std::sync::atomic::AtomicUsize,
         child_calls: std::sync::atomic::AtomicUsize,
         child_schema_names: std::sync::Mutex<Vec<Vec<String>>>,
+        manager_calls: std::sync::atomic::AtomicUsize,
+        leaf_schema_names: std::sync::Mutex<Vec<Vec<String>>>,
         grandchild_calls: std::sync::atomic::AtomicUsize,
         nested_spawn_calls: std::sync::atomic::AtomicUsize,
+        leaf_refusal_readable: std::sync::atomic::AtomicBool,
         accepted_followups: std::sync::atomic::AtomicUsize,
         child_started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
         child_release: tokio::sync::Notify,
@@ -65,25 +69,64 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
             _state: &(),
             request: ModelRequest,
         ) -> tinyinference_llm::Result<ModelResponse> {
-            let contains_child_prompt = request.messages.iter().any(|message| {
+            let contains_user_marker = |marker: &str| request.messages.iter().any(|message| {
                 matches!(message, tinyinference_llm::message::Message::User(_))
-                    && message.text().contains(CHILD_PROMPT)
+                    && message.text().contains(marker)
             });
-            if !contains_child_prompt
-                && request.messages.iter().any(|message| {
-                    matches!(message, tinyinference_llm::message::Message::User(_))
-                        && message.text().contains(GRANDCHILD_PROMPT)
-                })
-            {
-                self.grandchild_calls
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                if let Some(started) = self.child_started.lock().unwrap().take() {
-                    let _ = started.send(());
+            if contains_user_marker(GREAT_GRANDCHILD_PROMPT) {
+                self.leaf_schema_names.lock().unwrap().push(
+                    request.tools.iter().map(|tool| tool.name.clone()).collect(),
+                );
+                let call = self.grandchild_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                if call == 0 {
+                    if let Some(started) = self.child_started.lock().unwrap().take() {
+                        let _ = started.send(());
+                    }
+                    self.child_release.notified().await;
+                    let mut response = ModelResponse::assistant("");
+                    response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
+                        "headless-flow-at-cap-spawn",
+                        "spawn_subagent",
+                        serde_json::json!({
+                            "agent_id": "flow_final",
+                            "prompt": "must not run beyond the native depth cap",
+                            "task_key": "headless-flow-at-cap-task",
+                            "context": "depth cap refusal regression",
+                            "model": "test-model"
+                        }),
+                    )];
+                    response.finish_reason = Some("tool_calls".into());
+                    return Ok(response);
                 }
-                self.child_release.notified().await;
+                let refusal_visible = request.messages.iter().any(|message| {
+                    matches!(message, tinyinference_llm::message::Message::Tool(_))
+                        && message.text().to_ascii_lowercase().contains("unknown tool")
+                });
+                self.leaf_refusal_readable.store(refusal_visible, std::sync::atomic::Ordering::SeqCst);
                 return Ok(ModelResponse::assistant("headless-flow-grandchild-result"));
             }
-            if contains_child_prompt {
+            if contains_user_marker(GRANDCHILD_PROMPT) {
+                let call = self.manager_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                if call > 0 {
+                    return Ok(ModelResponse::assistant("headless-flow-manager-result"));
+                }
+                self.nested_spawn_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let mut response = ModelResponse::assistant("");
+                response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
+                    "headless-flow-leaf-spawn",
+                    "spawn_subagent",
+                    serde_json::json!({
+                        "agent_id": "flow_leaf",
+                        "prompt": GREAT_GRANDCHILD_PROMPT,
+                        "task_key": "headless-flow-leaf-task",
+                        "context": "headless flow depth-cap regression",
+                        "model": "test-model"
+                    }),
+                )];
+                response.finish_reason = Some("tool_calls".into());
+                return Ok(response);
+            }
+            if contains_user_marker(CHILD_PROMPT) {
                 self.child_schema_names
                     .lock()
                     .unwrap()
@@ -155,8 +198,11 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
         spawn_calls: std::sync::atomic::AtomicUsize::new(0),
         child_calls: std::sync::atomic::AtomicUsize::new(0),
         child_schema_names: std::sync::Mutex::new(Vec::new()),
+        manager_calls: std::sync::atomic::AtomicUsize::new(0),
+        leaf_schema_names: std::sync::Mutex::new(Vec::new()),
         grandchild_calls: std::sync::atomic::AtomicUsize::new(0),
         nested_spawn_calls: std::sync::atomic::AtomicUsize::new(0),
+        leaf_refusal_readable: std::sync::atomic::AtomicBool::new(false),
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
