@@ -135,7 +135,9 @@ async fn gitbooks_tools_fail_closed_when_the_module_is_not_attested() {
 #[test]
 fn redact_endpoint_origin_keeps_only_safe_origin() {
     assert_eq!(
-        redact_endpoint_origin("https://tinyhumans.gitbook.io/openhuman/~gitbook/mcp?token=secret#fragment-secret"),
+        redact_endpoint_origin(
+            "https://tinyhumans.gitbook.io/openhuman/~gitbook/mcp?token=secret#fragment-secret"
+        ),
         "https://tinyhumans.gitbook.io/"
     );
     assert_eq!(
@@ -143,7 +145,9 @@ fn redact_endpoint_origin_keeps_only_safe_origin() {
         "http://example.com:8080/"
     );
     assert_eq!(
-        redact_endpoint_origin("https://user:secret@example.com/private/secret?token=secret#fragment-secret"),
+        redact_endpoint_origin(
+            "https://user:secret@example.com/private/secret?token=secret#fragment-secret"
+        ),
         "https://example.com/"
     );
     assert_eq!(
