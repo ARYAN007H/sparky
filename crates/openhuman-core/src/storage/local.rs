@@ -97,6 +97,19 @@ pub(super) fn arm_test_sync_backend_entry_signal(
 }
 
 #[cfg(test)]
+pub(super) fn clear_test_sync_backend_entry_signal(workspace_dir: &Path) {
+    let mut signal = SYNC_BACKEND_ENTRY_TEST_SIGNAL
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    if signal
+        .as_ref()
+        .is_some_and(|signal| signal.workspace_dir == workspace_dir)
+    {
+        signal.take();
+    }
+}
+
+#[cfg(test)]
 async fn await_test_backend_open_gate() {
     let gate = BACKEND_OPEN_TEST_GATE
         .lock()

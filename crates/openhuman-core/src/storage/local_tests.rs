@@ -93,9 +93,10 @@ async fn warm_sync_open_reuses_the_backend_without_entering_the_blocking_bridge(
     let dir = tempfile::tempdir().unwrap();
     let warmed = backend_for_async(dir.path()).await.unwrap();
     let (entered_tx, entered_rx) = std::sync::mpsc::channel();
-    super::arm_test_sync_backend_entry_signal(entered_tx);
+    super::arm_test_sync_backend_entry_signal(dir.path(), entered_tx);
 
     let synchronous = backend_for(dir.path()).unwrap();
+    super::clear_test_sync_backend_entry_signal(dir.path());
 
     assert!(Arc::ptr_eq(&warmed, &synchronous));
     assert_eq!(
@@ -164,7 +165,7 @@ fn current_thread_sync_fallback_does_not_deadlock_on_async_backend_initializatio
             .expect("async initialization claimed the workspace cell");
 
         let (sync_entry_tx, sync_entry_rx) = std::sync::mpsc::channel();
-        super::arm_test_sync_backend_entry_signal(sync_entry_tx);
+        super::arm_test_sync_backend_entry_signal(dir.path(), sync_entry_tx);
         let releaser = std::thread::spawn(move || {
             sync_entry_rx
                 .recv_timeout(std::time::Duration::from_secs(30))

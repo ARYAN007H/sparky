@@ -108,6 +108,7 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
     // with no timeout, so a test that is meant to be offline waited on the
     // network (24 s here) and could wait forever behind a firewall.
     let mut config = offline_config();
+    config.mcp_client.enabled = false;
     config.modules.allow_download = false;
     runtime.block_on(async move {
         // `Runtime::block_on` polls its root future on this test thread, whose
