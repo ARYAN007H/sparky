@@ -67,6 +67,10 @@ type OnceKey = (usize, String, &'static str, String);
 static DONE_ONCE: LazyLock<Mutex<HashMap<OnceKey, Weak<dyn StorageBackend>>>> =
     LazyLock::new(Mutex::default);
 
+type PreparedKey = (usize, String);
+static PREPARED_SCOPES: LazyLock<Mutex<HashMap<PreparedKey, Weak<dyn StorageBackend>>>> =
+    LazyLock::new(Mutex::default);
+
 /// The backend and scope a [`Repo`] was opened on, for declaring its
 /// collections once per process instead of on every call.
 #[derive(Clone)]
@@ -137,6 +141,26 @@ impl Repo {
         let scoped = backend
             .for_scope(scope)
             .with_context(|| format!("[{domain}] open the storage scope"))?;
+        let prepared_key = (backend_addr(backend), scope.as_str().to_owned());
+        let already_prepared = PREPARED_SCOPES
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&prepared_key)
+            .and_then(Weak::upgrade)
+            .is_some_and(|alive| Arc::ptr_eq(&alive, backend));
+        if !already_prepared {
+            let to_prepare = scoped.clone();
+            block_on(async move {
+                super::boot::prepare_scope(&to_prepare).await?;
+                Ok(())
+            })
+            .with_context(|| format!("[{domain}] prepare owner collections"))?;
+            let mut prepared = PREPARED_SCOPES
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            prepared.retain(|_, weak| weak.strong_count() > 0);
+            prepared.insert(prepared_key, Arc::downgrade(backend));
+        }
         let mut repo = Self::over(&scoped, domain, collections);
         repo.origin = Some(Origin {
             backend: Arc::clone(backend),
@@ -235,6 +259,18 @@ impl Repo {
             future.await
         })
         .map_err(|error| anyhow!("[{domain}] storage: {error}"))
+    }
+
+    /// Runs an operation with the complete scope-bound six-port handle after
+    /// declaring this owner's document collections.
+    pub fn run_storage<T, F, Fut>(&self, op: F) -> Result<T>
+    where
+        F: FnOnce(Storage) -> Fut,
+        Fut: Future<Output = Result<T, StorageError>> + Send + 'static,
+        T: Send + 'static,
+    {
+        let storage = self.scoped.clone();
+        self.run(move |_| op(storage))
     }
 }
 

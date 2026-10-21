@@ -55,7 +55,7 @@ pub use scope::{
 };
 
 use std::future::Future;
-use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock};
+use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock, mpsc};
 
 /// SQLite bindings re-exported by the storage driver crate, for the two
 /// consumers that open a SQLite file that is not a storage backend: the
@@ -110,17 +110,43 @@ impl<T: tinystoragedrivers_api::DocumentStoreExt + ?Sized> DocumentStoreExt for 
 /// asynchronous storage ports. Keeping it on its own thread also permits a
 /// synchronous facade to be called while the caller is on a current-thread
 /// Tokio runtime.
-struct Blocking(tokio::runtime::Runtime);
+struct Blocking {
+    tasks: mpsc::Sender<Box<dyn FnOnce(&tokio::runtime::Runtime) + Send>>,
+}
+
+thread_local! {
+    static ON_STORAGE_RUNTIME: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
 
 impl Blocking {
     fn new() -> anyhow::Result<Self> {
-        Ok(Self(
-            tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(1)
-                .enable_all()
-                .thread_name("openhuman-storage")
-                .build()?,
-        ))
+        let (tasks, receiver) = mpsc::channel::<Box<dyn FnOnce(&tokio::runtime::Runtime) + Send>>();
+        let (started, ready) = mpsc::sync_channel(1);
+        std::thread::Builder::new()
+            .name("openhuman-storage".to_owned())
+            .spawn(move || {
+                let runtime = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build();
+                match runtime {
+                    Ok(runtime) => {
+                        if started.send(Ok(())).is_err() {
+                            return;
+                        }
+                        while let Ok(task) = receiver.recv() {
+                            task(&runtime);
+                        }
+                    }
+                    Err(error) => {
+                        let _ = started.send(Err(error.to_string()));
+                    }
+                }
+            })?;
+        ready
+            .recv()
+            .map_err(|error| anyhow::anyhow!("storage runtime failed to start: {error}"))?
+            .map_err(anyhow::Error::msg)?;
+        Ok(Self { tasks })
     }
 
     fn run<T, F>(&self, future: F) -> Result<T, StorageError>
@@ -128,7 +154,23 @@ impl Blocking {
         F: Future<Output = Result<T, StorageError>> + Send + 'static,
         T: Send + 'static,
     {
-        Ok(self.0.block_on(future)?)
+        if ON_STORAGE_RUNTIME.with(std::cell::Cell::get) {
+            return Err(StorageError::backend(
+                "synchronous storage bridge cannot be re-entered from its own runtime",
+            ));
+        }
+        let (reply, result) = mpsc::sync_channel(1);
+        self.tasks
+            .send(Box::new(move |runtime| {
+                ON_STORAGE_RUNTIME.with(|active| active.set(true));
+                let outcome = runtime.block_on(future);
+                ON_STORAGE_RUNTIME.with(|active| active.set(false));
+                let _ = reply.send(outcome);
+            }))
+            .map_err(|error| StorageError::backend(format!("storage bridge stopped: {error}")))?;
+        result
+            .recv()
+            .map_err(|error| StorageError::backend(format!("storage bridge stopped: {error}")))?
     }
 }
 
@@ -355,7 +397,7 @@ where
         .get_or_init(|| Blocking::new().map_err(|error| error.to_string()))
         .as_ref()
         .map_err(|error| StorageError::backend(error.clone()))?;
-    bridge.run(future)?
+    bridge.run(future)
 }
 
 /// [`block_on`] for a future whose error is an `anyhow::Error` — the stores

@@ -26,17 +26,18 @@ use anyhow::{Context, Result};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tinystoragedrivers::{
-    CollectionSpec, DocumentStore, ErrorKind, Key, Kv, Scope, ScopedStorage, StorageError,
-};
+use tinystoragedrivers::{CollectionSpec, Cursor, ErrorKind, Precondition, Scope, StorageError};
+use tinystoragedrivers_api::KvStore;
+use sha2::Digest;
 
 use super::documents::Repo;
 use super::import_state;
+use super::Storage;
 
 /// The `tsd.migrations` step kind of a state-file import.
 const IMPORT_KIND: &str = "state_file";
 
-/// The body of a `tsd.kv` document, as `Kv` writes it.
+/// The envelope used to preserve exact host namespace/key identity in TSD KV.
 #[derive(Serialize, Deserialize)]
 struct KvEntry {
     owner: String,
@@ -46,7 +47,7 @@ struct KvEntry {
 }
 
 fn collections() -> Vec<CollectionSpec> {
-    tinystoragedrivers::primitives::collection_specs()
+    Vec::new()
 }
 
 /// One `(owner, namespace)` of runtime state values in one scope.
@@ -83,7 +84,7 @@ impl StateKv {
 
     /// The state over an already scoped handle (tests, explicit scopes).
     #[must_use]
-    pub fn over(scoped: &ScopedStorage, owner: &'static str, ns: &'static str) -> Self {
+    pub fn over(scoped: &Storage, owner: &'static str, ns: &'static str) -> Self {
         Self {
             repo: Repo::over(scoped, "storage::state_kv", collections),
             owner,
@@ -91,12 +92,13 @@ impl StateKv {
         }
     }
 
-    fn kv(&self, docs: &Arc<dyn DocumentStore>) -> Result<Kv, StorageError> {
-        Kv::ns(docs, self.owner, self.ns)
+    fn prefix(&self) -> String {
+        let namespace = format!("{}\0{}", self.owner, self.ns);
+        format!("openhuman-state:{}:", hex::encode(sha2::Sha256::digest(namespace.as_bytes())))
     }
 
     fn id(&self, name: &str) -> Result<String, StorageError> {
-        Ok(Key::of([self.owner, self.ns, name])?.as_str().to_owned())
+        Ok(format!("{}{}", self.prefix(), hex::encode(sha2::Sha256::digest(name.as_bytes()))))
     }
 
     /// The value stored under `name`.
@@ -106,8 +108,15 @@ impl StateKv {
     /// A storage error, or a stored value that is not a `T`.
     pub fn get<T: DeserializeOwned + Send + 'static>(&self, name: &str) -> Result<Option<T>> {
         let (this, name) = (self.clone(), name.to_owned());
-        self.repo
-            .run(move |docs| async move { this.kv(&docs)?.get::<T>(&name).await })
+        self.repo.run_storage(move |storage| async move {
+            let Some(record) = storage.kv().get(&this.id(&name)?).await? else {
+                return Ok(None);
+            };
+            let entry = this.decode_entry(&record.id, record.doc)?;
+            serde_json::from_value(entry.value)
+                .map(Some)
+                .map_err(|error| StorageError::invalid_input(error.to_string()))
+        })
     }
 
     /// Stores `value` under `name`, replacing any earlier one.
@@ -118,8 +127,13 @@ impl StateKv {
     pub fn put<T: Serialize>(&self, name: &str, value: &T) -> Result<()> {
         let (this, name) = (self.clone(), name.to_owned());
         let value = serde_json::to_value(value).context("serialize the state value")?;
-        self.repo
-            .run(move |docs| async move { this.kv(&docs)?.put(&name, &value).await.map(|_| ()) })
+        self.repo.run_storage(move |storage| async move {
+            storage
+                .kv()
+                .put(&this.id(&name)?, this.entry(&name, value)?)
+                .await?;
+            Ok(())
+        })
     }
 
     /// Removes `name`, reporting whether it existed.
@@ -130,7 +144,12 @@ impl StateKv {
     pub fn delete(&self, name: &str) -> Result<bool> {
         let (this, name) = (self.clone(), name.to_owned());
         self.repo
-            .run(move |docs| async move { this.kv(&docs)?.delete(&name).await })
+            .run_storage(move |storage| async move {
+                match storage.kv().get(&this.id(&name)?).await? {
+                    Some(current) => storage.kv().delete(&current.id, current.unchanged()).await,
+                    None => Ok(false),
+                }
+            })
     }
 
     /// Every `(name, value)` whose name starts with `prefix`, in name order.
@@ -143,8 +162,27 @@ impl StateKv {
         prefix: &str,
     ) -> Result<Vec<(String, T)>> {
         let (this, prefix) = (self.clone(), prefix.to_owned());
-        self.repo
-            .run(move |docs| async move { this.kv(&docs)?.list::<T>(&prefix).await })
+        self.repo.run_storage(move |storage| async move {
+            let mut cursor: Option<Cursor> = None;
+            let mut entries = Vec::new();
+            loop {
+                let page = storage.kv().list(&this.prefix(), cursor, 256).await?;
+                for record in page.items {
+                    let entry = this.decode_entry(&record.id, record.doc)?;
+                    if entry.key.starts_with(&prefix) {
+                        let value = serde_json::from_value(entry.value)
+                            .map_err(|error| StorageError::invalid_input(error.to_string()))?;
+                        entries.push((entry.key, value));
+                    }
+                }
+                cursor = page.next;
+                if cursor.is_none() {
+                    break;
+                }
+            }
+            entries.sort_by(|left, right| left.0.cmp(&right.0));
+            Ok(entries)
+        })
     }
 
     /// Stores `value` under `name` only when nothing is stored there yet.
@@ -154,20 +192,14 @@ impl StateKv {
     ///
     /// A storage error.
     pub fn insert_if_absent<T: Serialize>(&self, name: &str, value: &T) -> Result<bool> {
-        let entry = KvEntry {
-            owner: self.owner.to_owned(),
-            ns: self.ns.to_owned(),
-            key: name.to_owned(),
-            value: serde_json::to_value(value).context("serialize the state value")?,
-        };
+        let body = self.entry(
+            name,
+            serde_json::to_value(value).context("serialize the state value")?,
+        )?;
         let this = self.clone();
         let name = name.to_owned();
-        self.repo.run(move |docs| async move {
-            let repo = tinystoragedrivers::Repo::<KvEntry>::new(
-                &docs,
-                tinystoragedrivers::primitives::KV,
-            )?;
-            match repo.insert(&this.id(&name)?, &entry).await {
+        self.repo.run_storage(move |storage| async move {
+            match storage.kv().cas(&this.id(&name)?, body, Precondition::Absent).await {
                 Ok(_) => Ok(true),
                 Err(error) if error.kind() == ErrorKind::Conflict => Ok(false),
                 Err(error) => Err(error),
@@ -194,35 +226,61 @@ impl StateKv {
     {
         let this = self.clone();
         let name = name.to_owned();
-        self.repo.run(move |docs| async move {
-            let repo = tinystoragedrivers::Repo::<KvEntry>::new(
-                &docs,
-                tinystoragedrivers::primitives::KV,
-            )?
-            .with_retry(tinystoragedrivers::RetryPolicy::default());
-            let mut result = None;
-            repo.update(&this.id(&name)?, |current| {
+        self.repo.run_storage(move |storage| async move {
+            for _ in 0..32 {
+                let current = storage.kv().get(&this.id(&name)?).await?;
                 let mut value: T = match &current {
-                    Some(entry) => serde_json::from_value(entry.value.clone())
-                        .map_err(|e| StorageError::invalid_input(e.to_string()))?,
+                    Some(record) => {
+                        let entry = this.decode_entry(&record.id, record.doc.clone())?;
+                        serde_json::from_value(entry.value)
+                            .map_err(|error| StorageError::invalid_input(error.to_string()))?
+                    }
                     None => T::default(),
                 };
                 let (outcome, changed) = change(&mut value);
-                result = Some(outcome);
                 if !changed {
-                    return Ok(None);
+                    return Ok(outcome);
                 }
-                Ok(Some(KvEntry {
-                    owner: this.owner.to_owned(),
-                    ns: this.ns.to_owned(),
-                    key: name.clone(),
-                    value: serde_json::to_value(&value)
-                        .map_err(|e| StorageError::invalid_input(e.to_string()))?,
-                }))
-            })
-            .await?;
-            result.ok_or_else(|| StorageError::backend("state update produced no result"))
+                let body = this.entry(
+                    &name,
+                    serde_json::to_value(&value)
+                        .map_err(|error| StorageError::serialization(error.to_string()))?,
+                )?;
+                let expected = current
+                    .as_ref()
+                    .map_or(Precondition::Absent, |record| record.unchanged());
+                match storage.kv().cas(&this.id(&name)?, body, expected).await {
+                    Ok(_) => return Ok(outcome),
+                    Err(error) if error.kind() == ErrorKind::Conflict => continue,
+                    Err(error) => return Err(error),
+                }
+            }
+            Err(StorageError::conflict("state update exceeded its retry budget"))
         })
+    }
+
+    fn entry(&self, key: &str, value: Value) -> Result<Value, StorageError> {
+        serde_json::to_value(KvEntry {
+            owner: self.owner.to_owned(),
+            ns: self.ns.to_owned(),
+            key: key.to_owned(),
+            value,
+        })
+        .map_err(|error| StorageError::serialization(error.to_string()))
+    }
+
+    fn decode_entry(&self, storage_key: &str, value: Value) -> Result<KvEntry, StorageError> {
+        let entry: KvEntry = serde_json::from_value(value)
+            .map_err(|error| StorageError::invalid_input(error.to_string()))?;
+        if entry.owner != self.owner
+            || entry.ns != self.ns
+            || self.id(&entry.key)? != storage_key
+        {
+            return Err(StorageError::invalid_input(
+                "state KV identity envelope does not match its storage prefix",
+            ));
+        }
+        Ok(entry)
     }
 
     /// Copies the legacy JSON file `legacy` into `name` once for this backend

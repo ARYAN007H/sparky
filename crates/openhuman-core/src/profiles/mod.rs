@@ -38,7 +38,7 @@ pub mod ops;
 mod recovery;
 pub mod registry;
 mod storage_schema;
-pub(crate) use storage_schema::{collection_specs, upgrade_records};
+pub(crate) use storage_schema::{collection_specs, upgrade_lease_records, upgrade_records};
 pub mod schemas;
 pub mod surface;
 pub mod tools;

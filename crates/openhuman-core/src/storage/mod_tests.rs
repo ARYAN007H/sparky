@@ -131,13 +131,16 @@ fn block_on_runs_a_future_from_sync_code() {
     assert_eq!(error.message(), "raced");
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn block_on_works_inside_a_runtime_too() {
-    let answer = tokio::task::spawn_blocking(|| block_on(async { Ok::<_, StorageError>(7) }))
-        .await
-        .unwrap()
-        .unwrap();
+#[tokio::test(flavor = "current_thread")]
+async fn block_on_works_inside_a_current_thread_runtime() {
+    let answer = block_on(async { Ok::<_, StorageError>(7) }).unwrap();
     assert_eq!(answer, 7);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn block_on_works_inside_a_multi_thread_runtime() {
+    let answer = block_on(async { Ok::<_, StorageError>(8) }).unwrap();
+    assert_eq!(answer, 8);
 }
 
 #[test]
