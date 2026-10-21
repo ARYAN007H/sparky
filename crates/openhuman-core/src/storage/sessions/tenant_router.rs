@@ -16,7 +16,9 @@ use tinyagents_harness::store::SchemaAdmission;
 use tinyagents_session::port::{AgentStorageFactory, AgentStores, SessionStoreProvider};
 use tinyagents_session::DriverSessionStores;
 use tinyagents_storage_kit::{Blocking, Scope as PortScope, ScopedStorage};
-use tinystoragedrivers::{Scope, StorageBackend, StorageError};
+use tinystoragedrivers::{StorageBackend, StorageError};
+
+use crate::storage::Scope;
 
 /// Session stores over one backend, routed to a per-tenant provider.
 pub struct TenantSessionStores {

@@ -218,8 +218,15 @@ fn tenant_scope_for(workspace_dir: &Path, what: &str) -> Option<(String, ScopedS
             return None;
         }
     };
-    match backend.for_scope(&session_scope(&key)) {
-        Ok(scoped) => Some((key, scoped)),
+    let scope = session_scope(&key);
+    match backend.for_scope(&scope) {
+        Ok(scoped) => match tinyagents_storage_kit::Scope::new(scope.as_str()) {
+            Ok(port_scope) => Some((key, ScopedStorage::new(scoped, port_scope))),
+            Err(error) => {
+                log::warn!("[session_store] {what} scope invalid agent={key}: {error}");
+                None
+            }
+        },
         Err(error) => {
             log::warn!("[session_store] {what} scope refused agent={key}: {error}");
             None
@@ -432,6 +439,7 @@ pub fn session_scope(key: &str) -> tinystoragedrivers::Scope {
     crate::storage::tenant_scope(profile.as_deref())
         .agent(&agent)
         .unwrap_or_else(|_| unreachable!("a non-empty agent id is a valid segment"))
+        .to_storage_scope()
 }
 
 #[cfg(test)]

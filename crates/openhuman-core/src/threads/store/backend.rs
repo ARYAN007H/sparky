@@ -24,6 +24,7 @@ use tinyagents_session::threads::{
     CreateConversationThread, CrossThreadHit, DriverConversationStore, ThreadMessage,
     ThreadMessagePatch,
 };
+use tinyagents_storage_kit::{Scope as AgentScope, ScopedStorage};
 
 use crate::core::runtime::DispatchCtx;
 use crate::storage::documents::Repo;
@@ -110,7 +111,10 @@ pub(crate) fn import_legacy_into(
         .map_err(|e| format!("{LOG_PREFIX} open the storage scope: {e}"))?;
     let repo = Repo::on(backend, &scope, DOMAIN, super::legacy_import::collections)
         .map_err(|e| format!("{LOG_PREFIX} {e:#}"))?;
-    let store = DriverConversationStore::new(scoped.clone());
+    let store = DriverConversationStore::new(ScopedStorage::new(
+        scoped.clone(),
+        AgentScope::new(scope.as_str()).map_err(|e| format!("{LOG_PREFIX} invalid scope: {e}"))?,
+    ));
     let docs = Arc::clone(scoped.documents());
     storage::block_on(async move {
         DriverConversationStore::prepare_schema(docs.as_ref()).await?;
@@ -150,7 +154,11 @@ impl ConversationStore {
             .map_err(|e| format!("{LOG_PREFIX} open the storage scope: {e}"))?;
         let repo = Repo::on(&backend, &scope, DOMAIN, super::legacy_import::collections)
             .map_err(|e| format!("{LOG_PREFIX} {e:#}"))?;
-        let store = DriverConversationStore::new(scoped.clone());
+        let store = DriverConversationStore::new(ScopedStorage::new(
+            scoped.clone(),
+            AgentScope::new(scope.as_str())
+                .map_err(|e| format!("{LOG_PREFIX} invalid scope: {e}"))?,
+        ));
         repo.once_per_backend("schema", || {
             let docs = Arc::clone(scoped.documents());
             storage::block_on(async move {
