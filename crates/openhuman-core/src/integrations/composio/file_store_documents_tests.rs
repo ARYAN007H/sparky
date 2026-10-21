@@ -2,8 +2,8 @@ use super::*;
 use crate::config::Config;
 use crate::storage::Scope;
 use crate::storage::test_support::memory_backend;
-use std::sync::Arc;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 fn docs_in(storage: &Arc<dyn crate::storage::StorageBackend>, scope: &Scope) -> Docs {
     Docs::over(&storage.for_scope(scope).unwrap())
