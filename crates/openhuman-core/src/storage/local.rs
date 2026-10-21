@@ -20,9 +20,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 
-use super::{current_scope, installed, Scope, Storage, StorageBackend};
+use super::{Scope, Storage, StorageBackend, current_scope, installed};
 
 /// A backend and the scope a store's records live under in it.
 #[derive(Clone)]
@@ -52,6 +52,21 @@ type WorkspaceBackend = Arc<tokio::sync::OnceCell<Arc<dyn StorageBackend>>>;
 
 static WORKSPACES: LazyLock<Mutex<HashMap<PathBuf, WorkspaceBackend>>> =
     LazyLock::new(Mutex::default);
+
+#[cfg(test)]
+static TEST_WORKSPACE_URLS: LazyLock<Mutex<HashMap<PathBuf, String>>> =
+    LazyLock::new(Mutex::default);
+
+#[cfg(test)]
+pub(super) fn use_persistent_default_for_test(workspace_dir: &Path) {
+    TEST_WORKSPACE_URLS
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .insert(
+            workspace_dir.to_path_buf(),
+            super::config::default_url(workspace_dir),
+        );
+}
 
 #[cfg(test)]
 struct BackendOpenTestGate {
@@ -120,21 +135,49 @@ async fn open_default_backend(workspace_dir: PathBuf) -> Result<Arc<dyn StorageB
     #[cfg(test)]
     await_test_backend_open_gate().await;
 
-    let url = super::config::default_url(&workspace_dir);
-    super::config::prepare_default_dir(&workspace_dir).with_context(|| {
-        format!(
-            "create the storage directory for {}",
-            workspace_dir.display()
-        )
-    })?;
-    tracing::debug!(
-        target: "openhuman::storage",
-        workspace = %workspace_dir.display(),
-        "[storage::local] opening the workspace default backend (none installed)"
-    );
-    super::open(&url)
-        .await
-        .with_context(|| format!("open the default storage for {}", workspace_dir.display()))
+    #[cfg(test)]
+    {
+        let persistent_url = TEST_WORKSPACE_URLS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&workspace_dir)
+            .cloned();
+        if let Some(url) = persistent_url {
+            super::config::prepare_default_dir(&workspace_dir).with_context(|| {
+                format!(
+                    "create the storage directory for {}",
+                    workspace_dir.display()
+                )
+            })?;
+            return super::open(&url).await.with_context(|| {
+                format!("open the default storage for {}", workspace_dir.display())
+            });
+        }
+
+        let backend: Arc<dyn StorageBackend> =
+            Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
+        super::boot::prepare_and_migrate(&backend).await?;
+        return Ok(super::fenced_backend::wrap(backend));
+    }
+
+    #[cfg(not(test))]
+    {
+        let url = super::config::default_url(&workspace_dir);
+        super::config::prepare_default_dir(&workspace_dir).with_context(|| {
+            format!(
+                "create the storage directory for {}",
+                workspace_dir.display()
+            )
+        })?;
+        tracing::debug!(
+            target: "openhuman::storage",
+            workspace = %workspace_dir.display(),
+            "[storage::local] opening the workspace default backend (none installed)"
+        );
+        super::open(&url)
+            .await
+            .with_context(|| format!("open the default storage for {}", workspace_dir.display()))
+    }
 }
 
 async fn initialized_backend(
