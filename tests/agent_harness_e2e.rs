@@ -598,14 +598,19 @@ async fn wait_for_event(
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
         match tokio::time::timeout(remaining, rx.recv()).await {
             Ok(Some(v)) => {
-                seen.push(
-                    v.get("event")
-                        .and_then(Value::as_str)
-                        .unwrap_or("<no event>")
-                        .to_string(),
-                );
-                if v.get("event").and_then(Value::as_str) == Some(event_name) {
+                let received = v.get("event").and_then(Value::as_str);
+                seen.push(received.unwrap_or("<no event>").to_string());
+                if received == Some(event_name) {
                     return v;
+                }
+                if received == Some("chat_error") {
+                    let error_type = v.get("error_type").and_then(Value::as_str);
+                    let error_source = v.get("error_source").and_then(Value::as_str);
+                    let message = v.get("message").and_then(Value::as_str);
+                    let captured_requests = with_captured(|captured| captured.len());
+                    panic!(
+                        "received chat_error while waiting for {event_name}: error_type={error_type:?}, error_source={error_source:?}, message={message:?}, captured requests={captured_requests}"
+                    );
                 }
             }
             Ok(None) => {
