@@ -1,5 +1,4 @@
 use super::*;
-use tinyinference_embeddings::format_embedding_signature;
 
 async fn endpoint() -> (String, tokio::task::JoinHandle<()>) {
     use axum::{routing::post, Json, Router};
@@ -60,11 +59,7 @@ async fn endpoint_only_custom_change_reports_persisted_provider_signature() {
         .await
         .unwrap();
     let persisted = reloaded_config(&tmp).await;
-    let expected = format_embedding_signature(
-        &persisted.memory.embedding_provider,
-        &persisted.memory.embedding_model,
-        persisted.memory.embedding_dimensions,
-    );
+    let expected = format!("provider=custom:{endpoint};model=bge-m3;dims=4");
 
     assert_eq!(
         persisted.memory.embedding_provider,
@@ -104,11 +99,7 @@ async fn auto_detected_dimensions_are_used_in_persisted_provider_signature() {
         .await
         .unwrap();
     let persisted = reloaded_config(&tmp).await;
-    let expected = format_embedding_signature(
-        &persisted.memory.embedding_provider,
-        &persisted.memory.embedding_model,
-        persisted.memory.embedding_dimensions,
-    );
+    let expected = format!("provider=custom:{endpoint};model=bge-m3;dims=4");
 
     assert_eq!(
         persisted.memory.embedding_provider,
