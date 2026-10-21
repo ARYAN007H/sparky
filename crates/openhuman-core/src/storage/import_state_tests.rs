@@ -271,8 +271,8 @@ fn takeover_and_lost_heartbeat_refuse_the_stale_payload_write() {
             std::thread::sleep(Duration::from_millis(150));
             let stale_repo = worker_repo.conditioned(condition)?;
             let attempted = stale_repo.run(|docs| async move {
-                docs.ensure_collection(&CollectionSpec::new("claim_payload"))
-                    .await?;
+                let spec = CollectionSpec::new("claim_payload");
+                docs.ensure_collection(&spec).await?;
                 docs.put(
                     "claim_payload",
                     "stale",
@@ -282,7 +282,10 @@ fn takeover_and_lost_heartbeat_refuse_the_stale_payload_write() {
                 .await
                 .map(|_| ())
             });
-            assert!(attempted.is_err(), "the expired claim cannot write its payload");
+            assert!(
+                attempted.is_err(),
+                "the expired claim cannot write its payload"
+            );
             Ok(())
         })
     });
@@ -293,7 +296,10 @@ fn takeover_and_lost_heartbeat_refuse_the_stale_payload_write() {
         .unwrap()
         .expect("takeover replaces the old claim");
     takeover_tx.send(()).unwrap();
-    assert!(worker.join().unwrap().is_err(), "lost heartbeat fails the import");
+    assert!(
+        worker.join().unwrap().is_err(),
+        "lost heartbeat fails the import"
+    );
     release(&repo, &replacement).unwrap();
 
     let payload = repo
