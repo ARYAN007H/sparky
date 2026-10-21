@@ -69,7 +69,7 @@ fn keyring_consent_schema(function: &str) -> ControllerSchema {
                 name: "mode",
                 ty: TypeSchema::String,
                 comment: "Either 'local_encrypted' (consent to local storage) or 'declined' (refuse local storage).",
-                required: false,
+                required: true,
             }],
             outputs: vec![FieldSchema {
                 name: "result",
