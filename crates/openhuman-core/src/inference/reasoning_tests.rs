@@ -85,6 +85,8 @@ fn thread_choice_wins_over_config_and_clears_back_to_it() {
     let thread = "reasoning-test-thread-precedence";
     let mut config = Config::default();
     config.runtime.reasoning_effort = Some("low".into());
+    let mut host_context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+    host_context.thread_id = Some(thread.to_string());
 
     apply_requested_effort(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -93,11 +95,7 @@ fn thread_choice_wins_over_config_and_clears_back_to_it() {
     )
     .expect("valid effort");
     assert_eq!(
-        turn_reasoning(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            Some(thread),
-            Some(&config)
-        ),
+        turn_reasoning_for(&host_context, Some(&config), None),
         Some(ReasoningConfig::effort(ReasoningEffort::High))
     );
 
@@ -120,11 +118,7 @@ fn thread_choice_wins_over_config_and_clears_back_to_it() {
         None
     );
     assert_eq!(
-        turn_reasoning(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            Some(thread),
-            Some(&config)
-        ),
+        turn_reasoning_for(&host_context, Some(&config), None),
         Some(ReasoningConfig::effort(ReasoningEffort::Low))
     );
 }

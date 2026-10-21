@@ -18,11 +18,10 @@ pub struct SubagentScope {
     pub extended_policy: bool,
 }
 
-/// A shared `call_id → tool_name` map. The adapter writes it when a tool call
-/// *starts* because the crate's `ToolDelta` has no `tool_name` field. The
-/// bridge reads it to label incremental tool-argument fragments projected from
-/// the crate stream (`MessageDelta.tool_call`), preserving the UI's
-/// `ToolCallArgsDelta` `tool_name` contract.
+/// A shared `call_id → tool_name` map used by the adapter and bridge to label
+/// incremental tool-argument fragments projected from the crate stream
+/// (`MessageDelta.tool_call`), preserving the UI's `ToolCallArgsDelta`
+/// `tool_name` contract.
 pub(crate) type ToolNameMap = Arc<Mutex<std::collections::HashMap<String, String>>>;
 
 /// Shared `call_id → (success, classified failure, elapsed_ms, output_chars,
