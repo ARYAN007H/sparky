@@ -498,7 +498,7 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
     assert_eq!(count(&mcp, "mcp_servers").await, fixture.mcp_servers);
     assert_eq!(count(&mcp, "mcp_server_names").await, fixture.mcp_servers);
     assert_eq!(
-        mcp.streams().len("mcp.audit").await.unwrap(),
+        mcp.streams().len("mcp_audit").await.unwrap(),
         fixture.mcp_audit as u64
     );
     let stored = mcp
