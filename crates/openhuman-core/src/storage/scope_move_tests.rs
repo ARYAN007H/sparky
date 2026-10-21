@@ -222,7 +222,6 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     use crate::storage::layout::{legacy, Target};
     use crate::storage::{self, DocumentStoreExt, Precondition, Scope};
     use tinystoragedrivers::{CollectionSpec, Query};
-    use tinystoragedrivers_testkit::MemoryBackend;
 
     let dir = tempfile::tempdir().unwrap();
     let target = Target::new(dir.path(), "alice");
@@ -231,7 +230,7 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     std::fs::write(&config_path, "# profile fixture\n").unwrap();
     let config = crate::config::Config {
         config_path,
-        workspace_dir: target.workspace(),
+        workspace_dir: target.files(),
         ..crate::config::Config::default()
     };
 
@@ -257,7 +256,8 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
 
     let source_db = legacy::v1_db(&target);
     let before = hash_file(&source_db);
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
+    let destination_url = format!("sqlite:{}", target.storage_db().display());
+    let backend = storage::block_on(async move { storage::open(&destination_url).await }).unwrap();
     let first = crate::storage::import::run_all(&backend, &config);
     let moved = first
         .iter()
