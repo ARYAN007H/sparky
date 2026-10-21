@@ -7,7 +7,6 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use tinystoragedrivers::secrets::DerivedKeys;
-use tinystoragedrivers::StorageBackend;
 use zeroize::Zeroizing;
 
 const TOKEN: &str = "legacy-profile-boot-e2e-token";
