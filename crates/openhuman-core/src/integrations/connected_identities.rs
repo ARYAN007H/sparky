@@ -7,16 +7,12 @@
 /// Render persisted provider identities (if available) as a compact
 /// `## Connected Identities` section.
 ///
-/// `load_connected_identities` reads through the bound memory driver now
-/// (tinymemory v1.13.4 deleted the in-process engine's process-global client
-/// this used to read synchronously — see
-/// `integrations::composio::identity_store`'s module docs), which makes it
-/// async. This function's ~7 call sites build a `PromptContext` struct
-/// literal from a mix of sync and async functions, so rather than threading
-/// `async`/`.await` through every one of them, this stays sync and uses a
-/// `block_in_place` + current-runtime-handle bridge. Best-effort: no runtime, a
-/// single-threaded runtime, or a config-load/driver failure all render an
-/// empty section rather than panicking or blocking a prompt on a memory read.
+/// This synchronous wrapper is for prompt-rendering callers that cannot await.
+/// Async turn preparation should use [`render_connected_identities_async`]
+/// instead, so it does not block a Tokio worker on the memory driver. Best-
+/// effort: no runtime, a single-threaded runtime, or a config-load/driver
+/// failure all render an empty section rather than panicking or blocking a
+/// prompt on a memory read.
 pub fn render_connected_identities(ctx: &crate::core::runtime::DispatchCtx) -> String {
     let Ok(handle) = tokio::runtime::Handle::try_current() else {
         return String::new();
