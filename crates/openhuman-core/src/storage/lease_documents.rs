@@ -9,10 +9,9 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tinystoragedrivers::{
-    CollectionSpec, DocumentStore, Fence, Filter, Key, Precondition, Scope, StorageBackend,
-    Version, Versioned, WriteOptions,
-};
+use tinystoragedrivers::{CollectionSpec, Precondition, Scope, StorageBackend};
+use tinystoragedrivers_api::DocumentStore;
+use tinystoragedrivers_types::{Filter, Key, Version, Versioned, WriteCondition, WriteOptions};
 
 use super::lease::{
     validate_key, LeaseError, LeaseGrant, LeaseRecord, LeaseStore, CLUSTER_SCOPE, LEASE_COLLECTION,
@@ -108,7 +107,7 @@ impl DocumentLeases {
 
     /// Records that the document store this was built over is bound to
     /// `scope`, so storage fences can name the lease record
-    /// ([`LeaseStore::driver_fence`]).
+    /// ([`LeaseStore::write_condition`]).
     #[must_use]
     pub fn in_scope(mut self, scope: Scope) -> Self {
         self.scope = Some(scope);
@@ -399,17 +398,20 @@ impl LeaseStore for DocumentLeases {
         Ok(self.read(key).await?.map(|record| record_of(record.doc)))
     }
 
-    fn driver_fence(&self, key: &str, node: &str, epoch: u64) -> Option<Fence> {
+    fn write_condition(&self, key: &str, node: &str, epoch: u64) -> Option<WriteCondition> {
         let scope = self.scope.clone()?;
         let id = Key::of([LEASE_OWNER, key]).ok()?;
-        Some(Fence::new(
+        WriteCondition::new(
             scope,
             LEASE_COLLECTION,
             id.as_str().to_string(),
             Filter::eq("epoch", epoch)
                 .and(Filter::eq("holder", node.to_string()))
                 .and(Filter::exists("released", false)),
-        ))
+        )
+        .ok()?
+        .with_valid_until_field("expires_ms")
+        .ok()
     }
 }
 

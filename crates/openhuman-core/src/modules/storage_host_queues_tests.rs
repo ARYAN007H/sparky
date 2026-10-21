@@ -9,7 +9,9 @@ use tinybus::broker::Broker;
 use tinybus::transport::memory::MemoryBus;
 use tinybus::Connection;
 use tinystoragedrivers::ErrorKind;
-use tinystoragedrivers_types::{NewMessage, QueueSpec};
+use tinystoragedrivers_api::QueueStore;
+use tinystoragedrivers_testkit::MemoryBackend as MemoryStorage;
+use tinystoragedrivers_types::{NewMessage, QueueFeatures, QueueSpec};
 
 fn manifest() -> Arc<QueueManifest> {
     Arc::new(
@@ -78,7 +80,7 @@ async fn peers() -> Peers {
     }
 }
 
-async fn queues_of(connection: &Connection) -> Arc<dyn tinystoragedrivers::QueueStore> {
+async fn queues_of(connection: &Connection) -> Arc<dyn QueueStore> {
     let storage = tinystoragedrivers_busproxy::connect_storage(connection.clone())
         .await
         .expect("every module connects, with or without queues");
@@ -142,7 +144,7 @@ async fn a_module_without_a_queue_grant_connects_but_is_denied_queues() {
     let queues = queues_of(&peers.plain).await;
     assert_eq!(
         queues.features(),
-        tinystoragedrivers::queue::QueueFeatures::default()
+        QueueFeatures::default()
     );
     let error = queues
         .enqueue("inbox", &[NewMessage::new(json!({}))])

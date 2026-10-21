@@ -2,10 +2,9 @@
 //!
 //! A module reaches storage only through `ai.tinyhumans.tinystorage.Storage`
 //! (`storage_host`) and its authority is a [`StorageGrant`]. Each module owner
-//! declares what it stores in `storage_schema()` (collections with their
-//! indexes, streams, blob and secret prefixes, each with a scope class); the
-//! host composes those into the registry ([`crate::storage::schema`]) and this
-//! file turns the **module-scoped** items of the module's owner into the grant.
+//! declares its collections through its owner storage contract; the host
+//! composes those into the registry ([`crate::storage::schema`]) and this file
+//! turns the module-scoped collection declarations into the grant.
 //! The hand-written per-module tables this replaces could drift from what the
 //! module actually declares; a generated grant cannot.
 //!
@@ -130,11 +129,13 @@ pub(super) async fn migrate_imported(ctx: &crate::core::runtime::DispatchCtx, mo
 pub(super) fn grant_for(module_id: &str) -> Option<StorageGrant> {
     let row = ROWS.iter().find(|row| row.module == module_id)?;
     let queues = row.queues.and_then(|source| source());
-    let items = module_collections(row.owner);
+    let collections = module_collections(row.owner);
     let mut secret_prefixes: Vec<String> = row.secrets.iter().map(|s| (*s).to_owned()).collect();
-    secret_prefixes.extend(items.secrets);
+    // Collection declarations are now the owner contracts' only published
+    // storage inventory. Stream/blob/secret grants remain explicit below
+    // until their bus contracts expose equivalent pure descriptors.
     Some(StorageGrant {
-        collections: items.collections,
+        collections,
         // v2 owner bus crates expose their collection declarations, but not
         // every non-document name. Keep those capabilities explicit at the
         // host boundary until the owner contracts publish them. Connectors

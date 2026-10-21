@@ -86,27 +86,33 @@ pub(crate) async fn sweep_scope_within(
     }
 }
 
-/// Reclaims the lapsed blobs of each SaaS profile in `profile_ids`: the
-/// profile's own scope (`u:<id>`) and the scopes the blob-owning modules
-/// keep for it. Returns the total reclaimed.
-pub(crate) async fn sweep_profiles(backend: &dyn StorageBackend, profile_ids: &[String]) -> u64 {
+/// Reclaims the lapsed blobs in one already-authorized profile's scopes.
+async fn sweep_profile_scopes(backend: &dyn StorageBackend, profile_id: &str) -> u64 {
     let mut removed = 0;
-    for id in profile_ids {
-        let scope = super::scope_for_profile(id);
-        removed += sweep_scope(backend, &scope).await;
-        for module_scope in crate::modules::expiring_blob_module_scopes_for(id) {
-            if module_scope != scope {
-                removed += sweep_scope(backend, &module_scope).await;
-            }
+    let scope = super::scope_for_profile(profile_id);
+    removed += sweep_scope(backend, &scope).await;
+    for module_scope in crate::modules::expiring_blob_module_scopes_for(profile_id) {
+        if module_scope != scope {
+            removed += sweep_scope(backend, &module_scope).await;
         }
     }
     removed
 }
 
+/// Test helper for the per-scope portion of the sweeper. Production profile
+/// enumeration always supplies an already-open profile's captured backend.
+#[cfg(test)]
+pub(crate) async fn sweep_profiles(backend: &dyn StorageBackend, profile_ids: &[String]) -> u64 {
+    let mut removed = 0;
+    for id in profile_ids {
+        removed += sweep_profile_scopes(backend, id).await;
+    }
+    removed
+}
+
 /// One pass over every scope background work covers, against `backend`:
-/// `local` outside SaaS mode, each known agent, and each provisioned SaaS
-/// profile (`profile:<id>`, which [`super::agents::for_each_scope`] does not
-/// visit). Returns the total number of blobs reclaimed.
+/// `local` outside SaaS mode, each known agent, and each locally open SaaS
+/// profile. Returns the total number of blobs reclaimed.
 ///
 /// Agent scopes are enumerated from the installed backend (the only caller,
 /// [`sweep_installed`], passes that one).
@@ -137,27 +143,39 @@ pub async fn sweep_all(backend: Arc<dyn StorageBackend>) -> u64 {
     .into_iter()
     .map(|(_, removed)| removed)
     .sum();
-    scoped + sweep_host_profiles(backend.as_ref()).await
+    scoped + sweep_host_profiles().await
 }
 
-/// [`sweep_profiles`] over the profiles the process's profile host has
-/// provisioned; zero outside SaaS mode (no host installed).
-async fn sweep_host_profiles(backend: &dyn StorageBackend) -> u64 {
+/// [`sweep_all`] over profiles this process currently holds open. Each pass
+/// captures the profile's exact lease fence in its backend, so neither a
+/// dormant profile nor a replacement holder's fence can authorize a sweep.
+async fn sweep_host_profiles() -> u64 {
     let Some(host) = crate::profiles::host::host() else {
         return 0;
     };
-    match bounded_listing(SCOPE_SWEEP_TIMEOUT, host.ids()).await {
-        Some(Ok(ids)) => sweep_profiles(backend, &ids).await,
-        Some(Err(error)) => {
-            tracing::warn!(%error, "[storage::blob_sweep] could not list profiles; skipped");
-            0
+    let now_ms = super::fence::system_now_ms();
+    let mut removed = 0;
+    for profile in host.hosted_profiles() {
+        if let Err(error) = profile.lease_fence().check_local(now_ms) {
+            tracing::debug!(profile = %profile.id, %error, "[storage::blob_sweep] profile is not locally fenced; skipped");
+            continue;
         }
-        None => 0,
+        let backend = match host.storage_backend_for(&profile) {
+            Ok(Some(backend)) => backend,
+            Ok(None) => continue,
+            Err(error) => {
+                tracing::warn!(profile = %profile.id, %error, "[storage::blob_sweep] could not capture profile fence; skipped");
+                continue;
+            }
+        };
+        removed += sweep_profile_scopes(backend.as_ref(), profile.id.as_str()).await;
     }
+    removed
 }
 
 /// Awaits a profile listing for at most `limit`; `None` (logged) when it hangs,
 /// so a stuck registry cannot stall the scheduler. Retried on the next tick.
+#[cfg(test)]
 async fn bounded_listing<T>(
     limit: Duration,
     listing: impl std::future::Future<Output = T>,
