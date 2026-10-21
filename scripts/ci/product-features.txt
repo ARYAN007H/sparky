@@ -114,6 +114,7 @@ storage-sqlite
 
 # The process keyring's encrypted file backend is independent from storage-file.
 secret-file
+legacy-import
 
 # OS keychain providers owned by the RPC host layer.
 os-keyring

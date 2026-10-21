@@ -455,6 +455,7 @@ default = [
     "inbound-queues",
     "storage-sqlite",
     "secret-file",
+    "legacy-import",
 ]
 # Every gate forwards to `openhuman-rpc` alone (chain: rpc -> tinyhumans ->
 # embed -> core); `scripts/ci/check-feature-forwarding.mjs` checks the link.
@@ -475,6 +476,7 @@ storage-mongodb = ["openhuman-rpc/storage-mongodb"]
 storage-s3 = ["openhuman-rpc/storage-s3"]
 storage-file = ["openhuman-rpc/storage-file"]
 secret-file = ["openhuman-rpc/secret-file"]
+legacy-import = ["openhuman-rpc/legacy-import"]
 media = ["openhuman-rpc/media"]
 flows = ["openhuman-rpc/flows"]
 skills = ["openhuman-rpc/skills"]

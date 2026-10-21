@@ -75,7 +75,8 @@ pub use tinystoragedrivers_api::{DocumentStore, Storage};
 
 /// Read-only legacy importers use SQLite to consume historical files. The
 /// process storage API remains the `StorageBackend` facade above.
-pub use tinystoragedrivers::sqlite::rusqlite;
+#[cfg(feature = "legacy-import")]
+pub use tinystoragedrivers_connect::sqlite::rusqlite;
 
 /// Typed conveniences for document consumers, including a bounded cursor
 /// walk for callers that need every matching record.
