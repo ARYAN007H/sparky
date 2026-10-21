@@ -346,7 +346,7 @@ Persistence, setup and RPC:
 - `AgentDefinition`, `AgentDefinitionRegistry`, `ToolScope`, `SandboxMode`
   (`../agent_registry/host_definition.rs` + `tinyagents-definition`): what an agent is.
 - `ParentExecutionContext` ([`harness/fork_context.rs`](./harness/fork_context.rs)): explicit parent
-  state a sub-agent reads from the run context (`parent`); `orchestration::parent_context::build_root_parent`
+  state a sub-agent reads from the run context (`parent`); `triage::parent_context::build_root_parent`
   builds one for runs with no parent turn.
 - `run_subagent`, `run_subagent_with_parent`, `SubagentRunOptions`
   ([`subagent_host/lifecycle.rs`](./subagent_host/lifecycle.rs), [`subagent_host/types.rs`](./subagent_host/types.rs)).

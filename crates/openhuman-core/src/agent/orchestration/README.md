@@ -12,7 +12,6 @@ and UI-facing projections.
 - Background sub-agent task tracking, cancellation, completion
   delivery, and run-ledger projection.
 - Manual cancellation for detached `spawn_subagent` runs.
-- The shared root `ParentExecutionContext` builder used by background tasks.
 
 ## Key files
 
@@ -23,7 +22,6 @@ and UI-facing projections.
   routing.
 - `subagent_control.rs`: manual cancel RPC over the driver-owned job registry.
 - `subagent_sessions/`: durable session reuse and deduplication.
-- `parent_context/builder.rs`: construction for tasks without a parent turn.
 - `tools.rs`: callable sub-agent tools.
 
 ## RPC
