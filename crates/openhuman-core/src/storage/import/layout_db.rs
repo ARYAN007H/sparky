@@ -35,7 +35,7 @@ fn sql(error: rusqlite::Error) -> LayoutError {
 ///
 /// When the file cannot be opened or read.
 pub fn table_counts(path: &Path) -> Result<Counts, LayoutError> {
-    let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE).map_err(sql)?;
+    let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(sql)?;
     counts_of(&conn)
 }
 
@@ -97,7 +97,7 @@ pub(crate) fn mismatch(source: &Counts, copy: &Counts) -> Option<String> {
 /// an I/O or SQLite error. The source is untouched either way.
 pub fn copy(source: &Path, dest: &Path) -> Result<DbCopy, LayoutError> {
     let conn =
-        Connection::open_with_flags(source, OpenFlags::SQLITE_OPEN_READ_WRITE).map_err(sql)?;
+        Connection::open_with_flags(source, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(sql)?;
     let source_counts = counts_of(&conn)?;
     if dest.is_file() {
         if let Ok(existing) = table_counts(dest) {
@@ -154,10 +154,6 @@ pub fn checkpoint(path: &Path) -> Result<(), LayoutError> {
         .map_err(sql)?;
     Ok(())
 }
-
-#[cfg(test)]
-#[path = "layout_db_tests.rs"]
-mod tests;
 
 #[cfg(test)]
 #[path = "layout_db_tests.rs"]
