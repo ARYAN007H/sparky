@@ -12,8 +12,8 @@
 
 use crate::agent::prompts::{ConnectedIntegration, PromptContext};
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
-use crate::prompts::{render_datetime, render_identity, render_tools, render_workspace};
 use crate::integrations::composio::orchestrator_actions::sanitise_slug;
+use crate::prompts::{render_datetime, render_identity, render_tools, render_workspace};
 use crate::tools::toolpacks;
 use anyhow::Result;
 use std::fmt::Write;
