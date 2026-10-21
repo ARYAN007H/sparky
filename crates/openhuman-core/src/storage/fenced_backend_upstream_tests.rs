@@ -347,7 +347,7 @@ async fn stream_and_blob_writes_are_driver_fenced() {
     let scoped = a.for_scope(&Scope::new("profile:alice").unwrap()).unwrap();
     leases.armed.store(true, Ordering::SeqCst);
     assert!(scoped.streams().append("log", json!(1)).await.is_err());
-    let raw = backend
+    let raw = backend.backend
         .for_scope(&Scope::new("profile:alice").unwrap())
         .unwrap();
     assert_eq!(raw.streams().len("log").await.unwrap(), 0);
@@ -364,7 +364,13 @@ async fn stream_and_blob_writes_are_driver_fenced() {
 async fn memory_backend_rejects_conditioned_storage() {
     let backend = memory_backend();
     let scope = Scope::new("profile:alice").unwrap();
-    let condition = tinystoragedrivers_types::WriteCondition::always();
+    let condition = tinystoragedrivers_types::WriteCondition::new(
+        scope.clone(),
+        "leases",
+        "profile",
+        tinystoragedrivers_types::Filter::eq("active", true),
+    )
+    .unwrap();
     assert_eq!(
         backend
             .for_scope_conditioned(&scope, &condition)
