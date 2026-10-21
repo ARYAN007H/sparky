@@ -1,3 +1,5 @@
+#![cfg(feature = "testkit")]
+
 mod common;
 use common::{chat_completion, chat_requests, offline_config, runtime, stub_backend};
 use openhuman_embed::session_store::SessionRef;
