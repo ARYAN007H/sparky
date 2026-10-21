@@ -80,14 +80,11 @@ async fn unknown_agent_id_lists_available() {
     let workspace = tempfile::tempdir().expect("workspace");
     let mut parent = super::tests::parent_context(workspace.path());
     parent.session_id = "unknown-agent-session".into();
-    let (live, core) =
-        super::tests::headless_core_backed_parent(workspace.path(), parent);
+    let (live, core) = super::tests::headless_core_backed_parent(workspace.path(), parent);
     let result = crate::core::runtime::CoreContext::scope(core, async {
-        let detached = crate::agent::subagent_host::detached_subagent_parent(
-            &live,
-            "async-subagent",
-        )
-        .expect("live parent can be detached");
+        let detached =
+            crate::agent::subagent_host::detached_subagent_parent(&live, "async-subagent")
+                .expect("live parent can be detached");
         SpawnSubagentTool::new()
             .execute_with_live_parent_context(
                 json!({
