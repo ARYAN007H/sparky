@@ -33,7 +33,7 @@ use tinystoragedrivers_types::{Capability, CollectionSpec, Query, StorageError};
 
 use crate::storage::documents::Repo;
 use crate::storage::import_state;
-use crate::storage::{state_kv::StateKv, Storage};
+use crate::storage::{Storage, state_kv::StateKv};
 
 /// The `tsd.kv` owner and namespace of the state values.
 const KV_OWNER: &str = "composio";
@@ -120,11 +120,13 @@ impl Docs {
         log::debug!("[composio:store] document import id={name}");
         let step = import_step(name);
         let repo = self.repo.clone();
+        let body_repo = repo.clone();
+        let body_step = step.clone();
         let claimed = import_state::with_claim(&repo, IMPORT_OWNER, &step, move |condition| {
-            let claimed_repo = repo.conditioned(condition)?;
+            let claimed_repo = body_repo.conditioned(condition)?;
             let state = StateKv::over(claimed_repo.scoped(), KV_OWNER, KV_NS);
             let wrote = state.insert_if_absent(name, &value)?;
-            import_state::set_done(&claimed_repo, IMPORT_OWNER, &step)?;
+            import_state::set_done(&claimed_repo, IMPORT_OWNER, &body_step)?;
             Ok(wrote)
         })?;
         Ok(claimed.unwrap_or(false))

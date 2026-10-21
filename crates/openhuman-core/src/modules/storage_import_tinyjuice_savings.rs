@@ -61,13 +61,24 @@ pub(crate) async fn import_legacy<F, Fut>(
     adopt: F,
 ) -> Result<Outcome>
 where
-    F: FnOnce(SavingsAggregate) -> Fut,
-    Fut: Future<Output = Result<bool>>,
+    F: FnOnce(SavingsAggregate) -> Fut + Send + 'static,
+    Fut: Future<Output = Result<bool>> + Send + 'static,
 {
-    let Some(scoped) = support::module_scope(ctx, MODULE_ID)? else {
+    if support::module_scope(ctx, MODULE_ID)?.is_none() {
+        return Ok(Outcome::NoBackend);
+    }
+    if std::fs::symlink_metadata(file).is_err() {
+        return Ok(Outcome::NoSource);
+    }
+    let marker = support::marker_id("savings", file);
+    let file = file.to_owned();
+    let result = support::with_module_claim(ctx, MODULE_ID, MARKER_KIND, &marker, move |scoped| {
+        crate::storage::block_on_anyhow(async move { import_into(&scoped, &file, adopt).await })
+    })?;
+    let Some(outcome) = result else {
         return Ok(Outcome::NoBackend);
     };
-    import_into(&scoped, file, adopt).await
+    Ok(outcome)
 }
 
 async fn import_into<F, Fut>(scoped: &Storage, file: &Path, adopt: F) -> Result<Outcome>

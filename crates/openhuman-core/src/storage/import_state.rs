@@ -16,7 +16,6 @@ use tinystoragedrivers::{
 use tinystoragedrivers_api::DocumentStore;
 
 use super::documents::Repo;
-use super::DocumentStoreExt;
 
 /// How long a claim blocks other processes before it can be taken over.
 pub const CLAIM_TTL_MS: i64 = 10 * 60 * 1000;
@@ -83,13 +82,13 @@ impl StorageBackend for ClaimBoundBackend {
         self.backend.capabilities()
     }
 
-    fn for_scope(&self, scope: &crate::storage::Scope) -> Result<Storage, StorageError> {
+    fn for_scope(&self, scope: &tinystoragedrivers::Scope) -> Result<Storage, StorageError> {
         self.backend.for_scope_conditioned(scope, &self.condition)
     }
 
     fn for_scope_conditioned(
         &self,
-        scope: &crate::storage::Scope,
+        scope: &tinystoragedrivers::Scope,
         condition: &WriteCondition,
     ) -> Result<Storage, StorageError> {
         let condition = self
@@ -113,7 +112,7 @@ fn record_key(owner: &str, step: &str, kind: &str) -> String {
 
 async fn ensure(scoped: &Storage) -> Result<(), StorageError> {
     for spec in collection_specs() {
-        scoped.ensure_collection(&spec).await?;
+        scoped.documents().ensure_collection(&spec).await?;
     }
     Ok(())
 }
@@ -164,7 +163,7 @@ fn decode<T: for<'de> Deserialize<'de>>(
 pub async fn done(scoped: &Storage, owner: &str, step: &str) -> Result<bool, StorageError> {
     ensure(scoped).await?;
     let id = record_key(owner, step, "done");
-    let Some(row) = scoped.get(COLLECTION, &id).await? else {
+    let Some(row) = scoped.documents().get(COLLECTION, &id).await? else {
         return Ok(false);
     };
     let _: Completion = decode(row, "completion", owner, step)?;
@@ -192,11 +191,12 @@ async fn mark_done_at(
     })
     .map_err(|error| StorageError::serialization(error.to_string()))?;
     for _ in 0..CAS_RETRIES {
-        if let Some(current) = scoped.get(COLLECTION, &id).await? {
+        if let Some(current) = scoped.documents().get(COLLECTION, &id).await? {
             let _: Completion = decode(current, "completion", owner, step)?;
             return Ok(());
         }
         match scoped
+            .documents()
             .put(COLLECTION, &id, body.clone(), Precondition::Absent)
             .await
         {
@@ -248,18 +248,28 @@ pub fn with_claim<T>(
     step: &str,
     body: impl FnOnce(&WriteCondition) -> Result<T>,
 ) -> Result<Option<T>> {
+    with_claim_ttl(repo, owner, step, CLAIM_TTL_MS, body)
+}
+
+fn with_claim_ttl<T>(
+    repo: &Repo,
+    owner: &str,
+    step: &str,
+    ttl_ms: i64,
+    body: impl FnOnce(&WriteCondition) -> Result<T>,
+) -> Result<Option<T>> {
     let started = Instant::now();
     let mut body = Some(body);
     loop {
         let now = chrono::Utc::now().timestamp_millis();
-        if let Some(token) = acquire(repo, owner, step, now, CLAIM_TTL_MS)? {
+        if let Some(token) = acquire(repo, owner, step, now, ttl_ms)? {
             let condition = token.write_condition()?;
             let (stop_tx, stop_rx) = std::sync::mpsc::channel();
             let healthy = std::sync::Arc::new(AtomicBool::new(true));
             let heartbeat = start_heartbeat(
                 repo.clone(),
                 token.clone(),
-                CLAIM_TTL_MS,
+                ttl_ms,
                 stop_rx,
                 std::sync::Arc::clone(&healthy),
             );

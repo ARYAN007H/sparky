@@ -5,7 +5,9 @@
 //! (it reads through the WAL), to `storage.db.tmp`; the copy is verified table
 //! by table against the source (the driver keeps documents, streams and blobs
 //! in tables, so equal row counts mean equal collection, stream and blob
-//! counts) and only then renamed into place. The source is never modified.
+//! counts) and only then renamed into place. Inventory and copying open the
+//! source read-only. The separate `checkpoint` operation is used by the
+//! destructive layout migration before archiving and deleting the legacy DB.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -35,7 +37,7 @@ fn sql(error: rusqlite::Error) -> LayoutError {
 ///
 /// When the file cannot be opened or read.
 pub fn table_counts(path: &Path) -> Result<Counts, LayoutError> {
-    let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE).map_err(sql)?;
+    let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(sql)?;
     counts_of(&conn)
 }
 
@@ -97,7 +99,7 @@ pub(crate) fn mismatch(source: &Counts, copy: &Counts) -> Option<String> {
 /// an I/O or SQLite error. The source is untouched either way.
 pub fn copy(source: &Path, dest: &Path) -> Result<DbCopy, LayoutError> {
     let conn =
-        Connection::open_with_flags(source, OpenFlags::SQLITE_OPEN_READ_WRITE).map_err(sql)?;
+        Connection::open_with_flags(source, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(sql)?;
     let source_counts = counts_of(&conn)?;
     if dest.is_file() {
         if let Ok(existing) = table_counts(dest) {
@@ -143,7 +145,10 @@ pub fn copy(source: &Path, dest: &Path) -> Result<DbCopy, LayoutError> {
 }
 
 /// Checkpoints and truncates the WAL of `path`, so the file set the archive
-/// reads is complete in the `.db` file.
+/// reads is complete in the `.db` file. This deliberately mutates the legacy
+/// database and is only for the layout migration that archives then deletes
+/// that source; callers importing records must use [`table_counts`] and
+/// [`copy`] instead.
 ///
 /// # Errors
 ///
@@ -154,10 +159,6 @@ pub fn checkpoint(path: &Path) -> Result<(), LayoutError> {
         .map_err(sql)?;
     Ok(())
 }
-
-#[cfg(test)]
-#[path = "layout_db_tests.rs"]
-mod tests;
 
 #[cfg(test)]
 #[path = "layout_db_tests.rs"]

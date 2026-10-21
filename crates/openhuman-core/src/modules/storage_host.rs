@@ -473,7 +473,8 @@ impl StorageHost {
             })?;
             let secrets = Arc::new(DocumentSecrets::from_parts(
                 Arc::clone(storage.documents()),
-                scope.clone(),
+                tinystoragedrivers_types::Scope::new(scope.as_str())
+                    .map_err(|_| BindError::Backend(StorageKind::Backend))?,
                 keys,
             ));
             storage = tinystoragedrivers::Storage::new(

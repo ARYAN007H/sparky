@@ -52,9 +52,10 @@ impl LegacyDb {
         self.read("the table list", |connection| {
             let mut statement =
                 connection.prepare("SELECT name FROM sqlite_master WHERE type = 'table'")?;
-            statement
+            let rows = statement
                 .query_map([], |row| row.get::<_, String>(0))?
-                .collect::<rusqlite::Result<HashSet<_>>>()
+                .collect::<rusqlite::Result<HashSet<_>>>();
+            rows
         })
         .await
     }
@@ -63,9 +64,10 @@ impl LegacyDb {
     pub(super) async fn columns(&self, table: &'static str) -> Result<HashSet<String>> {
         self.read("a column list", move |connection| {
             let mut statement = connection.prepare(&format!("PRAGMA table_info({table})"))?;
-            statement
+            let rows = statement
                 .query_map([], |row| row.get::<_, String>(1))?
-                .collect::<rusqlite::Result<HashSet<_>>>()
+                .collect::<rusqlite::Result<HashSet<_>>>();
+            rows
         })
         .await
     }

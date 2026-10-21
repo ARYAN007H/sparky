@@ -295,7 +295,7 @@ pub(crate) fn authorize(
         Object::Streams => streams(grant, selector, request),
         Object::Blobs => blobs(grant, selector, request),
         Object::Secrets => secrets(grant, selector, request),
-        Object::Queues => queues(selector, request),
+        Object::Queues => queues(grant, selector, request),
         Object::Kv => Err(Denied::Object),
     }?;
     Ok(match plan {

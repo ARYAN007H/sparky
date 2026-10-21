@@ -9,14 +9,15 @@ use std::{ops::Range, sync::Arc, time::Duration};
 use async_trait::async_trait;
 use serde_json::Value;
 use tinystoragedrivers_api::{
-    Blob, BlobMeta, BlobReader, BlobStore, BlobStream, DeadLetter, Delivery, DocumentStore,
-    DocumentWatch, Enqueued, KvStore, NewMessage, QueueStore, Receipt, Retry, Storage, StreamStore,
+    BlobReader, BlobStore, DocumentStore, DocumentWatch, KvStore, QueueStore, Storage,
+    StreamStore,
 };
 use tinystoragedrivers_types::{
-    Capabilities, Capability, CollectionSpec, Cursor, Filter, Page, Precondition, Query,
-    QueueFeatures, QueueSpec, QueueStats, ReadCheck, Result, SealOutcome, SearchHit, Sort,
-    StreamEntry, StreamInfo, TreeEntry, TreeFile, Version, Versioned, WatchOptions, WriteOp,
-    WriteOptions, WriteResult,
+    Blob, BlobMeta, BlobStream, Capabilities, Capability, CollectionSpec, Cursor, DeadLetter,
+    Delivery, Enqueued, Filter, NewMessage, Page, Precondition, Query, QueueFeatures, QueueSpec,
+    QueueStats, ReadCheck, Receipt, Result, Retry, SealOutcome, SearchHit, Sort, StreamEntry,
+    StreamInfo, TreeEntry, TreeFile, Version, Versioned, WatchOptions, WriteOp, WriteOptions,
+    WriteResult,
 };
 
 use super::{
@@ -65,6 +66,9 @@ struct GuardedDocuments {
     inner: Arc<dyn DocumentStore>,
     fence: Arc<LeaseFence>,
     clock: Arc<FenceRegistry>,
+}
+impl std::fmt::Debug for GuardedDocuments {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.debug_struct("GuardedDocuments").finish_non_exhaustive() }
 }
 #[async_trait]
 impl DocumentStore for GuardedDocuments {
@@ -152,6 +156,9 @@ struct GuardedStreams {
     fence: Arc<LeaseFence>,
     clock: Arc<FenceRegistry>,
 }
+impl std::fmt::Debug for GuardedStreams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.debug_struct("GuardedStreams").finish_non_exhaustive() }
+}
 #[async_trait]
 impl StreamStore for GuardedStreams {
     fn capabilities(&self) -> Capabilities {
@@ -204,6 +211,9 @@ struct GuardedKv {
     fence: Arc<LeaseFence>,
     clock: Arc<FenceRegistry>,
 }
+impl std::fmt::Debug for GuardedKv {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.debug_struct("GuardedKv").finish_non_exhaustive() }
+}
 #[async_trait]
 impl KvStore for GuardedKv {
     fn capabilities(&self) -> Capabilities {
@@ -237,6 +247,9 @@ struct GuardedBlobs {
     inner: Arc<dyn BlobStore>,
     fence: Arc<LeaseFence>,
     clock: Arc<FenceRegistry>,
+}
+impl std::fmt::Debug for GuardedBlobs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.debug_struct("GuardedBlobs").finish_non_exhaustive() }
 }
 #[async_trait]
 impl BlobStore for GuardedBlobs {
@@ -359,6 +372,9 @@ struct GuardedQueues {
     inner: Arc<dyn QueueStore>,
     fence: Arc<LeaseFence>,
     clock: Arc<FenceRegistry>,
+}
+impl std::fmt::Debug for GuardedQueues {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.debug_struct("GuardedQueues").finish_non_exhaustive() }
 }
 #[async_trait]
 impl QueueStore for GuardedQueues {

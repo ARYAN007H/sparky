@@ -87,10 +87,13 @@ async fn preferences_and_the_trigger_archive_move_into_the_modules_storage() {
     let gmail = docs.get(PREFS_COLLECTION, "gmail").await.unwrap().unwrap();
     assert_eq!(
         gmail.doc,
-        json!({"value": {"allow_write": false, "allow_delete": false}})
+        json!({"allow_write": false, "allow_delete": false})
     );
     let slack = docs.get(PREFS_COLLECTION, "slack").await.unwrap().unwrap();
-    assert_eq!(slack.doc, json!({"value": true}));
+    assert_eq!(
+        slack.doc,
+        json!({tinyconnectors_bus::storage::NON_OBJECT_FIELD: true})
+    );
     assert!(
         docs.get(PREFS_COLLECTION, "broken")
             .await
@@ -100,19 +103,19 @@ async fn preferences_and_the_trigger_archive_move_into_the_modules_storage() {
 
     let streams = scoped.streams();
     let first = streams
-        .read_window("triggers/2026-10-12", 0, 10)
+        .read_window("connectors.triggers/2026-10-12", 0, 10)
         .await
         .unwrap();
     assert_eq!(first.len(), 2);
     assert_eq!(first[0].value["metadataId"], "a");
     assert_eq!(first[1].value["payload"], json!({"k": 1}));
     let second = streams
-        .read_window("triggers/2026-10-13", 0, 10)
+        .read_window("connectors.triggers/2026-10-13", 0, 10)
         .await
         .unwrap();
     assert_eq!(second.len(), 1);
     assert_eq!(second[0].value["toolkit"], "slack");
-    assert!(streams.len("triggers/README").await.unwrap() == 0);
+    assert!(streams.len("connectors.triggers/README").await.unwrap() == 0);
 }
 
 #[tokio::test]
@@ -164,14 +167,17 @@ async fn records_the_module_already_wrote_are_never_replaced_or_duplicated() {
         .put(
             PREFS_COLLECTION,
             "gmail",
-            json!({"value": {"allow_write": true}}),
+            json!({"allow_write": true}),
             Precondition::Absent,
         )
         .await
         .unwrap();
     scoped
         .streams()
-        .append("triggers/2026-10-12", json!({"metadataId": "live"}))
+        .append(
+            "connectors.triggers/2026-10-12",
+            json!({"metadataId": "live"}),
+        )
         .await
         .unwrap();
 
@@ -192,10 +198,10 @@ async fn records_the_module_already_wrote_are_never_replaced_or_duplicated() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(gmail.doc, json!({"value": {"allow_write": true}}));
+    assert_eq!(gmail.doc, json!({"allow_write": true}));
     let day = scoped
         .streams()
-        .read_window("triggers/2026-10-12", 0, 10)
+        .read_window("connectors.triggers/2026-10-12", 0, 10)
         .await
         .unwrap();
     assert_eq!(day.len(), 1);

@@ -9,10 +9,12 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::storage::{DocumentStore, ErrorKind, Precondition, Storage};
+use crate::storage::{DocumentStore, Precondition, Storage};
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 use sha2::Digest;
+use tinystoragedrivers::ErrorKind;
+use tinystoragedrivers_types::WriteOptions;
 
 /// The module's scope of the installed backend, or `None` when the process
 /// runs without a storage backend (the module is then not using this storage).
@@ -29,6 +31,51 @@ pub(super) fn module_scope(
         .for_scope(&scope)
         .map_err(|error| anyhow!("open the module scope: {:?}", error.kind()))?;
     Ok(Some(scoped))
+}
+
+/// Runs one module import under a durable host claim. The body receives a
+/// storage handle bound to the same claim condition and must use it for both
+/// payload writes and the completion marker. A lost claim therefore prevents
+/// late payload or completion writes.
+pub(super) fn with_module_claim<T>(
+    ctx: &crate::core::runtime::DispatchCtx,
+    module_id: &str,
+    marker_kind: &str,
+    marker_id: &str,
+    body: impl FnOnce(Storage) -> Result<T> + Send + 'static,
+) -> Result<Option<T>>
+where
+    T: Send + 'static,
+{
+    let Some(backend) = crate::storage::installed() else {
+        return Ok(None);
+    };
+    let scope = super::storage_host::current_module_scope(ctx, module_id)
+        .map_err(|error| anyhow!("resolve the module scope: {:?}", error.kind()))?;
+    let repo = crate::storage::documents::Repo::on(
+        &backend,
+        &scope,
+        "storage_import",
+        crate::storage::import_state::collection_specs,
+    )?;
+    let claim_backend = Arc::clone(&backend);
+    let claim_scope = scope.clone();
+    let claimed = crate::storage::import_state::with_claim(
+        &repo,
+        crate::storage::import_state::HOST_OWNER,
+        &crate::storage::import_state::step_id(marker_kind, marker_id),
+        move |condition| {
+            let scoped_backend = crate::storage::import_state::backend_with_condition(
+                claim_backend,
+                condition.clone(),
+            );
+            let scoped = scoped_backend
+                .for_scope(&claim_scope)
+                .map_err(|error| anyhow!("open claim-bound module storage: {:?}", error.kind()))?;
+            body(scoped)
+        },
+    )?;
+    Ok(claimed)
 }
 
 /// A stable marker id for one source path: `<prefix>@<16 hex of sha256(path)>`.
@@ -62,6 +109,27 @@ pub(super) async fn put_absent(
     doc: Value,
 ) -> Result<bool> {
     match docs.put(collection, id, doc, Precondition::Absent).await {
+        Ok(_) => Ok(true),
+        Err(error) if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) => {
+            Ok(false)
+        }
+        Err(error) => Err(anyhow!("write {collection}: {:?}", error.kind())),
+    }
+}
+
+/// Writes `doc` with owner metadata only when `id` is absent; `true` when it
+/// was written.
+pub(super) async fn put_absent_with(
+    docs: &Arc<dyn DocumentStore>,
+    collection: &str,
+    id: &str,
+    doc: Value,
+    options: WriteOptions,
+) -> Result<bool> {
+    match docs
+        .put_with(collection, id, doc, Precondition::Absent, options)
+        .await
+    {
         Ok(_) => Ok(true),
         Err(error) if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) => {
             Ok(false)

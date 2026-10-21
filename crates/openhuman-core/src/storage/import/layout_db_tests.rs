@@ -56,3 +56,30 @@ fn a_missing_source_is_an_error() {
     let target = Target::new(dir.path(), "u1");
     assert!(copy(&dir.path().join("nope.db"), &target.storage_db()).is_err());
 }
+
+#[test]
+fn inventory_and_copy_leave_a_live_wal_source_unchanged() {
+    let dir = TempDir::new().unwrap();
+    let source = dir.path().join("legacy.db");
+    let dest = dir.path().join("copy.db");
+    let writer = Connection::open(&source).unwrap();
+    writer.pragma_update(None, "journal_mode", "WAL").unwrap();
+    writer.pragma_update(None, "wal_autocheckpoint", 0).unwrap();
+    writer
+        .execute_batch("CREATE TABLE records (id TEXT); INSERT INTO records VALUES ('one');")
+        .unwrap();
+    let wal = source.with_file_name("legacy.db-wal");
+    assert!(
+        wal.is_file(),
+        "fixture must retain committed rows in its WAL"
+    );
+
+    let db_before = std::fs::read(&source).unwrap();
+    let wal_before = std::fs::read(&wal).unwrap();
+    let counts = table_counts(&source).unwrap();
+    assert_eq!(counts.get("records"), Some(&1));
+    copy(&source, &dest).unwrap();
+    assert_eq!(std::fs::read(&source).unwrap(), db_before);
+    assert_eq!(std::fs::read(&wal).unwrap(), wal_before);
+    drop(writer);
+}

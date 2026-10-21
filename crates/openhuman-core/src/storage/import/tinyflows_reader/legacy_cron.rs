@@ -14,7 +14,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use tinyflows_bus::schedule::types::{
@@ -22,7 +22,7 @@ use tinyflows_bus::schedule::types::{
     SessionTarget,
 };
 
-use super::legacy_db::{column_or, LegacyDb};
+use super::legacy_db::{LegacyDb, column_or};
 use super::report::ImportReport;
 
 /// What `jobs.db` held, decoded.
@@ -114,7 +114,7 @@ async fn read_jobs(
     let mut rows = db
         .read("cron jobs", move |conn| {
             let mut statement = conn.prepare(&select)?;
-            statement
+            let rows = statement
                 .query_map([], |row| {
                     Ok(JobRow {
                         id: row.get(0)?,
@@ -141,7 +141,8 @@ async fn read_jobs(
                         claim_generation: row.get(21)?,
                     })
                 })?
-                .collect::<Result<Vec<_>, _>>()
+                .collect::<Result<Vec<_>, _>>();
+            rows
         })
         .await?;
     if tables.contains("cron_job_policies") {
@@ -169,11 +170,12 @@ async fn read_policies(db: &LegacyDb) -> Result<HashMap<String, (Option<i64>, i6
     db.read("cron job policies", |conn| {
         let mut statement =
             conn.prepare("SELECT job_id, retries, single_flight FROM cron_job_policies")?;
-        statement
+        let rows = statement
             .query_map([], |row| {
                 Ok((row.get::<_, String>(0)?, (row.get(1)?, row.get(2)?)))
             })?
-            .collect::<Result<HashMap<_, _>, _>>()
+            .collect::<Result<HashMap<_, _>, _>>();
+        rows
     })
     .await
 }
@@ -251,7 +253,7 @@ async fn read_runs(db: &LegacyDb, report: &mut ImportReport) -> Result<Vec<CronR
     let rows = db
         .read("cron runs", move |conn| {
             let mut statement = conn.prepare(&select)?;
-            statement
+            let rows = statement
                 .query_map([], |row| {
                     Ok((
                         row.get::<_, i64>(0)?,
@@ -264,7 +266,8 @@ async fn read_runs(db: &LegacyDb, report: &mut ImportReport) -> Result<Vec<CronR
                         row.get::<_, Option<String>>(7)?,
                     ))
                 })?
-                .collect::<Result<Vec<_>, _>>()
+                .collect::<Result<Vec<_>, _>>();
+            rows
         })
         .await?;
     let mut runs = Vec::new();
