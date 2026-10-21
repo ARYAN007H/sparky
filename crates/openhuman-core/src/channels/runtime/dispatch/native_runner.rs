@@ -614,10 +614,12 @@ pub(crate) async fn run(
     );
     let result = runner_result.map_err(|error| error.to_string());
     if !queued && result.is_err() {
-        if let Some(staged_lease) = staged_lease.as_ref()
-            && staged_lease.discard().await.is_err()
-        {
-            tracing::warn!("[channels::dispatch] failed to clean rejected native media staging");
+        if let Some(staged_lease) = staged_lease.as_ref() {
+            if staged_lease.discard().await.is_err() {
+                tracing::warn!(
+                    "[channels::dispatch] failed to clean rejected native media staging"
+                );
+            }
         }
     }
     if queued {
