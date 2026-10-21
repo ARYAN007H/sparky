@@ -408,6 +408,18 @@ impl ProfileHost {
         self.lock().get(id).map(|slot| Arc::clone(&slot.state))
     }
 
+    /// Snapshot profiles currently leased by this host.
+    ///
+    /// The returned handles keep each slot in use until the caller drops the
+    /// snapshot, so maintenance cannot outlive the lease that fences its
+    /// profile-scoped writes.
+    pub(crate) fn hosted_profiles(&self) -> Vec<Arc<Profile>> {
+        self.lock()
+            .values()
+            .map(|slot| Arc::clone(&slot.state))
+            .collect()
+    }
+
     pub fn is_open(&self, id: &ProfileId) -> bool {
         self.lock().contains_key(id)
     }

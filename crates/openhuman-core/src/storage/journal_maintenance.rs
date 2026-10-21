@@ -56,7 +56,11 @@ pub async fn maintain_once(
 ) -> Result<MaintenanceSummary, crate::storage::StorageError> {
     let retention_ms = u64::from(retention_days).saturating_mul(DAY_MS);
     let mut summary = MaintenanceSummary::default();
-    for scope in known_scopes().await? {
+    // Keep these handles alive for the entire pass. An open profile handle
+    // keeps its host slot in use, which prevents its lease fence from being
+    // retired while this pass writes to that profile's scope.
+    let (_hosted_profiles, scopes) = known_scopes().await?;
+    for scope in scopes {
         match maintain_scope(backend, &scope, retention_ms, now_ms).await {
             Ok(report) => {
                 summary.scopes += 1;
@@ -140,34 +144,45 @@ async fn maintain_scope(
     Ok(report)
 }
 
-/// Scopes represented by the host's own registries and compiled module table.
+/// Scopes this process can safely maintain, plus the profile handles that
+/// keep their lease fences alive for the duration of a pass.
 ///
-/// This deliberately does not ask the backend to enumerate arbitrary scopes:
-/// it includes local/cluster, registered profiles, known agent contexts, and
-/// compiled-in module scopes for local and registered profiles.
-async fn known_scopes() -> Result<Vec<Scope>, crate::storage::StorageError> {
+/// This does not ask the backend to enumerate arbitrary scopes. In SaaS mode,
+/// profile scopes are included only when this process currently holds their
+/// profile handle and lease. Dormant profiles are maintained after this host
+/// opens them; sweeping their scopes directly could mutate a profile leased
+/// by another host. Cluster scope is intentionally excluded: harness run
+/// journals have historically been tenant/local data, not cluster data.
+async fn known_scopes(
+) -> Result<(Vec<Arc<crate::profiles::Profile>>, Vec<Scope>), crate::storage::StorageError> {
     let mut scopes = BTreeSet::new();
-    scopes.insert(Scope::cluster());
     if !crate::core::runtime::mode::is_saas() {
         scopes.insert(Scope::local());
     }
 
-    let mut profiles = BTreeSet::new();
-    if let Some(host) = crate::profiles::host::host() {
-        let listed = host
-            .known_profiles()
-            .await
-            .map_err(crate::storage::StorageError::backend)?;
-        for profile in listed {
-            profiles.insert(profile);
-        }
-    }
+    let hosted_profiles = crate::profiles::host::host()
+        .map(|host| host.hosted_profiles())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|profile| {
+            let now_ms = u64::try_from(chrono::Utc::now().timestamp_millis()).unwrap_or_default();
+            profile.lease_fence().check_local(now_ms).is_ok()
+        })
+        .collect::<Vec<_>>();
+    let profiles = hosted_profiles
+        .iter()
+        .map(|profile| profile.id.as_str().to_owned())
+        .collect::<BTreeSet<_>>();
 
     for (agent, context) in crate::storage::agents::contexts() {
         let dispatch = crate::core::runtime::DispatchCtx::new(context);
         if let Ok(tenant) = dispatch.tenant() {
             if let Some(profile) = tenant.profile {
-                profiles.insert(profile);
+                // A profile context can outlive the host's lease. Only the
+                // captured, currently fenced handles above authorize work.
+                if profiles.contains(&profile) {
+                    scopes.insert(crate::storage::scope_for_profile(&profile));
+                }
             } else if let Some(agent) = tenant.agent.or(Some(agent)) {
                 scopes.insert(crate::storage::scope_for_agent(&agent));
             }
@@ -175,9 +190,9 @@ async fn known_scopes() -> Result<Vec<Scope>, crate::storage::StorageError> {
     }
 
     let bases: Vec<Scope> = if crate::core::runtime::mode::is_saas() {
-        profiles
+        hosted_profiles
             .iter()
-            .map(|profile| crate::storage::scope_for_profile(profile))
+            .map(|profile| crate::storage::scope_for_profile(profile.id.as_str()))
             .collect()
     } else {
         std::iter::once(Scope::local())
@@ -196,7 +211,7 @@ async fn known_scopes() -> Result<Vec<Scope>, crate::storage::StorageError> {
             }
         }
     }
-    Ok(scopes.into_iter().collect())
+    Ok((hosted_profiles, scopes.into_iter().collect()))
 }
 
 /// Retention days from the current config; default when it cannot load.
