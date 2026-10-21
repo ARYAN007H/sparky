@@ -308,13 +308,9 @@ fn create_chat_model_routes_managed_backend_to_crate_native() {
     config.workspace_dir = tmp.path().join("workspace");
     config.config_path = tmp.path().join("config.toml");
     store_fixture_session(&config);
-    let (_model, model_id) = create_chat_model_with_model_id_in(
-        &fixture_library_dispatch(),
-        "chat",
-        &config,
-        0.7,
-    )
-    .expect("managed create_chat_model must build");
+    let (_model, model_id) =
+        create_chat_model_with_model_id_in(&fixture_library_dispatch(), "chat", &config, 0.7)
+            .expect("managed create_chat_model must build");
     assert_eq!(model_id, "fixture/managed-default");
     crate::inference::registry::unregister_chat_model(
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
@@ -389,13 +385,9 @@ fn create_chat_model_routes_plain_bearer_cloud_slug_to_crate_native() {
     config.cloud_providers.push(deepseek_entry("p_ds"));
     config.chat_provider = Some("deepseek:deepseek-reasoner".to_string());
     store_fixture_cloud_key(&config, "deepseek");
-    let (model, model_id) = create_chat_model_with_model_id_in(
-        &fixture_library_dispatch(),
-        "chat",
-        &config,
-        0.7,
-    )
-    .expect("bearer cloud create_chat_model must build");
+    let (model, model_id) =
+        create_chat_model_with_model_id_in(&fixture_library_dispatch(), "chat", &config, 0.7)
+            .expect("bearer cloud create_chat_model must build");
     assert_eq!(model_id, "deepseek-reasoner");
     let profile = model
         .profile()
@@ -413,7 +405,9 @@ fn explicit_cloud_provider_string_routes_to_crate_native_model() {
     config.cloud_providers.push(deepseek_entry("p_ds"));
     store_fixture_cloud_key(&config, "deepseek");
     let model_and_id = crate::core::runtime::CoreContext::sync_scope(
-        fixture_library_dispatch().resolved().expect("library context"),
+        fixture_library_dispatch()
+            .resolved()
+            .expect("library context"),
         || {
             create_chat_model_from_string_with_model_id(
                 "chat",
@@ -444,13 +438,9 @@ fn create_chat_model_routes_anthropic_auth_cloud_slug_to_crate_native() {
         .push(anthropic_entry("p_anth", "anthropic"));
     config.chat_provider = Some("anthropic:claude-sonnet-4-6".to_string());
     store_fixture_cloud_key(&config, "anthropic");
-    let (model, model_id) = create_chat_model_with_model_id_in(
-        &fixture_library_dispatch(),
-        "chat",
-        &config,
-        0.7,
-    )
-    .expect("anthropic cloud create_chat_model must build");
+    let (model, model_id) =
+        create_chat_model_with_model_id_in(&fixture_library_dispatch(), "chat", &config, 0.7)
+            .expect("anthropic cloud create_chat_model must build");
     assert_eq!(model_id, "claude-sonnet-4-6");
     assert_eq!(
         model.profile().and_then(|p| p.provider.as_deref()),
