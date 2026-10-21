@@ -16,8 +16,8 @@
 //! `env_lock()` across `.await` on purpose, as there.
 #![allow(clippy::await_holding_lock)]
 
-use crate::env_guard::env_lock_async;
 use crate::env_guard::EnvVarGuard;
+use crate::env_guard::env_lock_async;
 use crate::rpc_auth::{ensure_rpc_auth, rpc_token};
 use crate::scripted_stack::{
     assert_no_jsonrpc_error, current_user, lock_or_recover, text_completion, tool_calls_completion,
@@ -31,7 +31,7 @@ use axum::http::header::AUTHORIZATION;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures_util::StreamExt;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tempfile::tempdir;
 
 use openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry;
@@ -639,7 +639,7 @@ async fn run_case_inner(case: Case) {
 
     match case.entry {
         Entry::Summarizer => {
-            use openhuman_core::inference::host_runtime::ops::{agent_chat_for, AgentChatTarget};
+            use openhuman_core::inference::host_runtime::ops::{AgentChatTarget, agent_chat_for};
             let mut config = openhuman_core::config::Config::load_or_init()
                 .await
                 .unwrap();
@@ -797,10 +797,9 @@ async fn run_case_inner(case: Case) {
             requests.len() >= 2,
             "the tool result must reach a subsequent model request"
         );
-        assert!(requests
-            .iter()
-            .all(|request| !system_text(request)
-                .contains("You compress a single oversized tool result")));
+        assert!(requests.iter().all(|request| {
+            !system_text(request).contains("You compress a single oversized tool result")
+        }));
     }
 }
 
