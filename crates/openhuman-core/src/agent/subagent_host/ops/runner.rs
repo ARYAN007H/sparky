@@ -806,14 +806,14 @@ async fn run_typed_mode(
         );
     }
 
+    let mut child_run_context = options
+        .run_context
+        .for_subagent(definition, config.as_ref().ok().map(AsRef::as_ref));
+    child_run_context.parent = Some(parent.clone());
+    let dynamic_tools = nested_spawn_tool
+        .map(|tool| vec![Box::new(tool) as Box<dyn Tool>])
+        .unwrap_or_default();
     let (output, iterations, agg_usage, early_exit_tool, hit_cap, breaker_halt, failure_cause) =
-        let mut child_run_context = options
-            .run_context
-            .for_subagent(definition, config.as_ref().ok().map(AsRef::as_ref));
-        child_run_context.parent = Some(parent.clone());
-        let dynamic_tools = nested_spawn_tool
-            .map(|tool| vec![Box::new(tool) as Box<dyn Tool>])
-            .unwrap_or_default();
         super::graph::run_subagent_via_graph(
             subagent_source.clone(),
             &model,
