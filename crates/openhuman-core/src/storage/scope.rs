@@ -41,7 +41,9 @@ impl Scope {
     /// Parses an opaque stored scope without interpreting its host grammar.
     /// Use [`Scope::parsed`] when a caller needs OpenHuman tenant semantics.
     pub fn parse(value: impl AsRef<str>) -> Result<Self, StorageError> {
-        Self::new(value)
+        let scope = Self::new(value)?;
+        scope.parsed()?;
+        Ok(scope)
     }
 
     /// The host's single-operator tenant scope.
@@ -170,9 +172,8 @@ pub struct ParsedScope {
 impl ParsedScope {
     /// Parses a string using the host's scope grammar.
     pub fn parse(value: &str) -> Result<Self, StorageError> {
-        let invalid = || {
-            StorageError::invalid_input(format!("{value:?} is not an OpenHuman storage scope"))
-        };
+        let invalid =
+            || StorageError::invalid_input(format!("{value:?} is not an OpenHuman storage scope"));
         if value == CLUSTER {
             return Ok(Self {
                 tenant: Tenant::Cluster,
@@ -284,10 +285,7 @@ pub fn scope_for_agent(agent_id: &str) -> Scope {
 }
 
 /// The scope for module `module_id` under `profile` (`None` for local).
-pub fn scope_for_module(
-    profile: Option<&str>,
-    module_id: &str,
-) -> Result<Scope, StorageError> {
+pub fn scope_for_module(profile: Option<&str>, module_id: &str) -> Result<Scope, StorageError> {
     tenant_scope(profile).module(module_id)
 }
 
@@ -326,7 +324,9 @@ fn encode_segment(id: &str) -> Result<String, StorageError> {
         bit_count += 8;
         while bit_count >= 5 {
             bit_count -= 5;
-            encoded.push(char::from(BASE32_LOWER[((bits >> bit_count) & 0x1f) as usize]));
+            encoded.push(char::from(
+                BASE32_LOWER[((bits >> bit_count) & 0x1f) as usize],
+            ));
         }
     }
     encoded.truncate(MAX_HASH_SEGMENT_LEN);
