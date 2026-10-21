@@ -435,7 +435,7 @@ fn import_flows_after_migration(
         }
         let dir = dir.clone();
         let backend = import_state::backend_with_condition(Arc::clone(backend), condition.clone());
-        let scope = scope.clone();
+        let scope = (*scope).clone();
         let config = config.clone();
         let totals = Arc::new(Mutex::new(ImportTotals::default()));
         crate::storage::block_on_anyhow(async move {
