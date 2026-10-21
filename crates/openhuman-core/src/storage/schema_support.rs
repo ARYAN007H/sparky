@@ -14,13 +14,7 @@ use crate::storage::import::Record;
 pub(crate) struct LegacySourceRecord {
     pub id: String,
     pub body: Value,
-    pub meta: LegacySourceMeta,
-}
-
-/// Metadata carried into an owner conversion from the source reader.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct LegacySourceMeta {
-    pub created_ms: i64,
+    pub meta: tinystoragedrivers::Meta,
 }
 
 /// Target row emitted by a typed owner import conversion.
@@ -65,8 +59,9 @@ where
             source.push(LegacySourceRecord {
                 id: record.id,
                 body: record.doc,
-                meta: LegacySourceMeta {
+                meta: tinystoragedrivers::Meta {
                     created_ms: record.created_ms.unwrap_or_default(),
+                    ..tinystoragedrivers::Meta::unknown()
                 },
             });
         } else {
