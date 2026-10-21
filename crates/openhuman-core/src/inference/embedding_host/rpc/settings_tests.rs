@@ -1,5 +1,4 @@
 use super::*;
-use tinyinference_embeddings::format_embedding_signature;
 
 async fn endpoint() -> (String, tokio::task::JoinHandle<()>) {
     use axum::{routing::post, Json, Router};
@@ -60,11 +59,7 @@ async fn endpoint_only_custom_change_reports_persisted_provider_signature() {
         .await
         .unwrap();
     let persisted = reloaded_config(&tmp).await;
-    let expected = format_embedding_signature(
-        &persisted.memory.embedding_provider,
-        &persisted.memory.embedding_model,
-        persisted.memory.embedding_dimensions,
-    );
+    let expected = format!("provider=custom:{endpoint};model=bge-m3;dims=4");
 
     assert_eq!(
         persisted.memory.embedding_provider,
@@ -104,11 +99,7 @@ async fn auto_detected_dimensions_are_used_in_persisted_provider_signature() {
         .await
         .unwrap();
     let persisted = reloaded_config(&tmp).await;
-    let expected = format_embedding_signature(
-        &persisted.memory.embedding_provider,
-        &persisted.memory.embedding_model,
-        persisted.memory.embedding_dimensions,
-    );
+    let expected = format!("provider=custom:{endpoint};model=bge-m3;dims=4");
 
     assert_eq!(
         persisted.memory.embedding_provider,
@@ -118,4 +109,107 @@ async fn auto_detected_dimensions_are_used_in_persisted_provider_signature() {
     assert_eq!(outcome.value["signature_changed"], true);
     assert_eq!(outcome.value["new_signature"], expected);
     server.abort();
+}
+
+#[tokio::test]
+async fn custom_verification_keeps_model_guidance_and_rejects_the_save() {
+    use axum::{
+        http::StatusCode,
+        routing::{get, post},
+        Json, Router,
+    };
+
+    let app = Router::new()
+        .route(
+            "/v1/embeddings",
+            post(|| async {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
+                        "error": { "message": "model does not support embeddings" }
+                    })),
+                )
+            }),
+        )
+        .route(
+            "/v1/models",
+            get(|| async {
+                Json(serde_json::json!({
+                    "data": [{ "id": "text-embedding-bge-m3" }]
+                }))
+            }),
+        );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!(
+        "http://127.0.0.1:{}/v1",
+        listener.local_addr().unwrap().port()
+    );
+    let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let (tmp, ctx) = config_context("custom:http://127.0.0.1:1/v1".to_string()).await;
+
+    let outcome = update_settings(
+        &ctx,
+        Some("custom".to_string()),
+        Some("bge-m3".to_string()),
+        Some(8),
+        Some(endpoint),
+        None,
+    )
+    .await
+    .unwrap();
+    let persisted = reloaded_config(&tmp).await;
+
+    assert_eq!(outcome.value["error"], "EMBEDDINGS_NO_MODEL_LOADED");
+    assert_eq!(outcome.value["requested_model"], "bge-m3");
+    assert_eq!(outcome.value["suggested_model"], "text-embedding-bge-m3");
+    assert_eq!(
+        persisted.memory.embedding_provider,
+        "custom:http://127.0.0.1:1/v1"
+    );
+    assert_eq!(persisted.memory.embedding_dimensions, 4);
+    server.abort();
+}
+
+#[tokio::test]
+async fn settings_reports_native_effective_embedder_resolution() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let mut config = Config::default();
+    config.config_path = tmp.path().join("config.toml");
+
+    config.embeddings_provider = Some("none".to_string());
+    assert_eq!(
+        get_settings(&config).await.unwrap().value["effective_provider"],
+        "none"
+    );
+
+    config.embeddings_provider = Some("ollama:nomic-embed-text".to_string());
+    config.memory.embedding_provider = "openai".to_string();
+    assert_eq!(
+        get_settings(&config).await.unwrap().value["effective_provider"],
+        "ollama"
+    );
+
+    config.embeddings_provider = Some("openhuman".to_string());
+    config.memory.embedding_provider = "custom:https://example.test/v1".to_string();
+    assert_eq!(
+        get_settings(&config).await.unwrap().value["effective_provider"],
+        "custom"
+    );
+
+    config.memory.embedding_provider = "managed".to_string();
+    tokio::fs::write(tmp.path().join("auth-profiles.json"), "{}")
+        .await
+        .unwrap();
+    assert_eq!(
+        get_settings(&config).await.unwrap().value["effective_provider"],
+        "cloud"
+    );
+
+    tokio::fs::remove_file(tmp.path().join("auth-profiles.json"))
+        .await
+        .unwrap();
+    assert_eq!(
+        get_settings(&config).await.unwrap().value["effective_provider"],
+        "unconfigured"
+    );
 }

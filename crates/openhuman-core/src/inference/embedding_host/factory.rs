@@ -7,16 +7,15 @@ use tinyinference_embeddings::factory::{
     create_configured_embedding_model, create_default_embedding_model, CredentialResolver,
     EmbeddingFactorySettings, ManagedModelFactory,
 };
-use tinyinference_embeddings::EmbeddingModel;
+use tinyinference_embeddings::{EmbeddingModel, UnavailableEmbeddingModel};
 use tinyinference_providers::route::custom_provider_string;
 
-use super::cloud::UnavailableEmbeddingModel;
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
 use crate::inference::registry::EmbeddingRequest;
 use crate::security::approval::ApprovalChatContext;
 use crate::security::credentials::embedding_scope::credential_scope;
 
-fn settings(
+pub(super) fn settings(
     provider: &str,
     model: &str,
     dimensions: usize,
@@ -30,14 +29,16 @@ fn settings(
     }
 }
 
-fn managed_factory(config: &Config, chat: Option<ApprovalChatContext>) -> ManagedModelFactory {
-    let config = config.clone();
+pub(super) fn managed_factory(
+    config: Option<Config>,
+    chat: Option<ApprovalChatContext>,
+) -> ManagedModelFactory {
     Arc::new(move |model, dimensions| {
         if let Some(registered) = crate::inference::registry::embedding(PROVIDER_OPENHUMAN) {
             log::debug!("[embeddings::factory] managed model served by a registered factory");
-            let (state_dir, secrets_encrypt) = credential_scope(Some(&config));
+            let (state_dir, secrets_encrypt) = credential_scope(config.as_ref());
             return registered(&EmbeddingRequest {
-                config: Some(&config),
+                config: config.as_ref(),
                 model,
                 dimensions,
                 chat: chat.clone(),
@@ -46,11 +47,17 @@ fn managed_factory(config: &Config, chat: Option<ApprovalChatContext>) -> Manage
             });
         }
         log::debug!("[embeddings::factory] no managed embedding provider registered");
-        Ok(Box::new(UnavailableEmbeddingModel::new(model, dimensions)))
+        let message = format!(
+            "{} managed embeddings need a hosted provider; none is registered",
+            crate::core::observability::BACKEND_UNAVAILABLE_PREFIX
+        );
+        Ok(Box::new(UnavailableEmbeddingModel::new(
+            model, dimensions, message,
+        )))
     })
 }
 
-fn credential_resolver(config: &Config) -> CredentialResolver {
+pub(super) fn credential_resolver(config: &Config) -> CredentialResolver {
     let config = config.clone();
     Arc::new(move |provider| super::rpc::resolve_api_key(&config, provider))
 }
@@ -69,22 +76,6 @@ pub fn create_embedding_provider_with_credentials(
         .unwrap_or_else(|| provider.to_owned());
     let api_key = api_key.to_owned();
     let credentials: CredentialResolver = Arc::new(move |_| api_key.clone());
-    let managed: ManagedModelFactory = Arc::new(|model, dimensions| {
-        if let Some(registered) = crate::inference::registry::embedding(PROVIDER_OPENHUMAN) {
-            log::debug!("[embeddings::factory] managed model served by a registered factory");
-            let (state_dir, secrets_encrypt) = credential_scope(None);
-            return registered(&EmbeddingRequest {
-                config: None,
-                model,
-                dimensions,
-                chat: None,
-                state_dir,
-                secrets_encrypt,
-            });
-        }
-        log::debug!("[embeddings::factory] no managed embedding provider registered");
-        Ok(Box::new(UnavailableEmbeddingModel::new(model, dimensions)))
-    });
     let model = create_configured_embedding_model(
         &settings(
             &provider,
@@ -93,7 +84,7 @@ pub fn create_embedding_provider_with_credentials(
             tinyinference_local::ollama::ollama_base_url(),
         ),
         &credentials,
-        &managed,
+        &managed_factory(None, None),
     )?;
     Ok(model)
 }
@@ -145,8 +136,11 @@ pub fn create_embedding_provider_for_chat(
     );
     let api_key = api_key.to_owned();
     let credentials: CredentialResolver = Arc::new(move |_| api_key.clone());
-    let model =
-        create_configured_embedding_model(&selected, &credentials, &managed_factory(config, chat))?;
+    let model = create_configured_embedding_model(
+        &selected,
+        &credentials,
+        &managed_factory(Some(config.clone()), chat),
+    )?;
     Ok(model)
 }
 
@@ -173,7 +167,7 @@ pub fn default_embedding_provider_for_chat(
     let model = create_default_embedding_model(
         &selected,
         &credential_resolver(config),
-        &managed_factory(config, chat),
+        &managed_factory(Some(config.clone()), chat),
     )
     .unwrap_or_else(|error| {
         log::warn!("[embeddings::factory] managed fallback failed to build: {error}");

@@ -13,17 +13,7 @@ pub use embed::{embed, test_connection};
 pub use settings::{get_settings, update_settings};
 
 #[cfg(test)]
-use tinyinference_embeddings::probe::redact_secrets;
-
-#[cfg(test)]
 use settings::remember_active_custom_profile;
-#[cfg(test)]
-use tinyinference_embeddings::probe::{classify_embed_probe, EmbedProbe};
-#[cfg(test)]
-use tinyinference_embeddings::served_models::{
-    check_requested_model_served, fetch_served_model_ids, normalize_embed_model_id,
-    reject_model_not_served,
-};
 
 use crate::config::Config;
 use crate::security::credentials::AuthService;

@@ -4,8 +4,10 @@ use crate::config::Config;
 use crate::core::Outcome;
 
 use super::{resolve_api_key, LOG_PREFIX};
-use crate::inference::embedding_host::factory::create_embedding_provider_with_config;
-use tinyinference_embeddings::probe::probe_custom_embeddings;
+use crate::inference::embedding_host::factory::{
+    create_embedding_provider_with_config, credential_resolver, managed_factory, settings,
+};
+use tinyinference_embeddings::verify::{test_embedding_connection_detailed, ConnectionTestError};
 use tinyinference_providers::route::split_custom_provider;
 
 /// Generates embeddings for the given input texts using the currently
@@ -73,8 +75,6 @@ pub async fn test_connection(
     let model = model.unwrap_or(&config.memory.embedding_model);
     let dims = dims.unwrap_or(config.memory.embedding_dimensions);
 
-    let api_key = resolve_api_key(config, slug);
-
     let (provider_slug, custom_endpoint) = split_custom_provider(slug);
 
     let provider_tag = if custom_endpoint.is_some() {
@@ -90,29 +90,34 @@ pub async fn test_connection(
         "{LOG_PREFIX} test_connection starting"
     );
 
-    let result = if let Some(endpoint) = custom_endpoint.as_deref() {
-        probe_custom_embeddings(endpoint, &api_key, model, dims)
-            .await
-            .map_err(|error| error.to_string())
-    } else {
-        let embedder = create_embedding_provider_with_config(
-            config,
-            provider_tag,
-            model,
-            dims,
-            &api_key,
-            None,
-        )
-        .map_err(|e| e.to_string())?;
-        embedder
-            .embed(&["connection test".to_string()])
-            .await
-            .map_err(|e| e.to_string())
+    let custom_provider = custom_endpoint
+        .as_deref()
+        .map(|endpoint| format!("custom:{endpoint}"));
+    let selected = settings(
+        custom_provider.as_deref().unwrap_or(provider_tag),
+        model,
+        dims,
+        tinyinference_local::ollama::ollama_base_url_from_override(
+            config.local_ai.base_url.as_deref(),
+        ),
+    );
+    let credentials = credential_resolver(config);
+    let managed = managed_factory(Some(config.clone()), None);
+    let result = test_embedding_connection_detailed(
+        &selected,
+        &credentials,
+        &managed,
+        custom_endpoint.as_deref(),
+    )
+    .await;
+    let result = match result {
+        Ok(result) => Ok(result.actual_dims),
+        Err(ConnectionTestError::Build(error)) => return Err(error.to_string()),
+        Err(ConnectionTestError::Embed(error)) => Err(error.to_string()),
     };
 
     match result {
-        Ok(vectors) => {
-            let actual_dims = vectors.first().map(|v| v.len()).unwrap_or(0);
+        Ok(actual_dims) => {
             let payload = serde_json::json!({
                 "success": true,
                 "provider": provider_tag,
