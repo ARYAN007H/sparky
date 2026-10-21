@@ -423,7 +423,7 @@ impl<T: Tool> MediaArtifactTool<T> {
 }
 
 async fn copy_blob_to_file(
-    reader: &mut tinyagents_storage_kit::BlobReader,
+    reader: &mut tinyagents_storage_kit::blob::BlobReader,
     dest: &Path,
     key: &str,
 ) -> Result<u64, String> {
