@@ -361,7 +361,6 @@ pub(super) fn on_subagent_awaiting_user(
             // written (#5928).
             checkpoint_path: checkpoint_path.clone(),
             checkpoint: Some(json!({
-                "resumeTool": "continue_subagent",
                 "taskId": task_id,
                 "agentId": agent_id,
                 "question": question,
