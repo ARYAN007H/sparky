@@ -197,10 +197,21 @@ impl ChannelTurnStateSubscriber {
         }
     }
     async fn mark(&self, channel: &str, reply_target: &str, event_ws: &PathBuf, busy: bool) {
+        #[cfg(test)]
+        eprintln!(
+            "turn-state mark begin busy={busy} channel={channel:?} target={reply_target:?} cancelled={} remote={} event_ws={:?} subscriber_ws={:?} config={}",
+            self.cancellation.is_cancelled(),
+            capabilities_for(channel).remote_control,
+            event_ws,
+            self.workspace_dir,
+            self.config.is_some(),
+        );
         if self.cancellation.is_cancelled()
             || !capabilities_for(channel).remote_control
             || *event_ws != self.workspace_dir
         {
+            #[cfg(test)]
+            eprintln!("turn-state mark skipped");
             return;
         }
         #[cfg(test)]
@@ -223,6 +234,8 @@ impl ChannelTurnStateSubscriber {
                 },),
             )
             .await;
+        #[cfg(test)]
+        eprintln!("turn-state mark result: {result:?}");
         if result.is_err() {
             tracing::debug!("channel turn status unavailable");
         }
