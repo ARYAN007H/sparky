@@ -197,7 +197,11 @@ fn handle_list_pending(ctx: DispatchCtx, params: Map<String, Value>) -> Controll
 }
 
 fn list_pending_controller() -> BoundRegisteredController {
-    BoundRegisteredController::typed(schemas("list_pending"), parse_list_pending, run_list_pending)
+    BoundRegisteredController::typed(
+        schemas("list_pending"),
+        parse_list_pending,
+        run_list_pending,
+    )
 }
 
 fn run_list_pending(ctx: DispatchCtx, agent_id: Option<String>) -> ControllerFuture {
@@ -235,7 +239,11 @@ fn handle_get_gate_state(_ctx: DispatchCtx, params: Map<String, Value>) -> Contr
 }
 
 fn get_gate_state_controller() -> BoundRegisteredController {
-    BoundRegisteredController::typed(schemas("get_gate_state"), parse_get_gate_state, run_get_gate_state)
+    BoundRegisteredController::typed(
+        schemas("get_gate_state"),
+        parse_get_gate_state,
+        run_get_gate_state,
+    )
 }
 
 fn run_get_gate_state(_ctx: DispatchCtx, _parsed: ()) -> ControllerFuture {
