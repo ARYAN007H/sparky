@@ -10,7 +10,7 @@ use crate::agent::queued_turn::QueuedPayload;
 use tokio::sync::{mpsc, watch};
 
 /// Aborts a task when dropped.
-pub(super) struct AbortOnDrop(tokio::task::JoinHandle<()>);
+pub(super) struct AbortOnDrop(pub(super) tokio::task::JoinHandle<()>);
 
 impl Drop for AbortOnDrop {
     fn drop(&mut self) {

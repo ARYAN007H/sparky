@@ -44,7 +44,9 @@ use tinyagents_harness::progress::AgentProgress;
 
 #[path = "turn_host_progress.rs"]
 mod progress_helpers;
-use progress_helpers::{settle_turn_snapshot, spawn_heartbeat, tap_progress, AbortOnDrop};
+use progress_helpers::{
+    settle_turn_snapshot, spawn_heartbeat, spawn_heartbeat_with_interval, tap_progress, AbortOnDrop,
+};
 
 
 /// How long a finished turn waits for its progress tap to forward every event
