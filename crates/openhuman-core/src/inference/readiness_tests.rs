@@ -9,8 +9,10 @@ async fn cached_probe_serves_definitive_negative_results() {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
-    let _model_override_guard =
-        crate::inference::provider::factory::test_provider_override::exclusive();
+    // Acquire the async inference guard before the synchronous provider
+    // override lock, matching the global lock order used by other fixtures.
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let _exclusive = crate::inference::provider::factory::test_provider_override::exclusive();
     let tmp = TempDir::new().unwrap();
     let config = Config {
         workspace_dir: tmp.path().join("workspace"),
@@ -19,28 +21,10 @@ async fn cached_probe_serves_definitive_negative_results() {
         ..Config::default()
     };
     let hit_count = std::sync::Arc::new(AtomicUsize::new(0));
-    // The core owns no hosted provider; the managed backend's readiness probe
-    // is whatever the host registered. Register one that rejects the way the
-    // backend does, and count how often the core actually asks it.
-    let _guard = crate::inference::inference_test_guard_async().await;
-    let _exclusive = crate::inference::provider::factory::test_provider_override::exclusive();
+    // The core owns no hosted provider; this scoped host registration supplies
+    // a deterministic negative probe and counts cache misses without touching
+    // a global provider or a real backend.
     let counter = hit_count.clone();
-    let managed = crate::inference::registry::chat_model(
-        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-    )
-    .expect("the unit-test managed provider is available");
-    crate::inference::registry::register_chat_model(
-        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-        crate::inference::registry::ChatModelEntry {
-            build: managed.build,
-            probe: Some(std::sync::Arc::new(move |_role, _model, _config| {
-                counter.fetch_add(1, Ordering::SeqCst);
-                Box::pin(async { Err("API key not configured for provider".to_string()) })
-            })),
-            models: None,
-        },
-    );
-
     let extensions = Extensions::new();
     register_chat_model_in(
         &extensions,
@@ -54,23 +38,9 @@ async fn cached_probe_serves_definitive_negative_results() {
                     "fixture-model".to_string(),
                 ))
             }),
-            probe: Some(Arc::new(|_, _, config| {
-                Box::pin(async move {
-                    let base = config.api_url.as_deref().unwrap().trim_end_matches('/');
-                    let response = reqwest::Client::new()
-                        .post(format!("{base}/openai/v1/chat/completions"))
-                        .json(&serde_json::json!({"model":"fixture-model","messages":[]}))
-                        .send()
-                        .await
-                        .map_err(|error| error.to_string())?;
-                    let status = response.status();
-                    let body = response.text().await.map_err(|error| error.to_string())?;
-                    if status.is_success() {
-                        Ok(())
-                    } else {
-                        Err(body)
-                    }
-                })
+            probe: Some(Arc::new(move |_, _, _| {
+                counter.fetch_add(1, Ordering::SeqCst);
+                Box::pin(async { Err("API key not configured for provider".to_string()) })
             })),
             models: Some(ProviderModelHooks {
                 default_model: Arc::new(|| Some("fixture-model".to_string())),
@@ -100,7 +70,4 @@ async fn cached_probe_serves_definitive_negative_results() {
     assert_eq!(hit_count.load(Ordering::SeqCst), 1);
     assert!(cached_probe(&ctx, "summarization", &config).await.is_err());
     assert_eq!(hit_count.load(Ordering::SeqCst), 1);
-    crate::inference::registry::unregister_chat_model(
-        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-    );
 }
