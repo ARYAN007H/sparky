@@ -502,13 +502,6 @@ impl OpenHumanRunContext {
         self
     }
 
-    /// Marks an opted-in headless root whose host will settle driver jobs.
-    #[must_use]
-    pub(crate) fn with_headless_descendant_settlement(mut self) -> Self {
-        self.headless_descendant_settlement = true;
-        self
-    }
-
     /// The dispatch context this run's readers use: its own `core`, else the
     /// calling task's (a run assembled by a caller that did not bind one).
     pub fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
