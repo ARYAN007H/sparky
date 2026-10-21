@@ -40,6 +40,11 @@ pub(super) fn spec() -> CollectionSpec {
     CollectionSpec::new(TRANSCRIPT_KEYS)
 }
 
+/// Collections owned by the thread host alongside TinyAgents' transcript store.
+pub(crate) fn collection_specs() -> Vec<CollectionSpec> {
+    vec![spec()]
+}
+
 fn transcript_keys_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {
     batch
         .into_iter()

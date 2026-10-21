@@ -66,6 +66,11 @@ pub(super) fn specs() -> Vec<CollectionSpec> {
     ]
 }
 
+/// Collections owned by the notification store.
+pub(crate) fn collection_specs() -> Vec<CollectionSpec> {
+    specs()
+}
+
 /// The v1 collections as the legacy importer declares them.
 pub(super) fn legacy_collections() -> Vec<CollectionSpec> {
     vec![

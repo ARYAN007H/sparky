@@ -51,6 +51,15 @@ pub(super) fn records_spec() -> CollectionSpec {
     CollectionSpec::new(RECORDS).index(IndexSpec::new("by_thread", ["thread_id", "created_ms"]))
 }
 
+/// Collections owned by the artifact store.
+pub(crate) fn collection_specs() -> Vec<CollectionSpec> {
+    vec![
+        records_spec(),
+        CollectionSpec::new(ARGS),
+        CollectionSpec::new(VERSIONS),
+    ]
+}
+
 /// A card as its stored body: its fields with `created_at` replaced by
 /// `created_ms`.
 ///

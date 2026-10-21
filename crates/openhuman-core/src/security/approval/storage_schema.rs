@@ -54,6 +54,11 @@ pub(super) fn specs() -> [CollectionSpec; 2] {
     ]
 }
 
+/// Collections owned by the approval store.
+pub(crate) fn collection_specs() -> Vec<CollectionSpec> {
+    specs().into()
+}
+
 /// The v1 collections as the legacy importer declares them.
 pub(super) fn legacy_collections() -> Vec<CollectionSpec> {
     vec![

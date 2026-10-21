@@ -33,6 +33,11 @@ pub(super) fn spec() -> CollectionSpec {
     CollectionSpec::new(SESSIONS)
 }
 
+/// Collections owned by the sub-agent session host.
+pub(crate) fn collection_specs() -> Vec<CollectionSpec> {
+    vec![spec()]
+}
+
 pub(super) fn legacy_collections() -> Vec<CollectionSpec> {
     vec![CollectionSpec::new(LEGACY_SESSIONS)]
 }

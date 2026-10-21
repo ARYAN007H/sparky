@@ -31,6 +31,11 @@ pub(super) fn spec() -> CollectionSpec {
     CollectionSpec::new(DEVICES).index(IndexSpec::new("by_active", ["revoked", "created_ms"]))
 }
 
+/// Collections owned by the paired-device store.
+pub(crate) fn collection_specs() -> Vec<CollectionSpec> {
+    vec![spec()]
+}
+
 /// The v1 collection as the importer declares it.
 pub(super) fn legacy_collections() -> Vec<CollectionSpec> {
     vec![CollectionSpec::new(LEGACY_DEVICES)

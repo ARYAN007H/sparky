@@ -27,6 +27,11 @@ pub const REGISTRY_COLLECTION: &str = "profiles.registry";
 pub(super) const LEGACY_REGISTRY_COLLECTION: &str = "profiles";
 const SCHEMA: u32 = 2;
 
+/// Collections owned by the profile registry.
+pub(crate) fn collection_specs() -> Vec<CollectionSpec> {
+    vec![CollectionSpec::new(REGISTRY_COLLECTION)]
+}
+
 /// What the profile registry keeps and the step from the v1 collection.
 #[must_use]
 pub fn storage_schema() -> Schema {
