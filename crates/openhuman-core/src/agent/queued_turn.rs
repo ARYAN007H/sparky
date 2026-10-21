@@ -52,6 +52,10 @@ pub struct QueuedPayload {
     pub(crate) deferred_user_message: bool,
     pub(crate) stored_attachments: Option<StoredAttachmentInput>,
     pub(crate) pending_attachments: Option<PendingAttachmentInput>,
+    /// Typed native-channel input resolved from the exact module envelope for
+    /// this queued request. Synthetic queue placeholders deliberately do not
+    /// inherit it from the currently running turn.
+    pub(crate) native_message_input: Option<tinyinference_llm::message::Message>,
 }
 
 impl std::fmt::Debug for QueuedPayload {
@@ -69,6 +73,7 @@ impl std::fmt::Debug for QueuedPayload {
                 "has_pending_attachments",
                 &self.pending_attachments.is_some(),
             )
+            .field("has_native_message_input", &self.native_message_input.is_some())
             .finish_non_exhaustive()
     }
 }

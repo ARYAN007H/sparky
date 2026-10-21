@@ -260,29 +260,6 @@ pub(crate) fn user_message_from_parts(
     Ok(Message::User(UserMessage { content }))
 }
 
-/*
-            tinychannels_bus::ContentPart::Audio { media, .. }
-            | tinychannels_bus::ContentPart::Video { media, .. } => {
-                let path = media
-                    .path
-                    .clone()
-                    .ok_or_else(|| "resolved media attachment has no trusted path".to_string())?;
-                let media_ref = MediaRef::Path {
-                    path,
-                    media_type: media.content_type.clone(),
-                };
-                let block = match part {
-                    tinychannels_bus::ContentPart::Audio { .. } => ContentBlock::Audio(media_ref),
-                    tinychannels_bus::ContentPart::Video { .. } => ContentBlock::Video(media_ref),
-                    _ => ContentBlock::Document(media_ref),
-                };
-                content.push(block);
-            }
-            _ => return Err("resolved attachment has an unsupported kind".into()),
-        }
-    }
-    Ok(Message::User(UserMessage { content }))
-*/
 }
 
 /// The inverse of [`user_message_from_text`]: a user message's text with each

@@ -91,6 +91,7 @@ impl HostAgent {
         event_session_id: &str,
         channel: &str,
         message: &str,
+        message_input: Option<tinyinference_llm::message::Message>,
         origin: crate::agent::turn_origin::AgentTurnOrigin,
         approval: crate::security::approval::ApprovalTurnContext,
         progress: Option<tokio::sync::mpsc::Sender<tinyagents_harness::progress::AgentProgress>>,
@@ -125,7 +126,7 @@ impl HostAgent {
             &mut session,
             crate::agent::turn_host::AgentTurnRequest {
                 message: message.to_owned(),
-                message_input: None,
+                message_input,
                 thread_id: Some(session_key.to_owned()),
                 origin,
                 approval: approval.clone(),

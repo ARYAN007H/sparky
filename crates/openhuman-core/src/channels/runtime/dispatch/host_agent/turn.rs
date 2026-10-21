@@ -23,6 +23,8 @@ pub(crate) struct HostChannelTurn {
     pub(crate) event_session_id: String,
     /// The message the agent answers.
     pub(crate) message: String,
+    /// Scoped typed media input for this exact queued channel request.
+    pub(crate) message_input: Option<tinyinference_llm::message::Message>,
     /// Who asked: the channel's `ExternalChannel` origin.
     pub(crate) origin: AgentTurnOrigin,
     /// Live progress projected through the compiled channel module.
@@ -50,6 +52,7 @@ pub(crate) async fn run_host_agent_turn(
         session_key,
         event_session_id,
         message,
+        message_input,
         origin,
         progress,
         run_queue,
@@ -93,6 +96,7 @@ pub(crate) async fn run_host_agent_turn(
             &event_session_id,
             &channel,
             &message,
+            message_input,
             origin,
             approval,
             progress,

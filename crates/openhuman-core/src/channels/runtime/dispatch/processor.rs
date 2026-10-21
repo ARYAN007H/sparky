@@ -16,6 +16,7 @@
 
 mod approval;
 mod bus_turn;
+mod native_media;
 pub(crate) mod progressive;
 mod reset;
 mod turn;

@@ -1,7 +1,5 @@
 //! Resolve typed native-channel media through TinyChannels' scoped media port.
 
-use std::sync::Arc;
-
 use tinyinference_llm::message::Message;
 use tinychannels_bus::{
     module_media::{MediaReadBegin, MediaReadChunk, MediaReadFinish}, ChannelInboundEnvelope,

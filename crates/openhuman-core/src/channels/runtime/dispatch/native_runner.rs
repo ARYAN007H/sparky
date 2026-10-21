@@ -179,6 +179,7 @@ impl TurnHost<QueuedPayload> for NativeHost {
                 session_key: session.session_id.clone(),
                 event_session_id: trusted.event_session_id.clone(),
                 message: request.text.clone(),
+                message_input: request.payload.native_message_input.clone(),
                 origin: trusted.origin.clone(),
                 progress: Some(agent_progress),
                 run_queue: Some(queue),
@@ -551,6 +552,7 @@ pub(crate) async fn run(
     thread_id: String,
     request_id: String,
     text: String,
+    message_input: Option<tinyinference_llm::message::Message>,
     trusted: Arc<crate::agent::turn_host::TrustedAgentTurn>,
 ) -> NativeTurnExecution {
     let runtime = crate::core::runtime::slot_for::<NativeRuntime>(dispatch);
@@ -576,6 +578,7 @@ pub(crate) async fn run(
         payload: QueuedPayload {
             ctx: Some(dispatch.clone()),
             trusted_turn: Some(trusted),
+            native_message_input: message_input,
             ..Default::default()
         },
         host_authored: false,
