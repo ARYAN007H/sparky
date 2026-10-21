@@ -117,7 +117,8 @@ pub(crate) fn upgrade_lease_records(
                     "openhuman.leases",
                     key_of_parts(["profiles", record.id.as_str()])?,
                     Value::Object(body),
-                ))
+                )
+                .source_metadata(record.meta))
             })
             .collect()
     })
