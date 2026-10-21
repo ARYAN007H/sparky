@@ -172,6 +172,7 @@ fn sub_agents_stay_with_the_agent_that_declared_them() {
                 );
                 assert!(!String::from_utf8_lossy(&request.body).contains(HELPER_MARK));
             }
+            host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers(&runtime).await;
             assert_eq!(
                 chat_requests(&runtime_provider).await.len(),
                 0,
@@ -183,22 +184,7 @@ fn sub_agents_stay_with_the_agent_that_declared_them() {
     });
 }
 
-#[test]
-fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers() {
-    runtime().block_on(async {
-        tokio::spawn(async move {
-            let backend = stub_backend().await;
-            let runtime_provider = scripted_provider(Vec::new(), "runtime-provider").await;
-            let runtime = Runtime::builder()
-                .config(offline_config())
-                .workspace(Workspace::Ephemeral)
-                .backend_url(backend.uri())
-                .provider(route(&runtime_provider, "runtime-model"))
-                .access(Access::full())
-                .build()
-                .await
-                .expect("runtime builds");
-
+async fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers(runtime: &Runtime) {
             let host_only_provider = scripted_provider(
                 vec![
                     tool_call_completion(
@@ -305,15 +291,6 @@ fn host_only_and_disallowed_scopes_do_not_opt_into_declared_helpers() {
                 .join("\n");
             assert_refused_without_async_reference(&denied_tool_results);
 
-            assert_eq!(
-                chat_requests(&runtime_provider).await.len(),
-                0,
-                "no helper work falls back to the runtime provider"
-            );
-        })
-        .await
-        .expect("test task");
-    });
 }
 
 fn assert_refused_without_async_reference(result: &str) {
