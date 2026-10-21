@@ -65,15 +65,18 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
             _state: &(),
             request: ModelRequest,
         ) -> tinyinference_llm::Result<ModelResponse> {
-            let contains_child_prompt = request
-                .messages
-                .iter()
-                .any(|message| message.text().contains(CHILD_PROMPT));
+            let contains_child_prompt = request.messages.iter().any(|message| {
+                matches!(message, tinyinference_llm::message::Message::User(_))
+                    && message.text().contains(CHILD_PROMPT)
+            });
             if !contains_child_prompt
                 && request
                     .messages
                     .iter()
-                    .any(|message| message.text().contains(GRANDCHILD_PROMPT))
+                    .any(|message| {
+                        matches!(message, tinyinference_llm::message::Message::User(_))
+                            && message.text().contains(GRANDCHILD_PROMPT)
+                    })
             {
                 self.grandchild_calls
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -83,11 +86,7 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
                 self.child_release.notified().await;
                 return Ok(ModelResponse::assistant("headless-flow-grandchild-result"));
             }
-            if request
-                .messages
-                .iter()
-                .any(|message| message.text().contains(CHILD_PROMPT))
-            {
+            if contains_child_prompt {
                 self.child_schema_names.lock().unwrap().push(
                     request
                         .tools
