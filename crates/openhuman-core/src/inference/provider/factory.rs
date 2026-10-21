@@ -34,7 +34,7 @@ pub(crate) use credentials::{
     openai_bearer_is_oauth, redact_endpoint_origin, resolve_codex_routing,
 };
 pub(crate) use local_runtime::create_local_chat_model_from_string;
-pub(crate) use routing::{fallback_diagnostics_for_role, role_uses_implicit_cloud_fallback};
+pub(crate) use routing::fallback_diagnostics_for_role;
 pub use routing::{provider_for_role, role_bypasses_managed_credits};
 pub(crate) use routing::{workload_router, ConfigRouteSource};
 

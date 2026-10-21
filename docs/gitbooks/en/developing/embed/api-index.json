@@ -162,6 +162,7 @@
     "events",
     "fanout",
     "identity",
+    "inbound",
     "memory",
     "modules",
     "observe",

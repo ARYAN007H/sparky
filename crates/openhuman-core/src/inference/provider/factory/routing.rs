@@ -162,10 +162,6 @@ pub(crate) fn fallback_diagnostics_for_role(
     WORKLOAD_ROUTER.fallback_diagnostics(role, &source)
 }
 
-pub(crate) fn role_uses_implicit_cloud_fallback(role: &str, config: &Config) -> bool {
-    fallback_diagnostics_for_role(role, config).is_some()
-}
-
 /// Kept until v0.66; review after 2027-01-11 before removing legacy
 /// `inference_url` route compatibility from the host's route source.
 fn is_explicit_provider_default(model: &str, config: &Config) -> bool {

@@ -221,23 +221,23 @@ fn implicit_cloud_fallback_is_claimed_only_when_the_role_has_no_route_of_its_own
 
     // Unset background route: the role genuinely landed on the cloud because
     // the local chat model cannot serve it, so the explanation applies.
-    assert!(role_uses_implicit_cloud_fallback("vision", &config));
+    assert!(fallback_diagnostics_for_role("vision", &config).is_some());
     // The literal "cloud" is the same "route me wherever the cloud is" intent.
     config.embeddings_provider = Some("cloud".to_string());
-    assert!(role_uses_implicit_cloud_fallback("embeddings", &config));
+    assert!(fallback_diagnostics_for_role("embeddings", &config).is_some());
     // Whitespace is not a configured route.
     config.memory_provider = Some("   ".to_string());
-    assert!(role_uses_implicit_cloud_fallback("memory", &config));
+    assert!(fallback_diagnostics_for_role("memory", &config).is_some());
 
     // Explicitly routed to a cloud slug: a credential failure here is about
     // that route, not about the local chat model, so it must not be described
     // as a fallback.
     config.vision_provider = Some("anthropic:claude-3-5-sonnet-latest".to_string());
-    assert!(!role_uses_implicit_cloud_fallback("vision", &config));
+    assert!(fallback_diagnostics_for_role("vision", &config).is_none());
 
     // Chat-tier roles are never described as cloud fallbacks, routed or not.
     for role in ["chat", "reasoning", "coding"] {
-        assert!(!role_uses_implicit_cloud_fallback(role, &config));
+        assert!(fallback_diagnostics_for_role(role, &config).is_none());
     }
 }
 

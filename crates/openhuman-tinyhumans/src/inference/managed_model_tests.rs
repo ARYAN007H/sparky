@@ -21,7 +21,7 @@ fn managed_model_preserves_the_openhuman_response_cache_identity() {
 }
 
 #[test]
-fn managed_model_trims_a_configured_model_and_uses_the_product_default_when_blank() {
+fn managed_factory_passes_product_default_to_native_model_when_configured_model_is_blank() {
     let configured = build_chat_model(
         Some("https://api.example.test"),
         &ManagedOptions::default(),
@@ -49,6 +49,31 @@ fn managed_model_trims_a_configured_model_and_uses_the_product_default_when_blan
         blank.cache_identity().as_deref(),
         Some("openhuman:https://api.example.test/openai/v1:openrouter/deepseek/deepseek-v4-flash")
     );
+}
+
+#[test]
+fn managed_native_model_exposes_tool_vision_and_physical_attempt_capabilities() {
+    use tinyinference_llm::model::{InputModality, InputSource};
+
+    let model = build_chat_model(
+        Some("https://api.example.test"),
+        &ManagedOptions::default(),
+        "reasoning-v1",
+        true,
+        None,
+        false,
+    )
+    .expect("managed native model");
+
+    let profile = model.profile().expect("managed model profile");
+    assert!(profile.tool_calling);
+    assert!(profile.modalities.image_in);
+    assert!(model.tracks_physical_attempts());
+    assert!(model.supports_input(
+        InputModality::Image,
+        "image/png",
+        InputSource::Base64
+    ));
 }
 
 #[test]

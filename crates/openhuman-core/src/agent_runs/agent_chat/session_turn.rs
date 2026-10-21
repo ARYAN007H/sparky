@@ -346,6 +346,35 @@ pub async fn agent_chat_reply_for(
     route: Option<crate::config::schema::EphemeralRoute>,
     env: AgentChatEnv,
 ) -> Result<AgentChatReply, String> {
+    agent_chat_reply_for_controlled(
+        config,
+        target,
+        message,
+        model_override,
+        temperature,
+        thread_id,
+        cwd,
+        route,
+        env,
+    )
+    .await
+    .map_err(|error| error.to_string())
+}
+
+/// [`agent_chat_reply_for`] while retaining typed host-policy errors for
+/// callers that need to distinguish dispatch refusal from provider failure.
+#[allow(clippy::too_many_arguments)]
+pub async fn agent_chat_reply_for_controlled(
+    config: &mut Config,
+    target: AgentChatTarget<'_>,
+    message: &str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    thread_id: Option<String>,
+    cwd: Option<String>,
+    route: Option<crate::config::schema::EphemeralRoute>,
+    env: AgentChatEnv,
+) -> anyhow::Result<AgentChatReply> {
     match target {
         AgentChatTarget::Definition {
             untrusted_input: true,
@@ -353,13 +382,16 @@ pub async fn agent_chat_reply_for(
             ..
         } => {
             if !host_only {
-                return Err("untrusted_input is only allowed on a host-only agent".to_string());
+                return Err(anyhow::anyhow!(
+                    "untrusted_input is only allowed on a host-only agent"
+                ));
             }
             log::debug!(
                 "[inference] agent_chat untrusted input on a host-only agent; guard skipped"
             );
         }
-        _ => enforce_user_prompt_or_reject(message, "local_ai.ops.agent_chat")?,
+        _ => enforce_user_prompt_or_reject(message, "local_ai.ops.agent_chat")
+            .map_err(anyhow::Error::msg)?,
     }
 
     // TAURI-RUST-RS: an upstream caller (frontend, JSON-RPC client) can pass
@@ -384,7 +416,7 @@ pub async fn agent_chat_reply_for(
         .as_deref()
         .map(str::trim)
         .filter(|id| !id.is_empty());
-    let turn_cwd = resolve_turn_cwd(cwd)?;
+    let turn_cwd = resolve_turn_cwd(cwd).map_err(anyhow::Error::msg)?;
     // The turn's context: the host environment's bound one, else the task's.
     let turn_ctx = crate::core::runtime::DispatchCtx::from_weak(env.host.core.as_ref());
     let mut agent = match turn_cwd.as_ref() {
@@ -405,14 +437,16 @@ pub async fn agent_chat_reply_for(
                 root.display()
             );
             let mut agent =
-                build_turn_agent(&turn_ctx, &scoped, &target, turn_session_id, temperature)?;
+                build_turn_agent(&turn_ctx, &scoped, &target, turn_session_id, temperature)
+                    .map_err(anyhow::Error::msg)?;
             // Also thread it as the turn's workspace descriptor so acting tools
             // that read `ToolExecutionContext::workspace` (shell) resolve their
             // default cwd here, and so spawned sub-agents inherit the same root.
             agent.set_workspace_descriptor(Some(tinytools::WorkspaceDescriptor::new(root.clone())));
             agent
         }
-        None => build_turn_agent(&turn_ctx, config, &target, turn_session_id, temperature)?,
+        None => build_turn_agent(&turn_ctx, config, &target, turn_session_id, temperature)
+            .map_err(anyhow::Error::msg)?,
     };
     // Thread-correct resume. `OpenHumanSessionHost::turn` would otherwise auto-load the
     // newest transcript for the agent *name*, which is another thread's
@@ -440,7 +474,8 @@ pub async fn agent_chat_reply_for(
                 turn_cwd.clone(),
                 message,
             )
-            .await?
+            .await
+            .map_err(anyhow::Error::msg)?
         }
         _ => message.to_string(),
     };
@@ -450,7 +485,7 @@ pub async fn agent_chat_reply_for(
         ..
     } = target
     {
-        agent.set_untrusted_input(true).map_err(|e| e.to_string())?;
+        agent.set_untrusted_input(true)?;
     }
     // A seeded turn replaces resume rather than adding to it.
     //
@@ -468,9 +503,7 @@ pub async fn agent_chat_reply_for(
     } = target
     {
         agent.clear_history();
-        agent
-            .seed_resume_from_messages(seed.to_vec(), message)
-            .map_err(|e| e.to_string())?;
+        agent.seed_resume_from_messages(seed.to_vec(), message)?;
         agent.set_next_turn_overrides(crate::agent::session_host::TurnOverrides {
             suppress_transcript_autoload: true,
             ..Default::default()
@@ -553,7 +586,7 @@ pub async fn agent_chat_reply_for(
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = agent.last_turn_usage();
     }
-    let text = outcome.map_err(|e| e.to_string())?;
+    let text = outcome?;
     let hit_cap = agent.last_turn_hit_cap();
     if hit_cap {
         log::info!("[inference] agent_chat turn paused at its iteration cap; reporting hit_cap");

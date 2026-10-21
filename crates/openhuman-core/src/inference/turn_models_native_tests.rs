@@ -83,7 +83,7 @@ async fn native_budget_wrapping_keeps_owner_error_slots_for_primary_tiers_and_su
     let models = TurnModelSource::new_crate_native(&ctx, "chat", config)
         .build("hint:chat", 0.0, None, None)
         .expect("native model set")
-        .with_budget(Some(&budget));
+        .with_host_controls(Some(&budget), None);
     let owner = models
         .native_model_set
         .as_ref()
