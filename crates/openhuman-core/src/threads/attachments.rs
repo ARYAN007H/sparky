@@ -20,7 +20,8 @@ mod staged;
 use staged::*;
 pub(crate) use staged::{
     bind_staged_refs, commit_native_channel_parts, consume_staged_parts, discard_staged_parts,
-    stage_native_channel_part, stage_queued_parts, validate_opaque_parts,
+    native_parts_in_committed_message, stage_native_channel_part, stage_queued_parts,
+    validate_opaque_parts,
 };
 
 pub(crate) fn has_opaque_ref(part: &ContentPart) -> bool {

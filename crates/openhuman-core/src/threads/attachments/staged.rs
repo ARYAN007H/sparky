@@ -384,6 +384,37 @@ pub(crate) async fn commit_native_channel_parts(
     claim_staged_refs(ctx, thread_id, &config, committed_message_id, &entries).await
 }
 
+pub(crate) fn native_parts_in_committed_message(
+    staged: &[ContentPart],
+    message: &tinyinference_llm::message::Message,
+) -> Vec<ContentPart> {
+    let tinyinference_llm::message::Message::User(user) = message else {
+        return Vec::new();
+    };
+    let committed = user
+        .content
+        .iter()
+        .filter_map(|block| match block {
+            tinyinference_llm::message::ContentBlock::Image(image) => {
+                image.url.strip_prefix("openhuman-staged://")
+            }
+            tinyinference_llm::message::ContentBlock::Document(
+                tinyinference_llm::message::MediaRef::Path { path, .. },
+            ) => path.strip_prefix("openhuman-staged://"),
+            _ => None,
+        })
+        .collect::<std::collections::HashSet<_>>();
+    staged
+        .iter()
+        .filter(|part| {
+            opaque_media(part)
+                .and_then(|media| media.opaque_id.as_deref())
+                .is_some_and(|id| committed.contains(id))
+        })
+        .cloned()
+        .collect()
+}
+
 pub(super) async fn validate_staged_files(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,

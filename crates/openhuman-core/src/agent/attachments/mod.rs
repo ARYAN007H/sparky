@@ -23,6 +23,8 @@ pub(crate) mod provider;
 pub(crate) struct AttachmentAccessScope {
     pub(crate) external_channel: bool,
     pub(crate) workspace: Option<PathBuf>,
+    pub(crate) native_staged_parts: Vec<tinychannels_bus::ContentPart>,
+    pub(crate) thread_id: Option<String>,
 }
 
 const REQUEST_SCOPE_KEY: &str = "__openhuman_attachment_access_scope";
@@ -43,6 +45,8 @@ pub(crate) fn attach_request_scope(
     request.metadata[REQUEST_SCOPE_KEY] = serde_json::json!({
         "external_channel": external_channel,
         "workspace": workspace,
+        "native_staged_parts": context.native_staged_parts,
+        "thread_id": context.thread_id,
     });
 }
 
@@ -62,6 +66,14 @@ pub(crate) fn take_request_scope(metadata: &mut serde_json::Value) -> Attachment
             .get("workspace")
             .and_then(serde_json::Value::as_str)
             .map(PathBuf::from),
+        native_staged_parts: value
+            .get("native_staged_parts")
+            .and_then(|parts| serde_json::from_value(parts.clone()).ok())
+            .unwrap_or_default(),
+        thread_id: value
+            .get("thread_id")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned),
     }
 }
 
