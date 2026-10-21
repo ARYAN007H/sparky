@@ -3,6 +3,8 @@ use std::sync::{Arc, Mutex as StdMutex};
 
 use serde_json::{json, Value};
 use tempfile::TempDir;
+use tinyinference_llm::model::context_window::{ContextWindowResolver, ContextWindowRouteInput};
+use tinyinference_llm::model::discover::DiscoveryRequest;
 use tinyinference_llm::model::discover::ModelLimitsCache;
 
 use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
@@ -148,6 +150,50 @@ async fn deepseek_v41_flash_uses_provider_window_not_static_128k() {
         ),
         Some(1_048_576)
     );
+}
+
+#[tokio::test]
+async fn model_only_projection_does_not_reuse_empty_provider_discovery() {
+    let model = V41_FLASH;
+    let endpoint = "https://managed.example.test/v1";
+    let fetcher = FakeFetcher::default().with(
+        "https://managed.example.test/v1/models",
+        json!({ "data": [{ "id": model, "context_length": 777_777 }] }),
+    );
+    let cache = ModelLimitsCache::default();
+    let resolver = ContextWindowResolver::new();
+    let discovery = DiscoveryRequest::new(endpoint, model);
+
+    let discovered = resolver
+        .resolve_for_route_with_fetcher(
+            "",
+            model,
+            None,
+            ContextWindowRouteInput {
+                discovery: Some(discovery.clone()),
+                ..Default::default()
+            },
+            &cache,
+            &fetcher,
+        )
+        .await;
+    assert_eq!(discovered.window, Some(777_777));
+
+    let route_projection = resolver.project_for_route(
+        "",
+        model,
+        None,
+        ContextWindowRouteInput {
+            discovery: Some(discovery),
+            ..Default::default()
+        },
+    );
+    assert_eq!(route_projection.window, Some(777_777));
+
+    let model_projection =
+        crate::inference::context_window::project_context_window_for_model(model, None);
+    assert_eq!(model_projection.window, Some(128_000));
+    assert_ne!(model_projection.window, route_projection.window);
 }
 
 #[tokio::test]

@@ -254,14 +254,14 @@ pub(crate) fn project_context_window(
     resolver().project_for_route(provider, model, local_kind, route)
 }
 
-/// Projects a static model-only window. The empty route key prevents a catalog
-/// or usage display from borrowing a learned limit from an unrelated provider.
+/// Projects a static model-only window without borrowing remembered state from
+/// the valid empty-provider route used by managed inference.
 pub(crate) fn project_context_window_for_model(
     model: &str,
     extensions: Option<Option<&crate::core::slots::Extensions>>,
 ) -> ResolvedWindow {
     let route = static_route_facts(model, extensions);
-    resolver().project_for_route("", model, None, route)
+    ContextWindowResolver::new().project_for_route("", model, None, route)
 }
 
 /// Creates a client that carries OpenHuman's configured CA and proxy policy.
