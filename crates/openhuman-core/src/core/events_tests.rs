@@ -782,18 +782,18 @@ fn a_long_error_is_clipped_on_a_character_boundary() {
 #[test]
 fn events_outside_the_supervisor_have_no_event_log_detail() {
     assert!(DomainEvent::CronJobCompleted {
-            job_id: "job-1".into(),
-            success: true,
-            output: "done".into(),
-        }
-        .log_detail()
-        .is_none());
+        job_id: "job-1".into(),
+        success: true,
+        output: "done".into(),
+    }
+    .log_detail()
+    .is_none());
     assert!(DomainEvent::McpServerConnected {
-            server_id: "srv-1".into(),
-            tool_count: 25,
-        }
-        .log_detail()
-        .is_none());
+        server_id: "srv-1".into(),
+        tool_count: 25,
+    }
+    .log_detail()
+    .is_none());
 }
 
 // ── workspace_dir ────────────────────────────────────────────────────────
@@ -952,7 +952,7 @@ fn events_without_a_workspace_report_none() {
         }
         .workspace_dir(),
         None,
-        "the retired wire tombstone has no workspace field"
+        "a channel event with no workspace field must not borrow one"
     );
 }
 

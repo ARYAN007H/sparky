@@ -187,8 +187,8 @@ async fn typed_channel_projection_uses_scoped_persisted_row_bindings_after_resta
     };
 
     assert!(super::adapters::project_channel_event(&bob, event.clone())
-            .await
-            .unwrap()
+        .await
+        .unwrap()
         .is_none());
     let bob_messages = crate::threads::store::blocking::get_messages(
         bob.clone(),
@@ -202,8 +202,8 @@ async fn typed_channel_projection_uses_scoped_persisted_row_bindings_after_resta
         "bob-voice"
     );
     assert!(bob_messages[0]
-            .extra_metadata
-            .get("channelActivity")
+        .extra_metadata
+        .get("channelActivity")
         .is_none());
 
     let projected = super::adapters::project_channel_event(&alice, event.clone())
@@ -237,8 +237,8 @@ async fn typed_channel_projection_uses_scoped_persisted_row_bindings_after_resta
         ..event
     };
     assert!(super::adapters::project_channel_event(&restarted, read)
-            .await
-            .unwrap()
+        .await
+        .unwrap()
         .is_some());
     let messages = crate::threads::store::blocking::get_messages(restarted, workspace, thread_id)
         .await
@@ -283,7 +283,7 @@ async fn event_sink_rejects_non_object_payload() {
 }
 
 #[tokio::test]
-async fn event_sink_ignores_legacy_reactions_without_a_typed_message_target() {
+async fn event_sink_routes_channel_reactions_to_domain_bus() {
     let sink = OpenHumanEventSink;
     assert!(sink
         .publish_host(
@@ -310,10 +310,10 @@ async fn event_sink_ignores_legacy_reactions_without_a_typed_message_target() {
     // Unknown domain/kind is a benign no-op.
     assert!(sink
         .publish_host("mystery", "x", serde_json::json!({}))
-            .await
+        .await
         .is_ok());
     assert!(sink
         .publish_host("channel", "unknown", serde_json::json!({}))
-            .await
+        .await
         .is_ok());
 }
