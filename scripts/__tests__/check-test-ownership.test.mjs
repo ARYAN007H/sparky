@@ -1,0 +1,59 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { findOwnershipViolations } from '../ci/check-test-ownership.mjs';
+
+test('rejects tests that call TinyChannels provider internals', () => {
+  const source = `
+    use tinychannels::providers::email_channel::parse;
+    #[test]
+    fn parses_email() { let _ = parse("message"); }
+  `;
+
+  assert.deepEqual(findOwnershipViolations(source, 'tests/email.rs'), [
+    {
+      line: 2,
+      path: 'tinychannels::providers::',
+      reason: 'TinyChannels provider behavior belongs in TinyChannels.',
+    },
+  ]);
+});
+
+test('allows public facades and bus contracts', () => {
+  const source = `
+    use tinychannels::ChannelInboundEnvelope;
+    use tinychannels_bus::contract::SendMessageRequest;
+    use tinyinference_local::profile::is_local_provider_string;
+  `;
+
+  assert.deepEqual(findOwnershipViolations(source, 'crates/openhuman-core/src/example_tests.rs'), []);
+});
+
+test('rejects other known module implementation paths', () => {
+  const source = [
+    'use tinyinference_local::service::LocalAiService;',
+    'use tinyflows::gates::failures;',
+    'use tinymemory_tools::lifecycle::turn::TurnPack;',
+  ].join('\n');
+
+  assert.deepEqual(
+    findOwnershipViolations(source, 'crates/openhuman-core/src/example_tests.rs').map(
+      ({ path }) => path,
+    ),
+    [
+      'tinyinference_local::service::',
+      'tinyflows::gates::',
+      'tinymemory_tools::lifecycle::turn::',
+    ],
+  );
+});
+
+test('does not scan production Rust files', () => {
+  const source = 'use tinychannels::providers::email_channel::parse;';
+  assert.deepEqual(findOwnershipViolations(source, 'crates/openhuman-core/src/example.rs'), []);
+});
+
+test('ignores ownership examples in Rust comments', () => {
+  const source = '// tinychannels::providers::email_channel::parse is forbidden\n';
+  assert.deepEqual(findOwnershipViolations(source, 'tests/example.rs'), []);
+});
