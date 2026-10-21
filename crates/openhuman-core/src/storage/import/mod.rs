@@ -354,62 +354,34 @@ pub fn run_with(
 /// declare. A record in a collection no step reads passes through unchanged.
 #[cfg(feature = "legacy-import")]
 fn upgrade(owner: &str, records: Vec<Record>) -> Result<(Vec<Record>, Vec<CollectionSpec>)> {
-    use tinystoragedrivers::Meta;
-    use tinystoragedrivers::schema::{Item, SourceRecord, StepBody};
-    let schema = super::schema::owner_schemas()
-        .into_iter()
-        .find(|schema| schema.owner.as_str() == owner)
-        .ok_or_else(|| anyhow!("no storage schema for owner `{owner}`"))?;
-    let specs = schema
-        .items
+    let (upgraded, specs) = match owner {
+        "approvals" => (
+            crate::security::approval::upgrade_records(records)?,
+            crate::security::approval::collection_specs(),
+        ),
+        "devices" => (
+            crate::security::devices::upgrade_records(records)?,
+            crate::security::devices::collection_specs(),
+        ),
+        "notifications" => (
+            crate::desktop::notifications::upgrade_records(records)?,
+            crate::desktop::notifications::collection_specs(),
+        ),
+        "task_sources" => (
+            crate::integrations::task_sources::upgrade_records(records)?,
+            crate::integrations::task_sources::collection_specs(),
+        ),
+        _ => return Err(anyhow!("no legacy record converter for owner `{owner}`")),
+    };
+
+    let used_collections = upgraded
         .iter()
-        .filter_map(|item| match item {
-            Item::Collection { spec, .. } => Some(spec.clone()),
-            _ => None,
-        })
+        .map(|record| record.collection.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let specs = specs
+        .into_iter()
+        .filter(|spec| used_collections.contains(spec.name.as_str()))
         .collect();
-    let mut upgraded = Vec::with_capacity(records.len());
-    let mut by_collection: Vec<(String, Vec<SourceRecord>)> = Vec::new();
-    for record in records {
-        match by_collection
-            .iter_mut()
-            .find(|(collection, _)| *collection == record.collection)
-        {
-            Some((_, batch)) => batch,
-            None => {
-                by_collection.push((record.collection.clone(), Vec::new()));
-                &mut by_collection.last_mut().expect("just pushed").1
-            }
-        }
-        .push(SourceRecord {
-            id: record.id,
-            body: record.doc,
-            meta: Meta::unknown(),
-        });
-    }
-    for (collection, batch) in by_collection {
-        let step = schema.steps.iter().find(|step| {
-            matches!(step.run, StepBody::Documents(_))
-                && step.source.unwrap_or(step.item) == collection
-        });
-        let Some(StepBody::Documents(run)) = step.map(|step| &step.run) else {
-            upgraded.extend(batch.into_iter().map(|r| Record {
-                collection: collection.clone(),
-                id: r.id,
-                doc: r.body,
-                created_ms: None,
-            }));
-            continue;
-        };
-        for target in run(batch)? {
-            upgraded.push(Record {
-                collection: target.collection,
-                id: target.id,
-                doc: target.body,
-                created_ms: target.created_ms,
-            });
-        }
-    }
     Ok((upgraded, specs))
 }
 
