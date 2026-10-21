@@ -74,7 +74,7 @@ async fn resolve_context_window_inner(
     let route = route_input(role, provider, model, config, extensions, local_kind);
     #[cfg(test)]
     {
-        return resolver()
+        resolver()
             .resolve_for_route_with_fetcher(
                 provider,
                 model,
@@ -83,19 +83,21 @@ async fn resolve_context_window_inner(
                 model_limits_cache(),
                 &OfflineFetcher,
             )
-            .await;
+            .await
     }
     #[cfg(not(test))]
-    resolver()
-        .resolve_for_route(
-            provider,
-            model,
-            local_kind,
-            route,
-            model_limits_cache(),
-            || model_limits_client(config, provider),
-        )
-        .await
+    {
+        resolver()
+            .resolve_for_route(
+                provider,
+                model,
+                local_kind,
+                route,
+                model_limits_cache(),
+                || model_limits_client(config, provider),
+            )
+            .await
+    }
 }
 
 /// Unit-test callers never reach a provider unless they explicitly inject a
