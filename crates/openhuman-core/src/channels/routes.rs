@@ -256,15 +256,17 @@ where
             return true;
         }
     };
-    if clear_history && let Err(error) = reset_history().await {
-        tracing::warn!(%error, "channel durable history reset failed");
-        if let Some(channel) = target_channel {
-            let copy = crate::channels::failure_copy::generic_failure(ctx.config.as_deref());
-            let _ = channel
-                .send_with_outbound_intent(&reply_message(&copy))
-                .await;
+    if clear_history {
+        if let Err(error) = reset_history().await {
+            tracing::warn!(%error, "channel durable history reset failed");
+            if let Some(channel) = target_channel {
+                let copy = crate::channels::failure_copy::generic_failure(ctx.config.as_deref());
+                let _ = channel
+                    .send_with_outbound_intent(&reply_message(&copy))
+                    .await;
+            }
+            return true;
         }
-        return true;
     }
     // Apply a route change only after its requested durable reset has
     // succeeded, so a failed reset cannot partially alter command state.
