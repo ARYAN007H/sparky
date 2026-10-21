@@ -134,6 +134,9 @@ impl WatcherStateStore {
                 let page = kv.list(KEY_PREFIX, cursor, PAGE_SIZE).await?;
                 for item in page.items {
                     let state = decode_state(&item.doc)?;
+                    if item.id != key_for(&state.path) {
+                        return Err(anyhow!("watcher state key identity mismatch"));
+                    }
                     if !state.deleted {
                         states.push(FileState {
                             path: PathBuf::from(state.path),
