@@ -53,7 +53,8 @@ pub(super) fn parameter_contracts() -> Vec<ControllerParamContract> {
 fn secret_parsers_preserve_strings_and_required_value_errors() {
     use serde_json::json;
 
-    let parsers: [(&str, fn(Map<String, Value>) -> Result<String, String>); 2] = [
+    type SecretParser = fn(Map<String, Value>) -> Result<String, String>;
+    let parsers: [(&str, SecretParser); 2] = [
         ("plaintext", parse_encrypt_secret),
         ("ciphertext", parse_decrypt_secret),
     ];
