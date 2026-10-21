@@ -33,8 +33,10 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use tinyagents_session::DriverSessionStores;
+use tinyagents_session::port::TurnStates;
 use tinyagents_session::run_ledger::{ImportCounts, LegacyDatabaseReport, LegacySessionImport};
 use tinyagents_session::transcript::{SessionRef, session_stem};
+use tinyagents_session::turn_state::TurnState;
 
 use super::tinyflows::{finish, marked};
 use super::{Outcome, Report, Snapshot};
@@ -113,7 +115,7 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
             let stores = provider
                 .try_for_agent(DEFAULT_AGENT)
                 .map_err(|error| anyhow::anyhow!("open the turn states: {error}"))?;
-            let report = import_turn_states(&workspace, stores.turn_states.as_ref())
+            let report = import_turn_states(&turns, stores.turn_states.as_ref())
                 .context("[sessions] import turn states")?;
             found += report.read;
             written += report.imported;
@@ -144,6 +146,63 @@ fn database_totals(report: &LegacyDatabaseReport) -> (usize, usize) {
         (0, 0),
         |(found, written), ImportCounts { read, imported, .. }| (found + read, written + imported),
     )
+}
+
+#[derive(Default)]
+struct TurnStateReport {
+    read: usize,
+    imported: usize,
+    unreadable: usize,
+}
+
+/// Imports old per-turn snapshots without changing the workspace files. The
+/// flat legacy form is retained alongside the newer per-thread directories.
+fn import_turn_states(dir: &Path, destination: &dyn TurnStates) -> Result<TurnStateReport> {
+    let mut report = TurnStateReport::default();
+    for path in turn_state_files(dir)? {
+        let state = match std::fs::read(&path)
+            .with_context(|| format!("read turn-state snapshot {}", path.display()))
+            .and_then(|bytes| serde_json::from_slice::<TurnState>(&bytes).map_err(Into::into))
+        {
+            Ok(state) => state,
+            Err(error) => {
+                tracing::warn!("[sessions] skipping unreadable turn state {}: {error}", path.display());
+                report.unreadable += 1;
+                continue;
+            }
+        };
+        report.read += 1;
+        if destination
+            .get_turn(&state.thread_id, &state.request_id)
+            .map_err(anyhow::Error::msg)?
+            .is_none()
+        {
+            destination.put(&state).map_err(anyhow::Error::msg)?;
+            report.imported += 1;
+        }
+    }
+    Ok(report)
+}
+
+fn turn_state_files(dir: &Path) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    let mut entries = std::fs::read_dir(dir)
+        .with_context(|| format!("list turn-state directory {}", dir.display()))?
+        .collect::<std::io::Result<Vec<_>>>()?;
+    entries.sort_by_key(std::fs::DirEntry::file_name);
+    for entry in entries {
+        let path = entry.path();
+        if entry.file_type()?.is_dir() {
+            let mut children = std::fs::read_dir(path)?.collect::<std::io::Result<Vec<_>>>()?;
+            children.sort_by_key(std::fs::DirEntry::file_name);
+            files.extend(children.into_iter().map(|child| child.path()).filter(|path| {
+                path.extension().and_then(|extension| extension.to_str()) == Some("json")
+            }));
+        } else if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
+            files.push(path);
+        }
+    }
+    Ok(files)
 }
 
 /// The agent definitions a stem may belong to, by the component their ids
