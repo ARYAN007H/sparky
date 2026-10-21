@@ -14,7 +14,7 @@
 
 use anyhow::Result;
 use serde_json::Value;
-use tinystoragedrivers::{CollectionSpec, Storage};
+use tinystoragedrivers::{CollectionSpec, Key, Storage};
 
 use crate::storage::schema_support::{
     key_of, map_legacy_collection, Body, LegacySourceRecord as SourceRecord,
@@ -115,7 +115,9 @@ pub(crate) fn upgrade_lease_records(
                 }
                 Ok(TargetRecord::new(
                     "openhuman.leases",
-                    key_of(&record.id)?,
+                    Key::of(["profiles", record.id.as_str()])?
+                        .as_str()
+                        .to_owned(),
                     Value::Object(body),
                 ))
             })
