@@ -42,8 +42,11 @@ pub(crate) fn read(path: &Path) -> Result<(Vec<(String, u32)>, Option<i64>)> {
     let mut owners = BTreeMap::<String, u32>::new();
     let mut last = None::<i64>;
     while let Some(row) = rows.next().context("read legacy migration progress")? {
-        let body: String = row.get(0).context("read migration progress body")?;
+        let body: rusqlite::types::Value = row.get(0).context("read migration progress body")?;
         let updated_ms: i64 = row.get(1).context("read migration update timestamp")?;
+        let Ok(body) = decode_body(body) else {
+            continue;
+        };
         let Ok(progress) = serde_json::from_str::<LegacyProgress>(&body) else {
             // Match the old status view: malformed or unrelated rows do not
             // prevent reporting valid migration progress.
@@ -56,6 +59,17 @@ pub(crate) fn read(path: &Path) -> Result<(Vec<(String, u32)>, Option<i64>)> {
         }
     }
     Ok((owners.into_iter().collect(), last))
+}
+
+fn decode_body(body: rusqlite::types::Value) -> Result<String> {
+    match body {
+        rusqlite::types::Value::Text(text) => Ok(text),
+        rusqlite::types::Value::Blob(bytes) if bytes.first() == Some(&1) => {
+            let json = zstd::decode_all(&bytes[1..]).context("decompress legacy migration body")?;
+            String::from_utf8(json).context("decode legacy migration body as UTF-8")
+        }
+        _ => anyhow::bail!("unsupported legacy migration body encoding"),
+    }
 }
 
 #[cfg(test)]
