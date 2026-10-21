@@ -544,31 +544,27 @@ impl TurnModelSource {
                 temperature: Some(temperature),
                 egress_tag: None,
             };
-            return tinyagents_harness::host::TurnModelSet::<()>::builder(
-                &factory, &factory, &cn.role,
-            )
-            .primary_model_pin(model)
-            .primary_opts(opts.clone())
-            .without_workload_tiers()
-            .summarization(&cn.role, Some(model.to_owned()))
-            .summarization_opts(opts)
-            .build()
-            .map(|built| {
-                built
-                    .map_models(|_, inner| {
-                        let profile = inner.profile().cloned().unwrap_or_default();
-                        let provider = profile.provider.as_deref().unwrap_or("unknown");
-                        let resolved = profile.model.as_deref().unwrap_or(model);
-                        crate::attachments::provider::wrap(
-                            &ctx,
-                            inner,
-                            cn.config.clone(),
-                            resolved,
-                            provider,
-                        )
-                    })
-                    .summarizer()
-            });
+            let request = tinyagents_harness::host::ModelBuildRequest {
+                role: cn.role.clone(),
+                route: None,
+                purpose: tinyagents_harness::host::ModelPurpose::Summarization,
+                model_pin: Some(model.to_owned()),
+                opts,
+            };
+            tinyagents_harness::host::ModelBuildGate::check(&factory, &request)?;
+            let (model, route) =
+                tinyagents_harness::host::ModelFactory::build(&factory, &request)?;
+            let provider = model
+                .profile()
+                .and_then(|profile| profile.provider.as_deref())
+                .unwrap_or("unknown");
+            Ok(crate::attachments::provider::wrap(
+                &ctx,
+                model,
+                cn.config.clone(),
+                &route.model,
+                provider,
+            ))
         }
         Err(anyhow::anyhow!("turn model source is missing a model"))
     }
