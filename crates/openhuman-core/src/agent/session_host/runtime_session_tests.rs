@@ -27,19 +27,26 @@ fn host_enrichment_preserves_ordered_typed_media_once() {
     });
     let original_text = crate::agent::message_convert::user_text_with_markers(&original);
     let enriched = format!("turn preamble\n\nhost channel context\n{original_text}");
-    let Message::User(actual) = super::enriched_typed_user_input(&original, &original_text, &enriched)
-        .expect("prefix is constructed before original text")
-        .expect("typed media is retained")
+    let Message::User(actual) =
+        super::enriched_typed_user_input(&original, &original_text, &enriched)
+            .expect("prefix is constructed before original text")
+            .expect("typed media is retained")
     else {
         panic!("enriched input remains a user message");
     };
 
-    assert!(matches!(&actual.content[0], ContentBlock::Text(text) if text == "turn preamble\n\nhost channel context\n"));
+    assert!(
+        matches!(&actual.content[0], ContentBlock::Text(text) if text == "turn preamble\n\nhost channel context\n")
+    );
     assert!(matches!(&actual.content[1], ContentBlock::Text(text) if text == "[Channel context]"));
     assert!(matches!(&actual.content[2], ContentBlock::Text(text) if text == "before image"));
-    assert!(matches!(&actual.content[3], ContentBlock::Image(image) if image.url == "openhuman-staged://image"));
+    assert!(
+        matches!(&actual.content[3], ContentBlock::Image(image) if image.url == "openhuman-staged://image")
+    );
     assert!(matches!(&actual.content[4], ContentBlock::Text(text) if text == "between media"));
-    assert!(matches!(&actual.content[5], ContentBlock::Document(MediaRef::Path { path, .. }) if path == "openhuman-staged://document"));
+    assert!(
+        matches!(&actual.content[5], ContentBlock::Document(MediaRef::Path { path, .. }) if path == "openhuman-staged://document")
+    );
     assert!(matches!(&actual.content[6], ContentBlock::Text(text) if text == "after document"));
     assert_eq!(actual.content.len(), 7, "original blocks are appended once");
 }
@@ -64,9 +71,11 @@ fn host_enrichment_keeps_text_only_path_unchanged() {
     let original = Message::User(UserMessage {
         content: vec![ContentBlock::Text("hello".into())],
     });
-    assert!(super::enriched_typed_user_input(&original, "hello", "prefix\n\nhello")
-        .expect("text-only input has no typed-media transformation")
-        .is_none());
+    assert!(
+        super::enriched_typed_user_input(&original, "hello", "prefix\n\nhello")
+            .expect("text-only input has no typed-media transformation")
+            .is_none()
+    );
 }
 
 #[tokio::test]
