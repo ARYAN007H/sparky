@@ -101,6 +101,8 @@ struct Seen {
 #[tokio::test]
 async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     let tmp = tempfile::tempdir().unwrap();
+    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+        .unwrap();
     let config = config(&tmp);
     let core_context = CoreContext::for_test(DomainSet::full(), None).derive_with(
         ContextOverlay::new(config.clone(), DomainSet::full(), Default::default())
