@@ -58,11 +58,7 @@ pub(crate) use managed_backend::{
     make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread_in,
     make_openhuman_backend_model_in,
 };
-use subprocess_providers::{
-    prepare_claude_agent_sdk_chat_model, try_create_claude_agent_sdk_chat_model,
-    try_create_claude_agent_sdk_chat_model_from_string, try_create_claude_code_chat_model,
-    try_create_claude_code_chat_model_from_string,
-};
+use subprocess_providers::{build_claude_code_model, prepare_claude_agent_sdk_chat_model};
 use tinyinference_providers::route::split_model_and_temperature;
 
 /// Test-only seam: inject a mock [`ChatModel`] so e2e tests can drive the

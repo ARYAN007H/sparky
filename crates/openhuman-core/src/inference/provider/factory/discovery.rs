@@ -6,6 +6,7 @@
 use super::*;
 use tinyinference_llm::model::discover::DiscoveryRequest;
 use tinyinference_llm::providers::registry::{ProviderBuildOptions, ProviderRegistry};
+use tinyinference_providers::route::{ProviderRoute, RouteKind};
 
 /// The discovery request for `provider` (a role's resolved provider string)
 /// serving `model`, or `None` when the route has no listing to ask:
@@ -36,36 +37,47 @@ pub(crate) fn model_limits_request_for(
     extensions: Option<&crate::core::slots::Extensions>,
 ) -> Option<DiscoveryRequest> {
     let p = provider.trim();
-    if p.is_empty() || p == "cloud" || p == PROVIDER_OPENHUMAN {
+    if p.is_empty() || p == "cloud" {
         return managed_limits_request(model, config, extensions);
     }
-    if p == BYOK_INCOMPLETE_SENTINEL
-        || p == CLAUDE_AGENT_SDK_PROVIDER
-        || p.starts_with(CLAUDE_AGENT_SDK_PREFIX)
-        || p.starts_with(tinyagents_harness::providers::claude_code::PROVIDER_PREFIX)
-        || tinyinference_local::profile::is_local_provider_string(p)
+    let route = ProviderRoute::parse(p);
+    if p == PROVIDER_OPENHUMAN
+        || route
+            .as_ref()
+            .is_some_and(|route| matches!(route.kind(), RouteKind::Managed))
     {
+        return managed_limits_request(
+            route
+                .as_ref()
+                .map(|route| route.model.as_str())
+                .filter(|model| !model.is_empty())
+                .unwrap_or(model),
+            config,
+            extensions,
+        );
+    }
+    let Some(route) = route else {
         log::debug!("[model_limits] provider route has no discoverable listing role={role}");
         return None;
-    }
-    let (slug, raw) = p.split_once(':')?;
-    let slug = slug.trim();
+    };
+    let RouteKind::Cloud { slug } = route.kind() else {
+        log::debug!("[model_limits] provider route has no discoverable listing role={role}");
+        return None;
+    };
     let entry = config.cloud_providers.iter().find(|e| e.slug == slug)?;
     if crate::config::schema::cloud_providers::is_hosted_auth_style_for(
         extensions,
         entry.auth_style,
     ) {
-        let (raw_model, _) = split_model_and_temperature(raw);
-        let model = if raw_model.trim().is_empty() {
+        let model = if route.model.trim().is_empty() {
             model
         } else {
-            raw_model.trim()
+            route.model.trim()
         };
         return managed_limits_request(model, config, extensions);
     }
 
-    let (raw_model, _) = split_model_and_temperature(raw);
-    let resolution = match resolve_cloud_slug_for(role, slug, &raw_model, config, extensions) {
+    let resolution = match resolve_cloud_slug_for(role, &slug, &route.model, config, extensions) {
         Ok(resolution) => resolution,
         Err(error) => {
             log::debug!(
