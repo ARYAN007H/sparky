@@ -1,4 +1,5 @@
 use super::*;
+use std::path::Path;
 #[cfg(feature = "legacy-import")]
 use crate::storage::Precondition;
 #[cfg(feature = "legacy-import")]
@@ -220,8 +221,7 @@ async fn canonical_cluster_scope_import_converts_profiles_and_leases_in_place() 
 #[test]
 fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     use crate::storage::layout::{legacy, Target};
-    use crate::storage::{self, DocumentStoreExt, Precondition, Scope};
-    use tinystoragedrivers::{CollectionSpec, Query};
+    use crate::storage::{self, CollectionSpec, DocumentStoreExt, Precondition, Query, Scope};
 
     let dir = tempfile::tempdir().unwrap();
     let target = Target::new(dir.path(), "alice");
@@ -232,10 +232,6 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     let config = crate::config::Config {
         config_path,
         workspace_dir: target.files(),
-        storage: crate::config::StorageConfig {
-            url: Some(destination_url.clone()),
-            ..Default::default()
-        },
         ..crate::config::Config::default()
     };
 
@@ -331,10 +327,6 @@ fn boot_import_reports_no_source_for_a_new_mongodb_target() {
     let workspace = tempfile::tempdir().unwrap();
     let config = crate::config::Config {
         workspace_dir: workspace.path().to_path_buf(),
-        storage: crate::config::StorageConfig {
-            url: Some("mongodb://127.0.0.1/openhuman".into()),
-            ..Default::default()
-        },
         ..Default::default()
     };
     // This is the actual boot importer pipeline. With no legacy SQLite file,
