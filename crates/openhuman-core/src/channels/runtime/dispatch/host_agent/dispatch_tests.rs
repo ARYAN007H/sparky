@@ -145,6 +145,12 @@ async fn an_unbound_channel_runs_the_orchestrator() {
     let channel = Arc::new(crate::channels::runtime::TestChannel::new("telegram"));
 
     let mut ctx = context(Arc::clone(&channel), config.clone());
+    Arc::get_mut(&mut ctx)
+        .expect("the channel context is shared only by this test")
+        .default_provider = Arc::new(crate::config::schema::EPHEMERAL_ROUTE_SLUG.to_string());
+    Arc::get_mut(&mut ctx)
+        .expect("the channel context remains uniquely owned")
+        .model = Arc::new("fixture".into());
     let core = Arc::new(CoreContext::for_test_with_config(DomainSet::full(), config));
     Arc::get_mut(&mut ctx)
         .expect("the channel context is shared only by this test")
