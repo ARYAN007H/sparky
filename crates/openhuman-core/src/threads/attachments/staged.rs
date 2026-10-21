@@ -475,7 +475,7 @@ pub(crate) async fn read_authorized_native_attachment(
     let root = tokio::fs::canonicalize(&workspace)
         .await
         .map_err(|_| "native attachment workspace is unavailable".to_owned())?;
-    let limit = native_attachment_byte_limit(&record.attachment.part, config)?;
+    let limit = native_attachment_byte_limit(&record.attachment.part, config);
     let bytes = read_staged_file_bounded(&path, &root, limit).await?;
     validate_native_attachment_size(&record.attachment.part, bytes.len(), config)?;
     Ok(ResolvedNativeAttachment {
@@ -488,24 +488,24 @@ pub(crate) async fn read_authorized_native_attachment(
 fn native_attachment_byte_limit(
     part: &ContentPart,
     config: &crate::config::Config,
-) -> Result<usize, String> {
+) -> usize {
     let is_image = matches!(part, ContentPart::Image { .. });
     let mb = if is_image {
         config.multimodal.effective_limits().1
     } else {
         config.multimodal_files.effective_limits().1
     };
-    Ok(mb
+    mb
         .saturating_mul(1024 * 1024)
-        .min(tinychannels_bus::module_media::MEDIA_UPLOAD_MAX_BYTES))
+        .min(tinychannels_bus::module_media::MEDIA_UPLOAD_MAX_BYTES)
 }
 
-async fn read_staged_file_bounded(
+pub(super) async fn read_staged_file_bounded(
     path: &std::path::Path,
     root: &std::path::Path,
     limit: usize,
 ) -> Result<Vec<u8>, String> {
-    let file = crate::agent::attachments::secure_open(path, root)
+    let file = crate::agent::attachments::provider::open::secure_open(path, root)
         .map_err(|_| "native attachment bytes are unavailable".to_owned())?;
     let metadata = file
         .metadata()
