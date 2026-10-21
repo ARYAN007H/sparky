@@ -36,8 +36,8 @@ use super::{
 use crate::config::Config;
 use crate::security::policy::SecurityPolicy;
 use tinytools::collapse::{
-    any_external_effect, args_without_action, merge_action_schemas, resolve, strictest_permission,
-    unknown_action_message, CollapsedAction,
+    CollapsedAction, any_external_effect, args_without_action, merge_action_schemas, resolve,
+    strictest_permission, unknown_action_message,
 };
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult};
 

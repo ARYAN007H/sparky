@@ -95,14 +95,18 @@ fn origin_delivery_or_current_target_without_an_origin_is_an_error() {
         })
         .unwrap(),
     );
-    assert!(create_agent_job(&cfg, i, None)
-        .unwrap_err()
-        .contains("origin"));
+    assert!(
+        create_agent_job(&cfg, i, None)
+            .unwrap_err()
+            .contains("origin")
+    );
     let mut i = input();
     i.session_target = Some(SessionTarget::Current);
-    assert!(create_agent_job(&cfg, i, None)
-        .unwrap_err()
-        .contains("current"));
+    assert!(
+        create_agent_job(&cfg, i, None)
+            .unwrap_err()
+            .contains("current")
+    );
 }
 
 fn announce(channel_name: &str, to: &str) -> DeliveryConfig {

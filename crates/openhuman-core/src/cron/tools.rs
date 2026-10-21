@@ -13,7 +13,7 @@ mod runs;
 mod update;
 
 pub use add::CronAddTool;
-pub use collapsed::{CronTool, CRON_TOOL_NAME};
+pub use collapsed::{CRON_TOOL_NAME, CronTool};
 pub use list::CronListTool;
 pub use remove::CronRemoveTool;
 pub use run::CronRunTool;

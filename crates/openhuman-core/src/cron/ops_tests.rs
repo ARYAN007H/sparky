@@ -178,9 +178,10 @@ fn update_fails_when_no_fields_provided() {
     let job = make_job(&config, "*/5 * * * *", None, "echo test");
 
     let err = run_update(&config, &job.id, None, None, None, None).unwrap_err();
-    assert!(err
-        .to_string()
-        .contains("At least one of --expression, --tz, --command, or --name"));
+    assert!(
+        err.to_string()
+            .contains("At least one of --expression, --tz, --command, or --name")
+    );
 }
 
 #[test]
@@ -191,9 +192,10 @@ fn update_rejects_expression_for_non_cron_schedule() {
     let job = add_shell_job(&config, None, Schedule::At { at }, "echo test").unwrap();
 
     let err = run_update(&config, &job.id, Some("0 9 * * *"), None, None, None).unwrap_err();
-    assert!(err
-        .to_string()
-        .contains("Cannot update expression/tz on a non-cron schedule"));
+    assert!(
+        err.to_string()
+            .contains("Cannot update expression/tz on a non-cron schedule")
+    );
 }
 
 // ── add_once ────────────────────────────────────────────────────
@@ -615,11 +617,13 @@ async fn run_job_now_refuses_a_job_that_is_already_running() {
 async fn run_job_now_reports_an_unknown_job() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    assert!(run_job_now(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
-        "no-such-job"
-    )
-    .await
-    .is_err());
+    assert!(
+        run_job_now(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &config,
+            "no-such-job"
+        )
+        .await
+        .is_err()
+    );
 }

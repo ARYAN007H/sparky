@@ -99,13 +99,15 @@ async fn no_reply_is_suppressed_without_writing_anything() {
     .await
     .unwrap();
     assert_eq!(status, DeliveryStatus::Suppressed);
-    assert!(conversations::get_messages(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        cfg.workspace_dir.clone(),
-        "t-1"
-    )
-    .unwrap()
-    .is_empty());
+    assert!(
+        conversations::get_messages(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            cfg.workspace_dir.clone(),
+            "t-1"
+        )
+        .unwrap()
+        .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -182,15 +184,17 @@ async fn web_delivery_to_a_missing_thread_fails() {
 async fn origin_mode_without_an_origin_is_an_error() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = config(&tmp);
-    assert!(deliver_to_origin(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &cfg,
-        &job(None),
-        "run-1",
-        "hi"
-    )
-    .await
-    .is_err());
+    assert!(
+        deliver_to_origin(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &cfg,
+            &job(None),
+            "run-1",
+            "hi"
+        )
+        .await
+        .is_err()
+    );
 }
 
 fn meta() -> TranscriptMeta {
