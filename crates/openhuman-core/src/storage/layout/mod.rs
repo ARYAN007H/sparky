@@ -39,26 +39,33 @@
 
 pub mod archive;
 pub mod credentials;
+#[cfg(feature = "legacy-import")]
 pub mod db;
+#[cfg(feature = "legacy-import")]
 pub mod legacy;
 pub mod plan;
+#[cfg(feature = "legacy-import")]
 mod run;
+#[cfg(feature = "legacy-import")]
 pub mod schemas;
 pub mod state;
+#[cfg(feature = "legacy-import")]
 mod status;
 
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-pub use run::{auto_migrate, migrate, restore, Options};
+#[cfg(feature = "legacy-import")]
+pub use run::{Options, auto_migrate, migrate, restore};
 pub use state::{LayoutError, Step};
-pub use status::{status, Status};
+#[cfg(feature = "legacy-import")]
+pub use status::{Status, status};
 
+use crate::config::Config;
 use crate::config::schema::profile_layout::{
     PROFILE_FILES_DIR, PROFILE_STORAGE_FILE, PROFILE_WORKSPACE_DIR,
 };
-use crate::config::Config;
 
 /// Directory under the root that holds the archives.
 pub const BACKUPS_DIR: &str = "backups";
@@ -199,9 +206,9 @@ pub enum Outcome {
     Migrated(Box<Report>),
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-import"))]
 mod test_fixtures;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-import"))]
 #[path = "mod_tests.rs"]
 mod tests;

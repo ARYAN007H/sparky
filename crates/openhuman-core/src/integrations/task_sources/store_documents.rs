@@ -33,8 +33,10 @@ use crate::integrations::composio::contract::NormalizedTask;
 use crate::storage::documents::{Repo, compare_and_swap, text};
 use crate::storage::{DocumentStoreExt, StorageError};
 
+#[cfg(feature = "legacy-import")]
+use super::storage_schema::legacy_collections;
+use super::storage_schema::specs;
 pub(super) use super::storage_schema::{INGESTED, SOURCES, ingested_id};
-use super::storage_schema::{legacy_collections, specs};
 use crate::storage::schema_support::key_of;
 const DOMAIN: &str = "task_sources::store";
 

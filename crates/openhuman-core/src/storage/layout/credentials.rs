@@ -18,12 +18,15 @@
 
 use std::path::Path;
 
+#[cfg(feature = "legacy-import")]
 use tinystoragedrivers::secrets::SecretStore as _;
 
+#[cfg(feature = "legacy-import")]
 use super::Target;
 use super::state::LayoutError;
 use crate::security::credentials::http_creds::{self, STORAGE_SECRET_NAME, STORE_FILENAME};
 use crate::security::credentials::profiles::{self, PROFILES_FILENAME, PROFILES_SECRET_NAME};
+#[cfg(feature = "legacy-import")]
 use crate::storage;
 
 /// The path prefix a profile-level plan entry carries (`@profile/<file>`),
@@ -102,6 +105,7 @@ pub fn candidates(profile_dir: &Path) -> Result<Vec<String>, LayoutError> {
 ///
 /// A write that does not read back identically, or a stored record that does
 /// not decrypt with the current key. Nothing is deleted then.
+#[cfg(feature = "legacy-import")]
 pub async fn import(target: &Target) -> Result<Vec<String>, LayoutError> {
     let mut files = Vec::new();
     for (file, secret) in FILES {
@@ -154,6 +158,6 @@ pub async fn import(target: &Target) -> Result<Vec<String>, LayoutError> {
     Ok(imported)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-import"))]
 #[path = "credentials_tests.rs"]
 mod tests;

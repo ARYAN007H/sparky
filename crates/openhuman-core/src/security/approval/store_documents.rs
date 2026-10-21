@@ -36,8 +36,10 @@ use tinystoragedrivers::{
     CollectionSpec, ErrorKind, Filter, Key, Precondition, Query, Sort, Versioned,
 };
 
+#[cfg(feature = "legacy-import")]
+use super::storage_schema::legacy_collections;
+use super::storage_schema::specs;
 pub(super) use super::storage_schema::{APPROVALS, FLOW_TRUST, trust_id};
-use super::storage_schema::{legacy_collections, specs};
 
 use super::types::{
     ApprovalAuditEntry, ApprovalDecision, ApprovalSourceContext, ExecutionOutcome, PendingApproval,

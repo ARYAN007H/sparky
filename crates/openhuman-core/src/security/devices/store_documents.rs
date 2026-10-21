@@ -21,7 +21,9 @@ use crate::security::devices::types::PairedDevice;
 use crate::storage::DocumentStoreExt;
 use crate::storage::documents::{Repo, compare_and_swap, text};
 
-use super::storage_schema::{DEVICES, legacy_collections, spec};
+#[cfg(feature = "legacy-import")]
+use super::storage_schema::legacy_collections;
+use super::storage_schema::{DEVICES, spec};
 use crate::storage::schema_support::{key_of, ms_rfc3339};
 
 const DOMAIN: &str = "devices::store";

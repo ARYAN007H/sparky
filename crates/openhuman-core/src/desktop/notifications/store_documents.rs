@@ -43,8 +43,10 @@ use crate::config::Config;
 use crate::storage::documents::{Repo, compare_and_swap, text, update_or_insert};
 use crate::storage::{DocumentStore, DocumentStoreExt, StorageError};
 
+#[cfg(feature = "legacy-import")]
+use super::storage_schema::legacy_collections;
+use super::storage_schema::specs;
 pub(super) use super::storage_schema::{CORE, DEDUP, NOTIFICATIONS, SETTINGS, core_id};
-use super::storage_schema::{legacy_collections, specs};
 use crate::storage::schema_support::key_of;
 
 /// The `workspace` key of core notifications in the per-workspace default

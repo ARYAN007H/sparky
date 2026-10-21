@@ -12,8 +12,8 @@ use std::{
 
 use serde_json::{Map, Value};
 
-use crate::core::runtime::DispatchCtx;
 use crate::core::ControllerSchema;
+use crate::core::runtime::DispatchCtx;
 
 /// A pinned, boxed future returned by a controller handler.
 pub type ControllerFuture = Pin<Box<dyn Future<Output = Result<Value, String>> + Send + 'static>>;
@@ -671,8 +671,11 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         crate::desktop::notifications::all_notifications_registered_controllers(),
     );
     // Storage layout v1 -> v2 migration, status and restore
-    #[rustfmt::skip]
+    #[cfg(feature = "legacy-import")]
+    {
+        #[rustfmt::skip]
     push(&mut controllers, DomainGroup::Config, crate::storage::layout::schemas::all_registered_controllers());
+    }
     // Mobile device pairing and management
     push(
         &mut controllers,

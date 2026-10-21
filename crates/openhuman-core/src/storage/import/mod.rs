@@ -521,6 +521,7 @@ fn import_one(
 
 /// Whether the import of `source` is recorded as done (test and diagnostics
 /// helper).
+#[cfg(feature = "legacy-import")]
 pub fn is_done(
     backend: &Arc<dyn StorageBackend>,
     config: &Config,
@@ -538,3 +539,7 @@ pub fn is_done(
 #[cfg(all(test, feature = "legacy-import"))]
 #[path = "mod_tests.rs"]
 mod tests;
+
+#[cfg(all(test, not(feature = "legacy-import")))]
+#[path = "disabled_tests.rs"]
+mod disabled_tests;

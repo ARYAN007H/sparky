@@ -134,6 +134,12 @@ impl Blocking {
                 let runtime = tokio::runtime::Builder::new_multi_thread()
                     .worker_threads(2)
                     .enable_all()
+                    .on_thread_start(|| {
+                        // Futures spawned from a bridge request may be
+                        // polled on runtime workers rather than the owner
+                        // thread, and must obey the same re-entrancy guard.
+                        ON_STORAGE_RUNTIME.with(|active| active.set(true));
+                    })
                     .build();
                 match runtime {
                     Ok(runtime) => {
