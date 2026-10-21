@@ -29,7 +29,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::storage::{CollectionSpec, DocumentStore, ErrorKind, Precondition, Storage};
+use crate::storage::{CollectionSpec, DocumentStore, ErrorKind, Precondition, Storage, StorageBackend};
 use anyhow::{Context, Result, anyhow};
 use serde_json::{Value, json};
 use sha2::Digest;
@@ -58,6 +58,8 @@ pub(crate) enum Outcome {
     NoBackend,
     /// The marker says this data directory was already imported.
     AlreadyDone,
+    /// Another importer still owns this data directory's claim.
+    InProgress,
     /// Neither legacy file exists.
     NoSource,
     /// The files were read and their records written.
@@ -79,19 +81,14 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
     let scoped = backend
         .for_scope(&scope)
         .map_err(|error| anyhow!("open the module scope: {:?}", error.kind()))?;
-    let secrets = scoped.secrets();
-    import_into(ctx, &scoped, secrets.as_ref(), data_dir).await
-}
-
-async fn import_into(
-    ctx: &DispatchCtx,
-    scoped: &Storage,
-    secrets: &dyn SecretStore,
-    data_dir: &Path,
-) -> Result<Outcome> {
-    let docs = scoped.documents();
+    let markers = crate::storage::documents::Repo::on(
+        &backend,
+        &scope,
+        "storage::import",
+        crate::storage::import_state::collection_specs,
+    )?;
     let marker = marker_id(data_dir);
-    if crate::storage::import_state::host_import_done(scoped, MARKER_COLLECTION, &marker)
+    if crate::storage::import_state::host_import_done(&scoped, MARKER_COLLECTION, &marker)
         .await
         .map_err(|error| anyhow!("read the import state: {:?}", error.kind()))?
     {
@@ -103,24 +100,79 @@ async fn import_into(
         return Ok(Outcome::NoSource);
     }
 
-    // The files are read on a blocking thread, from copies.
-    let (legacy_servers, legacy_audit) = ctx
-        .spawn_blocking(move || -> Result<_> {
-            let servers = if clients.exists() {
-                read_servers(&clients)?
-            } else {
-                Vec::new()
-            };
-            let audit = if audit.exists() {
-                read_audit(&audit)?
-            } else {
-                Vec::new()
-            };
-            Ok((servers, audit))
-        })
-        .await
-        .context("the legacy reader panicked")??;
+    let step = crate::storage::import_state::step_id(MARKER_COLLECTION, &marker);
+    let claimed = crate::storage::import_state::with_claim(
+        &markers,
+        crate::storage::import_state::HOST_OWNER,
+        &step,
+        |condition| {
+            let claimed_markers = markers.conditioned(condition)?;
+            let claimed_backend = crate::storage::import_state::backend_with_condition(
+                Arc::clone(&backend),
+                condition.clone(),
+            );
+            let claimed_scoped = claimed_backend
+                .for_scope(&scope)
+                .map_err(|error| anyhow!("open claimed module scope: {:?}", error.kind()))?;
+            let claimed_secrets = crate::storage::secrets::over(
+                &claimed_scoped,
+                scope.clone(),
+                crate::storage::secrets::keys()?,
+            );
+            crate::storage::block_on_anyhow(async move {
+                if crate::storage::import_state::host_import_done(
+                    claimed_markers.scoped(),
+                    MARKER_COLLECTION,
+                    &marker,
+                )
+                .await
+                .map_err(|error| anyhow!("read the import state: {:?}", error.kind()))?
+                {
+                    return Ok(Outcome::AlreadyDone);
+                }
+                let (legacy_servers, legacy_audit) = tokio::task::spawn_blocking(move || {
+                    let servers = if clients.exists() {
+                        read_servers(&clients)?
+                    } else {
+                        Vec::new()
+                    };
+                    let audit_rows = if audit.exists() {
+                        read_audit(&audit)?
+                    } else {
+                        Vec::new()
+                    };
+                    Ok::<_, anyhow::Error>((servers, audit_rows))
+                })
+                .await
+                .context("the legacy reader panicked")??;
+                let result = import_payload(
+                    &claimed_scoped,
+                    &claimed_secrets,
+                    legacy_servers,
+                    legacy_audit,
+                )
+                .await?;
+                crate::storage::import_state::host_import_mark(
+                    claimed_markers.scoped(),
+                    MARKER_COLLECTION,
+                    &marker,
+                )
+                .await
+                .map_err(|error| anyhow!("write the import state: {:?}", error.kind()))?;
+                Ok(result)
+            })
+        },
+    )?;
+    Ok(claimed.unwrap_or(Outcome::InProgress))
+}
 
+async fn import_payload(
+    scoped: &Storage,
+    secrets: &dyn SecretStore,
+    legacy_servers: Vec<LegacyServer>,
+    legacy_audit: Vec<Value>,
+) -> Result<Outcome> {
+    let docs = scoped.documents();
     for name in [SERVERS, SERVER_NAMES] {
         docs.ensure_collection(&CollectionSpec::new(name))
             .await
@@ -167,9 +219,6 @@ async fn import_into(
         }
     }
 
-    crate::storage::import_state::host_import_mark(scoped, MARKER_COLLECTION, &marker)
-        .await
-        .map_err(|error| anyhow!("write the import state: {:?}", error.kind()))?;
     tracing::info!(
         "{LOG_PREFIX} imported servers={servers} secrets={secret_count} audit={audited}"
     );
