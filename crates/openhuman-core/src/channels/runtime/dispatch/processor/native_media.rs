@@ -387,23 +387,36 @@ async fn read_scoped_media(
             )
         })?;
     let mut lease = MediaReadLease::new(client.clone(), dispatch.clone(), begin.handle.clone());
-    if begin.byte_count == 0
-        || begin.byte_count > max_bytes
-        || begin.byte_count > MAX_MEDIA_BYTES
-        || begin.media.opaque_id != media.opaque_id
-        || begin.media.kind != media.kind
-        || begin.media.path.is_some()
-        || begin.media.url.is_some()
-        || begin.media.local_cache_path.is_some()
-        || begin.content_type != media.content_type.as_deref().unwrap_or_default()
-        || media
-            .size_bytes
-            .is_some_and(|size| size != begin.byte_count as u64)
+    let byte_count_valid = begin.byte_count > 0
+        && begin.byte_count <= max_bytes
+        && begin.byte_count <= MAX_MEDIA_BYTES;
+    let opaque_reference_matches = begin.media.opaque_id == media.opaque_id;
+    let kind_matches = begin.media.kind == media.kind;
+    let provider_locations_absent = begin.media.path.is_none()
+        && begin.media.url.is_none()
+        && begin.media.local_cache_path.is_none();
+    let content_type_matches =
+        begin.content_type == media.content_type.as_deref().unwrap_or_default();
+    let declared_size_matches = media
+        .size_bytes
+        .is_none_or(|size| size == begin.byte_count as u64);
+    if !(byte_count_valid
+        && opaque_reference_matches
+        && kind_matches
+        && provider_locations_absent
+        && content_type_matches
+        && declared_size_matches)
     {
-        return Err(log_rejection(
-            "module_read_metadata",
-            "native media read metadata does not match its scoped reference".into(),
-        ));
+        tracing::warn!(
+            byte_count_valid,
+            opaque_reference_matches,
+            kind_matches,
+            provider_locations_absent,
+            content_type_matches,
+            declared_size_matches,
+            "[dispatch] native media module returned mismatched read metadata"
+        );
+        return Err("native media read metadata does not match its scoped reference".into());
     }
     let expected_chunks = begin
         .byte_count
