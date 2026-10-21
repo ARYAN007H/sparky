@@ -376,4 +376,3 @@ fn inventory_scope_counts(
             .filter(|row| row.scope == source_scope)
             .count()
 }
-
