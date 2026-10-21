@@ -2,10 +2,9 @@
 //!
 //! A module reaches storage only through `ai.tinyhumans.tinystorage.Storage`
 //! (`storage_host`) and its authority is a [`StorageGrant`]. Each module owner
-//! declares what it stores in `storage_schema()` (collections with their
-//! indexes, streams, blob and secret prefixes, each with a scope class); the
-//! host composes those into the registry ([`crate::storage::schema`]) and this
-//! file turns the **module-scoped** items of the module's owner into the grant.
+//! declares its collections through its owner storage contract; the host
+//! composes those into the registry ([`crate::storage::schema`]) and this file
+//! turns the module-scoped collection declarations into the grant.
 //! The hand-written per-module tables this replaces could drift from what the
 //! module actually declares; a generated grant cannot.
 //!
