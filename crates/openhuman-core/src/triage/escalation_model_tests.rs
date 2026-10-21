@@ -111,9 +111,11 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         triage_test_model(Arc::clone(&requests), Arc::clone(&builds), None),
     );
+    let mut domains = crate::core::runtime::DomainSet::harness();
+    domains.platform = true;
     let runtime = crate::core::runtime::CoreBuilder::new(crate::core::types::HostKind::Library)
         .services(crate::core::runtime::ServiceSet::none())
-        .domains(crate::core::runtime::DomainSet::harness())
+        .domains(domains)
         .tool_groups(crate::tools::toolpacks::ToolGroups::advertised())
         .config(config)
         .extensions(extensions)
@@ -424,7 +426,7 @@ async fn react_dispatch_falls_back_to_parent_model_when_hint_route_cannot_build(
 }
 
 #[tokio::test]
-async fn react_dispatch_preserves_the_parent_model_role_for_hint_targets() {
+async fn escalate_dispatch_preserves_orchestrator_tools_without_child_delegation() {
     let _events_guard = test_events_guard().await;
     let temp = tempfile::tempdir().expect("isolated triage workspace");
     let workspace = temp.path().join("workspace");
@@ -444,9 +446,12 @@ async fn react_dispatch_preserves_the_parent_model_role_for_hint_targets() {
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         triage_test_model(Arc::clone(&requests), Arc::clone(&builds), None),
     );
+    let mut domains = crate::core::runtime::DomainSet::harness();
+    domains.platform = true;
     let runtime = crate::core::runtime::CoreBuilder::new(crate::core::types::HostKind::Library)
         .services(crate::core::runtime::ServiceSet::none())
-        .domains(crate::core::runtime::DomainSet::none())
+        .domains(domains)
+        .tool_groups(crate::tools::toolpacks::ToolGroups::advertised())
         .config(config)
         .extensions(extensions)
         .build()
@@ -491,6 +496,18 @@ async fn react_dispatch_preserves_the_parent_model_role_for_hint_targets() {
             .text()
             .contains("route this task with the parent workload")
     }));
+    let tool_names: Vec<_> = requests[0]
+        .2
+        .tools
+        .iter()
+        .map(|tool| tool.name.as_str())
+        .collect();
+    assert!(tool_names.contains(&"read_workspace_state"));
+    assert!(
+        !tool_names
+            .iter()
+            .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") })
+    );
 }
 
 #[tokio::test]
