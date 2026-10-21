@@ -157,10 +157,11 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
     if let Some(backend) = installed() {
         return Ok(backend);
     }
+
+    let cell = workspace_backend(workspace_dir);
     #[cfg(test)]
     signal_test_sync_backend_entry();
 
-    let cell = workspace_backend(workspace_dir);
     let workspace_dir = workspace_dir.to_path_buf();
     super::block_on_anyhow(async move { initialized_backend(cell, workspace_dir).await })
 }
