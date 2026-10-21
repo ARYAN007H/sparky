@@ -3,7 +3,8 @@ use super::super::runtime::test_support::{
     linked_telegram_runtime, run_dispatch_harness, DispatchHarnessOptions,
 };
 use super::super::runtime::{
-    process_channel_message, run_message_dispatch_loop, RuntimeChannelMessage,
+    process_channel_message, process_channel_runtime_message, run_message_dispatch_loop,
+    RuntimeChannelMessage,
 };
 use super::common::{use_real_agent_handler, RecordingChannel, SlowModel};
 use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
@@ -129,18 +130,11 @@ async fn message_dispatch_processes_messages_in_parallel() {
 async fn process_channel_message_sends_typing_before_the_provider_reply() {
     let _bus_guard = use_real_agent_handler().await;
     let linked = linked_telegram_runtime().await;
-    let channel = linked
-        .channels()
-        .get("telegram")
-        .expect("linked TinyChannels fixture should expose Telegram")
-        .clone();
-
-    let mut channels_by_name = HashMap::new();
-    channels_by_name.insert("telegram".to_string(), channel);
+    let channels_by_name = linked.channels();
 
     let mut runtime_ctx = ChannelRuntimeContext {
         relay_thread: None,
-        channels_by_name: Arc::new(channels_by_name),
+        channels_by_name,
         module_objects: linked.module_objects(),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(SlowModel {
@@ -171,20 +165,72 @@ async fn process_channel_message_sends_typing_before_the_provider_reply() {
         linked.config(),
     );
     let runtime_ctx = Arc::new(runtime_ctx);
-
-    process_channel_message(
+    let configured_account = runtime_ctx
+        .channels_by_name
+        .keys()
+        .find(|name| tinychannels_bus::provider_id(name) == "telegram")
+        .cloned()
+        .expect("linked Telegram should have a configured account identity");
+    let message = traits::ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
+        id: "typing-msg".to_string(),
+        sender: "alice".to_string(),
+        reply_target: "42".to_string(),
+        content: "hello".to_string(),
+        channel: "telegram".to_string(),
+        timestamp: 1,
+        thread_ts: None,
+        sender_name: None,
+    };
+    let envelope = tinychannels_bus::ChannelInboundEnvelope {
+        channel: tinychannels_bus::ChannelRef {
+            id: "telegram".into(),
+            account_id: Some(configured_account),
+        },
+        message_id: message.id.clone(),
+        conversation: tinychannels_bus::ConversationRef {
+            kind: tinychannels_bus::ConversationKind::Dm,
+            id: message.reply_target.clone(),
+            ..Default::default()
+        },
+        sender: tinychannels_bus::SenderRef {
+            id: message.sender.clone(),
+            name: message.sender_name.clone(),
+            ..Default::default()
+        },
+        timestamp_unix_ms: Some(message.timestamp * 1000),
+        text: message.content.clone(),
+        parts: vec![tinychannels_bus::ContentPart::Text {
+            text: message.content.clone(),
+            markdown_dialect: None,
+        }],
+        ..Default::default()
+    };
+    let prepared = crate::modules::channel_controller::prepare_inbound(
+        &crate::channels::context::module_client(&runtime_ctx).await,
+        tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
+            source: tinychannels_bus::module_inbound::ChannelInboundSource::Envelope {
+                envelope,
+                timestamp: message.timestamp,
+            },
+            namespace: "main".into(),
+            session_policy: Default::default(),
+            preparation_mode: Default::default(),
+        },
+    )
+    .await
+    .expect("linked module should prepare the trusted configured channel input");
+    process_channel_runtime_message(
         runtime_ctx,
-        traits::ChannelMessage {
-            reply_to_id: None,
-            topic_id: None,
-            id: "typing-msg".to_string(),
-            sender: "alice".to_string(),
-            reply_target: "42".to_string(),
-            content: "hello".to_string(),
-            channel: "telegram".to_string(),
-            timestamp: 1,
-            thread_ts: None,
-            sender_name: None,
+        RuntimeChannelMessage {
+            message: prepared.message.clone(),
+            inbound_envelope: Some(prepared.envelope.clone()),
+            authenticated_relay: false,
+            prepared_inbound: Some(prepared),
+            imported_history: Vec::new(),
+            legacy_history: None,
+            progressive_target: None,
         },
     )
     .await;

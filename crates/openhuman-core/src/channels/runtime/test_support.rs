@@ -286,14 +286,17 @@ pub(crate) fn bind_test_core_context(
     config.workspace_dir = workspace.clone();
     config.action_dir = workspace.clone();
     config.config_path = workspace.join("config.toml");
-    config.cloud_providers = vec![crate::config::schema::CloudProviderCreds {
-        id: "p_openai_channel_test".into(),
-        slug: "openai".into(),
-        label: "Channel test provider".into(),
-        endpoint: "http://127.0.0.1:9/v1".into(),
-        default_model: Some("channel-test-model".into()),
-        ..Default::default()
-    }];
+    config.cloud_providers = ["openai", "test-provider"]
+        .into_iter()
+        .map(|slug| crate::config::schema::CloudProviderCreds {
+            id: format!("p_{slug}_channel_test"),
+            slug: slug.into(),
+            label: "Channel test provider".into(),
+            endpoint: "http://127.0.0.1:9/v1".into(),
+            default_model: Some("channel-test-model".into()),
+            ..Default::default()
+        })
+        .collect();
     context.config = Some(Arc::new(config.clone()));
     let core = CoreContext::for_test(DomainSet::none(), Some(workspace)).derive_with(
         ContextOverlay::new(config, DomainSet::full(), Default::default())
