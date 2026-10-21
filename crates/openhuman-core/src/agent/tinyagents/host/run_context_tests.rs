@@ -97,6 +97,7 @@ fn child_inherits_tree_handles_but_isolates_observations_and_usage() {
     let mut parent = OpenHumanRunContext::new();
     parent.thread_id = Some("thread-a".to_string());
     parent.file_state_agent_id = Some("parent-file-state".to_string());
+    parent.headless_descendant_settlement = true;
     *parent.resolved_route.lock().expect("route lock") =
         Some(tinyinference_llm::model::ResolvedModelRoute {
             provider: "provider-a".to_string(),
@@ -107,6 +108,7 @@ fn child_inherits_tree_handles_but_isolates_observations_and_usage() {
     let child = parent.child();
 
     assert_eq!(child.spawn_depth, 1);
+    assert!(child.headless_descendant_settlement);
     assert_eq!(child.thread_id.as_deref(), Some("thread-a"));
     assert!(child.file_state_agent_id().is_none());
     assert!(child
@@ -209,12 +211,17 @@ fn failed_outer_run_promotes_completed_nested_usage_once() {
 fn detached_children_reset_turn_accounting_and_cancellation() {
     let mut root = OpenHumanRunContext::new();
     root.thread_id = Some("thread-a".into());
+    root.headless_descendant_settlement = true;
     let dispatch = Arc::new(TurnDispatchState::new(Some(std::time::Duration::ZERO)));
     dispatch.record_subagent_elapsed(std::time::Duration::from_secs(1));
     root.dispatch = Some(dispatch);
     let detached = root.detached_child();
 
     assert_eq!(detached.thread_id.as_deref(), Some("thread-a"));
+    assert!(
+        !detached.headless_descendant_settlement,
+        "detached work is outside the root's settlement lease"
+    );
     assert!(detached.dispatch.is_none());
     root.cancellation.cancel();
     assert!(!detached.cancellation.is_cancelled());

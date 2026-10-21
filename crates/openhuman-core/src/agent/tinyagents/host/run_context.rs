@@ -643,6 +643,7 @@ impl OpenHumanRunContext {
         child.subagent_usage = Arc::new(Mutex::new(Vec::new()));
         child.parent_subagent_usage = None;
         child.cancellation = tinyagents_harness::cancel::CancellationToken::new();
+        child.headless_descendant_settlement = false;
         child
     }
 

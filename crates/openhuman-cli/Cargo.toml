@@ -218,6 +218,10 @@ name = "cli_sigpipe"
 path = "../../tests/cli_sigpipe.rs"
 
 [[test]]
+name = "cli_agent_chat_headless_e2e"
+path = "../../tests/cli_agent_chat_headless_e2e.rs"
+
+[[test]]
 name = "cli_storage_url_e2e"
 path = "../../tests/cli_storage_url_e2e.rs"
 
