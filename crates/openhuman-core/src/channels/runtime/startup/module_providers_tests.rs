@@ -742,21 +742,24 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
                         == "media:tenant7/thread42/voice1"
             })
     );
+    let expected_channel_ref = serde_json::to_value(&channel).expect("expected channel ref");
+    let expected_conversation_ref =
+        serde_json::to_value(&conversation).expect("expected conversation ref");
     assert_eq!(
-        voice_gateway_wire["structured"]["channel_ref"]["accountId"],
-        "trusted-account-7"
+        voice_gateway_wire["structured"]["channel_ref"],
+        expected_channel_ref
     );
     assert_eq!(
-        voice_gateway_wire["structured"]["conversation_ref"]["threadId"],
-        "topic-3"
+        voice_gateway_wire["structured"]["conversation_ref"],
+        expected_conversation_ref
     );
     assert_eq!(
-        image_gateway_wire["structured"]["channel_ref"]["accountId"],
-        "trusted-account-7"
+        image_gateway_wire["structured"]["channel_ref"],
+        expected_channel_ref
     );
     assert_eq!(
-        image_gateway_wire["structured"]["conversation_ref"]["threadId"],
-        "topic-3"
+        image_gateway_wire["structured"]["conversation_ref"],
+        expected_conversation_ref
     );
     assert_eq!(
         gateway_terminals
