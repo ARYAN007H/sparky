@@ -64,8 +64,15 @@ fn put_get_list_delete_round_trip() {
 fn scopes_do_not_see_each_others_state() {
     let backend: std::sync::Arc<dyn StorageBackend> =
         std::sync::Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
-    let alice = StateKv::on_backend(&backend, &Scope::new("alice").unwrap(), "test_owner", "state").unwrap();
-    let bob = StateKv::on_backend(&backend, &Scope::new("bob").unwrap(), "test_owner", "state").unwrap();
+    let alice = StateKv::on_backend(
+        &backend,
+        &Scope::new("alice").unwrap(),
+        "test_owner",
+        "state",
+    )
+    .unwrap();
+    let bob =
+        StateKv::on_backend(&backend, &Scope::new("bob").unwrap(), "test_owner", "state").unwrap();
     alice.put("x", &1u32).unwrap();
     assert!(bob.get::<u32>("x").unwrap().is_none());
 }
@@ -233,7 +240,8 @@ fn typed_quarantine_validation_is_cached_per_backend_scope_name_and_type() {
     std::fs::write(&first_legacy, r#"{"ok":true}"#).unwrap();
     std::fs::write(&second_legacy, r#"{"ok":true}"#).unwrap();
 
-    let backend: std::sync::Arc<dyn StorageBackend> = std::sync::Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
+    let backend: std::sync::Arc<dyn StorageBackend> =
+        std::sync::Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
     let local = StateKv::on_backend(&backend, &Scope::local(), "test_owner", "state").unwrap();
     local
         .import_file_quarantining::<CountedA>("first", &first_legacy)

@@ -26,9 +26,9 @@ use anyhow::{Context, Result};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::Digest;
 use tinystoragedrivers::{CollectionSpec, Cursor, ErrorKind, Precondition, Scope, StorageError};
 use tinystoragedrivers_api::KvStore;
-use sha2::Digest;
 
 use super::documents::Repo;
 use super::import_state;
@@ -94,11 +94,18 @@ impl StateKv {
 
     fn prefix(&self) -> String {
         let namespace = format!("{}\0{}", self.owner, self.ns);
-        format!("openhuman-state:{}:", hex::encode(sha2::Sha256::digest(namespace.as_bytes())))
+        format!(
+            "openhuman-state:{}:",
+            hex::encode(sha2::Sha256::digest(namespace.as_bytes()))
+        )
     }
 
     fn id(&self, name: &str) -> Result<String, StorageError> {
-        Ok(format!("{}{}", self.prefix(), hex::encode(sha2::Sha256::digest(name.as_bytes()))))
+        Ok(format!(
+            "{}{}",
+            self.prefix(),
+            hex::encode(sha2::Sha256::digest(name.as_bytes()))
+        ))
     }
 
     /// The value stored under `name`.
@@ -143,13 +150,12 @@ impl StateKv {
     /// A storage error.
     pub fn delete(&self, name: &str) -> Result<bool> {
         let (this, name) = (self.clone(), name.to_owned());
-        self.repo
-            .run_storage(move |storage| async move {
-                match storage.kv().get(&this.id(&name)?).await? {
-                    Some(current) => storage.kv().delete(&current.id, current.unchanged()).await,
-                    None => Ok(false),
-                }
-            })
+        self.repo.run_storage(move |storage| async move {
+            match storage.kv().get(&this.id(&name)?).await? {
+                Some(current) => storage.kv().delete(&current.id, current.unchanged()).await,
+                None => Ok(false),
+            }
+        })
     }
 
     /// Every `(name, value)` whose name starts with `prefix`, in name order.
@@ -199,7 +205,11 @@ impl StateKv {
         let this = self.clone();
         let name = name.to_owned();
         self.repo.run_storage(move |storage| async move {
-            match storage.kv().cas(&this.id(&name)?, body, Precondition::Absent).await {
+            match storage
+                .kv()
+                .cas(&this.id(&name)?, body, Precondition::Absent)
+                .await
+            {
                 Ok(_) => Ok(true),
                 Err(error) if error.kind() == ErrorKind::Conflict => Ok(false),
                 Err(error) => Err(error),
@@ -255,7 +265,9 @@ impl StateKv {
                     Err(error) => return Err(error),
                 }
             }
-            Err(StorageError::conflict("state update exceeded its retry budget"))
+            Err(StorageError::conflict(
+                "state update exceeded its retry budget",
+            ))
         })
     }
 
@@ -272,10 +284,7 @@ impl StateKv {
     fn decode_entry(&self, storage_key: &str, value: Value) -> Result<KvEntry, StorageError> {
         let entry: KvEntry = serde_json::from_value(value)
             .map_err(|error| StorageError::invalid_input(error.to_string()))?;
-        if entry.owner != self.owner
-            || entry.ns != self.ns
-            || self.id(&entry.key)? != storage_key
-        {
+        if entry.owner != self.owner || entry.ns != self.ns || self.id(&entry.key)? != storage_key {
             return Err(StorageError::invalid_input(
                 "state KV identity envelope does not match its storage prefix",
             ));

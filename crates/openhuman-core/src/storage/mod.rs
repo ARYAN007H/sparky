@@ -55,7 +55,7 @@ pub use scope::{
 };
 
 use std::future::Future;
-use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock, mpsc};
+use std::sync::{mpsc, Arc, LazyLock, Mutex, OnceLock, RwLock};
 
 /// SQLite bindings re-exported by the storage driver crate, for the two
 /// consumers that open a SQLite file that is not a storage backend: the
