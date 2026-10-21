@@ -189,7 +189,7 @@ async fn native_turn_preserves_deepseek_route_metadata_after_cloud_resolution() 
     let config = crate::config::Config {
         config_path: tmp.path().join("config.toml"),
         workspace_dir: tmp.path().join("workspace"),
-        chat_provider: Some("deepseek:deepseek-chat".into()),
+        chat_provider: Some("deepseek:hint:chat".into()),
         cloud_providers: vec![CloudProviderCreds {
             id: "deepseek-fixture".into(),
             slug: "deepseek".into(),
@@ -216,10 +216,17 @@ async fn native_turn_preserves_deepseek_route_metadata_after_cloud_resolution() 
     );
     let ctx = DispatchCtx::new(context);
     let models = TurnModelSource::new_crate_native(&ctx, "chat", Arc::new(config))
-        .build("deepseek:deepseek-chat", 0.2, None, None)
+        .build("hint:chat", 0.2, None, None)
         .expect("configured DeepSeek turn model builds");
 
     assert_eq!(models.provider_id(), "deepseek");
+    let route = models
+        .native_model_set
+        .as_ref()
+        .expect("native owner route set")
+        .primary_route();
+    assert_eq!(route.provider, "deepseek");
+    assert_eq!(route.model, "deepseek-chat");
     let profile = models.primary.profile().expect("cloud model profile");
     assert_eq!(profile.provider.as_deref(), Some("deepseek"));
     assert_eq!(profile.model.as_deref(), Some("deepseek-chat"));
