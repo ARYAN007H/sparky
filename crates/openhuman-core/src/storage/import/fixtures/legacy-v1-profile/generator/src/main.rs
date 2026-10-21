@@ -235,7 +235,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let incarnation = "fixture-incarnation";
     let thread_key = Key::of([thread_id])?.as_str().to_owned();
     put(
-        docs,
+        user_scope.documents(),
         "conversations.threads",
         &thread_key,
         json!({
@@ -269,7 +269,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     put(
-        docs,
+        user_scope.documents(),
         "threads_transcript_keys",
         "fixture-thread",
         json!({"transcript_key": "fixture-transcript-key"}),
