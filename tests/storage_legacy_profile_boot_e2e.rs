@@ -211,6 +211,12 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
                         dispatch,
                         owner_workspace,
                     );
+                    let listed = thread_store.list_threads().unwrap();
+                    assert_eq!(
+                        listed.len(),
+                        1,
+                        "thread owner did not read the v1 database thread: {listed:?}"
+                    );
                     assert_eq!(
                         thread_store
                             .transcript_key("fixture-thread")
