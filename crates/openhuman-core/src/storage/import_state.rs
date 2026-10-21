@@ -4,13 +4,14 @@
 //! collection is deliberately separate from Tiny Storage Drivers' schemas:
 //! the host owns importer names, completion records, and claim policy.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tinystoragedrivers::{
-    CollectionSpec, ErrorKind, ExpectedDocument, Precondition, ReadCheck, Storage, StorageError,
-    Versioned, WriteOp,
+    CollectionSpec, ErrorKind, ExpectedDocument, Filter, Precondition, ReadCheck, Storage,
+    StorageError, Versioned, WriteCondition, WriteOp,
 };
 use tinystoragedrivers_api::DocumentStore;
 
@@ -199,19 +200,32 @@ pub fn with_claim<T>(
     repo: &Repo,
     owner: &str,
     step: &str,
-    body: impl FnOnce() -> Result<T>,
+    body: impl FnOnce(&WriteCondition) -> Result<T>,
 ) -> Result<Option<T>> {
     let started = Instant::now();
     let mut body = Some(body);
     loop {
         let now = chrono::Utc::now().timestamp_millis();
         if let Some(token) = acquire(repo, owner, step, now, CLAIM_TTL_MS)? {
+            let condition = token.write_condition()?;
             let (stop_tx, stop_rx) = std::sync::mpsc::channel();
-            let heartbeat = start_heartbeat(repo.clone(), token.clone(), CLAIM_TTL_MS, stop_rx);
-            let result = body.take().expect("import body runs once")();
+            let healthy = std::sync::Arc::new(AtomicBool::new(true));
+            let heartbeat = start_heartbeat(
+                repo.clone(),
+                token.clone(),
+                CLAIM_TTL_MS,
+                stop_rx,
+                std::sync::Arc::clone(&healthy),
+            );
+            let result = body.take().expect("import body runs once")(&condition);
             let _ = stop_tx.send(());
             let _ = heartbeat.join();
             release(repo, &token)?;
+            if !healthy.load(Ordering::Acquire) {
+                return Err(anyhow::anyhow!(
+                    "import claim was lost before its operation completed"
+                ));
+            }
             return result.map(Some);
         }
         if started.elapsed() >= Duration::from_millis(CLAIM_TTL_MS.max(0) as u64) {
@@ -229,12 +243,13 @@ pub fn with_claim_at<T>(
     step: &str,
     now_ms: i64,
     ttl_ms: i64,
-    body: impl FnOnce() -> Result<T>,
+    body: impl FnOnce(&WriteCondition) -> Result<T>,
 ) -> Result<Option<T>> {
     let Some(token) = acquire(repo, owner, step, now_ms, ttl_ms)? else {
         return Ok(None);
     };
-    let result = body();
+    let condition = token.write_condition()?;
+    let result = body(&condition);
     release(repo, &token)?;
     result.map(Some)
 }
@@ -243,11 +258,27 @@ pub fn with_claim_at<T>(
 struct ClaimToken {
     owner: String,
     step: String,
+    scope: String,
     holder: String,
     epoch: u64,
     ttl_ms: i64,
     clock_started: Instant,
     clock_start_ms: i64,
+}
+
+impl ClaimToken {
+    fn write_condition(&self) -> Result<WriteCondition> {
+        let scope = crate::storage::Scope::new(&self.scope)?;
+        let filter = Filter::eq("holder", self.holder.clone())
+            .and(Filter::eq("epoch", serde_json::json!(self.epoch)));
+        Ok(WriteCondition::new(
+            scope,
+            COLLECTION,
+            record_key(&self.owner, &self.step, "claim"),
+            filter,
+        )?
+        .with_valid_until_field("valid_until_ms")?)
+    }
 }
 
 fn acquire(
@@ -261,6 +292,10 @@ fn acquire(
         return Err(anyhow::anyhow!("import claim TTL must be positive"));
     }
     let holder = format!("pid-{}-{}", std::process::id(), uuid::Uuid::new_v4());
+    let scope = repo
+        .origin_scope()
+        .ok_or_else(|| anyhow::anyhow!("import claims require an opened backend scope"))?
+        .to_owned();
     let (owner_owned, step_owned, holder_owned) =
         (owner.to_owned(), step.to_owned(), holder.clone());
     let scoped = repo.scoped().clone();
@@ -321,6 +356,7 @@ fn acquire(
     Ok(outcome.map(|epoch| ClaimToken {
         owner: owner.to_owned(),
         step: step.to_owned(),
+        scope,
         holder,
         epoch,
         ttl_ms,
@@ -334,6 +370,7 @@ fn start_heartbeat(
     token: ClaimToken,
     ttl_ms: i64,
     stop: std::sync::mpsc::Receiver<()>,
+    healthy: std::sync::Arc<AtomicBool>,
 ) -> std::thread::JoinHandle<()> {
     let interval = Duration::from_millis((ttl_ms / 3).max(1) as u64);
     std::thread::spawn(move || {
@@ -344,6 +381,7 @@ fn start_heartbeat(
             match renew(&repo, &token, now_ms) {
                 Ok(true) => {}
                 Ok(false) | Err(_) => {
+                    healthy.store(false, Ordering::Release);
                     tracing::warn!(target: "openhuman::storage_import", "{LOG_PREFIX} could not renew the import claim");
                     break;
                 }
