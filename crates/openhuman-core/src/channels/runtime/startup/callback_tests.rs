@@ -3,6 +3,7 @@ use super::{ProgressiveChannelTransport, ProgressiveOutputObserver};
 
 use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::runtime::dispatch::RuntimeChannelMessage;
+use crate::channels::runtime::{ChannelHandle, TestChannel};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 use tinychannels_bus::channel::{
@@ -182,9 +183,9 @@ fn callback_for_channels(
 #[tokio::test]
 async fn voice_media_projection_accepts_only_durable_refs_for_the_configured_account() {
     let channel = Arc::new(RecordingChannel::new("telegram:bot-a"));
-    let channels: HashMap<String, Arc<dyn Channel>> = HashMap::from([(
-        channel.name().to_owned(),
-        channel.clone() as Arc<dyn Channel>,
+    let channels: HashMap<String, Arc<ChannelHandle>> = HashMap::from([(
+        channel.name.clone(),
+        Arc::new(ChannelHandle::test(TestChannel::new(channel.name.clone()))),
     )]);
     let (callback, _context) = callback_for_channels(channels, HashMap::new(), None);
     let request = || tinychannels_bus::HostStoreVoiceMediaRequest {

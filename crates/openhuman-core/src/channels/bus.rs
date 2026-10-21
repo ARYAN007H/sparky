@@ -10,9 +10,6 @@ mod subscriber;
 pub(crate) use delivery::NativeProgressiveReply;
 pub use subscriber::ChannelInboundSubscriber;
 
-#[cfg(test)]
-#[path = "bus_inbound_thread_id_tests_tests.rs"]
-mod inbound_thread_id_tests;
 
 #[cfg(test)]
 #[path = "bus_tests.rs"]
