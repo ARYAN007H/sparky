@@ -85,3 +85,14 @@ fn path_hashes_keep_distinct_paths_and_verify_body_identity() {
     store.record_seen(path, 1).unwrap();
     assert_eq!(store.last_mtime(Path::new("/vault/b.md")).unwrap(), None);
 }
+
+#[cfg(feature = "storage-sqlite")]
+#[tokio::test]
+async fn local_backend_open_and_sync_operations_work_inside_current_thread_runtime() {
+    let directory = tempfile::tempdir().unwrap();
+    let db = directory.path().join("watcher.db");
+    let mut store = WatcherStateStore::open(&db).unwrap();
+    let path = Path::new("/machine/vault/current.md");
+    store.record_seen(path, 123).unwrap();
+    assert_eq!(store.last_mtime(path).unwrap(), Some(123));
+}
