@@ -324,7 +324,7 @@ fn an_unparseable_raw_payload_reads_as_a_string() {
 
 #[test]
 fn scopes_keep_notifications_apart() {
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     docs_in(&storage, "alice")
         .insert(&note("a", "slack", "hi", 0), true)
         .unwrap();

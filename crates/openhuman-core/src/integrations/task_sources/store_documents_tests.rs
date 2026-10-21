@@ -230,7 +230,7 @@ fn a_corrupt_source_is_an_error_not_a_panic() {
 
 #[test]
 fn scopes_keep_sources_apart() {
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let alice = docs_in(&storage, "alice");
     alice.add_source(&source("s")).unwrap();
     alice.mark_ingested("s", &task("1", "one")).unwrap();
