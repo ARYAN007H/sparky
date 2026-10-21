@@ -412,6 +412,7 @@ async fn failed_history_reset_does_not_apply_requested_route() {
 
 #[tokio::test]
 async fn handle_runtime_command_telegram_status_replies_without_agent() {
+    let _linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let channel_state = Arc::new(TestChannel::new("recording"));
     let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
@@ -449,6 +450,7 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
 
 #[tokio::test]
 async fn handle_runtime_command_without_target_channel_still_consumes_command() {
+    let _linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let msg = ChannelMessage {
         reply_to_id: None,
@@ -470,6 +472,7 @@ async fn handle_runtime_command_without_target_channel_still_consumes_command() 
 
 #[tokio::test]
 async fn handle_runtime_command_telegram_help_replies_with_remote_command_list() {
+    let _linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let channel_state = Arc::new(TestChannel::new("recording"));
     let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
@@ -508,6 +511,7 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
 
 #[tokio::test]
 async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
+    let _linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
     let tempdir = tempfile::tempdir().unwrap();
     let ctx = runtime_context(tempdir.path().to_path_buf());
     let channel_state = Arc::new(TestChannel::new("recording"));
@@ -543,8 +547,8 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 }
 
 #[tokio::test]
-#[ignore = "the linked tinychannels-module is given no storage backend here, so /new fails to persist the chat binding (host storage is unavailable); needs a storage fixture"]
 async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
+    let _linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
     let tempdir = tempfile::tempdir().unwrap();
     let ctx = runtime_context(tempdir.path().to_path_buf());
     let channel_state = Arc::new(TestChannel::new("recording"));
@@ -661,7 +665,8 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 }
 
 #[tokio::test]
-async fn handle_runtime_command_telegram_new_reports_unavailable_storage() {
+async fn handle_runtime_command_telegram_new_uses_module_storage() {
+    let _linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
     let tempdir = tempfile::tempdir().unwrap();
     let ctx = runtime_context(tempdir.path().to_path_buf());
     let channel_state = Arc::new(TestChannel::new("recording"));
@@ -694,9 +699,9 @@ async fn handle_runtime_command_telegram_new_reports_unavailable_storage() {
         "{}",
         sent[0].content
     );
+    assert!(sent[0].content.contains("Started new session"));
     assert!(sent[0]
         .content
-        .contains("failed to persist the chat binding"));
-    assert!(sent[0].content.contains("host storage is unavailable"));
+        .contains("Durable conversation history reset"));
     assert_eq!(sent[0].thread_ts.as_deref(), Some("42"));
 }
