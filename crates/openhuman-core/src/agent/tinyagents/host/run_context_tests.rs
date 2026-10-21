@@ -186,6 +186,7 @@ fn detached_children_reset_turn_accounting_and_cancellation() {
     let mut root = OpenHumanRunContext::new();
     root.thread_id = Some("thread-a".into());
     root.headless_descendant_settlement = true;
+    root.headless_descendant_owner = Some("root-owner".into());
     let dispatch = Arc::new(TurnDispatchState::new(Some(std::time::Duration::ZERO)));
     dispatch.record_subagent_elapsed(std::time::Duration::from_secs(1));
     root.dispatch = Some(dispatch);
@@ -196,6 +197,8 @@ fn detached_children_reset_turn_accounting_and_cancellation() {
         !detached.headless_descendant_settlement,
         "detached work is outside the root's settlement lease"
     );
+    assert_eq!(root.child().headless_descendant_owner.as_deref(), Some("root-owner"));
+    assert!(detached.headless_descendant_owner.is_none());
     assert!(detached.dispatch.is_none());
     root.cancellation.cancel();
     assert!(!detached.cancellation.is_cancelled());
