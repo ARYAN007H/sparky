@@ -9,11 +9,11 @@ use std::{ops::Range, sync::Arc, time::Duration};
 use async_trait::async_trait;
 use serde_json::Value;
 use tinystoragedrivers_api::{
-    BlobReader, BlobStore, DocumentStore, DocumentWatch, KvStore, QueueStore, Storage,
-    StreamStore,
+    BlobReader, BlobStore, BlobStream, DocumentStore, DocumentWatch, KvStore, QueueStore,
+    Storage, StreamStore,
 };
 use tinystoragedrivers_types::{
-    Blob, BlobMeta, BlobStream, Capabilities, Capability, CollectionSpec, Cursor, DeadLetter,
+    Blob, BlobMeta, Capabilities, Capability, CollectionSpec, Cursor, DeadLetter,
     Delivery, Enqueued, Filter, NewMessage, Page, Precondition, Query, QueueFeatures, QueueSpec,
     QueueStats, ReadCheck, Receipt, Result, Retry, SealOutcome, SearchHit, Sort, StreamEntry,
     StreamInfo, TreeEntry, TreeFile, Version, Versioned, WatchOptions, WriteOp, WriteOptions,
