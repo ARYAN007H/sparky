@@ -316,6 +316,9 @@ pub struct OpenHumanRunContext {
     pub file_state_agent_id: Option<String>,
     /// Host-owned artifact index for tool-result references.
     pub(crate) tool_result_artifact_index: Option<Arc<ToolResultArtifactIndexStore>>,
+    /// This root run owns settlement of driver jobs before its host turn
+    /// returns. Inherited by recursive child contexts, never by ordinary chat.
+    pub(crate) headless_descendant_settlement: bool,
     /// Current-turn attachment placeholders forwarded to vision delegates.
     pub attachment_placeholders: Arc<Vec<String>>,
     /// Dispatch guard shared by synchronous delegates in this run.
@@ -452,6 +455,7 @@ impl OpenHumanRunContext {
             transcripts: None,
             file_state_agent_id: None,
             tool_result_artifact_index: None,
+            headless_descendant_settlement: false,
             attachment_placeholders: Arc::new(Vec::new()),
             dispatch: None,
             task_recency_window: None,
@@ -495,6 +499,13 @@ impl OpenHumanRunContext {
     #[must_use]
     pub fn with_core(mut self, core: Option<Arc<crate::core::runtime::CoreContext>>) -> Self {
         self.core = core.as_ref().map(Arc::downgrade);
+        self
+    }
+
+    /// Marks an opted-in headless root whose host will settle driver jobs.
+    #[must_use]
+    pub(crate) fn with_headless_descendant_settlement(mut self) -> Self {
+        self.headless_descendant_settlement = true;
         self
     }
 
