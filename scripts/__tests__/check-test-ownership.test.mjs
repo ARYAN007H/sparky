@@ -19,6 +19,34 @@ test('rejects tests that call TinyChannels provider internals', () => {
   ]);
 });
 
+test('rejects grouped imports of TinyChannels provider internals', () => {
+  const source = `
+    use tinychannels::{providers::email_channel::parse};
+  `;
+
+  assert.deepEqual(findOwnershipViolations(source, 'tests/email.rs'), [
+    {
+      line: 2,
+      path: 'tinychannels::providers::',
+      reason: 'TinyChannels provider behavior belongs in TinyChannels.',
+    },
+  ]);
+});
+
+test('rejects TinyChannels provider imports with whitespace around path separators', () => {
+  const source = `
+    use tinychannels :: providers :: email_channel :: parse;
+  `;
+
+  assert.deepEqual(findOwnershipViolations(source, 'tests/email.rs'), [
+    {
+      line: 2,
+      path: 'tinychannels::providers::',
+      reason: 'TinyChannels provider behavior belongs in TinyChannels.',
+    },
+  ]);
+});
+
 test('allows public facades and bus contracts', () => {
   const source = `
     use tinychannels::ChannelInboundEnvelope;
