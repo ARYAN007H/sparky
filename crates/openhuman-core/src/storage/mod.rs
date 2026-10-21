@@ -443,8 +443,14 @@ pub fn driver_is_shared(driver: &str) -> bool {
 /// tinystoragedrivers' `conformance::run_shared` proves the claim per driver.
 pub fn backend_has_cross_process_cas(backend: &dyn StorageBackend) -> bool {
     backend
-        .capabilities()
-        .contains(tinystoragedrivers::Capability::SharedAcrossProcesses)
+        .for_scope(&Scope::cluster())
+        .ok()
+        .is_some_and(|storage| {
+            storage
+                .documents()
+                .capabilities()
+                .contains(tinystoragedrivers::Capability::CrossProcessCas)
+        })
 }
 
 /// The same answer from a driver name alone, for the boot guard, which judges
