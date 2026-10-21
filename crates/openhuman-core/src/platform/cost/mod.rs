@@ -9,7 +9,9 @@ pub mod scope;
 mod storage_schema;
 pub mod tools;
 pub mod tracker;
-pub(crate) use storage_schema::{collection_specs, upgrade_records};
+pub(crate) use storage_schema::collection_specs;
+#[cfg(feature = "legacy-import")]
+pub(crate) use storage_schema::upgrade_records;
 mod tracker_documents;
 pub mod types;
 
@@ -17,7 +19,7 @@ pub use global::{
     init_global, rebind_global, record_embedding_usage, record_provider_usage,
     record_provider_usage_scoped, seed_tenant_tracker, try_global,
 };
-pub use route::{route_for_model, CostRoute};
+pub use route::{CostRoute, route_for_model};
 pub use schemas::{
     all_controller_schemas as all_cost_controller_schemas,
     all_registered_controllers as all_cost_registered_controllers,

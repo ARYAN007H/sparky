@@ -28,7 +28,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Digest;
 use tinystoragedrivers::{CollectionSpec, Cursor, ErrorKind, Precondition, StorageError};
-use tinystoragedrivers_api::KvStore;
 
 use super::documents::Repo;
 use super::import_state;

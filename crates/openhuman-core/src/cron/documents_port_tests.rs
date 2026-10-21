@@ -1,5 +1,5 @@
 use super::*;
-use crate::storage::{MemoryStorage, Scope, StorageBackend};
+use crate::storage::{test_support::memory_backend, Scope, StorageBackend};
 use serde_json::json;
 use tinyflows_bus::schedule::{DOCUMENT_INTERFACE, DOCUMENT_METHOD};
 
@@ -12,7 +12,7 @@ async fn port_with_backend() -> (tinybus::Proxy, CallbackAddress, Arc<dyn Storag
     let config = Config::default();
     // Start the module runtime and attach the module before touching the bus.
     module::proxy(&config).await.expect("module attaches");
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let backend = memory_backend();
     let scope = DocScope::on_backend(&config, Arc::clone(&backend), Scope::local());
     let address = address(&scope).await.expect("port is served");
     let runtime = crate::modules::runtime::runtime().await.unwrap();
@@ -187,12 +187,11 @@ async fn shared_schedule_records_are_owner_scoped_and_never_scanned() {
     )
     .await;
     assert!(record.get("error").is_none(), "{record}");
-    assert!(
-        docs.get("tsd.counters", "cron/runs")
-            .await
-            .unwrap()
-            .is_some()
-    );
+    assert!(docs
+        .get("tsd.counters", "cron/runs")
+        .await
+        .unwrap()
+        .is_some());
 
     let requests = [
         json!({"op":"get","collection":"tsd.counters","id":"other/runs"}),

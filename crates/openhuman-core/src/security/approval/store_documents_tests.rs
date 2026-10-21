@@ -1,13 +1,14 @@
 use super::*;
+use crate::storage::{test_support::memory_backend, Scope, StorageBackend};
 use chrono::{Duration, Timelike};
-use tinystoragedrivers::{MemoryStorage, Scope, StorageBackend};
 
-fn docs_in(storage: &MemoryStorage, scope: &str) -> Docs {
+fn docs_in(storage: &dyn StorageBackend, scope: &str) -> Docs {
     Docs::new(&storage.for_scope(&Scope::new(scope).unwrap()).unwrap())
 }
 
 fn docs() -> Docs {
-    docs_in(&MemoryStorage::new(), "local")
+    let storage = memory_backend();
+    docs_in(storage.as_ref(), "local")
 }
 
 fn pending(id: &str, created_secs_ago: i64, expires_in: Option<i64>) -> PendingApproval {
@@ -61,18 +62,16 @@ fn a_request_is_decided_exactly_once() {
         store.get_decision("r").unwrap(),
         Some(ApprovalDecision::ApproveOnce)
     );
-    assert!(
-        store
-            .decide("missing", ApprovalDecision::Deny)
-            .unwrap()
-            .is_none()
-    );
+    assert!(store
+        .decide("missing", ApprovalDecision::Deny)
+        .unwrap()
+        .is_none());
     assert!(store.list_pending().unwrap().is_empty());
 }
 
 #[test]
 fn concurrent_deciders_never_both_win() {
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let store = docs_in(&storage, "local");
     store
         .insert_pending(&pending("race", 0, None), "s")
@@ -144,22 +143,18 @@ fn execution_is_recorded_after_a_decision_and_only_once() {
     );
     store.decide("r", ApprovalDecision::ApproveOnce).unwrap();
     let long = format!("token=sk-abcdefghijklmnopqrstuvwxyz {}", "e".repeat(800));
-    assert!(
-        store
-            .record_execution("r", ExecutionOutcome::Failure, Some(&long))
-            .unwrap()
-    );
+    assert!(store
+        .record_execution("r", ExecutionOutcome::Failure, Some(&long))
+        .unwrap());
     assert!(
         !store
             .record_execution("r", ExecutionOutcome::Success, None)
             .unwrap(),
         "the first outcome wins"
     );
-    assert!(
-        !store
-            .record_execution("missing", ExecutionOutcome::Success, None)
-            .unwrap()
-    );
+    assert!(!store
+        .record_execution("missing", ExecutionOutcome::Success, None)
+        .unwrap());
     let stored = store
         .run(|docs| async move { docs.get(APPROVALS, "r").await })
         .unwrap()
@@ -269,17 +264,16 @@ fn flow_trust_grants_list_and_revoke() {
 
 #[test]
 fn scopes_keep_users_apart() {
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let alice = docs_in(&storage, "alice");
     let bob = docs_in(&storage, "bob");
     alice.insert_pending(&pending("r", 0, None), "s").unwrap();
     alice.insert_flow_trust("flow-1", "shell").unwrap();
     assert!(bob.list_pending().unwrap().is_empty());
-    assert!(
-        bob.decide("r", ApprovalDecision::ApproveOnce)
-            .unwrap()
-            .is_none()
-    );
+    assert!(bob
+        .decide("r", ApprovalDecision::ApproveOnce)
+        .unwrap()
+        .is_none());
     assert!(!bob.is_flow_tool_trusted("flow-1", "shell").unwrap());
     assert_eq!(alice.list_pending().unwrap().len(), 1);
 }
@@ -330,12 +324,10 @@ fn sub_second_timestamps_order_and_expire_on_time() {
     let mut p = pending("late", 0, None);
     p.expires_at = Some(due);
     store.insert_pending(&p, "s").unwrap();
-    assert!(
-        store
-            .expire_stale(whole + Duration::milliseconds(100))
-            .unwrap()
-            .is_empty()
-    );
+    assert!(store
+        .expire_stale(whole + Duration::milliseconds(100))
+        .unwrap()
+        .is_empty());
     assert_eq!(store.expire_stale(due).unwrap().len(), 1);
 }
 
@@ -369,12 +361,10 @@ fn expiry_is_compared_in_epoch_milliseconds() {
     let mut p = pending("tight", 0, None);
     p.expires_at = Some(due);
     store.insert_pending(&p, "s").unwrap();
-    assert!(
-        store
-            .expire_stale(whole + Duration::milliseconds(2))
-            .unwrap()
-            .is_empty()
-    );
+    assert!(store
+        .expire_stale(whole + Duration::milliseconds(2))
+        .unwrap()
+        .is_empty());
     assert_eq!(store.expire_stale(due).unwrap().len(), 1);
 }
 

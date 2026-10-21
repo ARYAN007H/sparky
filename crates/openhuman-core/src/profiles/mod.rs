@@ -38,14 +38,16 @@ pub mod ops;
 mod recovery;
 pub mod registry;
 mod storage_schema;
-pub(crate) use storage_schema::{collection_specs, upgrade_lease_records, upgrade_records};
+pub(crate) use storage_schema::collection_specs;
+#[cfg(feature = "legacy-import")]
+pub(crate) use storage_schema::{upgrade_lease_records, upgrade_records};
 pub mod schemas;
 pub mod surface;
 pub mod tools;
 pub mod turn_gate;
 pub mod types;
 
-pub use host::{current, Profile, ProfileHost};
+pub use host::{Profile, ProfileHost, current};
 pub use layout::ProfileLayout;
 pub use lease::OpenError;
 pub use registry::ProfileRegistry;

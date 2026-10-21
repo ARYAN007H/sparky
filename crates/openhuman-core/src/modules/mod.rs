@@ -118,7 +118,7 @@ mod storage_import_tinymcp;
 #[cfg(all(feature = "modules", feature = "web3", feature = "legacy-import"))]
 mod storage_import_tinywallet;
 #[cfg(feature = "modules")]
-pub(crate) mod storage_queue_manifest;
+pub mod storage_queue_manifest;
 pub mod tinybox;
 pub(crate) mod tinyflows;
 #[cfg(feature = "modules")]

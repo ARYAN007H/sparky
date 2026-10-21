@@ -739,7 +739,6 @@ pub(crate) fn saas_outcome_with(
         ctx, tool_name,
     )))
 }
-
 /// Maps a SaaS gate verdict to a [`GateOutcome`].
 pub(crate) fn saas_outcome(verdict: Result<(), String>) -> GateOutcome {
     match verdict {

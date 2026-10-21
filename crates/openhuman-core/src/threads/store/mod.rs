@@ -34,7 +34,9 @@ pub mod blocking;
 mod bus;
 mod legacy_import;
 mod storage_schema;
-pub(crate) use storage_schema::{collection_specs, upgrade_records};
+pub(crate) use storage_schema::collection_specs;
+#[cfg(feature = "legacy-import")]
+pub(crate) use storage_schema::upgrade_records;
 #[cfg(test)]
 #[path = "legacy_import_tests.rs"]
 mod legacy_import_tests;
@@ -69,15 +71,15 @@ impl From<types::ConversationPurgeStats> for ConversationPurgeStats {
 pub(crate) use bus::claim_channel_turn;
 pub use bus::register_conversation_persistence_subscriber;
 pub use store::{
-    append_message, delete_messages_from, delete_thread, ensure_thread, list_threads,
-    purge_threads, update_message, update_thread_labels, update_thread_title,
-    update_thread_working_dir, ConversationStore,
+    ConversationStore, append_message, delete_messages_from, delete_thread, ensure_thread,
+    list_threads, purge_threads, update_message, update_thread_labels, update_thread_title,
+    update_thread_working_dir,
 };
 pub(crate) use transcript_key::bind_transcript_key;
 pub use types::{
-    is_deterministic_message_id, reply_run_id, run_reply_message_id, ConversationThread,
-    CreateConversationThread, CrossThreadHit, ThreadMessage as ConversationMessage,
-    ThreadMessagePatch as ConversationMessagePatch,
+    ConversationThread, CreateConversationThread, CrossThreadHit,
+    ThreadMessage as ConversationMessage, ThreadMessagePatch as ConversationMessagePatch,
+    is_deterministic_message_id, reply_run_id, run_reply_message_id,
 };
 
 /// A thread's messages without artifact rows. Artifact rows place artifact

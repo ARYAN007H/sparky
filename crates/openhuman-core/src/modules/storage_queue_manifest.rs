@@ -7,10 +7,15 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use tinystoragedrivers_types::QueueSpec;
 
-/// A validated version-1 queue manifest supplied by the host.
+/// A version-1 queue manifest supplied by the host.
+///
+/// This type is public because it appears in the public `StorageGrant` and
+/// inbound settings contracts. [`QueueManifest::from_json`] parses and
+/// validates it; values deserialized through Serde directly should be checked
+/// with [`QueueManifest::validate`] before use.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct QueueManifest {
+pub struct QueueManifest {
     #[serde(default, rename = "$schema", skip_serializing_if = "Option::is_none")]
     schema: Option<String>,
     version: u32,
@@ -50,7 +55,7 @@ impl QueueDeclaration {
 
 impl QueueManifest {
     /// Parse and validate a manifest. Unknown fields and names fail closed.
-    pub(crate) fn from_json(text: &str) -> Result<Self, String> {
+    pub fn from_json(text: &str) -> Result<Self, String> {
         let mut manifest: Self = serde_json::from_str(text).map_err(|error| error.to_string())?;
         manifest.validate()?;
         manifest
@@ -60,7 +65,7 @@ impl QueueManifest {
     }
 
     /// Validate a value assembled by host code.
-    pub(crate) fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), String> {
         if self.version != 1 {
             return Err(format!(
                 "unsupported queue manifest version {}",

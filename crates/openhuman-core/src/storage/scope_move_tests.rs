@@ -3,6 +3,8 @@ use super::*;
 use crate::storage::Precondition;
 #[cfg(feature = "legacy-import")]
 use serde_json::json;
+#[cfg(feature = "legacy-import")]
+use std::io::Read;
 use tinystoragedrivers_testkit::MemoryBackend;
 use tinystoragedrivers_types::Meta;
 
@@ -122,6 +124,241 @@ async fn a_v1_scope_moves_its_documents_streams_and_blobs() {
         .unwrap();
     assert_eq!(again.entries, 0);
     assert_eq!(new.streams().len("journal").await.unwrap(), 2);
+}
+
+#[tokio::test]
+#[cfg(feature = "legacy-import")]
+async fn canonical_cluster_scope_import_converts_profiles_and_leases_in_place() {
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
+    let inventory = crate::storage::import::scope_move::LegacyScopeInventory {
+        scopes: vec!["cluster".into()],
+        documents: vec![
+            crate::storage::import::scope_move::LegacyDocument {
+                scope: "cluster".into(),
+                collection: "profiles".into(),
+                id: "alice".into(),
+                body: json!({
+                    "profile_id": "alice",
+                    "created_at": 1_700_000_000_i64,
+                    "layout_version": 3
+                }),
+                meta: Meta {
+                    created_ms: 10,
+                    updated_ms: 11,
+                    ..Meta::default()
+                },
+            },
+            crate::storage::import::scope_move::LegacyDocument {
+                scope: "cluster".into(),
+                collection: "leases".into(),
+                id: "alice".into(),
+                body: json!({
+                    "owner": "worker-a",
+                    "epoch": 8,
+                    "expires_at_ms": 9_000,
+                    "endpoint": "https://worker.example",
+                    "released": false
+                }),
+                meta: Meta {
+                    schema: 2,
+                    created_ms: 20,
+                    updated_ms: 21,
+                    expires_ms: Some(10_000),
+                },
+            },
+        ],
+        ..Default::default()
+    };
+
+    let report = copy_inventory(&backend, &known(), &inventory)
+        .await
+        .unwrap();
+    assert_eq!(report.moved, 1);
+    assert_eq!(report.documents, 2);
+    assert_eq!(report.updated_times_not_restored, 2);
+
+    let cluster = backend
+        .for_scope(&crate::storage::Scope::new("cluster").unwrap())
+        .unwrap();
+    let profile = cluster
+        .documents()
+        .get("profiles.registry", "alice")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        profile.doc,
+        json!({"profile_id":"alice", "layout_version":3})
+    );
+    assert_eq!(profile.meta.created_ms, 1_700_000_000_000);
+
+    let lease_id = crate::storage::schema_support::key_of_parts(["profiles", "alice"]).unwrap();
+    let lease = cluster
+        .documents()
+        .get(crate::storage::lease::LEASE_COLLECTION, &lease_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        lease.doc,
+        json!({"holder":"worker-a", "epoch":8, "expires_ms":9000, "endpoint":"https://worker.example"})
+    );
+    assert_eq!(lease.meta.schema, 2);
+    assert_eq!(lease.meta.created_ms, 20);
+    assert_eq!(lease.meta.expires_ms, Some(10_000));
+
+    let operator = backend.for_scope(&crate::storage::Scope::local()).unwrap();
+    assert!(operator
+        .documents()
+        .get("profiles.registry", "alice")
+        .await
+        .unwrap()
+        .is_none());
+}
+
+#[cfg(feature = "legacy-import")]
+#[test]
+fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
+    use crate::storage::layout::{legacy, Target};
+    use crate::storage::{self, DocumentStoreExt, Precondition, Scope};
+    use tinystoragedrivers::{CollectionSpec, Query};
+
+    let dir = tempfile::tempdir().unwrap();
+    let target = Target::new(dir.path(), "alice");
+    let config_path = target.profile_dir.join("config.toml");
+    let destination_url = format!("sqlite:{}", target.storage_db().display());
+    std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+    std::fs::write(&config_path, "# profile fixture\n").unwrap();
+    let config = crate::config::Config {
+        config_path,
+        workspace_dir: target.files(),
+        storage: crate::config::StorageConfig {
+            url: Some(destination_url.clone()),
+            ..Default::default()
+        },
+        ..crate::config::Config::default()
+    };
+
+    // Use the same v1 SQLite backend and path selected by profile boot, with
+    // an actual persisted owner document in the old profile-qualified scope.
+    let source_url = legacy::v1_url(&target);
+    storage::block_on(async move {
+        let source = storage::open(&source_url).await?;
+        let old_scope = Scope::new("alice~agent").unwrap();
+        let docs = source.for_scope(&old_scope)?.documents().clone();
+        docs.ensure_collection(&CollectionSpec::new("scope_move_fixture"))
+            .await?;
+        docs.put(
+            "scope_move_fixture",
+            "stable-id",
+            json!({"payload":"kept"}),
+            Precondition::Absent,
+        )
+        .await?;
+        Ok::<_, anyhow::Error>(())
+    })
+    .unwrap();
+
+    let source_db = legacy::v1_db(&target);
+    let before = hash_file(&source_db);
+    let destination =
+        crate::storage::test_support::sqlite_backend_in(dir, destination_url).unwrap();
+    let backend = &destination.backend;
+    let _installed =
+        crate::storage::test_support::install_for_test(&destination.url, Arc::clone(backend));
+    let first = crate::storage::import::run_all(backend, &config);
+    let moved = first
+        .iter()
+        .find(|report| report.domain == IMPORT_DOMAIN)
+        .expect("scope move report is part of the boot importer pipeline");
+    assert!(
+        matches!(
+            moved.outcome,
+            Ok(crate::storage::import::Outcome::Imported {
+                found: 1,
+                written: 1
+            })
+        ),
+        "{moved:?}"
+    );
+
+    let destination = backend
+        .for_scope(&scope_for_profile("alice").agent("agent").unwrap())
+        .unwrap();
+    let copied = storage::block_on(async {
+        destination
+            .documents()
+            .query_all("scope_move_fixture", &Query::all())
+            .await
+    })
+    .unwrap();
+    assert_eq!(copied.len(), 1);
+    assert_eq!(copied[0].id, "stable-id");
+    assert_eq!(copied[0].doc, json!({"payload":"kept"}));
+
+    // A completed scope claim prevents a later boot from resurrecting a row
+    // deleted by the current owner, and the source bytes remain untouched.
+    storage::block_on(async {
+        destination
+            .documents()
+            .delete("scope_move_fixture", "stable-id", Precondition::Any)
+            .await
+    })
+    .unwrap();
+    let second = crate::storage::import::run_all(backend, &config);
+    let outcome = second
+        .iter()
+        .find(|report| report.domain == IMPORT_DOMAIN)
+        .unwrap();
+    assert_eq!(
+        outcome.outcome,
+        Ok(crate::storage::import::Outcome::AlreadyDone)
+    );
+    let after = storage::block_on(async {
+        destination
+            .documents()
+            .query_all("scope_move_fixture", &Query::all())
+            .await
+    })
+    .unwrap();
+    assert!(after.is_empty());
+    assert_eq!(hash_file(&source_db), before);
+}
+
+#[test]
+#[cfg(feature = "legacy-import")]
+fn boot_import_reports_no_source_for_a_new_mongodb_target() {
+    let workspace = tempfile::tempdir().unwrap();
+    let config = crate::config::Config {
+        workspace_dir: workspace.path().to_path_buf(),
+        storage: crate::config::StorageConfig {
+            url: Some("mongodb://127.0.0.1/openhuman".into()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    // This is the actual boot importer pipeline. With no legacy SQLite file,
+    // the current destination URL is not evidence of a legacy Mongo source.
+    // No backend is installed and the driver is never opened here.
+    let backend = crate::storage::test_support::memory_backend();
+    let reports = crate::storage::import::run_all(&backend, &config);
+    let report = reports
+        .iter()
+        .find(|report| report.domain == IMPORT_DOMAIN)
+        .expect("scope migration is in the boot importer pipeline");
+    assert_eq!(
+        report.outcome,
+        Ok(crate::storage::import::Outcome::NoSource)
+    );
+}
+
+#[cfg(feature = "legacy-import")]
+fn hash_file(path: &Path) -> Vec<u8> {
+    let mut file = std::fs::File::open(path).unwrap();
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).unwrap();
+    use sha2::Digest;
+    sha2::Sha256::digest(bytes).to_vec()
 }
 
 #[tokio::test]

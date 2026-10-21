@@ -111,7 +111,7 @@ pub(crate) fn import_legacy_into(
         .map_err(|e| format!("{LOG_PREFIX} open the storage scope: {e}"))?;
     let repo = Repo::on(backend, &scope, DOMAIN, super::legacy_import::collections)
         .map_err(|e| format!("{LOG_PREFIX} {e:#}"))?;
-    let store = DriverConversationStore::new(ScopedStorage::new(
+    let _store = DriverConversationStore::new(ScopedStorage::new(
         scoped.clone(),
         AgentScope::new(scope.as_str()).map_err(|e| format!("{LOG_PREFIX} invalid scope: {e}"))?,
     ));

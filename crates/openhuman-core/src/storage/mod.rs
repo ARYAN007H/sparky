@@ -50,6 +50,8 @@ pub mod scope_move;
 pub mod secrets;
 pub mod sessions;
 pub mod state_kv;
+#[cfg(test)]
+pub mod test_support;
 
 pub use scope::{
     ParsedScope, Principal, Scope, Tenant, scope_for_agent, scope_for_module, scope_for_profile,

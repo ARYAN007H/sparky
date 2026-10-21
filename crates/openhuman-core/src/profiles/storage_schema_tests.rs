@@ -1,6 +1,8 @@
 use super::*;
+use crate::storage::test_support::sqlite_backend;
 use serde_json::json;
-use tinystoragedrivers::{MemoryStorage, Meta, Precondition, Scope, StorageBackend};
+use std::sync::Arc;
+use tinystoragedrivers::{Meta, Precondition, Scope};
 
 #[test]
 fn a_registry_row_loses_its_seconds_field_and_keeps_its_creation_time() {
@@ -20,8 +22,10 @@ fn a_registry_row_loses_its_seconds_field_and_keeps_its_creation_time() {
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn migrate_cluster_moves_the_v1_registry_into_the_v2_collection() {
-    let backend = MemoryStorage::new();
+    let fixture = sqlite_backend().unwrap();
+    let backend = Arc::clone(&fixture.backend);
     let scoped = backend.for_scope(&Scope::cluster()).unwrap();
     let docs = scoped.documents();
     docs.ensure_collection(&CollectionSpec::new("profiles"))
@@ -51,13 +55,18 @@ async fn migrate_cluster_moves_the_v1_registry_into_the_v2_collection() {
 
 #[test]
 fn the_schema_composes_under_its_owner() {
-    tinystoragedrivers::schema::Registry::compose([storage_schema()]).unwrap();
+    assert_eq!(
+        collection_specs(),
+        vec![CollectionSpec::new(REGISTRY_COLLECTION)]
+    );
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn migrate_cluster_moves_v1_leases_into_tsd_leases_and_keeps_their_epoch() {
-    use crate::storage::lease::{DocumentLeases, LEASE_OWNER, LeaseStore};
-    let backend = MemoryStorage::new();
+    use crate::storage::lease::{DocumentLeases, LeaseStore, LEASE_OWNER};
+    let fixture = sqlite_backend().unwrap();
+    let backend = Arc::clone(&fixture.backend);
     let scoped = backend.for_scope(&Scope::cluster()).unwrap();
     let docs = scoped.documents();
     docs.ensure_collection(&CollectionSpec::new("leases"))
