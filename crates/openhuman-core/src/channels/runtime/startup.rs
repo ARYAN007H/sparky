@@ -15,10 +15,7 @@ use tinybus::module::{ModuleCallError, ModuleClient};
 
 #[cfg(test)]
 type BeginTypingRefresh = std::sync::Arc<
-    dyn Fn(
-            String,
-            u64,
-        ) -> futures::future::BoxFuture<'static, anyhow::Result<Option<String>>>
+    dyn Fn(String, u64) -> futures::future::BoxFuture<'static, anyhow::Result<Option<String>>>
         + Send
         + Sync,
 >;
