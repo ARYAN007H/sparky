@@ -110,6 +110,7 @@ fn native_usage_round_trip_preserves_submicro_usd_and_charge_state_in_cost_rows(
     const FREE_MODEL: &str = "test-model/submicro-free";
     const UNKNOWN_MODEL: &str = "test-model/submicro-unknown";
     const ESTIMATED_MODEL: &str = "test-model/submicro-estimated";
+    const LEGACY_MODEL: &str = "test-model/submicro-legacy-micros";
 
     let billed = BilledUsage::from_counts(4, 2).with_charged_usd(0.00000042);
     let response = tinyinference_llm::model::response_to_model_response(
@@ -166,6 +167,20 @@ fn native_usage_round_trip_preserves_submicro_usd_and_charge_state_in_cost_rows(
     assert!(!unknown.cost_is_estimate);
     record_provider_usage(&DispatchCtx::ambient(), UNKNOWN_MODEL, &unknown);
 
+    let legacy = tinyinference_llm::model::ModelResponse {
+        usage: Some(tinyinference_llm::usage::Usage {
+            charged_amount: Some(tinyinference_llm::usage::ChargedAmount::usd_micros(42)),
+            ..tinyinference_llm::usage::Usage::new(4, 2)
+        }),
+        ..tinyinference_llm::model::ModelResponse::assistant("legacy usage")
+    };
+    let legacy = tinyinference_llm::usage::usage_info_from_response(&legacy)
+        .expect("legacy micros usage is recovered");
+    assert_eq!(legacy.charged_amount_usd.to_bits(), 0.000042_f64.to_bits());
+    assert!(legacy.charge_reported);
+    assert!(!legacy.cost_is_estimate);
+    record_provider_usage(&DispatchCtx::ambient(), LEGACY_MODEL, &legacy);
+
     record_provider_usage(
         &DispatchCtx::ambient(),
         ESTIMATED_MODEL,
@@ -191,6 +206,9 @@ fn native_usage_round_trip_preserves_submicro_usd_and_charge_state_in_cost_rows(
     let estimated_row = row(ESTIMATED_MODEL);
     assert_eq!(estimated_row.cost_usd.to_bits(), 0.00000037_f64.to_bits());
     assert_eq!(estimated_row.cost_source, CostSource::Estimated);
+    let legacy_row = row(LEGACY_MODEL);
+    assert_eq!(legacy_row.cost_usd.to_bits(), 0.000042_f64.to_bits());
+    assert_eq!(legacy_row.cost_source, CostSource::ProviderCharged);
 }
 
 #[test]
