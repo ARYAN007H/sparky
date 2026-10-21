@@ -88,7 +88,7 @@ async fn run_import(workspace: Option<&std::path::Path>) -> Value {
 #[tokio::test]
 async fn a_real_run_on_an_empty_configured_workspace_reports_each_domain() {
     let result = run_import(None).await;
-    assert_eq!(result["dry_run"], Value::Bool(false));
+    assert_eq!(result["dry_run"], Value::Bool(false), "{result:#}");
     assert!(result["imports"].is_array());
     assert!(result["sources"].is_object());
 }
