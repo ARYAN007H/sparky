@@ -1,6 +1,6 @@
 use super::*;
 use crate::storage::test_support::memory_backend;
-use tinystoragedrivers::Scope;
+use crate::storage::Scope;
 
 fn put_marker(stores: &ReboundSessionStores, backend: &Arc<dyn StorageBackend>) {
     // Opening an agent's stores declares its collections in the backend.

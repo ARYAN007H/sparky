@@ -14,9 +14,7 @@ fn profile() -> ProfileId {
 fn context_with_store() -> (Arc<CoreContext>, Arc<dyn SessionStoreProvider>) {
     let backend = memory_backend();
     let provider: Arc<dyn SessionStoreProvider> = Arc::new(
-        tinyagents_session::DriverSessionStores::new(backend, crate::storage::Scope::local())
-            .unwrap()
-            .recover_on_open(false),
+        crate::storage::sessions::TenantSessionStores::new(backend, false).unwrap(),
     );
     let mut overrides = crate::agent::host_overrides::HostOverrides::default();
     overrides.session_store = Some(Arc::clone(&provider));
