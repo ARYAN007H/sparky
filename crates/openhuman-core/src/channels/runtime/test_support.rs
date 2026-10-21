@@ -24,7 +24,7 @@ use tinychannels_bus::{ChannelMessage, SendMessage};
 use tinychannels_runtime::Channel;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
-use wiremock::matchers::method;
+use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[derive(Debug, Clone)]
@@ -168,9 +168,23 @@ impl LinkedTelegramRuntime {
 pub(crate) async fn linked_telegram_runtime() -> LinkedTelegramRuntime {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
+        .and(path("/bottoken/sendChatAction"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "ok": true,
             "result": true
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/bottoken/sendMessage"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "ok": true,
+            "result": {
+                "message_id": 991,
+                "date": 1,
+                "chat": { "id": 42, "type": "private" },
+                "text": "dispatch ok"
+            }
         })))
         .mount(&server)
         .await;
