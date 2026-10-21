@@ -144,7 +144,12 @@ async fn an_unbound_channel_runs_the_orchestrator() {
         .insert("discord".into(), "some-agent".into());
     let channel = Arc::new(crate::channels::runtime::TestChannel::new("telegram"));
 
-    process_channel_message(context(Arc::clone(&channel), config), message("hello")).await;
+    let mut ctx = context(Arc::clone(&channel), config.clone());
+    let core = Arc::new(CoreContext::for_test_with_config(DomainSet::full(), config));
+    Arc::get_mut(&mut ctx)
+        .expect("the channel context is shared only by this test")
+        .core = Some(Arc::downgrade(&core));
+    process_channel_message(ctx, message("hello")).await;
 
     assert_eq!(
         channel
