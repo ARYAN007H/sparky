@@ -192,3 +192,7 @@ impl StorageEndpoint for DocumentsOnlyEndpoint {
         None
     }
 }
+
+#[cfg(test)]
+#[path = "storage_host_invocation_tests.rs"]
+mod tests;
