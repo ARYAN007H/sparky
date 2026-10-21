@@ -2070,7 +2070,7 @@ async fn provider_error_retry_inner() {
 //     request[2] = vision_agent (inner loop continuation) → DEPTH2_CANARY text
 //     request[3] = orchestrator synthesis
 
-/// Two `spawn_async_subagent` calls issued together really do put two workers
+/// Two `spawn_subagent` calls issued together really do put two workers
 /// in flight: both are dispatched and both run, concurrently.
 ///
 /// This is the surviving half of what `spawn_parallel_agents` used to prove.
@@ -2083,7 +2083,7 @@ async fn provider_error_retry_inner() {
 /// serializes (145-200s gaps between workers).
 ///
 /// The *other* half — both results reaching the user — is deliberately not
-/// asserted here, and not because it stopped mattering. `spawn_async_subagent`
+/// asserted here, and not because it stopped mattering. `spawn_subagent`
 /// returns a task id immediately and results come back through
 /// `orchestration::background_delivery`, which is documented "idle-gated —
 /// never mid-turn" and debounced, i.e. on a LATER system turn. That subsystem
@@ -2118,11 +2118,11 @@ async fn parallel_subagent_fanout_inner() {
     reset_script(vec![
         tool_calls_completion(&[
             (
-                "spawn_async_subagent",
+                "spawn_subagent",
                 json!({ "agent_id": "vision_agent", "prompt": "Find PARALLEL_ALPHA_CANARY" }),
             ),
             (
-                "spawn_async_subagent",
+                "spawn_subagent",
                 json!({ "agent_id": "vision_agent", "prompt": "Find PARALLEL_BETA_CANARY" }),
             ),
         ]),
@@ -5113,7 +5113,7 @@ async fn thread_goal_is_set_read_back_and_completed_across_turns_inner() {
 /// Cancel aborts the detached task, and an aborted future never reaches its own
 /// `Cancelled` branch — so before `AbortReport` the client got no terminal event
 /// and the delegation card spun forever. This drives the production path: a
-/// real `spawn_async_subagent` child held mid-model-call by the canary barrier,
+/// real `spawn_subagent` child held mid-model-call by the canary barrier,
 /// cancelled over the `openhuman.subagent_cancel` JSON-RPC, and observed on the
 /// same SSE stream the app renders from (`subagent_failed` is what settles the
 /// card's row). A second cancel then gets the RPC's "nothing running" answer
@@ -5134,7 +5134,7 @@ async fn cancelling_a_running_background_subagent_settles_it_inner() {
     arm_canary_barrier(&["CANCEL_E2E_CANARY", "CANCEL_E2E_NEVER"]);
     reset_script(vec![
         tool_calls_completion(&[(
-            "spawn_async_subagent",
+            "spawn_subagent",
             json!({ "agent_id": "vision_agent", "prompt": "Find CANCEL_E2E_CANARY" }),
         )]),
         text_completion("Spawned a worker; its result will arrive later."),
