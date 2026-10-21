@@ -2,7 +2,9 @@ use super::*;
 #[cfg(feature = "legacy-import")]
 use serde_json::json;
 #[cfg(feature = "legacy-import")]
-use tinystoragedrivers::{MemoryStorage, Meta, Precondition};
+use crate::storage::{Precondition, Scope};
+use tinystoragedrivers_testkit::MemoryBackend;
+use tinystoragedrivers_types::Meta;
 
 fn known() -> Known {
     Known {
@@ -60,7 +62,7 @@ fn v2_scopes_are_left_alone() {
 #[tokio::test]
 #[cfg(feature = "legacy-import")]
 async fn a_v1_scope_moves_its_documents_streams_and_blobs() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
     let source = "alice~asha";
     let inventory = crate::storage::import::scope_move::LegacyScopeInventory {
         scopes: vec![source.into()],
@@ -124,7 +126,7 @@ async fn a_v1_scope_moves_its_documents_streams_and_blobs() {
 #[tokio::test]
 #[cfg(feature = "legacy-import")]
 async fn a_record_already_in_the_target_wins_a_merge() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
     let target = backend.for_scope(&scope_for_agent("asha")).unwrap();
     target
         .documents()
@@ -160,7 +162,7 @@ async fn a_record_already_in_the_target_wins_a_merge() {
 #[tokio::test]
 #[cfg(feature = "legacy-import")]
 async fn a_timestamped_stream_refuses_a_lossy_move_before_copying_entries() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryBackend::new());
     let inventory = crate::storage::import::scope_move::LegacyScopeInventory {
         scopes: vec!["asha".into()],
         streams: vec![crate::storage::import::scope_move::LegacyStream {
