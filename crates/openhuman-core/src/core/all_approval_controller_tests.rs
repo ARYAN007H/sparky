@@ -58,6 +58,21 @@ fn raw_approval_security_registry_matches_its_independent_contract() {
         .expect("raw approval entries use their declared schemas and runtime decoders");
 
     let schemas: Vec<_> = entries.iter().map(|entry| &entry.schema).collect();
+    for (schema, expected) in schemas.iter().zip([
+        ["agent_id"].as_slice(),
+        ["limit"].as_slice(),
+        ["request_id", "decision", "agent_id"].as_slice(),
+        [].as_slice(),
+        ["flow_id", "tool_names"].as_slice(),
+    ]) {
+        assert_eq!(
+            schema.inputs.iter().map(|field| field.name).collect::<Vec<_>>(),
+            expected,
+            "{}.{} input order",
+            schema.namespace,
+            schema.function
+        );
+    }
     assert_input(
         schemas[0],
         "agent_id",
