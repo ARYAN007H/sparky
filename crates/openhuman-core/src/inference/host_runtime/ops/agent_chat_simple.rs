@@ -6,6 +6,9 @@ use crate::agent_runs::agent_chat::guards::{
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::inference::provider as providers;
+use tinyinference_llm::model::{
+    ChatModel, ModelRequestDefaults, ModelResponse, ProfileOverrideModel,
+};
 
 /// A simplified chat interface that does not update the base configuration.
 pub async fn agent_chat_simple(
@@ -61,15 +64,33 @@ pub async fn agent_chat_simple(
         temperature = effective.default_temperature,
         "[inference] agent_chat_simple invoking crate-native chat model"
     );
-    let run = model.invoke(
-        &(),
-        tinyinference_llm::model::ModelRequest::new(vec![
-            tinyinference_llm::message::Message::user(message.to_string()),
-        ])
-        .with_model(resolved_model.clone())
-        .with_temperature(effective.default_temperature),
-    );
-    let response = run.await.map_err(|e| e.to_string())?.text();
+    let response = simple_chat_with_model(
+        model,
+        resolved_model,
+        effective.default_temperature,
+        message,
+    )
+    .await?
+    .text();
 
     Ok(Outcome::single_log(response, "agent simple chat completed"))
 }
+
+async fn simple_chat_with_model(
+    model: std::sync::Arc<dyn ChatModel<()>>,
+    resolved_model: String,
+    temperature: f64,
+    prompt: &str,
+) -> Result<ModelResponse, String> {
+    let model: std::sync::Arc<dyn ChatModel<()>> = std::sync::Arc::new(
+        ProfileOverrideModel::new_preserving_profile(model).with_defaults(ModelRequestDefaults {
+            model: Some(resolved_model),
+            temperature: Some(temperature),
+        }),
+    );
+    tinyagents_harness::oneshot::simple_chat(model, Vec::new(), prompt.to_string()).await
+}
+
+#[cfg(test)]
+#[path = "agent_chat_simple_tests.rs"]
+mod tests;

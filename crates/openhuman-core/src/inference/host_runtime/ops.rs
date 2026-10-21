@@ -9,7 +9,6 @@
 mod tests;
 
 mod agent_chat_simple;
-mod complete_once;
 mod runtime_ops;
 
 pub use crate::agent_runs::agent_chat::{
@@ -17,10 +16,6 @@ pub use crate::agent_runs::agent_chat::{
     AgentChatEnv, AgentChatReply, AgentChatTarget,
 };
 pub use agent_chat_simple::agent_chat_simple;
-pub use complete_once::{
-    complete_once, complete_once_controlled, complete_once_observed,
-    validate_complete_once_request, CompletionEndpoint,
-};
 pub use runtime_ops::{
     local_ai_prompt, local_ai_status, local_ai_summarize, local_ai_transcribe,
     local_ai_transcribe_bytes, local_ai_tts, local_ai_vision_prompt,
