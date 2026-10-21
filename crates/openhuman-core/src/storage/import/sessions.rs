@@ -111,9 +111,13 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
                 tasks: rows.tasks,
                 tool_effects: rows.tool_effects,
             };
-            let report =
-                crate::storage::block_on(async move { ledger.import_legacy_batch(batch).await })?
-                    .context("[sessions] import sessions.db")?;
+            let report = crate::storage::block_on_anyhow(async move {
+                ledger
+                    .import_legacy_batch(batch)
+                    .await
+                    .map_err(|error| anyhow::anyhow!("{error}"))
+            })
+            .context("[sessions] import sessions.db")?;
             let (database_found, database_written) = database_totals(&report);
             found += database_found;
             written += database_written;

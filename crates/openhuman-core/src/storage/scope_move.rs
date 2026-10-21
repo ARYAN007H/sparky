@@ -17,6 +17,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use anyhow::Context;
 use sha2::Digest;
 use tinystoragedrivers_types::{Capability, CollectionSpec, ErrorKind, WriteOptions};
 
