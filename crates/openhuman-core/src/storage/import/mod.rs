@@ -22,7 +22,7 @@
 //!   so a record that already exists in the backend (a resumed import, or one
 //!   the new code has since changed) is never overwritten.
 //! - **Runs once.** After a domain's documents are written, the importer is
-//!   recorded as done in `tsd.migrations` of the backend's local scope
+//!   recorded as done in `storage.import_state` of the backend's tenant scope
 //!   ([`super::import_state`], step `storage_import/<domain>@<workspace
 //!   digest>`). A later boot sees it and does nothing, so a record deleted
 //!   since is not resurrected from the untouched legacy file. A marker row an
@@ -43,8 +43,8 @@
 //!
 //! # What is not here
 //!
-//! Sessions, transcripts, turn states and the run ledger are read by
-//! TinyAgents' importer, which owns those formats; see [`sessions`]. The
+//! Sessions, transcripts, turn states and the run ledger are decoded by the
+//! host's read-only compatibility importer; see [`sessions`]. The
 //! tinyflows stores (cron jobs, the flow catalog and checkpoints) are copied
 //! with `tinyflows-import`; see [`tinyflows`].
 
