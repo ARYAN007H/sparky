@@ -95,11 +95,7 @@ async fn the_same_agent_key_is_isolated_between_operator_and_profile_scopes() {
         Some(serde_json::json!("alice"))
     );
     assert_eq!(
-        escaped_profile
-            .kv
-            .get("scope-test", "owner")
-            .await
-            .unwrap(),
+        escaped_profile.kv.get("scope-test", "owner").await.unwrap(),
         Some(serde_json::json!("escaped"))
     );
 }
