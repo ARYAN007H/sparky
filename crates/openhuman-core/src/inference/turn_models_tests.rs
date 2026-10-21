@@ -334,7 +334,7 @@ async fn injected_turn_profile_is_authoritative_and_skips_unselected_routes() {
     );
     let mut profile = ModelProfile::default();
     profile.provider = Some("ollama:injected".into());
-    profile.tool_calling = true;
+    profile.tool_calling = false;
     profile.modalities.image_in = true;
     profile.max_input_tokens = Some(123_456);
     let mut overrides = HostOverrides::default();
@@ -356,11 +356,60 @@ async fn injected_turn_profile_is_authoritative_and_skips_unselected_routes() {
         .expect("host injected model builds");
 
     assert_eq!(models.provider_id(), "ollama:injected");
-    assert!(models.native_tools());
+    assert!(!models.native_tools());
     assert!(models.supports_vision());
     assert!(models.is_local());
     assert_eq!(models.context_window(), Some(123_456));
     assert_eq!(builds.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn injected_turn_without_profile_keeps_conservative_capabilities() {
+    use crate::agent::host_overrides::HostOverrides;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    use crate::core::types::HostKind;
+
+    struct ProfilelessModel;
+    #[async_trait]
+    impl ChatModel<()> for ProfilelessModel {
+        async fn invoke(
+            &self,
+            _state: &(),
+            _request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            Ok(ModelResponse::assistant("profileless"))
+        }
+    }
+
+    let root = CoreContext::for_test_with_host_kind(
+        HostKind::Library,
+        DomainSet::full(),
+        None,
+    );
+    let mut overrides = HostOverrides::default();
+    overrides.model = Some(Arc::new(ProfilelessModel));
+    let context = root.derive_with(
+        ContextOverlay::new(
+            crate::config::Config {
+                chat_provider: Some("openhuman".into()),
+                ..Default::default()
+            },
+            DomainSet::full(),
+            Default::default(),
+        )
+        .host_overrides(Arc::new(overrides)),
+    );
+    let ctx = DispatchCtx::new(context);
+    let models = TurnModelSource::new_crate_native(&ctx, "chat", Arc::new(Default::default()))
+        .build("hint:chat", 0.2, None, None)
+        .expect("profileless host-injected model builds");
+
+    assert_eq!(models.provider_id(), "injected");
+    assert!(!models.native_tools());
+    assert!(!models.supports_vision());
+    assert!(!models.is_local());
+    assert_eq!(models.context_window(), None);
+    assert!(models.primary.profile().is_none());
 }
 
 #[tokio::test]

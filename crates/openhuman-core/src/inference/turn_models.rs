@@ -494,11 +494,6 @@ impl TurnModelSource {
             let host_injected = ctx
                 .host_overrides()
                 .and_then(|overrides| overrides.model_for(&cn.role));
-            #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
-            let injected = host_injected
-                .or_else(crate::inference::provider::factory::test_provider_override::current);
-            #[cfg(not(any(test, feature = "e2e-test-support", feature = "rss-bench")))]
-            let injected = host_injected;
             let injected_profile = host_injected.as_ref().and_then(|model| model.profile());
             let provider_string = cn.primary_override.clone().unwrap_or_else(|| {
                 crate::inference::provider::provider_for_role(&cn.role, &cn.config)
