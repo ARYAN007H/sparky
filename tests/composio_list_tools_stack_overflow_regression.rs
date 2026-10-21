@@ -21,7 +21,7 @@
 //!   ← Config::load_or_init_with_env_lookup
 //!   ← config::ops::load_config_with_timeout
 //!   ← ComposioListToolsTool::execute
-//!   ← subagent_runner::run_inner_loop / run_typed_mode / run_subagent
+//!   ← subagent runner inner loop / run_typed_mode / direct child host
 //!   ← SkillDelegationTool::execute   (delegate_to_integrations_agent, since removed)
 //!   ← Agent::execute_tool_call / execute_tools / turn
 //!   ← web_chat::run_chat_task
@@ -55,7 +55,7 @@
 //! rebuild the upper chat-channel layers (`web_chat::
 //! run_chat_task → Agent::turn → execute_tools → <delegation tool>`)
 //! without standing up an HTTP + Socket.IO stack. We drive the production
-//! path from `run_subagent` downward — i.e. everything below a delegation
+//! path from direct child execution downward — i.e. everything below a delegation
 //! tool's `execute` — on a small tokio worker stack (`SUBAGENT_TOWER_STACK_BYTES`).
 //!
 //! **Caveat — what this test does and does not catch.** Because the
@@ -70,7 +70,7 @@
 //!   * **What this test does NOT catch:** a re-introduction of the
 //!     specific stack-overflow trigger (re-inlining the TOML parse onto
 //!     the worker). The production crash needed the full tower above
-//!     `run_subagent` to push 2 MB over.
+//!     direct child execution to push 2 MB over.
 //!
 //! The actual stack-overflow fix is in
 //! [`crates/openhuman-core/src/config/schema/load.rs`](`parse_config_with_recovery`)
@@ -93,7 +93,7 @@
 //!     frame growth in the tower is caught long before it threatens production,
 //!   * `OPENHUMAN_WORKSPACE` pointed at a tempdir with a representative
 //!     `config.toml` so the TOML parser does real work,
-//!   * `run_subagent` on a test-owned worker exactly like a delegation tool
+//!   * direct child execution on a test-owned worker exactly like a delegation tool
 //!     does, with a stubbed `ChatModel`
 //!     that emits one `composio_list_tools` tool call on iteration 1
 //!     and stops on iteration 2.
@@ -128,7 +128,7 @@ use tinytools_agent::dialect::ToolCallFormat;
 /// `AGENT_WORKER_STACK_BYTES` (16 MiB, which stays the real budget).
 ///
 /// Measured in an unoptimised build (#6379): before the async-frame work the
-/// sub-agent tower (`run_subagent` → `run_subagent_direct` → config load →
+/// sub-agent tower (direct host lifecycle → child execution → config load →
 /// `Config::save`) needed between 3.5 and 4 MiB; it overflowed at 3 MiB. It
 /// now peaks near 1.6 MiB (passes at 1664 KiB, overflows at 1536 KiB). 3 MiB
 /// leaves ~85% headroom for unrelated growth while still failing on the old
@@ -399,7 +399,7 @@ async fn drive_subagent() {
         .expect("vision worker built-in must exist")
         .clone();
     // Give the worker a test-owned identity and a narrow, neutral surface.
-    // Inherit keeps the stub model above on the real run_subagent path.
+    // Inherit keeps the stub model above on the direct child host path.
     def.id = "stack_regression_worker".into();
     def.display_name = Some("Stack regression worker".into());
     def.when_to_use = "Read the supplied request for this stack regression.".into();
