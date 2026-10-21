@@ -59,6 +59,11 @@ jobs:
     # Sequential diagnostic validation plus cache save already took 118 min
     # before seven coverage suites could execute; reserve a complete-run budget.
     timeout-minutes: 180
+    env:
+      # One line per compile (outcome, crate, time, why not stored): ranks the
+      # misses and the not-cacheable compiles. Copied to ci-out/tinymold.log by
+      # "Record cache statistics" below and uploaded with the lane logs.
+      TINYMOLD_LOG: ${{ runner.temp }}/tinymold.log
     steps:
       - name: Checkout PR merge commit
         uses: tinyhumansai/.github/actions/checkout@35fa65b76c80d48779592b111837e55d9d0860d4
