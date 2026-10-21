@@ -166,9 +166,9 @@ async fn report_options_parse_before_dispatch_config_and_models_gate_before_pars
         .invoke(ctx, malformed.clone())
         .await
         .expect_err("config gate runs before model parameter parsing");
-    assert!(
-        gate_error.contains("is a directory") || gate_error.contains("not a file"),
-        "models config gate error: {gate_error}"
+    assert_eq!(
+        gate_error,
+        "The selected profile config is missing or invalid."
     );
     assert!(!gate_error.starts_with("invalid 'use_cache':"));
 
