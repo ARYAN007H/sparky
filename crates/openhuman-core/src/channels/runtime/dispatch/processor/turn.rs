@@ -6,7 +6,8 @@ use crate::channels::context::{is_context_window_overflow_error, ChannelRuntimeC
 use crate::channels::routes::get_or_create_turn_model_source;
 use crate::channels::routes::{get_route_selection, handle_runtime_command_with_reset};
 #[cfg(test)]
-use crate::channels::ChannelSendExt;
+#[cfg(test)]
+use tinychannels_runtime::ChannelSendExt;
 use crate::channels::SendMessage;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;

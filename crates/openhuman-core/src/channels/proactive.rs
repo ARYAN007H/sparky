@@ -17,7 +17,7 @@
 use crate::channels::runtime::ChannelHandle;
 use crate::channels::SendMessage;
 #[cfg(test)]
-use crate::channels::ChannelSendExt;
+use tinychannels_runtime::ChannelSendExt;
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;

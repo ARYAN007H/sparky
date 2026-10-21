@@ -2,7 +2,7 @@
 use crate::channels::capabilities::capabilities_for;
 use crate::channels::runtime::ChannelHandle;
 #[cfg(test)]
-use crate::channels::ChannelSendExt;
+use tinychannels_runtime::ChannelSendExt;
 use crate::channels::SendMessage;
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;

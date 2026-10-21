@@ -12,7 +12,7 @@ pub(crate) mod credentials;
 
 pub use tinychannels_bus::SendMessage;
 #[cfg(test)]
-pub use tinychannels_runtime::{Channel, ChannelSendExt};
+use tinychannels_runtime::Channel;
 
 #[cfg(feature = "channels")]
 pub mod bus;

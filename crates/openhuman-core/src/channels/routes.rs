@@ -4,7 +4,7 @@ use super::context::{ChannelRouteSelection, ChannelRuntimeContext};
 use super::SendMessage;
 use super::runtime::ChannelHandle;
 #[cfg(test)]
-use super::ChannelSendExt;
+use tinychannels_runtime::ChannelSendExt;
 use crate::inference::provider;
 use std::sync::Arc;
 use tinychannels_bus as traits;

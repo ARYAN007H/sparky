@@ -3,7 +3,7 @@ use super::{ProgressiveChannelTransport, ProgressiveOutputObserver};
 
 use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::runtime::dispatch::RuntimeChannelMessage;
-use crate::channels::Channel;
+use tinychannels_runtime::Channel;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 use tinychannels_bus::channel::{

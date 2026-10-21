@@ -22,7 +22,8 @@ use std::sync::Arc;
 use crate::agent::host_agents::HostAgent;
 use crate::channels::context::ChannelRuntimeContext;
 #[cfg(test)]
-use crate::channels::ChannelSendExt;
+#[cfg(test)]
+use tinychannels_runtime::ChannelSendExt;
 use crate::channels::SendMessage;
 use crate::config::Config;
 use crate::core::bus::BUS;
