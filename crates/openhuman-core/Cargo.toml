@@ -113,6 +113,7 @@ tinyagents-graph = { path = "../../vendor/tinyagents/crates/tinyagents-graph", f
 ] }
 tinyagents-registry = { path = "../../vendor/tinyagents/crates/tinyagents-registry" }
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session", features = ["storage-drivers"] }
+tinyagents-storage-kit = { path = "../../vendor/tinyagents/crates/tinyagents-storage-kit" }
 # The storage ports and the URL-to-backend facade (`storage` domain). No driver
 # by default: the `storage-*` features below add them.
 tinystoragedrivers = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2", default-features = false }
