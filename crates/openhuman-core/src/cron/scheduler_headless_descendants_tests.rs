@@ -111,10 +111,18 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
         super::super::agent_run::run_agent_job_for_run(&dispatch, &config, &job, "cron-run-test")
             .await
     });
-    tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx)
-        .await
-        .expect("the scheduled child reaches its model")
-        .expect("child-start observation remains connected");
+    match tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx).await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => panic!("child-start observation disconnected: {error}"),
+        Err(_) => {
+            model.child_release.notify_one();
+            let result = tokio::time::timeout(std::time::Duration::from_secs(5), run).await;
+            panic!(
+                "scheduled child never reached its model (spawn calls: {}); run result: {result:?}",
+                model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst)
+            );
+        }
+    }
     model.child_release.notify_one();
 
     let (success, output, error) = run.await.expect("cron runner task");
