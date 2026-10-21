@@ -1,3 +1,5 @@
+#![cfg(feature = "storage-sqlite")]
+
 use super::*;
 use crate::storage::test_support::{sqlite_backend, SqliteBackend};
 use tinyagents_harness::events::{AgentEvent, EventSink, HarnessRunStatus};
@@ -163,7 +165,7 @@ async fn maintenance_deletes_a_sealed_journal_after_the_configured_retention() {
     let storage = backend.for_scope(&Scope::local()).unwrap();
     assert!(storage
         .streams()
-        .info(&format!("{JOURNAL_STREAM}/run.old"))
+            .info(&format!("{}run.old", DriverAppendStore::JOURNAL_PREFIX))
         .await
         .unwrap()
         .is_none());
@@ -217,7 +219,7 @@ async fn dormant_or_expired_profile_fences_receive_no_journal_maintenance_writes
     let profile_journal = journal_in_scope(&backend, &profile_scope);
     seed(&profile_journal, "run.foreign", 1).await;
     profile_journal.seal_run("run.foreign").await.unwrap();
-    let stream = format!("{JOURNAL_STREAM}/run.foreign");
+    let stream = format!("{}run.foreign", DriverAppendStore::JOURNAL_PREFIX);
     let sealed_at = backend
         .for_scope(&profile_scope)
         .unwrap()
