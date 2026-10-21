@@ -738,8 +738,7 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
             .any(|part| {
                 part["kind"] == "voice"
                     && part["voice"]["kind"] == "media"
-                    && part["voice"]["media"]["opaqueId"]
-                        == "media:tenant7/thread42/voice1"
+                    && part["voice"]["media"]["opaqueId"] == "media:tenant7/thread42/voice1"
             })
     );
     let expected_channel_ref = serde_json::to_value(&channel).expect("expected channel ref");
