@@ -8,7 +8,8 @@ pub(crate) mod remote_control;
 pub(crate) mod voice;
 
 pub(crate) use adapters::{ConfigAllowlistStore, OpenHumanEventSink};
-pub use channel_events::{ChannelApprovalSurfaceSubscriber, ChannelTurnStateSubscriber};
+pub(crate) use channel_events::ChannelApprovalSurfaceSubscriber;
+pub use channel_events::ChannelTurnStateSubscriber;
 
 #[cfg(test)]
 #[path = "host_tests.rs"]

@@ -12,14 +12,14 @@ use tinybus::EventHandler;
 use tinychannels_bus::{approvals::ReplyContext, ChannelMessage};
 
 /// Captures the account configuration and reply addresses used by approvals.
-pub struct ChannelApprovalSurfaceSubscriber {
+pub(crate) struct ChannelApprovalSurfaceSubscriber {
     channels: Arc<HashMap<String, Arc<ChannelHandle>>>,
     replies: Mutex<HashMap<String, ReplyContext>>,
     config: Option<Arc<crate::config::Config>>,
     cancellation: tokio_util::sync::CancellationToken,
 }
 impl ChannelApprovalSurfaceSubscriber {
-    pub fn with_config(
+    pub(crate) fn with_config(
         channels: Arc<HashMap<String, Arc<ChannelHandle>>>,
         config: Arc<crate::config::Config>,
     ) -> Self {
@@ -31,7 +31,7 @@ impl ChannelApprovalSurfaceSubscriber {
         }
     }
     #[cfg(test)]
-    pub fn new(channels: Arc<HashMap<String, Arc<ChannelHandle>>>) -> Self {
+    pub(crate) fn new(channels: Arc<HashMap<String, Arc<ChannelHandle>>>) -> Self {
         Self {
             channels,
             replies: Mutex::new(HashMap::new()),

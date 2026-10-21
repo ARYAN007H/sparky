@@ -33,7 +33,7 @@ fn proactive_approval_gate() -> Option<Arc<crate::security::approval::ApprovalGa
 }
 
 /// Routes proactive messages to the user's preferred channel.
-pub struct ProactiveMessageSubscriber {
+pub(crate) struct ProactiveMessageSubscriber {
     /// External channels (Telegram, Discord, etc.) keyed by name.
     /// Empty in the desktop/web-only runtime.
     channels_by_name: Arc<HashMap<String, Arc<ChannelHandle>>>,
@@ -46,7 +46,7 @@ pub struct ProactiveMessageSubscriber {
 impl ProactiveMessageSubscriber {
     /// Construct with access to the external channels map and a
     /// preferred channel name (from `channels_config.active_channel`).
-    pub fn new(
+    pub(crate) fn new(
         channels_by_name: Arc<HashMap<String, Arc<ChannelHandle>>>,
         active_channel: Option<String>,
     ) -> Self {

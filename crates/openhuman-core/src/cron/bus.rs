@@ -15,12 +15,12 @@ use tinychannels_bus::SendMessage;
 
 /// Subscribes to `CronDeliveryRequested` events and dispatches
 /// the output to the named channel.
-pub struct CronDeliverySubscriber {
+pub(crate) struct CronDeliverySubscriber {
     channels_by_name: Arc<HashMap<String, Arc<ChannelHandle>>>,
 }
 
 impl CronDeliverySubscriber {
-    pub fn new(channels_by_name: Arc<HashMap<String, Arc<ChannelHandle>>>) -> Self {
+    pub(crate) fn new(channels_by_name: Arc<HashMap<String, Arc<ChannelHandle>>>) -> Self {
         Self { channels_by_name }
     }
 }
