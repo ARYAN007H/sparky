@@ -159,10 +159,6 @@ impl RuntimeBuilder {
         // build cannot undo (the stored API key, the host memory engine), so
         // a refused controller extension leaves neither behind. Restorable
         // seams are undone by this guard if the boot below fails.
-        let mut storage_info = super::StorageInfo::describe(
-            self.seams.storage.as_ref(),
-            config.as_ref().unwrap_or(&Config::default()),
-        );
         let mut host_seams = std::mem::take(&mut self.seams);
         if host_seams.storage.is_none() {
             if let Some(config) = &config {
@@ -179,6 +175,11 @@ impl RuntimeBuilder {
         if host_seams.storage.is_none() && matches!(self.workspace, Workspace::Stateless) {
             host_seams.storage = Some(super::StorageSource::Url("memory".into()));
         }
+        let mut storage_info = super::StorageInfo::describe(
+            host_seams.storage.as_ref(),
+            config.as_ref().unwrap_or(&Config::default()),
+            host_seams.storage_driver.as_deref(),
+        );
         validate_storage_feature(host_seams.storage.as_ref())?;
         host_seams
             .open_storage()
@@ -189,10 +190,13 @@ impl RuntimeBuilder {
             _ => None,
         };
         if self.session_store.is_none() {
-            if let Some(backend) = &storage_backend {
+            if storage_backend.is_some() {
                 let stores = openhuman_core::storage::sessions::TenantSessionStores::new(
                     backend.clone(),
-                    !openhuman_core::storage::driver_is_shared(backend.driver()),
+                    host_seams
+                        .storage_driver
+                        .as_deref()
+                        .is_some_and(|driver| !openhuman_core::storage::driver_is_shared(driver)),
                 )
                 .map_err(|e| RuntimeError::Build(e.into()))?;
                 self.session_store = Some(Arc::new(stores));
@@ -280,11 +284,8 @@ impl RuntimeBuilder {
         let storage_backend = storage_backend.or_else(openhuman_core::storage::installed);
         if !storage_info.configured {
             if let Some(backend) = &storage_backend {
-                storage_info = super::StorageInfo {
-                    source: "backend".into(),
-                    driver: Some(backend.driver().into()),
-                    configured: true,
-                };
+                let installed_url = openhuman_core::storage::installed_url();
+                storage_info = super::StorageInfo::backend(installed_url.as_deref());
             }
         }
 
