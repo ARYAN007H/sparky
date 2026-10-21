@@ -120,7 +120,9 @@ fn raw_approval_security_registry_matches_its_independent_contract() {
         ("state", "ApprovalGateBootState", true),
         ("result", "FlowPreauthorizationResult", true),
     ];
-    for (schema, (name, reference, required)) in schemas.iter().zip(outputs) {
+    for (index, (schema, (name, reference, required))) in
+        schemas.iter().zip(outputs).enumerate()
+    {
         assert_eq!(
             schema.outputs.len(),
             1,
@@ -131,7 +133,15 @@ fn raw_approval_security_registry_matches_its_independent_contract() {
         let output = &schema.outputs[0];
         assert_eq!(output.name, name);
         assert_eq!(output.required, required);
-        assert!(matches!(&output.ty, TypeSchema::Ref(actual) if *actual == reference));
+        if index < 2 {
+            assert!(matches!(
+                &output.ty,
+                TypeSchema::Array(inner)
+                    if matches!(inner.as_ref(), TypeSchema::Ref(actual) if *actual == reference)
+            ));
+        } else {
+            assert!(matches!(&output.ty, TypeSchema::Ref(actual) if *actual == reference));
+        }
     }
 
     for (entry, extra) in entries.iter().zip([
