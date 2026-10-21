@@ -50,6 +50,9 @@ pub(crate) enum Outcome {
 /// Imports the legacy ledger under `workspace_dir` into the module's scope of
 /// the installed backend.
 pub(crate) async fn import_legacy(ctx: &DispatchCtx, workspace_dir: &Path) -> Result<Outcome> {
+    if support::module_scope(ctx, MODULE_ID)?.is_none() {
+        return Ok(Outcome::NoBackend);
+    }
     let ledger = workspace_dir.join(LEDGER_FILE);
     if !ledger.is_file() {
         return Ok(Outcome::NoSource);

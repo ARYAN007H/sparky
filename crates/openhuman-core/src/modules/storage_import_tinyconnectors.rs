@@ -62,6 +62,9 @@ pub(crate) enum Outcome {
 /// Imports the legacy files under `state_dir` into the module's scope of the
 /// installed backend.
 pub(crate) async fn import_legacy(ctx: &DispatchCtx, state_dir: &Path) -> Result<Outcome> {
+    if support::module_scope(ctx, MODULE_ID)?.is_none() {
+        return Ok(Outcome::NoBackend);
+    }
     let prefs_dir = state_dir.join(PREFS_DIR);
     let triggers_dir = state_dir.join(TRIGGERS_DIR);
     if !prefs_dir.is_dir() && !triggers_dir.is_dir() {

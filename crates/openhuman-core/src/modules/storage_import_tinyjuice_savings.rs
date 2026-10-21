@@ -64,6 +64,9 @@ where
     F: FnOnce(SavingsAggregate) -> Fut + Send + 'static,
     Fut: Future<Output = Result<bool>> + Send + 'static,
 {
+    if support::module_scope(ctx, MODULE_ID)?.is_none() {
+        return Ok(Outcome::NoBackend);
+    }
     if std::fs::symlink_metadata(file).is_err() {
         return Ok(Outcome::NoSource);
     }
