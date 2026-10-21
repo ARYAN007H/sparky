@@ -136,11 +136,7 @@ async fn process_channel_message_sends_typing_before_the_provider_reply() {
         relay_thread: None,
         channels_by_name,
         module_objects: linked.module_objects(),
-        turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
-            Arc::new(SlowModel {
-                delay: Duration::from_millis(20),
-            }),
-        )),
+        turn_model_source: None,
         default_provider: Arc::new("test-provider".to_string()),
         tools_registry: Arc::new(vec![]),
         system_prompt: crate::channels::ChannelSystemPrompt::fixed("test-system-prompt"),
@@ -160,13 +156,12 @@ async fn process_channel_message_sends_typing_before_the_provider_reply() {
         config: None,
         core: None,
     };
-    let _core = crate::channels::runtime::test_support::bind_test_core_context(
-        &mut runtime_ctx,
-        linked.config(),
-    );
-    // Keep the bound core for host policy/config while selecting the injected
-    // model source below, as bespoke test hosts do.
-    runtime_ctx.config = None;
+    let _core =
+        crate::channels::runtime::test_support::bind_test_core_context_with_provider_endpoint(
+            &mut runtime_ctx,
+            linked.config(),
+            &linked.provider_endpoint(),
+        );
     let runtime_ctx = Arc::new(runtime_ctx);
     let configured_account = runtime_ctx
         .channels_by_name
@@ -255,6 +250,23 @@ async fn process_channel_message_sends_typing_before_the_provider_reply() {
         1,
         "the module-backed provider should receive the completed reply; got {requests:?}"
     );
+    let typing_index = requests
+        .iter()
+        .position(|path| path.ends_with("/sendChatAction"))
+        .expect("typing action should precede the model reply");
+    let reply_index = requests
+        .iter()
+        .position(|path| path.ends_with("/sendMessage"))
+        .expect("provider should receive the model reply");
+    assert!(
+        typing_index < reply_index,
+        "typing should precede reply: {requests:?}"
+    );
+    let sent = linked
+        .provider_request_bodies("/bottoken/sendMessage")
+        .await;
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0]["text"], "typing fixture reply");
 }
 
 /// Integration test that proves channel dispatch actually routes through

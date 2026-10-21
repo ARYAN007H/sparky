@@ -234,6 +234,20 @@ pub(crate) async fn linked_telegram_runtime() -> LinkedTelegramRuntime {
         })))
         .mount(&server)
         .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
+            concat!(
+                "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"typing fixture reply\"}}]}\n\n",
+                "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
+                "data: [DONE]\n\n"
+            )
+            .as_bytes()
+            .to_vec(),
+            "text/event-stream",
+        ))
+        .mount(&server)
+        .await;
     let env = crate::config::test_env::EnvVarGuard::locked_async()
         .await
         .with("OPENHUMAN_TELEGRAM_BOT_API_BASE", server.uri());
@@ -283,6 +297,14 @@ pub(crate) fn bind_test_core_context(
     context: &mut crate::channels::context::ChannelRuntimeContext,
     base_config: &crate::config::Config,
 ) -> Arc<crate::core::runtime::CoreContext> {
+    bind_test_core_context_with_provider_endpoint(context, base_config, "http://127.0.0.1:9/v1")
+}
+
+pub(crate) fn bind_test_core_context_with_provider_endpoint(
+    context: &mut crate::channels::context::ChannelRuntimeContext,
+    base_config: &crate::config::Config,
+    provider_endpoint: &str,
+) -> Arc<crate::core::runtime::CoreContext> {
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
 
     let workspace = context.workspace_dir.as_ref().clone();
@@ -296,7 +318,7 @@ pub(crate) fn bind_test_core_context(
             id: format!("p_{slug}_channel_test"),
             slug: slug.into(),
             label: "Channel test provider".into(),
-            endpoint: "http://127.0.0.1:9/v1".into(),
+            endpoint: provider_endpoint.into(),
             default_model: Some("channel-test-model".into()),
             ..Default::default()
         })

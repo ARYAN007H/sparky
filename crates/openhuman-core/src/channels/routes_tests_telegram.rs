@@ -5,6 +5,8 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     let linked = crate::channels::runtime::test_support::linked_telegram_runtime().await;
     let workspace = linked.config().workspace_dir.clone();
     let mut ctx = runtime_context(workspace.clone());
+    let _core =
+        crate::channels::runtime::test_support::bind_test_core_context(&mut ctx, linked.config());
     let channel_state = Arc::new(TestChannel::new("recording"));
     let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
     let sender_key = "telegram_alice_chat-remote";
@@ -32,8 +34,11 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     );
 
     let subscriber = ChannelTurnStateSubscriber::with_config(Arc::new(linked.config().clone()));
-    let event_core =
-        crate::channels::runtime::test_support::bind_test_core_context(&mut ctx, linked.config());
+    let event_core = ctx
+        .core
+        .as_ref()
+        .and_then(std::sync::Weak::upgrade)
+        .expect("the linked route commands and event must share a core scope");
     crate::core::runtime::CoreContext::scope(event_core, async {
         subscriber
             .handle(&DomainEvent::ChannelMessageReceived {
