@@ -100,11 +100,23 @@ impl OpenHumanModelFactory<'_> {
             .as_deref()
             .map(crate::core::runtime::CoreContext::extensions);
         let (model, route_provider, resolved_model) = if let Some(result) =
-            try_create_claude_agent_sdk_chat_model_from_string(role, &provider, self.config, self.egress)
+            prepare_claude_agent_sdk_chat_model(role, &provider, self.config)
         {
-            let model = result?;
-            let concrete = if pin.is_empty() { model.profile().and_then(|p| p.model.clone()).unwrap_or_default() } else { pin.to_owned() };
-            (model, CLAUDE_AGENT_SDK_PROVIDER.to_owned(), concrete)
+            let configured = result?;
+            let concrete = if pin.is_empty() { configured } else { pin.to_owned() };
+            emit_inference_egress(
+                role,
+                &format!("{CLAUDE_AGENT_SDK_PREFIX}{concrete}"),
+                self.egress,
+            );
+            (
+                Arc::new(ClaudeAgentSdkProvider::for_model(
+                    (&self.config.claude_agent_sdk).into(),
+                    concrete.clone(),
+                )) as Arc<dyn ChatModel<()>>,
+                CLAUDE_AGENT_SDK_PROVIDER.to_owned(),
+                concrete,
+            )
         } else if let Some(result) = try_create_claude_code_chat_model_from_string(
             role, &provider, self.config, (!pin.is_empty()).then_some(pin), self.egress,
         ) {
@@ -170,12 +182,9 @@ impl ModelFactory<()> for OpenHumanModelFactory<'_> {
             model: (!route.model.is_empty()).then(|| route.model.clone()),
             temperature: request.opts.temperature,
         };
-        let model = if let Some(profile) = model.profile().cloned() {
-            Arc::new(ProfileOverrideModel::new(model, profile).with_defaults(opts))
-                as Arc<dyn ChatModel<()>>
-        } else {
-            model
-        };
+        let profile = model.profile().cloned().unwrap_or_default();
+        let model = Arc::new(ProfileOverrideModel::new(model, profile).with_defaults(opts))
+            as Arc<dyn ChatModel<()>>;
         Ok((model, route))
     }
 }

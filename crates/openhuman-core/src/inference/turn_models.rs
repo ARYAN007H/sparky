@@ -544,71 +544,45 @@ impl TurnModelSource {
                     cn.config.clone(),
                 ));
             }
-            let managed = cn
-                .primary_override
-                .as_deref()
-                .map(|provider| {
-                    let provider = provider.trim();
-                    provider.is_empty() || provider == "cloud" || provider == "openhuman"
-                })
-                .unwrap_or_else(|| {
-                    crate::inference::provider::factory::resolves_to_managed_backend(
-                        &cn.role, &cn.config,
-                    )
-                });
-            if managed {
-                let resolved_context = cn.ctx().resolved();
-                let extensions = resolved_context
-                    .as_deref()
-                    .map(crate::core::runtime::CoreContext::extensions);
-                return crate::inference::provider::factory::make_openhuman_backend_model_for_thread_in(
-                    extensions,
-                    &cn.role,
-                    &cn.config,
-                    Some(model),
-                    true,
-                    thread_id,
-                    &crate::security::egress::EgressLedger::none(),
-                )
-                .map(|(inner, _)| crate::attachments::provider::wrap(&cn.ctx(), inner, cn.config.clone(), model, "openhuman"));
-            }
-            let built = match cn.primary_override.as_deref() {
-                Some(ps) => {
-                    crate::inference::provider::factory::create_turn_chat_model_from_string(
-                        &cn.ctx(),
-                        &cn.role,
-                        ps,
-                        &cn.config,
-                        model,
-                        temperature,
-                    )
-                }
-                None => crate::inference::provider::factory::create_turn_chat_model(
-                    &cn.ctx(),
-                    &cn.role,
-                    &cn.config,
-                    model,
-                    temperature,
-                ),
+            let ctx = cn.ctx();
+            let egress = crate::security::egress::EgressLedger::per_turn();
+            let factory = crate::inference::provider::factory::OpenHumanModelFactory {
+                ctx: &ctx,
+                config: &cn.config,
+                primary_provider: cn.primary_override.as_deref(),
+                egress: &egress,
+                thread_id,
             };
-            return built.map(|inner| {
-                let provider = inner
-                    .profile()
-                    .and_then(|p| p.provider.as_deref())
-                    .unwrap_or("unknown")
-                    .to_owned();
-                let resolved = inner
-                    .profile()
-                    .and_then(|p| p.model.as_deref())
-                    .unwrap_or(model)
-                    .to_owned();
-                crate::attachments::provider::wrap(
-                    &cn.ctx(),
-                    inner,
-                    cn.config.clone(),
-                    &resolved,
-                    &provider,
-                )
+            let opts = tinyagents_harness::host::BuildOpts {
+                native_tools: true,
+                temperature: Some(temperature),
+                egress_tag: None,
+            };
+            return tinyagents_harness::host::TurnModelSet::<()>::builder(
+                &factory,
+                &factory,
+                &cn.role,
+            )
+            .primary_model_pin(model)
+            .primary_opts(opts.clone())
+            .without_workload_tiers()
+            .summarization(&cn.role, Some(model.to_owned()))
+            .summarization_opts(opts)
+            .build()
+            .map(|built| {
+                built.map_models(|_, inner| {
+                    let profile = inner.profile().cloned().unwrap_or_default();
+                    let provider = profile.provider.as_deref().unwrap_or("unknown");
+                    let resolved = profile.model.as_deref().unwrap_or(model);
+                    crate::attachments::provider::wrap(
+                        &ctx,
+                        inner,
+                        cn.config.clone(),
+                        resolved,
+                        provider,
+                    )
+                })
+                .summarizer()
             });
         }
         Err(anyhow::anyhow!("turn model source is missing a model"))
