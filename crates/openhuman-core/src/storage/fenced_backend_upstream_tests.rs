@@ -350,13 +350,22 @@ async fn driver_refuses_the_write_the_host_check_admitted(shared: Arc<dyn Storag
         .unwrap()
         .unwrap();
     assert_eq!(stored.doc["v"], 1, "the late write did not land");
-    // Latched: every later write is refused before it reaches the driver.
+    // The cached handle remains protected by the driver's condition too.
     assert!(scoped.streams().append("log", json!(1)).await.is_err());
-    assert!(fence.is_fenced());
+    assert_eq!(
+        shared
+            .for_scope(&Scope::new("profile:alice").unwrap())
+            .unwrap()
+            .streams()
+            .len("log")
+            .await
+            .unwrap(),
+        0
+    );
 }
 
 #[tokio::test]
-async fn memory_driver_refuses_a_write_after_a_takeover_the_check_missed() {
+async fn sqlite_driver_refuses_a_write_after_a_takeover_the_check_missed() {
     let backend = shared();
     driver_refuses_the_write_the_host_check_admitted(Arc::clone(&backend.backend)).await;
 }
