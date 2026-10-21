@@ -55,11 +55,20 @@ pub async fn maintain_once(
     now_ms: i64,
 ) -> Result<MaintenanceSummary, crate::storage::StorageError> {
     let retention_ms = u64::from(retention_days).saturating_mul(DAY_MS);
-    let mut summary = MaintenanceSummary::default();
     // Keep these handles alive for the entire pass. An open profile handle
     // keeps its host slot in use, which prevents its lease fence from being
     // retired while this pass writes to that profile's scope.
     let (_hosted_profiles, scopes) = known_scopes()?;
+    maintain_scopes(backend, scopes, retention_ms, now_ms).await
+}
+
+async fn maintain_scopes(
+    backend: &Arc<dyn StorageBackend>,
+    scopes: Vec<Scope>,
+    retention_ms: u64,
+    now_ms: i64,
+) -> Result<MaintenanceSummary, crate::storage::StorageError> {
+    let mut summary = MaintenanceSummary::default();
     for scope in scopes {
         match maintain_scope(backend, &scope, retention_ms, now_ms).await {
             Ok(report) => {
@@ -161,55 +170,55 @@ fn known_scopes(
     }
 
     let now_ms = u64::try_from(chrono::Utc::now().timestamp_millis()).unwrap_or(u64::MAX);
-    let hosted_profiles = crate::profiles::host::host()
+    let profiles = crate::profiles::host::host()
         .map(|host| host.hosted_profiles())
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|profile| profile.lease_fence().check_local(now_ms).is_ok())
-        .collect::<Vec<_>>();
-    let profiles = hosted_profiles
-        .iter()
-        .map(|profile| profile.id.as_str().to_owned())
-        .collect::<BTreeSet<_>>();
+        .unwrap_or_default();
+    let (hosted_profiles, profile_scopes) = profile_scope_snapshot(profiles, now_ms);
+    scopes.extend(profile_scopes);
 
     for (agent, context) in crate::storage::agents::contexts() {
         let dispatch = crate::core::runtime::DispatchCtx::new(context);
         if let Ok(tenant) = dispatch.tenant() {
-            if let Some(profile) = tenant.profile {
-                // A profile context can outlive the host's lease. Only the
-                // captured, currently fenced handles above authorize work.
-                if profiles.contains(&profile) {
-                    scopes.insert(crate::storage::scope_for_profile(&profile));
+            if tenant.profile.is_none() {
+                if let Some(agent) = tenant.agent.or(Some(agent)) {
+                    scopes.insert(crate::storage::scope_for_agent(&agent));
                 }
-            } else if let Some(agent) = tenant.agent.or(Some(agent)) {
-                scopes.insert(crate::storage::scope_for_agent(&agent));
             }
         }
     }
 
-    let bases: Vec<Scope> = if crate::core::runtime::mode::is_saas() {
-        hosted_profiles
-            .iter()
-            .map(|profile| crate::storage::scope_for_profile(profile.id.as_str()))
-            .collect()
-    } else {
-        std::iter::once(Scope::local())
-            .chain(
-                hosted_profiles
-                    .iter()
-                    .map(|profile| crate::storage::scope_for_profile(profile.id.as_str())),
-            )
-            .collect()
-    };
-    scopes.extend(bases.iter().cloned());
-    for base in bases {
+    if !crate::core::runtime::mode::is_saas() {
+        for module in crate::modules::registry::ALL {
+            if let Ok(scope) = Scope::local().module(module.id) {
+                scopes.insert(scope);
+            }
+        }
+    }
+    Ok((hosted_profiles, scopes.into_iter().collect()))
+}
+
+/// Retain only profile handles whose lease is still live and enumerate their
+/// tenant/module scopes. Keeping the handles alive prevents release while the
+/// caller is using those scopes.
+fn profile_scope_snapshot(
+    profiles: Vec<Arc<crate::profiles::Profile>>,
+    now_ms: u64,
+) -> (Vec<Arc<crate::profiles::Profile>>, Vec<Scope>) {
+    let live = profiles
+        .into_iter()
+        .filter(|profile| profile.lease_fence().check_local(now_ms).is_ok())
+        .collect::<Vec<_>>();
+    let mut scopes = BTreeSet::new();
+    for profile in &live {
+        let base = crate::storage::scope_for_profile(profile.id.as_str());
+        scopes.insert(base.clone());
         for module in crate::modules::registry::ALL {
             if let Ok(scope) = base.module(module.id) {
                 scopes.insert(scope);
             }
         }
     }
-    Ok((hosted_profiles, scopes.into_iter().collect()))
+    (live, scopes.into_iter().collect())
 }
 
 /// Retention days from the current config; default when it cannot load.

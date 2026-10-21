@@ -1,10 +1,10 @@
 use super::*;
-use tinyagents_harness::HarnessStatusStore;
 use tinyagents_harness::events::{AgentEvent, EventSink, HarnessRunStatus};
 use tinyagents_harness::ids::{ComponentId, HarnessPhase, RunId};
 use tinyagents_harness::observability::replay::read_run_events_page;
 use tinyagents_harness::observability::{AgentObservation, HarnessEventJournal, StoreEventJournal};
 use tinyagents_harness::store::{AppendStore, DriverAppendStore};
+use tinyagents_harness::HarnessStatusStore;
 use tinystoragedrivers_testkit::memory_backend as test_memory_backend;
 
 fn backend() -> Arc<dyn StorageBackend> {
@@ -12,7 +12,14 @@ fn backend() -> Arc<dyn StorageBackend> {
 }
 
 fn journal(backend: &Arc<dyn StorageBackend>) -> StoreEventJournal<Arc<dyn AppendStore>> {
-    let storage = backend.for_scope(&Scope::local()).unwrap();
+    journal_in_scope(backend, &Scope::local())
+}
+
+fn journal_in_scope(
+    backend: &Arc<dyn StorageBackend>,
+    scope: &Scope,
+) -> StoreEventJournal<Arc<dyn AppendStore>> {
+    let storage = backend.for_scope(scope).unwrap();
     StoreEventJournal::new(
         Arc::new(DriverAppendStore::journal(Arc::clone(storage.streams()))) as Arc<dyn AppendStore>,
     )
@@ -151,14 +158,12 @@ async fn maintenance_deletes_a_sealed_journal_after_the_configured_retention() {
     .unwrap();
     assert_eq!(late.deleted, 1);
     let storage = backend.for_scope(&Scope::local()).unwrap();
-    assert!(
-        storage
-            .streams()
-            .info(&format!("{JOURNAL_STREAM}/run.old"))
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(storage
+        .streams()
+        .info(&format!("{JOURNAL_STREAM}/run.old"))
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
@@ -186,4 +191,73 @@ async fn zero_retention_days_keeps_sealed_journals_forever() {
     .unwrap();
     assert_eq!(summary.deleted, 0);
     assert!(sealed(&backend, "run.keep").await);
+}
+
+#[tokio::test]
+async fn dormant_or_expired_profile_fences_receive_no_journal_maintenance_writes() {
+    let profile_root = tempfile::tempdir().unwrap();
+    let profile_host = crate::profiles::ProfileHost::new(
+        crate::core::runtime::SaasConfig::new(profile_root.path()),
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None),
+    );
+    let profile_id = crate::profiles::ProfileId::for_user(
+        "journal-dormant",
+        crate::profiles::ProfileIdMode::Raw,
+    )
+    .unwrap();
+    profile_host.provision(&profile_id).await.unwrap();
+
+    let backend = backend();
+    let profile_scope = crate::storage::scope_for_profile(profile_id.as_str());
+    let profile_journal = journal_in_scope(&backend, &profile_scope);
+    seed(&profile_journal, "run.foreign", 1).await;
+    profile_journal.seal_run("run.foreign").await.unwrap();
+    let stream = format!("{JOURNAL_STREAM}/run.foreign");
+    let sealed_at = backend
+        .for_scope(&profile_scope)
+        .unwrap()
+        .streams()
+        .info(&stream)
+        .await
+        .unwrap()
+        .unwrap()
+        .sealed_ms
+        .unwrap();
+    let expired_at = sealed_at + DAY_MS as i64 + 1;
+
+    // Provisioned in the registry, but never opened here: it may be leased by
+    // another host, so it must not appear in this process's maintenance pass.
+    let (handles, scopes) = profile_scope_snapshot(profile_host.hosted_profiles(), u64::MAX);
+    assert!(handles.is_empty());
+    assert!(scopes.is_empty());
+    let untouched = maintain_scopes(&backend, scopes, DAY_MS, expired_at)
+        .await
+        .unwrap();
+    assert_eq!(untouched.deleted, 0);
+
+    // Even a previously captured profile handle stops authorizing writes
+    // after its lease fence expires.
+    let opened = profile_host.open(&profile_id).await.unwrap();
+    opened.lease_fence().renewed(0);
+    let (handles, scopes) = profile_scope_snapshot(vec![opened], u64::MAX);
+    assert!(handles.is_empty());
+    assert!(scopes.is_empty());
+    let expired = maintain_scopes(&backend, scopes, DAY_MS, expired_at)
+        .await
+        .unwrap();
+    assert_eq!(expired.deleted, 0);
+    assert!(backend
+        .for_scope(&profile_scope)
+        .unwrap()
+        .streams()
+        .info(&stream)
+        .await
+        .unwrap()
+        .is_some());
+}
+
+#[test]
+fn journal_scope_inventory_excludes_cluster() {
+    let (_profiles, scopes) = known_scopes().unwrap();
+    assert!(!scopes.contains(&Scope::cluster()));
 }
