@@ -325,6 +325,30 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     assert_eq!(hash_file(&source_db), before);
 }
 
+#[test]
+#[cfg(feature = "legacy-import")]
+fn boot_import_reports_no_source_for_a_new_mongodb_target() {
+    let workspace = tempfile::tempdir().unwrap();
+    let config = crate::config::Config {
+        workspace_dir: workspace.path().to_path_buf(),
+        storage: crate::config::StorageConfig {
+            url: Some("mongodb://127.0.0.1/openhuman".into()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    // This is the actual boot importer pipeline. With no legacy SQLite file,
+    // the current destination URL is not evidence of a legacy Mongo source.
+    // No backend is installed and the driver is never opened here.
+    let backend = crate::storage::test_support::memory_backend();
+    let reports = crate::storage::import::run_all(&backend, &config);
+    let report = reports
+        .iter()
+        .find(|report| report.domain == IMPORT_DOMAIN)
+        .expect("scope migration is in the boot importer pipeline");
+    assert_eq!(report.outcome, Ok(crate::storage::import::Outcome::NoSource));
+}
+
 #[cfg(feature = "legacy-import")]
 fn hash_file(path: &Path) -> Vec<u8> {
     let mut file = std::fs::File::open(path).unwrap();

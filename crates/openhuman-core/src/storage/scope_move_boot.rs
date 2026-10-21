@@ -30,15 +30,6 @@ pub fn run_from_config(
     let result = (|| {
         let source = legacy_scope_source(config);
         if !source.is_file() {
-            if let Some(url) = crate::storage::explicit_url(config) {
-                let parsed = crate::storage::StorageUrl::parse(&url)?;
-                if parsed.driver() != "sqlite" {
-                    anyhow::bail!(
-                        "legacy scope inventory source driver `{}` is unsupported; only the configured v1 SQLite source can be read",
-                        parsed.driver()
-                    );
-                }
-            }
             return Ok(crate::storage::import::Outcome::NoSource);
         }
 
