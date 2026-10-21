@@ -495,8 +495,8 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
     // tinymcp: both servers (plus their name claims), the audit log and the
     // env secret, which is never a document.
     let mcp = module_storage(backend.as_ref(), "tinymcp");
-    assert_eq!(count(&mcp, "mcp.servers").await, fixture.mcp_servers);
-    assert_eq!(count(&mcp, "mcp.server_names").await, fixture.mcp_servers);
+    assert_eq!(count(&mcp, "mcp_servers").await, fixture.mcp_servers);
+    assert_eq!(count(&mcp, "mcp_server_names").await, fixture.mcp_servers);
     assert_eq!(
         mcp.streams().len("mcp.audit").await.unwrap(),
         fixture.mcp_audit as u64
