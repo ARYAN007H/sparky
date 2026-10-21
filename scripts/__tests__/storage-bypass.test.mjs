@@ -13,6 +13,7 @@ import {
   ALLOW,
   allowed,
   compare,
+  isTestFile,
   scan,
   withoutAllowed,
 } from "../ci/check-storage-bypass.mjs";
@@ -89,6 +90,19 @@ test("ignores comments and doc lines", () => {
     ].join("\n"),
   );
   assert.deepEqual(found, []);
+});
+
+test("fixture generator scripts are test data writers, not runtime stores", () => {
+  for (const file of [
+    "vendor/tinyagents/crates/tinyagents-tasks/src/storage/fixtures/generate-31cc.rs",
+    "vendor/tinyagents/crates/tinyagents-session/src/run_ledger/drivers/fixtures/generate-31cc.rs",
+  ]) {
+    assert.equal(isTestFile(file), true, file);
+  }
+  assert.equal(
+    isTestFile("vendor/tinyagents/crates/tinyagents-tasks/src/storage/store.rs"),
+    false,
+  );
 });
 
 test("compare reports added and stale sites", () => {
