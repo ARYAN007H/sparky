@@ -6,21 +6,6 @@ use tinyinference_providers::route::{ProviderRoute, RouteKind};
 /// Build the Claude Agent SDK subprocess directly as a crate model. This is a
 /// prompt-guided model: TinyAgents owns its text-tool protocol, while the
 /// provider owns only subprocess transport and NDJSON decoding.
-pub(super) fn prepare_claude_agent_sdk_chat_model(
-    role: &str,
-    provider: &str,
-    config: &Config,
-) -> Option<anyhow::Result<String>> {
-    let model = claude_agent_sdk_model_from_string(provider, config)?;
-    if let Err(error) = enforce_local_only_inference(role, provider) {
-        return Some(Err(error));
-    }
-    if let Err(error) = verify_provider_session(config, provider) {
-        return Some(Err(error));
-    }
-    Some(Ok(model))
-}
-
 pub(super) fn claude_agent_sdk_model_from_string(
     provider: &str,
     config: &Config,

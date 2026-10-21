@@ -57,7 +57,6 @@ pub(crate) use managed_backend::{
 };
 use subprocess_providers::{
     build_claude_code_model, claude_agent_sdk_model_from_string,
-    prepare_claude_agent_sdk_chat_model,
 };
 use tinyinference_providers::route::split_model_and_temperature;
 
