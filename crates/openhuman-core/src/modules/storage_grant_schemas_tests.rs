@@ -48,6 +48,17 @@ fn the_registry_ids_exist() {
     }
 }
 
+#[cfg(feature = "inbound-queues")]
+#[test]
+fn event_queue_grants_use_the_owner_name_from_the_v2_contract() {
+    let row = ROWS
+        .iter()
+        .find(|row| row.module == "tinyeventqueues")
+        .expect("event queue grant is declared");
+    assert_eq!(row.owner, "teq");
+    assert!(!module_collections(row.owner).is_empty());
+}
+
 #[test]
 fn tinymcp_reaches_its_v2_collections_stream_and_secrets() {
     let grant = declared("tinymcp").unwrap();
