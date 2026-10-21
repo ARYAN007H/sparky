@@ -75,6 +75,7 @@ async fn assert_supplied_backend_owns_the_cap_and_fence(
         },
     )
     .await;
+    eprintln!("profile cron update after takeover: {update:?}");
     assert!(
         update
             .as_ref()
