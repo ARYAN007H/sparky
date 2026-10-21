@@ -5,7 +5,9 @@
 //! (it reads through the WAL), to `storage.db.tmp`; the copy is verified table
 //! by table against the source (the driver keeps documents, streams and blobs
 //! in tables, so equal row counts mean equal collection, stream and blob
-//! counts) and only then renamed into place. The source is never modified.
+//! counts) and only then renamed into place. Inventory and copying open the
+//! source read-only. The separate `checkpoint` operation is used by the
+//! destructive layout migration before archiving and deleting the legacy DB.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -143,7 +145,10 @@ pub fn copy(source: &Path, dest: &Path) -> Result<DbCopy, LayoutError> {
 }
 
 /// Checkpoints and truncates the WAL of `path`, so the file set the archive
-/// reads is complete in the `.db` file.
+/// reads is complete in the `.db` file. This deliberately mutates the legacy
+/// database and is only for the layout migration that archives then deletes
+/// that source; callers importing records must use [`table_counts`] and
+/// [`copy`] instead.
 ///
 /// # Errors
 ///
