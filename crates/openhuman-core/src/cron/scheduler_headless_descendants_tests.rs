@@ -4,10 +4,19 @@ use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelRespo
 
 const CHILD_PROMPT: &str = "headless-cron-child-result-marker";
 
+struct ChildInvocationDrop(std::sync::Arc<std::sync::atomic::AtomicBool>);
+
+impl Drop for ChildInvocationDrop {
+    fn drop(&mut self) {
+        self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 struct CronChildModel {
     spawn_calls: std::sync::atomic::AtomicUsize,
     child_calls: std::sync::atomic::AtomicUsize,
     child_effect_denials: std::sync::atomic::AtomicUsize,
+    child_invocation_dropped: std::sync::Arc<std::sync::atomic::AtomicBool>,
     accepted_followups: std::sync::atomic::AtomicUsize,
     child_started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
     child_release: tokio::sync::Notify,
@@ -38,9 +47,6 @@ impl ChatModel<()> for CronChildModel {
                 .child_calls
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             if call == 0 {
-                if let Some(started) = self.child_started.lock().unwrap().take() {
-                    let _ = started.send(());
-                }
                 let mut response = ModelResponse::assistant("");
                 response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
                     "headless-cron-forbidden-effect",
@@ -59,6 +65,12 @@ impl ChatModel<()> for CronChildModel {
                 self.child_effect_denials
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             }
+            if let Some(started) = self.child_started.lock().unwrap().take() {
+                let _ = started.send(());
+            }
+            let _drop = ChildInvocationDrop(std::sync::Arc::clone(
+                &self.child_invocation_dropped,
+            ));
             self.child_release.notified().await;
             return Ok(ModelResponse::assistant("headless-cron-child-result"));
         }
@@ -104,6 +116,9 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
         spawn_calls: std::sync::atomic::AtomicUsize::new(0),
         child_calls: std::sync::atomic::AtomicUsize::new(0),
         child_effect_denials: std::sync::atomic::AtomicUsize::new(0),
+        child_invocation_dropped: std::sync::Arc::new(
+            std::sync::atomic::AtomicBool::new(false),
+        ),
         accepted_followups: std::sync::atomic::AtomicUsize::new(0),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
