@@ -196,8 +196,11 @@ fn install_request_turns_on_the_handle_preview_by_default() {
     assert!(request.options.router_enabled);
     assert!(request.options.ccr_enabled);
     assert!(request.options.repl_handle);
-    // The plain-text copy on disk is opt-in.
-    assert_eq!(request.options.repl_save_dir, None);
+    // The host owns the plain-text copy path; it is not sent over the module bus.
+    assert_eq!(
+        repl_save_dir(&config.workspace_dir),
+        std::path::PathBuf::from(".tokenjuice/repl")
+    );
 }
 
 #[test]
@@ -214,10 +217,7 @@ fn install_request_handle_mode_follows_every_switch_it_needs() {
         config.tokenjuice.repl_save_enabled = true;
         let request = install_request(&config);
         assert!(!request.options.repl_handle);
-        assert_eq!(
-            request.options.repl_save_dir, None,
-            "no handle, so nothing to save a copy of"
-        );
+        assert!(!request.options.repl_handle, "no handle means no copy is written");
     }
 }
 
@@ -227,9 +227,10 @@ fn install_request_saves_a_copy_under_the_workspace_when_asked() {
     config.workspace_dir = std::path::PathBuf::from("/ws");
     config.tokenjuice.repl_save_enabled = true;
     let request = install_request(&config);
+    assert!(request.options.repl_handle);
     assert_eq!(
-        request.options.repl_save_dir,
-        Some(std::path::PathBuf::from("/ws/.tokenjuice/repl"))
+        repl_save_dir(&config.workspace_dir),
+        std::path::PathBuf::from("/ws/.tokenjuice/repl")
     );
 }
 
