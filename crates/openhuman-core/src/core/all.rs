@@ -400,10 +400,10 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         crate::security::all_security_registered_controllers(),
     );
     // Interactive approval workflow (#1339 — gate external-effect tool calls)
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Security,
-        crate::security::approval::all_approval_registered_controllers(),
+        crate::security::approval::schemas::all_approval_controller_entries(),
     );
     // Interactive plan-review gate — parks a live turn on a thread-scoped plan
     push(

@@ -6,7 +6,9 @@
 use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
-use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::all::{
+    BoundRegisteredController, ControllerEntry, ControllerFuture, RegisteredController,
+};
 use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
@@ -45,6 +47,16 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
             schema: schemas("preauthorize_flow"),
             handler: handle_preauthorize_flow,
         },
+    ]
+}
+
+pub(crate) fn all_approval_controller_entries() -> Vec<ControllerEntry> {
+    vec![
+        ControllerEntry::bound(list_pending_controller()),
+        ControllerEntry::bound(list_recent_decisions_controller()),
+        ControllerEntry::bound(decide_controller()),
+        ControllerEntry::bound(get_gate_state_controller()),
+        ControllerEntry::bound(preauthorize_flow_controller()),
     ]
 }
 
@@ -181,8 +193,15 @@ pub fn schemas(function: &str) -> ControllerSchema {
 }
 
 fn handle_list_pending(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    list_pending_controller().invoke(ctx, params)
+}
+
+fn list_pending_controller() -> BoundRegisteredController {
+    BoundRegisteredController::typed(schemas("list_pending"), parse_list_pending, run_list_pending)
+}
+
+fn run_list_pending(ctx: DispatchCtx, agent_id: Option<String>) -> ControllerFuture {
     Box::pin(async move {
-        let agent_id = parse_list_pending(params)?;
         let outcome = approval_rpc::approval_list_pending(&ctx, agent_id.as_deref())
             .await
             .map_err(|e| e.to_string())?;
@@ -191,8 +210,19 @@ fn handle_list_pending(ctx: DispatchCtx, params: Map<String, Value>) -> Controll
 }
 
 fn handle_list_recent_decisions(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    list_recent_decisions_controller().invoke(_ctx, params)
+}
+
+fn list_recent_decisions_controller() -> BoundRegisteredController {
+    BoundRegisteredController::typed(
+        schemas("list_recent_decisions"),
+        parse_list_recent_decisions,
+        run_list_recent_decisions,
+    )
+}
+
+fn run_list_recent_decisions(_ctx: DispatchCtx, limit: Option<usize>) -> ControllerFuture {
     Box::pin(async move {
-        let limit = parse_list_recent_decisions(params)?;
         let outcome = approval_rpc::approval_list_recent_decisions(limit)
             .await
             .map_err(|e| e.to_string())?;
@@ -201,8 +231,15 @@ fn handle_list_recent_decisions(_ctx: DispatchCtx, params: Map<String, Value>) -
 }
 
 fn handle_get_gate_state(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    get_gate_state_controller().invoke(_ctx, params)
+}
+
+fn get_gate_state_controller() -> BoundRegisteredController {
+    BoundRegisteredController::typed(schemas("get_gate_state"), parse_get_gate_state, run_get_gate_state)
+}
+
+fn run_get_gate_state(_ctx: DispatchCtx, _parsed: ()) -> ControllerFuture {
     Box::pin(async move {
-        parse_get_gate_state(params)?;
         let outcome = approval_rpc::approval_get_gate_state()
             .await
             .map_err(|e| e.to_string())?;
@@ -211,8 +248,18 @@ fn handle_get_gate_state(_ctx: DispatchCtx, params: Map<String, Value>) -> Contr
 }
 
 fn handle_decide(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    decide_controller().invoke(ctx, params)
+}
+
+fn decide_controller() -> BoundRegisteredController {
+    BoundRegisteredController::typed(schemas("decide"), parse_decide, run_decide)
+}
+
+fn run_decide(
+    ctx: DispatchCtx,
+    (request_id, decision, agent_id): (String, ApprovalDecision, Option<String>),
+) -> ControllerFuture {
     Box::pin(async move {
-        let (request_id, decision, agent_id) = parse_decide(params)?;
         let outcome =
             approval_rpc::approval_decide(&ctx, request_id.trim(), decision, agent_id.as_deref())
                 .await
@@ -222,8 +269,22 @@ fn handle_decide(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutu
 }
 
 fn handle_preauthorize_flow(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    preauthorize_flow_controller().invoke(_ctx, params)
+}
+
+fn preauthorize_flow_controller() -> BoundRegisteredController {
+    BoundRegisteredController::typed(
+        schemas("preauthorize_flow"),
+        parse_preauthorize_flow,
+        run_preauthorize_flow,
+    )
+}
+
+fn run_preauthorize_flow(
+    _ctx: DispatchCtx,
+    (flow_id, tool_names): (String, Vec<String>),
+) -> ControllerFuture {
     Box::pin(async move {
-        let (flow_id, tool_names) = parse_preauthorize_flow(params)?;
         let outcome = approval_rpc::approval_preauthorize_flow(flow_id.trim(), tool_names)
             .await
             .map_err(|e| e.to_string())?;
