@@ -1,7 +1,7 @@
 //! The per-message pipeline: typing indicator, ACK reaction, durable-session
 //! dispatch through the shared runner, and final reply delivery.
 
-use crate::channels::context::{is_context_window_overflow_error, ChannelRuntimeContext};
+use crate::channels::context::{ChannelRuntimeContext, is_context_window_overflow_error};
 #[cfg(test)]
 use crate::channels::routes::get_or_create_turn_model_source;
 use crate::channels::routes::{get_route_selection, handle_runtime_command_with_reset};
@@ -15,12 +15,12 @@ use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 
 use super::super::helpers::{
-    build_channel_context_block, log_worker_join_result, spawn_typing_task,
-    REPLY_LOG_TRUNCATE_CHARS,
+    REPLY_LOG_TRUNCATE_CHARS, build_channel_context_block, log_worker_join_result,
+    spawn_typing_task,
 };
 use super::super::host_agent::{self, HostRoute};
-use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 use super::RuntimeChannelMessage;
+use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 
 fn channel_inbound_preparation_request(
     source: tinychannels_bus::module_inbound::ChannelInboundSource,
@@ -96,8 +96,7 @@ pub(crate) async fn process_channel_runtime_message(
     let mut envelope = prepared.envelope;
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
     let native_message_input = if typed_envelope_input {
-        match super::native_media::resolve_typed_message(&ctx, &envelope, &prepared.thread_id)
-            .await
+        match super::native_media::resolve_typed_message(&ctx, &envelope, &prepared.thread_id).await
         {
             Ok(input) => input,
             Err(error) => {

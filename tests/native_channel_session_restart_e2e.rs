@@ -145,10 +145,7 @@ async fn send_message(State(state): State<Arc<MockState>>, Json(body): Json<Valu
     Json(json!({ "ok": true, "result": { "message_id": id, "chat": { "id": 42 } } }))
 }
 
-async fn get_file(
-    State(state): State<Arc<MockState>>,
-    Json(body): Json<Value>,
-) -> Json<Value> {
+async fn get_file(State(state): State<Arc<MockState>>, Json(body): Json<Value>) -> Json<Value> {
     let file_id = body
         .get("file_id")
         .and_then(Value::as_str)
@@ -816,7 +813,13 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
     wait_for_media_fetch(&mocks.state, 200, "typed-image-file", "photos/native.png").await;
     wait_for_completion(&mocks.state, 1).await;
     push_media_update(&mocks.state, media_update(201, 21, false, true, None));
-    wait_for_media_fetch(&mocks.state, 201, "typed-document-file", "documents/native.txt").await;
+    wait_for_media_fetch(
+        &mocks.state,
+        201,
+        "typed-document-file",
+        "documents/native.txt",
+    )
+    .await;
     wait_for_completion(&mocks.state, 2).await;
     push_media_update(
         &mocks.state,
@@ -828,7 +831,13 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
         &mocks.state,
         media_update(203, 23, false, true, Some("file caption before media")),
     );
-    wait_for_media_fetch(&mocks.state, 203, "typed-document-file", "documents/native.txt").await;
+    wait_for_media_fetch(
+        &mocks.state,
+        203,
+        "typed-document-file",
+        "documents/native.txt",
+    )
+    .await;
     wait_for_completion(&mocks.state, 4).await;
 
     let requests = mocks

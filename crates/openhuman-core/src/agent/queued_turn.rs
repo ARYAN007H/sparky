@@ -73,7 +73,10 @@ impl std::fmt::Debug for QueuedPayload {
                 "has_pending_attachments",
                 &self.pending_attachments.is_some(),
             )
-            .field("has_native_message_input", &self.native_message_input.is_some())
+            .field(
+                "has_native_message_input",
+                &self.native_message_input.is_some(),
+            )
             .finish_non_exhaustive()
     }
 }

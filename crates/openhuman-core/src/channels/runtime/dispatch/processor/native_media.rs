@@ -1,14 +1,14 @@
 //! Resolve typed native-channel media through TinyChannels' scoped media port.
 
-use tinyinference_llm::message::Message;
-use tinychannels_bus::{
-    module_media::{MediaReadBegin, MediaReadChunk, MediaReadFinish}, ChannelInboundEnvelope,
-    ContentPart, HostVoiceScope, MediaKind, MediaReference,
-};
 use tinybus::module::ModuleClient;
+use tinychannels_bus::{
+    ChannelInboundEnvelope, ContentPart, HostVoiceScope, MediaReference,
+    module_media::{MediaReadBegin, MediaReadChunk, MediaReadFinish},
+};
+use tinyinference_llm::message::Message;
 
 use crate::{
-    channels::context::{module_client, ChannelRuntimeContext},
+    channels::context::{ChannelRuntimeContext, module_client},
     core::runtime::DispatchCtx,
 };
 
@@ -76,7 +76,11 @@ pub(super) async fn resolve_typed_message(
         let (media, image, name) = match part {
             ContentPart::Image { media, .. } => {
                 image_count += 1;
-                (media, true, media.file_name.clone().unwrap_or_else(|| "image".into()))
+                (
+                    media,
+                    true,
+                    media.file_name.clone().unwrap_or_else(|| "image".into()),
+                )
             }
             ContentPart::File {
                 media, file_name, ..
@@ -118,14 +122,21 @@ pub(super) async fn resolve_typed_message(
             image_mb.saturating_mul(1024 * 1024).min(MAX_MEDIA_BYTES)
         } else {
             if max_files == 0 || file_count > max_files {
-                return Err("native file attachments are disabled or exceed their count limit".into());
+                return Err(
+                    "native file attachments are disabled or exceed their count limit".into(),
+                );
             }
             file_mb.saturating_mul(1024 * 1024).min(MAX_MEDIA_BYTES)
         };
         if image_count > max_images {
             return Err("native image attachments exceed their count limit".into());
         }
-        validate_reference(media, image, byte_limit, &config.multimodal_files.allowed_mime_types)?;
+        validate_reference(
+            media,
+            image,
+            byte_limit,
+            &config.multimodal_files.allowed_mime_types,
+        )?;
         let bytes = read_scoped_media(
             &client,
             &dispatch,
@@ -140,11 +151,7 @@ pub(super) async fn resolve_typed_message(
             .as_deref()
             .ok_or_else(|| "native media has no content type".to_owned())?;
         let staged = crate::agent::attachments::store_scoped_channel_media(
-            config,
-            thread_id,
-            &name,
-            mime,
-            &bytes,
+            config, thread_id, &name, mime, &bytes,
         )
         .await
         .map_err(|_| "native media could not be staged safely".to_owned())?;
@@ -185,7 +192,10 @@ fn validate_reference(
     {
         return Err("native media reference is not an opaque module reference".into());
     }
-    if media.size_bytes.is_some_and(|size| size == 0 || size > byte_limit as u64) {
+    if media
+        .size_bytes
+        .is_some_and(|size| size == 0 || size > byte_limit as u64)
+    {
         return Err("native media exceeds its declared byte limit".into());
     }
     let mime = media
@@ -194,7 +204,10 @@ fn validate_reference(
         .filter(|mime| !mime.trim().is_empty())
         .ok_or_else(|| "native media has no content type".to_owned())?;
     if image {
-        if !matches!(mime, "image/png" | "image/jpeg" | "image/webp" | "image/gif") {
+        if !matches!(
+            mime,
+            "image/png" | "image/jpeg" | "image/webp" | "image/gif"
+        ) {
             return Err("native image MIME type is unsupported".into());
         }
     } else if !allowed_file_mimes.iter().any(|allowed| allowed == mime) {
@@ -230,11 +243,15 @@ async fn read_scoped_media(
         || begin.byte_count > MAX_MEDIA_BYTES
         || begin.media.opaque_id != media.opaque_id
         || begin.content_type != media.content_type.as_deref().unwrap_or_default()
-        || media.size_bytes.is_some_and(|size| size != begin.byte_count as u64)
+        || media
+            .size_bytes
+            .is_some_and(|size| size != begin.byte_count as u64)
     {
         return Err("native media read metadata does not match its scoped reference".into());
     }
-    let expected_chunks = begin.byte_count.div_ceil(tinychannels_bus::module_media::MEDIA_READ_CHUNK_BYTES);
+    let expected_chunks = begin
+        .byte_count
+        .div_ceil(tinychannels_bus::module_media::MEDIA_READ_CHUNK_BYTES);
     if begin.chunk_count as usize != expected_chunks {
         return Err("native media read chunk count is invalid".into());
     }

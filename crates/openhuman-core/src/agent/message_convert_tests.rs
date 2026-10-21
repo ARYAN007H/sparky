@@ -38,6 +38,79 @@ fn stored_typed_media_rejects_unresolved_paths() {
 }
 
 #[test]
+fn typed_native_parts_preserve_text_voice_transcript_and_file_order() {
+    let parts = vec![
+        tinychannels_bus::ContentPart::Text {
+            text: "before".into(),
+            markdown_dialect: None,
+        },
+        tinychannels_bus::ContentPart::VoiceNote {
+            voice_note: tinychannels_bus::VoiceNote {
+                transcript: Some(tinychannels_bus::VoiceTranscript {
+                    text: "spoken words".into(),
+                    language: Some("en".into()),
+                    state: tinychannels_bus::VoiceTranscriptState::Complete,
+                    source: tinychannels_bus::VoiceTranscriptSource::Provider,
+                }),
+                ..Default::default()
+            },
+        },
+        tinychannels_bus::ContentPart::File {
+            media: tinychannels_bus::MediaReference {
+                path: Some("uploads/thread/document.txt".into()),
+                content_type: Some("text/plain".into()),
+                ..Default::default()
+            },
+            file_name: Some("document.txt".into()),
+            caption: Some("after voice".into()),
+        },
+    ];
+    let Message::User(user) = user_message_from_parts("", &parts).unwrap() else {
+        panic!("user message expected")
+    };
+    assert!(matches!(&user.content[0], ContentBlock::Text(text) if text == "before"));
+    assert!(matches!(&user.content[1], ContentBlock::Text(text) if text == "spoken words"));
+    assert!(matches!(&user.content[2], ContentBlock::Text(text) if text == "after voice"));
+    assert!(matches!(
+        &user.content[3],
+        ContentBlock::Document(MediaRef::Path { path, .. }) if path == "uploads/thread/document.txt"
+    ));
+}
+
+#[test]
+fn typed_native_parts_reject_unavailable_voice_and_unsupported_audio_video() {
+    let incomplete = tinychannels_bus::ContentPart::VoiceNote {
+        voice_note: tinychannels_bus::VoiceNote {
+            transcript: Some(tinychannels_bus::VoiceTranscript {
+                text: "partial".into(),
+                language: None,
+                state: tinychannels_bus::VoiceTranscriptState::Pending,
+                source: tinychannels_bus::VoiceTranscriptSource::HostStt,
+            }),
+            ..Default::default()
+        },
+    };
+    assert!(user_message_from_parts("", &[incomplete]).is_err());
+
+    let audio = tinychannels_bus::ContentPart::Audio {
+        media: tinychannels_bus::MediaReference::default(),
+        codec: None,
+        duration_ms: None,
+        title: None,
+        transcript: None,
+    };
+    assert!(user_message_from_parts("", &[audio]).is_err());
+
+    let video = tinychannels_bus::ContentPart::Video {
+        media: tinychannels_bus::MediaReference::default(),
+        caption: None,
+        duration_ms: None,
+        thumbnail: None,
+    };
+    assert!(user_message_from_parts("", &[video]).is_err());
+}
+
+#[test]
 fn durable_upload_parts_survive_message_row_replay_without_inline_payloads() {
     let mut text = String::from("Inspect these files");
     for (name, mime) in [
@@ -61,18 +134,21 @@ fn durable_upload_parts_survive_message_row_replay_without_inline_payloads() {
     let Message::User(user) = replay else {
         panic!("user row expected")
     };
-    assert!(user
-        .content
-        .iter()
-        .any(|part| matches!(part, ContentBlock::Audio(MediaRef::Path { .. }))));
-    assert!(user
-        .content
-        .iter()
-        .any(|part| matches!(part, ContentBlock::Video(MediaRef::Path { .. }))));
-    assert!(user
-        .content
-        .iter()
-        .any(|part| matches!(part, ContentBlock::Document(MediaRef::Path { .. }))));
+    assert!(
+        user.content
+            .iter()
+            .any(|part| matches!(part, ContentBlock::Audio(MediaRef::Path { .. })))
+    );
+    assert!(
+        user.content
+            .iter()
+            .any(|part| matches!(part, ContentBlock::Video(MediaRef::Path { .. })))
+    );
+    assert!(
+        user.content
+            .iter()
+            .any(|part| matches!(part, ContentBlock::Document(MediaRef::Path { .. })))
+    );
     assert!(!serde_json::to_string(&row).unwrap().contains("base64"));
 }
 use tinyinference_llm::model::ModelRequest;
@@ -339,10 +415,12 @@ fn reasoning_content_uses_typed_thinking_block_and_round_trips_metadata() {
             ContentBlock::Thinking { text, signature: None } if text == "private thoughts"
         )
     }));
-    assert!(!assistant
-        .content
-        .iter()
-        .any(|block| matches!(block, ContentBlock::ProviderExtension(_))));
+    assert!(
+        !assistant
+            .content
+            .iter()
+            .any(|block| matches!(block, ContentBlock::ProviderExtension(_)))
+    );
 
     let back = message_to_chat_message(&msg).expect("assistant converts");
     assert_eq!(back.content, "visible answer");

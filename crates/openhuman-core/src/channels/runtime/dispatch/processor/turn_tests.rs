@@ -73,18 +73,20 @@ async fn native_inbound_preparation_preserves_image_envelope_for_typed_turns() {
         ),
     )
     .await;
-    assert!(legacy.is_err(), "legacy callers must still reject rich-only input");
+    assert!(
+        legacy.is_err(),
+        "legacy callers must still reject rich-only input"
+    );
 }
 
 #[tokio::test]
 async fn native_typed_preparation_preserves_ordered_voice_and_file_parts() {
     use tinychannels_bus::{
         channel::{
-            ChannelRef, ContentPart, ConversationKind, ConversationRef, MediaKind,
-            MediaReference, SenderRef, VoiceNote, VoiceTranscript, VoiceTranscriptSource,
-            VoiceTranscriptState,
+            ChannelRef, ContentPart, ConversationKind, ConversationRef, MediaKind, MediaReference,
+            SenderRef, VoiceNote, VoiceTranscript, VoiceTranscriptSource, VoiceTranscriptState,
         },
-        module_inbound::{ChannelInboundSource, ChannelInboundPreparationMode},
+        module_inbound::{ChannelInboundPreparationMode, ChannelInboundSource},
     };
 
     let envelope = tinychannels_bus::ChannelInboundEnvelope {
@@ -155,9 +157,18 @@ async fn native_typed_preparation_preserves_ordered_voice_and_file_parts() {
 
     assert_eq!(prepared.envelope, envelope);
     assert_eq!(prepared.message.content, "before\nspoken words\nafter");
-    assert_eq!(prepared.envelope.channel.account_id.as_deref(), Some("work"));
-    assert_eq!(prepared.envelope.conversation.thread_id.as_deref(), Some("thread-3"));
-    assert_eq!(prepared.envelope.conversation.topic_id.as_deref(), Some("topic-4"));
+    assert_eq!(
+        prepared.envelope.channel.account_id.as_deref(),
+        Some("work")
+    );
+    assert_eq!(
+        prepared.envelope.conversation.thread_id.as_deref(),
+        Some("thread-3")
+    );
+    assert_eq!(
+        prepared.envelope.conversation.topic_id.as_deref(),
+        Some("topic-4")
+    );
     assert!(matches!(
         prepared.envelope.parts.get(2),
         Some(ContentPart::File { media, .. }) if media.opaque_id.as_deref() == Some("scoped-file-ref")
