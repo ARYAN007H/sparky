@@ -480,7 +480,11 @@ function assertSelfTests() {
   const policyExport = [{ text: "pub use tinytools::ToolPolicy;" }];
   if (
     !isEmbedContractExport(embedPath, policyExport, 0) ||
-    isEmbedContractExport("crates/openhuman-core/src/lib.rs", policyExport, 0) ||
+    isEmbedContractExport(
+      "crates/openhuman-core/src/lib.rs",
+      policyExport,
+      0,
+    ) ||
     isEmbedContractExport(
       embedPath,
       [{ text: "pub use tinytools::{ToolPolicy, ToolRegistry};" }],
@@ -509,14 +513,20 @@ function assertSelfTests() {
       "agent-runtime boundary self-test: embed tool injection contract must stay exact",
     );
   const stopExport = [
-    { text: "pub use tinyagents_harness::middleware::{StopDecision, StopHook};" },
+    {
+      text: "pub use tinyagents_harness::middleware::{StopDecision, StopHook};",
+    },
   ];
   if (
     !isEmbedContractExport(embedPath, stopExport, 0) ||
     isEmbedContractExport("crates/openhuman-core/src/lib.rs", stopExport, 0) ||
     isEmbedContractExport(
       embedPath,
-      [{ text: "pub use tinyagents_harness::middleware::{StopDecision, StopHook, TurnState};" }],
+      [
+        {
+          text: "pub use tinyagents_harness::middleware::{StopDecision, StopHook, TurnState};",
+        },
+      ],
       0,
     )
   )
