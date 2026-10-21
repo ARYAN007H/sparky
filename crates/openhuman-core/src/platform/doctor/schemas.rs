@@ -2,7 +2,11 @@ use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
-use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::config::Config;
+use crate::core::all::{
+    BoundRegisteredController, ControllerEntry, ControllerFuture, ControllerTask,
+    RegisteredController,
+};
 use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
@@ -21,6 +25,18 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
             handler: handle_models,
         },
     ]
+}
+
+pub(crate) fn all_controller_entries() -> Vec<ControllerEntry> {
+    vec![
+        ControllerEntry::bound(report_controller()),
+        ControllerEntry::bound(models_controller()),
+    ]
+}
+
+#[cfg(test)]
+pub(crate) fn doctor_parameter_contracts() -> Vec<crate::core::all::ControllerParamContract> {
+    tests::doctor_parameter_contracts()
 }
 
 pub fn schemas(function: &str) -> ControllerSchema {
@@ -70,16 +86,39 @@ pub fn schemas(function: &str) -> ControllerSchema {
 }
 
 fn handle_report(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
-        let config = ctx.load_config().await?;
-        to_json(crate::platform::doctor::rpc::doctor_report(&config).await?)
-    })
+    report_controller().invoke(ctx, _params)
 }
 
 fn handle_models(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    models_controller().invoke(ctx, params)
+}
+
+fn report_controller() -> BoundRegisteredController {
+    BoundRegisteredController::after_gate(schemas("report"), load_config, parse_report, run_report)
+}
+
+fn models_controller() -> BoundRegisteredController {
+    BoundRegisteredController::after_gate(schemas("models"), load_config, parse_models, run_models)
+}
+
+fn load_config(ctx: DispatchCtx) -> ControllerTask<Config> {
+    Box::pin(async move { ctx.load_config().await })
+}
+
+fn parse_report(_params: Map<String, Value>) -> Result<(), String> {
+    Ok(())
+}
+
+fn parse_models(params: Map<String, Value>) -> Result<bool, String> {
+    Ok(read_optional::<bool>(&params, "use_cache")?.unwrap_or(true))
+}
+
+fn run_report(_ctx: DispatchCtx, config: Config, (): ()) -> ControllerFuture {
+    Box::pin(async move { to_json(crate::platform::doctor::rpc::doctor_report(&config).await?) })
+}
+
+fn run_models(_ctx: DispatchCtx, config: Config, use_cache: bool) -> ControllerFuture {
     Box::pin(async move {
-        let config = ctx.load_config().await?;
-        let use_cache = read_optional::<bool>(&params, "use_cache")?.unwrap_or(true);
         to_json(crate::platform::doctor::rpc::doctor_models(&config, use_cache).await?)
     })
 }

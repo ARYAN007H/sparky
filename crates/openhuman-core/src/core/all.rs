@@ -370,10 +370,10 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         crate::core::subsystem::all_subsystems_registered_controllers(),
     );
     // Diagnostic tools
-    push(
+    push_entries(
         &mut controllers,
         DomainGroup::Platform,
-        crate::platform::doctor::all_doctor_registered_controllers(),
+        crate::platform::doctor::all_doctor_controller_entries(),
     );
     // User-authored hooks — inspect, reload, and test-fire `hooks.json` entries.
     push(
