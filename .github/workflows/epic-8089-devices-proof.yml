@@ -1,0 +1,223 @@
+name: Epic 8089 Approval legacy RED proof
+
+on:
+  push:
+    branches:
+      - epic-8089-228-devices-proof
+
+permissions:
+  actions: read
+  contents: read
+  packages: read
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  CARGO_INCREMENTAL: "0"
+  CARGO_BUILD_JOBS: "1"
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+  RUST_MIN_STACK: "33554432"
+
+concurrency:
+  group: devices-proof-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  devices-controller-proof:
+    if: github.repository == 'senamakel/openhuman'
+    name: Approval raw registry legacy RED proof
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    container:
+      image: ghcr.io/tinyhumansai/openhuman_ci:latest
+    steps:
+      - name: Free disk space on the hosted container
+        run: |
+          rm -rf /__t/* || true
+          df -h /__w || true
+
+      - name: Checkout the frozen Approval regression source and recursive pins
+        uses: actions/checkout@v7
+        with:
+          ref: 89a091349f3543bf9cddd12e496266fa51069aab
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Trust container checkout and submodules
+        run: bash scripts/ci/trust-checkout.sh
+
+      - name: Install Rust 1.96.1
+        uses: dtolnay/rust-toolchain@1.96.1
+
+      - name: Assert frozen source and recursive pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 89a091349f3543bf9cddd12e496266fa51069aab
+          test "$(git rev-parse HEAD^{tree})" = e28519c27431294306d1f10bd279995e4d7f6b67
+          test "$(git rev-parse HEAD:crates/openhuman-core/src/security/approval/schemas.rs)" = 60574116a9cc3e4ac9cbd866baae61217bf0ac66
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          submodules="$(git submodule status --recursive)"
+          if grep -Eq '^[+-U]' <<< "$submodules"; then
+            printf '%s\n' "$submodules"
+            echo "recursive submodules are not at their recorded pins"
+            exit 1
+          fi
+          git submodule foreach --quiet --recursive 'test -z "$(git status --porcelain=v1 --untracked-files=all)"'
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+          cache-on-failure: true
+          key: devices-proof
+
+      - name: Compile and run the exact raw registry RED test
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf -- target/approval-proof
+          mkdir -p target/build-tmp target/approval-proof target/debug/proof-binaries
+          evidence=target/approval-proof
+          export TMPDIR="$GITHUB_WORKSPACE/target/build-tmp"
+          test "$(git rev-parse HEAD)" = 89a091349f3543bf9cddd12e496266fa51069aab
+          test "$(git rev-parse HEAD^{tree})" = e28519c27431294306d1f10bd279995e4d7f6b67
+          test "$(git rev-parse HEAD:crates/openhuman-core/src/security/approval/schemas.rs)" = 60574116a9cc3e4ac9cbd866baae61217bf0ac66
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git submodule status --recursive > "$evidence/submodules-before-build.txt"
+          if grep -Eq '^[+-U]' "$evidence/submodules-before-build.txt"; then
+            cat "$evidence/submodules-before-build.txt"
+            echo "recursive submodules are not at their recorded pins"
+            exit 1
+          fi
+          git submodule foreach --quiet --recursive 'test -z "$(git status --porcelain=v1 --untracked-files=all)"'
+          {
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'workflow_ref=%s\n' "$GITHUB_WORKFLOW_REF"
+            printf 'workflow_sha=%s\n' "$GITHUB_SHA"
+            printf 'source_head=%s\n' "$(git rev-parse HEAD)"
+            printf 'source_tree=%s\n' "$(git rev-parse HEAD^{tree})"
+            printf 'schemas_blob=%s\n' "$(git rev-parse HEAD:crates/openhuman-core/src/security/approval/schemas.rs)"
+            printf 'features=default,voice,inference\n'
+            printf 'rustc_version=%s\n' "$(rustc --version)"
+            printf 'cargo_version=%s\n' "$(cargo --version)"
+            printf 'host_mem_available_kib=%s\n' "$(awk '/MemAvailable/ {print $2}' /proc/meminfo)"
+            printf 'build_filesystem=%s\n' "$(df -Pk . | tail -n 1)"
+            printf 'build_command=TMPDIR=%s CARGO_BUILD_JOBS=1 RUST_MIN_STACK=33554432 bash scripts/ci-cancel-aware.sh cargo test -p openhuman --locked --lib --features voice,inference --no-run --message-format=json\n' "$TMPDIR"
+          } > "$evidence/receipt.txt"
+
+          build_json="$evidence/build.jsonl"
+          build_stderr="$evidence/build.stderr"
+          started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          set +e
+          bash scripts/ci-cancel-aware.sh cargo test -p openhuman --locked --lib --features voice,inference --no-run --message-format=json > "$build_json" 2> "$build_stderr"
+          build_exit=$?
+          set -e
+          ended_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          printf 'build_started_utc=%s\nbuild_ended_utc=%s\nbuild_exit=%s\n' "$started_at" "$ended_at" "$build_exit" >> "$evidence/receipt.txt"
+          if [ "$build_exit" -ne 0 ]; then
+            cat "$build_stderr"
+            exit "$build_exit"
+          fi
+
+          test "$(git rev-parse HEAD^{tree})" = e28519c27431294306d1f10bd279995e4d7f6b67
+          test "$(git rev-parse HEAD:crates/openhuman-core/src/security/approval/schemas.rs)" = 60574116a9cc3e4ac9cbd866baae61217bf0ac66
+          git diff --exit-code --ignore-submodules=none
+          test -z "$(git status --porcelain=v1 --untracked-files=all --ignore-submodules=none)"
+          git submodule foreach --quiet --recursive 'test -z "$(git status --porcelain=v1 --untracked-files=all)"'
+          git submodule status --recursive > "$evidence/submodules-after-build.txt"
+          cmp "$evidence/submodules-before-build.txt" "$evidence/submodules-after-build.txt"
+
+          python3 - "$build_json" "$evidence/test-binary-path" "$evidence/compiler-fresh.txt" <<'PY'
+          import json
+          import sys
+
+          artifacts = []
+          fresh_values = []
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              for line in stream:
+                  try:
+                      message = json.loads(line)
+                  except json.JSONDecodeError:
+                      continue
+                  target = message.get("target", {})
+                  executable = message.get("executable")
+                  if (
+                      message.get("reason") == "compiler-artifact"
+                      and target.get("name") == "openhuman_core"
+                      and target.get("test") is True
+                      and executable
+                  ):
+                      artifacts.append(executable)
+                      fresh_values.append(str(message.get("fresh", "unknown")))
+          if len(artifacts) != 1:
+              raise SystemExit(f"expected exactly one openhuman lib-test binary, got {artifacts!r}")
+          with open(sys.argv[2], "w", encoding="utf-8") as stream:
+              stream.write(artifacts[0] + "\n")
+          with open(sys.argv[3], "w", encoding="utf-8") as stream:
+              stream.write("\n".join(fresh_values) + "\n")
+          PY
+          source_binary="$(cat "$evidence/test-binary-path")"
+          binary=target/debug/proof-binaries/approval-legacy-red
+          cp "$source_binary" "$binary"
+          sha256sum "$binary" > "$evidence/test-binary.sha256"
+          "$binary" --list > "$evidence/test-list.txt"
+          sha256sum "$evidence/test-list.txt" > "$evidence/test-list.sha256"
+          {
+            printf 'compiler_artifact_fresh='; paste -sd, "$evidence/compiler-fresh.txt"
+            printf 'immutable_binary=%s\n' "$binary"
+            cat "$evidence/test-binary.sha256"
+            cat "$evidence/test-list.sha256"
+          } >> "$evidence/receipt.txt"
+
+          raw_filter=core::all::bound_controller_tests::approval_controller_tests::raw_approval_security_registry_matches_its_independent_contract
+          raw_log="$evidence/raw-contract.log"
+          printf 'raw_filter=%s\nraw_command=%s %s --exact --test-threads=1\nexpected_raw_exit=101\n' "$raw_filter" "$binary" "$raw_filter" >> "$evidence/receipt.txt"
+          started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          set +e
+          "$binary" "$raw_filter" --exact --test-threads=1 > "$raw_log" 2>&1
+          raw_exit=$?
+          set -e
+          ended_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          printf 'raw_started_utc=%s\nraw_ended_utc=%s\nraw_exit=%s\n' "$started_at" "$ended_at" "$raw_exit" >> "$evidence/receipt.txt"
+          if [ "$raw_exit" -ne 101 ]; then
+            cat "$raw_log"
+            echo "expected one genuine runtime RED with exit 101, got $raw_exit"
+            exit 1
+          fi
+          grep -Fq 'approval.decide registry entry is legacy, not bound' "$raw_log"
+          grep -Fq 'test result: FAILED. 0 passed; 1 failed;' "$raw_log"
+          cat "$raw_log"
+          control_filter=security::approval::schemas::tests::
+          printf 'semantic_control_filter=%s\n' "$control_filter" >> "$evidence/receipt.txt"
+          set +e
+          "$binary" "$control_filter" --test-threads=1 > "$evidence/semantic-controls.log" 2>&1
+          control_exit=$?
+          set -e
+          printf 'semantic_control_exit=%s\n' "$control_exit" >> "$evidence/receipt.txt"
+          if [ "$control_exit" -ne 0 ]; then
+            cat "$evidence/semantic-controls.log"
+            exit "$control_exit"
+          fi
+          grep -Fq 'test result: ok. 7 passed; 0 failed; 0 ignored;' "$evidence/semantic-controls.log"
+          cat "$evidence/semantic-controls.log"
+
+      - name: Upload proof logs and receipt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: approval-legacy-red-receipt
+          path: target/approval-proof/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload matching lib-test binary
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: approval-proof-legacy-red-binary
+          path: target/debug/proof-binaries/approval-legacy-red
+          retention-days: 1
+          compression-level: 1
+          if-no-files-found: error
