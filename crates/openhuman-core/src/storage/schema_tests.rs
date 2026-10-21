@@ -9,7 +9,7 @@ fn every_linked_owner_collection_is_valid_and_unique() {
         assert!(names.insert(spec.name.as_str()), "duplicate {}", spec.name);
     }
     for expected in [
-        "harness.journal",
+        "harness.run_status",
         "conversations.threads",
         "approvals.requests",
         "devices.paired",
