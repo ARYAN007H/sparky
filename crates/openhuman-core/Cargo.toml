@@ -116,6 +116,7 @@ tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session
 # The storage ports and the URL-to-backend facade (`storage` domain). No driver
 # by default: the `storage-*` features below add them.
 tinystoragedrivers = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2", default-features = false }
+tinystoragedrivers-api = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2" }
 tinystoragedrivers-types = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2" }
 # The storage bus: the wire contract and the reference host server that the
 # `modules::storage_host` interface answers loaded modules with. Modules only.
@@ -466,6 +467,7 @@ windows-sys = { version = "0.61", features = [
 tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
 
 [dev-dependencies]
+tinystoragedrivers-testkit = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.0.2" }
 # Legacy TinyChannels provider/runtime fixtures remain available to tests only;
 # production channel execution uses the TinyBus module contract above.
 tinychannels = { path = "../../vendor/tinychannels", features = ["relay-websocket", "email", "lark"] }

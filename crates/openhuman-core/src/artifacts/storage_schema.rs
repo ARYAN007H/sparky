@@ -12,8 +12,8 @@
 //! `{"_args": <value>}`, so the body is always an object and
 //! [`args_of_body`] reads either form back.
 
-use serde_json::{json, Value};
 use anyhow::Result;
+use serde_json::{json, Value};
 use tinystoragedrivers::{CollectionSpec, IndexSpec};
 
 use super::types::ArtifactMeta;

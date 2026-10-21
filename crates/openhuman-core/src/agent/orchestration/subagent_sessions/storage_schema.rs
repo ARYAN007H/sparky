@@ -11,8 +11,8 @@
 //! saved since. The driver's `updated_ms` is the time of the write, not of the
 //! session's last use.
 
-use serde_json::{Map, Value};
 use anyhow::Result;
+use serde_json::{Map, Value};
 use tinystoragedrivers::CollectionSpec;
 
 use crate::storage::schema_support::{

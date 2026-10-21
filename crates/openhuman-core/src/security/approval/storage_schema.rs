@@ -12,8 +12,8 @@
 //! stay JSON text: they carry arbitrary tool arguments whose keys a
 //! document-store driver (MongoDB) must never see as field names.
 
-use serde_json::Value;
 use anyhow::Result;
+use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, IndexSpec, Key};
 
 use crate::storage::schema_support::{

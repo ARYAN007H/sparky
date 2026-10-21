@@ -13,8 +13,8 @@
 //! visits it; [`migrate_cluster`] runs this owner's steps over it, the first
 //! time a registry opens the shared backend.
 
-use serde_json::Value;
 use anyhow::Result;
+use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, Storage};
 
 use crate::storage::schema_support::{

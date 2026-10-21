@@ -5472,8 +5472,11 @@ dependencies = [
  "tinyskills",
  "tinyskills-drivers",
  "tinystoragedrivers",
+ "tinystoragedrivers-api",
  "tinystoragedrivers-bus",
  "tinystoragedrivers-busproxy 2.0.2",
+ "tinystoragedrivers-testkit",
+ "tinystoragedrivers-types",
  "tinytools",
  "tinytools-agent",
  "tinytools-std",
@@ -10047,6 +10050,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinystoragedrivers-testkit"
+version = "2.0.2"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures-util",
+ "serde_json",
+ "tinystoragedrivers-api",
+ "tinystoragedrivers-blob",
+ "tinystoragedrivers-document",
+ "tinystoragedrivers-kv",
+ "tinystoragedrivers-queue",
+ "tinystoragedrivers-secrets",
+ "tinystoragedrivers-types",
+ "tokio",
+ "ulid",
+ "zeroize",
+]
+
+[[package]]
 name = "tinystoragedrivers-types"
 version = "2.0.2"
 dependencies = [
@@ -12489,11 +12512,3 @@ checksum = "27bc9d5b815bc103f142aa054f561d9187d191692ec7c2d1e2b4737f8dbd7296"
 dependencies = [
  "zune-core",
 ]
-
-[[patch.unused]]
-name = "tinystoragedrivers-testkit"
-version = "2.0.2"
-
-[[patch.unused]]
-name = "tinystoragedrivers-testkit"
-version = "2.0.2"

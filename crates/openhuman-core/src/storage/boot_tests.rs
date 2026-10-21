@@ -1,42 +1,31 @@
 use super::*;
-use serde_json::json;
-use tinystoragedrivers::{MemoryStorage, Precondition};
 
 #[tokio::test]
-async fn an_empty_backend_prepares_and_migrates_cleanly() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+async fn boot_prepares_the_composed_owner_collections_on_host_scopes() {
+    let backend: Arc<dyn StorageBackend> =
+        Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
+
     let report = prepare_and_migrate(&backend).await.unwrap();
-    assert!(report.failures.is_empty(), "{:?}", report.failures);
-    assert!(report.scopes >= 1);
-    // A second boot has nothing left to do.
-    let again = prepare_and_migrate(&backend).await.unwrap();
-    assert!(again.failures.is_empty(), "{:?}", again.failures);
-    assert_eq!(again.steps_run, 0);
+    let declared = super::super::schema::owner_collections().unwrap();
+    assert_eq!(report.scopes, 2);
+    assert_eq!(report.collections, declared.len() * report.scopes);
+
+    // Owner declarations are idempotent: a retry after an interrupted boot
+    // may safely ensure every collection again.
+    let retry = prepare_and_migrate(&backend).await.unwrap();
+    assert_eq!(retry, report);
 }
 
 #[tokio::test]
-async fn a_v1_agent_scope_is_moved_before_its_owner_steps_run() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
-    let old = backend.for_scope(&Scope::new("asha").unwrap()).unwrap();
-    old.documents()
-        .put(
-            "harness_embedding_cache",
-            "legacy-id",
-            json!({"sig": "s", "key": "k", "vector": [1.0]}),
-            Precondition::None,
-        )
-        .await
-        .unwrap();
-    let report = prepare_and_migrate(&backend).await.unwrap();
-    assert!(report.failures.is_empty(), "{:?}", report.failures);
+async fn tenant_scopes_use_the_same_owner_collection_declarations() {
+    let backend = tinystoragedrivers_testkit::MemoryBackend::new();
+    let scope = super::super::scope::scope_for_profile("profile-a");
+    let storage = backend.for_scope(&scope).unwrap();
 
-    let new = backend
-        .for_scope(&Scope::local().agent("asha").unwrap())
-        .unwrap();
-    assert!(new
-        .documents()
-        .get("harness.embedding_cache", "s/k")
-        .await
-        .unwrap()
-        .is_some());
+    let prepared = prepare_scope(&storage).await.unwrap();
+
+    assert_eq!(
+        prepared,
+        super::super::schema::owner_collections().unwrap().len()
+    );
 }

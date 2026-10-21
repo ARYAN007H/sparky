@@ -26,12 +26,10 @@ pub(crate) fn upgrade_records(
         batch
             .into_iter()
             .map(|record| {
-                Ok(LegacyTargetRecord::new(
-                    CONFIG_COLLECTION,
-                    key_of(&record.id)?,
-                    record.body,
+                Ok(
+                    LegacyTargetRecord::new(CONFIG_COLLECTION, key_of(&record.id)?, record.body)
+                        .created_ms(record.meta.created_ms),
                 )
-                .created_ms(record.meta.created_ms))
             })
             .collect()
     })

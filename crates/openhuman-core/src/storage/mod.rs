@@ -68,11 +68,40 @@ use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock};
 /// tinystoragedrivers owns the one copy; the re-export goes when the importers
 /// do (the one-time legacy import window closes). Re-checked for #7768: both
 /// consumers are still present, so it stays.
-pub use tinystoragedrivers::sqlite::rusqlite;
 pub use tinystoragedrivers::{
-    Blocking, CollectionSpec, DocumentStore, DocumentStoreExt, MemoryStorage, Precondition,
-    ScopedStorage, StorageBackend, StorageConfig as StorageUrl, StorageError,
+    CollectionSpec, Precondition, StorageBackend, StorageConfig as StorageUrl, StorageError,
 };
+pub use tinystoragedrivers_api::{DocumentStore, DocumentStoreExt, Storage};
+
+/// SQLite is used only by the read-only compatibility importers while they
+/// consume historical per-domain files. It is not the process storage API.
+pub use tinystoragedrivers::sqlite::rusqlite;
+
+/// Dedicated runtime for synchronous domain surfaces that bridge to the
+/// asynchronous storage ports. Keeping it on its own thread also permits a
+/// synchronous facade to be called while the caller is on a current-thread
+/// Tokio runtime.
+struct Blocking(tokio::runtime::Runtime);
+
+impl Blocking {
+    fn new() -> anyhow::Result<Self> {
+        Ok(Self(
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(1)
+                .enable_all()
+                .thread_name("openhuman-storage")
+                .build()?,
+        ))
+    }
+
+    fn run<T, F>(&self, future: F) -> Result<T, StorageError>
+    where
+        F: Future<Output = Result<T, StorageError>> + Send + 'static,
+        T: Send + 'static,
+    {
+        Ok(self.0.block_on(future)?)
+    }
+}
 
 use crate::config::schema::storage::redact_url;
 use crate::config::Config;
@@ -271,7 +300,7 @@ pub fn scope_from(
 ///
 /// When the scope cannot be resolved ([`current_scope`]) or the backend
 /// refuses it.
-pub fn current_scoped() -> Result<Option<ScopedStorage>, StorageError> {
+pub fn current_scoped() -> Result<Option<Storage>, StorageError> {
     installed()
         .map(|backend| backend.for_scope(&current_scope()?))
         .transpose()

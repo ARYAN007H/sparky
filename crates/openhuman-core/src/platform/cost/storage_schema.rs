@@ -5,8 +5,8 @@
 //! |---|---|---|
 //! | `cost_records` (`usage.timestamp` RFC 3339 beside `ts_ms`) | `cost.records` | `usage.timestamp` dropped; `ts_ms` is the instant |
 
-use serde_json::Value;
 use anyhow::Result;
+use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, IndexSpec};
 
 use super::types::CostRecord;

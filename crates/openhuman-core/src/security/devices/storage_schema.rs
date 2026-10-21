@@ -5,8 +5,8 @@
 //! |---|---|---|
 //! | `paired_devices` (`created_at`, `last_seen_at` RFC 3339) | `devices.paired` (`created_ms`, `last_seen_ms`) | tenant |
 
-use serde_json::Value;
 use anyhow::Result;
+use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, IndexSpec};
 
 use crate::storage::schema_support::{

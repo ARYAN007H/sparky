@@ -13,8 +13,8 @@
 //! provider-controlled documents whose keys a document-store driver must never
 //! see as field names.
 
-use serde_json::Value;
 use anyhow::Result;
+use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, IndexSpec, Key};
 
 use crate::storage::schema_support::{
