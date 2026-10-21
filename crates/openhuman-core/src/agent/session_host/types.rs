@@ -159,7 +159,7 @@ pub struct OpenHumanSessionHost {
     pub(super) tools: Arc<Vec<Box<dyn Tool>>>,
     /// The delegation tools synthesised for the current connection set —
     /// `delegate_<toolkit>` skill tools and archetype delegates, produced by
-    /// [`crate::tools::orchestrator_tools::collect_orchestrator_tools`].
+    /// [`crate::integrations::composio::orchestrator_actions::collect_orchestrator_tools`].
     ///
     /// Held apart from [`Self::tools`] because it is the only part of the
     /// surface that changes mid-session, and `Box<dyn Tool>` is not cloneable:
@@ -524,7 +524,7 @@ pub struct OpenHumanSessionHost {
     /// re-announced per turn. Seeded from the session-build catalogue.
     pub(super) announced_skills: std::collections::HashSet<String>,
     /// Names of every tool currently in [`OpenHumanSessionHost::synthesized_tools`] — those
-    /// produced by [`crate::tools::orchestrator_tools::collect_orchestrator_tools`]
+    /// produced by [`crate::integrations::composio::orchestrator_actions::collect_orchestrator_tools`]
     /// (i.e. `delegate_<toolkit>` skill tools and archetype-delegation
     /// tools). Tracked so
     /// [`OpenHumanSessionHost::refresh_delegation_tools`] can drop the entire

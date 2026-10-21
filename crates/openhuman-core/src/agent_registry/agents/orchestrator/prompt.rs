@@ -4,7 +4,7 @@
 //! cheap direct tools whenever possible, and delegate only for specialised
 //! execution. Connected Composio integrations are part of that direct
 //! surface: every connected toolkit's actions are registered as `Deferred`
-//! tools (`orchestrator_tools::collect_deferred_integration_actions`), so
+//! tools (`orchestrator_actions::collect_deferred_integration_actions`), so
 //! the `## Connected Integrations` block tells the model to `tool_search`
 //! for the action and call it — there is no integrations sub-agent to
 //! delegate to any more. That prose lives here (not in the shared prompts
@@ -133,8 +133,8 @@ pub fn build(ctx: &PromptContext<'_>) -> Result<String> {
 /// none of it conditioned on the live tool set, and ten of those names were
 /// tools a pack had withheld: the prompt taught the model to call something it
 /// could not see, and nothing in the build compared the two. Deriving the rows
-/// from the same registry `collect_orchestrator_tools` synthesises the
-/// delegates from means a pack change moves both halves at once.
+/// from the same registry `collect_orchestrator_tools` filters for the
+/// orchestrator's skills wildcard, so a pack change moves both halves at once.
 ///
 /// **Advertised specialists are deliberately absent.** Their `when_to_use` is
 /// already their tool description on the wire, and restating it here would be
