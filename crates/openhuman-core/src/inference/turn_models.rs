@@ -3,9 +3,6 @@
 
 use std::sync::Arc;
 
-pub(crate) type TurnChatModel = Arc<dyn tinyinference_llm::model::ChatModel<()>>;
-pub(crate) type TierRoutes = Vec<(String, TurnChatModel)>;
-
 use crate::core::runtime::DispatchCtx;
 
 use tinyinference_llm::model::ProfileOverrideModel;
@@ -17,13 +14,13 @@ use tinyinference_llm::model::{ResolvedModelRoute, RouteRecordingModel};
 /// [`OpenHumanTurnPlanner`](crate::agent::tinyagents::turn_plan::OpenHumanTurnPlanner) resolves calls through its native resolver.
 pub(crate) struct TurnModels {
     /// The turn's effective/primary model (registry default + dispatch target).
-    pub(crate) primary: TurnChatModel,
+    pub(crate) primary: Arc<dyn tinyinference_llm::model::ChatModel<()>>,
     /// Additive workload-tier routes (registry name → model), excluding the
     /// primary; the crate registry resolves fallback/selection across them.
-    pub(crate) routes: TierRoutes,
+    pub(crate) routes: Vec<(String, Arc<dyn tinyinference_llm::model::ChatModel<()>>)>,
     /// A model for the context-window summarizer (a distinct adapter instance so
     /// its provider errors don't touch the turn's `error_slot`).
-    pub(crate) summarizer: TurnChatModel,
+    pub(crate) summarizer: Arc<dyn tinyinference_llm::model::ChatModel<()>>,
     /// Recovers the primary's original (downcastable) provider error on failure.
     pub(crate) error_slot: tinyinference_llm::model::ModelErrorSlot,
     /// Provider telemetry id (`{provider_id}.{model}` in Langfuse), captured from
@@ -66,7 +63,11 @@ impl TurnModels {
 
     /// Adds a tier route to a test bundle (the injected-model builder has none).
     #[cfg(test)]
-    pub(crate) fn with_test_route(mut self, name: &str, model: TurnChatModel) -> Self {
+    pub(crate) fn with_test_route(
+        mut self,
+        name: &str,
+        model: Arc<dyn tinyinference_llm::model::ChatModel<()>>,
+    ) -> Self {
         self.routes.push((name.to_string(), model));
         self
     }
@@ -242,7 +243,7 @@ fn build_turn_models_crate(
 pub struct TurnModelSource {
     /// A directly injected crate model. This is the replacement test seam for
     /// provider-backed mocks while WP-1 removes `native model adapter`.
-    pub(crate) direct_model: Option<TurnChatModel>,
+    pub(crate) direct_model: Option<Arc<dyn tinyinference_llm::model::ChatModel<()>>>,
     /// Acting-workspace config for injected models that resolve attachments.
     attachment_config: Option<Arc<crate::config::Config>>,
     /// When set, [`build`](Self::build) / [`build_summarizer`](Self::build_summarizer)
@@ -284,7 +285,7 @@ impl TurnModelSource {
     /// Use an already-constructed TinyAgents model as the complete turn model
     /// source. Intended for deterministic tests and embedding callers that do
     /// not need role/config-based route construction.
-    pub fn from_model(model: TurnChatModel) -> Self {
+    pub fn from_model(model: Arc<dyn tinyinference_llm::model::ChatModel<()>>) -> Self {
         Self {
             direct_model: Some(model),
             attachment_config: None,
@@ -302,7 +303,7 @@ impl TurnModelSource {
     /// Inject a model while supplying capability metadata that the model itself
     /// does not expose (common for deterministic scripted tests).
     pub(crate) fn from_model_with_profile(
-        model: TurnChatModel,
+        model: Arc<dyn tinyinference_llm::model::ChatModel<()>>,
         profile: tinyinference_llm::model::ModelProfile,
     ) -> Self {
         Self::from_model(Arc::new(ProfileOverrideModel::new(model, profile)))
@@ -418,7 +419,7 @@ impl TurnModelSource {
             let is_local =
                 crate::agent::tinyagents::turn_policy::provider_is_self_hosted(&provider_id, None);
             let context_window = context_window.or(profile.max_input_tokens);
-            let primary: TurnChatModel = Arc::new(
+            let primary: Arc<dyn tinyinference_llm::model::ChatModel<()>> = Arc::new(
                 ProfileOverrideModel::new(direct.clone(), profile)
                     .with_request_model(model)
                     .with_request_temperature(temperature),
@@ -504,7 +505,7 @@ impl TurnModelSource {
     ) -> anyhow::Result<Arc<dyn tinyinference_llm::model::ChatModel<()>>> {
         if let Some(direct) = &self.direct_model {
             let profile = direct.profile().cloned().unwrap_or_default();
-            let summarizer: TurnChatModel = Arc::new(
+            let summarizer: Arc<dyn tinyinference_llm::model::ChatModel<()>> = Arc::new(
                 ProfileOverrideModel::new(direct.clone(), profile)
                     .with_request_model(model)
                     .with_request_temperature(temperature),
