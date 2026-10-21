@@ -1,7 +1,7 @@
 //! Top-level sub-agent run entry points.
 //!
-//! [`run_subagent`] is the primary entry point for agent delegation and
-//! dispatches to [`run_typed_mode`] which builds a brand-new system prompt
+//! The registered dispatcher reaches this adapter, which dispatches to
+//! [`run_typed_mode`] to build a brand-new system prompt
 //! and a filtered tool list for the requested archetype, then drives provider
 //! calls and tool execution until the model returns without further tool calls
 //! (or the iteration budget is exhausted).
@@ -82,7 +82,7 @@ pub(super) fn tier_gate_decision(
     Ok(())
 }
 
-/// Run a sub-agent based on its definition and a task prompt.
+/// Execute a prepared sub-agent based on its definition and a task prompt.
 ///
 /// Creates a task id, checks the root-turn dispatch budget, reads the parent's
 /// [`ParentExecutionContext`], then dispatches to `run_typed_mode`.
@@ -97,13 +97,13 @@ pub(crate) async fn run_subagent_direct_with_native_context(
     mut options: SubagentRunOptions,
     native: crate::agent::tinyagents::NativeSubagentRunContext,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
-    // Unconditionally heap-allocate the entire run_subagent body so
+    // Unconditionally heap-allocate the entire child execution body so
     // every caller doesn't have to carry this future's state inline.
     // Tools that delegate run inside the parent agent's already-deep
     // turn poll (the boxed tinyagents harness drive future in
     // `TurnSpec::run`), so the parent's stack would
     // otherwise pile (parent turn state + dispatch_subagent state +
-    // run_subagent's wrapper state + run_typed_mode state + child turn
+    // dispatcher state + run_typed_mode state + child turn
     // state) onto tokio's 2 MiB worker stack and abort with "thread
     // 'tokio-rt-worker' has overflowed its stack, fatal runtime error:
     // stack overflow" — observed at `[subagent_host] dispatching
@@ -362,7 +362,7 @@ pub(crate) async fn run_subagent_direct_with_native_context(
     .await
 }
 
-/// One spawn's snapshot of the host config, loaded once by [`run_subagent`].
+/// One spawn's snapshot of the host config, loaded once by the host adapter.
 ///
 /// `Config::load_or_init()` is **not cached** — it re-resolves the config dirs
 /// and re-reads `config.toml` on every call. `run_typed_mode` needed it in six
@@ -871,7 +871,7 @@ async fn run_typed_mode(
         failure_cause,
         final_history: history,
         usage,
-        // Filled in by `run_subagent` once the offload step has had its say, so
+        // Filled in by the host adapter once the offload step has had its say, so
         // both the harness-offloaded and worker-authored pointers are counted.
         artifact_paths: Vec::new(),
         persistence_disposition:
