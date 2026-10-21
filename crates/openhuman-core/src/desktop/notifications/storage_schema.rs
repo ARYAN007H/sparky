@@ -14,10 +14,13 @@
 //! see as field names.
 
 use serde_json::Value;
-use tinystoragedrivers::schema::{Schema, ScopeClass, SourceRecord, Step, TargetRecord};
-use tinystoragedrivers::{CollectionSpec, IndexSpec, Key, Result};
+use anyhow::Result;
+use tinystoragedrivers::{CollectionSpec, IndexSpec, Key};
 
-use crate::storage::schema_support::{key_of, owner, time_ms, Body};
+use crate::storage::schema_support::{
+    key_of, map_legacy_collection, time_ms, Body, LegacySourceRecord as SourceRecord,
+    LegacyTargetRecord as TargetRecord,
+};
 
 pub(super) const NOTIFICATIONS: &str = "notifications.integration";
 pub(super) const DEDUP: &str = "notifications.dedup";
@@ -29,26 +32,14 @@ pub(super) const LEGACY_DEDUP: &str = "notification_dedup";
 pub(super) const LEGACY_SETTINGS: &str = "notification_settings";
 pub(super) const LEGACY_CORE: &str = "core_notifications";
 
-const SCHEMA: u32 = 2;
-
-/// What the notification store keeps and the steps from the v1 collections.
-#[must_use]
-pub fn storage_schema() -> Schema {
-    let mut schema = Schema::new(owner("notifications"));
-    for spec in specs() {
-        schema = schema.collection_with(SCHEMA, spec, ScopeClass::Tenant);
-    }
-    schema
-        .step(
-            Step::new("integration_v2", NOTIFICATIONS, 1, SCHEMA, integration_v2)
-                .source(LEGACY_NOTIFICATIONS),
-        )
-        .step(Step::new("dedup_v2", DEDUP, 1, SCHEMA, renamed(DEDUP)).source(LEGACY_DEDUP))
-        .step(
-            Step::new("settings_v2", SETTINGS, 1, SCHEMA, renamed(SETTINGS))
-                .source(LEGACY_SETTINGS),
-        )
-        .step(Step::new("core_v2", CORE, 1, SCHEMA, core_v2).source(LEGACY_CORE))
+/// Converts legacy notification documents into the current owner shapes.
+pub(crate) fn upgrade_records(
+    records: Vec<crate::storage::import::Record>,
+) -> Result<Vec<crate::storage::import::Record>> {
+    let records = map_legacy_collection(records, LEGACY_NOTIFICATIONS, integration_v2)?;
+    let records = map_legacy_collection(records, LEGACY_DEDUP, renamed(DEDUP))?;
+    let records = map_legacy_collection(records, LEGACY_SETTINGS, renamed(SETTINGS))?;
+    map_legacy_collection(records, LEGACY_CORE, core_v2)
 }
 
 /// The four v2 collections with their indexes.

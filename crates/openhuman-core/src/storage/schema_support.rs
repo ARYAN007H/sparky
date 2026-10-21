@@ -50,11 +50,14 @@ impl LegacyTargetRecord {
 
 /// Converts one legacy collection using an owner-specific pure transform.
 /// Records from other collections pass through unchanged.
-pub(crate) fn map_legacy_collection(
+pub(crate) fn map_legacy_collection<F>(
     records: Vec<Record>,
     source_collection: &str,
-    convert: fn(Vec<LegacySourceRecord>) -> anyhow::Result<Vec<LegacyTargetRecord>>,
-) -> anyhow::Result<Vec<Record>> {
+    convert: F,
+) -> anyhow::Result<Vec<Record>>
+where
+    F: FnOnce(Vec<LegacySourceRecord>) -> anyhow::Result<Vec<LegacyTargetRecord>>,
+{
     let mut source = Vec::new();
     let mut output = Vec::new();
     for record in records {
