@@ -152,6 +152,7 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
     };
     let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
     *model.child_started.lock().unwrap() = Some(child_started_tx);
+    let jobs_core = std::sync::Arc::clone(&core);
     let run = tokio::spawn(async move {
         crate::core::runtime::CoreContext::scope(
             core,
@@ -179,6 +180,10 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
     model.child_release.notify_one();
     let output = run.await.expect("flow runner task");
     let output = output.expect("headless flow agent should settle its child");
+    let snapshots = crate::core::runtime::slot_for::<
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    >(&crate::core::runtime::DispatchCtx::new(jobs_core))
+    .list();
 
     assert_eq!(
         model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
@@ -199,7 +204,7 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
     );
     assert!(
         !returned_before_child,
-        "the headless flow must remain pending after root turn until its child settles"
+        "the headless flow must remain pending after root turn until its child settles; jobs: {snapshots:?}"
     );
 
     assert!(
