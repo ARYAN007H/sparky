@@ -184,6 +184,7 @@ where
         let mut message = SendMessage::new(content, reply_recipient.clone());
         message.thread_ts = reply_thread.clone();
         message.topic_id = reply_topic.clone();
+        message.reply_to_id = msg.reply_to_id.clone();
         message
     };
     let history_len =

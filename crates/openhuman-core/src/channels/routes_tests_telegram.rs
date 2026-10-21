@@ -11,7 +11,6 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 
     let new_msg = ChannelMessage {
         reply_to_id: None,
-        topic_id: None,
         id: "1".into(),
         sender: "alice".into(),
         reply_target: "chat-remote".into(),
@@ -48,7 +47,6 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 
     let status_msg = ChannelMessage {
         reply_to_id: None,
-        topic_id: None,
         id: "3".into(),
         sender: "alice".into(),
         reply_target: "chat-remote".into(),
@@ -65,7 +63,6 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 
     let sessions_msg = ChannelMessage {
         reply_to_id: None,
-        topic_id: None,
         id: "4".into(),
         sender: "alice".into(),
         reply_target: "chat-remote".into(),
@@ -118,21 +115,23 @@ async fn handle_runtime_command_telegram_new_uses_module_storage() {
     let msg = ChannelMessage {
         reply_to_id: None,
         topic_id: Some("42".into()),
-        id: "100".into(),
+        id: "200".into(),
+        reply_to_id: Some("100".into()),
         sender: "alice".into(),
         // The module prepares the chat and topic as distinct canonical fields.
         reply_target: "-200".into(),
         content: "/new".into(),
         channel: "telegram".into(),
         timestamp: 0,
-        thread_ts: Some("100".into()),
+        thread_ts: None,
         sender_name: None,
     };
     assert!(
         handle_linked_runtime_command(&mut ctx, &msg, Some(&channel), &linked, Some("-200")).await
     );
     let topic_only_msg = ChannelMessage {
-        id: "101".into(),
+        id: "201".into(),
+        reply_to_id: None,
         thread_ts: None,
         ..msg.clone()
     };

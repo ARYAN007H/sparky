@@ -141,7 +141,7 @@ async fn process_channel_message_sends_typing_before_the_provider_reply() {
     let mut runtime_ctx = ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
-        module_objects: Arc::new(HashMap::new()),
+        module_objects: linked.module_objects(),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(SlowModel {
                 delay: Duration::from_millis(20),
