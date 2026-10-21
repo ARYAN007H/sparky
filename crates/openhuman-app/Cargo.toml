@@ -96,6 +96,7 @@ openhuman-rpc = { path = "../openhuman-rpc", default-features = false, features 
     "tinymemes",
     "inbound-queues",
     "storage-sqlite",
+    "secret-file",
 ] }
 # The widget scheme reduces CSP origins with `tinymcp_bus::ui`'s pure rules.
 # The contract, not the module crate: hosts reach modules through `*-bus`.

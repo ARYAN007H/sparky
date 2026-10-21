@@ -112,5 +112,8 @@ inbound-queues
 # `sqlite:` in `[storage] url`. MongoDB is not part of the product.
 storage-sqlite
 
+# The process keyring's encrypted file backend is independent from storage-file.
+secret-file
+
 # OS keychain providers owned by the RPC host layer.
 os-keyring

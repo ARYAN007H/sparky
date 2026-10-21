@@ -29,6 +29,7 @@ default = [
     "file-logging",
     "modules",
     "storage-sqlite",
+    "secret-file",
 ]
 crash-reporting = ["openhuman-rpc/crash-reporting"]
 jev = ["openhuman-rpc/jev"]
