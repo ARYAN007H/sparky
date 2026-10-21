@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex as StdMutex};
 
 use serde_json::{json, Value};
 use tempfile::TempDir;
-use tinyinference_llm::model::context_window::{ContextWindowResolver, ContextWindowRouteInput};
+use tinyinference_llm::model::context_window::ContextWindowRouteInput;
 use tinyinference_llm::model::discover::DiscoveryRequest;
 use tinyinference_llm::model::discover::ModelLimitsCache;
 
@@ -161,7 +161,7 @@ async fn model_only_projection_does_not_reuse_empty_provider_discovery() {
         json!({ "data": [{ "id": model, "context_length": 777_777 }] }),
     );
     let cache = ModelLimitsCache::default();
-    let resolver = ContextWindowResolver::new();
+    let resolver = resolver();
     let discovery = DiscoveryRequest::new(endpoint, model);
 
     let discovered = resolver
