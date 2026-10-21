@@ -184,6 +184,119 @@ async fn staged_claim_and_cancellation_have_one_atomic_document_winner() {
 }
 
 #[tokio::test]
+async fn native_attachment_refs_are_bound_to_profile_agent_account_and_turn() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+
+    let temp = tempfile::tempdir().unwrap();
+    let workspace = temp.path().join("workspace");
+    let config = crate::config::Config {
+        workspace_dir: workspace.clone(),
+        action_dir: workspace.clone(),
+        ..Default::default()
+    };
+    let make_dispatch = |profile: &str, agent: &str| {
+        let root = CoreContext::for_test(DomainSet::none(), Some(workspace.clone()));
+        let scoped = root.derive_with(
+            ContextOverlay::new(config.clone(), DomainSet::full(), Default::default())
+                .profile(profile)
+                .session_agent(agent),
+        );
+        DispatchCtx::new(scoped)
+    };
+    let alice = make_dispatch("profile-a", "agent-a");
+    let other_profile = make_dispatch("profile-b", "agent-a");
+    let other_agent = make_dispatch("profile-a", "agent-b");
+    let part = image(MediaReference {
+        opaque_id: Some(uuid::Uuid::new_v4().simple().to_string()),
+        content_type: Some("image/png".into()),
+        size_bytes: Some(4),
+        ..Default::default()
+    });
+    let thread = "telegram:account-a:conversation-42";
+    let record = StagedAttachment {
+        tenant: crate::core::runtime::Tenant {
+            profile: Some("profile-a".into()),
+            agent: Some("agent-a".into()),
+        },
+        thread_id: thread.into(),
+        attachment: StoredAttachment {
+            part: part.clone(),
+            path: "media.png".into(),
+        },
+        expires_at: chrono::Utc::now().timestamp() + 60,
+        claim: None,
+    };
+    let repo = staged_repo(&alice, &workspace).unwrap();
+    insert_record(&repo, &record);
+    let opaque_id = opaque_media(&part)
+        .unwrap()
+        .opaque_id
+        .as_deref()
+        .unwrap()
+        .to_owned();
+
+    for dispatch in [&other_profile, &other_agent] {
+        assert!(
+            read_authorized_native_attachment(
+                dispatch,
+                &config,
+                thread,
+                &opaque_id,
+                std::slice::from_ref(&part),
+                false,
+            )
+            .await
+            .is_err()
+        );
+    }
+    assert!(
+        read_authorized_native_attachment(
+            &alice,
+            &config,
+            "telegram:account-b:conversation-42",
+            &opaque_id,
+            std::slice::from_ref(&part),
+            false,
+        )
+        .await
+        .is_err(),
+        "the same conversation under another configured account is isolated"
+    );
+
+    let forged_part = match part.clone() {
+        ContentPart::Image {
+            media,
+            alt_text,
+            ..
+        } => ContentPart::Image {
+            media,
+            caption: Some("forged turn".into()),
+            alt_text,
+        },
+        _ => unreachable!(),
+    };
+    assert!(
+        read_authorized_native_attachment(
+            &alice,
+            &config,
+            thread,
+            &opaque_id,
+            &[forged_part],
+            false,
+        )
+        .await
+        .is_err(),
+        "opaque IDs alone do not authorize a modified part"
+    );
+    assert!(
+        read_authorized_native_attachment(&alice, &config, thread, &opaque_id, &[], false)
+            .await
+            .is_err(),
+        "an unclaimed reference from another turn is not authorized"
+    );
+}
+
+#[tokio::test]
 async fn multipart_claim_failure_keeps_prior_claim_owned_by_retry() {
     let dir = tempfile::tempdir().unwrap();
     let mut config = crate::config::Config::default();
