@@ -1,5 +1,7 @@
 #![cfg(feature = "storage-sqlite")]
 
+#![cfg(feature = "storage-sqlite")]
+
 use super::*;
 use crate::core::runtime::{CoreContext, DomainSet, SaasConfig};
 use crate::profiles::lease::{now_ms, renew_once};
