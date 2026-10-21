@@ -294,7 +294,7 @@ async fn a_session_without_the_delegate_is_not_told_to_call_it() {
         "with no delegate to call, name the owning agent: {message}"
     );
     assert!(
-        !message.contains("Call `build_workflow`"),
+        !message.contains("Call `spawn_subagent`"),
         "must not instruct a call this session cannot make: {message}"
     );
 }
@@ -479,7 +479,7 @@ fn an_invented_tool_name_is_not_found_even_under_the_packs_permission_ceiling() 
 fn a_pack_member_this_session_never_registered_is_not_found_not_forbidden() {
     let mw = non_owner_middleware();
     // `save_workflow` is in the `workflows` pack, but this session's registry
-    // holds only `build_workflow` and `propose_workflow`.
+    // holds the spawn tool and `propose_workflow`, but not `save_workflow`.
     let workflows = crate::tools::toolpacks::pack("workflows").expect("workflows pack");
     assert!(
         workflows.owns("save_workflow"),
