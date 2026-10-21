@@ -28,7 +28,6 @@ use anyhow::Result;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use tinystoragedrivers_api::DocumentStore;
 use tinystoragedrivers_types::{Capability, Query, StorageError};
 
 use crate::storage::documents::Repo;
