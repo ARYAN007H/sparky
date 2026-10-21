@@ -140,3 +140,7 @@ impl StorageBackend for FencedBackend {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "fenced_backend_tests.rs"]
+mod tests;
