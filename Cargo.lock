@@ -9798,7 +9798,7 @@ dependencies = [
  "serde_norway",
  "sha2 0.11.0",
  "thiserror 2.0.20",
- "tinytools 0.5.0 (git+https://github.com/tinyhumansai/tinytools?rev=1cd9e9c4a117336e6f42d0c7936ed60e7476d88f)",
+ "tinytools 0.6.0",
  "tokio",
  "url",
 ]
@@ -10061,17 +10061,6 @@ dependencies = [
 [[package]]
 name = "tinytools"
 version = "0.5.0"
-source = "git+https://github.com/tinyhumansai/tinytools?rev=1cd9e9c4a117336e6f42d0c7936ed60e7476d88f#1cd9e9c4a117336e6f42d0c7936ed60e7476d88f"
-dependencies = [
- "anyhow",
- "async-trait",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "tinytools"
-version = "0.5.0"
 source = "git+https://github.com/tinyhumansai/tinytools?rev=bd60b9b52f1998b4483b9cf107a72d3338e672f8#bd60b9b52f1998b4483b9cf107a72d3338e672f8"
 dependencies = [
  "anyhow",
@@ -10098,7 +10087,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "tinytools 0.5.0 (git+https://github.com/tinyhumansai/tinytools?rev=bd60b9b52f1998b4483b9cf107a72d3338e672f8)",
+ "tinytools 0.5.0",
 ]
 
 [[package]]
