@@ -19,7 +19,23 @@
 use std::fmt::Write as _;
 
 use super::turn_checkpoint::CheckpointToolResult;
-use tinyagents_harness::turn_stop::TurnStop;
+use tinyagents_harness::turn_stop::{CopyProvider, CopyRequest, TurnStop, TurnStopCopyKey};
+
+struct OpenHumanStopCopy;
+
+impl CopyProvider for OpenHumanStopCopy {
+    fn copy_override(&self, request: &CopyRequest<'_>) -> Option<String> {
+        match request {
+            CopyRequest::TurnStop { key: TurnStopCopyKey::ProviderConfig, .. } => Some(
+                "the configured model or provider rejected the request; check the model and API key in Connections".into(),
+            ),
+            CopyRequest::TurnStop { key: TurnStopCopyKey::MissingConnection, .. } => Some(
+                "a service this needs isn't connected; connect it in Connections, then ask me to try again".into(),
+            ),
+            _ => None,
+        }
+    }
+}
 
 /// Longest error line shown for one tool, in characters.
 const ERROR_LINE_CHARS: usize = 120;
@@ -149,8 +165,32 @@ impl StopReasonKind {
     }
 
     /// English copy completing "I stopped this turn early because …".
-    pub(crate) fn copy(self) -> &'static str {
-        crate::inference::failure_copy::stop_summary_copy(self.key())
+    pub(crate) fn copy(self) -> String {
+        // Render through TinyAgents' neutral copy table while preserving the
+        // OpenHuman settings destinations for the two actionable classes.
+        let key = match self {
+            Self::Transient => TurnStopCopyKey::Transient,
+            Self::UncertainSideEffect => TurnStopCopyKey::UncertainSideEffect,
+            Self::Authentication => TurnStopCopyKey::Authentication,
+            Self::Permission => TurnStopCopyKey::Permission,
+            Self::Policy => TurnStopCopyKey::Policy,
+            Self::MissingProgram => TurnStopCopyKey::MissingProgram,
+            Self::NotFound => TurnStopCopyKey::NotFound,
+            Self::InvalidCalls => TurnStopCopyKey::InvalidCalls,
+            Self::Unavailable => TurnStopCopyKey::Unavailable,
+            Self::SiteRefused => TurnStopCopyKey::SiteRefused,
+            Self::RepeatedFailure => TurnStopCopyKey::RepeatedFailure,
+            Self::VariedFailures => TurnStopCopyKey::VariedFailures,
+            Self::RepeatingStep => TurnStopCopyKey::RepeatingStep,
+            Self::OutOfCredits => TurnStopCopyKey::OutOfCredits,
+            Self::ProviderConfig => TurnStopCopyKey::ProviderConfig,
+            Self::MissingConnection => TurnStopCopyKey::MissingConnection,
+            Self::Generic => TurnStopCopyKey::Generic,
+        };
+        tinyagents_harness::turn_stop::render_copy(
+            &OpenHumanStopCopy,
+            &CopyRequest::TurnStop { key, operation: None },
+        )
     }
 
     /// Read the kind from a breaker stop note. The notes come from a fixed

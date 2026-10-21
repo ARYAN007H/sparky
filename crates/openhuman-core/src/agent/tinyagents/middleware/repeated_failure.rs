@@ -35,9 +35,9 @@ impl CopyProvider for OpenHumanHaltCopy {
         use tinyagents_harness::turn_stop::{CopyRequest, TurnStopCopyKey};
 
         match request {
-            CopyRequest::ProviderConfig { .. } => Some(
-                "Stopping: the configured model/provider rejected the request (e.g. an unknown model, a non-chat/embedding model, a missing credential, or a region block) — retrying will not help. Fix the model or API key in Connections → API keys → LLM. Details:\n".to_owned(),
-            ),
+            CopyRequest::ProviderConfig { tool, last_error } => Some(format!(
+                "Stopping: the `{tool}` step failed because the configured model/provider rejected the request (e.g. an unknown model, a non-chat/embedding model, a missing credential, or a region block) — retrying will not help. Fix the model or API key in Connections → API keys → LLM. Details:\n{last_error}"
+            )),
             CopyRequest::TurnStop { key: TurnStopCopyKey::ProviderConfig, .. } => Some(
                 "the configured model or provider rejected the request; check the model and API key in Connections".to_owned(),
             ),
@@ -88,9 +88,7 @@ fn terminal_inference_halt_summary(kind: TerminalInferenceFailureKind, tool: &st
             stop::halt_summary::budget(&OpenHumanHaltCopy, tool, error).summary
         }
         TerminalInferenceFailureKind::ProviderConfig => {
-            let summary = stop::halt_summary::provider_config(&OpenHumanHaltCopy, tool, error).summary;
-            // Keep the provider settings destination in OpenHuman's copy.
-            summary.replace("Fix the model or API key, then try again.", "Fix the model or API key in Connections → API keys → LLM.")
+            stop::halt_summary::provider_config(&OpenHumanHaltCopy, tool, error).summary
         }
     }
 }
@@ -364,8 +362,8 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
                     summary: summary.clone(),
                     cause: Some(tinyagents_harness::no_progress::ClassifiedStopCause {
                         class: match kind {
-                            crate::inference::failure_copy::TerminalInferenceFailure::BudgetExhausted => "out_of_credits",
-                            crate::inference::failure_copy::TerminalInferenceFailure::ProviderConfig => "provider_config",
+                            TerminalInferenceFailureKind::BudgetExhausted => "out_of_credits",
+                            TerminalInferenceFailureKind::ProviderConfig => "provider_config",
                         }.to_owned(),
                         operation: call.name.clone(),
                         summary,
