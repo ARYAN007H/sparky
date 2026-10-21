@@ -536,6 +536,66 @@ async fn native_staged_lease_cleans_dropped_queue_and_preserves_committed_claims
     .expect("dropping the final queued payload clone should discard its staged ref");
     assert!(!pending_file.exists());
 
+    let removed_id = uuid::Uuid::new_v4().simple().to_string();
+    let removed = image(MediaReference {
+        opaque_id: Some(removed_id.clone()),
+        content_type: Some("image/png".into()),
+        ..Default::default()
+    });
+    let removed_path = "removed-from-queue.png";
+    let removed_file = workspace.join(removed_path);
+    tokio::fs::write(&removed_file, b"removed bytes")
+        .await
+        .unwrap();
+    insert_record(&repo, &staged_record(removed.clone(), removed_path));
+    let queue_lease = NativeStagedLease::new(
+        ctx.clone(),
+        thread_id.into(),
+        config.clone(),
+        vec![removed.clone()],
+    );
+    let queue = tinyagents_harness::run_queue::RunQueue::new();
+    let queued = tinyagents_harness::turn_runner::TurnRequest {
+        scope: tinyagents_harness::turn_runner::ScopeKey {
+            agent_id: "orchestrator".into(),
+            profile_id: None,
+        },
+        thread_id: thread_id.into(),
+        request_id: "remove-native-media".into(),
+        text: "queued image".into(),
+        payload: crate::agent::queued_turn::QueuedPayload {
+            native_staged_lease: Some(queue_lease),
+            ..Default::default()
+        },
+        host_authored: false,
+        disposition: tinyagents_harness::turn_runner::QueueDisposition::Followup,
+        deadline: None,
+        idle_timeout: None,
+    };
+    queue
+        .push(tinyagents_harness::run_queue::QueueLane::Followup, queued)
+        .await;
+    assert_eq!(
+        queue
+            .remove_where(|request| request.request_id == "remove-native-media")
+            .await,
+        1
+    );
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            let record = get_staged_record(&repo, &staged_doc_id(&removed_id).unwrap())
+                .unwrap()
+                .unwrap();
+            if record.claim.is_some_and(|claim| claim.canceled) {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("removing the queued request should discard its staged media");
+    assert!(!removed_file.exists());
+
     let committed_id = uuid::Uuid::new_v4().simple().to_string();
     let committed = image(MediaReference {
         opaque_id: Some(committed_id.clone()),
