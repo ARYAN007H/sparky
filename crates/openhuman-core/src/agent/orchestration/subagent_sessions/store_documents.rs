@@ -232,23 +232,17 @@ impl Docs {
     {
         let id = key_of(subagent_session_id)?;
         let updated = self.0.run(|docs| async move {
-            let repo = tinystoragedrivers::Repo::<Value>::new(&docs, SESSIONS)?;
-            repo.update(&id, move |current| {
-                let Some(current) = current else {
-                    return Ok(None);
-                };
+            crate::storage::documents::compare_and_swap(&docs, SESSIONS, &id, move |current| {
                 let stored: StoredSession = serde_json::from_value(current)
                     .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
                 let mut session = DurableSubagentSession::from(stored);
                 if !update(&mut session, chrono::Utc::now().to_rfc3339()) {
-                    return Ok(None);
+                    return None;
                 }
-                let next = serde_json::to_value(StoredSession::from(&session))
-                    .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
-                Ok(Some(next))
+                serde_json::to_value(StoredSession::from(&session)).ok()
             })
             .await
-            .map(|updated| updated.map(|(value, _)| value))
+            .map(|updated| updated.map(|record| record.doc))
         })?;
         Ok(updated
             .map(|value| {
@@ -316,17 +310,15 @@ async fn write_if_newer(
 ) -> Result<(), crate::storage::StorageError> {
     // A missing session is inserted; an existing one is replaced only while it
     // is older than ours. Both go through tsd's one retrying compare-and-swap.
-    let repo = tinystoragedrivers::Repo::<Value>::new(docs, SESSIONS)?;
-    repo.update(id, |stored| {
+    crate::storage::documents::update_or_insert(docs, SESSIONS, id, |stored| {
         if stored
-            .as_ref()
             .and_then(|stored| stored.get("updated_ms"))
             .and_then(Value::as_i64)
             .is_some_and(|have| have >= updated_ms)
         {
-            return Ok(None);
+            return None;
         }
-        Ok(Some(doc.clone()))
+        Some(doc.clone())
     })
     .await
     .map(|_| ())

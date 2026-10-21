@@ -40,7 +40,7 @@ use super::types::{
     NotificationStatus,
 };
 use crate::config::Config;
-use crate::storage::documents::{compare_and_swap, text, Repo};
+use crate::storage::documents::{compare_and_swap, text, update_or_insert, Repo};
 use crate::storage::{DocumentStore, DocumentStoreExt, StorageError};
 
 pub(super) use super::storage_schema::{core_id, CORE, DEDUP, NOTIFICATIONS, SETTINGS};
@@ -225,11 +225,9 @@ async fn claim_content(
     skip_recent: bool,
 ) -> Result<Option<Option<i64>>, StorageError> {
     let window_start = now_ms - DEDUP_WINDOW_SECS * 1000;
-    let repo = tinystoragedrivers::Repo::<Value>::new(docs, DEDUP)?;
     let mut previous: Option<Option<i64>> = None;
-    repo.update(id, |current| {
+    update_or_insert(docs, DEDUP, id, |current| {
         let last = current
-            .as_ref()
             .and_then(|doc| doc.get("last_ms"))
             .and_then(Value::as_i64);
         if skip_recent && last.is_some_and(|last| last >= window_start) {

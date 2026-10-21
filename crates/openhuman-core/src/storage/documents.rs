@@ -319,6 +319,39 @@ pub async fn compare_and_swap(
     )))
 }
 
+/// Repeatedly applies a transformation to the latest document, inserting it
+/// when absent. Returning `None` declines the write. Conflicts restart the
+/// transformation against a fresh version, so callers never overwrite a
+/// concurrent update based on a stale read.
+///
+/// # Errors
+/// A storage error, or a conflict when the document changed for the retry
+/// budget.
+pub async fn update_or_insert(
+    docs: &Arc<dyn DocumentStore>,
+    collection: &str,
+    id: &str,
+    mut change: impl FnMut(Option<&Value>) -> Option<Value> + Send,
+) -> Result<bool, StorageError> {
+    for _ in 0..32 {
+        let current = docs.get(collection, id).await?;
+        let Some(next) = change(current.as_ref().map(|record| &record.doc)) else {
+            return Ok(false);
+        };
+        let precondition = current
+            .as_ref()
+            .map_or(Precondition::Absent, Versioned::unchanged);
+        match docs.put(collection, id, next, precondition).await {
+            Ok(_) => return Ok(true),
+            Err(error) if error.kind() == ErrorKind::Conflict => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(StorageError::conflict(format!(
+        "document `{collection}/{id}` kept changing during update"
+    )))
+}
+
 /// The string field `field` of `doc`, when present.
 pub fn text<'a>(doc: &'a Value, field: &str) -> Option<&'a str> {
     doc.get(field).and_then(Value::as_str)
