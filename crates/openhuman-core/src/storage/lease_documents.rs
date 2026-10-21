@@ -19,7 +19,7 @@ use super::lease::{
     CLUSTER_SCOPE, LEASE_COLLECTION, LeaseError, LeaseGrant, LeaseRecord, LeaseStore, validate_key,
 };
 
-/// The `tsd.leases` owner of the host's process-placement leases.
+/// The owner namespace of the host's process-placement lease documents.
 pub const LEASE_OWNER: &str = "profiles";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,7 +37,7 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
-/// Leases kept in `tsd.leases`. See the module docs.
+/// Host leases kept in [`LEASE_COLLECTION`]. See the module docs.
 pub struct DocumentLeases {
     docs: Arc<dyn DocumentStore>,
     /// The scope `docs` is bound to, when known ([`Self::cluster`]); a
