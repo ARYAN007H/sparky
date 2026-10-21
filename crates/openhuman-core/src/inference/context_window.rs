@@ -287,6 +287,8 @@ pub(crate) fn model_limits_request_for(
         crate::inference::provider::factory::CloudCredentialResolver(&resolution.key),
     )
     .discovery_request(&spec, &options)
+    .ok()
+    .flatten()
 }
 
 /// Static hints owned outside TinyInference's generic model catalog.

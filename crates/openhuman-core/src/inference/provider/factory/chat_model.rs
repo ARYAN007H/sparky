@@ -141,12 +141,7 @@ impl OpenHumanModelFactory<'_> {
         {
             parsed_route = Some(ProviderRoute {
                 provider: CLAUDE_AGENT_SDK_PROVIDER.to_owned(),
-                model: self
-                    .config
-                    .claude_agent_sdk
-                    .default_model
-                    .clone()
-                    .unwrap_or_default(),
+                model: self.config.claude_agent_sdk.default_model.clone(),
                 temperature: None,
             });
         }
@@ -194,14 +189,16 @@ impl OpenHumanModelFactory<'_> {
                 .parent()
                 .map(std::path::Path::to_path_buf)
                 .unwrap_or_else(|| self.config.workspace_dir.clone());
-            let context = tinyagents_harness::host::SubprocessProviderContext {
+            let context = tinyagents_harness::host::model_factory::SubprocessProviderContext {
                 workspace_dir: workspace,
                 action_dir: self.config.action_dir.clone(),
                 claude_agent_sdk: (&self.config.claude_agent_sdk).into(),
                 mcp_provider: Some(Arc::new(OpenHumanMcpEndpoint)),
             };
-            let model = tinyagents_harness::host::build_claude_subprocess_model(route, &context)?
-                .ok_or_else(|| anyhow::anyhow!("unsupported subprocess route"))?;
+            let model = tinyagents_harness::host::model_factory::build_claude_subprocess_model(
+                route, &context,
+            )?
+            .ok_or_else(|| anyhow::anyhow!("unsupported subprocess route"))?;
             let route_provider = route.provider.clone();
             let resolved_model = effective_model.to_owned();
             let route = ResolvedModelRoute::new(
@@ -326,20 +323,21 @@ fn build_one_shot(
 }
 
 impl ModelBuildGate for OpenHumanModelFactory<'_> {
-    fn check(&self, request: &ModelBuildRequest) -> anyhow::Result<()> {
+    fn check(&self, request: &ModelBuildRequest) -> tinyagents_harness::Result<()> {
         // Explicit host model injection is authoritative and has no provider
         // construction, credential, or egress side effect to gate.
         if self.injected(request).is_some() {
             return Ok(());
         }
         let provider = self.provider_for(request);
-        enforce_local_only_inference(&request.role, &provider)?;
+        enforce_local_only_inference(&request.role, &provider)
+            .map_err(|error| tinyagents_harness::TinyAgentsError::Model(error.to_string()))?;
         crate::inference::provider::factory::access_gates::verify_provider_session_in(
             self.ctx,
             self.config,
             &provider,
-        )?;
-        Ok(())
+        )
+        .map_err(|error| tinyagents_harness::TinyAgentsError::Model(error.to_string()))
     }
 }
 
@@ -347,8 +345,10 @@ impl ModelFactory<()> for OpenHumanModelFactory<'_> {
     fn build(
         &self,
         request: &ModelBuildRequest,
-    ) -> anyhow::Result<(Arc<dyn ChatModel<()>>, ResolvedModelRoute)> {
-        let (model, route) = self.build_request(request)?;
+    ) -> tinyagents_harness::Result<(Arc<dyn ChatModel<()>>, ResolvedModelRoute)> {
+        let (model, route) = self
+            .build_request(request)
+            .map_err(|error| tinyagents_harness::TinyAgentsError::Model(error.to_string()))?;
         let opts = ModelRequestDefaults {
             model: (!route.model.is_empty()).then(|| route.model.clone()),
             temperature: request.opts.temperature,

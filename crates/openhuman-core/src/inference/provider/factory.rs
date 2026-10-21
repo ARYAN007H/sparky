@@ -34,26 +34,24 @@ pub(crate) use credentials::{
     openai_bearer_is_oauth, redact_endpoint_origin, resolve_codex_routing,
 };
 pub(crate) use local_runtime::create_local_chat_model_from_string;
-pub(crate) use managed_backend::make_openhuman_backend_model;
 pub(crate) use routing::role_uses_implicit_cloud_fallback;
 pub use routing::{provider_for_role, role_bypasses_managed_credits};
 
 // Factory-internal helpers shared across the implementation modules.
 use access_gates::{emit_inference_egress, enforce_local_only_inference};
-use chat_model::{unresolved_chat_model_error_for, with_default_temperature};
+#[cfg(test)]
+use chat_model::unresolved_chat_model_error_for;
 #[cfg(test)]
 use cloud_slug::try_create_cloud_slug_chat_model;
-use cloud_slug::{
-    try_create_cloud_slug_chat_model_from_string,
-    try_create_cloud_slug_chat_model_from_string_with_native_tools_for,
-};
+#[cfg(test)]
+use cloud_slug::try_create_cloud_slug_chat_model_from_string;
+use cloud_slug::try_create_cloud_slug_chat_model_from_string_with_native_tools_for;
 use local_runtime::{try_create_local_runtime_chat_model_from_string, OptionalChatModelResult};
 #[cfg(test)]
 pub(crate) use managed_backend::make_openhuman_backend_model_for_thread;
 use managed_backend::managed_chat_model_for;
 pub(crate) use managed_backend::{
     make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread_in,
-    make_openhuman_backend_model_in,
 };
 use subprocess_providers::OpenHumanMcpEndpoint;
 use tinyinference_providers::route::split_model_and_temperature;
@@ -82,7 +80,7 @@ use crate::config::Config;
 use crate::security::credentials::AuthService;
 use crate::security::egress::EgressLedger;
 use std::sync::Arc;
-use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse, ModelStream};
+use tinyinference_llm::model::ChatModel;
 use tinyinference_llm::providers::openai::codex::{
     openai_codex_client_version, openai_codex_user_agent, OPENAI_CODEX_ACCOUNT_HEADER,
     OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,

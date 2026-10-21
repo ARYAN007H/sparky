@@ -6,7 +6,6 @@ use std::sync::Arc;
 use crate::core::runtime::DispatchCtx;
 
 use tinyinference_llm::model::ProfileOverrideModel;
-use tinyinference_llm::model::{ResolvedModelRoute, RouteRecordingModel};
 
 /// The per-turn crate [`ChatModel`](tinyinference_llm::model::ChatModel) set,
 /// assembled by TinyAgents' `TurnModelSet` for one turn.
@@ -500,71 +499,74 @@ impl TurnModelSource {
             });
             // Tool/vision gating keeps its historical provider-name rule; only
             // the wall-clock ceilings use endpoint-aware self-hosted detection.
-            let (provider_id, native_tools, supports_vision, is_local, self_hosted, context_window) =
-                if let Some(profile) = injected_profile {
-                    let provider_id = profile
-                        .provider
-                        .as_deref()
-                        .unwrap_or("injected")
-                        .to_string();
-                    (
-                        provider_id.clone(),
-                        profile.tool_calling,
-                        profile.modalities.image_in,
-                        crate::agent::tinyagents::turn_policy::provider_is_self_hosted(
-                            &provider_id,
-                            None,
-                        ),
-                        crate::agent::tinyagents::turn_policy::provider_is_self_hosted(
-                            &provider_id,
-                            None,
-                        ),
-                        context_window.or(profile.max_input_tokens),
-                    )
-                } else if host_injected.is_some() {
-                    // A host-injected model owns the provider choice even when
-                    // it does not publish a profile. Keep capability claims
-                    // conservative and retain only the caller's window.
-                    (
-                        "injected".to_string(),
-                        false,
-                        false,
-                        false,
-                        false,
-                        context_window,
-                    )
+            let (
+                provider_id,
+                native_tools,
+                supports_vision,
+                _is_local,
+                self_hosted,
+                context_window,
+            ) = if let Some(profile) = injected_profile {
+                let provider_id = profile
+                    .provider
+                    .as_deref()
+                    .unwrap_or("injected")
+                    .to_string();
+                (
+                    provider_id.clone(),
+                    profile.tool_calling,
+                    profile.modalities.image_in,
+                    crate::agent::tinyagents::turn_policy::provider_is_self_hosted(
+                        &provider_id,
+                        None,
+                    ),
+                    crate::agent::tinyagents::turn_policy::provider_is_self_hosted(
+                        &provider_id,
+                        None,
+                    ),
+                    context_window.or(profile.max_input_tokens),
+                )
+            } else if host_injected.is_some() {
+                // A host-injected model owns the provider choice even when
+                // it does not publish a profile. Keep capability claims
+                // conservative and retain only the caller's window.
+                (
+                    "injected".to_string(),
+                    false,
+                    false,
+                    false,
+                    false,
+                    context_window,
+                )
+            } else {
+                let is_local =
+                    tinyinference_local::profile::is_local_provider_string(&provider_string);
+                let self_hosted = crate::agent::tinyagents::turn_policy::provider_is_self_hosted(
+                    &provider_string,
+                    crate::agent::tinyagents::turn_policy::local_openai_endpoint(&cn.config)
+                        .as_deref(),
+                );
+                let provider_id = if provider_string == "openhuman"
+                    || provider_string.is_empty()
+                    || provider_string == "cloud"
+                {
+                    "managed".to_string()
                 } else {
-                    let is_local =
-                        tinyinference_local::profile::is_local_provider_string(&provider_string);
-                    let self_hosted =
-                        crate::agent::tinyagents::turn_policy::provider_is_self_hosted(
-                            &provider_string,
-                            crate::agent::tinyagents::turn_policy::local_openai_endpoint(
-                                &cn.config,
-                            )
-                            .as_deref(),
-                        );
-                    let provider_id = if provider_string == "openhuman"
-                        || provider_string.is_empty()
-                        || provider_string == "cloud"
-                    {
-                        "managed".to_string()
-                    } else {
-                        provider_string
-                            .split(':')
-                            .next()
-                            .unwrap_or(&provider_string)
-                            .to_string()
-                    };
-                    (
-                        provider_id,
-                        !is_local,
-                        !is_local,
-                        is_local,
-                        self_hosted,
-                        context_window,
-                    )
+                    provider_string
+                        .split(':')
+                        .next()
+                        .unwrap_or(&provider_string)
+                        .to_string()
                 };
+                (
+                    provider_id,
+                    !is_local,
+                    !is_local,
+                    is_local,
+                    self_hosted,
+                    context_window,
+                )
+            };
             return build_turn_models_crate(
                 &ctx,
                 &cn.role,
@@ -648,13 +650,13 @@ impl TurnModelSource {
                 .profile()
                 .and_then(|profile| profile.provider.as_deref())
                 .unwrap_or("unknown");
-            Ok(crate::attachments::provider::wrap(
+            return Ok(crate::attachments::provider::wrap(
                 &ctx,
                 model,
                 cn.config.clone(),
                 &route.model,
                 provider,
-            ))
+            ));
         }
         Err(anyhow::anyhow!("turn model source is missing a model"))
     }
