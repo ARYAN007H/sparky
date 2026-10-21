@@ -8,7 +8,6 @@ use crate::modules::channel_runtime::ChannelRuntimeLease;
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, Weak};
-use tokio::sync::mpsc;
 use tinybus::module::{ModuleCallError, ModuleClient, ModuleObjectClient};
 use tinychannels_bus::module_runtime::{
     ChannelIngressKind, ChannelMessagePreparation, ConfiguredChannelInfo,
@@ -16,6 +15,7 @@ use tinychannels_bus::module_runtime::{
 use tinychannels_bus::module_supervision::ChannelSupervisionPolicy;
 use tinychannels_bus::SendMessage;
 use tinychannels_bus::{ChannelInteraction, ChannelInteractionResult};
+use tokio::sync::mpsc;
 
 /// Channel objects sharing one captured config, callback object and module lease.
 pub(super) struct ModuleChannelRuntime {

@@ -5,7 +5,6 @@ use super::dispatch::{
     process_channel_message, process_channel_runtime_message, RuntimeChannelMessage,
 };
 use crate::channels::context::ChannelRuntimeContext;
-use tinychannels_bus::CHANNEL_MESSAGE_TIMEOUT_SECS;
 use crate::channels::ChannelSystemPrompt;
 use crate::config::{MultimodalConfig, MultimodalFileConfig, ReliabilityConfig};
 use crate::core::events::DomainEvent;
@@ -18,6 +17,7 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tinychannels_bus::ChannelMessage;
+use tinychannels_bus::CHANNEL_MESSAGE_TIMEOUT_SECS;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
 use wiremock::matchers::{method, path};

@@ -257,9 +257,7 @@ async fn native_progressive_transport_dispatches_typed_content_through_configure
     let channels: HashMap<String, Arc<ChannelHandle>> = HashMap::from([
         (
             other_account.name().to_owned(),
-            Arc::new(ChannelHandle::test(TestChannel::new(
-                other_account.name(),
-            ))),
+            Arc::new(ChannelHandle::test(TestChannel::new(other_account.name()))),
         ),
         (
             selected_account.name().to_owned(),
@@ -378,15 +376,11 @@ async fn native_progressive_transport_rejects_unconfigured_account_without_provi
     let channels: HashMap<String, Arc<ChannelHandle>> = HashMap::from([
         (
             "telegram:bot-a".into(),
-            Arc::new(ChannelHandle::test(TestChannel::new(
-                first_account.name(),
-            ))),
+            Arc::new(ChannelHandle::test(TestChannel::new(first_account.name()))),
         ),
         (
             "telegram:bot-b".into(),
-            Arc::new(ChannelHandle::test(TestChannel::new(
-                second_account.name(),
-            ))),
+            Arc::new(ChannelHandle::test(TestChannel::new(second_account.name()))),
         ),
     ]);
     let progressive_channels: HashMap<String, Arc<dyn ProgressiveChannelTransport>> =
@@ -444,9 +438,7 @@ async fn native_progressive_output_event_is_acknowledged_by_optional_host_observ
     let (callback, _context) = callback_for_channels(
         HashMap::from([(
             "telegram:bot-b".into(),
-            Arc::new(ChannelHandle::test(TestChannel::new(
-                "telegram:bot-b",
-            ))),
+            Arc::new(ChannelHandle::test(TestChannel::new("telegram:bot-b"))),
         )]),
         HashMap::from([(
             "telegram:bot-b".into(),
@@ -525,9 +517,7 @@ async fn native_progressive_output_event_validates_scope_without_observer() {
     let (callback, _context) = callback_for_channels(
         HashMap::from([(
             "telegram:bot-b".into(),
-            Arc::new(ChannelHandle::test(TestChannel::new(
-                "telegram:bot-b",
-            ))),
+            Arc::new(ChannelHandle::test(TestChannel::new("telegram:bot-b"))),
         )]),
         HashMap::from([(
             "telegram:bot-b".into(),
@@ -568,9 +558,7 @@ async fn native_progressive_output_event_validates_scope_before_observer() {
     let (callback, _) = callback_for_channels(
         HashMap::from([(
             "telegram:bot-b".into(),
-            Arc::new(ChannelHandle::test(TestChannel::new(
-                "telegram:bot-b",
-            ))),
+            Arc::new(ChannelHandle::test(TestChannel::new("telegram:bot-b"))),
         )]),
         HashMap::from([(
             "telegram:bot-b".into(),
@@ -598,9 +586,7 @@ async fn native_progressive_callbacks_stop_after_channel_session_cancellation() 
     let (callback, _context) = callback_for_channels(
         HashMap::from([(
             "telegram:bot-b".into(),
-            Arc::new(ChannelHandle::test(TestChannel::new(
-                "telegram:bot-b",
-            ))),
+            Arc::new(ChannelHandle::test(TestChannel::new("telegram:bot-b"))),
         )]),
         HashMap::from([(
             "telegram:bot-b".into(),
@@ -627,9 +613,7 @@ async fn native_progressive_callbacks_fail_closed_after_transport_owner_drops() 
     let (callback, context) = callback_for_channels(
         HashMap::from([(
             "telegram:bot-b".into(),
-            Arc::new(ChannelHandle::test(TestChannel::new(
-                "telegram:bot-b",
-            ))),
+            Arc::new(ChannelHandle::test(TestChannel::new("telegram:bot-b"))),
         )]),
         HashMap::from([(
             "telegram:bot-b".into(),

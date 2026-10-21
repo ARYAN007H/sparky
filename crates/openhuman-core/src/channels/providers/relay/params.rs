@@ -51,7 +51,10 @@ impl RelayInboundParams {
     /// Production callers obtain this from `PrepareChannelIdentity`.
     #[cfg(test)]
     pub(crate) fn thread_id(&self) -> String {
-        format!("channel:{}/{}/{}", self.channel, self.sender_id, self.chat_id)
+        format!(
+            "channel:{}/{}/{}",
+            self.channel, self.sender_id, self.chat_id
+        )
     }
 
     /// A message with the five required facts and nothing optional: no
