@@ -10,14 +10,14 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tinytools::Tool;
 
-pub(crate) use tinychannels_runtime::context::{
-    ChannelRouteSelection, CHANNEL_MESSAGE_TIMEOUT_SECS, CHANNEL_TYPING_REFRESH_INTERVAL_SECS,
+pub(crate) use tinychannels_bus::{
+    CHANNEL_MESSAGE_TIMEOUT_SECS, CHANNEL_TYPING_REFRESH_INTERVAL_SECS, ChannelRouteSelection,
     DEFAULT_CHANNEL_INITIAL_BACKOFF_SECS, DEFAULT_CHANNEL_MAX_BACKOFF_SECS, MAX_CHANNEL_HISTORY,
 };
 
 #[cfg(test)]
 pub(crate) use tinychannels::context::{
-    effective_channel_message_timeout_secs, MIN_CHANNEL_MESSAGE_TIMEOUT_SECS,
+    MIN_CHANNEL_MESSAGE_TIMEOUT_SECS, effective_channel_message_timeout_secs,
 };
 
 pub(crate) type TurnModelSourceCacheMap = Arc<Mutex<HashMap<String, TurnModelSource>>>;
