@@ -7,14 +7,14 @@ fn raw_devices_security_registry_matches_its_independent_contract() {
         .iter()
         .filter(|row| row.controller.schema.namespace == "devices")
         .collect();
-    let methods = [
-        "devices.create_pairing",
-        "devices.list",
-        "devices.revoke",
-    ];
+    let methods = ["devices.create_pairing", "devices.list", "devices.revoke"];
     let contracts = crate::security::devices::devices_parameter_contracts();
 
-    assert_eq!(entries.len(), methods.len(), "complete raw devices inventory");
+    assert_eq!(
+        entries.len(),
+        methods.len(),
+        "complete raw devices inventory"
+    );
     assert_eq!(
         entries
             .iter()
@@ -23,9 +23,7 @@ fn raw_devices_security_registry_matches_its_independent_contract() {
         methods,
         "device registration order is a wire contract"
     );
-    assert!(entries
-        .iter()
-        .all(|row| row.group == DomainGroup::Security));
+    assert!(entries.iter().all(|row| row.group == DomainGroup::Security));
     assert!(internal_registry()
         .iter()
         .all(|row| row.controller.schema.namespace != "devices"));
@@ -55,9 +53,18 @@ fn raw_devices_security_registry_matches_its_independent_contract() {
             .iter()
             .map(|field| field.name)
             .collect::<Vec<_>>(),
-        ["channel_id", "pairing_token", "core_pubkey", "rpc_url", "expires_at"]
+        [
+            "channel_id",
+            "pairing_token",
+            "core_pubkey",
+            "rpc_url",
+            "expires_at"
+        ]
     );
-    assert_eq!(create.outputs.iter().filter(|field| field.required).count(), 4);
+    assert_eq!(
+        create.outputs.iter().filter(|field| field.required).count(),
+        4
+    );
 
     let list = &entries[1].controller.schema;
     assert!(list.inputs.is_empty());

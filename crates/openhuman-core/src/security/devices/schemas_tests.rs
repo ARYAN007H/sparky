@@ -132,7 +132,10 @@ fn revoke_parser_requires_and_preserves_a_string_channel_id() {
     );
     for (value, serde_error) in [
         (json!(null), "invalid type: null, expected a string"),
-        (json!(true), "invalid type: boolean `true`, expected a string"),
+        (
+            json!(true),
+            "invalid type: boolean `true`, expected a string",
+        ),
         (json!(7), "invalid type: integer `7`, expected a string"),
         (json!([]), "invalid type: sequence, expected a string"),
         (json!({}), "invalid type: map, expected a string"),
@@ -147,5 +150,60 @@ fn revoke_parser_requires_and_preserves_a_string_channel_id() {
             parse_revoke(Map::from_iter([("channel_id".into(), json!(value))])).unwrap(),
             value
         );
+    }
+}
+
+async fn runtime_device_entries() -> Vec<crate::core::all::ControllerEntry> {
+    use crate::core::runtime::{CoreContext, DomainSet};
+
+    CoreContext::scope(CoreContext::for_test(DomainSet::full(), None), async {
+        crate::core::all::all_registered_controllers()
+            .into_iter()
+            .filter(|entry| entry.schema.namespace == "devices")
+            .collect()
+    })
+    .await
+}
+
+#[tokio::test]
+async fn device_handlers_load_config_before_parsing_or_running() {
+    use crate::config::test_env::EnvVarGuard;
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::create_dir(tmp.path().join("config.toml")).unwrap();
+    let _env = EnvVarGuard::workspace_async(tmp.path()).await;
+    let entries = runtime_device_entries().await;
+    assert_eq!(entries.len(), 3, "all runtime device entries are present");
+    let ctx = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None));
+
+    for (method, params) in [
+        (
+            "devices.create_pairing",
+            Map::from_iter([("label".into(), json!(false))]),
+        ),
+        (
+            "devices.list",
+            Map::from_iter([("unexpected".into(), json!({"ignored": true}))]),
+        ),
+        (
+            "devices.revoke",
+            Map::from_iter([("channel_id".into(), json!(false))]),
+        ),
+    ] {
+        let entry = entries
+            .iter()
+            .find(|entry| entry.schema.method_name() == method)
+            .expect("runtime device method is registered");
+        let error = entry
+            .invoke(ctx.clone(), params)
+            .await
+            .expect_err("invalid config prevents parser/runner effects");
+        assert!(
+            error.contains("is a directory") || error.contains("not a file"),
+            "{method} config load precedes its parser and operation: {error}"
+        );
+        assert!(!error.starts_with("invalid 'label':"));
+        assert!(!error.starts_with("invalid 'channel_id':"));
     }
 }
