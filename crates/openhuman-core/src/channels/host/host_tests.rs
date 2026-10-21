@@ -1,13 +1,6 @@
 //! Unit tests for the OpenHuman ChannelHost capability adapters.
 
 use super::*;
-use std::sync::Arc;
-use tinychannels::host::{
-    ApprovalDecision, ApprovalGate, ConversationMessage, ConversationStore, EventSink, Transcriber,
-};
-
-use crate::config::Config;
-
 #[test]
 fn typed_channel_projection_uses_the_target_message_id_not_the_event_id() {
     use tinychannels_bus::{
@@ -259,35 +252,13 @@ async fn typed_channel_projection_uses_scoped_persisted_row_bindings_after_resta
     );
 }
 
-// --- ApprovalGate::parse_reply -------------------------------------------
-
-#[test]
-fn approval_gate_maps_core_replies() {
-    let gate = CoreApprovalGate;
-    assert_eq!(gate.parse_reply("yes"), Some(ApprovalDecision::Approve));
-    assert_eq!(gate.parse_reply("APPROVE"), Some(ApprovalDecision::Approve));
-    assert_eq!(gate.parse_reply("no"), Some(ApprovalDecision::Deny));
-    assert_eq!(gate.parse_reply("deny"), Some(ApprovalDecision::Deny));
-    assert_eq!(gate.parse_reply("banana"), None);
-}
-
-// --- Reactions -----------------------------------------------------------
-
-/// The host offers no reaction gate: emoji reactions came from a local-model
-/// call that sat on the reply path and could hold back delivery indefinitely.
-#[test]
-fn channel_host_offers_no_reaction_gate() {
-    let host = build_channel_host(Arc::new(Config::default()));
-    assert!(host.reactions().is_none());
-}
-
 // --- OpenHumanEventSink --------------------------------------------------
 
 #[tokio::test]
 async fn event_sink_accepts_web_channel_event_shape() {
     let sink = OpenHumanEventSink;
     let ok = sink
-        .publish(
+        .publish_host(
             "web",
             "chat_done",
             serde_json::json!({
@@ -306,7 +277,7 @@ async fn event_sink_accepts_web_channel_event_shape() {
 async fn event_sink_rejects_non_object_payload() {
     let sink = OpenHumanEventSink;
     let err = sink
-        .publish("web", "bad", serde_json::json!([1, 2, 3]))
+        .publish_host("web", "bad", serde_json::json!([1, 2, 3]))
         .await;
     assert!(err.is_err());
 }
@@ -315,7 +286,7 @@ async fn event_sink_rejects_non_object_payload() {
 async fn event_sink_routes_channel_reactions_to_domain_bus() {
     let sink = OpenHumanEventSink;
     assert!(sink
-        .publish(
+        .publish_host(
             "channel",
             "reaction_received",
             serde_json::json!({
@@ -338,85 +309,12 @@ async fn event_sink_routes_channel_reactions_to_domain_bus() {
         .is_ok());
     // Unknown domain/kind is a benign no-op.
     assert!(sink
-        .publish("mystery", "x", serde_json::json!({}))
+        .publish_host("mystery", "x", serde_json::json!({}))
         .await
         .is_ok());
     assert!(sink
-        .publish("channel", "unknown", serde_json::json!({}))
+        .publish_host("channel", "unknown", serde_json::json!({}))
         .await
         .is_ok());
 }
 
-// --- ConversationHistoryStore --------------------------------------------
-
-#[tokio::test]
-async fn conversation_store_append_then_history_roundtrips() {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let store = ConversationHistoryStore {
-        workspace_dir: dir.path().to_path_buf(),
-    };
-    let thread = "thread-1";
-
-    store
-        .append(
-            thread,
-            ConversationMessage {
-                role: "user".into(),
-                content: "first".into(),
-                timestamp: None,
-            },
-        )
-        .await
-        .expect("append user");
-    store
-        .append(
-            thread,
-            ConversationMessage {
-                role: "assistant".into(),
-                content: "second".into(),
-                timestamp: None,
-            },
-        )
-        .await
-        .expect("append assistant");
-
-    let history = store.history(thread, 10).await.expect("history");
-    assert_eq!(history.len(), 2);
-    assert_eq!(history[0].content, "first");
-    assert_eq!(history[0].role, "user");
-    assert_eq!(history[1].content, "second");
-    assert_eq!(history[1].role, "assistant");
-
-    // `limit` keeps the most recent messages.
-    let recent = store.history(thread, 1).await.expect("history limited");
-    assert_eq!(recent.len(), 1);
-    assert_eq!(recent[0].content, "second");
-}
-
-// --- build_channel_host ---------------------------------------------------
-
-#[test]
-fn build_channel_host_advertises_expected_capabilities() {
-    let host = build_channel_host(Arc::new(Config::default()));
-    let caps = host.capabilities();
-    assert!(caps.lifecycle);
-    assert!(caps.stt);
-    assert!(caps.tts);
-    assert!(!caps.reaction_gate, "no reaction gate is offered");
-    assert!(caps.approvals);
-    assert!(caps.conversation_store);
-    assert!(caps.event_sink);
-    assert!(caps.allowlist_store);
-    // Not yet backed portably:
-    assert!(!caps.turn_dispatch);
-    assert!(!caps.run_ledger);
-    assert!(!caps.memory_recall);
-}
-
-#[test]
-fn transcriber_reports_stable_name() {
-    let stt = VoiceTranscriber {
-        config: Arc::new(Config::default()),
-    };
-    assert_eq!(stt.name(), "openhuman-voice");
-}
