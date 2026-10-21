@@ -642,6 +642,12 @@ async fn canceling_native_media_resolution_cleans_the_first_staged_part() {
     let task_ctx = ctx.clone();
     let task_config = config.clone();
     let task = tokio::spawn(async move {
+        let lease = NativeStagedLease::new(
+            task_ctx.clone(),
+            thread_id.into(),
+            task_config.clone(),
+            Vec::new(),
+        );
         let source = image(MediaReference {
             content_type: Some("image/png".into()),
             kind: tinychannels_bus::MediaKind::Image,
@@ -655,6 +661,7 @@ async fn canceling_native_media_resolution_cleans_the_first_staged_part() {
             "first-native.png",
             "image/png",
             b"cancellation lifecycle fixture",
+            &lease,
         )
         .await
         .unwrap();

@@ -427,11 +427,16 @@ pub(crate) async fn process_channel_runtime_message(
     } else {
         None
     };
-    let (native_message_input, native_staged_parts, native_preparation_error) =
+    let (native_message_input, native_staged_parts, native_staged_lease, native_preparation_error) =
         match native_preparation {
-            Some(Ok(Some(prepared))) => (Some(prepared.message), prepared.staged_parts, None),
-            Some(Ok(None)) | None => (None, Vec::new(), None),
-            Some(Err(error)) => (None, Vec::new(), Some(error)),
+            Some(Ok(Some(prepared))) => (
+                Some(prepared.message),
+                prepared.staged_parts,
+                Some(prepared.staged_lease),
+                None,
+            ),
+            Some(Ok(None)) | None => (None, Vec::new(), None, None),
+            Some(Err(error)) => (None, Vec::new(), None, Some(error)),
         };
     let channel_session = selected_host.as_ref().and_then(|host| {
         let account_id = envelope
@@ -487,6 +492,7 @@ pub(crate) async fn process_channel_runtime_message(
                 enriched_message.clone(),
                 native_message_input,
                 native_staged_parts,
+                native_staged_lease,
                 Some(envelope.message_id.clone()),
                 native_preparation_error,
                 trusted,

@@ -47,7 +47,11 @@ impl NativeStagedLease {
     }
 
     pub(crate) fn track(&self, part: ContentPart) -> Result<(), String> {
-        let mut parts = self.0.parts.lock().unwrap_or_else(|error| error.into_inner());
+        let mut parts = self
+            .0
+            .parts
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         if self.0.state.load(Ordering::Acquire) != NATIVE_STAGED_ACTIVE {
             return Err("native attachment lease is no longer active".into());
         }
@@ -82,14 +86,14 @@ impl NativeStagedLease {
             state: self.0.clone(),
             completed: false,
         };
-        let parts = self.0.parts.lock().unwrap_or_else(|error| error.into_inner()).clone();
-        discard_native_channel_parts(
-            &self.0.dispatch,
-            &self.0.thread_id,
-            &self.0.config,
-            &parts,
-        )
-        .await?;
+        let parts = self
+            .0
+            .parts
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone();
+        discard_native_channel_parts(&self.0.dispatch, &self.0.thread_id, &self.0.config, &parts)
+            .await?;
         self.0
             .state
             .store(NATIVE_STAGED_DISCARDED, Ordering::Release);

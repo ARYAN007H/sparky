@@ -184,6 +184,12 @@ pub(super) async fn resolve_typed_message(
         .map_err(|error| log_rejection("module_media_read", error))?;
         media_payloads.push((index, part.clone(), name, mime, bytes));
     }
+    let staged_lease = crate::threads::attachments::NativeStagedLease::new(
+        host_dispatch.clone(),
+        thread_id.to_owned(),
+        config.clone(),
+        Vec::new(),
+    );
     for (index, input, name, mime, bytes) in media_payloads {
         let staged = match crate::threads::attachments::stage_native_channel_part(
             host_dispatch,
@@ -193,18 +199,13 @@ pub(super) async fn resolve_typed_message(
             &name,
             &mime,
             &bytes,
+            &staged_lease,
         )
         .await
         {
             Ok(staged) => staged,
             Err(error) => {
-                let _ = crate::threads::attachments::discard_native_channel_parts(
-                    host_dispatch,
-                    thread_id,
-                    config,
-                    &staged_parts,
-                )
-                .await;
+                let _ = staged_lease.discard().await;
                 return Err(log_rejection("host_staging", error));
             }
         };
@@ -230,19 +231,14 @@ pub(super) async fn resolve_typed_message(
         match crate::agent::message_convert::user_message_from_parts(channel_context, &parts) {
             Ok(message) => message,
             Err(error) => {
-                let _ = crate::threads::attachments::discard_native_channel_parts(
-                    host_dispatch,
-                    thread_id,
-                    config,
-                    &staged_parts,
-                )
-                .await;
+                let _ = staged_lease.discard().await;
                 return Err(log_rejection("message_conversion", error));
             }
         };
     Ok(Some(ResolvedNativeMessage {
         message,
         staged_parts,
+        staged_lease,
     }))
 }
 
@@ -258,6 +254,7 @@ fn media_opaque_id(part: &ContentPart) -> Option<&str> {
 pub(super) struct ResolvedNativeMessage {
     pub(super) message: Message,
     pub(super) staged_parts: Vec<ContentPart>,
+    pub(super) staged_lease: crate::threads::attachments::NativeStagedLease,
 }
 
 fn media_scope(envelope: &ChannelInboundEnvelope) -> Result<HostVoiceScope, String> {

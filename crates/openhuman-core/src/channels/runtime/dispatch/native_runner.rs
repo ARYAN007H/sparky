@@ -560,6 +560,7 @@ pub(crate) async fn run(
     text: String,
     message_input: Option<tinyinference_llm::message::Message>,
     staged_parts: Vec<tinychannels_bus::ContentPart>,
+    staged_lease: Option<crate::threads::attachments::NativeStagedLease>,
     staged_message_id: Option<String>,
     preparation_error: Option<String>,
     trusted: Arc<crate::agent::turn_host::TrustedAgentTurn>,
@@ -576,14 +577,6 @@ pub(crate) async fn run(
         }
     };
     runtime.shared.begin_delivery_wait(&request_id);
-    let staged_lease = (!staged_parts.is_empty()).then(|| {
-        crate::threads::attachments::NativeStagedLease::new(
-            dispatch.clone(),
-            thread_id.clone(),
-            trusted.host_agent.config.clone(),
-            staged_parts.clone(),
-        )
-    });
     let request = TurnRequest {
         scope: ScopeKey {
             agent_id: trusted.host_agent.definition.id.clone(),
