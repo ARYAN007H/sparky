@@ -492,6 +492,7 @@ pub async fn agent_chat_reply_for(
             let scope = crate::agent::attachments::AttachmentAccessScope {
                 external_channel: false,
                 workspace: turn_cwd.clone(),
+                ..Default::default()
             };
             let references = crate::agent::attachments::host::stage_host(
                 attachments,

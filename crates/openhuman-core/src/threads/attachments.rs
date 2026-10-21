@@ -284,6 +284,7 @@ pub(crate) async fn restage_persisted_parts(
     let scope = crate::agent::attachments::AttachmentAccessScope {
         external_channel: false,
         workspace: Some(workspace),
+        ..Default::default()
     };
     for part in &mut resolved {
         let media = opaque_media_mut(part)

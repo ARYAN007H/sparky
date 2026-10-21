@@ -317,6 +317,7 @@ pub(super) async fn message_append_with_config(
                         Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
                     ),
                     workspace: Some(workspace.clone()),
+                    ..Default::default()
                 };
                 let path = crate::agent::attachments::resolve_path(config, &file.path, &scope)
                     .await

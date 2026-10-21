@@ -446,6 +446,8 @@ pub(super) async fn validate_staged_files(
         let scope = crate::agent::attachments::AttachmentAccessScope {
             external_channel: false,
             workspace: Some(workspace.clone()),
+            thread_id: Some(thread_id.to_owned()),
+            ..Default::default()
         };
         let path = crate::agent::attachments::resolve_path(config, &entry.path, &scope)
             .await
@@ -520,6 +522,8 @@ pub(super) async fn discard_staged_entries(
         let scope = crate::agent::attachments::AttachmentAccessScope {
             external_channel: false,
             workspace: Some(workspace.clone()),
+            thread_id: Some(thread_id.to_owned()),
+            ..Default::default()
         };
         let path = crate::agent::attachments::resolve_path(config, &entry.path, &scope)
             .await
