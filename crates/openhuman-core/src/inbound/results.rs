@@ -23,6 +23,7 @@ use tinystoragedrivers::{CollectionSpec, ErrorKind, Filter, IndexSpec, Precondit
 use crate::config::Config;
 use crate::storage::documents::{compare_and_swap, Repo};
 use crate::storage::schema_support::{key_of, owner};
+use crate::storage::DocumentStoreExt;
 
 /// The results collection.
 pub const RESULTS: &str = "inbound.results";
