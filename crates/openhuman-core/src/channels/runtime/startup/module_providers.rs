@@ -61,6 +61,12 @@ impl ModuleChannelRuntime {
         context: Arc<OnceLock<Weak<crate::channels::context::ChannelRuntimeContext>>>,
         dispatch: mpsc::Sender<RuntimeChannelMessage>,
     ) -> Result<Self> {
+        #[cfg(feature = "voice")]
+        if channel_voice_codec_may_be_used(&config) {
+            if let Err(error) = crate::modules::ops::ensure_loaded(&config, "tinyvoice").await {
+                tracing::warn!("[channels] TinyVoice codec module is unavailable: {error}");
+            }
+        }
         let client = crate::modules::client((*config).clone());
         // Queued deliveries from before the storage contract move into the
         // module's storage before it starts and reads its queue. Best effort:
@@ -287,6 +293,27 @@ impl ModuleChannelRuntime {
             None => Ok(()),
         }
     }
+}
+
+#[cfg(feature = "voice")]
+fn channel_voice_codec_may_be_used(config: &Config) -> bool {
+    use crate::config::schema::VoiceReplyMode;
+
+    if crate::modules::ops::disabled_component(config, "tinyvoice").is_some() {
+        return false;
+    }
+
+    config.channel_voice.reply_mode != VoiceReplyMode::Never
+        || config
+            .channel_voice
+            .channels
+            .values()
+            .any(|override_| override_.reply_mode.is_some_and(|mode| mode != VoiceReplyMode::Never))
+        || config
+            .channel_voice
+            .threads
+            .values()
+            .any(|mode| *mode != VoiceReplyMode::Never)
 }
 
 impl Drop for ModuleChannelRuntime {
