@@ -147,7 +147,7 @@ impl ModuleChannelRuntime {
             let channel = Arc::new(channel);
             channels.insert(
                 info.name.clone(),
-                Arc::new(super::ChannelHandle::Module((*channel).clone())),
+                Arc::new(super::ChannelHandle::Module(Arc::clone(&channel))),
             );
             let progressive_channel: Arc<dyn ProgressiveChannelTransport> = channel.clone();
             progressive.insert(info.name.clone(), Arc::downgrade(&progressive_channel));

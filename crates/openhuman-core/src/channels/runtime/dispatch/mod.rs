@@ -32,7 +32,7 @@ use processor::channel_has_approval_surface;
 
 // Re-export internal helpers accessed by test_support (cfg(any(test,
 // debug_assertions))) and the inline #[cfg(test)] modules via `super::*`.
-#[cfg(test)]
+#[cfg(any(test, debug_assertions))]
 use helpers::build_channel_context_block;
 #[cfg(test)]
 use helpers::select_acknowledgment_reaction;
@@ -40,10 +40,10 @@ use helpers::select_acknowledgment_reaction;
 #[cfg(test)]
 use routing::{build_visible_tool_set, AgentScoping};
 
-#[cfg(test)]
+#[cfg(any(test, debug_assertions))]
 use tinychannels_bus as traits;
 
-#[cfg(test)]
+#[cfg(any(test, debug_assertions))]
 #[path = "mod_test_support_tests.rs"]
 pub mod test_support;
 

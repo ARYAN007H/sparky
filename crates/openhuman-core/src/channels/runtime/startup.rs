@@ -17,7 +17,7 @@ use tinybus::module::{ModuleCallError, ModuleClient};
 /// are dispatched through the loaded TinyChannels module's bus object.
 #[derive(Clone)]
 pub(crate) enum ChannelHandle {
-    Module(module_providers::ModuleChannel),
+    Module(std::sync::Arc<module_providers::ModuleChannel>),
     Relay(std::sync::Arc<crate::channels::providers::relay::RelayChannel>),
     /// Test-only sink for narrow policy tests that do not need the linked module.
     #[cfg(test)]

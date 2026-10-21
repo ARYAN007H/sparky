@@ -6,7 +6,7 @@ use super::dispatch::{
 };
 pub use super::startup::test_support::resolve_yuanbao_app_secret_for_test;
 use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, AGENT_RUN_TURN_METHOD};
-use crate::channels::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
+use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::ChannelSystemPrompt;
 use crate::config::{MultimodalConfig, MultimodalFileConfig, ReliabilityConfig};
 use crate::core::bus::BUS;
@@ -139,7 +139,7 @@ pub struct DispatchHarnessObservation {
 /// should use this fixture rather than a synthetic `Channel` implementation.
 pub(crate) struct LinkedTelegramRuntime {
     _env: crate::config::test_env::EnvVarGuard,
-    _storage: crate::channels::module_fixture_tests::MemoryStorageGuard,
+    _storage: crate::channels::module_fixture::MemoryStorageGuard,
     _workspace: tempfile::TempDir,
     server: MockServer,
     runtime: crate::channels::runtime::ModuleRuntimeTestGuard,
@@ -363,10 +363,9 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
             }
         });
 
-    let state = Arc::new(crate::channels::runtime::TestChannel::new(
-        options.channel_name.clone(),
-    ));
+    let mut state = crate::channels::runtime::TestChannel::new(options.channel_name.clone());
     state.supports_reactions = options.supports_reactions;
+    let state = Arc::new(state);
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(
         options.channel_name.clone(),

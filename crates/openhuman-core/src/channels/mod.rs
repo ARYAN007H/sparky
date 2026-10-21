@@ -43,7 +43,7 @@ pub(crate) use system_prompt::ChannelSystemPrompt;
 #[cfg(all(feature = "channels", test))]
 mod tests;
 
-#[cfg(all(feature = "channels", any(test, feature = "e2e-test-support")))]
+#[cfg(all(feature = "channels", any(test, debug_assertions)))]
 pub mod test_support;
 
 #[cfg(feature = "channels")]

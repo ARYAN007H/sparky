@@ -353,16 +353,14 @@ pub enum DomainEvent {
         /// `workspace_dir` does not match their own workspace binding.
         workspace_dir: std::path::PathBuf,
     },
-    /// Retired legacy reaction callback payload. Kept as a wire tombstone for
-    /// Events 1.x compatibility; new providers publish typed `ChannelEvent`s.
+    /// Retired legacy reaction callback payload, retained as an Events 1.x wire tombstone.
     ChannelReactionReceived {
         channel: String,
         sender: String,
         target_message_id: String,
         emoji: String,
     },
-    /// Retired legacy reaction callback payload. Kept as a wire tombstone for
-    /// Events 1.x compatibility; new providers publish typed `ChannelEvent`s.
+    /// Retired legacy reaction callback payload, retained as an Events 1.x wire tombstone.
     ChannelReactionSent {
         channel: String,
         target_message_id: String,
