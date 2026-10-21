@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, it } from 'vitest';
 
 import { __metaAssertPressKeyReachesCaptureListener } from '../../../test/commandTestUtils';

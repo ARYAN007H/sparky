@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

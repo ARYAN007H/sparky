@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { BACKEND_URL } from '../../utils/config';
