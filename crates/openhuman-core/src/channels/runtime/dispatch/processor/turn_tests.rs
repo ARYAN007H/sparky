@@ -75,3 +75,93 @@ async fn native_inbound_preparation_preserves_image_envelope_for_typed_turns() {
     .await;
     assert!(legacy.is_err(), "legacy callers must still reject rich-only input");
 }
+
+#[tokio::test]
+async fn native_typed_preparation_preserves_ordered_voice_and_file_parts() {
+    use tinychannels_bus::{
+        channel::{
+            ChannelRef, ContentPart, ConversationKind, ConversationRef, FileReference, MediaKind,
+            MediaReference, SenderRef, VoiceNote, VoiceTranscript, VoiceTranscriptSource,
+            VoiceTranscriptState,
+        },
+        module_inbound::{ChannelInboundSource, ChannelInboundPreparationMode},
+    };
+
+    let envelope = tinychannels_bus::ChannelInboundEnvelope {
+        channel: ChannelRef {
+            id: "telegram".into(),
+            account_id: Some("work".into()),
+        },
+        message_id: "provider-message-voice-file".into(),
+        conversation: ConversationRef {
+            kind: ConversationKind::Dm,
+            id: "chat-12".into(),
+            thread_id: Some("thread-3".into()),
+            topic_id: Some("topic-4".into()),
+            ..Default::default()
+        },
+        sender: SenderRef {
+            id: "sender-2".into(),
+            ..Default::default()
+        },
+        text: "before".into(),
+        parts: vec![
+            ContentPart::Text {
+                text: "before".into(),
+                markdown_dialect: None,
+            },
+            ContentPart::VoiceNote {
+                voice_note: VoiceNote {
+                    transcript: Some(VoiceTranscript {
+                        text: "spoken words".into(),
+                        language: Some("en".into()),
+                        state: VoiceTranscriptState::Complete,
+                        source: VoiceTranscriptSource::HostStt,
+                    }),
+                    ..Default::default()
+                },
+            },
+            ContentPart::File {
+                media: MediaReference {
+                    opaque_id: Some("scoped-file-ref".into()),
+                    file_name: Some("notes.txt".into()),
+                    content_type: Some("text/plain".into()),
+                    kind: MediaKind::Document,
+                    ..Default::default()
+                },
+                file_name: Some("notes.txt".into()),
+                caption: Some("meeting notes".into()),
+            },
+            ContentPart::Text {
+                text: "after".into(),
+                markdown_dialect: None,
+            },
+        ],
+        ..Default::default()
+    };
+
+    let prepared = crate::modules::channel_controller::prepare_inbound(
+        &crate::channels::module_fixture::client().await,
+        channel_inbound_preparation_request(
+            ChannelInboundSource::Envelope {
+                envelope: envelope.clone(),
+                timestamp: 2,
+            },
+            ChannelInboundPreparationMode::Typed,
+        ),
+    )
+    .await
+    .expect("typed preparation retains the full provider envelope");
+
+    assert_eq!(prepared.envelope, envelope);
+    assert_eq!(prepared.message.content, "before\\nspoken words\\nafter");
+    assert_eq!(prepared.envelope.channel.account_id.as_deref(), Some("work"));
+    assert_eq!(prepared.envelope.conversation.thread_id.as_deref(), Some("thread-3"));
+    assert_eq!(prepared.envelope.conversation.topic_id.as_deref(), Some("topic-4"));
+    assert!(matches!(
+        prepared.envelope.parts.get(2),
+        Some(ContentPart::File { media, .. }) if media.opaque_id.as_deref() == Some("scoped-file-ref")
+    ));
+
+    let _ = FileReference::default();
+}
