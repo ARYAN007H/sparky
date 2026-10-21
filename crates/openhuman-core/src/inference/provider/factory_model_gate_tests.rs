@@ -4,6 +4,8 @@ use super::*;
 async fn turn_factory_checks_privacy_then_explicit_host_session_before_building_or_egress() {
     let _guard = crate::inference::inference_test_guard_async().await;
     let _env = crate::config::TEST_ENV_LOCK.lock().await;
+    crate::core::bus::init().await.expect("bus init");
+    let mut events = crate::core::bus::BUS.get().expect("bus").receiver();
     let tmp = tempfile::tempdir().expect("isolated workspace");
     let builds = install_test_managed_provider();
     let mut config = Config::default();
@@ -32,32 +34,76 @@ async fn turn_factory_checks_privacy_then_explicit_host_session_before_building_
     };
 
     crate::core::runtime::CoreContext::scope(ambient_library, async {
-        let _privacy =
-            crate::security::live_policy::test_privacy_scope(crate::config::PrivacyMode::LocalOnly);
-        let privacy_result =
+        {
+            let _privacy = crate::security::live_policy::test_privacy_scope(
+                crate::config::PrivacyMode::LocalOnly,
+            );
+            let result =
+                tinyagents_harness::host::TurnModelSet::<()>::builder(&factory, &factory, "chat")
+                    .primary_model_pin("hint:chat")
+                    .without_workload_tiers()
+                    .build();
+            let error = match result {
+                Err(error) => error,
+                Ok(_) => panic!("LocalOnly must reject managed inference before session lookup"),
+            };
+            assert!(error.to_string().contains("Local-only privacy mode"));
+        }
+
+        let result =
             tinyagents_harness::host::TurnModelSet::<()>::builder(&factory, &factory, "chat")
                 .primary_model_pin("hint:chat")
                 .without_workload_tiers()
                 .build();
-        let privacy_error = match privacy_result {
+        let error = match result {
             Err(error) => error,
-            Ok(_) => panic!("LocalOnly must reject managed inference before session lookup"),
+            Ok(_) => panic!("explicit CLI dispatch must require a session despite ambient Library"),
         };
-        assert!(privacy_error
-            .to_string()
-            .contains("Local-only privacy mode"));
+        assert!(error.to_string().contains("SESSION_EXPIRED"));
+        assert!(builds.lock().expect("build counter").is_empty());
+
+        crate::security::credentials::AuthService::from_config(&config)
+            .store_provider_token(
+                crate::security::credentials::APP_SESSION_PROVIDER,
+                "default",
+                "fixture-session-token",
+                Default::default(),
+                true,
+            )
+            .expect("store isolated test session");
+        let built = tinyagents_harness::host::TurnModelSet::<()>::builder(&factory, &factory, "chat")
+            .primary_model_pin("factory-gate-order-sentinel-model")
+            .without_workload_tiers()
+            .build()
+            .expect("authorized managed turn builds");
+        let _summarizer = built.summarizer();
+        assert_eq!(builds.lock().expect("build counter").len(), 2);
+
+        crate::security::egress::emit_external_transfer(
+            None,
+            crate::security::egress::EgressDescriptor::network_fetch(
+                "factory-gate-order-test-sentinel",
+            ),
+        );
+        let mut disclosures = 0;
+        loop {
+            match events.recv().await {
+                Some(crate::core::events::DomainEvent::ExternalTransferPending {
+                    descriptor,
+                    ..
+                }) => {
+                    if descriptor.service == "factory-gate-order-sentinel-model" {
+                        disclosures += 1;
+                    }
+                    if descriptor.service == "factory-gate-order-test-sentinel" {
+                        break;
+                    }
+                }
+                Some(_) => continue,
+                None => panic!("the bus closed before the test sentinel arrived"),
+            }
+        }
+        assert_eq!(disclosures, 1, "the turn ledger deduplicates primary and summary egress");
     })
     .await;
-
-    let session_result =
-        tinyagents_harness::host::TurnModelSet::<()>::builder(&factory, &factory, "chat")
-            .primary_model_pin("hint:chat")
-            .without_workload_tiers()
-            .build();
-    let session_error = match session_result {
-        Err(error) => error,
-        Ok(_) => panic!("explicit CLI dispatch must require a session despite ambient Library"),
-    };
-    assert!(session_error.to_string().contains("SESSION_EXPIRED"));
-    assert!(builds.lock().expect("build counter").is_empty());
 }
