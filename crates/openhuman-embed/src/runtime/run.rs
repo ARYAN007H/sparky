@@ -141,8 +141,13 @@ impl CliGlobals {
     /// configured, now opened.
     fn install(
         mut self,
-    ) -> Result<Option<(Arc<dyn openhuman_core::storage::StorageBackend>, Option<String>)>, String>
-    {
+    ) -> Result<
+        Option<(
+            Arc<dyn openhuman_core::storage::StorageBackend>,
+            Option<String>,
+        )>,
+        String,
+    > {
         if let Some(engine) = self.memory_engine {
             openhuman_core::memory::engine::install_host_engine(engine);
         }
