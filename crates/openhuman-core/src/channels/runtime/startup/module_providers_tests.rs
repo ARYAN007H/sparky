@@ -413,7 +413,7 @@ async fn hosted_target_projects_to_the_canonical_thread_and_keeps_one_gateway_te
     use crate::tools::toolpacks::ToolGroups;
     let _env_lock = EnvVarGuard::locked_async().await;
     let _storage = crate::channels::module_fixture::install_memory_storage();
-    crate::channels::module_fixture::client().await;
+    let client = source_tinychannels_client().await;
 
     let request_id = "relay-target-projection-request";
     let client_id = "relay-target-projection-client";
@@ -784,6 +784,26 @@ async fn hosted_target_projects_typed_media_and_voice_to_web_and_gateway_once() 
         .close()
         .await
         .expect("hosted projection runtime closes");
+}
+
+async fn source_tinychannels_client() -> tinybus::module::ModuleClient {
+    use crate::config::schema::ModuleSourceMode;
+
+    let mut config = Config::default();
+    config.modules.allow_download = false;
+    config.modules.source = ModuleSourceMode::Source;
+    crate::modules::ops::ensure_loaded(&config, "tinychannels")
+        .await
+        .expect("the compiled TinyChannels source artifact should load");
+    let proxy = crate::modules::runtime::runtime()
+        .await
+        .expect("the module runtime should start")
+        .proxy(
+            tinychannels_module::BUS_NAME,
+            tinychannels_module::OBJECT_PATH,
+        )
+        .expect("the compiled TinyChannels proxy should be available");
+    crate::modules::ops::fixture_client(proxy)
 }
 
 async fn run_hosted_compiled_turn(
