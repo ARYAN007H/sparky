@@ -335,8 +335,7 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
     );
     assert_eq!(
         model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
-        2,
-        "the child receives the denied tool result and then completes"
+        1
     );
     assert!(
         model
@@ -390,7 +389,8 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
     );
     assert_eq!(
         model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
-        1
+        2,
+        "the child receives the denied tool result and then completes"
     );
     assert!(
         model
