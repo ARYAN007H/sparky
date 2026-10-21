@@ -76,6 +76,7 @@ pub(crate) async fn process_channel_runtime_message(
                 PrepareChannelInboundRequest {
                     source,
                     namespace: "main".into(),
+                    preparation_mode: Default::default(),
                     session_policy: Default::default(),
                 },
             )
