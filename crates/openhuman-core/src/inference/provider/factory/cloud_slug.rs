@@ -122,7 +122,7 @@ pub(super) fn resolve_cloud_slug_for<'a>(
         role,
         slug,
         effective_model,
-        super::super::redact_endpoint_origin(&entry.endpoint)
+        redact_endpoint_origin(&entry.endpoint)
     );
 
     // #5146 §2.1: a raw "failed to read API key for slug 'anthropic'" is
