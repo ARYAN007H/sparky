@@ -2,7 +2,9 @@ use super::*;
 use crate::storage::test_support::memory_backend;
 #[cfg(feature = "storage-sqlite")]
 use crate::storage::test_support::sqlite_backend;
-use tinystoragedrivers_types::{CollectionSpec, Precondition, Scope};
+use tinystoragedrivers_types::{CollectionSpec, Scope};
+#[cfg(feature = "storage-sqlite")]
+use tinystoragedrivers_types::Precondition;
 
 fn meta(id: &str, created_at: u64) -> ProfileMeta {
     ProfileMeta {

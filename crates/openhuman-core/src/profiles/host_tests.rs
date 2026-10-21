@@ -4,6 +4,7 @@ use crate::profiles::doctor::DoctorProfileState;
 use crate::storage::test_support::memory_backend;
 #[cfg(feature = "storage-sqlite")]
 use crate::storage::test_support::sqlite_backend;
+#[cfg(feature = "storage-sqlite")]
 use crate::storage::{CollectionSpec, Scope};
 use std::collections::BTreeMap;
 
