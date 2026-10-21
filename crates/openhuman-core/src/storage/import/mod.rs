@@ -49,9 +49,9 @@
 //! with `tinyflows-import`; see [`tinyflows`].
 
 #[cfg(feature = "legacy-import")]
-pub(crate) mod layout_status;
-#[cfg(feature = "legacy-import")]
 pub(crate) mod layout_db;
+#[cfg(feature = "legacy-import")]
+pub(crate) mod layout_status;
 pub mod live;
 mod schemas;
 #[cfg(feature = "legacy-import")]
@@ -59,9 +59,9 @@ pub mod sessions;
 #[cfg(feature = "legacy-import")]
 mod snapshot;
 #[cfg(feature = "legacy-import")]
-mod tinyflows_reader;
-#[cfg(feature = "legacy-import")]
 pub mod tinyflows;
+#[cfg(feature = "legacy-import")]
+mod tinyflows_reader;
 
 pub use schemas::{
     all_session_import_controller_schemas, all_session_import_registered_controllers,

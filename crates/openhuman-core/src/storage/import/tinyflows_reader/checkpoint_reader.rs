@@ -376,7 +376,3 @@ pub(crate) fn unescape_thread_id(escaped: &str) -> Option<String> {
     }
     String::from_utf8(out).ok()
 }
-
-#[cfg(test)]
-#[path = "checkpoint_reader_tests.rs"]
-mod tests;

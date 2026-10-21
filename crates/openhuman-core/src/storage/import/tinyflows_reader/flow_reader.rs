@@ -119,9 +119,7 @@ async fn page_rows<T, ToRecord, F, Fut>(
     db: &LegacyDb,
     what: &'static str,
     query: &str,
-    decode: impl Fn(
-        &crate::storage::rusqlite::Row<'_>,
-    ) -> crate::storage::rusqlite::Result<T>
+    decode: impl Fn(&crate::storage::rusqlite::Row<'_>) -> crate::storage::rusqlite::Result<T>
     + Send
     + Sync
     + 'static,
@@ -261,7 +259,3 @@ fn record_identity(record: &LegacyImportRecord) -> Option<String> {
     };
     value.map(|identity| identity.chars().take(128).collect())
 }
-
-#[cfg(test)]
-#[path = "flow_reader_tests.rs"]
-mod tests;

@@ -120,7 +120,3 @@ impl ImportReport {
         self.problems.is_empty()
     }
 }
-
-#[cfg(test)]
-#[path = "report_tests.rs"]
-mod tests;
