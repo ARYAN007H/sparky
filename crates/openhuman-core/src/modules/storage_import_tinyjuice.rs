@@ -84,13 +84,10 @@ pub(crate) async fn import_legacy(
                 import_into(&ctx_for_read, &scoped, &root, ttl, SystemTime::now()).await
             })
         })?;
-    let Some(result) = result else {
+    let Some(outcome) = result else {
         return Ok(Outcome::NoBackend);
     };
-    Ok(match result {
-        support::ClaimedImport::AlreadyDone => Outcome::AlreadyDone,
-        support::ClaimedImport::Imported(outcome) => outcome,
-    })
+    Ok(outcome)
 }
 
 /// One readable original: its token, text and age.

@@ -72,13 +72,10 @@ where
     let result = support::with_module_claim(ctx, MODULE_ID, MARKER_KIND, &marker, move |scoped| {
         crate::storage::block_on_anyhow(async move { import_into(&scoped, &file, adopt).await })
     })?;
-    let Some(result) = result else {
+    let Some(outcome) = result else {
         return Ok(Outcome::NoBackend);
     };
-    Ok(match result {
-        support::ClaimedImport::AlreadyDone => Outcome::AlreadyDone,
-        support::ClaimedImport::Imported(outcome) => outcome,
-    })
+    Ok(outcome)
 }
 
 async fn import_into<F, Fut>(scoped: &Storage, file: &Path, adopt: F) -> Result<Outcome>

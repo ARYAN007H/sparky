@@ -63,13 +63,10 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, workspace_dir: &Path) -> Re
         support::with_module_claim(ctx, MODULE_ID, MARKER_COLLECTION, &marker, move |scoped| {
             crate::storage::block_on_anyhow(async move { import_into(&scoped, &base).await })
         })?;
-    let Some(result) = result else {
+    let Some(outcome) = result else {
         return Ok(Outcome::NoBackend);
     };
-    Ok(match result {
-        support::ClaimedImport::AlreadyDone => Outcome::AlreadyDone,
-        support::ClaimedImport::Imported(outcome) => outcome,
-    })
+    Ok(outcome)
 }
 
 async fn import_into(scoped: &Storage, base: &Path) -> Result<Outcome> {

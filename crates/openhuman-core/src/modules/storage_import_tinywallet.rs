@@ -63,13 +63,10 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, workspace_dir: &Path) -> Re
                 import_into(&ctx_for_read, &scoped, &workspace_dir).await
             })
         })?;
-    let Some(result) = result else {
+    let Some(outcome) = result else {
         return Ok(Outcome::NoBackend);
     };
-    Ok(match result {
-        support::ClaimedImport::AlreadyDone => Outcome::AlreadyDone,
-        support::ClaimedImport::Imported(outcome) => outcome,
-    })
+    Ok(outcome)
 }
 
 async fn import_into(ctx: &DispatchCtx, scoped: &Storage, workspace_dir: &Path) -> Result<Outcome> {

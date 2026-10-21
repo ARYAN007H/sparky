@@ -76,13 +76,10 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, state_dir: &Path) -> Result
                 import_into(&ctx_for_read, &scoped, &state_dir).await
             })
         })?;
-    let Some(result) = result else {
+    let Some(outcome) = result else {
         return Ok(Outcome::NoBackend);
     };
-    Ok(match result {
-        support::ClaimedImport::AlreadyDone => Outcome::AlreadyDone,
-        support::ClaimedImport::Imported(outcome) => outcome,
-    })
+    Ok(outcome)
 }
 
 /// A preference file: the toolkit key and its bare JSON value.
