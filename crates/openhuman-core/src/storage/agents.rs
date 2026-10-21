@@ -29,40 +29,17 @@ use std::future::Future;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use serde_json::{json, Value};
-use tinystoragedrivers::schema::{Schema, ScopeClass, SourceRecord, Step, TargetRecord};
 use tinystoragedrivers::{CollectionSpec, Precondition, Query, Scope};
 
-use super::schema_support::{key_of, owner};
+use super::schema_support::key_of;
 use super::{block_on, installed, DocumentStoreExt, StorageBackend};
 use crate::core::runtime::{AgentContextRegistry, CoreContext, DispatchCtx};
 
 /// The `local`-scope collection recording which agents have their own scope.
 pub(super) const AGENTS: &str = "agents.registry";
-/// The v1 name, `{}` per agent under the agent id.
-const LEGACY_AGENTS: &str = "storage_agents";
-
-/// What the agent registry keeps and the step from the v1 collection: the
-/// document id is `Key::of([agent id])` and the body names the agent, so a
-/// listing needs no unescaping.
-#[must_use]
-pub fn storage_schema() -> Schema {
-    Schema::new(owner("agents"))
-        .collection_with(2, CollectionSpec::new(AGENTS), ScopeClass::Tenant)
-        .step(Step::new("registry_v2", AGENTS, 1, 2, registry_v2).source(LEGACY_AGENTS))
-}
-
-fn registry_v2(batch: Vec<SourceRecord>) -> tinystoragedrivers::Result<Vec<TargetRecord>> {
-    batch
-        .into_iter()
-        .map(|record| {
-            Ok(TargetRecord::new(
-                AGENTS,
-                key_of(&record.id)?,
-                json!({ "agent_id": record.id }),
-            )
-            .created_ms(record.meta.created_ms))
-        })
-        .collect()
+/// Collections owned by the host's agent registry.
+pub(crate) fn collection_specs() -> Vec<CollectionSpec> {
+    vec![CollectionSpec::new(AGENTS)]
 }
 
 /// `(backend, agent id)` pairs this process has already recorded, the
