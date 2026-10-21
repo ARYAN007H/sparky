@@ -23,6 +23,9 @@ pub(crate) struct TurnModels {
     pub(crate) summarizer: Arc<dyn tinyinference_llm::model::ChatModel<()>>,
     /// Recovers the primary's original (downcastable) provider error on failure.
     pub(crate) error_slot: tinyinference_llm::model::ModelErrorSlot,
+    /// Native owner set retained so its route and primary error slots are
+    /// applied after host decorators such as the turn budget.
+    native_model_set: Option<tinyagents_harness::host::TurnModelSet<()>>,
     /// Provider telemetry id (`{provider_id}.{model}` in Langfuse), captured from
     /// the source `Provider` at build time. Carried here (issue #4249, Phase 3 /
     /// Motion A) so the harness turn path no longer reads it off a raw
@@ -47,6 +50,9 @@ pub(crate) struct TurnModels {
 impl TurnModels {
     /// Bind the already selected turn routes to the harness-owned resolver.
     pub(crate) fn resolver(&self) -> tinyagents_harness::host::PrebuiltModelResolver<()> {
+        if let Some(models) = &self.native_model_set {
+            return models.resolver();
+        }
         tinyagents_harness::host::PrebuiltModelResolver::new(
             self.primary.clone(),
             self.routes.to_vec(),
@@ -221,6 +227,7 @@ fn build_turn_models_crate(
         routes,
         summarizer,
         error_slot,
+        native_model_set: Some(built),
         provider_id,
         context_window,
         native_tools,
@@ -444,6 +451,7 @@ impl TurnModelSource {
                 routes: Vec::new(),
                 summarizer,
                 error_slot: Arc::new(std::sync::Mutex::new(None)),
+                native_model_set: None,
                 provider_id,
                 context_window,
                 native_tools,
