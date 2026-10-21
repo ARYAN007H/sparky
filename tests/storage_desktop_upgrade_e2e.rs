@@ -528,7 +528,7 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
     {
         let wallet = module_storage(backend.as_ref(), "tinywallet");
         assert_eq!(
-            wallet.streams().len("wallet.payments").await.unwrap(),
+            wallet.streams().len("x402.payments").await.unwrap(),
             fixture.x402_payments as u64
         );
     }
