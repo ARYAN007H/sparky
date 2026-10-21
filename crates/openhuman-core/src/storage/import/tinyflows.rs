@@ -69,7 +69,7 @@ pub(super) fn marked(
     backend: &Arc<dyn StorageBackend>,
     workspace: &Path,
     domain: &str,
-    body: impl FnOnce() -> Result<Option<(usize, usize, usize)>>,
+    body: impl FnOnce(&tinystoragedrivers::WriteCondition) -> Result<Option<(usize, usize, usize)>>,
 ) -> Result<Outcome> {
     let step = marker_step(domain, workspace);
     let markers = Repo::on(
@@ -81,11 +81,12 @@ pub(super) fn marked(
     if import_state::is_done(&markers, MARKER_OWNER, &step)? {
         return Ok(Outcome::AlreadyDone);
     }
-    let claimed = import_state::with_claim(&markers, MARKER_OWNER, &step, || {
-        if import_state::is_done(&markers, MARKER_OWNER, &step)? {
+    let claimed = import_state::with_claim(&markers, MARKER_OWNER, &step, |condition| {
+        let claimed_markers = markers.conditioned(condition)?;
+        if import_state::is_done(&claimed_markers, MARKER_OWNER, &step)? {
             return Ok(Outcome::AlreadyDone);
         }
-        let Some((found, written, skipped)) = body()? else {
+        let Some((found, written, skipped)) = body(condition)? else {
             return Ok(Outcome::NoSource);
         };
         if skipped > 0 {
@@ -101,7 +102,7 @@ pub(super) fn marked(
                 skipped,
             });
         }
-        import_state::set_done(&markers, MARKER_OWNER, &step)?;
+        import_state::set_done(&claimed_markers, MARKER_OWNER, &step)?;
         Ok(Outcome::Imported { found, written })
     })?;
     Ok(claimed.unwrap_or(Outcome::InProgress))
@@ -428,12 +429,12 @@ fn import_flows_after_migration(
     };
 
     let dir = config.workspace_dir.join("flows");
-    marked(backend, &config.workspace_dir, FLOWS_DOMAIN, || {
+    marked(backend, &config.workspace_dir, FLOWS_DOMAIN, |condition| {
         if !flow_sources_present(&dir) {
             return Ok(None);
         }
         let dir = dir.clone();
-        let backend = Arc::clone(backend);
+        let backend = import_state::backend_with_condition(Arc::clone(backend), condition.clone());
         let scope = scope.clone();
         let config = config.clone();
         let totals = Arc::new(Mutex::new(ImportTotals::default()));
@@ -530,7 +531,7 @@ pub fn import_cron(
         format!("{CRON_DOMAIN}/{label}")
     };
     let jobs_db = legacy_jobs_db(scope_dir);
-    marked(backend, &config.workspace_dir, &domain, || {
+    marked(backend, &config.workspace_dir, &domain, |condition| {
         if !jobs_db.is_file() {
             return Ok(None);
         }
@@ -538,7 +539,8 @@ pub fn import_cron(
         // records only) and replayed through the module's `import_job` /
         // `import_run` store operations, which write only what is absent and
         // file a flow-schedule job under the id its flow derives.
-        let doc_scope = DocScope::on_backend(config, Arc::clone(backend), scope.clone());
+        let backend = import_state::backend_with_condition(Arc::clone(backend), condition.clone());
+        let doc_scope = DocScope::on_backend(config, backend, scope.clone());
         let config = config.clone();
         let report = crate::storage::block_on_anyhow({
             let jobs_db = jobs_db.clone();

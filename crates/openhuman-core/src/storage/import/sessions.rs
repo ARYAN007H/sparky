@@ -67,11 +67,13 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
         .join("memory")
         .join("conversations")
         .join("turn_states");
-    marked(backend, &workspace, SESSIONS_DOMAIN, || {
+    marked(backend, &workspace, SESSIONS_DOMAIN, |condition| {
         if !db.is_file() && !raw.is_dir() && !turns.is_dir() {
             return Ok(None);
         }
-        let provider = DriverSessionStores::new(Arc::clone(backend), Scope::local())
+        let claimed_backend =
+            super::super::import_state::backend_with_condition(Arc::clone(backend), condition.clone());
+        let provider = DriverSessionStores::new(claimed_backend, Scope::local())
             .map_err(|error| anyhow::anyhow!("start the session store bridge: {error}"))?
             .recover_on_open(false);
         let mut found = 0usize;
