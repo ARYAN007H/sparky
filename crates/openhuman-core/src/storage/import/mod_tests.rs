@@ -310,6 +310,7 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
         .iter()
         .find(|report| report.domain == crate::storage::scope_move::IMPORT_DOMAIN)
         .expect("boot importer includes legacy scope movement");
+    println!("scope migration report after profile boot: {moved:?}");
     assert_eq!(
         moved.outcome.as_ref().unwrap(),
         &Outcome::AlreadyDone,
