@@ -50,17 +50,34 @@ pub(crate) enum Outcome {
 /// Imports the legacy ledger under `workspace_dir` into the module's scope of
 /// the installed backend.
 pub(crate) async fn import_legacy(ctx: &DispatchCtx, workspace_dir: &Path) -> Result<Outcome> {
-    let Some(scoped) = support::module_scope(ctx, MODULE_ID)? else {
+    let ledger = workspace_dir.join(LEDGER_FILE);
+    if !ledger.is_file() {
+        return Ok(Outcome::NoSource);
+    }
+    let marker = support::marker_id("x402", workspace_dir);
+    let workspace_dir = workspace_dir.to_owned();
+    let ctx_for_read = ctx.clone();
+    let result = support::with_module_claim(
+        ctx,
+        MODULE_ID,
+        MARKER_COLLECTION,
+        &marker,
+        move |scoped| {
+            crate::storage::block_on_anyhow(async move {
+                import_into(&ctx_for_read, &scoped, &workspace_dir).await
+            })
+        },
+    )?;
+    let Some(result) = result else {
         return Ok(Outcome::NoBackend);
     };
-    import_into(ctx, &scoped, workspace_dir).await
+    Ok(match result {
+        support::ClaimedImport::AlreadyDone => Outcome::AlreadyDone,
+        support::ClaimedImport::Imported(outcome) => outcome,
+    })
 }
 
 async fn import_into(ctx: &DispatchCtx, scoped: &Storage, workspace_dir: &Path) -> Result<Outcome> {
-    let marker = support::marker_id("x402", workspace_dir);
-    if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {
-        return Ok(Outcome::AlreadyDone);
-    }
     let ledger = workspace_dir.join(LEDGER_FILE);
     if !ledger.is_file() {
         return Ok(Outcome::NoSource);
@@ -77,7 +94,6 @@ async fn import_into(ctx: &DispatchCtx, scoped: &Storage, workspace_dir: &Path) 
     let payments = support::append_if_empty(scoped, PAYMENTS_STREAM, records)
         .await
         .map_err(|error| anyhow!("import the payments: {error:#}"))?;
-    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
     tracing::info!("{LOG_PREFIX} imported payments={payments} skipped={skipped}");
     Ok(Outcome::Imported { payments, skipped })
 }
