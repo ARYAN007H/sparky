@@ -54,7 +54,7 @@ fn field(out: &Value, name: &str) -> Option<Value> {
 /// durable session alone, instead of rewriting it as "cancelled by user".
 #[tokio::test]
 async fn cancel_of_a_legacy_failed_run_reports_its_outcome_and_rewrites_nothing() {
-    use crate::agent::orchestration::subagent_sessions::{SubagentSessionStore, mark_failed};
+    use crate::agent::orchestration::subagent_sessions::{mark_failed, SubagentSessionStore};
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use std::sync::Arc;
 
@@ -119,8 +119,8 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
         forget_workspace_for_test, pending_for,
     };
     use crate::agent::orchestration::subagent_sessions::{
-        DriverTaskCancellation, DurableSubagentStatus, SubagentSessionSelector,
-        SubagentSessionStore, SubagentSessionUpsert, mark_finished, upsert_running,
+        mark_finished, upsert_running, DriverTaskCancellation, DurableSubagentStatus,
+        SubagentSessionSelector, SubagentSessionStore, SubagentSessionUpsert,
     };
     use tinyagents_orchestration::subagent::SubagentTaskKey;
     use tinyagents_tasks::CompletionStatus;
@@ -186,16 +186,14 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
     };
 
     forget_workspace_for_test(&workspace_dir);
-    assert!(
-        settle_paused_driver_cancel(
-            &DispatchCtx::process_default(),
-            &observed,
-            observed.parent_epoch,
-            Some("user requested stop")
-        )
-        .await
-        .expect("paused cancellation settles")
-    );
+    assert!(settle_paused_driver_cancel(
+        &DispatchCtx::process_default(),
+        &observed,
+        observed.parent_epoch,
+        Some("user requested stop")
+    )
+    .await
+    .expect("paused cancellation settles"));
 
     let row = store.load().unwrap().remove(0);
     assert_eq!(row.status, DurableSubagentStatus::Failed);
