@@ -71,8 +71,10 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
         if !db.is_file() && !raw.is_dir() && !turns.is_dir() {
             return Ok(None);
         }
-        let claimed_backend =
-            super::super::import_state::backend_with_condition(Arc::clone(backend), condition.clone());
+        let claimed_backend = super::super::import_state::backend_with_condition(
+            Arc::clone(backend),
+            condition.clone(),
+        );
         let provider = DriverSessionStores::new(claimed_backend, Scope::local())
             .map_err(|error| anyhow::anyhow!("start the session store bridge: {error}"))?
             .recover_on_open(false);
@@ -200,18 +202,24 @@ fn turn_state_files(dir: &Path) -> Result<Vec<PathBuf>> {
     entries.sort_by_key(std::fs::DirEntry::file_name);
     for entry in entries {
         let path = entry.path();
-        if entry.file_type()?.is_dir() {
+        let file_type = entry.file_type()?;
+        if file_type.is_symlink() {
+            continue;
+        }
+        if file_type.is_dir() {
             let mut children = std::fs::read_dir(path)?.collect::<std::io::Result<Vec<_>>>()?;
             children.sort_by_key(std::fs::DirEntry::file_name);
-            files.extend(
-                children
-                    .into_iter()
-                    .map(|child| child.path())
-                    .filter(|path| {
-                        path.extension().and_then(|extension| extension.to_str()) == Some("json")
-                    }),
-            );
-        } else if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
+            for child in children {
+                let path = child.path();
+                if child.file_type()?.is_file()
+                    && path.extension().and_then(|extension| extension.to_str()) == Some("json")
+                {
+                    files.push(path);
+                }
+            }
+        } else if file_type.is_file()
+            && path.extension().and_then(|extension| extension.to_str()) == Some("json")
+        {
             files.push(path);
         }
     }
@@ -411,8 +419,8 @@ fn decode_transcript(
     Option<serde_json::Value>,
     Vec<DisplayRecord>,
 )> {
-    let bytes = std::fs::read(path)
-        .with_context(|| format!("read transcript {}", path.display()))?;
+    let bytes =
+        std::fs::read(path).with_context(|| format!("read transcript {}", path.display()))?;
     let mut meta = None;
     let mut tools = None;
     let mut records = Vec::new();
@@ -675,13 +683,19 @@ fn transcript_files(raw: &Path) -> Result<Vec<(String, PathBuf)>> {
     entries.sort_by_key(std::fs::DirEntry::file_name);
     for entry in entries {
         let path = entry.path();
-        if entry.file_type()?.is_dir() {
+        let file_type = entry.file_type()?;
+        if file_type.is_symlink() {
+            continue;
+        }
+        if file_type.is_dir() {
             let mut inner: Vec<_> = std::fs::read_dir(&path)?.collect::<std::io::Result<_>>()?;
             inner.sort_by_key(std::fs::DirEntry::file_name);
             for entry in inner {
-                push_jsonl(&mut dated, entry.path());
+                if entry.file_type()?.is_file() {
+                    push_jsonl(&mut dated, entry.path());
+                }
             }
-        } else {
+        } else if file_type.is_file() {
             push_jsonl(&mut flat, path);
         }
     }

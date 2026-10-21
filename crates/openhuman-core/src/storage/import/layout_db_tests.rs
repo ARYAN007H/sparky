@@ -69,7 +69,10 @@ fn inventory_and_copy_leave_a_live_wal_source_unchanged() {
         .execute_batch("CREATE TABLE records (id TEXT); INSERT INTO records VALUES ('one');")
         .unwrap();
     let wal = source.with_file_name("legacy.db-wal");
-    assert!(wal.is_file(), "fixture must retain committed rows in its WAL");
+    assert!(
+        wal.is_file(),
+        "fixture must retain committed rows in its WAL"
+    );
 
     let db_before = std::fs::read(&source).unwrap();
     let wal_before = std::fs::read(&wal).unwrap();

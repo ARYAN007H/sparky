@@ -53,6 +53,31 @@ fn host_jsonl_reader_preserves_meta_usage_typed_rows_and_tool_state() {
     assert_eq!(row.message.tool_call_id.as_deref(), Some("call-1"));
 }
 
+#[cfg(unix)]
+#[test]
+fn session_file_discovery_never_follows_symlinks_outside_legacy_roots() {
+    use std::os::unix::fs::symlink;
+
+    let dir = TempDir::new().unwrap();
+    let workspace = dir.path().join("workspace");
+    let raw = workspace.join("session_raw");
+    let turns = workspace.join("turn_states");
+    std::fs::create_dir_all(&raw).unwrap();
+    std::fs::create_dir_all(&turns).unwrap();
+    let external = dir.path().join("outside.jsonl");
+    std::fs::write(&external, "{}\n").unwrap();
+    symlink(&external, raw.join("external.jsonl")).unwrap();
+
+    let external_turn = dir.path().join("outside.json");
+    std::fs::write(&external_turn, "{}").unwrap();
+    let turn_dir = turns.join("thread");
+    std::fs::create_dir(&turn_dir).unwrap();
+    symlink(&external_turn, turn_dir.join("external.json")).unwrap();
+
+    assert!(transcript_files(&raw).unwrap().is_empty());
+    assert!(turn_state_files(&turns).unwrap().is_empty());
+}
+
 /// Every file under `root` with a digest of its bytes.
 fn tree(root: &Path) -> BTreeMap<String, String> {
     fn walk(dir: &Path, root: &Path, out: &mut BTreeMap<String, String>) {
