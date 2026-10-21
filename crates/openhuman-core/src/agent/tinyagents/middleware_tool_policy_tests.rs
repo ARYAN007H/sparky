@@ -193,7 +193,9 @@ async fn a_use_skill_listing_hides_what_this_session_cannot_call_and_names_the_r
         result_text(&result)
     );
     assert!(
-        result_text(&result).contains("Call `spawn_subagent` instead"),
+        result_text(&result).contains("Call `spawn_subagent` to delegate")
+            && (result_text(&result).contains("workflow_builder")
+                || result_text(&result).contains("flow_discovery")),
         "the empty listing must name the callable owner hand-off:\n{}",
         result_text(&result)
     );
@@ -442,7 +444,8 @@ async fn an_invented_tool_name_in_a_skill_is_not_reported_as_a_denial() {
         "an invented name must not read as a permission denial: {message}"
     );
     assert!(
-        message.contains("Call `spawn_subagent` instead"),
+        message.contains("Call `spawn_subagent` to delegate")
+            && (message.contains("workflow_builder") || message.contains("flow_discovery")),
         "the answer must name what this session can call in the skill: {message}"
     );
 }
