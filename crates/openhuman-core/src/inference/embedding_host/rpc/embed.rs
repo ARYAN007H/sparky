@@ -115,8 +115,7 @@ pub async fn test_connection(
     .map_err(|error| error.to_string());
 
     match result {
-        Ok(vectors) => {
-            let actual_dims = vectors.first().map(|v| v.len()).unwrap_or(0);
+        Ok(actual_dims) => {
             let payload = serde_json::json!({
                 "success": true,
                 "provider": provider_tag,
