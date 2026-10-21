@@ -173,6 +173,17 @@ fn native_typed_message_keeps_context_prefix_and_interleaved_part_order() {
             text: "first text".into(),
             markdown_dialect: None,
         },
+        ContentPart::VoiceNote {
+            voice_note: tinychannels_bus::VoiceNote {
+                transcript: Some(tinychannels_bus::VoiceTranscript {
+                    text: "spoken words".into(),
+                    language: Some("en".into()),
+                    state: tinychannels_bus::VoiceTranscriptState::Complete,
+                    source: tinychannels_bus::VoiceTranscriptSource::HostStt,
+                }),
+                ..Default::default()
+            },
+        },
         ContentPart::Image {
             media: MediaReference {
                 path: Some("openhuman-staged://image-ref".into()),
@@ -206,7 +217,7 @@ fn native_typed_message_keeps_context_prefix_and_interleaved_part_order() {
     else {
         panic!("user message expected")
     };
-    assert_eq!(user.content.len(), 5);
+    assert_eq!(user.content.len(), 6);
     assert!(matches!(
         &user.content[0],
         tinyinference_llm::message::ContentBlock::Text(text)
@@ -218,15 +229,19 @@ fn native_typed_message_keeps_context_prefix_and_interleaved_part_order() {
     ));
     assert!(matches!(
         &user.content[2],
+        tinyinference_llm::message::ContentBlock::Text(text) if text == "spoken words"
+    ));
+    assert!(matches!(
+        &user.content[3],
         tinyinference_llm::message::ContentBlock::Image(image)
             if image.url == "openhuman-staged://image-ref"
     ));
     assert!(matches!(
-        &user.content[3],
+        &user.content[4],
         tinyinference_llm::message::ContentBlock::Text(text) if text == "second text"
     ));
     assert!(matches!(
-        &user.content[4],
+        &user.content[5],
         tinyinference_llm::message::ContentBlock::Document(
             tinyinference_llm::message::MediaRef::Path { path, .. }
         ) if path == "openhuman-staged://file-ref"
