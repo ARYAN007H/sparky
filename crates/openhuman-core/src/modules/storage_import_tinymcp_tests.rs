@@ -98,14 +98,7 @@ fn digest(path: &Path) -> Vec<u8> {
 async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
     let legacy = legacy_dir();
     let rig = rig();
-    let outcome = import_into(
-        &DispatchCtx::host_default(),
-        &rig.scoped,
-        rig.scoped.secrets().as_ref(),
-        legacy.path(),
-    )
-    .await
-    .unwrap();
+    let outcome = import(&rig, legacy.path()).await.unwrap();
     assert_eq!(
         outcome,
         Outcome::Imported {
@@ -115,7 +108,8 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
         }
     );
 
-    let docs = rig.scoped.documents();
+    let scoped = rig.scoped();
+    let docs = scoped.documents();
     let one = docs.get(SERVERS, "srv-1").await.unwrap().unwrap();
     let body = one.doc;
     assert_eq!(body["qualified_name"], "io.example/files");
@@ -144,8 +138,7 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
     assert_eq!(env["API_KEY"], "sk-secret");
     assert_eq!(env["REGION"], "eu");
     assert!(
-        rig.scoped
-            .secrets()
+        rig.secrets()
             .get("mcp_client_env/srv-2")
             .await
             .unwrap()
@@ -170,32 +163,19 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
 async fn the_import_runs_once_and_never_resurrects_a_deleted_server() {
     let legacy = legacy_dir();
     let rig = rig();
-    import_into(
-        &DispatchCtx::host_default(),
-        &rig.scoped,
-        rig.scoped.secrets().as_ref(),
-        legacy.path(),
-    )
-    .await
-    .unwrap();
-    let docs = rig.scoped.documents();
+    import(&rig, legacy.path()).await.unwrap();
+    let scoped = rig.scoped();
+    let docs = scoped.documents();
     let held = docs.get(SERVERS, "srv-1").await.unwrap().unwrap();
     docs.delete(SERVERS, "srv-1", held.unchanged())
         .await
         .unwrap();
 
-    let again = import_into(
-        &DispatchCtx::host_default(),
-        &rig.scoped,
-        rig.scoped.secrets().as_ref(),
-        legacy.path(),
-    )
-    .await
-    .unwrap();
+    let again = import(&rig, legacy.path()).await.unwrap();
     assert_eq!(again, Outcome::AlreadyDone);
     assert!(docs.get(SERVERS, "srv-1").await.unwrap().is_none());
     assert_eq!(
-        rig.scoped.streams().len(AUDIT_STREAM).await.unwrap(),
+        scoped.streams().len(AUDIT_STREAM).await.unwrap(),
         2,
         "the audit log is not duplicated"
     );
@@ -206,14 +186,7 @@ async fn the_legacy_files_are_left_untouched() {
     let legacy = legacy_dir();
     let before = [CLIENTS_DB, AUDIT_DB].map(|path| digest(&legacy.path().join(path)));
     let rig = rig();
-    import_into(
-        &DispatchCtx::host_default(),
-        &rig.scoped,
-        rig.scoped.secrets().as_ref(),
-        legacy.path(),
-    )
-    .await
-    .unwrap();
+    import(&rig, legacy.path()).await.unwrap();
     let after = [CLIENTS_DB, AUDIT_DB].map(|path| digest(&legacy.path().join(path)));
     assert_eq!(before, after);
     assert!(
@@ -228,7 +201,8 @@ async fn the_legacy_files_are_left_untouched() {
 async fn a_record_the_module_already_wrote_is_not_overwritten() {
     let legacy = legacy_dir();
     let rig = rig();
-    let docs = rig.scoped.documents();
+    let scoped = rig.scoped();
+    let docs = scoped.documents();
     docs.ensure_collection(&CollectionSpec::new(SERVERS))
         .await
         .unwrap();
@@ -240,20 +214,12 @@ async fn a_record_the_module_already_wrote_is_not_overwritten() {
     )
     .await
     .unwrap();
-    rig.scoped
-        .secrets()
+    rig.secrets()
         .set("mcp_client_env/srv-1", b"{\"API_KEY\":\"rotated\"}")
         .await
         .unwrap();
 
-    let outcome = import_into(
-        &DispatchCtx::host_default(),
-        &rig.scoped,
-        rig.scoped.secrets().as_ref(),
-        legacy.path(),
-    )
-    .await
-    .unwrap();
+    let outcome = import(&rig, legacy.path()).await.unwrap();
     assert_eq!(
         outcome,
         Outcome::Imported {
@@ -265,7 +231,6 @@ async fn a_record_the_module_already_wrote_is_not_overwritten() {
     let kept = docs.get(SERVERS, "srv-1").await.unwrap().unwrap();
     assert_eq!(kept.doc["newer"], true);
     let secret = rig
-        .scoped
         .secrets()
         .get("mcp_client_env/srv-1")
         .await
@@ -279,14 +244,7 @@ async fn a_data_dir_with_no_legacy_files_is_a_no_op() {
     let empty = tempfile::tempdir().unwrap();
     let rig = rig();
     assert_eq!(
-        import_into(
-            &DispatchCtx::host_default(),
-            &rig.scoped,
-            rig.scoped.secrets().as_ref(),
-            empty.path()
-        )
-        .await
-        .unwrap(),
+        import(&rig, empty.path()).await.unwrap(),
         Outcome::NoSource
     );
 }
@@ -303,17 +261,10 @@ async fn an_unreadable_file_writes_no_marker_so_the_next_start_retries() {
     .unwrap();
     let rig = rig();
     assert!(
-        import_into(
-            &DispatchCtx::host_default(),
-            &rig.scoped,
-            rig.scoped.secrets().as_ref(),
-            dir.path()
-        )
-        .await
-        .is_err()
+        import(&rig, dir.path()).await.is_err()
     );
     let done = crate::storage::import_state::host_import_done(
-        &rig.scoped,
+        &rig.scoped(),
         MARKER_COLLECTION,
         &marker_id(dir.path()),
     )
