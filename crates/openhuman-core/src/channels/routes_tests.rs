@@ -762,7 +762,9 @@ async fn handle_runtime_command_telegram_new_uses_module_storage() {
         topic_id: Some("42".into()),
         id: "100".into(),
         sender: "alice".into(),
-        reply_target: "-200:42".into(),
+        // This fixture supplies the same canonical conversation reference the
+        // inbound module preparation boundary provides to command handling.
+        reply_target: "-200".into(),
         content: "/new".into(),
         channel: "telegram".into(),
         timestamp: 0,

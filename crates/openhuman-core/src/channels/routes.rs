@@ -172,6 +172,20 @@ where
     // for reply targeting; forum topic routing is already encoded in
     // `reply_target` and must not be reused as a reply-to id.
     let reply_thread = msg.thread_ts.clone();
+    let reply_recipient = reset_scope
+        .as_ref()
+        .map(|scope| scope.conversation.id.clone())
+        .unwrap_or_else(|| msg.reply_target.clone());
+    let reply_topic = reset_scope
+        .as_ref()
+        .and_then(|scope| scope.conversation.topic_id.clone())
+        .or_else(|| msg.topic_id.clone());
+    let reply_message = |content: &str| {
+        let mut message = SendMessage::new(content, reply_recipient.clone());
+        message.thread_ts = reply_thread.clone();
+        message.topic_id = reply_topic.clone();
+        message
+    };
     let history_len =
         durable_channel_history_len(ctx, &current, &msg.channel, durable_session_key.as_deref())
             .await;
@@ -235,10 +249,7 @@ where
             if let Some(channel) = target_channel {
                 let reply = crate::channels::failure_copy::generic_failure(ctx.config.as_deref());
                 let _ = channel
-                    .send_with_outbound_intent(
-                        &SendMessage::new(&reply, &msg.reply_target)
-                            .in_thread(reply_thread.clone()),
-                    )
+                    .send_with_outbound_intent(&reply_message(&reply))
                     .await;
             }
             return true;
@@ -249,9 +260,7 @@ where
         if let Some(channel) = target_channel {
             let copy = crate::channels::failure_copy::generic_failure(ctx.config.as_deref());
             let _ = channel
-                .send_with_outbound_intent(
-                    &SendMessage::new(&copy, &msg.reply_target).in_thread(reply_thread.clone()),
-                )
+                .send_with_outbound_intent(&reply_message(&copy))
                 .await;
         }
         return true;
@@ -273,9 +282,7 @@ where
     };
     if let Some(channel) = target_channel {
         if channel
-            .send_with_outbound_intent(
-                &SendMessage::new(reply, &msg.reply_target).in_thread(reply_thread),
-            )
+            .send_with_outbound_intent(&reply_message(&reply))
             .await
             .is_err()
         {
