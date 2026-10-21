@@ -408,4 +408,3 @@ jobs:
           path: target/approval-proof/
           if-no-files-found: error
           retention-days: 30
-
