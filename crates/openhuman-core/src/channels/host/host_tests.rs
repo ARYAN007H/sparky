@@ -283,7 +283,7 @@ async fn event_sink_rejects_non_object_payload() {
 }
 
 #[tokio::test]
-async fn event_sink_routes_channel_reactions_to_domain_bus() {
+async fn event_sink_ignores_legacy_reaction_callbacks() {
     let sink = OpenHumanEventSink;
     assert!(sink
         .publish_host(
