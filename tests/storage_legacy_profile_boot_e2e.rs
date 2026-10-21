@@ -174,7 +174,12 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         manifest.files.iter().any(|file| {
             file.path == "workspace/storage/storage.db" && file.size == source_bytes.len() as u64
         }),
-        "archive manifest must record the historical storage.db"
+        "archive manifest must record the historical storage.db: {:?}",
+        manifest
+            .files
+            .iter()
+            .map(|file| (&file.path, file.size))
+            .collect::<Vec<_>>()
     );
     assert_eq!(
         std::fs::read(restored.path().join("workspace/storage/storage.db")).unwrap(),
