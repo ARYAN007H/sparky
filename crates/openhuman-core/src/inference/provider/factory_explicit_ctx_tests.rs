@@ -52,16 +52,40 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
         provider,
         entry("context-a-one-shot", Arc::clone(&a_probed)),
     );
-    let context_a = CoreContext::for_test_with_extensions(DomainSet::full(), None, a_extensions);
+    let context_a = CoreContext::for_test_with_host_kind_and_extensions(
+        crate::core::types::HostKind::Library,
+        DomainSet::full(),
+        None,
+        a_extensions,
+    );
     let b_extensions = Extensions::new();
     crate::inference::registry::register_chat_model_in(
         &b_extensions,
         provider,
         entry("context-b-one-shot", Arc::clone(&b_probed)),
     );
-    let context_b = CoreContext::for_test_with_extensions(DomainSet::full(), None, b_extensions);
+    let context_b = CoreContext::for_test_with_host_kind_and_extensions(
+        crate::core::types::HostKind::Library,
+        DomainSet::full(),
+        None,
+        b_extensions,
+    );
     let dispatch = DispatchCtx::new(context_a);
-    let config = Config::default();
+    let tmp = tempfile::tempdir().expect("isolated workspace");
+    let config = Config {
+        config_path: tmp.path().join("config.toml"),
+        workspace_dir: tmp.path().join("workspace"),
+        ..Default::default()
+    };
+    crate::security::credentials::AuthService::from_config(&config)
+        .store_provider_token(
+            crate::security::credentials::APP_SESSION_PROVIDER,
+            "default",
+            "fixture-session-token",
+            Default::default(),
+            true,
+        )
+        .expect("store isolated fixture session");
 
     CoreContext::scope(context_b, async {
         let (_, model) = create_chat_model_with_model_id_in(&dispatch, "chat", &config, 0.0)

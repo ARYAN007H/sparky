@@ -95,7 +95,10 @@ async fn native_budget_wrapping_keeps_owner_error_slots_for_primary_tiers_and_su
     let resolver = models.resolver();
 
     for (request, expected_slot) in [
-        (ModelResolveRequest::new("chat"), primary_slot),
+        (
+            ModelResolveRequest::new("chat").as_team_lead(),
+            primary_slot,
+        ),
         (
             ModelResolveRequest::new("worker").with_model_pin("hint:coding"),
             tier_slot,
@@ -174,6 +177,53 @@ async fn explicit_provider_string_turn_source_uses_scoped_managed_model() {
     })
     .await;
 }
+
+#[tokio::test]
+async fn native_turn_preserves_deepseek_route_metadata_after_cloud_resolution() {
+    use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    use crate::core::types::HostKind;
+
+    let tmp = tempfile::tempdir().expect("isolated workspace");
+    let config = crate::config::Config {
+        config_path: tmp.path().join("config.toml"),
+        workspace_dir: tmp.path().join("workspace"),
+        chat_provider: Some("deepseek:deepseek-chat".into()),
+        cloud_providers: vec![CloudProviderCreds {
+            id: "deepseek-fixture".into(),
+            slug: "deepseek".into(),
+            label: "DeepSeek fixture".into(),
+            endpoint: "https://api.deepseek.com/v1".into(),
+            auth_style: AuthStyle::Bearer,
+            default_model: Some("deepseek-chat".into()),
+        }],
+        ..Default::default()
+    };
+    crate::security::credentials::AuthService::from_config(&config)
+        .store_provider_token(
+            "provider:deepseek",
+            "default",
+            "sk-fixture-deepseek",
+            Default::default(),
+            true,
+        )
+        .expect("store isolated BYOK credential");
+    let context = CoreContext::for_test_with_host_kind(
+        HostKind::Library,
+        DomainSet::full(),
+        Some(tmp.path().join("library")),
+    );
+    let ctx = DispatchCtx::new(context);
+    let models = TurnModelSource::new_crate_native(&ctx, "chat", Arc::new(config))
+        .build("deepseek:deepseek-chat", 0.2, None, None)
+        .expect("configured DeepSeek turn model builds");
+
+    assert_eq!(models.provider_id(), "deepseek");
+    let profile = models.primary.profile().expect("cloud model profile");
+    assert_eq!(profile.provider.as_deref(), Some("deepseek"));
+    assert_eq!(profile.model.as_deref(), Some("deepseek-chat"));
+}
+
 #[tokio::test]
 async fn injected_turn_profile_is_authoritative_and_skips_unselected_routes() {
     use crate::agent::host_overrides::HostOverrides;
