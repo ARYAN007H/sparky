@@ -27,7 +27,7 @@ test('collection names must be <owner>.<entity> in snake_case', () => {
     collections: [
       collection('jobs'),
       collection('Cron.Jobs'),
-      collection('flows.runs'),
+      collection('flows.runs-v2'),
     ],
   });
   assert.equal(problems.length, 3, problems.join('\n'));
