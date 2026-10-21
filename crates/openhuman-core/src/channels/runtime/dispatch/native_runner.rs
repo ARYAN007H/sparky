@@ -595,7 +595,7 @@ pub(crate) async fn run(
         },
         host_authored: false,
         disposition: QueueDisposition::Interrupt,
-        deadline: Some(deadline),
+        deadline: crate::agent::session_host::turn_backstop::configured_backstop(),
         idle_timeout: Some(crate::agent::turn_policy::configured_idle_window()),
     };
     let runner_result = runtime.runner.run(request).await;
