@@ -101,7 +101,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("ProfileMeta did not serialize as an object")?
         .remove("created_at");
     let docs = cluster.documents();
-    docs.ensure_collection(&CollectionSpec::new("profiles")).await?;
+    docs.ensure_collection(&CollectionSpec::new("profiles"))
+        .await?;
     docs.put_with(
         "profiles",
         PROFILE_ID,
@@ -111,7 +112,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
 
-    backend.checkpoint(tinystoragedrivers::Checkpoint::Truncate).await?;
+    backend
+        .checkpoint(tinystoragedrivers::Checkpoint::Truncate)
+        .await?;
     println!("written {}", path.display());
     Ok(())
 }
@@ -122,7 +125,8 @@ async fn put(
     id: &str,
     body: Value,
 ) -> Result<(), tinystoragedrivers::StorageError> {
-    docs.ensure_collection(&CollectionSpec::new(collection)).await?;
+    docs.ensure_collection(&CollectionSpec::new(collection))
+        .await?;
     docs.put(collection, id, body, Precondition::Absent).await?;
     Ok(())
 }

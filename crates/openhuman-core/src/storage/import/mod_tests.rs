@@ -274,16 +274,11 @@ fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrectio
     let source_hash = sha2::Sha256::digest(std::fs::read(&source_db).unwrap());
 
     let destination_url = format!("sqlite:{}", target.storage_db().display());
-    let destination = crate::storage::test_support::sqlite_backend_in(
-        root,
-        destination_url.clone(),
-    )
-    .unwrap();
+    let destination =
+        crate::storage::test_support::sqlite_backend_in(root, destination_url.clone()).unwrap();
     let backend = Arc::clone(&destination.backend);
-    let _installed = crate::storage::test_support::install_for_test(
-        &destination_url,
-        Arc::clone(&backend),
-    );
+    let _installed =
+        crate::storage::test_support::install_for_test(&destination_url, Arc::clone(&backend));
     let config = Config {
         config_path,
         workspace_dir: target.workspace(),
@@ -361,7 +356,10 @@ fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrectio
     assert_eq!(artifact_meta.thread_id.as_deref(), Some("thread-1"));
     assert_eq!(artifact_meta.created_at.timestamp_millis(), created_ms);
     assert_eq!(args.len(), 1);
-    assert_eq!(args[0].doc, serde_json::json!({"title":"Fixture plan", "format":"markdown"}));
+    assert_eq!(
+        args[0].doc,
+        serde_json::json!({"title":"Fixture plan", "format":"markdown"})
+    );
 
     let registry = ProfileRegistry::cluster(backend.as_ref()).unwrap();
     let profile = storage::block_on(registry.get(&ProfileId::parse("u1").unwrap()))
@@ -391,12 +389,19 @@ fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrectio
         .find(|report| report.domain == crate::storage::scope_move::IMPORT_DOMAIN)
         .unwrap();
     assert_eq!(moved.outcome.as_ref().unwrap(), &Outcome::AlreadyDone);
-    let docs = Arc::clone(backend.for_scope(&scope_for_profile("u1")).unwrap().documents());
-    let remaining = storage::block_on(async move {
-        docs.query_all("cost.records", &Query::all()).await
-    })
-    .unwrap();
-    assert!(remaining.is_empty(), "a deleted imported row must not return");
+    let docs = Arc::clone(
+        backend
+            .for_scope(&scope_for_profile("u1"))
+            .unwrap()
+            .documents(),
+    );
+    let remaining =
+        storage::block_on(async move { docs.query_all("cost.records", &Query::all()).await })
+            .unwrap();
+    assert!(
+        remaining.is_empty(),
+        "a deleted imported row must not return"
+    );
     assert_eq!(
         sha2::Sha256::digest(std::fs::read(&source_db).unwrap()),
         source_hash,
