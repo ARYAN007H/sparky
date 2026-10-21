@@ -21,6 +21,9 @@ pub(crate) struct OpenHumanModelFactory<'a> {
     pub(crate) primary_provider: Option<&'a str>,
     pub(crate) egress: &'a EgressLedger,
     pub(crate) thread_id: Option<&'a str>,
+    /// Attach OpenHuman's per-turn multimodal providers using the route this
+    /// factory actually selected. One-shot probes do not need host attachments.
+    pub(crate) attach_host_attachments: bool,
 }
 
 impl OpenHumanModelFactory<'_> {
@@ -305,6 +308,7 @@ fn build_one_shot(
         primary_provider: provider,
         egress: &egress,
         thread_id: None,
+        attach_host_attachments: false,
     };
     let request = ModelBuildRequest {
         role: role.to_owned(),
@@ -353,7 +357,24 @@ impl ModelFactory<()> for OpenHumanModelFactory<'_> {
             model: (!route.model.is_empty()).then(|| route.model.clone()),
             temperature: request.opts.temperature,
         };
-        let model = with_request_defaults(model, opts);
+        let mut model = with_request_defaults(model, opts);
+        if self.attach_host_attachments {
+            model = if self.injected(request).is_some() {
+                crate::attachments::provider::wrap_injected(
+                    self.ctx,
+                    model,
+                    Arc::new(self.config.clone()),
+                )
+            } else {
+                crate::attachments::provider::wrap(
+                    self.ctx,
+                    model,
+                    Arc::new(self.config.clone()),
+                    &route.model,
+                    &route.provider,
+                )
+            };
+        }
         Ok((model, route))
     }
 }
