@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex as StdMutex};
 
 use serde_json::{json, Value};
 use tempfile::TempDir;
-use tinyinference_llm::model::context_window::ContextWindowRouteInput;
+use tinyinference_llm::model::context_window::{ContextWindowRouteInput, WindowSource};
 use tinyinference_llm::model::discover::DiscoveryRequest;
 use tinyinference_llm::model::discover::ModelLimitsCache;
 

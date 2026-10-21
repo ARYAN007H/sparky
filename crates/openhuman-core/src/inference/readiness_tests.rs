@@ -37,6 +37,7 @@ async fn cached_probe_serves_definitive_negative_results() {
                 counter.fetch_add(1, Ordering::SeqCst);
                 Box::pin(async { Err("API key not configured for provider".to_string()) })
             })),
+            models: None,
         },
     );
 
