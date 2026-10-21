@@ -18,10 +18,9 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use sha2::Digest;
-use tinystoragedrivers::{
-    DocumentStore, ErrorKind, Precondition, Scope, StorageBackend, WriteOptions,
-};
+use tinystoragedrivers_types::{CollectionSpec, ErrorKind, WriteOptions};
 
+use crate::storage::{DocumentStore, DocumentStoreExt, Precondition, Scope, StorageBackend};
 use super::scope::{scope_for_agent, scope_for_profile, tenant_scope};
 
 /// The `tsd.migrations` owner the move records under.
@@ -166,8 +165,7 @@ pub async fn copy_inventory(
     known: &Known,
     inventory: &crate::storage::import::scope_move::LegacyScopeInventory,
 ) -> anyhow::Result<MoveReport> {
-    use anyhow::{Context, bail};
-    use tinystoragedrivers::CollectionSpec;
+    use anyhow::bail;
 
     let mut report = MoveReport::default();
     let mut source_scopes: Vec<&str> = inventory.scopes.iter().map(String::as_str).collect();
@@ -305,6 +303,8 @@ pub async fn run_from_source(
     source_db: &std::path::Path,
     known: &Known,
 ) -> anyhow::Result<MoveReport> {
+    use anyhow::Context;
+
     let path = source_db.to_owned();
     let inventory = tokio::task::spawn_blocking(move || {
         crate::storage::import::scope_move::LegacyScopeInventory::read(&path)
