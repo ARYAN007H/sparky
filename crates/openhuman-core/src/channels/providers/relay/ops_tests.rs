@@ -100,133 +100,140 @@ struct Seen {
 
 #[tokio::test]
 async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
-    let seen = Arc::new(Mutex::new(Seen::default()));
-    let stub_seen = Arc::clone(&seen);
-    let relayed_thread = params("m1", "x").thread_id();
-    let _bus = mock_agent_run_turn(move |req: AgentTurnRequest| {
-        let mut seen = stub_seen.lock().unwrap();
-        seen.busy
-            .push(crate::agent::orchestration::busy_guard::is_busy(
-                &crate::core::runtime::DispatchCtx::ambient(),
-                &relayed_thread,
-            ));
-        seen.histories.push(
-            req.history
-                .iter()
-                .map(|m| (m.role.clone(), m.content.clone()))
-                .collect(),
-        );
-        seen.origins.push(req.origin.clone());
-        let n = seen.histories.len();
-        async move { Ok(AgentTurnResponse::new(format!("answer {n}"))) }
-    })
-    .await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config(&tmp);
-    let workspace = config.workspace_dir.clone();
-    let mut events = crate::web_chat::subscribe_web_channel_events();
-
-    for (id, text) in [("m1", "first question"), ("m2", "second question")] {
-        let p = params(id, text);
-        let thread = p.thread_id();
-        assert_eq!(
-            store::record_inbound(
-                &crate::core::runtime::DispatchCtx::ambient(),
-                &workspace,
-                &p,
-                &thread
-            )
-            .await,
-            Ok(Recorded::New)
-        );
-        let replies = run_relay_turn(
-            crate::core::runtime::DispatchCtx::ambient(),
-            config.clone(),
-            p,
-            thread,
-            format!("req-{id}"),
-        )
+    let core_context = CoreContext::for_test(DomainSet::full(), None).derive_with(
+        ContextOverlay::new(config.clone(), DomainSet::full(), Default::default())
+            .session_agent("relay-agent"),
+    );
+    CoreContext::scope(core_context, async {
+        let seen = Arc::new(Mutex::new(Seen::default()));
+        let stub_seen = Arc::clone(&seen);
+        let relayed_thread = params("m1", "x").thread_id();
+        let _bus = mock_agent_run_turn(move |req: AgentTurnRequest| {
+            let mut seen = stub_seen.lock().unwrap();
+            seen.busy
+                .push(crate::agent::orchestration::busy_guard::is_busy(
+                    &crate::core::runtime::DispatchCtx::ambient(),
+                    &relayed_thread,
+                ));
+            seen.histories.push(
+                req.history
+                    .iter()
+                    .map(|m| (m.role.clone(), m.content.clone()))
+                    .collect(),
+            );
+            seen.origins.push(req.origin.clone());
+            let n = seen.histories.len();
+            async move { Ok(AgentTurnResponse::new(format!("answer {n}"))) }
+        })
         .await;
-        assert_eq!(replies.len(), 1, "{replies:?}");
-    }
+        let workspace = config.workspace_dir.clone();
+        let mut events = crate::web_chat::subscribe_web_channel_events();
 
-    let seen = seen.lock().unwrap();
-    assert_eq!(seen.histories.len(), 2, "one agent turn per message");
-    assert_eq!(
-        seen.busy,
-        vec![true, true],
-        "a relayed turn marks its thread busy, so a background result waits"
-    );
-    assert!(
-        !crate::agent::orchestration::busy_guard::is_busy(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            &params("m1", "x").thread_id()
-        ),
-        "the thread is idle once the turn ends"
-    );
-    for origin in &seen.origins {
-        match origin {
-            AgentTurnOrigin::ExternalChannel {
-                channel, sender, ..
-            } => {
-                assert_eq!(channel, "telegram");
-                assert_eq!(sender.as_deref(), Some("42"));
+        for (id, text) in [("m1", "first question"), ("m2", "second question")] {
+            let p = params(id, text);
+            let thread = p.thread_id();
+            assert_eq!(
+                store::record_inbound(
+                    &crate::core::runtime::DispatchCtx::ambient(),
+                    &workspace,
+                    &p,
+                    &thread
+                )
+                .await,
+                Ok(Recorded::New)
+            );
+            let replies = run_relay_turn(
+                crate::core::runtime::DispatchCtx::ambient(),
+                config.clone(),
+                p,
+                thread,
+                format!("req-{id}"),
+            )
+            .await;
+            assert_eq!(replies.len(), 1, "{replies:?}");
+        }
+
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.histories.len(), 2, "one agent turn per message");
+        assert_eq!(
+            seen.busy,
+            vec![true, true],
+            "a relayed turn marks its thread busy, so a background result waits"
+        );
+        assert!(
+            !crate::agent::orchestration::busy_guard::is_busy(
+                &crate::core::runtime::DispatchCtx::ambient(),
+                &params("m1", "x").thread_id()
+            ),
+            "the thread is idle once the turn ends"
+        );
+        for origin in &seen.origins {
+            match origin {
+                AgentTurnOrigin::ExternalChannel {
+                    channel, sender, ..
+                } => {
+                    assert_eq!(channel, "telegram");
+                    assert_eq!(sender.as_deref(), Some("42"));
+                }
+                other => panic!("relayed turns run as an external channel, got {other:?}"),
             }
-            other => panic!("relayed turns run as an external channel, got {other:?}"),
         }
-    }
-    // The second turn is seeded from the thread: the first exchange, then
-    // the new message.
-    let second = &seen.histories[1];
-    let contents: Vec<&str> = second.iter().map(|(_, c)| c.as_str()).collect();
-    assert!(
-        contents.iter().any(|c| c.contains("first question")),
-        "{contents:?}"
-    );
-    assert!(contents.contains(&"answer 1"), "{contents:?}");
-    assert!(
-        contents
-            .last()
-            .is_some_and(|c| c.contains("second question")),
-        "{contents:?}"
-    );
+        // The second turn is seeded from the thread: the first exchange, then
+        // the new message.
+        let second = &seen.histories[1];
+        let contents: Vec<&str> = second.iter().map(|(_, c)| c.as_str()).collect();
+        assert!(
+            contents.iter().any(|c| c.contains("first question")),
+            "{contents:?}"
+        );
+        assert!(contents.contains(&"answer 1"), "{contents:?}");
+        assert!(
+            contents
+                .last()
+                .is_some_and(|c| c.contains("second question")),
+            "{contents:?}"
+        );
 
-    let thread = params("m1", "x").thread_id();
-    let messages = crate::threads::store::get_messages(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        workspace.clone(),
-        &thread,
-    )
-    .unwrap();
-    let ids: Vec<&str> = messages.iter().map(|m| m.id.as_str()).collect();
-    assert_eq!(
-        ids,
-        vec!["user:m1", "assistant:m1", "user:m2", "assistant:m2"]
-    );
-    assert_eq!(messages[1].content, "answer 1");
+        let thread = params("m1", "x").thread_id();
+        let messages = crate::threads::store::get_messages(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            workspace.clone(),
+            &thread,
+        )
+        .unwrap();
+        let ids: Vec<&str> = messages.iter().map(|m| m.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["user:m1", "assistant:m1", "user:m2", "assistant:m2"]
+        );
+        assert_eq!(messages[1].content, "answer 1");
 
-    let mut outbound = Vec::new();
-    while let Ok(event) = events.try_recv() {
-        if event.context().client_id == "gw-ops-test" {
-            outbound.push(event);
+        let mut outbound = Vec::new();
+        while let Ok(event) = events.try_recv() {
+            if event.context().client_id == "gw-ops-test" {
+                outbound.push(event);
+            }
         }
-    }
-    assert_eq!(outbound.len(), 2, "one channel_outbound per reply");
-    assert!(outbound
-        .iter()
-        .all(|event| event.event_name() == CHANNEL_OUTBOUND_EVENT));
-    assert!(outbound
-        .iter()
-        .all(|event| event.context().thread_id == thread));
-    assert_eq!(outbound[0].context().request_id, "req-m1");
-    assert!(matches!(
-        outbound[0].wire_event(),
-        crate::web_chat::WebChannelEvent::ChannelOutbound {
-            full_response: Some(text),
-            structured: Some(structured),
-            ..
-        } if text == "answer 1" && structured["chat_id"] == "-100"
-    ));
+        assert_eq!(outbound.len(), 2, "one channel_outbound per reply");
+        assert!(outbound
+            .iter()
+            .all(|event| event.event_name() == CHANNEL_OUTBOUND_EVENT));
+        assert!(outbound
+            .iter()
+            .all(|event| event.context().thread_id == thread));
+        assert_eq!(outbound[0].context().request_id, "req-m1");
+        assert!(matches!(
+            outbound[0].wire_event(),
+            crate::web_chat::WebChannelEvent::ChannelOutbound {
+                full_response: Some(text),
+                structured: Some(structured),
+                ..
+            } if text == "answer 1" && structured["chat_id"] == "-100"
+        ));
+    })
+    .await;
 }
 
 #[tokio::test]
