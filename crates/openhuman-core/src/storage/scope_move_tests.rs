@@ -132,6 +132,7 @@ async fn a_v1_scope_moves_its_documents_streams_and_blobs() {
 async fn canonical_cluster_scope_import_converts_profiles_and_leases_in_place() {
     let fixture = crate::storage::test_support::sqlite_backend().unwrap();
     let backend = Arc::clone(&fixture.backend);
+    let future_expiry_ms = chrono::Utc::now().timestamp_millis() + 10_000;
     let inventory = crate::storage::import::scope_move::LegacyScopeInventory {
         scopes: vec!["cluster".into()],
         documents: vec![
@@ -157,7 +158,7 @@ async fn canonical_cluster_scope_import_converts_profiles_and_leases_in_place() 
                 body: json!({
                     "owner": "worker-a",
                     "epoch": 8,
-                    "expires_at_ms": 9_000,
+                    "expires_at_ms": future_expiry_ms,
                     "endpoint": "https://worker.example",
                     "released": false
                 }),
@@ -165,7 +166,7 @@ async fn canonical_cluster_scope_import_converts_profiles_and_leases_in_place() 
                     schema: 2,
                     created_ms: 20,
                     updated_ms: 21,
-                    expires_ms: Some(10_000),
+                    expires_ms: Some(future_expiry_ms),
                 },
             },
         ],
@@ -203,11 +204,11 @@ async fn canonical_cluster_scope_import_converts_profiles_and_leases_in_place() 
         .unwrap();
     assert_eq!(
         lease.doc,
-        json!({"holder":"worker-a", "epoch":8, "expires_ms":9000, "endpoint":"https://worker.example"})
+        json!({"holder":"worker-a", "epoch":8, "expires_ms":future_expiry_ms, "endpoint":"https://worker.example"})
     );
     assert_eq!(lease.meta.schema, 2);
     assert_eq!(lease.meta.created_ms, 20);
-    assert_eq!(lease.meta.expires_ms, Some(10_000));
+    assert_eq!(lease.meta.expires_ms, Some(future_expiry_ms));
 
     let operator = backend.for_scope(&crate::storage::Scope::local()).unwrap();
     assert!(operator

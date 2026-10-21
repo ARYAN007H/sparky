@@ -59,7 +59,7 @@ fn host_jsonl_reader_preserves_meta_usage_typed_rows_and_tool_state() {
             "{\"_meta\":{\"agent\":\"Orchestrator\",\"agent_id\":\"orchestrator\",\"dispatcher\":\"native\",\"created\":\"2026-01-01T00:00:00Z\",\"updated\":\"2026-01-02T00:00:00Z\",\"turn_count\":2,\"input_tokens\":7,\"output_tokens\":3,\"cached_input_tokens\":1,\"charged_amount_usd\":0.25,\"thread_id\":\"thread\"}}\n",
             "{\"kind\":\"tools\",\"tools\":[{\"name\":\"lookup\"}]}\n",
             "{\"role\":\"assistant\",\"content\":\"answer\",\"provider\":\"local\",\"model\":\"m1\",\"usage\":{\"input\":7,\"output\":3,\"cached_input\":1,\"cost_usd\":0.25},\"ts\":\"2026-01-02T00:00:00Z\",\"request_id\":\"r1\",\"iteration\":2}\n",
-            "{\"role\":\"user\",\"content\":\"old envelope\",\"tool_call_id\":\"call-1\"}\n"
+            "{\"role\":\"tool\",\"content\":\"{\\\"tool_call_id\\\":\\\"call-1\\\",\\\"content\\\":\\\"old envelope\\\"}\"}\n"
         ),
     )
     .unwrap();
