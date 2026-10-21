@@ -9,15 +9,16 @@
 mod tests;
 
 mod agent_chat;
+mod agent_chat_source;
 mod complete_once;
 mod runtime_ops;
 mod turn_guards;
 
-pub(crate) use agent_chat::agent_chat_for_with_turn_model_source;
 pub use agent_chat::{
     agent_chat, agent_chat_for, agent_chat_reply_for, agent_chat_simple, AgentChatEnv,
     AgentChatReply, AgentChatTarget,
 };
+pub(crate) use agent_chat_source::agent_chat_for_with_turn_model_source;
 pub use complete_once::{complete_once, CompletionEndpoint};
 pub use runtime_ops::{
     local_ai_prompt, local_ai_status, local_ai_summarize, local_ai_transcribe,

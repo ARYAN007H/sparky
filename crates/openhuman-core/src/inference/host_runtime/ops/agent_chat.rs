@@ -354,74 +354,22 @@ pub fn agent_chat_for<'a>(
     route: Option<crate::config::schema::EphemeralRoute>,
     env: AgentChatEnv,
 ) -> futures::future::BoxFuture<'a, Result<Outcome<String>, String>> {
-    agent_chat_for_with_turn_model_source(
-        config,
-        target,
-        message,
-        model_override,
-        temperature,
-        thread_id,
-        cwd,
-        route,
-        env,
-        None,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn agent_chat_for_with_turn_model_source<'a>(
-    config: &'a mut Config,
-    target: AgentChatTarget<'a>,
-    message: &'a str,
-    model_override: Option<String>,
-    temperature: Option<f64>,
-    thread_id: Option<String>,
-    cwd: Option<String>,
-    route: Option<crate::config::schema::EphemeralRoute>,
-    env: AgentChatEnv,
-    turn_model_source: Option<(crate::agent::tinyagents::TurnModelSource, String)>,
-) -> futures::future::BoxFuture<'a, Result<Outcome<String>, String>> {
-    Box::pin(agent_chat_for_inner(
-        config,
-        target,
-        message,
-        model_override,
-        temperature,
-        thread_id,
-        cwd,
-        route,
-        env,
-        turn_model_source,
-    ))
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn agent_chat_for_inner(
-    config: &mut Config,
-    target: AgentChatTarget<'_>,
-    message: &str,
-    model_override: Option<String>,
-    temperature: Option<f64>,
-    thread_id: Option<String>,
-    cwd: Option<String>,
-    route: Option<crate::config::schema::EphemeralRoute>,
-    env: AgentChatEnv,
-    turn_model_source: Option<(crate::agent::tinyagents::TurnModelSource, String)>,
-) -> Result<Outcome<String>, String> {
-    agent_chat_reply_for_inner(
-        config,
-        target,
-        message,
-        model_override,
-        temperature,
-        thread_id,
-        cwd,
-        route,
-        env,
-        turn_model_source,
-    )
-    .await
-    .map(AgentChatReply::into_outcome)
+    Box::pin(async {
+        agent_chat_reply_for_inner(
+            config,
+            target,
+            message,
+            model_override,
+            temperature,
+            thread_id,
+            cwd,
+            route,
+            env,
+            None,
+        )
+        .await
+        .map(AgentChatReply::into_outcome)
+    })
 }
 
 /// [`agent_chat_for`], keeping whether the turn stopped at its iteration cap.
@@ -454,7 +402,7 @@ pub async fn agent_chat_reply_for(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn agent_chat_reply_for_inner(
+pub(super) async fn agent_chat_reply_for_inner(
     config: &mut Config,
     target: AgentChatTarget<'_>,
     message: &str,
