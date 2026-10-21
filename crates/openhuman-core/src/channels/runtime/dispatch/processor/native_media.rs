@@ -90,14 +90,14 @@ pub(super) async fn resolve_typed_message(
     for (index, part) in parts.iter_mut().enumerate() {
         let (media, image, name) = match part {
             ContentPart::Image { media, .. } => (
-                media,
+                media.clone(),
                 true,
                 media.file_name.clone().unwrap_or_else(|| "image".into()),
             ),
             ContentPart::File {
                 media, file_name, ..
             } => (
-                media,
+                media.clone(),
                 false,
                 file_name
                     .clone()
@@ -123,20 +123,20 @@ pub(super) async fn resolve_typed_message(
             _ => return Err("native channel content kind is not supported".into()),
         };
         let byte_limit = if image { image_limit } else { file_limit };
+        let mime = media
+            .content_type
+            .clone()
+            .ok_or_else(|| "native media has no content type".to_owned())?;
         let bytes = read_scoped_media(
             &client,
             &module_dispatch,
             envelope.channel.id.as_str(),
             &scope,
-            media,
+            &media,
             byte_limit,
         )
         .await?;
-        let mime = media
-            .content_type
-            .as_deref()
-            .ok_or_else(|| "native media has no content type".to_owned())?;
-        media_payloads.push((index, part.clone(), name, mime.to_owned(), bytes));
+        media_payloads.push((index, part.clone(), name, mime, bytes));
     }
     for (index, input, name, mime, bytes) in media_payloads {
         let staged = match crate::threads::attachments::stage_native_channel_part(

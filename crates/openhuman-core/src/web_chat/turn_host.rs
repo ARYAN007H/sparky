@@ -340,6 +340,9 @@ impl WebHost {
                 run_queue: Some(queue),
                 cancellation,
                 turn_deadline: request.deadline,
+                native_staged_parts: Vec::new(),
+                native_staged_lease: None,
+                native_message_id: None,
                 // Also the turn's workspace, so attachment reads and
                 // delegated sub-agents use the upload folder (#7714).
                 workspace: thread_dir

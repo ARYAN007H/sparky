@@ -555,7 +555,7 @@ pub(crate) async fn read_authorized_native_attachment(
     .map_err(|_| "native attachment workspace is unavailable".to_owned())?;
     let scope = crate::agent::attachments::AttachmentAccessScope {
         external_channel: false,
-        workspace: Some(workspace),
+        workspace: Some(workspace.clone()),
         thread_id: Some(thread_id.to_owned()),
         ..Default::default()
     };

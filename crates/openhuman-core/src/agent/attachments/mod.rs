@@ -19,7 +19,7 @@ pub(crate) mod provider;
 
 /// Per-model-call attachment authority copied from the live agent context.
 /// The provider wrapper removes its request carrier before forwarding it.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct AttachmentAccessScope {
     pub(crate) external_channel: bool,
     pub(crate) workspace: Option<PathBuf>,

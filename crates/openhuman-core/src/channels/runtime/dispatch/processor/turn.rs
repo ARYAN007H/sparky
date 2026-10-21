@@ -111,7 +111,6 @@ pub(crate) async fn process_channel_runtime_message(
     let msg = prepared.message;
     let history_key = prepared.history_key;
     let canonical_session_key = prepared.session_key.clone();
-    let prepared_thread_id = prepared.thread_id.clone();
     let mut envelope = prepared.envelope;
     tracing::debug!(
         provider_matches_account = envelope
