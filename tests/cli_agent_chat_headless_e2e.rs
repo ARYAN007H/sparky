@@ -160,12 +160,7 @@ fn run_cli(
     let params = json!({ "message": "Delegate this request to a child and report its exact result", "model_override": "e2e-mock-model" });
     let mut child = ChildGuard(
         Command::new(env!("CARGO_BIN_EXE_openhuman-core"))
-            .args([
-                "call",
-                "--method",
-                method,
-                "--params",
-            ])
+            .args(["call", "--method", method, "--params"])
             .arg(params.to_string())
             .env("HOME", home)
             .env("USERPROFILE", home)
