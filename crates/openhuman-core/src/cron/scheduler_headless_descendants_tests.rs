@@ -117,11 +117,10 @@ impl ChatModel<()> for CronChildModel {
         _state: &(),
         request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelResponse> {
-        if request
-            .messages
-            .iter()
-            .any(|message| message.text().contains(CHILD_PROMPT))
-        {
+        if request.messages.iter().any(|message| {
+            matches!(message, tinyinference_llm::message::Message::User(_))
+                && message.text().contains(CHILD_PROMPT)
+        }) {
             let call = self
                 .child_calls
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -159,9 +158,10 @@ impl ChatModel<()> for CronChildModel {
         }
 
         if request.messages.iter().any(|message| {
-            message
-                .text()
-                .contains("Accepted async sub-agent `task_manager_agent`")
+            matches!(message, tinyinference_llm::message::Message::Tool(_))
+                && message
+                    .text()
+                    .contains("Accepted async sub-agent `task_manager_agent`")
         }) {
             self.accepted_followups
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -293,14 +293,6 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
         Ok(Ok(())) => {}
         Ok(Err(error)) => panic!("scheduled child exited before its model blocked: {error}"),
         Err(_) => {
-            eprintln!(
-                "CRON_TIMEOUT_SETUP_DIAGNOSTIC spawn_calls={} accepted_followups={} child_calls={} invocation_dropped={} run_finished={}",
-                model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
-                model.accepted_followups.load(std::sync::atomic::Ordering::SeqCst),
-                model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
-                model.child_invocation_dropped.load(std::sync::atomic::Ordering::SeqCst),
-                run.is_finished(),
-            );
             model.child_release.notify_one();
             let _ = tokio::time::timeout(std::time::Duration::from_secs(5), run).await;
             panic!(
