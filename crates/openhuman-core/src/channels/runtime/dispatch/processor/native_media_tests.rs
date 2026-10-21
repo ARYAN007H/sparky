@@ -41,6 +41,7 @@ fn native_media_rejects_declared_oversize_and_unsupported_mime() {
     assert!(validate_reference(&media, true, 1024, &[]).is_err());
 
     let mut file = reference();
+    file.kind = MediaKind::Document;
     file.content_type = Some("application/x-executable".into());
     assert!(validate_reference(&file, false, 1024, &["text/plain".into()]).is_err());
 }
@@ -98,4 +99,45 @@ fn native_audio_video_and_incomplete_voice_are_rejected_before_media_reads() {
         },
     };
     assert!(validate_native_parts(&[pending_voice]).is_err());
+}
+
+#[test]
+fn module_media_scope_preserves_account_full_conversation_and_provider_turn() {
+    let envelope = ChannelInboundEnvelope {
+        channel: tinychannels_bus::ChannelRef {
+            id: "telegram".into(),
+            account_id: Some("telegram:work".into()),
+        },
+        conversation: tinychannels_bus::ConversationRef {
+            kind: tinychannels_bus::ConversationKind::Thread,
+            id: "chat-42".into(),
+            thread_id: Some("thread-7".into()),
+            topic_id: Some("topic-9".into()),
+            ..Default::default()
+        },
+        message_id: "provider-message-19".into(),
+        ..Default::default()
+    };
+    let scope = media_scope(&envelope).unwrap();
+    assert_eq!(scope.configured_instance, "telegram:work");
+    assert_eq!(scope.channel, envelope.channel);
+    assert_eq!(scope.conversation, envelope.conversation);
+    assert_eq!(scope.turn_id, "provider-message-19");
+
+    let missing_account = ChannelInboundEnvelope {
+        channel: tinychannels_bus::ChannelRef {
+            id: "telegram".into(),
+            account_id: None,
+        },
+        ..envelope
+    };
+    assert!(media_scope(&missing_account).is_err());
+}
+
+#[test]
+fn scoped_media_actual_bytes_must_match_declared_and_configured_bounds() {
+    assert!(validate_actual_media_size(10, 10, 10).is_ok());
+    assert!(validate_actual_media_size(11, 10, 20).is_err());
+    assert!(validate_actual_media_size(10, 10, 9).is_err());
+    assert!(validate_actual_media_size(0, 0, 10).is_err());
 }

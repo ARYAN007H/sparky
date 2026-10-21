@@ -38,18 +38,7 @@ pub(super) async fn resolve_typed_message(
         return Ok(None);
     }
     validate_native_parts(&envelope.parts)?;
-    let account = envelope
-        .channel
-        .account_id
-        .as_deref()
-        .filter(|account| !account.trim().is_empty())
-        .ok_or_else(|| "native media has no configured account scope".to_owned())?;
-    if envelope.channel.id.trim().is_empty()
-        || envelope.conversation.id.trim().is_empty()
-        || envelope.message_id.trim().is_empty()
-    {
-        return Err("native media has an incomplete conversation scope".into());
-    }
+    let scope = media_scope(envelope)?;
     let config = ctx
         .config
         .as_deref()
@@ -97,13 +86,6 @@ pub(super) async fn resolve_typed_message(
     }
     let client = module_client(ctx).await;
     let dispatch = ctx.dispatch_ctx();
-    let scope = HostVoiceScope {
-        configured_instance: account.to_owned(),
-        channel: envelope.channel.clone(),
-        conversation: envelope.conversation.clone(),
-        turn_id: envelope.message_id.clone(),
-    };
-
     for part in &mut parts {
         let (media, image, name) = match part {
             ContentPart::Image { media, .. } => (
@@ -166,15 +148,28 @@ pub(super) async fn resolve_typed_message(
         media.size_bytes = Some(staged.size_bytes as u64);
     }
 
-    let text = if parts
-        .iter()
-        .any(|part| matches!(part, ContentPart::Text { .. }))
+    crate::agent::message_convert::user_message_from_parts("", &parts).map(Some)
+}
+
+fn media_scope(envelope: &ChannelInboundEnvelope) -> Result<HostVoiceScope, String> {
+    let configured_instance = envelope
+        .channel
+        .account_id
+        .as_deref()
+        .filter(|account| !account.trim().is_empty())
+        .ok_or_else(|| "native media has no configured account scope".to_owned())?;
+    if envelope.channel.id.trim().is_empty()
+        || envelope.conversation.id.trim().is_empty()
+        || envelope.message_id.trim().is_empty()
     {
-        String::new()
-    } else {
-        envelope.text.clone()
-    };
-    crate::agent::message_convert::user_message_from_parts(&text, &parts).map(Some)
+        return Err("native media has an incomplete conversation scope".into());
+    }
+    Ok(HostVoiceScope {
+        configured_instance: configured_instance.to_owned(),
+        channel: envelope.channel.clone(),
+        conversation: envelope.conversation.clone(),
+        turn_id: envelope.message_id.clone(),
+    })
 }
 
 fn validate_native_parts(parts: &[ContentPart]) -> Result<(), String> {
@@ -253,6 +248,13 @@ fn validate_reference(
     Ok(())
 }
 
+fn validate_actual_media_size(actual: usize, declared: usize, maximum: usize) -> Result<(), String> {
+    if actual == 0 || actual != declared || actual > maximum || actual > MAX_MEDIA_BYTES {
+        return Err("native media bytes exceed or disagree with their declared limit".into());
+    }
+    Ok(())
+}
+
 async fn read_scoped_media(
     client: &ModuleClient,
     dispatch: &DispatchCtx,
@@ -279,6 +281,10 @@ async fn read_scoped_media(
         || begin.byte_count > max_bytes
         || begin.byte_count > MAX_MEDIA_BYTES
         || begin.media.opaque_id != media.opaque_id
+        || begin.media.kind != media.kind
+        || begin.media.path.is_some()
+        || begin.media.url.is_some()
+        || begin.media.local_cache_path.is_some()
         || begin.content_type != media.content_type.as_deref().unwrap_or_default()
         || media
             .size_bytes
@@ -309,6 +315,9 @@ async fn read_scoped_media(
         if chunk.sequence != sequence || chunk.done != expected_done {
             return Err("native media read returned an invalid chunk sequence".into());
         }
+        if chunk.bytes.len() > tinychannels_bus::module_media::MEDIA_READ_CHUNK_BYTES {
+            return Err("native media read returned an oversized chunk".into());
+        }
         if bytes.len().saturating_add(chunk.bytes.len()) > begin.byte_count
             || bytes.len().saturating_add(chunk.bytes.len()) > max_bytes
         {
@@ -316,9 +325,7 @@ async fn read_scoped_media(
         }
         bytes.extend(chunk.bytes);
     }
-    if bytes.len() != begin.byte_count {
-        return Err("native media bytes do not match their declared size".into());
-    }
+    validate_actual_media_size(bytes.len(), begin.byte_count, max_bytes)?;
     lease.abort().await?;
     Ok(bytes)
 }
