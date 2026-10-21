@@ -1,7 +1,10 @@
 use super::*;
 use crate::cron::client::testing as cron_store;
 use crate::storage::{MemoryStorage, Scope};
+use serde_json::json;
 use serde_json::Value;
+use sha2::Digest;
+use std::collections::BTreeMap;
 use tempfile::TempDir;
 use tinyflows_drivers::catalog::FlowCatalogDocuments;
 
@@ -39,6 +42,31 @@ fn workspace() -> (TempDir, Config) {
 
 fn backend() -> Arc<dyn StorageBackend> {
     Arc::new(MemoryStorage::new())
+}
+
+/// Hash the legacy files while ignoring SQLite's transient shared-memory state.
+fn tree(root: &Path) -> BTreeMap<String, String> {
+    fn walk(dir: &Path, root: &Path, out: &mut BTreeMap<String, String>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path, root, out);
+            } else {
+                let bytes = std::fs::read(&path).unwrap();
+                let name = path.to_string_lossy();
+                if name.ends_with("-shm") || (name.ends_with("-wal") && bytes.is_empty()) {
+                    continue;
+                }
+                out.insert(
+                    path.strip_prefix(root).unwrap().display().to_string(),
+                    hex::encode(sha2::Sha256::digest(bytes)),
+                );
+            }
+        }
+    }
+    let mut out = BTreeMap::new();
+    walk(root, root, &mut out);
+    out
 }
 
 fn documents(
