@@ -6,7 +6,7 @@ use tinystoragedrivers_types::CollectionSpec;
 
 use super::*;
 
-const IMPORT_DOMAIN: &str = "scope_move";
+pub(crate) const IMPORT_DOMAIN: &str = "scope_move";
 const IMPORT_OWNER: &str = "storage";
 
 fn marker_collections() -> Vec<CollectionSpec> {
