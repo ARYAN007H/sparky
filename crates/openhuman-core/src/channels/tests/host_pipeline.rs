@@ -122,6 +122,11 @@ async fn dispatch_harness_default_workspace_does_not_reuse_prior_transcript() {
     })
     .await;
     assert_eq!(first.model_calls.len(), 1);
+    assert_eq!(
+        first.sends.len(),
+        1,
+        "the first harness turn replies successfully"
+    );
 
     let second = run_dispatch_harness(DispatchHarnessOptions {
         content: "second isolated harness turn".into(),
