@@ -7,7 +7,7 @@ async fn agent_registry_rpc_preserves_document_conflicts() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-rpc"),
+        scoped(storage.as_ref(), "tenant-rpc"),
         Scope::new("tenant-rpc").unwrap(),
         keys(9),
     );
@@ -50,7 +50,7 @@ async fn memory_engine_rpc_preserves_document_conflicts() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-memory-rpc"),
+        scoped(storage.as_ref(), "tenant-memory-rpc"),
         Scope::new("tenant-memory-rpc").unwrap(),
         keys(10),
     );
@@ -93,7 +93,7 @@ async fn sequential_config_rpcs_use_the_latest_context_snapshot() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-sequential-config-rpc"),
+        scoped(storage.as_ref(), "tenant-sequential-config-rpc"),
         Scope::new("tenant-sequential-config-rpc").unwrap(),
         keys(11),
     );
@@ -135,7 +135,7 @@ async fn external_config_conflict_refreshes_the_context_before_the_next_read() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-refresh-config-rpc"),
+        scoped(storage.as_ref(), "tenant-refresh-config-rpc"),
         Scope::new("tenant-refresh-config-rpc").unwrap(),
         keys(13),
     );
@@ -182,7 +182,7 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-refresh-overlay"),
+        scoped(storage.as_ref(), "tenant-refresh-overlay"),
         Scope::new("tenant-refresh-overlay").unwrap(),
         keys(14),
     );
@@ -327,7 +327,7 @@ async fn nested_context_refresh_does_not_pin_a_previous_external_value() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-refresh-nested-overlay"),
+        scoped(storage.as_ref(), "tenant-refresh-nested-overlay"),
         Scope::new("tenant-refresh-nested-overlay").unwrap(),
         keys(15),
     );
@@ -420,7 +420,7 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
 
     let (from_tenant_a, tenant_a_version) = {
         let _source = ForcedDocumentSource::new(
-            scoped(&storage, "tenant-source-a"),
+            scoped(storage.as_ref(), "tenant-source-a"),
             Scope::new("tenant-source-a").unwrap(),
             keys(12),
         );
@@ -439,7 +439,7 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
 
     let (tenant_b_version, tenant_b_model) = {
         let _source = ForcedDocumentSource::new(
-            scoped(&storage, "tenant-source-b"),
+            scoped(storage.as_ref(), "tenant-source-b"),
             Scope::new("tenant-source-b").unwrap(),
             keys(12),
         );
@@ -453,7 +453,7 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
             .lock()
             .unwrap()
             .version;
-        let docs = Arc::clone(scoped(&storage, "tenant-source-b").documents());
+        let docs = Arc::clone(scoped(storage.as_ref(), "tenant-source-b").documents());
         let stored = docs
             .get(
                 super::super::storage_schema::CONFIG_COLLECTION,
@@ -475,7 +475,7 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
     from_tenant_a.default_model = Some("must-not-cross-tenant-boundary".into());
     let error = {
         let _source = ForcedDocumentSource::new(
-            scoped(&storage, "tenant-source-b"),
+            scoped(storage.as_ref(), "tenant-source-b"),
             Scope::new("tenant-source-b").unwrap(),
             keys(12),
         );
@@ -492,7 +492,7 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
 
     let tenant_b = {
         let _source = ForcedDocumentSource::new(
-            scoped(&storage, "tenant-source-b"),
+            scoped(storage.as_ref(), "tenant-source-b"),
             Scope::new("tenant-source-b").unwrap(),
             keys(12),
         );
@@ -601,7 +601,7 @@ async fn a_file_snapshot_can_seed_an_absent_document_after_storage_bootstrap() {
 
     let storage = memory_backend();
     let _source = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-file-bootstrap"),
+        scoped(storage.as_ref(), "tenant-file-bootstrap"),
         Scope::new("tenant-file-bootstrap").unwrap(),
         keys(15),
     );
@@ -621,8 +621,8 @@ async fn document_source_write_uses_its_last_read_revision() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = memory_backend();
     let path = tmp.path().join("config.toml");
-    let first = document_source(&storage, "tenant-source-cas", &path);
-    let stale = document_source(&storage, "tenant-source-cas", &path);
+    let first = document_source(storage.as_ref(), "tenant-source-cas", &path);
+    let stale = document_source(storage.as_ref(), "tenant-source-cas", &path);
 
     first.write("default_model = \"seed\"\n").await.unwrap();
     first.read().await.unwrap();
@@ -641,8 +641,8 @@ async fn an_unobserved_document_source_write_is_create_only() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = memory_backend();
     let path = tmp.path().join("config.toml");
-    let seed = document_source(&storage, "tenant-source-create-only", &path);
-    let blind = document_source(&storage, "tenant-source-create-only", &path);
+    let seed = document_source(storage.as_ref(), "tenant-source-create-only", &path);
+    let blind = document_source(storage.as_ref(), "tenant-source-create-only", &path);
 
     seed.write("default_model = \"seed\"\n").await.unwrap();
     let error = blind
