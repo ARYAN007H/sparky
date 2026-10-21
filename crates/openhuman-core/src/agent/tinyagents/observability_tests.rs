@@ -141,7 +141,11 @@ async fn the_top_level_run_announces_the_turn_once_and_first() {
         });
     }
     assert_eq!(kinds.first(), Some(&"turn"), "{kinds:?}");
-    assert_eq!(kinds.iter().filter(|k| **k == "turn").count(), 1, "{kinds:?}");
+    assert_eq!(
+        kinds.iter().filter(|k| **k == "turn").count(),
+        1,
+        "{kinds:?}"
+    );
 }
 
 #[tokio::test]
@@ -742,4 +746,35 @@ async fn bridge_forwards_tool_progress_with_a_message() {
             "running 4m 12s · 38.2 KB output".to_string()
         )]
     );
+}
+
+#[tokio::test]
+async fn only_a_top_level_turn_announces_its_compaction() {
+    let (tx, mut rx) = tokio::sync::mpsc::channel(8);
+    OpenhumanEventBridge::new(Some(tx), "mock-model", 10).announce_compaction();
+    assert!(matches!(
+        rx.try_recv(),
+        Ok(AgentProgress::ContextCompacting)
+    ));
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel(8);
+    OpenhumanEventBridge::with_scope(
+        Some(tx),
+        "mock-model",
+        "custom",
+        10,
+        Some(SubagentScope {
+            agent_id: "researcher".into(),
+            task_id: "t1".into(),
+            extended_policy: false,
+        }),
+        Arc::default(),
+        Arc::default(),
+        Arc::default(),
+        Arc::default(),
+        Vec::new(),
+        crate::core::runtime::DispatchCtx::unbound(),
+    )
+    .announce_compaction();
+    assert!(rx.try_recv().is_err());
 }

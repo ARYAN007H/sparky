@@ -19,6 +19,7 @@ import {
   type ChatApprovalDecidedEvent,
   type ChatApprovalRequestEvent,
   type ChatCancelledEvent,
+  type ChatContextCompactingEvent,
   type ChatDoneEvent,
   type ChatErrorEvent,
   type ChatEventListeners,
@@ -846,6 +847,25 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
               threadId: event.thread_id,
               status: {
                 phase: 'thinking',
+                iteration: event.round,
+                maxIterations: prev?.maxIterations ?? 0,
+              },
+            })
+          );
+        },
+        onContextCompacting: (event: ChatContextCompactingEvent) => {
+          rtLog('context_compacting', { thread: event.thread_id, request: event.request_id });
+          // A parallel branch's compaction is its own; the thread's status
+          // line describes the primary turn.
+          if (store.getState().chatRuntime.parallelRequestThreads[event.request_id] !== undefined) {
+            return;
+          }
+          const prev = store.getState().chatRuntime.inferenceStatusByThread[event.thread_id];
+          dispatch(
+            setInferenceStatusForThread({
+              threadId: event.thread_id,
+              status: {
+                phase: 'compacting',
                 iteration: event.round,
                 maxIterations: prev?.maxIterations ?? 0,
               },

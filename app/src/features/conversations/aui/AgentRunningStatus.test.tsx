@@ -105,6 +105,30 @@ describe('AgentRunningStatus waiting states', () => {
   });
 });
 
+describe('AgentRunningStatus while compacting', () => {
+  it('says it is summarizing earlier conversation instead of thinking', () => {
+    renderStatus({
+      inferenceStatusByThread: {
+        [THREAD_ID]: { phase: 'compacting', iteration: 1, maxIterations: 0 },
+      },
+    });
+    expect(screen.getByTestId('agent-running-status-thinking')).toHaveTextContent(
+      'Summarizing earlier conversation'
+    );
+  });
+
+  it('thinks again once the next model call starts', () => {
+    renderStatus({
+      inferenceStatusByThread: {
+        [THREAD_ID]: { phase: 'thinking', iteration: 1, maxIterations: 0 },
+      },
+    });
+    expect(screen.getByTestId('agent-running-status-thinking')).not.toHaveTextContent(
+      'Summarizing'
+    );
+  });
+});
+
 describe('waitingOnUser', () => {
   it('ranks approval over review over answer', () => {
     expect(waitingOnUser({ approval: true, review: true, answer: true })).toBe('approval');

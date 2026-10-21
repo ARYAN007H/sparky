@@ -1271,6 +1271,8 @@ const messages: TranslationMap = {
   'chat.failedToLoadMessages': 'فشل تحميل الرسائل',
   'chat.thinkingDots': 'جارٍ التفكير...',
   'chat.status.thinkingElapsed': 'جارٍ التفكير · {elapsed}',
+  'chat.status.compacting': 'جارٍ تلخيص المحادثة السابقة…',
+  'chat.status.compactingElapsed': 'جارٍ تلخيص المحادثة السابقة · {elapsed}',
   'chat.status.waitingApproval': 'في انتظار موافقتك',
   'chat.status.waitingReview': 'في انتظار مراجعتك',
   'chat.status.waitingAnswer': 'في انتظار إجابتك',

@@ -318,6 +318,14 @@ impl OpenhumanEventBridge {
         }
     }
 
+    /// Tell the client the turn is summarizing earlier conversation. Only a
+    /// top-level turn reports it: a subagent's compaction is not the turn's.
+    pub(crate) fn announce_compaction(&self) {
+        if self.scope.is_none() {
+            self.send(AgentProgress::ContextCompacting);
+        }
+    }
+
     pub(super) fn iteration(&self) -> u32 {
         self.cursor.load(Ordering::SeqCst)
     }

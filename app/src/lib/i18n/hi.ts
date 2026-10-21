@@ -1298,6 +1298,8 @@ const messages: TranslationMap = {
   'chat.failedToLoadMessages': 'मैसेज लोड नहीं हो पाए',
   'chat.thinkingDots': 'सोच रहा है...',
   'chat.status.thinkingElapsed': 'सोच रहा है · {elapsed}',
+  'chat.status.compacting': 'पिछली बातचीत का सारांश बना रहा है…',
+  'chat.status.compactingElapsed': 'पिछली बातचीत का सारांश बना रहा है · {elapsed}',
   'chat.status.waitingApproval': 'आपकी स्वीकृति की प्रतीक्षा',
   'chat.status.waitingReview': 'आपकी समीक्षा की प्रतीक्षा',
   'chat.status.waitingAnswer': 'आपके उत्तर की प्रतीक्षा',

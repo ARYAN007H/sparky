@@ -1481,6 +1481,8 @@ const messages: TranslationMap = {
   'chat.failedToLoadMessages': 'メッセージの読み込みに失敗しました',
   'chat.thinkingDots': '思考中...',
   'chat.status.thinkingElapsed': '思考中 · {elapsed}',
+  'chat.status.compacting': 'これまでの会話を要約中…',
+  'chat.status.compactingElapsed': 'これまでの会話を要約中 · {elapsed}',
   'chat.status.waitingApproval': '承認を待っています',
   'chat.status.waitingReview': 'レビューを待っています',
   'chat.status.waitingAnswer': '回答を待っています',

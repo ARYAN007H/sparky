@@ -1310,6 +1310,8 @@ const messages: TranslationMap = {
   'chat.failedToLoadMessages': 'Nie udało się wczytać wiadomości',
   'chat.thinkingDots': 'Myślę...',
   'chat.status.thinkingElapsed': 'Myślę · {elapsed}',
+  'chat.status.compacting': 'Podsumowuję wcześniejszą rozmowę…',
+  'chat.status.compactingElapsed': 'Podsumowuję wcześniejszą rozmowę · {elapsed}',
   'chat.status.waitingApproval': 'Czeka na Twoją zgodę',
   'chat.status.waitingReview': 'Czeka na Twoją ocenę',
   'chat.status.waitingAnswer': 'Czeka na Twoją odpowiedź',
