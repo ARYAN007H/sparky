@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * runItems — normalizer contract for the run inspector's per-item data browser.
  */

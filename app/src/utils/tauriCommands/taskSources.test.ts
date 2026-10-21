@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * Vitest for the task-sources tauriCommands surface.
  *

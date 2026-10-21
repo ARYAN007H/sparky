@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
 import { SCHEDULE_PRESET_VALUES, SCHEDULE_PRESETS } from './schedulePresets';

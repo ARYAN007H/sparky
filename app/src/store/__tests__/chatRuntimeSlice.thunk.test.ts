@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { configureStore } from '@reduxjs/toolkit';
 import { describe, expect, it, vi } from 'vitest';
 

@@ -1,4 +1,3 @@
-// @vitest-environment node
 import net from 'node:net';
 import { afterEach, expect, it } from 'vitest';
 

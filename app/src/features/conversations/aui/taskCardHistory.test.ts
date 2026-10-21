@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
 import { taskState, type TurnTask, updateTaskHistory } from './taskCardHistory';

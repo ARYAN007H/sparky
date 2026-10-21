@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { expect, it } from 'vitest';
 
 // @ts-ignore - test-only JS module outside app/src

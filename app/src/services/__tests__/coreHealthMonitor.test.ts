@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * Tests for coreHealthMonitor — covers changed lines 17-19, 21-23, 25-29,
  * 31-34, 37, 41-42, 47-50, 53-57, 60-64.

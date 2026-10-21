@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * Tests for socketService socket-event handler dispatches.
  * Covers lines 212, 230, 237, 240.

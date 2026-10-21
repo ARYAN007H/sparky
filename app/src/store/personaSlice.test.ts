@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { REHYDRATE } from 'redux-persist';
 import { describe, expect, it } from 'vitest';
 

@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * The "never again" guard for tool labels.
  *

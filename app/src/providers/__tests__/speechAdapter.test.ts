@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * The read-aloud bridge.
  *

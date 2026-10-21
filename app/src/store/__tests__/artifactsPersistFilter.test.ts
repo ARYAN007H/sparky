@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * Coverage for the persist filter that gates `chatRuntime.artifactsByThread`
  * on its way to storage (#3024). Confirms the slice's contract:

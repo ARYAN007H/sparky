@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
 import { REASONING_EFFORTS } from '../../../features/conversations/aui/ReasoningEffortPicker';

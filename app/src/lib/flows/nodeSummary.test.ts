@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * Unit tests for describeNode — the dynamic per-node card summary. Asserts the
  * config-driven text for representative kinds plus the generic fallbacks when

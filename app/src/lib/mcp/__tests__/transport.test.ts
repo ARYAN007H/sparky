@@ -1,4 +1,3 @@
-// @vitest-environment node
 import type { Socket } from 'socket.io-client';
 import { beforeEach, describe, expect, test } from 'vitest';
 

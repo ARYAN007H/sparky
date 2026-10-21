@@ -117,7 +117,7 @@ alignGlobalEventWithDom();
 
 // Polyfill window.matchMedia — used by Rive (@rive-app/react-webgl2) and
 // some media-query hooks; not implemented in jsdom.
-if (typeof window !== 'undefined' && typeof window.matchMedia === 'undefined') {
+if (typeof window.matchMedia === 'undefined') {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: vi.fn((query: string) => ({
@@ -190,7 +190,7 @@ if (typeof globalThis.IntersectionObserver === 'undefined') {
 // Polyfill PointerEvent for @testing-library/user-event's pointer sequences
 // against Radix triggers. jsdom 28 still ships no PointerEvent constructor, so
 // user-event falls back to MouseEvent and Radix's pointer handlers never fire.
-if (typeof globalThis.PointerEvent === 'undefined' && typeof MouseEvent !== 'undefined') {
+if (typeof globalThis.PointerEvent === 'undefined') {
   globalThis.PointerEvent = class PointerEvent extends MouseEvent {
     readonly pointerId: number;
     readonly pointerType: string;
@@ -212,11 +212,9 @@ if (typeof globalThis.PointerEvent === 'undefined' && typeof MouseEvent !== 'und
 // regress to the non-Tauri path. Seed a no-op handle once globally so the
 // IPC-readiness check passes by default. Tests that *want* the CEF gap
 // behaviour can `delete window.__TAURI_INTERNALS__` in a `beforeEach`.
-if (typeof window !== 'undefined') {
-  (
-    window as unknown as { __TAURI_INTERNALS__: { invoke: () => Promise<unknown> } }
-  ).__TAURI_INTERNALS__ = { invoke: vi.fn(() => Promise.resolve()) };
-}
+(
+  window as unknown as { __TAURI_INTERNALS__: { invoke: () => Promise<unknown> } }
+).__TAURI_INTERNALS__ = { invoke: vi.fn(() => Promise.resolve()) };
 
 // Mock Tauri APIs (not available in test env)
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn(), isTauri: vi.fn(() => false) }));
@@ -412,18 +410,16 @@ afterEach(async () => {
   // Fake-timer suites own their clock. Awaiting a synthetic timer there would
   // wait until Vitest's per-test timeout, rather than draining anything.
   if (!vi.isFakeTimers()) {
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    await new Promise<void>(resolve => window.setTimeout(resolve, 0));
   }
   alignGlobalEventWithDom();
   // Re-seed the IPC handle after any test that may have deleted it
   // (e.g. tests exercising the CEF-gap branch of `isTauri()`). Without
   // this, sibling tests in the same jsdom worker would silently regress
   // to the non-Tauri path. Per graycyrus review on PR #1556.
-  if (typeof window !== 'undefined') {
-    (
-      window as unknown as { __TAURI_INTERNALS__: { invoke: () => Promise<unknown> } }
-    ).__TAURI_INTERNALS__ = { invoke: vi.fn(() => Promise.resolve()) };
-  }
+  (
+    window as unknown as { __TAURI_INTERNALS__: { invoke: () => Promise<unknown> } }
+  ).__TAURI_INTERNALS__ = { invoke: vi.fn(() => Promise.resolve()) };
 });
 afterAll(async () => {
   await stopMockServer();

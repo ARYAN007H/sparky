@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { ActionableItem } from '../../../types/intelligence';

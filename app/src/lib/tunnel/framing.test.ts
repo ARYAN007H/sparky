@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * Unit tests for tunnel/framing.ts
  */

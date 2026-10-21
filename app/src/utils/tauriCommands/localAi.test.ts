@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../services/coreRpcClient', () => ({ callCoreRpc: vi.fn() }));

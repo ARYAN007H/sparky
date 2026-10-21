@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * runStepSummary (issue B20) — plain-language step summary derivation.
  *

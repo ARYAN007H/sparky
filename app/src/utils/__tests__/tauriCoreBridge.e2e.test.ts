@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { isTauri } from '@tauri-apps/api/core';
 import { beforeEach, describe, expect, type Mock, test, vi } from 'vitest';
 
