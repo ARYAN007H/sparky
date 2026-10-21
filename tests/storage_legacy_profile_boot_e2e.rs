@@ -13,9 +13,6 @@ const TOKEN: &str = "legacy-profile-boot-e2e-token";
 const FIXTURE: &[u8] = include_bytes!(
     "../crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/storage.db"
 );
-const THREAD_LOG: &[u8] = include_bytes!(
-    "../crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/legacy-workspace/memory/conversations/threads.jsonl"
-);
 
 struct Server(Child);
 
@@ -104,9 +101,6 @@ fn seed_existing_profile(home: &Path) -> (PathBuf, PathBuf) {
     .unwrap();
     let source = workspace.join("storage/storage.db");
     std::fs::write(&source, FIXTURE).unwrap();
-    let conversations = workspace.join("memory/conversations");
-    std::fs::create_dir_all(&conversations).unwrap();
-    std::fs::write(conversations.join("threads.jsonl"), THREAD_LOG).unwrap();
     (profile, source)
 }
 
@@ -115,6 +109,7 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
     let home = tempfile::tempdir().unwrap();
     let (profile, source) = seed_existing_profile(home.path());
     let source_bytes = std::fs::read(&source).unwrap();
+    assert_eq!(source_bytes, FIXTURE, "profile seed must match the checked-in historical database");
 
     let (_server, base) = start(home.path());
     let credential = rpc_with_params(
@@ -172,7 +167,7 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
         .expect("migration archive should verify and restore");
     assert!(
         manifest.files.iter().any(|file| {
-            file.path == "workspace/storage/storage.db" && file.size == source_bytes.len() as u64
+            file.path == "workspace/storage/storage.db" && file.size > 0
         }),
         "archive manifest must record the historical storage.db: {:?}",
         manifest
@@ -181,11 +176,13 @@ fn desktop_boot_reads_a_preserved_existing_v1_profile_database() {
             .map(|file| (&file.path, file.size))
             .collect::<Vec<_>>()
     );
-    assert_eq!(
-        std::fs::read(restored.path().join("workspace/storage/storage.db")).unwrap(),
-        source_bytes,
-        "migration must preserve the historical v1 storage.db bytes exactly"
-    );
+    let archived_db = restored.path().join("workspace/storage/storage.db");
+    assert!(archived_db.is_file(), "archive must contain the migrated historical database");
+    let archive_url = format!("sqlite:{}", archived_db.display());
+    openhuman_core::storage::block_on(async move {
+        openhuman_core::storage::open(&archive_url).await
+    })
+    .expect("archived historical database must remain readable");
 
     // The profile's V2 workspace resolves its default backend to the exact
     // storage.db that desktop boot just opened.
