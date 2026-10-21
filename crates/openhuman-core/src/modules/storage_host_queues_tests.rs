@@ -142,10 +142,7 @@ async fn a_queue_outside_the_manifest_is_not_found_and_a_divergent_spec_conflict
 async fn a_module_without_a_queue_grant_connects_but_is_denied_queues() {
     let peers = peers().await;
     let queues = queues_of(&peers.plain).await;
-    assert_eq!(
-        queues.features(),
-        QueueFeatures::default()
-    );
+    assert_eq!(queues.features(), QueueFeatures::default());
     let error = queues
         .enqueue("inbox", &[NewMessage::new(json!({}))])
         .await

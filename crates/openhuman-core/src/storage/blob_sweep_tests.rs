@@ -95,10 +95,12 @@ async fn module_blob_scopes_are_swept_alongside_the_acting_scope() {
 #[cfg(not(feature = "modules"))]
 #[test]
 fn no_module_blob_scopes_without_the_modules_feature() {
-    assert!(crate::modules::expiring_blob_module_scopes(
-        &crate::core::runtime::DispatchCtx::host_default()
-    )
-    .is_empty());
+    assert!(
+        crate::modules::expiring_blob_module_scopes(
+            &crate::core::runtime::DispatchCtx::host_default()
+        )
+        .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -210,4 +212,189 @@ fn module_blob_scopes_follow_the_handed_context_and_never_cross_tenants() {
     assert!(!alice.is_empty() && !bob.is_empty());
     assert!(alice.iter().all(|s| s.as_str().contains("blob-alice")));
     assert!(bob.iter().all(|s| s.as_str().contains("blob-bob")));
+}
+
+#[test]
+fn orphan_sweep_age_is_strict_and_unknown_ages_are_retained() {
+    assert!(!orphan_age_is_eligible(None, 100));
+    assert!(!orphan_age_is_eligible(Some(100), 100));
+    assert!(orphan_age_is_eligible(Some(99), 100));
+}
+
+#[test]
+fn orphan_sweep_refuses_empty_and_engine_owned_prefixes() {
+    for prefix in ["", "_tsd/", "_tsd/sealed", "_tsd/sealed/stream/"] {
+        assert_eq!(
+            validate_orphan_sweep_prefix(prefix, 1024)
+                .unwrap_err()
+                .kind(),
+            tinystoragedrivers_types::ErrorKind::InvalidInput,
+            "prefix {prefix:?}"
+        );
+    }
+    assert!(validate_orphan_sweep_prefix("user/attachments/", 1024).is_ok());
+    assert_eq!(
+        validate_orphan_sweep_prefix("a longer prefix", 3)
+            .unwrap_err()
+            .kind(),
+        tinystoragedrivers_types::ErrorKind::InvalidInput
+    );
+}
+
+#[test]
+fn orphan_sweep_rejects_malformed_or_nonadvancing_listing_pages() {
+    use tinystoragedrivers_types::{BlobListEntry, BlobListPage, BlobMeta};
+
+    let page = BlobListPage {
+        items: vec![BlobListEntry {
+            meta: BlobMeta {
+                key: "user/b".into(),
+                len: 1,
+                content_type: None,
+            },
+            written_at_ms: Some(1),
+        }],
+        next_after: Some("user/a".into()),
+    };
+    assert_eq!(
+        validate_orphan_sweep_page("user/", None, &page, 1024)
+            .unwrap_err()
+            .kind(),
+        tinystoragedrivers_types::ErrorKind::Backend
+    );
+    assert_eq!(
+        validate_orphan_sweep_page("user/", Some("user/b"), &page, 1024)
+            .unwrap_err()
+            .kind(),
+        tinystoragedrivers_types::ErrorKind::Backend
+    );
+}
+
+#[tokio::test]
+async fn orphan_sweep_pages_and_preserves_referenced_blobs() {
+    use tinystoragedrivers_api::BlobStore;
+    use tinystoragedrivers_testkit::memory_storage;
+    use tinystoragedrivers_types::Scope;
+
+    let storage = memory_storage(&Scope::local());
+    let blobs = storage.blobs();
+    for index in 0..=MAX_BLOB_LIST_PAGE_ITEMS {
+        blobs
+            .put(&format!("cleanup/{index:04}"), vec![index as u8], None)
+            .await
+            .unwrap();
+    }
+    let kept = format!("cleanup/{:04}", MAX_BLOB_LIST_PAGE_ITEMS);
+    let removed = sweep_unreferenced_blobs(blobs.as_ref(), "cleanup/", u64::MAX, |key| {
+        let kept = kept.clone();
+        async move { Ok(key == kept) }
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(removed, MAX_BLOB_LIST_PAGE_ITEMS as u64);
+    assert!(blobs.get(&kept).await.unwrap().is_some());
+    assert!(blobs.get("cleanup/0000").await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn orphan_sweep_checks_references_only_for_eligible_blobs() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tinystoragedrivers_api::BlobStore;
+    use tinystoragedrivers_testkit::memory_storage;
+    use tinystoragedrivers_types::Scope;
+
+    let storage = memory_storage(&Scope::local());
+    let blobs = storage.blobs();
+    blobs.put("cleanup/a", vec![1], None).await.unwrap();
+    blobs.put("cleanup/b", vec![2], None).await.unwrap();
+    let checked = AtomicUsize::new(0);
+
+    let removed = sweep_unreferenced_blobs(blobs.as_ref(), "cleanup/", 0, |_| {
+        checked.fetch_add(1, Ordering::SeqCst);
+        async { Ok(false) }
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(removed, 0);
+    assert_eq!(checked.load(Ordering::SeqCst), 0);
+    assert!(blobs.get("cleanup/a").await.unwrap().is_some());
+    assert!(blobs.get("cleanup/b").await.unwrap().is_some());
+}
+
+#[tokio::test]
+async fn orphan_sweep_stops_on_reference_error_after_preserving_prior_progress() {
+    use tinystoragedrivers_api::BlobStore;
+    use tinystoragedrivers_testkit::memory_storage;
+    use tinystoragedrivers_types::Scope;
+
+    let storage = memory_storage(&Scope::local());
+    let blobs = storage.blobs();
+    for key in ["cleanup/a", "cleanup/b", "cleanup/c"] {
+        blobs.put(key, vec![1], None).await.unwrap();
+    }
+
+    let error = sweep_unreferenced_blobs(blobs.as_ref(), "cleanup/", u64::MAX, |key| async move {
+        if key == "cleanup/b" {
+            Err(StorageError::backend("reference lookup failed"))
+        } else {
+            Ok(false)
+        }
+    })
+    .await
+    .unwrap_err();
+
+    assert_eq!(error.kind(), tinystoragedrivers_types::ErrorKind::Backend);
+    assert!(blobs.get("cleanup/a").await.unwrap().is_none());
+    assert!(blobs.get("cleanup/b").await.unwrap().is_some());
+    assert!(blobs.get("cleanup/c").await.unwrap().is_some());
+}
+
+#[tokio::test]
+async fn orphan_sweep_stops_on_listing_error_before_touching_blobs() {
+    use std::sync::Arc;
+    use tinystoragedrivers_api::BlobStore;
+    use tinystoragedrivers_testkit::{Failing, FaultPlan, memory_storage};
+    use tinystoragedrivers_types::{ErrorKind, Scope};
+
+    let storage = memory_storage(&Scope::local());
+    let blobs = Arc::clone(storage.blobs());
+    blobs.put("cleanup/a", vec![1], None).await.unwrap();
+    let faults = FaultPlan::new();
+    faults.fail_operation_nth("blob.list_page", 1, ErrorKind::Unavailable);
+    let failing = Failing::with_plan(blobs.clone(), faults);
+
+    let error = sweep_unreferenced_blobs(&failing, "cleanup/", u64::MAX, |_| async { Ok(false) })
+        .await
+        .unwrap_err();
+
+    assert_eq!(error.kind(), ErrorKind::Unavailable);
+    assert!(blobs.get("cleanup/a").await.unwrap().is_some());
+}
+
+#[tokio::test]
+async fn orphan_sweep_stops_on_delete_error_after_preserving_prior_progress() {
+    use std::sync::Arc;
+    use tinystoragedrivers_api::BlobStore;
+    use tinystoragedrivers_testkit::{Failing, FaultPlan, memory_storage};
+    use tinystoragedrivers_types::{ErrorKind, Scope};
+
+    let storage = memory_storage(&Scope::local());
+    let blobs = Arc::clone(storage.blobs());
+    for key in ["cleanup/a", "cleanup/b", "cleanup/c"] {
+        blobs.put(key, vec![1], None).await.unwrap();
+    }
+    let faults = FaultPlan::new();
+    faults.fail_operation_nth("blob.delete", 2, ErrorKind::Unavailable);
+    let failing = Failing::with_plan(blobs.clone(), faults);
+
+    let error = sweep_unreferenced_blobs(&failing, "cleanup/", u64::MAX, |_| async { Ok(false) })
+        .await
+        .unwrap_err();
+
+    assert_eq!(error.kind(), ErrorKind::Unavailable);
+    assert!(blobs.get("cleanup/a").await.unwrap().is_none());
+    assert!(blobs.get("cleanup/b").await.unwrap().is_some());
+    assert!(blobs.get("cleanup/c").await.unwrap().is_some());
 }

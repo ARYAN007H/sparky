@@ -84,7 +84,7 @@ const ROWS: &[Row] = &[
         secrets: &[],
         queues: None,
     },
-    // The inbound event queues keep their pipeline state in `teq.*`
+    // The inbound event queues keep their pipeline state under the `teq` owner
     // collections and their work in the queues the configured manifest
     // declares (the shipped `queues.json` unless `[inbound] queues_path`).
     #[cfg(feature = "inbound-queues")]

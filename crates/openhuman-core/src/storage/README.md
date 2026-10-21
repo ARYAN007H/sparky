@@ -104,13 +104,20 @@ it with the core stopped.
   need. `driver_has_cross_process_cas(driver)` is the same answer from a
   name, for the boot guard, which judges a URL before opening anything.
   Memory and file drivers coordinate only within one process.
-- `blob_sweep`: reclaims expired blobs (`StorageBackend::sweep_expired_blobs`)
+- `blob_sweep`: reclaims expired blobs (`BlobStore::sweep_expired`)
   for `local`, each known agent scope and each provisioned SaaS profile
   (`u:<id>` plus the blob-owning modules' scopes for it) every hour,
   spawned with the cron `ServiceSet` switch (`core::runtime::services`; not
   gated on `[cron] enabled`, since it reclaims storage rather than running
   jobs). Each scope's sweep is bounded by `SCOPE_SWEEP_TIMEOUT`; a timeout
   counts as a failed sweep and is retried on the next tick.
+- `sweep_unreferenced_blobs`: an explicit maintenance helper that pages
+  physical blob metadata, keeps unknown or cutoff-equal ages, asks the caller
+  whether each old key is referenced, and stops on the first error while
+  preserving earlier deletions. It is not activated by the periodic sweeper:
+  reference checking and deletion are separate operations, so a caller must
+  coordinate blob writers/reference creation with cleanup or use immutable
+  keys, with a grace period longer than the write-to-reference delay.
 - `journal_maintenance`: invokes TinyAgents' `maintain_run_journals` with the
   host's configured retention and clock. It visits local and known agent
   scopes plus module scopes, and only profiles currently open under this
