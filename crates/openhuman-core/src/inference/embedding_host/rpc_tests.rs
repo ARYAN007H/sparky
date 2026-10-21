@@ -231,15 +231,39 @@ async fn test_connection_returns_model_construction_failures_as_rpc_errors() {
     let mut config = Config::default();
     config.config_path = tmp.path().join("config.toml");
 
-    let error = test_connection(
-        &config,
-        Some("not-a-provider"),
-        Some("model"),
-        Some(4),
-    )
-    .await
-    .expect_err("invalid provider construction must remain an RPC error");
+    let error = test_connection(&config, Some("not-a-provider"), Some("model"), Some(4))
+        .await
+        .expect_err("invalid provider construction must remain an RPC error");
     assert!(error.contains("unknown embedding provider"), "{error}");
+}
+
+#[tokio::test]
+async fn test_connection_reports_embedding_failures_in_the_failure_payload() {
+    use axum::{http::StatusCode, routing::post, Router};
+
+    let app = Router::new().route(
+        "/api/embed",
+        post(|| async { (StatusCode::INTERNAL_SERVER_ERROR, "embedding unavailable") }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base_url = format!("http://{}", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let tmp = TempDir::new().unwrap();
+    let mut config = Config::default();
+    config.config_path = tmp.path().join("config.toml");
+    config.local_ai.base_url = Some(base_url);
+
+    let outcome = test_connection(&config, Some("ollama"), Some("model"), Some(4))
+        .await
+        .expect("model construction succeeded, so the failure stays in the outcome");
+    assert_eq!(outcome.value["success"], false);
+    assert!(outcome.value["error"]
+        .as_str()
+        .unwrap()
+        .contains("embedding"));
+    server.abort();
 }
 
 /// Live `embed` (RPC) for managed also routes through the config-aware
