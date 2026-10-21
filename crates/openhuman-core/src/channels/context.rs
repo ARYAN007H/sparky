@@ -17,11 +17,6 @@ pub(crate) use tinychannels_bus::{
     MIN_CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
 
-#[cfg(test)]
-pub(crate) fn effective_channel_message_timeout_secs(configured: u64) -> u64 {
-    configured.max(MIN_CHANNEL_MESSAGE_TIMEOUT_SECS)
-}
-
 // Compatibility projection for tests that exercise route-state consumers with
 // legacy message fixtures. Runtime turns consume TinyChannels' prepared
 // `history_key` directly; provider identity derivation stays in TinyChannels.
