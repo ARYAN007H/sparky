@@ -1,5 +1,6 @@
 //! Debug-build harnesses for raw integration coverage of the channel runtime.
 
+#[allow(unused_imports)] // Used by tests/raw_coverage outside the core unit-test crate.
 pub use super::dispatch::test_support::build_channel_context_block_for_test;
 use super::dispatch::{
     process_channel_message, process_channel_runtime_message, RuntimeChannelMessage,
