@@ -503,3 +503,8 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)'] }
 [[test]]
 name = "embeddings_opt_out"
 path = "../../tests/embeddings_opt_out.rs"
+
+[[test]]
+name = "storage_backend_capabilities"
+path = "../../tests/storage_backend_capabilities.rs"
+required-features = ["storage-sqlite"]
