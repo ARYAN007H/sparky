@@ -5,7 +5,7 @@ use super::super::runtime::test_support::{
 use super::super::runtime::{
     process_channel_message, run_message_dispatch_loop, RuntimeChannelMessage,
 };
-use super::common::{use_real_agent_handler, RecordingChannel, SlowModel};
+use super::common::{HistoryCaptureModel, use_real_agent_handler, RecordingChannel, SlowModel};
 use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::core::events::DomainEvent;
 use crate::inference::provider;
@@ -187,6 +187,158 @@ async fn discord_host_pipeline_dispatches_reply_with_thread_context() {
     assert_eq!(observation.sends[0].recipient, "reply");
     assert!(observation.sends[0].content.contains("hi from discord"));
     assert_eq!(observation.sends[0].thread_ts.as_deref(), Some("thread-42"));
+}
+
+#[tokio::test]
+async fn discord_host_pipeline_keeps_thread_histories_separate() {
+    let _bus_guard = use_real_agent_handler().await;
+    let workspace = tempfile::tempdir().expect("temporary Discord workspace");
+    let channel_state = Arc::new(crate::channels::runtime::TestChannel::new("discord"));
+    let channel = Arc::new(ChannelHandle::Test(Arc::clone(&channel_state)));
+    let model_state = Arc::new(HistoryCaptureModel::default());
+    let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> = Arc::clone(&model_state);
+    let runtime_ctx = Arc::new(ChannelRuntimeContext {
+        relay_thread: None,
+        channels_by_name: Arc::new(HashMap::from([("discord".into(), channel)])),
+        module_objects: Arc::new(HashMap::new()),
+        turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
+            Arc::clone(&model),
+        )),
+        default_provider: Arc::new("test-provider".into()),
+        tools_registry: Arc::new(vec![]),
+        system_prompt: crate::channels::ChannelSystemPrompt::fixed("test system"),
+        model: Arc::new("test-model".into()),
+        temperature: 0.0,
+        max_tool_iterations: 3,
+        turn_model_source_cache: Arc::new(Mutex::new(HashMap::from([(
+            "test-provider".into(),
+            crate::agent::tinyagents::TurnModelSource::from_model(model),
+        )]))),
+        route_overrides: Arc::new(Mutex::new(HashMap::new())),
+        api_url: None,
+        inference_url: None,
+        reliability: Arc::new(crate::config::ReliabilityConfig::default()),
+        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
+        workspace_dir: Arc::new(workspace.path().to_path_buf()),
+        message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
+        multimodal: crate::config::MultimodalConfig::default(),
+        multimodal_files: crate::config::MultimodalFileConfig::default(),
+        config: None,
+        core: None,
+    });
+
+    let first = traits::ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
+        id: "discord-a".into(),
+        sender: "user-123".into(),
+        reply_target: "channel-456".into(),
+        content: "first thread message".into(),
+        channel: "discord".into(),
+        timestamp: 1,
+        thread_ts: Some("thread-A".into()),
+        sender_name: None,
+    };
+    let second = traits::ChannelMessage {
+        id: "discord-b".into(),
+        content: "second thread message".into(),
+        thread_ts: Some("thread-B".into()),
+        ..first.clone()
+    };
+    assert_ne!(
+        super::super::context::conversation_history_key(&first),
+        super::super::context::conversation_history_key(&second)
+    );
+
+    process_channel_message(Arc::clone(&runtime_ctx), first).await;
+    process_channel_message(runtime_ctx, second).await;
+
+    let calls = model_state.calls.lock().unwrap();
+    assert_eq!(calls.len(), 2);
+    assert!(calls[0].iter().any(|(_, text)| text == "first thread message"));
+    assert!(calls[1].iter().any(|(_, text)| text == "second thread message"));
+    assert!(!calls[1].iter().any(|(_, text)| text == "first thread message"));
+    drop(calls);
+    assert_eq!(channel_state.sent_messages.lock().await.len(), 2);
+}
+
+#[tokio::test]
+async fn discord_host_pipeline_keeps_thread_histories_separate() {
+    let observed_histories = Arc::new(Mutex::new(Vec::<Vec<String>>::new()));
+    let histories_for_handler = Arc::clone(&observed_histories);
+    let _bus_guard = mock_agent_run_turn(move |request: AgentTurnRequest| {
+        let histories = Arc::clone(&histories_for_handler);
+        async move {
+            histories.lock().unwrap().push(
+                request
+                    .history
+                    .iter()
+                    .map(|message| message.content.clone())
+                    .collect(),
+            );
+            Ok(AgentTurnResponse::new("discord reply"))
+        }
+    })
+    .await;
+
+    let workspace = tempfile::tempdir().expect("temporary Discord workspace");
+    let channel = Arc::new(ChannelHandle::Test(Arc::new(
+        crate::channels::runtime::TestChannel::new("discord"),
+    )));
+    let runtime_ctx = Arc::new(ChannelRuntimeContext {
+        relay_thread: None,
+        channels_by_name: Arc::new(HashMap::from([("discord".into(), channel)])),
+        module_objects: Arc::new(HashMap::new()),
+        turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
+            Arc::new(super::common::DummyModel),
+        )),
+        default_provider: Arc::new("test-provider".into()),
+        tools_registry: Arc::new(vec![]),
+        system_prompt: crate::channels::ChannelSystemPrompt::fixed("test system"),
+        model: Arc::new("test-model".into()),
+        temperature: 0.0,
+        max_tool_iterations: 3,
+        turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
+        route_overrides: Arc::new(Mutex::new(HashMap::new())),
+        api_url: None,
+        inference_url: None,
+        reliability: Arc::new(crate::config::ReliabilityConfig::default()),
+        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
+        workspace_dir: Arc::new(workspace.path().to_path_buf()),
+        message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
+        multimodal: crate::config::MultimodalConfig::default(),
+        multimodal_files: crate::config::MultimodalFileConfig::default(),
+        config: None,
+        core: None,
+    });
+
+    for (id, thread_ts, content) in [
+        ("discord-a", "thread-A", "first thread message"),
+        ("discord-b", "thread-B", "second thread message"),
+    ] {
+        process_channel_message(
+            Arc::clone(&runtime_ctx),
+            traits::ChannelMessage {
+                reply_to_id: None,
+                topic_id: None,
+                id: id.into(),
+                sender: "user-123".into(),
+                reply_target: "channel-456".into(),
+                content: content.into(),
+                channel: "discord".into(),
+                timestamp: 1,
+                thread_ts: Some(thread_ts.into()),
+                sender_name: None,
+            },
+        )
+        .await;
+    }
+
+    let histories = observed_histories.lock().unwrap();
+    assert_eq!(histories.len(), 2);
+    assert!(histories[0].iter().any(|text| text == "first thread message"));
+    assert!(histories[1].iter().any(|text| text == "second thread message"));
+    assert!(!histories[1].iter().any(|text| text == "first thread message"));
 }
 
 #[tokio::test]

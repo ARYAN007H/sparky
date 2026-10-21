@@ -10,7 +10,7 @@ use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[tokio::test]
-async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlock() {
+async fn prepared_module_handle_keeps_progressive_send_alive() {
     let env_lock = EnvVarGuard::locked_async().await;
     let server = MockServer::start().await;
     let _env = env_lock.with("OPENHUMAN_TELEGRAM_BOT_API_BASE", server.uri());
@@ -95,6 +95,7 @@ async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlo
     )
     .await
     .expect("compiled TinyBus module should prepare configured Telegram");
+    assert!(runtime.channels().contains_key("telegram"));
     runtime
         .start(&config)
         .await
