@@ -20,9 +20,8 @@
 
 use std::sync::Arc;
 
-use tinystoragedrivers::queue::QueueManifest;
-
 use super::storage_grants::StorageGrant;
+use super::storage_queue_manifest::QueueManifest;
 use crate::storage::schema::module_items;
 
 /// One module's row: its registry id, the schema owner that declares its

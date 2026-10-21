@@ -13,10 +13,10 @@ use std::sync::{Arc, RwLock};
 use serde_json::{json, Value};
 use tinyeventqueues_bus::storage::{SHIPPED_PIPELINE_JSON, SHIPPED_QUEUES_JSON};
 use tinyeventqueues_bus::{Lane, PipelineConfig};
-use tinystoragedrivers::queue::QueueManifest;
 use tinystoragedrivers::QueueConfig;
 
 use crate::config::Config;
+use crate::modules::storage_queue_manifest::QueueManifest;
 use crate::modules::storage_grant_schemas::QueueGrant;
 
 /// The `[components]` switch that owns the inbound event queues.
