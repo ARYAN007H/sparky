@@ -523,6 +523,19 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
         .await
         .expect("the linked module prepares the exact inbound message");
     assert_eq!(prepared.message.channel, "telegram");
+    let account_id = prepared
+        .envelope
+        .channel
+        .account_id
+        .clone()
+        .expect("prepared native channel has an account identity");
+    let channel_object = fixture_client
+        .object_client("tinychannels", tinychannels_module::OBJECT_PATH)
+        .await
+        .expect("the linked fixture exposes the channel object");
+    Arc::get_mut(&mut ctx)
+        .expect("the test still owns the runtime context")
+        .module_objects = Arc::new(HashMap::from([(account_id, channel_object)]));
 
     let _installed = InstalledResolver::new(resolver);
     let inbound_message = prepared.message.clone();
