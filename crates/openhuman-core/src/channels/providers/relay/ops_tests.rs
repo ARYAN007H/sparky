@@ -5,6 +5,8 @@ use crate::agent::turn_origin::AgentTurnOrigin;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
 use std::sync::Mutex;
 
+const RELAY_THREAD_ID: &str = "channel:telegram/42/-100";
+
 #[tokio::test]
 async fn relayed_thread_and_external_authority_survive_scoped_spawn() {
     let tmp = tempfile::tempdir().unwrap();
@@ -21,7 +23,7 @@ async fn relayed_thread_and_external_authority_survive_scoped_spawn() {
         history_key: None,
         channel_session: None,
     };
-    let thread = params("spawned-turn", "hello").thread_id();
+    let thread = RELAY_THREAD_ID.to_owned();
     CoreContext::scope(context, async {
         CoreContext::scope(
             CoreContext::scoped()
@@ -102,7 +104,7 @@ struct Seen {
 async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     let seen = Arc::new(Mutex::new(Seen::default()));
     let stub_seen = Arc::clone(&seen);
-    let relayed_thread = params("m1", "x").thread_id();
+    let relayed_thread = RELAY_THREAD_ID.to_owned();
     let _bus = mock_agent_run_turn(move |req: AgentTurnRequest| {
         let mut seen = stub_seen.lock().unwrap();
         seen.busy
@@ -128,7 +130,7 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
 
     for (id, text) in [("m1", "first question"), ("m2", "second question")] {
         let p = params(id, text);
-        let thread = p.thread_id();
+        let thread = RELAY_THREAD_ID.to_owned();
         assert_eq!(
             store::record_inbound(
                 &crate::core::runtime::DispatchCtx::ambient(),
@@ -160,7 +162,7 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     assert!(
         !crate::agent::orchestration::busy_guard::is_busy(
             &crate::core::runtime::DispatchCtx::ambient(),
-            &params("m1", "x").thread_id()
+            RELAY_THREAD_ID
         ),
         "the thread is idle once the turn ends"
     );
@@ -191,7 +193,7 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
         "{contents:?}"
     );
 
-    let thread = params("m1", "x").thread_id();
+    let thread = RELAY_THREAD_ID.to_owned();
     let messages = crate::threads::store::get_messages(
         &crate::core::runtime::DispatchCtx::ambient(),
         workspace.clone(),
@@ -249,7 +251,7 @@ async fn invalid_or_repeated_messages_start_no_turn() {
         assert!(err.contains("chat_id"), "{err}");
 
         let p = params("m1", "hello");
-        let thread = p.thread_id();
+        let thread = RELAY_THREAD_ID.to_owned();
         store::record_inbound(&scope_ctx, &workspace, &p, &thread)
             .await
             .unwrap();
@@ -279,7 +281,7 @@ async fn relay_preflight_failure_uses_trusted_channel_locale_without_running_age
     config.channels_locale = Some("es".into());
     let workspace = config.workspace_dir.clone();
     let params = params("preflight-error", "hello");
-    let thread_id = params.thread_id();
+    let thread_id = RELAY_THREAD_ID.to_owned();
     let dispatch = crate::core::runtime::DispatchCtx::ambient();
     assert_eq!(
         store::record_inbound(&dispatch, &workspace, &params, &thread_id).await,

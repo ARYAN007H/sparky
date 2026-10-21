@@ -5,8 +5,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use tinychannels_bus::ChannelMessage;
-#[cfg(test)]
-use tinychannels_runtime::channel::derive_inbound_thread_id;
 
 /// Longest channel name: `telegram`, `imessage`, `discord`, ...
 pub const MAX_CHANNEL_LEN: usize = 32;
@@ -103,20 +101,6 @@ impl RelayInboundParams {
             return Err("attachments are not supported by the relay yet".to_string());
         }
         Ok(())
-    }
-
-    /// The conversation's thread: `channel:<channel>/<sender>/<chat>`, the
-    /// same derivation as the backend-relayed inbound path
-    /// (`tinychannels_runtime::channel::derive_inbound_thread_id`). A user cannot mint such
-    /// an id through `threads_upsert`, which reserves `channel:`.
-    #[cfg(test)]
-    pub fn thread_id(&self) -> String {
-        derive_inbound_thread_id(
-            &self.channel,
-            Some(&self.sender_id),
-            Some(&self.chat_id),
-            None,
-        )
     }
 
     /// The `/events` client id replies go to.
