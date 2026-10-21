@@ -409,7 +409,7 @@ async fn orphan_sweep_stops_on_listing_error_before_touching_blobs() {
     let blobs = Arc::clone(storage.blobs());
     blobs.put("cleanup/a", vec![1], None).await.unwrap();
     let faults = FaultPlan::new();
-    faults.fail_operation_nth("blob.list_page", 1, ErrorKind::Unavailable);
+    faults.fail_operation_nth("blobs.list_page", 1, ErrorKind::Unavailable);
     let failing = Failing::with_plan(blobs.clone(), faults);
 
     let error = sweep_unreferenced_blobs(&failing, "cleanup/", u64::MAX, |_| async { Ok(false) })
@@ -432,7 +432,7 @@ async fn orphan_sweep_stops_on_delete_error_after_preserving_prior_progress() {
         blobs.put(key, vec![1], None).await.unwrap();
     }
     let faults = FaultPlan::new();
-    faults.fail_operation_nth("blob.delete", 2, ErrorKind::Unavailable);
+    faults.fail_operation_nth("blobs.delete", 2, ErrorKind::Unavailable);
     let failing = Failing::with_plan(blobs.clone(), faults);
 
     let error = sweep_unreferenced_blobs(&failing, "cleanup/", u64::MAX, |_| async { Ok(false) })
