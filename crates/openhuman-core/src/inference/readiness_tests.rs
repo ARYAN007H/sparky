@@ -6,7 +6,7 @@ use tempfile::TempDir;
 async fn cached_probe_serves_definitive_negative_results() {
     use std::sync::atomic::{AtomicUsize, Ordering};
     let tmp = TempDir::new().unwrap();
-    let mut config = Config {
+    let config = Config {
         workspace_dir: tmp.path().join("workspace"),
         action_dir: tmp.path().join("workspace"),
         config_path: tmp.path().join("config.toml"),
@@ -22,30 +22,26 @@ async fn cached_probe_serves_definitive_negative_results() {
         )
         .expect("seed app-session token");
     let hit_count = std::sync::Arc::new(AtomicUsize::new(0));
+    // The core owns no hosted provider; the managed backend's readiness probe
+    // is whatever the host registered. Register one that rejects the way the
+    // backend does, and count how often the core actually asks it.
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let _exclusive = crate::inference::provider::factory::test_provider_override::exclusive();
     let counter = hit_count.clone();
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
-    let app = axum::Router::new().route(
-        "/openai/v1/chat/completions",
-        axum::routing::post(move || {
-            let counter = counter.clone();
-            async move {
+    let managed = crate::inference::registry::chat_model(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+    )
+    .expect("the unit-test managed provider is available");
+    crate::inference::registry::register_chat_model(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        crate::inference::registry::ChatModelEntry {
+            build: managed.build,
+            probe: Some(std::sync::Arc::new(move |_role, _model, _config| {
                 counter.fetch_add(1, Ordering::SeqCst);
-                use axum::response::IntoResponse;
-                (
-                    axum::http::StatusCode::BAD_REQUEST,
-                    axum::Json(serde_json::json!({
-                        "success": false,
-                        "error": "API key not configured for provider",
-                        "errorCode": "BAD_REQUEST"
-                    })),
-                )
-                    .into_response()
-            }
-        }),
+                Box::pin(async { Err("API key not configured for provider".to_string()) })
+            })),
+        },
     );
-    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-    config.api_url = Some(format!("http://{addr}"));
 
     let first = cached_probe(&DispatchCtx::ambient(), "summarization", &config).await;
     assert!(first
@@ -59,4 +55,7 @@ async fn cached_probe_serves_definitive_negative_results() {
             .is_err()
     );
     assert_eq!(hit_count.load(Ordering::SeqCst), 1);
+    crate::inference::registry::unregister_chat_model(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+    );
 }

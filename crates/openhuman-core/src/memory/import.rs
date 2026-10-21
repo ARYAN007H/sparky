@@ -103,13 +103,15 @@ fn importer(
 }
 
 /// `memory_import_scan`.
-pub async fn scan(config: &Config) -> Result<ImportScanView> {
+pub async fn scan(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+) -> Result<ImportScanView> {
     let workspace_dir = config.workspace_dir.clone();
-    let counts = tokio::task::spawn_blocking(move || {
-        tinymemory_integrations::import::count_legacy(&workspace_dir)
-    })
-    .await
-    .map_err(|error| Error::Engine(format!("import scan failed: {error}")))?;
+    let counts = ctx
+        .spawn_blocking(move || tinymemory_integrations::import::count_legacy(&workspace_dir))
+        .await
+        .map_err(|error| Error::Engine(format!("import scan failed: {error}")))?;
     let counts = counts.map(|counts: LegacyImportCounts| ImportCounts {
         documents: counts.documents,
         conversations: counts.conversations,
@@ -285,6 +287,19 @@ async fn launch(
     let workspace = config.workspace_dir.clone();
     let Some(guard) = run_slots::reserve(&IMPORT, &workspace, &[&BACKFILL, &MIGRATION]) else {
         if is_running(&workspace) {
+            return Ok(LaunchOutcome {
+                state: status(config),
+                started: false,
+            });
+        }
+        if paused.is_some() {
+            // An automatic resume that meets a peer run (layout migration or
+            // conversation backfill) defers: the checkpoint stays resumable
+            // and the next resume attempt retries, instead of recording the
+            // contention as a failed resume.
+            tracing::debug!(
+                "[memory:import] peer run holds the workspace; deferring the interrupted-import resume"
+            );
             return Ok(LaunchOutcome {
                 state: status(config),
                 started: false,
