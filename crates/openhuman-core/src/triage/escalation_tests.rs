@@ -66,6 +66,79 @@ fn triage_test_model(requests: Arc<Mutex<Vec<ModelRequest>>>) -> crate::inferenc
     }
 }
 
+#[tokio::test]
+async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records() {
+    let _events_guard = test_events_guard().await;
+    let temp = tempfile::tempdir().expect("isolated triage workspace");
+    let workspace = temp.path().join("workspace");
+    let mut config = Config {
+        workspace_dir: workspace.clone(),
+        config_path: temp.path().join("config.toml"),
+        action_dir: temp.path().join("actions"),
+        ..Config::default()
+    };
+    config.default_model = Some(crate::config::MODEL_MANAGED_DEFAULT.to_string());
+
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let extensions = crate::core::slots::Extensions::new();
+    crate::inference::registry::register_chat_model_in(
+        &extensions,
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        triage_test_model(Arc::clone(&requests)),
+    );
+    let runtime = crate::core::runtime::CoreBuilder::new(crate::core::types::HostKind::Library)
+        .services(crate::core::runtime::ServiceSet::none())
+        .domains(crate::core::runtime::DomainSet::none())
+        .config(config)
+        .extensions(extensions)
+        .build()
+        .await
+        .expect("isolated core runtime");
+    let ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(runtime.context()));
+    let envelope = envelope("esc-react-inline");
+    crate::core::bus::init().await.expect("bus init");
+
+    apply_decision(
+        &ctx,
+        run_with_target(
+            TriageAction::React,
+            "trigger_reactor",
+            "handle this trigger inline",
+        ),
+        &envelope,
+    )
+    .await
+    .expect("react escalation should complete");
+
+    // Prove that the requested route reached the model before checking the
+    // lifecycle boundary below, so a skipped dispatch cannot satisfy it.
+    let requests = requests.lock().unwrap();
+    assert_eq!(requests.len(), 1, "triage should make one model request");
+    assert!(
+        requests[0]
+            .messages
+            .iter()
+            .any(|message| message.text().contains("handle this trigger inline")),
+        "the target agent should receive the triage prompt"
+    );
+    drop(requests);
+    let captured = events::test_events_for_external_id("esc-react-inline");
+    assert!(captured.iter().any(|event| matches!(
+        event,
+        DomainEvent::TriggerEscalated {
+            external_id,
+            target_agent,
+            ..
+        } if external_id == "esc-react-inline" && target_agent == "trigger_reactor"
+    )));
+
+    let child_lifecycle = workspace.join(".openhuman/subagent_checkpoints");
+    assert!(
+        !child_lifecycle.exists(),
+        "a triage one-shot turn must not persist a child subagent lifecycle"
+    );
+}
+
 /// The triage parent is the shared root context with one override: nested
 /// spawns scoped to the dispatched target. Guards the #4369 collapse against
 /// drift from `build_root_parent`.
