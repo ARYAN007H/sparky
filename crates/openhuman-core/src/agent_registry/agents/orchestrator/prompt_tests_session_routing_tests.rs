@@ -67,7 +67,9 @@ fn prompt_routes_workflow_authoring_to_the_builder_not_use_skill() {
     // before it discovers the wall.
     assert!(
         ARCHETYPE.contains("Build or edit a workflow with `agent_id: \"workflow_builder\"`")
-            && ARCHETYPE.contains("Spawn specialist work with `spawn_subagent{agent_id, prompt, task_key}`"),
+            && ARCHETYPE.contains(
+                "Spawn specialist work with `spawn_subagent{agent_id, prompt, task_key}`"
+            ),
         "orchestrator prompt must carry the workflow routing rule and name the spawn to make"
     );
 
