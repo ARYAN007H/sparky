@@ -216,10 +216,20 @@ impl ModelFactory<()> for OpenHumanModelFactory<'_> {
             model: (!route.model.is_empty()).then(|| route.model.clone()),
             temperature: request.opts.temperature,
         };
-        let profile = model.profile().cloned().unwrap_or_default();
-        let model = Arc::new(ProfileOverrideModel::new(model, profile).with_defaults(opts))
-            as Arc<dyn ChatModel<()>>;
+        let model = with_request_defaults(model, opts);
         Ok((model, route))
+    }
+}
+
+fn with_request_defaults(
+    model: Arc<dyn ChatModel<()>>,
+    defaults: ModelRequestDefaults,
+) -> Arc<dyn ChatModel<()>> {
+    match model.profile().cloned() {
+        Some(profile) => Arc::new(ProfileOverrideModel::new(model, profile).with_defaults(defaults)),
+        None => Arc::new(
+            ProfileOverrideModel::new_preserving_profile(model).with_defaults(defaults),
+        ),
     }
 }
 
@@ -405,13 +415,10 @@ pub(super) fn with_default_temperature(
     model: Arc<dyn ChatModel<()>>,
     temperature: f64,
 ) -> Arc<dyn ChatModel<()>> {
-    let profile = model.profile().cloned().unwrap_or_default();
-    Arc::new(
-        ProfileOverrideModel::new(model, profile).with_defaults(ModelRequestDefaults {
+    with_request_defaults(model, ModelRequestDefaults {
             model: None,
             temperature: Some(temperature),
-        }),
-    )
+        })
 }
 
 /// Reproduce the legacy provider factory's access gates and diagnostics for a
