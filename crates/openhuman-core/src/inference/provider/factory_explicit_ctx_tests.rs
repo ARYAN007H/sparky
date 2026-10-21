@@ -10,7 +10,7 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
     use tinyinference_llm::message::Message;
     use tinyinference_llm::model::ModelRequest;
 
-    fn entry(name: &'static str, probed: Arc<AtomicBool>) -> ChatModelEntry {
+    fn entry(name: &'static str, probed: Arc<AtomicBool>) -> ChatModelEntry<ProviderContext> {
         ChatModelEntry {
             build: Arc::new(move |_| {
                 Ok((
@@ -140,7 +140,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
     use tinyinference_llm::message::Message;
     use tinyinference_llm::model::ModelRequest;
 
-    fn entry(name: &'static str) -> ChatModelEntry {
+    fn entry(name: &'static str) -> ChatModelEntry<ProviderContext> {
         ChatModelEntry {
             build: Arc::new(move |_| {
                 Ok((

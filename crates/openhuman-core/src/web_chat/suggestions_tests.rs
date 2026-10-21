@@ -91,7 +91,7 @@ fn install_suggestions_model_fixture() {
     crate::inference::registry::register_chat_model(
         PROVIDER_OPENHUMAN,
         ChatModelEntry {
-            build: Arc::new(|_request: &ChatModelRequest<'_>| {
+            build: Arc::new(|_request: &ChatModelRequest<'_, ProviderContext>| {
                 Ok((
                     Arc::new(ScriptedTextModel {
                         text: "[]".to_string(),

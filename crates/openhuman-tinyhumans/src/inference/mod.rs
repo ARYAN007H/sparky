@@ -49,7 +49,7 @@ fn managed_options(config: &Config) -> ManagedOptions {
 /// Builds the managed chat model for one registry request. The core has already
 /// resolved the concrete model id (`model_override`) and disclosed the egress.
 pub(crate) fn build_chat_model(
-    request: &ChatModelRequest<'_>,
+    request: &ChatModelRequest<'_, ProviderContext>,
 ) -> anyhow::Result<(Arc<dyn ChatModel<()>>, String)> {
     let pinned = request
         .model_override

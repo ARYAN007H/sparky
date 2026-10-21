@@ -234,7 +234,7 @@ impl PointedInference {
         use tinyinference_llm::providers::openai::OpenAiModel;
 
         let base_url = base_url.trim_end_matches('/').to_string();
-        let build = move |request: &ChatModelRequest<'_>| {
+        let build = move |request: &ChatModelRequest<'_, ProviderContext>| {
             let model = request
                 .model_override
                 .or(request.default_model)

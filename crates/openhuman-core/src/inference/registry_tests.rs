@@ -1,4 +1,5 @@
 use super::*;
+use tinyinference_llm::model::ChatModel;
 use crate::inference::context_window::model_limits_request;
 use crate::inference::provider::factory::{
     create_chat_model_from_string, make_openhuman_backend_model_for_thread, PROVIDER_OPENHUMAN,
@@ -23,7 +24,7 @@ impl ChatModel<()> for FakeModel {
     }
 }
 
-fn fake_entry(seen: SeenModelRequests) -> ChatModelEntry {
+fn fake_entry(seen: SeenModelRequests) -> ChatModelEntry<ProviderContext> {
     ChatModelEntry {
         build: Arc::new(move |request| {
             seen.lock().unwrap().push((

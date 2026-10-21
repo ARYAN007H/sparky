@@ -25,9 +25,9 @@ pub(crate) fn with_fixture_model_name(builder: SessionHostBuilder) -> SessionHos
 /// Installs an explicit generic model fixture for tests that construct a
 /// session through the managed-provider factory. HookSlot test registrations
 /// are thread-local, so each test opts in on the thread that builds its host.
-fn model_fixture_entry() -> ChatModelEntry {
+fn model_fixture_entry() -> ChatModelEntry<ProviderContext> {
     ChatModelEntry {
-        build: Arc::new(|request: &ChatModelRequest<'_>| {
+        build: Arc::new(|request: &ChatModelRequest<'_, ProviderContext>| {
             let model = request
                 .model_override
                 .or(request.default_model)

@@ -229,7 +229,7 @@ fn native_provider_metadata_resolves_by_context_and_preserves_request_fields() {
     use serde_json::json;
     use std::sync::Arc;
 
-    fn entry(label: &'static str, window: u64) -> ChatModelEntry {
+    fn entry(label: &'static str, window: u64) -> ChatModelEntry<ProviderContext> {
         ChatModelEntry {
             build: Arc::new(|_| panic!("metadata lookup must not build a model")),
             probe: None,
