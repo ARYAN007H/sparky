@@ -422,10 +422,13 @@ fn run_call_command(args: &[String]) -> Result<()> {
                 && crate::agent_registry::host_definition::AgentDefinitionRegistry::global()
                     .is_none()
             {
-                let config = crate::config::Config::load_or_init().await?;
+                let config = crate::config::Config::load_or_init()
+                    .await
+                    .map_err(|error| error.to_string())?;
                 crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
                     &config.workspace_dir,
-                )?;
+                )
+                .map_err(|error| error.to_string())?;
             }
             let dispatch = DispatchCtx::process_default();
             let dispatch = if headless_agent_chat {
