@@ -253,6 +253,9 @@ async fn relay_provider() -> MockServer {
 }
 
 #[tokio::test]
+// This process-wide mutex serializes temporary host-agent resolver installs;
+// the async test must hold it for the full turn to prevent resolver races.
+#[allow(clippy::await_holding_lock)]
 async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     let _slot = host_agents::tests::lock();
     let _ = tracing_subscriber::fmt().with_test_writer().try_init();
@@ -487,6 +490,9 @@ async fn invalid_or_repeated_messages_start_no_turn() {
 }
 
 #[tokio::test]
+// This process-wide mutex serializes temporary host-agent resolver installs;
+// the async test must hold it for the full turn to prevent resolver races.
+#[allow(clippy::await_holding_lock)]
 async fn relay_preflight_failure_uses_trusted_channel_locale_without_running_agent() {
     struct CountingResolver(AtomicUsize);
     impl HostAgentResolver for CountingResolver {
