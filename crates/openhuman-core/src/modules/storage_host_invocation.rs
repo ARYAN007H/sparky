@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinybus::module::ModuleRuntime;
 use tinybus::{BusName, ObjectPath};
 use tinystoragedrivers_api::BlobReader;
@@ -73,12 +73,9 @@ impl InvocationStorageBinding {
             active: Arc::clone(&active),
             server: StorageServer::new(storage),
         });
-        let served = tinystoragedrivers_busproxy::serve_at_address(
-            connection,
-            address.clone(),
-            endpoint,
-        )
-        .await?;
+        let served =
+            tinystoragedrivers_busproxy::serve_at_address(connection, address.clone(), endpoint)
+                .await?;
         Ok(Self {
             address: CallbackAddress {
                 host: address.host().to_string(),
@@ -161,9 +158,7 @@ impl StorageEndpoint for DocumentsOnlyEndpoint {
                 )
                 .await
                 .map_err(HostFailure::Storage),
-            (Object::Streams, "Capabilities") => {
-                Ok(json!(CapabilitiesReply::default()))
-            }
+            (Object::Streams, "Capabilities") => Ok(json!(CapabilitiesReply::default())),
             (Object::Blobs, "Capabilities") => Ok(json!(BlobCapabilities::default())),
             (Object::Kv, "Capabilities") => Ok(json!(KvCapabilitiesReply::default())),
             (Object::Queues, "Features") => Ok(json!(QueueFeaturesReply::default())),
