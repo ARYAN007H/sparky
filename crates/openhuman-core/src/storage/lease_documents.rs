@@ -14,10 +14,10 @@ use tinystoragedrivers::{
     Version, Versioned, WriteOptions,
 };
 
-use super::lease::{
-    validate_key, LeaseError, LeaseGrant, LeaseRecord, LeaseStore, CLUSTER_SCOPE, LEASE_COLLECTION,
-};
 use super::StorageError;
+use super::lease::{
+    CLUSTER_SCOPE, LEASE_COLLECTION, LeaseError, LeaseGrant, LeaseRecord, LeaseStore, validate_key,
+};
 
 /// The `tsd.leases` owner of the host's process-placement leases.
 pub const LEASE_OWNER: &str = "profiles";
@@ -33,7 +33,9 @@ struct LeaseBody {
     released: bool,
 }
 
-fn is_false(value: &bool) -> bool { !*value }
+fn is_false(value: &bool) -> bool {
+    !*value
+}
 
 /// Leases kept in `tsd.leases`. See the module docs.
 pub struct DocumentLeases {
@@ -182,26 +184,55 @@ impl DocumentLeases {
         let Some(found) = self.docs.get(LEASE_COLLECTION, &Self::id(key)?).await? else {
             return Ok(None);
         };
-        let body = serde_json::from_value(found.doc)
-            .map_err(|error| StorageError::backend("lease record is malformed").with_source(error))?;
+        let body = serde_json::from_value(found.doc).map_err(|error| {
+            StorageError::backend("lease record is malformed").with_source(error)
+        })?;
         Ok(Some(found.map(|_| body)))
     }
 
-    async fn write_cas(&self, id: &str, old: Option<&Versioned<LeaseBody>>, body: LeaseBody) -> Result<bool, StorageError> {
-        let condition = old.map_or(Precondition::Absent, |found| Precondition::Version(found.version));
-        let value = serde_json::to_value(body)
-            .map_err(|error| StorageError::backend("could not encode lease record").with_source(error))?;
-        match self.docs.put_with(LEASE_COLLECTION, id, value, condition, WriteOptions::default()).await {
+    async fn write_cas(
+        &self,
+        id: &str,
+        old: Option<&Versioned<LeaseBody>>,
+        body: LeaseBody,
+    ) -> Result<bool, StorageError> {
+        let condition = old.map_or(Precondition::Absent, |found| {
+            Precondition::Version(found.version)
+        });
+        let value = serde_json::to_value(body).map_err(|error| {
+            StorageError::backend("could not encode lease record").with_source(error)
+        })?;
+        match self
+            .docs
+            .put_with(
+                LEASE_COLLECTION,
+                id,
+                value,
+                condition,
+                WriteOptions::default(),
+            )
+            .await
+        {
             Ok(_) => Ok(true),
-            Err(error) if error.kind() == tinystoragedrivers::ErrorKind::Conflict || error.kind() == tinystoragedrivers::ErrorKind::AlreadyExists => Ok(false),
+            Err(error)
+                if error.kind() == tinystoragedrivers::ErrorKind::Conflict
+                    || error.kind() == tinystoragedrivers::ErrorKind::AlreadyExists =>
+            {
+                Ok(false)
+            }
             Err(error) => Err(error),
         }
     }
 }
 
 fn record_of(record: LeaseBody) -> LeaseRecord {
-    LeaseRecord { owner: record.holder, endpoint: record.endpoint, epoch: record.epoch,
-        expires_at_ms: u64::try_from(record.expires_ms).unwrap_or_default(), released: record.released }
+    LeaseRecord {
+        owner: record.holder,
+        endpoint: record.endpoint,
+        epoch: record.epoch,
+        expires_at_ms: u64::try_from(record.expires_ms).unwrap_or_default(),
+        released: record.released,
+    }
 }
 
 #[async_trait]
@@ -213,27 +244,63 @@ impl LeaseStore for DocumentLeases {
         let id = Self::id(key)?;
         for _ in 0..32 {
             let current = self.read(key).await?;
-            let live = current.as_ref().is_some_and(|found| found.doc.expires_ms > i64::try_from(now_ms).unwrap_or(i64::MAX) && !found.doc.released);
+            let live = current.as_ref().is_some_and(|found| {
+                found.doc.expires_ms > i64::try_from(now_ms).unwrap_or(i64::MAX)
+                    && !found.doc.released
+            });
             let was_held = self.held_epoch(key);
             let (epoch, previous_unclean) = match current.as_ref() {
                 None => (1, false),
-                Some(found) if live && found.doc.holder == self.node && was_held == Some(found.doc.epoch) => (found.doc.epoch, false),
-                Some(found) if live && found.doc.holder == self.node && was_held.is_none() =>
-                    (found.doc.epoch.checked_add(1).ok_or_else(|| StorageError::backend("lease epoch overflow"))?, true),
+                Some(found)
+                    if live
+                        && found.doc.holder == self.node
+                        && was_held == Some(found.doc.epoch) =>
+                {
+                    (found.doc.epoch, false)
+                }
+                Some(found) if live && found.doc.holder == self.node && was_held.is_none() => (
+                    found
+                        .doc
+                        .epoch
+                        .checked_add(1)
+                        .ok_or_else(|| StorageError::backend("lease epoch overflow"))?,
+                    true,
+                ),
                 Some(found) if live => return Err(LeaseError::Held(record_of(found.doc.clone()))),
-                Some(found) => (found.doc.epoch.checked_add(1).ok_or_else(|| StorageError::backend("lease epoch overflow"))?, !found.doc.released),
+                Some(found) => (
+                    found
+                        .doc
+                        .epoch
+                        .checked_add(1)
+                        .ok_or_else(|| StorageError::backend("lease epoch overflow"))?,
+                    !found.doc.released,
+                ),
             };
-            let expires_ms = i64::try_from(now_ms).unwrap_or(i64::MAX).checked_add(self.ttl_ms)
+            let expires_ms = i64::try_from(now_ms)
+                .unwrap_or(i64::MAX)
+                .checked_add(self.ttl_ms)
                 .ok_or_else(|| StorageError::backend("lease deadline overflow"))?;
-            let body = LeaseBody { holder: self.node.clone(), epoch, expires_ms,
-                endpoint: self.endpoint.clone(), released: false };
+            let body = LeaseBody {
+                holder: self.node.clone(),
+                epoch,
+                expires_ms,
+                endpoint: self.endpoint.clone(),
+                released: false,
+            };
             if self.write_cas(&id, current.as_ref(), body.clone()).await? {
                 let version = self.next_version(key, epoch)?;
-                return Ok(LeaseGrant { key: key.to_string(), epoch, version,
-                    expires_at_ms: u64::try_from(expires_ms).unwrap_or_default(), previous_unclean });
+                return Ok(LeaseGrant {
+                    key: key.to_string(),
+                    epoch,
+                    version,
+                    expires_at_ms: u64::try_from(expires_ms).unwrap_or_default(),
+                    previous_unclean,
+                });
             }
         }
-        Err(LeaseError::Storage(StorageError::backend("lease acquire exceeded CAS retry budget")))
+        Err(LeaseError::Storage(StorageError::backend(
+            "lease acquire exceeded CAS retry budget",
+        )))
     }
 
     async fn renew(&self, grant: &LeaseGrant, now_ms: u64) -> Result<LeaseGrant, LeaseError> {
@@ -250,24 +317,38 @@ impl LeaseStore for DocumentLeases {
             return Err(LeaseError::Lost);
         }
         self.declare().await?;
-        self.declare().await?;
         let id = Self::id(&grant.key)?;
-        let mut released = false;
         for _ in 0..32 {
-            let Some(current) = self.read(&grant.key).await? else { return Err(LeaseError::Lost) };
-            if current.doc.holder != self.node || current.doc.epoch != grant.epoch || current.doc.released || current.doc.expires_ms <= i64::try_from(now_ms).unwrap_or(i64::MAX) {
+            let Some(current) = self.read(&grant.key).await? else {
+                return Err(LeaseError::Lost);
+            };
+            if current.doc.holder != self.node
+                || current.doc.epoch != grant.epoch
+                || current.doc.released
+                || current.doc.expires_ms <= i64::try_from(now_ms).unwrap_or(i64::MAX)
+            {
                 return Err(LeaseError::Lost);
             }
-            let expires_ms = i64::try_from(now_ms).unwrap_or(i64::MAX).checked_add(self.ttl_ms)
+            let expires_ms = i64::try_from(now_ms)
+                .unwrap_or(i64::MAX)
+                .checked_add(self.ttl_ms)
                 .ok_or_else(|| StorageError::backend("lease deadline overflow"))?;
-            let mut body = current.doc.clone(); body.expires_ms = expires_ms;
+            let mut body = current.doc.clone();
+            body.expires_ms = expires_ms;
             if self.write_cas(&id, Some(&current), body).await? {
                 let version = self.next_version(&grant.key, grant.epoch)?;
-                return Ok(LeaseGrant { key: grant.key.clone(), epoch: grant.epoch, version,
-                    expires_at_ms: u64::try_from(expires_ms).unwrap_or_default(), previous_unclean: grant.previous_unclean });
+                return Ok(LeaseGrant {
+                    key: grant.key.clone(),
+                    epoch: grant.epoch,
+                    version,
+                    expires_at_ms: u64::try_from(expires_ms).unwrap_or_default(),
+                    previous_unclean: grant.previous_unclean,
+                });
             }
         }
-        Err(LeaseError::Storage(StorageError::backend("lease renew exceeded CAS retry budget")))
+        Err(LeaseError::Storage(StorageError::backend(
+            "lease renew exceeded CAS retry budget",
+        )))
     }
 
     async fn release(&self, grant: LeaseGrant) -> Result<(), LeaseError> {
@@ -278,15 +359,29 @@ impl LeaseStore for DocumentLeases {
         }
         self.declare().await?;
         let id = Self::id(&grant.key)?;
+        let mut released = false;
         for _ in 0..32 {
-            let Some(current) = self.read(&grant.key).await? else { return Err(LeaseError::Lost) };
-            if current.doc.holder != self.node || current.doc.epoch != grant.epoch || current.doc.released {
+            let Some(current) = self.read(&grant.key).await? else {
+                return Err(LeaseError::Lost);
+            };
+            if current.doc.holder != self.node
+                || current.doc.epoch != grant.epoch
+                || current.doc.released
+            {
                 return Err(LeaseError::Lost);
             }
-            let mut body = current.doc.clone(); body.released = true;
-            if self.write_cas(&id, Some(&current), body).await? { released = true; break; }
+            let mut body = current.doc.clone();
+            body.released = true;
+            if self.write_cas(&id, Some(&current), body).await? {
+                released = true;
+                break;
+            }
         }
-        if !released { return Err(LeaseError::Storage(StorageError::backend("lease release exceeded CAS retry budget"))); }
+        if !released {
+            return Err(LeaseError::Storage(StorageError::backend(
+                "lease release exceeded CAS retry budget",
+            )));
+        }
         self.clear_held_if(&grant.key, grant.epoch);
         tracing::debug!(
             target: "openhuman::storage::lease",
