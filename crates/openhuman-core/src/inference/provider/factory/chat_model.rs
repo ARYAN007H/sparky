@@ -24,6 +24,14 @@ pub(crate) struct OpenHumanModelFactory<'a> {
 }
 
 impl OpenHumanModelFactory<'_> {
+    fn route_name<'a>(request: &'a ModelBuildRequest, role: &'a str) -> &'a str {
+        request
+            .route
+            .as_deref()
+            .or_else(|| request.model_pin.as_deref().filter(|pin| !pin.is_empty()))
+            .unwrap_or(role)
+    }
+
     fn provider_for(&self, request: &ModelBuildRequest) -> String {
         match &request.purpose {
             ModelPurpose::Primary | ModelPurpose::Summarization => self
@@ -73,7 +81,7 @@ impl OpenHumanModelFactory<'_> {
             let route = ResolvedModelRoute::new(
                 profile.provider.as_deref().unwrap_or("injected"),
                 profile.model.as_deref().unwrap_or(pin),
-                request.route.as_deref().unwrap_or(role),
+                Self::route_name(request, role),
             );
             return Ok((model, route));
         }
@@ -116,7 +124,7 @@ impl OpenHumanModelFactory<'_> {
                 ResolvedModelRoute::new(
                     PROVIDER_OPENHUMAN,
                     concrete,
-                    request.route.as_deref().unwrap_or(role),
+                    Self::route_name(request, role),
                 ),
             ));
         }
@@ -199,7 +207,7 @@ impl OpenHumanModelFactory<'_> {
             let route = ResolvedModelRoute::new(
                 route_provider,
                 resolved_model,
-                request.route.as_deref().unwrap_or(role),
+                Self::route_name(request, role),
             );
             return Ok((model, route));
         }
@@ -281,7 +289,7 @@ impl OpenHumanModelFactory<'_> {
         let route = ResolvedModelRoute::new(
             route_provider,
             resolved_model,
-            request.route.as_deref().unwrap_or(role),
+            Self::route_name(request, role),
         );
         Ok((model, route))
     }
