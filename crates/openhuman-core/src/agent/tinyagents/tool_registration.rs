@@ -14,7 +14,7 @@ use tinyagents_harness_tools::goals::GoalToolKind;
 use tinyagents_harness_tools::skills::{PackSelection, UseSkillDispatch, USE_SKILL};
 use tinyagents_registry::{CapabilityRegistry, ComponentKind, RegistryDiagnostic};
 use tinyagents_runtime::turn_driver::{SharedToolSet, ToolSetBuilder};
-use tinyagents_runtime::{project_descriptors, ToolAdmission};
+use tinyagents_runtime::{project_descriptors, NestedSpawnDepth, ToolAdmission};
 use tinyinference_llm::model::ChatModel;
 use tinytools::{Tool, ToolCallOptions, ToolResult, ToolRunContext};
 
@@ -235,6 +235,7 @@ pub(crate) fn turn_admission(
     tool_sets: &[SharedToolSet],
     allowed: &Option<HashSet<String>>,
     has_thread: bool,
+    nested_spawn_depth: Option<NestedSpawnDepth>,
 ) -> ToolAdmission {
     ToolAdmission {
         allowed: allowed.clone(),
@@ -246,6 +247,7 @@ pub(crate) fn turn_admission(
             .map(|kind| kind.name().to_string())
             .collect(),
         spawn_tools: candidate_spawn_tools(tool_sets),
+        nested_spawn_depth,
     }
 }
 
@@ -259,7 +261,7 @@ pub(crate) fn host_tool_set_builder(
 ) -> ToolSetBuilder<(), OpenHumanRunContext> {
     ToolSetBuilder::new()
         .sets(tool_sets.iter().cloned())
-        .admission(turn_admission(tool_sets, allowed, has_thread))
+        .admission(turn_admission(tool_sets, allowed, has_thread, None))
         .deferred(session_deferred.iter().cloned())
         .dispatch(live_dispatch_selector())
         .exec_scope(Arc::new(TurnOriginScope))
@@ -271,10 +273,16 @@ pub(crate) fn host_tool_set_builder_for_turn(
     has_thread: bool,
     session_deferred: &HashSet<String>,
     run_context: &OpenHumanRunContext,
+    nested_spawn_depth: Option<NestedSpawnDepth>,
 ) -> ToolSetBuilder<(), OpenHumanRunContext> {
     ToolSetBuilder::new()
         .sets(tool_sets.iter().cloned())
-        .admission(turn_admission(tool_sets, allowed, has_thread))
+        .admission(turn_admission(
+            tool_sets,
+            allowed,
+            has_thread,
+            nested_spawn_depth,
+        ))
         .deferred(session_deferred.iter().cloned())
         .dispatch(turn_dispatch_selector(run_context))
         .exec_scope(Arc::new(TurnOriginScope))
