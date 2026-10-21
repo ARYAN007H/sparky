@@ -358,6 +358,7 @@ impl OpenHumanPersistence {
                 outcome,
                 agent_id: String::new(),
                 elapsed_ms: 0,
+                extensions: Default::default(),
             })),
         }
     }
