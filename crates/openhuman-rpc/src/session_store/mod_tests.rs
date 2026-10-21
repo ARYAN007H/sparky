@@ -33,6 +33,7 @@ async fn a_storage_url_installs_the_driver_backed_store() {
         provider.destination_key()
     );
     assert!(crate::core_host::storage::installed().is_some());
+    assert_eq!(crate::core_host::storage::installed_url().as_deref(), Some("memory"));
     // Agents are kept apart in the shared backend.
     let alice = provider.for_agent("alice");
     alice
@@ -61,9 +62,10 @@ async fn driver_backed_store_keeps_agents_apart(url: String) {
     let _turn = SLOTS.lock().await;
     let previous = crate::core_host::agent::session_store::installed();
     let previous_backend = crate::core_host::storage::installed();
-    install_for_url(Some(url)).await.unwrap();
+    install_for_url(Some(url.clone())).await.unwrap();
 
     assert!(crate::core_host::storage::installed().is_some());
+    assert_eq!(crate::core_host::storage::installed_url().as_deref(), Some(url.as_str()));
     let provider = crate::core_host::agent::session_store::installed().unwrap();
     let alice = provider.for_agent("alice");
     alice
@@ -111,7 +113,7 @@ async fn the_host_reads_the_storage_url_from_the_environment() {
 
     std::env::set_var(var, " memory ");
     let booted = install_for_host().await;
-    let installed = crate::core_host::storage::installed().is_some();
+    let installed_url = crate::core_host::storage::installed_url();
 
     std::env::set_var(var, "ftp://nowhere");
     let refused = install_for_host().await;
@@ -124,7 +126,7 @@ async fn the_host_reads_the_storage_url_from_the_environment() {
     crate::core_host::agent::session_store::restore(previous);
 
     booted.unwrap();
-    assert!(installed);
+    assert_eq!(installed_url.as_deref(), Some("memory"));
     assert!(refused.is_err(), "an unusable env URL fails the boot");
 }
 
@@ -137,7 +139,7 @@ async fn provider_for_url_returns_the_store_without_installing_it() {
 
     let backed = provider_for_url(Some("memory".into())).await.unwrap();
     let backed_key = backed.destination_key();
-    let backend_installed = crate::core_host::storage::installed().is_some();
+    let installed_url = crate::core_host::storage::installed_url();
     let left_uninstalled = crate::core_host::agent::session_store::installed().is_none();
 
     // No URL: each workspace keeps its sessions in its own default database.
@@ -153,7 +155,7 @@ async fn provider_for_url_returns_the_store_without_installing_it() {
             .is_some_and(|key| key.starts_with("memory://")),
         "{backed_key:?}"
     );
-    assert!(backend_installed, "the backend is installed");
+    assert_eq!(installed_url.as_deref(), Some("memory"), "the backend is installed");
     assert!(
         left_uninstalled,
         "the provider is handed back, not installed"

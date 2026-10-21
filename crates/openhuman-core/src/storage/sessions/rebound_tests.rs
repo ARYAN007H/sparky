@@ -123,8 +123,8 @@ fn the_provider_surface_forwards_to_the_current_backend() {
     let factory_backend = Arc::clone(&other);
     let factory: tinyagents_session::port::AgentStorageFactory = Arc::new(move |agent_id| {
         let scope = crate::storage::Scope::local().agent(agent_id)?;
-        let port_scope = tinyagents_session::port::Scope::new(scope.as_str())?;
-        Ok(crate::storage::sessions::ScopedStorage::new(
+        let port_scope = tinyagents_storage_kit::Scope::new(scope.as_str())?;
+        Ok(tinyagents_storage_kit::ScopedStorage::new(
             factory_backend.for_scope(&scope)?,
             port_scope,
         ))

@@ -173,11 +173,10 @@ async fn files_a_blob_backed_generated_artifact() {
     let workspace = root.path().join("workspace");
     let files_dir = root.path().join("Files");
     let backend = crate::storage::test_support::memory_backend();
-    let blobs = backend
+    let scoped = backend
         .for_scope(&crate::storage::Scope::local())
-        .unwrap()
-        .blobs();
-    let blobs: Arc<dyn BlobStore> = Arc::from(blobs);
+        .unwrap();
+    let blobs: Arc<dyn BlobStore> = Arc::clone(scoped.blobs());
     let _output = MediaOutput::new(root.path(), Arc::clone(&blobs));
     let wrapped = MediaArtifactTool::new(
         BlobBackedMediaTool {
@@ -296,7 +295,7 @@ async fn removes_partial_destination_when_blob_read_fails() {
         Ok(bytes::Bytes::from_static(b"partial media")),
         Err(tinystoragedrivers_types::StorageError::backend("reader failed")),
     ]));
-    let error = copy_blob_to_file(&mut reader.as_mut(), &dest, "generated-media/fail.png")
+    let error = copy_blob_to_file(&mut reader, &dest, "generated-media/fail.png")
     .await
     .unwrap_err();
 
@@ -309,11 +308,10 @@ async fn keeps_source_blob_when_artifact_finalization_fails() {
     let root = tempfile::tempdir().unwrap();
     let workspace = root.path().join("workspace");
     let backend = crate::storage::test_support::memory_backend();
-    let blobs = backend
+    let scoped = backend
         .for_scope(&crate::storage::Scope::local())
-        .unwrap()
-        .blobs();
-    let blobs: Arc<dyn BlobStore> = Arc::from(blobs);
+        .unwrap();
+    let blobs: Arc<dyn BlobStore> = Arc::clone(scoped.blobs());
     let key = "generated-media/finalize-failure.png";
     blobs
         .put(key, b"media bytes".to_vec(), Some("image/png"))

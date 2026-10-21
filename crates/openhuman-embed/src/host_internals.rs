@@ -452,7 +452,8 @@ pub mod platform {
 pub mod storage {
     pub use openhuman_core::storage::{
         block_on, block_on_anyhow, clear, configured_url, driver_is_shared, install,
-        install_for_url, installed, open, url_from, StorageBackend, StorageUrl, STORAGE_URL_VAR,
+        install_for_url, installed, installed_url, open, url_from, StorageBackend, StorageUrl,
+        STORAGE_URL_VAR,
     };
 
     /// The layout v1 -> v2 migration the host runs at boot when
