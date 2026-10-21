@@ -171,9 +171,8 @@ pub(super) async fn run_agent_job_for_run(
                     let deadline = tinyagents_harness::turn_deadline::TurnDeadline::starting_now(
                         std::time::Duration::from_secs(timeout_secs),
                     );
-                    let absolute_deadline = tokio::time::Instant::from_std(
-                        deadline.started() + deadline.backstop(),
-                    );
+                    let absolute_deadline =
+                        tokio::time::Instant::from_std(deadline.started() + deadline.backstop());
                     let mut host_env = agent.host_env().clone();
                     host_env.turn_deadline = Some(deadline);
                     agent.set_host_env(host_env);

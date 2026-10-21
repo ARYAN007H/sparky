@@ -422,13 +422,7 @@ fn run_call_command(args: &[String]) -> Result<()> {
             } else {
                 dispatch
             };
-            invoke_method(
-                dispatch,
-                default_state(),
-                &method,
-                params,
-            )
-            .await
+            invoke_method(dispatch, default_state(), &method, params).await
         })
         .map_err(anyhow::Error::msg)?;
 

@@ -85,7 +85,11 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
                 self.root_followup.notify_one();
                 return Ok(ModelResponse::assistant("headless-flow-root-result"));
             }
-            if self.spawn_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) > 0 {
+            if self
+                .spawn_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                > 0
+            {
                 return Ok(ModelResponse::assistant(
                     "headless-flow-root-finished-without-accepted-child",
                 ));
@@ -116,9 +120,8 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
         child_release: tokio::sync::Notify::new(),
         root_followup: tokio::sync::Notify::new(),
     });
-    let _model = crate::inference::provider::factory::test_provider_override::install_model(
-        model.clone(),
-    );
+    let _model =
+        crate::inference::provider::factory::test_provider_override::install_model(model.clone());
     let workspace = tempfile::tempdir().expect("flow workspace");
     let mut config = crate::config::Config::default();
     config.workspace_dir = workspace.path().to_path_buf();
@@ -165,15 +168,16 @@ async fn headless_flow_agent_includes_its_spawned_child_result() {
         .await
         .expect("the real detached child reaches its model")
         .expect("child-start observation remains connected");
-    tokio::time::timeout(std::time::Duration::from_secs(5), model.root_followup.notified())
-        .await
-        .expect("the parent receives spawn acceptance and produces its final response");
+    tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        model.root_followup.notified(),
+    )
+    .await
+    .expect("the parent receives spawn acceptance and produces its final response");
     tokio::task::yield_now().await;
     let returned_before_child = run.is_finished();
     model.child_release.notify_one();
-    let output = run
-        .await
-        .expect("flow runner task");
+    let output = run.await.expect("flow runner task");
     let output = output.expect("headless flow agent should settle its child");
 
     assert_eq!(

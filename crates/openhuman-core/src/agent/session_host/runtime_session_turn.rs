@@ -94,7 +94,9 @@ impl OpenHumanSessionHost {
             );
             Some(
                 jobs.retain_root_run_descendants(&root_config.run_id, owner)
-                    .map_err(|error| anyhow::anyhow!("retain headless sub-agent results: {error}"))?,
+                    .map_err(|error| {
+                        anyhow::anyhow!("retain headless sub-agent results: {error}")
+                    })?,
             )
         } else {
             None
@@ -199,7 +201,9 @@ impl OpenHumanSessionHost {
             for job in jobs {
                 match job.status {
                     tinyagents_orchestration::subagent::SubAgentJobStatus::Completed => {
-                        if let Some(child_output) = job.output.filter(|text| !text.trim().is_empty()) {
+                        if let Some(child_output) =
+                            job.output.filter(|text| !text.trim().is_empty())
+                        {
                             output.push_str("\n\n[Sub-agent result: ");
                             output.push_str(&job.agent);
                             output.push_str("]\n");

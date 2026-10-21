@@ -30,6 +30,7 @@ pub(crate) fn agent_chat_for_with_turn_model_source<'a>(
             route,
             env,
             Some(turn_model_source),
+            false,
         )
         .await
         .map(AgentChatReply::into_outcome)

@@ -415,7 +415,8 @@ impl OpenHumanAgentRunner {
         let deadline = tinyagents_harness::turn_deadline::TurnDeadline::starting_now(
             std::time::Duration::from_secs(timeout_secs),
         );
-        let absolute_deadline = tokio::time::Instant::from_std(deadline.started() + deadline.backstop());
+        let absolute_deadline =
+            tokio::time::Instant::from_std(deadline.started() + deadline.backstop());
         let mut host_env = agent.host_env().clone();
         host_env.turn_deadline = Some(deadline);
         agent.set_host_env(host_env);
@@ -483,32 +484,31 @@ impl OpenHumanAgentRunner {
             Some(context) => Box::pin(crate::core::runtime::CoreContext::scope(context, run)),
             None => run,
         };
-        let final_text =
-            match tokio::time::timeout_at(absolute_deadline, run).await {
-                Ok(Ok(text)) => text,
-                Ok(Err(e)) => {
-                    tracing::warn!(
-                        target: "flows",
-                        agent_ref,
-                        error = %e,
-                        "[flows] agent_runner: harness turn failed"
-                    );
-                    return Err(EngineError::Capability(format!(
-                        "agent node '{agent_ref}' turn failed: {e:#}"
-                    )));
-                }
-                Err(_) => {
-                    tracing::warn!(
-                        target: "flows",
-                        agent_ref,
-                        timeout_secs,
-                        "[flows] agent_runner: harness turn timed out"
-                    );
-                    return Err(EngineError::Capability(format!(
-                        "agent node '{agent_ref}' timed out after {timeout_secs}s"
-                    )));
-                }
-            };
+        let final_text = match tokio::time::timeout_at(absolute_deadline, run).await {
+            Ok(Ok(text)) => text,
+            Ok(Err(e)) => {
+                tracing::warn!(
+                    target: "flows",
+                    agent_ref,
+                    error = %e,
+                    "[flows] agent_runner: harness turn failed"
+                );
+                return Err(EngineError::Capability(format!(
+                    "agent node '{agent_ref}' turn failed: {e:#}"
+                )));
+            }
+            Err(_) => {
+                tracing::warn!(
+                    target: "flows",
+                    agent_ref,
+                    timeout_secs,
+                    "[flows] agent_runner: harness turn timed out"
+                );
+                return Err(EngineError::Capability(format!(
+                    "agent node '{agent_ref}' timed out after {timeout_secs}s"
+                )));
+            }
+        };
 
         Ok(build_agent_result(agent_ref, &final_text, &request))
     }

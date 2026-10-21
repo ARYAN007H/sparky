@@ -232,7 +232,8 @@ fn handle_agent_chat(ctx: DispatchCtx, params: Map<String, Value>) -> Controller
             }
             _ => crate::inference::host_runtime::ops::AgentChatTarget::Orchestrator,
         };
-        crate::inference::host_runtime::ops::agent_chat_reply_for(
+        let headless = ctx.is_headless_agent_chat();
+        crate::inference::host_runtime::ops::agent_chat_reply_for_with_headless(
             &mut config,
             target,
             &p.message,
@@ -243,6 +244,7 @@ fn handle_agent_chat(ctx: DispatchCtx, params: Map<String, Value>) -> Controller
             crate::config::schema::EphemeralRoute::from_params(p.inference_url, p.api_key)
                 .map(|route| route.with_headers(p.inference_headers)),
             crate::inference::host_runtime::ops::AgentChatEnv::default(),
+            headless,
         )
         .await?
         .into_rpc_json()

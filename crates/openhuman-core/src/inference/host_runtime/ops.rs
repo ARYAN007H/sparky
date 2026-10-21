@@ -14,6 +14,7 @@ mod complete_once;
 mod runtime_ops;
 mod turn_guards;
 
+pub(crate) use agent_chat::agent_chat_reply_for_with_headless;
 pub use agent_chat::{
     agent_chat, agent_chat_for, agent_chat_reply_for, agent_chat_simple, AgentChatEnv,
     AgentChatReply, AgentChatTarget,

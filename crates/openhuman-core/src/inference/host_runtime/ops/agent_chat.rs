@@ -366,6 +366,7 @@ pub fn agent_chat_for<'a>(
             route,
             env,
             None,
+            false,
         )
         .await
         .map(AgentChatReply::into_outcome)
@@ -386,6 +387,34 @@ pub async fn agent_chat_reply_for(
     route: Option<crate::config::schema::EphemeralRoute>,
     env: AgentChatEnv,
 ) -> Result<AgentChatReply, String> {
+    agent_chat_reply_for_with_headless(
+        config,
+        target,
+        message,
+        model_override,
+        temperature,
+        thread_id,
+        cwd,
+        route,
+        env,
+        false,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn agent_chat_reply_for_with_headless(
+    config: &mut Config,
+    target: AgentChatTarget<'_>,
+    message: &str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    thread_id: Option<String>,
+    cwd: Option<String>,
+    route: Option<crate::config::schema::EphemeralRoute>,
+    env: AgentChatEnv,
+    headless: bool,
+) -> Result<AgentChatReply, String> {
     agent_chat_reply_for_inner(
         config,
         target,
@@ -397,6 +426,7 @@ pub async fn agent_chat_reply_for(
         route,
         env,
         None,
+        headless,
     )
     .await
 }
@@ -413,6 +443,7 @@ pub(super) async fn agent_chat_reply_for_inner(
     route: Option<crate::config::schema::EphemeralRoute>,
     env: AgentChatEnv,
     turn_model_source: Option<(crate::agent::tinyagents::TurnModelSource, String)>,
+    headless: bool,
 ) -> Result<AgentChatReply, String> {
     match target {
         AgentChatTarget::Definition {
@@ -592,7 +623,20 @@ pub(super) async fn agent_chat_reply_for_inner(
     // The host environment of this turn (budget, cancellation, deadline, hooks,
     // tool-belt authority) rides the session explicitly.
     let approval = env.host.approval.clone();
-    agent.set_host_env(env.host);
+    if headless {
+        agent.enable_headless_descendant_settlement();
+    }
+    let mut host_env = env.host;
+    if headless && host_env.turn_deadline.is_none() {
+        host_env.turn_deadline = Some(
+            tinyagents_harness::turn_deadline::TurnDeadline::starting_now(
+                std::time::Duration::from_secs(
+                    tinyagents_harness::turn_deadline::DEFAULT_TURN_BACKSTOP_SECS,
+                ),
+            ),
+        );
+    }
+    agent.set_host_env(host_env);
     if let Some(queue) = env.run_queue {
         log::debug!("[inference] agent_chat attached a run queue for mid-turn steering");
         agent.set_run_queue(Some(queue));
