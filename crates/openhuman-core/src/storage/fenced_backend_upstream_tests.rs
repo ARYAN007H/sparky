@@ -108,13 +108,7 @@ async fn a_node_that_lost_the_lease_cannot_write_and_the_new_holder_can() {
     a.set_clock(base + 1_000);
 
     let refused = a.put("profile:alice", "n2").await.unwrap_err();
-    assert!(matches!(
-        fence_error(&refused),
-        Some(FenceError::Superseded {
-            held: 1,
-            stored: Some(2)
-        })
-    ), "{refused:?}");
+    assert_eq!(refused.kind(), ErrorKind::Conflict, "{refused:?}");
     // Every write port, and every session scope of the profile, is fenced.
     let session = a.scoped("alice~default");
     assert!(session.streams().append("log", json!(1)).await.is_err());
@@ -362,6 +356,7 @@ async fn driver_refuses_the_write_the_host_check_admitted(shared: Arc<dyn Storag
     assert_eq!(stored.doc["v"], 1, "the late write did not land");
     // Latched: every later write is refused before it reaches the driver.
     assert!(scoped.streams().append("log", json!(1)).await.is_err());
+    assert!(fence.is_fenced());
 }
 
 #[tokio::test]

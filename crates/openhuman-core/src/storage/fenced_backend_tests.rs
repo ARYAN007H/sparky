@@ -174,7 +174,11 @@ async fn a_cached_handle_cannot_mutate_after_cross_process_takeover_on_any_port(
         .await
         .is_err());
     assert!(storage.kv().put("key", json!(1)).await.is_err());
-    assert!(storage.queues().ack("work", &receipt).await.is_err());
+    assert!(!storage
+        .queues()
+        .ack("work", &receipt)
+        .await
+        .unwrap());
 
     let raw = shared
         .backend
