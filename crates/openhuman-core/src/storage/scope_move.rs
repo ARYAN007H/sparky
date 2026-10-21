@@ -317,6 +317,7 @@ fn import_inventory(
         let scope_known = known.clone();
         let scope_backend_for_claim = Arc::clone(&scope_backend);
         let marker_for_claim = marker.clone();
+        let step_for_claim = step.clone();
         let result = crate::storage::import_state::with_claim(
             &marker,
             IMPORT_OWNER,
@@ -326,7 +327,11 @@ fn import_inventory(
                 // documents, streams, blobs, and the completion marker finish.
                 let _profile_guard = profile_guard;
                 let claimed_marker = marker_for_claim.conditioned(condition)?;
-                if crate::storage::import_state::is_done(&claimed_marker, IMPORT_OWNER, &step)? {
+                if crate::storage::import_state::is_done(
+                    &claimed_marker,
+                    IMPORT_OWNER,
+                    &step_for_claim,
+                )? {
                     return Ok(None);
                 }
                 let claim_bound = crate::storage::import_state::backend_with_condition(
@@ -336,7 +341,11 @@ fn import_inventory(
                 let copied = crate::storage::block_on_anyhow(async move {
                     copy_inventory(&claim_bound, &scope_known, &scope_inventory).await
                 })?;
-                crate::storage::import_state::set_done(&claimed_marker, IMPORT_OWNER, &step)?;
+                crate::storage::import_state::set_done(
+                    &claimed_marker,
+                    IMPORT_OWNER,
+                    &step_for_claim,
+                )?;
                 Ok(Some(copied))
             },
         )?;
