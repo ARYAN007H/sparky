@@ -3,7 +3,7 @@
 //! managed entries), builds an authenticated `/models` request for it, and
 //! parses the response.
 
-use super::super::openai_codex::resolve_openai_codex_routing;
+use super::super::factory::resolve_codex_routing;
 use super::local_runtime::synthesize_local_runtime_entry;
 use tinyinference_llm::catalog::{
     append_query_param, endpoint_hosts_models_listing, is_openrouter_provider, list_models,
@@ -178,9 +178,8 @@ pub async fn list_configured_models_from_config(
 
     let bearer_is_oauth = entry.slug == "openai"
         && crate::inference::provider::factory::openai_bearer_is_oauth(config);
-    let routing =
-        resolve_openai_codex_routing(config, &entry.slug, &entry.endpoint, &api_key, bearer_is_oauth)
-            .unwrap_or_else(|err| {
+    let routing = resolve_codex_routing(config, &entry.slug, &entry.endpoint, &api_key, bearer_is_oauth)
+        .unwrap_or_else(|err| {
             log::warn!(
                 "[providers][list_models] openai codex routing unavailable; continuing with configured endpoint: {err}"
             );

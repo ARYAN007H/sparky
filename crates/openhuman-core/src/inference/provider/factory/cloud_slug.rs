@@ -423,38 +423,39 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools_for
         crate::security::egress::EgressDescriptor::inference(&slug, &effective_model, true),
     );
 
-    let http = match config
+    let ca_bundle = config
         .cloud_provider_ca_certs
         .get(&slug)
         .filter(|pem| !pem.is_empty())
-    {
-        Some(pem) => {
-            let label = if anthropic_native {
-                "provider.anthropic"
-            } else {
-                "provider.compatible"
-            };
-            match crate::util::tls::client_with_ca_bundle(pem, label) {
-                Ok(http) => Some(http),
-                Err(error) => return Some(Err(anyhow::anyhow!(error))),
-            }
-        }
-        None => None,
+        .map(String::as_str);
+    let service_key = if anthropic_native {
+        "provider.anthropic"
+    } else {
+        "provider.compatible"
     };
-    let auth_style = cloud_spec::registry_auth_style(entry.auth_style)
-        .expect("managed JWT entries returned above");
-    let chat = cloud_spec::build_cloud_model(cloud_spec::CloudBuild {
-        spec: cloud_spec::cloud_provider_spec(entry, &effective_model),
-        auth_style,
-        key: key.as_str(),
-        temperature_override,
-        temperature_unsupported_models: config.temperature_unsupported_models.as_slice(),
-        native_tool_calling,
-        extra_headers: extra_headers.as_slice(),
-        extra_query_params: extra_query_params.as_slice(),
-        user_agent: user_agent.as_deref(),
-        codex: codex_route,
-        http,
+    let http_builder = ca_bundle.map(|_| {
+        std::sync::Arc::new(move || {
+            crate::config::apply_runtime_proxy_to_builder(
+                crate::util::tls::tls_client_builder(),
+                service_key,
+            )
+        }) as tinyinference_llm::providers::registry::ProviderHttpClientBuilder<'_>
     });
+    let spec = cloud_spec::cloud_provider_spec(entry, &effective_model);
+    let chat = cloud_spec::build_cloud_model(
+        &spec,
+        &key,
+        entry.auth_style,
+        temperature_override,
+        config.temperature_unsupported_models.as_slice(),
+        native_tool_calling,
+        extra_headers.as_slice(),
+        extra_query_params.as_slice(),
+        user_agent.as_deref(),
+        codex_route,
+        None,
+        http_builder,
+        ca_bundle,
+    );
     Some(chat.map(|chat| (chat, effective_model)))
 }

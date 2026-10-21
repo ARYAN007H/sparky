@@ -79,21 +79,19 @@ pub(crate) fn model_limits_request_for(
         log::debug!("[model_limits] codex oauth routing has no window listing slug={slug}");
         return None;
     }
-    let auth_style = super::cloud_spec::registry_auth_style(resolution.entry.auth_style)?;
-    let (extra_headers, temperature_unsupported) = (Vec::new(), Vec::new());
-    super::cloud_spec::cloud_discovery_request(&super::cloud_spec::CloudBuild {
-        spec: super::cloud_spec::cloud_provider_spec(resolution.entry, &resolution.effective_model),
-        auth_style,
-        key: resolution.key.as_str(),
-        temperature_override: None,
-        temperature_unsupported_models: &temperature_unsupported,
-        native_tool_calling: true,
-        extra_headers: &extra_headers,
-        extra_query_params: &[],
-        user_agent: None,
-        codex: Some(&resolution.codex),
-        http: None,
-    })
+    if resolution.entry.auth_style == AuthStyle::OpenhumanJwt {
+        return None;
+    }
+    let spec = super::cloud_spec::cloud_provider_spec(resolution.entry, &resolution.effective_model);
+    super::cloud_spec::cloud_discovery_request(
+        &spec,
+        &resolution.key,
+        resolution.entry.auth_style,
+        &[],
+        &[],
+        None,
+        Some(&resolution.codex),
+    )
 }
 
 /// The managed backend's catalogue listing request, from the registered

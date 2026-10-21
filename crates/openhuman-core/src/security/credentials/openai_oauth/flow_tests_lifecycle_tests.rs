@@ -566,7 +566,7 @@ fn codex_routing_reaches_backend_for_oauth_only_openai_even_after_token_rotation
     // backend regardless of the bearer string passed in — here a deliberately
     // *different* token, standing in for a post-refresh rotation.
     use crate::inference::provider::factory::openai_bearer_is_oauth;
-    use crate::inference::provider::openai_codex::resolve_openai_codex_routing;
+    use crate::inference::provider::factory::resolve_codex_routing;
 
     let tmp = tempdir().unwrap();
     let config = test_config(&tmp);
@@ -593,7 +593,7 @@ fn codex_routing_reaches_backend_for_oauth_only_openai_even_after_token_rotation
         "OAuth is the only openai credential, so the bearer is OAuth"
     );
 
-    let routing = resolve_openai_codex_routing(
+    let routing = resolve_codex_routing(
         &config,
         "openai",
         "https://api.openai.com/v1",
@@ -618,7 +618,7 @@ fn codex_routing_reaches_backend_for_oauth_only_openai_even_after_token_rotation
         )
         .unwrap();
     assert!(!openai_bearer_is_oauth(&config));
-    let routing = resolve_openai_codex_routing(
+    let routing = resolve_codex_routing(
         &config,
         "openai",
         "https://api.openai.com/v1",
