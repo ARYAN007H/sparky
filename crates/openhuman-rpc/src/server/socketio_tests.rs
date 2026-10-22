@@ -16,7 +16,6 @@ fn thread_subscribe_cannot_choose_a_profile_for_review_replay() {
 }
 
 #[test]
-#[test]
 fn companion_state_transport_delivers_payload_to_bridge() {
     let mut rx = subscribe_companion_state_changed();
     let payload = serde_json::json!({
