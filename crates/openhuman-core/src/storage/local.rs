@@ -223,6 +223,15 @@ pub async fn backend_for_async(workspace_dir: &Path) -> Result<Arc<dyn StorageBa
         return Ok(backend);
     }
     let workspace_dir = workspace_dir.to_path_buf();
+    if super::ON_STORAGE_RUNTIME.with(std::cell::Cell::get) {
+        // A sync store may bridge into an async module operation that needs
+        // the same workspace fallback. Initializing through `backend_for`
+        // here would queue a second synchronous bridge request while this
+        // bridge worker is waiting for it. The existing initializer is async
+        // and safe to drive directly from this runtime.
+        let cell = workspace_backend(&workspace_dir);
+        return initialized_backend(cell, workspace_dir).await;
+    }
     tokio::task::spawn_blocking(move || backend_for(&workspace_dir))
         .await
         .context("join the workspace storage opener")?
