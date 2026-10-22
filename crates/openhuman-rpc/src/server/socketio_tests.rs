@@ -18,7 +18,7 @@ fn thread_subscribe_cannot_choose_a_profile_for_review_replay() {
 
 #[test]
 fn socket_review_replay_uses_the_profile_captured_from_server_context() {
-    let authenticated_profile = crate::core_host::core::runtime::tenant::Tenant {
+    let authenticated_profile = crate::core_host::core::runtime::Tenant {
         profile: Some("socket-profile".into()),
         agent: None,
     };
@@ -29,7 +29,7 @@ fn socket_review_replay_uses_the_profile_captured_from_server_context() {
 
 #[test]
 fn local_socket_review_replay_preserves_the_active_profile() {
-    let active_profile = crate::core_host::core::runtime::tenant::Tenant {
+    let active_profile = crate::core_host::core::runtime::Tenant {
         profile: Some("active-profile".into()),
         agent: None,
     };
@@ -40,11 +40,10 @@ fn local_socket_review_replay_preserves_the_active_profile() {
 
 #[test]
 fn socket_review_replay_fails_closed_without_saas_server_context() {
-    assert!(tenant_for_socket_connection(
-        Err(crate::core_host::core::runtime::tenant::NoTenant),
-        true,
-    )
-    .is_none());
+    assert!(
+        tenant_for_socket_connection(Err(crate::core_host::core::runtime::NoTenant), true,)
+            .is_none()
+    );
 }
 
 #[test]

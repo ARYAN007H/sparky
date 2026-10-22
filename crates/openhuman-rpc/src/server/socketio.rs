@@ -69,7 +69,7 @@ struct AuthedConnection;
 /// The per-process bearer authenticates the connection but does not encode a
 /// SaaS profile, so never accept tenant selection from a later event payload.
 #[derive(Clone, Debug)]
-struct SocketTenant(crate::core_host::core::runtime::tenant::Tenant);
+struct SocketTenant(crate::core_host::core::runtime::Tenant);
 
 /// Connection-time payload the client passes via Socket.IO's `auth` field.
 ///
@@ -1232,11 +1232,11 @@ fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str) {
 
 fn tenant_for_socket_connection(
     tenant: Result<
-        crate::core_host::core::runtime::tenant::Tenant,
-        crate::core_host::core::runtime::tenant::NoTenant,
+        crate::core_host::core::runtime::Tenant,
+        crate::core_host::core::runtime::NoTenant,
     >,
     saas: bool,
-) -> Option<crate::core_host::core::runtime::tenant::Tenant> {
+) -> Option<crate::core_host::core::runtime::Tenant> {
     match tenant {
         Ok(tenant) => Some(tenant),
         Err(_) if saas => None,
