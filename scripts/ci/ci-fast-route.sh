@@ -3,11 +3,14 @@
 #
 # Writes outsider=true|false and source=ci-fast|fallback to $GITHUB_OUTPUT: false when ci-fast.yml routed
 # the commit to the EX63 (an org member's PR), true otherwise. Used by
-# ci-fast-hosted.yml (run the hosted lanes for outsiders) and ci-lite.yml
-# (skip GitHub-hosted CI when the EX63 runs it). ci-gate.yml then requires
-# whichever of them ran.
+# ci-fast-hosted.yml (run the hosted lanes for outsiders and drafts).
+# ci-gate.yml then requires whichever of them ran.
 #
-# Env: GH_TOKEN, REPO, HEAD_SHA, AUTHOR, ACTOR, ASSOCIATION.
+# Env: GH_TOKEN, REPO, HEAD_SHA, AUTHOR, ACTOR, ASSOCIATION. Optional: DRAFT
+# (the PR is a draft) and SINCE (the PR's updated_at for this event).
+#
+# Draft PRs never run on the EX63 (ci-fast.yml routes them to GitHub-hosted
+# runners), so a draft is an outsider here without asking ci-fast.yml.
 set -euo pipefail
 # ci-fast.yml decides who is an org member: it runs from main with
 # the CI_MEMBERSHIP_TOKEN secret, so it also sees private members.
@@ -19,8 +22,12 @@ set -euo pipefail
 decide_from_ci_fast() {
   local run_id="" lanes=""
   for _ in $(seq 1 36); do
+    # Only a run started by this event: marking a draft ready re-runs
+    # ci-fast.yml on the same head commit, and the draft's earlier run (EX63
+    # skipped) must not answer for it.
     run_id="$(gh api "repos/${REPO}/actions/workflows/ci-fast.yml/runs?head_sha=${HEAD_SHA}&per_page=5" \
-      --jq '[.workflow_runs[] | select(.event == "pull_request_target")] | sort_by(.created_at) | last | .id // empty' 2>/dev/null || true)"
+      --arg since "${SINCE:-}" \
+      --jq '[.workflow_runs[] | select(.event == "pull_request_target" and .created_at >= $since)] | sort_by(.created_at) | last | .id // empty' 2>/dev/null || true)"
     if [ -n "${run_id}" ]; then
       # A member run materialises "Lanes / CI Fast (EX63)"; an
       # outsider run leaves the skipped call job "Lanes" alone.
@@ -42,7 +49,10 @@ decide_from_ci_fast() {
   done
   return 1
 }
-if verdict="$(decide_from_ci_fast)"; then
+if [ "${DRAFT:-false}" = "true" ]; then
+  outsider=true
+  reason="draft PR: GitHub-hosted runners"
+elif verdict="$(decide_from_ci_fast)"; then
   outsider="${verdict%% *}"
   reason="${verdict#* }"
 else
