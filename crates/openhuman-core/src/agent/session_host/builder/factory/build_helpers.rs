@@ -55,6 +55,63 @@ pub(super) fn prompt_builder(
 })
 }
 
+pub(super) fn tool_dispatcher(
+    tools: &[Box<dyn Tool>],
+    delegation_tools: &[Box<dyn Tool>],
+    dispatcher_choice: &str,
+    supports_native: bool,
+    agent_id: &str,
+) -> Box<dyn ToolDialect> {
+        // Build the P-Format registry AFTER the tool list is finalised
+        // (including orchestrator tools) so every tool gets a signature
+        // entry. The registry is self-contained — it doesn't hold a
+        // reference back into the tools Vec.
+        let pformat_registry = tinytools_agent::build_registry(
+            tools
+                .iter()
+                .chain(delegation_tools.iter())
+                .map(|tool| (tool.name(), tool.parameters_schema())),
+        );
+        let dispatcher_kind = ToolCallFormat::resolve(&dispatcher_choice, supports_native);
+        let tool_dispatcher: Box<dyn ToolDialect> = match dispatcher_kind {
+            ToolCallFormat::Native => Box::new(NativeDialect),
+            ToolCallFormat::Json => Box::new(XmlDialect),
+            ToolCallFormat::PFormat => Box::new(PFormatDialect::new(pformat_registry.clone())),
+            ToolCallFormat::Python => Box::new(CodeDialect::new(
+                CodeStyle::Python,
+                pformat_registry.clone(),
+            )),
+            ToolCallFormat::TypeScript => Box::new(CodeDialect::new(
+                CodeStyle::TypeScript,
+                pformat_registry.clone(),
+            )),
+        };
+
+        log::debug!(
+            "[agent] tool dispatcher selected: choice={dispatcher_choice} agent_id={agent_id} \
+             kind={dispatcher_kind:?} sends_tool_specs={} pformat_registry_entries={}",
+            tool_dispatcher.should_send_tool_specs(),
+            pformat_registry.len()
+        );
+        tool_dispatcher
+}
+
+pub(super) fn effective_settings(
+    target_def: Option<&crate::agent_registry::host_definition::AgentDefinition>,
+    config: &Config,
+) -> (f64, bool, tinyjuice_bus::types::AgentTokenjuiceCompression) {
+    let effective_temperature = target_def
+        .map(|def| def.temperature)
+        .unwrap_or(config.default_temperature);
+    let effective_omit_memory_context = target_def
+        .map(|def| def.extensions.omit_memory_context)
+        .unwrap_or(false);
+    let effective_tokenjuice_compression = target_def
+        .map(|def| def.extensions.tokenjuice_for(&def.model))
+        .unwrap_or(tinyjuice_bus::types::AgentTokenjuiceCompression::Full);
+    (effective_temperature, effective_omit_memory_context, effective_tokenjuice_compression)
+}
+
 pub(super) fn payload_summarizer(
     host_only: bool,
     agent_id: &str,
