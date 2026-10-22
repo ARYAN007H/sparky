@@ -39,7 +39,7 @@ pub(crate) fn open_for_context(
         SubagentError::Persistence("subagent session store has no resolved owner scope".into())
     })?;
     let documents = crate::core::runtime::CoreContext::sync_scope(context, open_documents)?;
-    let driver = Arc::new(DriverSubagentSessionStore::new(documents)?);
+    let driver = Arc::new(DriverSubagentSessionStore::new(Arc::clone(&documents))?);
     let parent_session = parent_session.into();
     import_host_sessions(
         ctx,
@@ -47,6 +47,7 @@ pub(crate) fn open_for_context(
         &parent_session,
         parent_thread_id.as_deref(),
         &driver,
+        documents,
     )?;
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
         &workspace_dir,
@@ -88,6 +89,7 @@ fn import_host_sessions(
     parent_session: &str,
     parent_thread_id: Option<&str>,
     driver: &DriverSubagentSessionStore,
+    documents: Arc<dyn crate::storage::DocumentStore>,
 ) -> Result<(), SubagentError> {
     let legacy = SubagentSessionStore::new_in_context(ctx, workspace_dir.to_path_buf())
         .map_err(SubagentError::Persistence)?
@@ -103,16 +105,18 @@ fn import_host_sessions(
             && row.parent_thread_id.as_deref() == parent_thread_id
     }) {
         let session = converter.convert(row)?;
-        if driver.get(&session.subagent_session_id).is_ok_and(|found| found.is_some()) {
-            continue;
+        match driver.get(&session.subagent_session_id) {
+            Ok(Some(_)) => continue,
+            Ok(None) => {}
+            Err(error) => return Err(error),
         }
         // The driver's upsert API intentionally only creates a Running row;
         // import existing terminal/reusable state as its public durable shape.
-        let docs = driver.document_store();
         let doc = serde_json::to_value(&session)
             .map_err(|error| SubagentError::Persistence(format!("session encode: {error}")))?;
         crate::storage::block_on(async move {
-            docs.put(
+            documents.ensure_collection(&tinystoragedrivers::CollectionSpec::new("subagent_sessions")).await?;
+            documents.put(
                 "subagent_sessions",
                 &session.subagent_session_id,
                 doc,
@@ -120,7 +124,6 @@ fn import_host_sessions(
             )
             .await
             .map(|_| ())
-            .map_err(|error| crate::storage::StorageError::backend(error.to_string()))
         })
         .map_err(|error| SubagentError::Persistence(format!("import host sessions: {error}")))?;
     }
