@@ -11,8 +11,6 @@ mod supervision;
 pub(crate) mod turn_driver;
 
 #[cfg(feature = "channels")]
-pub(crate) use startup::hydrate_channel_credentials;
-#[cfg(feature = "channels")]
 pub(crate) use startup::prepare_runtime_limits;
 #[cfg(feature = "channels")]
 pub use startup::start_channels;
