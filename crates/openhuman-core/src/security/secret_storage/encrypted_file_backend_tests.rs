@@ -41,6 +41,10 @@ fn write_profile_key(workspace: &Path, key: &[u8; KEY_LEN]) {
 
 #[test]
 fn profile_read_only_secret_lookup_uses_only_the_selected_store() {
+    let _env = crate::config::test_env::EnvVarGuard::locked_unset_many(&[
+        MASTER_KEY_ENV,
+        MASTER_KEY_FILE_ENV,
+    ]);
     let account_a = secrets_tempdir();
     let account_b = secrets_tempdir();
     let key_a = [0x42; KEY_LEN];
