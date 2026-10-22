@@ -249,6 +249,76 @@ fn a_marker_row_an_older_build_wrote_counts_as_a_finished_import() {
 
 #[cfg(feature = "storage-sqlite")]
 #[tokio::test(flavor = "multi_thread")]
+async fn historical_profile_fixture_conversation_survives_layout_copy_and_owner_migration() {
+    use crate::storage::layout::{Target, db};
+    use crate::storage::{self, Scope};
+    use tinyagents_session::threads::{ConversationPersistence, DriverConversationStore};
+    use tinyagents_storage_kit::{MigrateOptions, Registry, ScopedStorage};
+
+    let root = TempDir::new().unwrap();
+    let target = Target::new(root.path(), "u1");
+    std::fs::create_dir_all(target.workspace()).unwrap();
+    std::fs::create_dir_all(&target.profile_dir).unwrap();
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src/storage/import/fixtures/legacy-v1-profile/storage.db");
+    let source_db = crate::storage::layout::legacy::v1_db(&target);
+    std::fs::create_dir_all(source_db.parent().unwrap()).unwrap();
+    std::fs::copy(&fixture, &source_db).unwrap();
+
+    // Exercise the same physical database copy used by profile layout
+    // migration, then run the conversation owner's normal registered schema.
+    db::copy(&source_db, &target.storage_db()).unwrap();
+    let destination_url = format!("sqlite:{}", target.storage_db().display());
+    let destination = crate::storage::test_support::sqlite_backend_in(
+        root,
+        destination_url.clone(),
+    )
+    .unwrap();
+    let backend = Arc::clone(&destination.backend);
+    let _installed =
+        crate::storage::test_support::install_for_test(&destination_url, Arc::clone(&backend));
+    let raw_scope = backend.for_scope(&Scope::local()).unwrap();
+    let owner_scope = ScopedStorage::new(
+        raw_scope.clone(),
+        tinyagents_storage_kit::Scope::new(Scope::local().as_str()).unwrap(),
+    );
+    let migrate_storage = owner_scope.clone();
+    storage::block_on(async move {
+        tinyagents_storage_kit::with_migration_lease(&owner_scope, "conversations", move |_| {
+            let migration_storage = migrate_storage.clone();
+            async move {
+                let docs = Arc::clone(migration_storage.documents());
+                DriverConversationStore::prepare_schema(docs.as_ref()).await?;
+                DriverConversationStore::prepare_append_schema(docs.as_ref()).await?;
+                for spec in tinyagents_storage_kit::primitives::collection_specs() {
+                    docs.ensure_collection(&spec).await?;
+                }
+                Registry::compose([tinyagents_session::threads::conversations_storage_schema()])?
+                    .migrate(&migration_storage, &MigrateOptions::new())
+                    .await
+            }
+        })
+        .await
+    })
+    .unwrap();
+
+    let conversations = DriverConversationStore::new(owner_scope);
+    let threads = storage::block_on(async { conversations.list_threads().await }).unwrap();
+    assert_eq!(threads.len(), 1);
+    assert_eq!(threads[0].id, "fixture-thread");
+    assert_eq!(threads[0].title, "Fixture thread");
+    assert_eq!(threads[0].message_count, 1);
+    let messages = storage::block_on(async {
+        conversations.get_messages("fixture-thread").await
+    })
+    .unwrap();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].id, "fixture-message");
+    assert_eq!(messages[0].content, "historical profile message");
+}
+
+#[cfg(feature = "storage-sqlite")]
+#[tokio::test(flavor = "multi_thread")]
 async fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrection() {
     use crate::profiles::{ProfileId, ProfileRegistry};
     use crate::storage::layout::{Target, legacy};
