@@ -384,12 +384,13 @@ impl SpawnSubagentTool {
             .await
             {
                 let message = error.to_string();
-                let _ = subagent_sessions::mark_failed(
-                    &store,
+                let _ = driver_store
+                    .mark_failed(
                     &resumed_session.subagent_session_id,
                     task_id,
                     message.clone(),
-                );
+                    )
+                    .await;
                 completion_target
                     .failed(task_id, &definition.id, &message)
                     .await;
@@ -685,12 +686,14 @@ impl SpawnSubagentTool {
         )
         .await
         {
-            if let Err(store_err) = subagent_sessions::mark_failed(
-                &store,
-                &durable_session.subagent_session_id,
-                &task_id,
-                error.to_string(),
-            ) {
+            if let Err(store_err) = driver_store
+                .mark_failed(
+                    &durable_session.subagent_session_id,
+                    &task_id,
+                    error.to_string(),
+                )
+                .await
+            {
                 log::warn!(
                     "[subagent_reuse] mark_failed after driver registration error subagent_session_id={} task_id={} agent_id={} error={}",
                     durable_session.subagent_session_id,
