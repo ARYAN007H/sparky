@@ -344,7 +344,7 @@ impl RuntimeBuilder {
             storage_backend.or_else(openhuman_core::storage::installed)
         };
         if !storage_info.configured {
-            if let Some(backend) = &storage_backend {
+            if storage_backend.is_some() {
                 let installed_url = openhuman_core::storage::installed_url();
                 storage_info = super::StorageInfo::backend(installed_url.as_deref());
             }

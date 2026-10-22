@@ -136,18 +136,17 @@ impl RuntimeBuilder {
     }
 }
 
+type InstalledStorage = Option<(
+    Arc<dyn openhuman_core::storage::StorageBackend>,
+    Option<String>,
+)>;
+
 impl CliGlobals {
     /// Install every global; returns the storage backend, when one was
     /// configured, now opened.
     fn install(
         mut self,
-    ) -> Result<
-        Option<(
-            Arc<dyn openhuman_core::storage::StorageBackend>,
-            Option<String>,
-        )>,
-        String,
-    > {
+    ) -> Result<InstalledStorage, String> {
         if let Some(engine) = self.memory_engine {
             openhuman_core::memory::engine::install_host_engine(engine);
         }
