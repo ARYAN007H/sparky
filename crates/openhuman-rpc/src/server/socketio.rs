@@ -71,6 +71,18 @@ struct AuthedConnection;
 #[derive(Clone, Debug)]
 struct SocketTenant(crate::core_host::agent::plan_review::gate::SocketReviewScope);
 
+/// Bind replay tenancy from the HTTP request extensions retained by
+/// Socket.IO. Its async connect callback is spawned independently of the
+/// Axum request task, so task-local ambient context is not a reliable carrier.
+fn socket_tenant_from_request_extensions(
+    extensions: &axum::http::Extensions,
+) -> Option<SocketTenant> {
+    let dispatch = extensions.get::<crate::core_host::core::runtime::DispatchCtx>()?;
+    let scope = crate::core_host::agent::plan_review::gate::global()
+        .socket_scope_for_dispatch(dispatch)?;
+    Some(SocketTenant(scope))
+}
+
 /// Connection-time payload the client passes via Socket.IO's `auth` field.
 ///
 /// Browsers do not let `EventSource` / `WebSocket` clients attach custom
@@ -286,9 +298,9 @@ pub fn attach_socketio() -> (socketioxide::layer::SocketIoLayer, SocketIo) {
                 return;
             }
             socket.extensions.insert(AuthedConnection);
-            let Some(tenant) = crate::core_host::agent::plan_review::gate::global()
-                .socket_scope_for_current_context()
-            else {
+            let Some(tenant) = socket_tenant_from_request_extensions(
+                &socket.req_parts().extensions,
+            ) else {
                 log::warn!("[socketio] rejecting socket without a tenant scope in SaaS mode");
                 let _ = socket.clone().disconnect();
                 return;
