@@ -3,6 +3,7 @@ use serde_json::{json, Value};
 use std::path::Path;
 use std::sync::Arc;
 use tinyagents_harness::media::MediaOutput;
+use tinyagents_harness_tools::media::MediaJobProgress;
 use tinystoragedrivers::BlobStore;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolContent, ToolResult};
 
@@ -548,9 +549,23 @@ async fn per_call_observer_reports_each_calls_own_job_state() {
         root.path().join("workspace"),
         root.path().join("Files"),
     )
-    .with_per_call_inner(move |observer, _chat| PollingTool {
-        observer,
-        state: states.lock().unwrap().pop().unwrap(),
+    .with_per_call_inner(move |progress, _context| {
+        let observer = std::sync::Arc::new(
+            move |status: &tinyagents_harness::tinyinference_video::VideoJobStatus| {
+                progress(&MediaJobProgress {
+                    id: status.id.clone(),
+                    state: status.state.to_string(),
+                    outputs: status.outputs,
+                    output_indices: status.output_indices.clone(),
+                    cost_usd: status.cost_usd,
+                    error: status.error.clone(),
+                });
+            },
+        );
+        PollingTool {
+            observer,
+            state: states.lock().unwrap().pop().unwrap(),
+        }
     });
     let (a, b) = (Recorder::default(), Recorder::default());
     let (ra, rb) = tokio::join!(
