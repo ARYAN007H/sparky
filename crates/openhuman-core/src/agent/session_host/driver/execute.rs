@@ -251,10 +251,10 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         if outcome.text.trim().is_empty()
             && output.starts_with("I finished this turn without writing up a result.")
         {
-            let results = super::product_copy::close_results(&outcome.tool_outcomes);
-            let rendered = super::product_copy::render_close_results(&results, 4_000);
+            let results = super::super::product_copy::close_results(&outcome.tool_outcomes);
+            let rendered = super::super::product_copy::render_close_results(&results, 4_000);
             output = tinyagents_harness::close::checkpoint_with_copy(
-                &super::product_copy::OPENHUMAN_CLOSE_COPY,
+                &super::super::product_copy::OPENHUMAN_CLOSE_COPY,
                 self.max_iterations,
                 &rendered,
                 !results.is_empty(),

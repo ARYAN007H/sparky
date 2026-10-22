@@ -152,7 +152,7 @@ pub(super) async fn drive_turn(
         })
         .with_max_model_calls(max_iterations)
         .with_max_tool_calls(run_context.tool_call_limit_for(max_iterations))
-        .with_max_depth(super::budget::depth(&run_context))
+        .with_max_depth(super::super::budget::depth(&run_context))
         .with_tag("openhuman")
         .with_tag(if on_progress.is_some() {
             "observed"
@@ -463,8 +463,8 @@ pub(super) async fn drive_turn(
     if let Some(scope) = run_context.response_shape.clone() {
         tinyagents_harness::middleware::install_response_shape(&mut prepared.harness, scope);
     }
-    super::budget::install_depth(&mut prepared.harness, &run_context);
-    super::deadline_wind_down::install(
+    super::super::budget::install_depth(&mut prepared.harness, &run_context);
+    super::super::deadline_wind_down::install(
         &mut prepared.harness,
         &Some(steering.clone()),
         &run_context,
@@ -549,7 +549,7 @@ pub(super) async fn drive_turn(
                 streaming,
                 "[tinyagents] hosted root turn failed; keeping the typed kind"
             );
-            super::hosted_error::run_error_from_hosted(error)
+            super::super::hosted_error::run_error_from_hosted(error)
         });
         // Stop forwarding and deregister now: the poll loop must not deliver
         // into the no-longer-drained handle during post-run journal/mapping

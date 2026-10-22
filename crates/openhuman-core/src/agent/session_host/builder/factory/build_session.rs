@@ -11,7 +11,7 @@ impl OpenHumanSessionHost {
         agent_id: &str,
         target_def: Option<&crate::agent_registry::host_definition::AgentDefinition>,
         host_only: bool,
-        host: Option<&super::HostTools>,
+        host: Option<&super::super::HostTools>,
         session_id: Option<&str>,
         turn_model_source: Option<(crate::agent::tinyagents::TurnModelSource, String)>,
     ) -> Result<Self> {
@@ -85,7 +85,7 @@ impl OpenHumanSessionHost {
         }
 
         let (provider_role, model_name, supports_native) =
-            super::factory_resolution::resolve_session_model(
+            super::super::factory_resolution::resolve_session_model(
                 ctx,
                 config,
                 agent_id,
@@ -181,7 +181,7 @@ impl OpenHumanSessionHost {
             crate::agent_registry::host_definition::AgentDefinitionRegistry::current(),
         ) {
             // Host-only: no delegation; the host's names join an empty belt.
-            _ if host_only => (Vec::new(), Some(super::host_policy::empty_belt())),
+            _ if host_only => (Vec::new(), Some(super::super::host_policy::empty_belt())),
             (Some(def), Some(_reg)) => {
                 let synthed = if should_synthesize_delegation_tools(def) {
                     crate::integrations::composio::orchestrator_actions::collect_orchestrator_tools(
@@ -331,7 +331,7 @@ impl OpenHumanSessionHost {
         // A summary names the tool in its footer too, and summaries run with
         // the router off, so either one makes the tool necessary.
         if !host_only {
-            super::ensure_tinyjuice_tools_visible(&mut visible, agent_id, config);
+            super::super::ensure_tinyjuice_tools_visible(&mut visible, agent_id, config);
         }
 
         if let Some(def) = target_def {
@@ -395,7 +395,7 @@ impl OpenHumanSessionHost {
         // so the crate-native streaming path is exercised end-to-end.
         //
         let effective_agent_config = helpers::effective_agent_config(config, target_def, agent_id);
-        let merged_host_tools = super::host_tools::merge_for_turn(
+        let merged_host_tools = super::super::host_tools::merge_for_turn(
             ctx,
             host,
             agent_id,
@@ -403,9 +403,10 @@ impl OpenHumanSessionHost {
             &mut tools,
             &mut visible,
         )?;
-        let session_definition = super::host_tools::scope_def(target_def, &merged_host_tools);
+        let session_definition =
+            super::super::host_tools::scope_def(target_def, &merged_host_tools);
         let host_policy =
-            super::host_policy::session_policy(host_only, &tools, merged_host_tools.policy);
+            super::super::host_policy::session_policy(host_only, &tools, merged_host_tools.policy);
         let withheld_tool_names = merged_host_tools.withheld;
         let mut builder = OpenHumanSessionHost::builder()
             .tools(tools)
@@ -416,7 +417,7 @@ impl OpenHumanSessionHost {
             .permanent_tool_names(merged_host_tools.permanent)
             .deferred_tools(target_def.map_or_else(Vec::new, |d| d.deferred_tools.clone()))
             .tool_dispatcher(tool_dispatcher)
-            .prompt_builder(prompt_builder)
+            .prompt_builder(prompt_builder?)
             .config(effective_agent_config)
             .context_config(config.context.clone())
             .model_name(model_name)
@@ -458,7 +459,7 @@ impl OpenHumanSessionHost {
                 definitions,
                 security_policy: security,
                 session_definition: session_definition.clone().map(|definition| {
-                    Arc::new(super::host_tools::add_permanent_tools(
+                    Arc::new(super::super::host_tools::add_permanent_tools(
                         definition,
                         &agent.permanent_tool_names,
                     ))

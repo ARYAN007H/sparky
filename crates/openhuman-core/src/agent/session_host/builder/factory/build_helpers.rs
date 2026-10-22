@@ -122,7 +122,7 @@ pub(super) fn effective_agent_config(
     // while definitions still take precedence over the global default.
     let mut effective_agent_config = config.agent.clone();
     let effective_cap =
-        super::iteration_cap::resolve_max_tool_iterations(&config.agent, target_def);
+        super::super::super::iteration_cap::resolve_max_tool_iterations(&config.agent, target_def);
     if let Some(def) = target_def {
         log::info!(
             "[agent::builder] resolved iteration cap for agent_id={}: \
@@ -153,7 +153,7 @@ pub(super) fn payload_summarizer(
     agent_id: &str,
     config: &Config,
 ) -> Option<std::sync::Arc<crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer>> {
-    if !host_only && super::super::summarizes_tool_output(agent_id, config) {
+    if !host_only && super::super::super::summarizes_tool_output(agent_id, config) {
         match crate::agent_registry::host_definition::AgentDefinitionRegistry::current() {
             Some(reg) => match reg.get("summarizer") {
                 Some(summarizer_def) => {
