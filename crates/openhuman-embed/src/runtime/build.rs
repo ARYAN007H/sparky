@@ -343,11 +343,9 @@ impl RuntimeBuilder {
         } else {
             storage_backend.or_else(openhuman_core::storage::installed)
         };
-        if !storage_info.configured {
-            if storage_backend.is_some() {
-                let installed_url = openhuman_core::storage::installed_url();
-                storage_info = super::StorageInfo::backend(installed_url.as_deref());
-            }
+        if !storage_info.configured && storage_backend.is_some() {
+            let installed_url = openhuman_core::storage::installed_url();
+            storage_info = super::StorageInfo::backend(installed_url.as_deref());
         }
 
         // Discovered: agents start from the config the core just loaded.
