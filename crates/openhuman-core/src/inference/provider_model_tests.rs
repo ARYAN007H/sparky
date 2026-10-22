@@ -342,9 +342,8 @@ fn native_provider_metadata_resolves_by_context_and_preserves_request_fields() {
             request.model = Some(format!("{label}/raw"));
             request.max_tokens = Some(37);
             request.metadata = json!({"caller": "kept"});
-            let request = crate::inference::registry::provider_request_without_reasoning(
-                provider, request,
-            );
+            let request =
+                crate::inference::registry::provider_request_without_reasoning(provider, request);
             assert_eq!(
                 request.model.as_deref(),
                 Some(format!("{label}/raw").as_str())
