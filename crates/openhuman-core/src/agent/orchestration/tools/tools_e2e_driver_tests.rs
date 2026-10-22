@@ -2,16 +2,14 @@ use super::*;
 
 #[tokio::test]
 async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
-    use crate::agent::orchestration::subagent_sessions::{
-        DurableSubagentStatus, SubagentSessionStore,
-    };
+    use crate::agent::orchestration::subagent_sessions::open_for_context;
     use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness::context::RunContext;
     use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_harness_tools::subagents::{SubAgentJobRegistry, SubAgentJobsTool};
-    use tinyagents_orchestration::subagent::SubAgentJobStatus;
+    use tinyagents_orchestration::subagent::{DurableSubagentStatus, SubAgentJobStatus};
 
     struct GatedModel {
         calls: std::sync::atomic::AtomicUsize,
@@ -143,9 +141,21 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
         .into_iter()
         .find(|job| job.agent == "task_manager_agent" && job.status == SubAgentJobStatus::Running)
         .expect("first detached child is registered in shared Jobs");
-    let store = SubagentSessionStore::new(workspace.clone());
-    let before = store
-        .load()
+    let session_dispatch = live.data.dispatch_ctx();
+    let session_port = open_for_context(
+        &session_dispatch,
+        workspace.clone(),
+        "force-fresh-parent-session",
+        Some("force-fresh-parent-thread".into()),
+        Some((*jobs).clone()),
+    )
+    .expect("open explicitly scoped force-fresh session store");
+    let before = session_port
+        .list_for_parent(
+            "force-fresh-parent-session",
+            Some("force-fresh-parent-thread"),
+        )
+        .await
         .expect("first child session persisted")
         .into_iter()
         .find(|session| session.current_task_id.as_deref() == Some(old_task_id.as_str()))
@@ -179,7 +189,13 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
         .await
         .expect("replacement child is actually dispatched")
         .expect("replacement child start notification");
-    let rows = store.load().expect("replacement session persisted");
+    let rows = session_port
+        .list_for_parent(
+            "force-fresh-parent-session",
+            Some("force-fresh-parent-thread"),
+        )
+        .await
+        .expect("replacement session persisted");
     let closed_old = rows
         .iter()
         .find(|session| session.subagent_session_id == before.subagent_session_id)
@@ -198,15 +214,6 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
 
     release_first.notify_one();
     release_second.notify_one();
-    let session_dispatch = live.data.dispatch_ctx();
-    let session_port = crate::agent::orchestration::subagent_sessions::open_for_context(
-        &session_dispatch,
-        workspace.clone(),
-        "force-fresh-parent-session",
-        Some("force-fresh-parent-thread".into()),
-        Some((*jobs).clone()),
-    )
-    .expect("open explicitly scoped force-fresh session store");
     assert!(
         session_port
             .get(&old_task_id)
@@ -278,7 +285,13 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
         SubAgentJobStatus::Completed
     );
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
-    let after_rows = store.load().expect("final durable state");
+    let after_rows = session_port
+        .list_for_parent(
+            "force-fresh-parent-session",
+            Some("force-fresh-parent-thread"),
+        )
+        .await
+        .expect("final durable state");
     let old_after = after_rows
         .iter()
         .find(|session| session.subagent_session_id == before.subagent_session_id)
