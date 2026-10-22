@@ -34,23 +34,27 @@ impl Channel for FullRecordingChannel {
         "test-channel"
     }
 
-    #[allow(deprecated, reason = "Channel still requires its v21 adapter for one release")]
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 adapter for one release"
+    )]
     async fn send(&self, message: &traits::SendMessage) -> anyhow::Result<()> {
         self.send_typed(&traits::ChannelOutboundMessage::from_legacy_message(
-            self.name(), message,
+            self.name(),
+            message,
         ))
         .await
     }
 
-    async fn send_typed(
-        &self,
-        message: &traits::ChannelOutboundMessage,
-    ) -> anyhow::Result<()> {
+    async fn send_typed(&self, message: &traits::ChannelOutboundMessage) -> anyhow::Result<()> {
         self.sent.lock().await.push(message.clone());
         Ok(())
     }
 
-    #[allow(deprecated, reason = "Channel still requires its v21 listener for one release")]
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 listener for one release"
+    )]
     async fn listen(
         &self,
         _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
@@ -140,7 +144,7 @@ async fn inbound_thread_ts_is_forwarded_to_channel_send() {
             "tg_100_99",
             1,
             Some("99"),
-            None
+            None,
         ),
     )
     .await;
@@ -178,7 +182,7 @@ async fn no_thread_ts_on_inbound_message_results_in_none_on_send() {
             "tg_100_55",
             1,
             None,
-            None
+            None,
         ),
     )
     .await;
@@ -216,7 +220,7 @@ async fn reaction_marker_in_llm_response_is_passed_to_channel_send() {
             "tg_100_42",
             1,
             Some("42"),
-            None
+            None,
         ),
     )
     .await;
@@ -228,7 +232,8 @@ async fn reaction_marker_in_llm_response_is_passed_to_channel_send() {
         "expected exactly one send for a reaction marker"
     );
     assert_eq!(
-        sent[0].legacy_text().unwrap(), "[REACTION:👍]",
+        sent[0].legacy_text().unwrap(),
+        "[REACTION:👍]",
         "reaction marker must be delivered verbatim to channel.send"
     );
     assert_eq!(
@@ -268,7 +273,7 @@ async fn typing_indicator_starts_and_stops_once_per_message() {
             "typing-test",
             1,
             None,
-            None
+            None,
         ),
     )
     .await;
@@ -291,15 +296,8 @@ async fn typing_indicator_starts_and_stops_once_per_message() {
 #[test]
 fn telegram_channel_history_key_ignores_thread_ts() {
     let base_msg = channel_envelope(
-            "telegram",
-            "alice",
-            "100",
-            "hello",
-            "tg_100_1",
-            1,
-            None,
-            None
-        );
+        "telegram", "alice", "100", "hello", "tg_100_1", 1, None, None,
+    );
 
     let mut msg_with_thread = base_msg.clone();
     msg_with_thread.message_id = "tg_100_2".to_string();
@@ -342,23 +340,27 @@ impl Channel for TelegramReactingChannel {
         "telegram"
     }
 
-    #[allow(deprecated, reason = "Channel still requires its v21 adapter for one release")]
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 adapter for one release"
+    )]
     async fn send(&self, message: &traits::SendMessage) -> anyhow::Result<()> {
         self.send_typed(&traits::ChannelOutboundMessage::from_legacy_message(
-            self.name(), message,
+            self.name(),
+            message,
         ))
         .await
     }
 
-    async fn send_typed(
-        &self,
-        message: &traits::ChannelOutboundMessage,
-    ) -> anyhow::Result<()> {
+    async fn send_typed(&self, message: &traits::ChannelOutboundMessage) -> anyhow::Result<()> {
         self.sent.lock().await.push(message.clone());
         Ok(())
     }
 
-    #[allow(deprecated, reason = "Channel still requires its v21 listener for one release")]
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 listener for one release"
+    )]
     async fn listen(
         &self,
         _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
@@ -400,7 +402,7 @@ async fn telegram_threaded_inbound_emits_ack_reaction_then_reply() {
             "tg_200_77",
             1,
             Some("77"),
-            None
+            None,
         ),
     )
     .await;
@@ -417,7 +419,10 @@ async fn telegram_threaded_inbound_emits_ack_reaction_then_reply() {
     // inbound message_id so Telegram attaches the reaction correctly.
     let reaction_sends: Vec<_> = sent
         .iter()
-        .filter(|m| m.legacy_text().is_ok_and(|text| text.starts_with("[REACTION:")))
+        .filter(|m| {
+            m.legacy_text()
+                .is_ok_and(|text| text.starts_with("[REACTION:"))
+        })
         .collect();
     assert_eq!(
         reaction_sends.len(),
@@ -437,7 +442,10 @@ async fn telegram_threaded_inbound_emits_ack_reaction_then_reply() {
     // thread_ts so Telegram threads the reply to the original message.
     let reply_sends: Vec<_> = sent
         .iter()
-        .filter(|m| !m.legacy_text().is_ok_and(|text| text.starts_with("[REACTION:")))
+        .filter(|m| {
+            !m.legacy_text()
+                .is_ok_and(|text| text.starts_with("[REACTION:"))
+        })
         .collect();
     assert_eq!(
         reply_sends.len(),
@@ -461,15 +469,15 @@ async fn telegram_threaded_inbound_emits_ack_reaction_then_reply() {
 #[test]
 fn non_telegram_channel_history_key_includes_thread_ts() {
     let base_msg = channel_envelope(
-            "slack",
-            "alice",
-            "C01",
-            "hello",
-            "slack_C01_1",
-            1,
-            None,
-            None
-        );
+        "slack",
+        "alice",
+        "C01",
+        "hello",
+        "slack_C01_1",
+        1,
+        None,
+        None,
+    );
 
     let mut msg_in_thread = base_msg.clone();
     msg_in_thread.message_id = "slack_C01_2".to_string();

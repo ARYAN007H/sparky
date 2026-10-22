@@ -54,23 +54,27 @@ impl Channel for DiscordRecordingChannel {
         "discord"
     }
 
-    #[allow(deprecated, reason = "Channel still requires its v21 adapter for one release")]
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 adapter for one release"
+    )]
     async fn send(&self, message: &traits::SendMessage) -> anyhow::Result<()> {
         self.send_typed(&traits::ChannelOutboundMessage::from_legacy_message(
-            self.name(), message,
+            self.name(),
+            message,
         ))
         .await
     }
 
-    async fn send_typed(
-        &self,
-        message: &traits::ChannelOutboundMessage,
-    ) -> anyhow::Result<()> {
+    async fn send_typed(&self, message: &traits::ChannelOutboundMessage) -> anyhow::Result<()> {
         self.sent.lock().await.push(message.clone());
         Ok(())
     }
 
-    #[allow(deprecated, reason = "Channel still requires its v21 listener for one release")]
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 listener for one release"
+    )]
     async fn listen(
         &self,
         _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
@@ -169,7 +173,7 @@ async fn discord_inbound_dispatches_through_full_pipeline() {
             "discord_msg_1",
             1,
             None,
-            None
+            None,
         ),
     )
     .await;
@@ -220,7 +224,7 @@ async fn discord_threaded_message_does_not_emit_reaction_ack() {
             "discord_msg_2",
             1,
             Some("thread-42"),
-            None
+            None,
         ),
     )
     .await;
@@ -233,10 +237,7 @@ async fn discord_threaded_message_does_not_emit_reaction_ack() {
         "Discord must not receive an ack reaction alongside the reply"
     );
     assert!(
-        !sent[0]
-            .legacy_text()
-            .unwrap()
-            .starts_with("[REACTION:"),
+        !sent[0].legacy_text().unwrap().starts_with("[REACTION:"),
         "discord send must not contain a reaction marker, got {:?}",
         sent[0].legacy_text().unwrap()
     );
@@ -265,15 +266,15 @@ async fn discord_thread_ts_splits_conversation_history_end_to_end() {
     let ctx = make_discord_ctx(channel, provider);
 
     let first = channel_envelope(
-            "discord",
-            "user-123",
-            "channel-456",
-            "first thread message",
-            "discord_msg_a",
-            1,
-            Some("thread-A"),
-            None
-        );
+        "discord",
+        "user-123",
+        "channel-456",
+        "first thread message",
+        "discord_msg_a",
+        1,
+        Some("thread-A"),
+        None,
+    );
 
     let mut second = first.clone();
     second.message_id = "discord_msg_b".to_string();

@@ -140,7 +140,10 @@ impl Channel for TelegramRecordingChannel {
         "telegram"
     }
 
-    #[allow(deprecated, reason = "Channel still requires its v21 adapter for one release")]
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 adapter for one release"
+    )]
     async fn send(&self, message: &traits::SendMessage) -> anyhow::Result<()> {
         self.sent_messages
             .lock()
@@ -149,10 +152,7 @@ impl Channel for TelegramRecordingChannel {
         Ok(())
     }
 
-    async fn send_typed(
-        &self,
-        message: &traits::ChannelOutboundMessage,
-    ) -> anyhow::Result<()> {
+    async fn send_typed(&self, message: &traits::ChannelOutboundMessage) -> anyhow::Result<()> {
         self.sent_messages.lock().await.push(format!(
             "{}:{}",
             message.conversation_id,
@@ -161,7 +161,10 @@ impl Channel for TelegramRecordingChannel {
         Ok(())
     }
 
-    #[allow(deprecated, reason = "Channel still requires its v21 listener for one release")]
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 listener for one release"
+    )]
     async fn listen(
         &self,
         _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
@@ -184,7 +187,10 @@ impl Channel for RecordingChannel {
         "test-channel"
     }
 
-    #[allow(deprecated, reason = "Channel still requires its v21 adapter for one release")]
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 adapter for one release"
+    )]
     async fn send(&self, message: &traits::SendMessage) -> anyhow::Result<()> {
         self.sent_messages
             .lock()
@@ -193,10 +199,7 @@ impl Channel for RecordingChannel {
         Ok(())
     }
 
-    async fn send_typed(
-        &self,
-        message: &traits::ChannelOutboundMessage,
-    ) -> anyhow::Result<()> {
+    async fn send_typed(&self, message: &traits::ChannelOutboundMessage) -> anyhow::Result<()> {
         self.sent_messages.lock().await.push(format!(
             "{}:{}",
             message.conversation_id,
@@ -205,7 +208,10 @@ impl Channel for RecordingChannel {
         Ok(())
     }
 
-    #[allow(deprecated, reason = "Channel still requires its v21 listener for one release")]
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 listener for one release"
+    )]
     async fn listen(
         &self,
         _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
@@ -415,12 +421,18 @@ impl Channel for AlwaysFailChannel {
         self.name
     }
 
-    #[allow(deprecated, reason = "Channel still requires its v21 adapter for one release")]
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 adapter for one release"
+    )]
     async fn send(&self, _message: &traits::SendMessage) -> anyhow::Result<()> {
         Ok(())
     }
 
-    #[allow(deprecated, reason = "Channel still requires its v21 listener for one release")]
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 listener for one release"
+    )]
     async fn listen(
         &self,
         _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,

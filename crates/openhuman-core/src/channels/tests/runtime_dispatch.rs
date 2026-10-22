@@ -150,7 +150,8 @@ async fn message_dispatch_processes_messages_in_parallel() {
 
     let (parallel_channel, parallel_ctx) = build_runtime();
     let (tx, rx) = tokio::sync::mpsc::channel::<RuntimeChannelMessage>(4);
-    tx.send(RuntimeChannelMessage::with_inbound_envelope(channel_envelope(
+    tx.send(RuntimeChannelMessage::with_inbound_envelope(
+        channel_envelope(
             "test-channel",
             "alice",
             "alice",
@@ -158,20 +159,14 @@ async fn message_dispatch_processes_messages_in_parallel() {
             "1",
             1,
             None,
-            None
-        )))
+            None,
+        ),
+    ))
     .await
     .unwrap();
-    tx.send(RuntimeChannelMessage::with_inbound_envelope(channel_envelope(
-            "test-channel",
-            "bob",
-            "bob",
-            "world",
-            "2",
-            2,
-            None,
-            None
-        )))
+    tx.send(RuntimeChannelMessage::with_inbound_envelope(
+        channel_envelope("test-channel", "bob", "bob", "world", "2", 2, None, None),
+    ))
     .await
     .unwrap();
     drop(tx);
@@ -237,7 +232,7 @@ async fn process_channel_message_cancels_scoped_typing_task() {
             "typing-msg",
             1,
             None,
-            None
+            None,
         ),
     )
     .await;
@@ -327,7 +322,7 @@ async fn dispatch_routes_through_agent_run_turn_bus_handler() {
             "bus-stub-msg",
             1,
             None,
-            None
+            None,
         ),
     )
     .await;
@@ -462,7 +457,7 @@ async fn run_resolved_route_message(message_id: &str, noise_after: usize) {
             message_id.to_string(),
             1,
             None,
-            None
+            None,
         ),
     )
     .await;
@@ -584,7 +579,7 @@ async fn process_channel_message_hardens_multimodal_files_against_smuggled_marke
             "smuggle-attempt",
             1,
             None,
-            None
+            None,
         ),
     )
     .await;
@@ -667,7 +662,7 @@ async fn process_channel_message_hardens_against_relative_path_markers() {
             "smuggle-attempt-relative",
             1,
             None,
-            None
+            None,
         ),
     )
     .await;

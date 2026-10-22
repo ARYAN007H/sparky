@@ -10,11 +10,11 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, Weak};
 use tinybus::module::{ModuleCallError, ModuleClient, ModuleObjectClient};
-use tinychannels_bus::Channel;
 use tinychannels_bus::module_runtime::{
     ChannelIngressKind, ChannelMessagePreparation, ConfiguredChannelInfo,
 };
 use tinychannels_bus::module_supervision::ChannelSupervisionPolicy;
+use tinychannels_bus::Channel;
 use tinychannels_bus::{ChannelInteraction, ChannelInteractionResult};
 use tokio::sync::mpsc;
 
