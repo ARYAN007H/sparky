@@ -622,7 +622,7 @@ The harness shell lives under `crates/openhuman-core/src/agent/`, with the tinya
 | `session_host/runtime_session.rs`        | `Agent::turn`: the lifecycle described above; routes into the tinyagents runner via `tinyagents/turn_exec.rs`. |
 | `tinyagents/mod.rs`                      | `TurnSpec::run`: the shared tinyagents harness assembly (the live loop).                    |
 | `tinyagents/middleware.rs`               | The named OpenHuman middleware stack (approval/security, tool policy, recovery, budgets, circuit breaker).    |
-| `harness/graph.rs`                       | The channel/CLI bus turn route into the tinyagents runner.                                                    |
+| `../channels/runtime/turn_driver.rs`      | The channel/CLI bus turn driver, placed with channel runtime and routed into the tinyagents runner.           |
 | `subagent_host/`                         | Direct OpenHuman planner/executor/persistence adapters for `tinyagents-orchestration::subagent`; product prompt/tool/model/security/artifact/progress behavior remains here. |
 | `orchestration/subagent_sessions/`       | Durable reusable sub-agent identity, compatibility matching, persisted status/history.                        |
 | `../agent_registry/host_definition.rs`  | Host extension and registry over `tinyagents_definition::AgentDefinition`.                                   |

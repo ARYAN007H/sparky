@@ -33,8 +33,7 @@ pub(crate) mod prompt;
 pub mod providers;
 #[cfg(feature = "channels")]
 mod routes;
-#[cfg(feature = "channels")]
-mod runtime;
+pub(crate) mod runtime;
 #[cfg(feature = "channels")]
 pub(crate) mod system_prompt;
 
@@ -103,8 +102,6 @@ pub use yuanbao::YuanbaoChannel;
 #[cfg(all(feature = "channels", any(test, debug_assertions)))]
 pub use runtime::test_support;
 
-#[cfg(feature = "channels")]
-pub use commands::doctor_channels;
 #[cfg(feature = "channels")]
 // Channel system-prompt assembly lives in
 // `crate::channels::prompt` alongside the rest of

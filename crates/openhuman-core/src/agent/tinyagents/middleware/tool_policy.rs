@@ -12,6 +12,7 @@ use tinyagents_harness::middleware::{
     DenialRenderer, MiddlewareToolOutcome, PolicyDecision, ToolCallPolicy, ToolHandler,
     ToolMiddleware, ToolPolicyGateMiddleware,
 };
+use tinyagents_harness_tools::skills::PackRegistryHandle;
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::ToolResult as TaToolResult;
 
@@ -271,8 +272,13 @@ impl ToolPolicyHostState {
             .arguments
             .get("skill")
             .and_then(serde_json::Value::as_str)?;
-        let tool = self.resolve_tool(&call.name)?;
-        let handle = crate::tools::host_extensions::pack_registry_handle(tool.as_ref())?;
+        self.resolve_tool(&call.name)?;
+        let durable = self.tool_sets.first()?;
+        let handle = PackRegistryHandle::default();
+        handle.bind(Arc::downgrade(durable));
+        if let Some(synthesized) = self.tool_sets.get(1) {
+            handle.bind_synthesized(Arc::downgrade(synthesized));
+        }
         let is_callable = |name: &str| !self.session.decision_for(name).blocks_execution();
         let route = crate::tools::toolpacks::pack(skill)
             .map(|pack| self.route_for_pack(pack))
