@@ -174,6 +174,19 @@ pub(crate) fn clear_driver_cancel_reason(ctx: &crate::core::runtime::DispatchCtx
         .remove(&driver_task_key(ctx, task_id));
 }
 
+#[cfg(test)]
+pub(crate) fn clear_driver_task_owner_for_test(
+    ctx: &crate::core::runtime::DispatchCtx,
+    task_id: &str,
+) {
+    let key = driver_task_key(ctx, task_id);
+    let mut st = owners();
+    st.driver_tasks.remove(&key);
+    st.terminal_driver_tasks.remove(&key);
+    st.terminal_driver_task_order
+        .retain(|existing| existing != &key);
+}
+
 /// Return registered task scopes for one exact workspace/thread pair.
 pub(crate) fn driver_tasks_for_thread(
     ctx: &crate::core::runtime::DispatchCtx,
