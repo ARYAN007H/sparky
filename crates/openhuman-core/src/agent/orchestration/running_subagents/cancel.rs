@@ -296,13 +296,13 @@ pub(crate) async fn cancel_by_session_in_workspace(
 pub(crate) async fn cancel_for_thread(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
-) -> usize {
+) -> Result<usize, String> {
     let Some(core_context) = ctx.resolved() else {
-        return 0;
+        return Err("cannot resolve core context to cancel thread-owned driver jobs".into());
     };
-    let Ok(workspace_dir) = core_context.workspace_dir() else {
-        return 0;
-    };
+    let workspace_dir = core_context
+        .workspace_dir()
+        .map_err(|error| format!("cannot resolve workspace for thread-owned driver jobs: {error}"))?;
     let scopes = crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
         ctx,
         &workspace_dir,
@@ -312,6 +312,7 @@ pub(crate) async fn cancel_for_thread(
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(ctx);
     let mut cancelled = 0;
+    let mut failures = Vec::new();
     for (task_id, owner) in scopes {
         let Some(parent_thread_id) = owner.parent_thread_id.as_deref() else {
             continue;
@@ -333,7 +334,7 @@ pub(crate) async fn cancel_for_thread(
                 })
                 .collect::<Vec<_>>(),
             Err(error) => {
-                log::warn!("[running_subagents] failed to list thread-owned driver jobs: {error}");
+                failures.push(format!("failed to list thread-owned driver jobs: {error}"));
                 continue;
             }
         };
@@ -343,19 +344,25 @@ pub(crate) async fn cancel_for_thread(
                     cancelled += usize::from(!cancelled_job.status.is_terminal());
                 }
                 Err(error) => {
-                    log::warn!(
-                        "[running_subagents] driver thread deletion cancellation failed: {error}"
-                    );
+                    failures.push(format!("driver thread deletion cancellation failed: {error}"));
                 }
             }
             if let Err(error) = jobs.wait_owned(job.id.as_str(), &owner_key).await {
-                log::warn!(
-                    "[running_subagents] failed waiting for deleted-thread child to settle: {error}"
-                );
+                failures.push(format!(
+                    "failed waiting for deleted-thread child {} to settle: {error}",
+                    job.id
+                ));
             }
         }
     }
-    cancelled
+    if failures.is_empty() {
+        Ok(cancelled)
+    } else {
+        Err(format!(
+            "could not safely settle all thread-owned driver jobs: {}",
+            failures.join("; ")
+        ))
+    }
 }
 
 /// Abort every running detached sub-agent spawned from chat thread
