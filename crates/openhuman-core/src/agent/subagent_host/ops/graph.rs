@@ -52,9 +52,9 @@ pub(super) use dispatch::AggregatedUsage;
 // of the original flat imports now live with the code that uses them, in
 // `dispatch.rs` / `transcript.rs` / `worker_mirror`).
 #[cfg(test)]
-use crate::progress::AgentProgress;
-#[cfg(test)]
 use super::{mirror_worker_thread, mirror_worker_thread_from_history};
+#[cfg(test)]
+use crate::progress::AgentProgress;
 #[cfg(test)]
 use std::collections::HashSet;
 #[cfg(test)]
