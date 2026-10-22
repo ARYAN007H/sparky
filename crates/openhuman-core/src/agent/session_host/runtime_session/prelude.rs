@@ -361,6 +361,13 @@ impl OpenHumanTurnPrelude {
         &self,
         receipt: &CommitReceipt<OpenHumanRunContext>,
     ) {
-        self.memory_post_turn(receipt);
+        // A plan that finished this turn hands its notes over: they stay for
+        // the thread's next turns and go to long-term memory with the reply.
+        let finished_plan = crate::agent::tinyagents::state_block::close_finished_plan(
+            &self.workspace_dir,
+            self.thread_id.as_deref(),
+        )
+        .await;
+        self.memory_post_turn(receipt, finished_plan);
     }
 }

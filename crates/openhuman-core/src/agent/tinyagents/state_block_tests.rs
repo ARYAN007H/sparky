@@ -35,3 +35,45 @@ fn install_needs_the_scope_and_a_store() {
     );
     assert_eq!(installed(Some(store), false, Some("planner")), 0);
 }
+
+#[tokio::test]
+async fn a_finished_plan_hands_its_notes_over_at_the_end_of_the_turn() {
+    use tinyagents_harness_tools::scratchpad::ScratchpadUpdate;
+    use tinyagents_harness_tools::todos::{store as todo_store, TodoItem};
+
+    let workspace = tempfile::tempdir().unwrap();
+    let store = crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv;
+    todo_store::replace(&store, "t", vec![TodoItem::new("Write the migration")])
+        .await
+        .unwrap();
+    scratchpad_store::apply(
+        &store,
+        "t",
+        &ScratchpadUpdate {
+            facts: vec!["the table is auth_users".to_string()],
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    assert!(close_finished_plan(workspace.path(), None).await.is_none());
+    assert!(
+        close_finished_plan(workspace.path(), Some("t"))
+            .await
+            .is_none(),
+        "the plan is still open"
+    );
+    todo_store::complete(&store, "t", 1).await.unwrap();
+    let finished = close_finished_plan(workspace.path(), Some("t"))
+        .await
+        .expect("the plan finished with notes");
+    assert_eq!(finished.plan.notes.facts, ["the table is auth_users"]);
+    assert_eq!(finished.goal, None, "the thread has no goal");
+    assert!(
+        close_finished_plan(workspace.path(), Some("t"))
+            .await
+            .is_none(),
+        "handed over once"
+    );
+}
