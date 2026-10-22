@@ -113,7 +113,7 @@ fn upstream_rebind_keeps_tenant_routing_and_moves_only_future_leases() {
         tinyagents_harness::store::SchemaAdmission::Declare,
         Arc::clone(&registry),
     );
-    registry.register_backend(&router.backend);
+    registry.register_backend(&router.backend, &router.tenants);
     let alice_key = crate::core::runtime::session_key(&crate::core::runtime::Tenant {
         profile: Some("alice".into()),
         agent: Some("asha".into()),
@@ -180,7 +180,7 @@ fn failed_rebind_rolls_back_tenant_providers_already_moved() {
         tinyagents_harness::store::SchemaAdmission::Declare,
         Arc::clone(&registry),
     );
-    registry.register_backend(&router.backend);
+    registry.register_backend(&router.backend, &router.tenants);
     let alice_key = crate::core::runtime::session_key(&crate::core::runtime::Tenant {
         profile: Some("alice".into()),
         agent: Some("asha".into()),

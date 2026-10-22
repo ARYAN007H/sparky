@@ -73,7 +73,8 @@ impl TenantStoreRegistry {
         // keeps rollback behavior predictable across runs.
         providers.sort_by(|left, right| left.0.cmp(&right.0));
 
-        let mut moved = Vec::with_capacity(providers.len());
+        let mut moved: Vec<(Arc<RebindableSessionStores>, Arc<dyn StorageBackend>)> =
+            Vec::with_capacity(providers.len());
         for (_, provider, old_backend) in &providers {
             if let Err(error) = provider.rebind(Arc::clone(backend)) {
                 let mut rollback_failures = Vec::new();
