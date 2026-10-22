@@ -227,15 +227,14 @@ async fn require_owned_thread(ctx: &DispatchCtx, thread_id: &str) -> Result<(), 
         return Err("thread_id is required".to_string());
     }
     let config = ctx.load_config().await?;
-    let threads = crate::threads::store::blocking::list_threads(
-        ctx.clone(),
-        config.workspace_dir,
-    )
-    .await?;
+    let threads =
+        crate::threads::store::blocking::list_threads(ctx.clone(), config.workspace_dir).await?;
     if threads.iter().any(|thread| thread.id == thread_id) {
         Ok(())
     } else {
-        Err(format!("thread '{thread_id}' not found or not owned by caller"))
+        Err(format!(
+            "thread '{thread_id}' not found or not owned by caller"
+        ))
     }
 }
 

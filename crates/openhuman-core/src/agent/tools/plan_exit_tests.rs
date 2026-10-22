@@ -147,7 +147,9 @@ async fn plan_exit_publishes_build_run_mode_change() {
     let event = tokio::time::timeout(std::time::Duration::from_secs(1), async {
         loop {
             match events.recv().await {
-                Some((event_thread_id, mode)) if event_thread_id == thread_id && mode == "build" => {
+                Some((event_thread_id, mode))
+                    if event_thread_id == thread_id && mode == "build" =>
+                {
                     break (event_thread_id, mode);
                 }
                 Some(_) => continue,

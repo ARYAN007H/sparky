@@ -89,7 +89,7 @@ async fn plan_mode_stays_with_the_agent_that_set_it() {
 #[tokio::test]
 async fn run_mode_rpcs_reject_threads_owned_by_another_profile() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
-    use crate::threads::store::{CreateConversationThread, blocking::ensure_thread};
+    use crate::threads::store::{blocking::ensure_thread, CreateConversationThread};
     use crate::tools::toolpacks::ToolGroups;
 
     let scratch = tempfile::tempdir().expect("workspace");
@@ -101,10 +101,12 @@ async fn run_mode_rpcs_reject_threads_owned_by_another_profile() {
         ..Default::default()
     };
     let context = |profile: &str| {
-        DispatchCtx::new(CoreContext::for_test(DomainSet::full(), Some(dir.clone())).derive_with(
-            ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::none())
-                .profile(profile),
-        ))
+        DispatchCtx::new(
+            CoreContext::for_test(DomainSet::full(), Some(dir.clone())).derive_with(
+                ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::none())
+                    .profile(profile),
+            ),
+        )
     };
     let owner = context("run-mode-owner");
     let other = context("run-mode-other");
@@ -131,9 +133,7 @@ async fn run_mode_rpcs_reject_threads_owned_by_another_profile() {
         .unwrap()
         .clone();
     assert!(
-        handle_get_run_mode(other.clone(), id_params)
-            .await
-            .is_err(),
+        handle_get_run_mode(other.clone(), id_params).await.is_err(),
         "get_run_mode must not disclose another profile's thread state"
     );
     let set_params = serde_json::json!({ "thread_id": thread_id, "mode": "build" })
