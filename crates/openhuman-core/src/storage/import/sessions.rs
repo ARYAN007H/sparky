@@ -321,8 +321,9 @@ fn decode_transcript(
 }
 
 fn decode_display_message(value: &serde_json::Value) -> Result<DisplayMessage> {
-    let mut message: TranscriptMessage =
-        serde_json::from_value(value.clone()).context("decode transcript message")?;
+    let mut message: TranscriptMessage = serde_json::from_value(value.clone())
+        .context("decode transcript message")?
+        .normalized();
     if message.role.is_empty() {
         anyhow::bail!("transcript message has no role");
     }
