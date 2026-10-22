@@ -3,8 +3,8 @@
 use super::subagent_abort_report::AbortReport;
 use crate::agent::orchestration::running_subagents;
 use crate::agent::orchestration::subagent_sessions::{
-    self, DurableSubagentStatus, SubagentSessionSelector, SubagentSessionStore,
-    SubagentSessionUpsert,
+    self, DurableSubagentSession, DurableSubagentStatus, SubagentSessionSelector,
+    SubagentSessionStore, SubagentSessionUpsert,
 };
 use crate::agent::orchestration::tools::dispatch::incomplete_stop;
 use crate::agent::subagent_host::SubagentRunOptions;
