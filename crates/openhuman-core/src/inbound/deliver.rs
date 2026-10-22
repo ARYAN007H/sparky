@@ -299,22 +299,25 @@ impl Deliverer {
         Some((first.source.clone(), source))
     }
 
-    /// `turn`'s events of pinned sources, as turns of at most the source's
-    /// `max_batch` events with ids derived from the turn's, and the turn of
-    /// the other events (`None` when there are none). A redelivery derives
-    /// the same turns: each source's events are ordered by id.
+    /// `turn`'s events of pinned sources, one group per source and
+    /// conversation key, as turns of at most the source's `max_batch` events,
+    /// and the turn of the other events (`None` when there are none). Each
+    /// group is oldest first (event id breaks ties), and a part's id names
+    /// its first and last event, so a redelivery derives the same ids and a
+    /// changed `max_batch` derives new ones instead of reusing a finished id
+    /// for a different set of events.
     async fn split_pinned(
         &self,
         turn: &Turn,
     ) -> (Vec<(Turn, String, InboundSourceConfig)>, Option<Turn>) {
         let inbound = self.inbound().await;
-        let mut pinned: BTreeMap<String, (InboundSourceConfig, Vec<InboundEvent>)> =
+        let mut pinned: BTreeMap<(String, String), (InboundSourceConfig, Vec<InboundEvent>)> =
             BTreeMap::new();
         let mut rest = Vec::new();
         for event in &turn.events {
             match inbound.source(&event.source) {
                 Ok(source) => pinned
-                    .entry(event.source.clone())
+                    .entry((event.source.clone(), event.conversation_key.clone()))
                     .or_insert_with(|| (source.clone(), Vec::new()))
                     .1
                     .push(event.clone()),
@@ -322,12 +325,15 @@ impl Deliverer {
             }
         }
         let mut parts = Vec::new();
-        for (name, (source, mut events)) in pinned {
-            events.sort_by(|a, b| a.event_id.cmp(&b.event_id));
+        for ((name, key), (source, mut events)) in pinned {
+            events.sort_by(|a, b| {
+                (a.received_at_ms, &a.event_id).cmp(&(b.received_at_ms, &b.event_id))
+            });
             let max = usize::try_from(source.max_batch.max(1)).unwrap_or(usize::MAX);
-            for (n, chunk) in events.chunks(max).enumerate() {
+            for chunk in events.chunks(max) {
+                let (first, last) = (&chunk[0].event_id, &chunk[chunk.len() - 1].event_id);
                 let mut part = turn.clone();
-                part.turn_id = format!("{}:{name}:{n}", turn.turn_id);
+                part.turn_id = format!("{}:{name}:{key}:{first}..{last}", turn.turn_id);
                 part.events = chunk.to_vec();
                 parts.push((part, name.clone(), source.clone()));
             }
@@ -473,6 +479,15 @@ impl Deliverer {
                 return DeliverResponse::new(status);
             }
         }
+        if !parts.is_empty() && rest.is_some() && started.elapsed() >= self.budget {
+            // The pinned parts used the whole budget: triage the rest on the
+            // redelivery, where the finished parts are skipped.
+            return DeliverResponse::new(self.retry(
+                &turn,
+                None,
+                "delivery budget spent on pinned parts",
+            ));
+        }
         let turn = match rest {
             Some(rest) => rest,
             None if parts.is_empty() => turn,
@@ -496,7 +511,11 @@ impl Deliverer {
         let outcome = match cached {
             Some(run) => Ok(Ok(TriageOutcome::Decision(run))),
             None => {
-                let timeout = self.timeout().await;
+                // Within what is left of the delivery's budget.
+                let timeout = self
+                    .timeout()
+                    .await
+                    .min(self.budget.saturating_sub(started.elapsed()));
                 tokio::time::timeout(timeout, self.runner.run(&self.ctx, &envelope)).await
             }
         };
