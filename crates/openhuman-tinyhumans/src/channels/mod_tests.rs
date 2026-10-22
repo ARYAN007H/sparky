@@ -2,7 +2,7 @@ use super::*;
 use crate::hosted::test_support;
 use serde_json::json;
 use tinychannels_bus::module_progressive::{
-    ProgressiveTransportRequest, ProgressiveTransportResult,
+    ChannelOutputEvent, ProgressiveTransportRequest, ProgressiveTransportResult,
 };
 use tokio_util::sync::CancellationToken;
 use wiremock::matchers::{method, path};
@@ -98,6 +98,83 @@ async fn typing_posts_to_the_channel_route_with_the_session_credential() {
         }
         _ => panic!("expected a transport success"),
     }
+}
+
+#[tokio::test]
+async fn typed_send_preserves_v22_content_and_turn_metadata() {
+    let tmp = tempfile::tempdir().unwrap();
+    let server = MockServer::start().await;
+    let body = json!({
+        "text": "hello",
+        "parts": [],
+        "turn_id": "turn-1",
+        "channel_ref": null,
+        "conversation": null,
+        "sequence": 7,
+        "segment_index": 0,
+        "idempotency_key": "turn-1:0"
+    });
+    Mock::given(method("POST"))
+        .and(path("/channels/telegram/messages"))
+        .and(wiremock::matchers::body_json(body.clone()))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"success": true, "data": {"id": "msg-1"}})),
+        )
+        .mount(&server)
+        .await;
+    let config = test_support::signed_in(&tmp, &server.uri());
+    let request = ProgressiveTransportRequest::SendTyped {
+        channel: "telegram".into(),
+        turn_id: Some("turn-1".into()),
+        channel_ref: None,
+        conversation: None,
+        sequence: Some(7),
+        segment_index: Some(0),
+        idempotency_key: Some("turn-1:0".into()),
+        parts: vec![],
+        text: "hello".into(),
+    };
+
+    let answer = serve(
+        ctx(config, Some("telegram")),
+        ChannelBackendRequest::ProgressiveTransport(Box::new(request)),
+    )
+    .await
+    .unwrap();
+    assert!(matches!(
+        answer,
+        ChannelBackendResult::ProgressiveTransport(ProgressiveTransportResult::Success(value))
+            if value == json!({"id": "msg-1"})
+    ));
+}
+
+#[tokio::test]
+async fn hosted_callback_declines_module_output_events_without_losing_them_as_sends() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = test_support::signed_in(&tmp, "http://127.0.0.1:9");
+    let request = ProgressiveTransportRequest::OutputEvent {
+        channel: "telegram".into(),
+        turn_id: Some("turn-1".into()),
+        channel_ref: None,
+        conversation: None,
+        sequence: 1,
+        event: Box::new(ChannelOutputEvent::TextDelta {
+            text: "hello".into(),
+            iteration: Some(0),
+        }),
+    };
+
+    let answer = serve(
+        ctx(config, Some("telegram")),
+        ChannelBackendRequest::ProgressiveTransport(Box::new(request)),
+    )
+    .await
+    .unwrap();
+    assert!(matches!(
+        answer,
+        ChannelBackendResult::ProgressiveTransport(ProgressiveTransportResult::Unavailable)
+    ));
 }
 
 #[tokio::test]
