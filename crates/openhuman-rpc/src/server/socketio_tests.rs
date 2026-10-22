@@ -1,7 +1,18 @@
 use super::{
     channel_connection_update_payload, event_alias, origin_is_allowed_with_extra,
-    publish_companion_state_changed, subscribe_companion_state_changed,
+    publish_companion_state_changed, subscribe_companion_state_changed, ThreadSubscribePayload,
 };
+
+#[test]
+fn thread_subscribe_carries_the_sockets_profile_for_review_replay() {
+    let payload: ThreadSubscribePayload = serde_json::from_value(serde_json::json!({
+        "thread_id": "thread-1",
+        "profile_id": "socket-profile",
+    }))
+    .expect("thread subscribe payload");
+    assert_eq!(payload.thread_id, "thread-1");
+    assert_eq!(payload.profile_id.as_deref(), Some("socket-profile"));
+}
 
 #[test]
 fn companion_state_transport_delivers_payload_to_bridge() {

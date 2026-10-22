@@ -1,5 +1,48 @@
 use super::*;
 
+struct DecisionCollector {
+    thread_id: &'static str,
+    sender: tokio::sync::mpsc::UnboundedSender<(String, Option<String>)>,
+}
+
+#[async_trait::async_trait]
+impl tinybus::EventHandler<crate::core::events::DomainEvent> for DecisionCollector {
+    fn name(&self) -> &str {
+        "plan-review-gate-test"
+    }
+
+    async fn handle(&self, event: &crate::core::events::DomainEvent) {
+        if let crate::core::events::DomainEvent::PlanReviewDecided {
+            decision,
+            resolution,
+            thread_id: Some(thread_id),
+            ..
+        } = event
+        {
+            if thread_id == self.thread_id {
+                let _ = self.sender.send((decision.clone(), resolution.clone()));
+            }
+        }
+    }
+}
+
+async fn decision_events(
+    thread_id: &'static str,
+) -> (
+    impl Drop,
+    tokio::sync::mpsc::UnboundedReceiver<(String, Option<String>)>,
+) {
+    crate::core::bus::init().await.expect("bus init");
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    let handle = crate::core::bus::BUS
+        .subscribe(std::sync::Arc::new(DecisionCollector {
+            thread_id,
+            sender: tx,
+        }))
+        .expect("subscribe to core events");
+    (handle, rx)
+}
+
 fn tenant() -> crate::core::runtime::Tenant {
     crate::core::runtime::Tenant::default()
 }
@@ -59,6 +102,7 @@ async fn revise_carries_feedback_back() {
 
 #[tokio::test]
 async fn timeout_fails_closed_to_reject() {
+    let (_subscription, mut decisions) = decision_events("t3").await;
     let gate = PlanReviewGate::new(Duration::from_millis(40));
     let resolution = gate
         .request_review(
@@ -71,8 +115,41 @@ async fn timeout_fails_closed_to_reject() {
         )
         .await;
     assert_eq!(resolution, PlanReviewResolution::Reject);
+    assert_eq!(
+        decisions.recv().await,
+        Some(("reject".into(), Some("expired".into())))
+    );
     // The waiter is cleaned up after timeout.
     assert!(!gate.decide_by_thread(&tenant(), "t3", PlanReviewResolution::Approve));
+}
+
+#[tokio::test]
+async fn cancelled_park_publishes_cancelled_decision() {
+    let (_subscription, mut decisions) = decision_events("t-cancel-event").await;
+    let gate = std::sync::Arc::new(PlanReviewGate::new(Duration::from_secs(30)));
+    let g2 = gate.clone();
+    let handle = tokio::spawn(async move {
+        g2.request_review(
+            tenant(),
+            Some("t-cancel-event".into()),
+            Some("client-cancel".into()),
+            "Plan".into(),
+            vec![],
+            None,
+        )
+        .await
+    });
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    handle.abort();
+    let _ = handle.await;
+
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(1), decisions.recv())
+            .await
+            .unwrap(),
+        Some(("reject".into(), Some("cancelled".into()))),
+        "cancelling a parked review must tell the frontend to clear its card"
+    );
 }
 
 #[tokio::test]
@@ -189,4 +266,31 @@ async fn parked_reviews_are_isolated_by_tenant() {
         PlanReviewResolution::Approve
     ));
     assert_eq!(parked.await, PlanReviewResolution::Approve);
+}
+
+#[test]
+fn socket_replay_tenant_uses_the_sockets_profile_in_saas() {
+    let ambient = Tenant {
+        profile: Some("ambient-profile".into()),
+        agent: None,
+    };
+    let replay_tenant = socket_tenant(Some("socket-profile"), Ok(ambient), true)
+        .expect("socket profile must identify its review scope");
+    assert_eq!(replay_tenant.profile.as_deref(), Some("socket-profile"));
+}
+
+#[test]
+fn socket_replay_tenant_fails_closed_without_a_saas_profile() {
+    assert!(socket_tenant(None, Ok(Tenant::default()), true).is_none());
+}
+
+#[test]
+fn non_saas_socket_replay_keeps_the_host_tenant() {
+    let ambient = Tenant {
+        profile: Some("host-profile".into()),
+        agent: None,
+    };
+    let replay_tenant = socket_tenant(Some("untrusted-socket-hint"), Ok(ambient.clone()), false)
+        .expect("host tenant remains available");
+    assert_eq!(replay_tenant, ambient);
 }
