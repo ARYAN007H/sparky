@@ -33,8 +33,9 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use tinyagents_session::port::{SessionStoreProvider, TurnStates};
+use tinyagents_session::run_ledger::history::SessionHistoryImport;
 use tinyagents_session::run_ledger::RunLedgerStore;
-use tinyagents_session::run_ledger::{ImportCounts, LegacyDatabaseReport, LegacySessionImport};
+use tinyagents_session::run_ledger::{AgentFamilyImport, ImportCounts, LegacyLedgerRows};
 use tinyagents_session::transcript::{
     session_stem, DisplayMessage, DisplayRecord, SessionRef, TranscriptHistory, TranscriptMessage,
     TranscriptMeta, TranscriptPartial, TranscriptTurn,
@@ -93,33 +94,74 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
         if db.is_file() {
             let snapshot = Snapshot::of(&db, SESSIONS_DB)
                 .context("[sessions] copy sessions.db for reading")?;
-            let ledger = provider
-                .driver_run_ledger(DEFAULT_AGENT)
-                .map_err(|error| anyhow::anyhow!("open the run ledger: {error}"))?;
             let mut rows = super::session_db::SessionDatabase::read(snapshot.db())
                 .context("[sessions] read the session database snapshot")?;
             sanitize_legacy_system_messages(&mut rows.messages);
-            let batch = LegacySessionImport {
+            let fingerprint = source_fingerprint(snapshot.db())?;
+            let history_batch = SessionHistoryImport {
                 sessions: rows.sessions,
                 messages: rows.messages,
                 tool_calls: rows.tool_calls,
-                agent_runs: rows.agent_runs,
-                telemetry: rows.telemetry,
+            };
+            let ledger = provider
+                .driver_run_ledger(DEFAULT_AGENT)
+                .map_err(|error| anyhow::anyhow!("open the run ledger: {error}"))?;
+            let history = crate::storage::block_on_anyhow(async move {
+                ledger
+                    .import_session_history(history_batch)
+                    .await
+                    .map_err(|error| anyhow::anyhow!("{error}"))
+            })
+            .context("[sessions] import classic session history")?;
+
+            let agent_batch = AgentFamilyImport {
+                operation_id: workspace_operation_id(&workspace),
+                source_fingerprint: fingerprint,
+                runs: rows.agent_runs,
                 events: rows.events,
+                telemetry: rows.telemetry,
+            };
+            let ledger = provider
+                .driver_run_ledger(DEFAULT_AGENT)
+                .map_err(|error| anyhow::anyhow!("open the run ledger: {error}"))?;
+            let agent = crate::storage::block_on_anyhow(async move {
+                ledger
+                    .import_agent_family(agent_batch)
+                    .await
+                    .map_err(|error| anyhow::anyhow!("{error}"))
+            })
+            .context("[sessions] import classic agent run family")?;
+
+            let legacy_batch = LegacyLedgerRows {
                 workflow_runs: rows.workflows,
                 teams: rows.teams,
                 members: rows.members,
                 tasks: rows.tasks,
                 tool_effects: rows.tool_effects,
             };
-            let report = crate::storage::block_on_anyhow(async move {
+            let ledger = provider
+                .driver_run_ledger(DEFAULT_AGENT)
+                .map_err(|error| anyhow::anyhow!("open the run ledger: {error}"))?;
+            let legacy = crate::storage::block_on_anyhow(async move {
                 ledger
-                    .import_legacy_batch(batch)
+                    .import_legacy_rows(legacy_batch)
                     .await
                     .map_err(|error| anyhow::anyhow!("{error}"))
             })
-            .context("[sessions] import sessions.db")?;
-            let (database_found, database_written) = database_totals(&report);
+            .context("[sessions] import classic ledger rows")?;
+            let (database_found, database_written) = database_totals([
+                history.sessions,
+                history.messages,
+                history.tool_calls,
+                agent.agent_runs,
+                agent.events,
+                agent.telemetry,
+                legacy.workflow_runs,
+                legacy.teams,
+                legacy.members,
+                legacy.tasks,
+                legacy.tool_effects,
+            ]);
             found += database_found;
             written += database_written;
         }
@@ -147,24 +189,28 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
 
 /// The native importer reports source rows per stored family. FTS rows are a
 /// derived index and do not represent additional legacy records.
-fn database_totals(report: &LegacyDatabaseReport) -> (usize, usize) {
-    [
-        report.sessions,
-        report.messages,
-        report.tool_calls,
-        report.agent_runs,
-        report.telemetry,
-        report.events,
-        report.workflow_runs,
-        report.teams,
-        report.members,
-        report.tasks,
-        report.tool_effects,
-    ]
-    .into_iter()
-    .fold(
+fn database_totals(counts: [ImportCounts; 11]) -> (usize, usize) {
+    counts.into_iter().fold(
         (0, 0),
         |(found, written), ImportCounts { read, imported, .. }| (found + read, written + imported),
+    )
+}
+
+fn source_fingerprint(path: &Path) -> Result<String> {
+    use sha2::{Digest, Sha256};
+    let bytes =
+        std::fs::read(path).with_context(|| format!("read source snapshot {}", path.display()))?;
+    Ok(format!("sha256:{}", hex::encode(Sha256::digest(bytes))))
+}
+
+fn workspace_operation_id(workspace: &Path) -> String {
+    use sha2::{Digest, Sha256};
+    let identity = workspace
+        .canonicalize()
+        .unwrap_or_else(|_| workspace.to_path_buf());
+    format!(
+        "workspace-sessions-v1:{}",
+        hex::encode(Sha256::digest(identity.to_string_lossy().as_bytes()))
     )
 }
 

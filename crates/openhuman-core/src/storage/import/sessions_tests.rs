@@ -386,21 +386,10 @@ fn database_import_totals_source_families_not_derived_fts_rows() {
         imported,
         already_present: read - imported,
     };
-    let report = LegacyDatabaseReport {
-        sessions: counts(1, 1),
-        messages: counts(2, 1),
-        tool_calls: counts(3, 2),
-        agent_runs: counts(4, 3),
-        telemetry: counts(5, 4),
-        events: counts(6, 5),
-        workflow_runs: counts(7, 6),
-        teams: counts(8, 7),
-        members: counts(9, 8),
-        tasks: counts(10, 9),
-        tool_effects: counts(11, 10),
-        entries: ImportCounts::default(),
-        fts_rows: 1_000,
-    };
-
-    assert_eq!(database_totals(&report), (66, 56));
+    let counts = [
+        counts(1, 1), counts(2, 1), counts(3, 2), counts(4, 3), counts(5, 4),
+        counts(6, 5), counts(7, 6), counts(8, 7), counts(9, 8), counts(10, 9),
+        counts(11, 10),
+    ];
+    assert_eq!(database_totals(counts), (66, 56));
 }
