@@ -482,9 +482,6 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
     .await;
     assert!(!reports.is_empty());
     for report in &reports {
-        eprintln!("import {}: {:?}", report.domain, report.outcome);
-    }
-    for report in &reports {
         match report.outcome.as_ref().unwrap_or_else(|error| {
             panic!("{} failed to import: {error:#}", report.domain);
         }) {
