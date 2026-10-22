@@ -540,12 +540,20 @@ impl OpenHumanSessionHost {
                     .transcript(locator, self.injected_transcript_stem(), meta)
                     .resume_agent(self.agent_definition_name.clone()),
             }
-        } else {
+        } else if self.thread_id.is_some() && self.session_parent_prefix.is_none() {
             builder.identity_resolver(
                 self.runtime_session_key(),
                 meta,
                 Arc::new(self.session_identity_resolver()),
             )
+        } else {
+            builder
+                .transcript(
+                    self.subagent_transcript_locator(),
+                    self.injected_transcript_stem(),
+                    meta,
+                )
+                .resume_agent(self.agent_definition_name.clone())
         };
         self.runtime_session = Some(
             builder
