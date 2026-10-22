@@ -28,7 +28,9 @@ pub(super) fn map_backend_error(error: anyhow::Error) -> ProgressiveTransportRes
 
 fn request_channel(request: &ProgressiveTransportRequest) -> &str {
     match request {
-        ProgressiveTransportRequest::Send { channel, .. }
+        ProgressiveTransportRequest::OutputEvent { channel, .. }
+        | ProgressiveTransportRequest::Send { channel, .. }
+        | ProgressiveTransportRequest::SendTyped { channel, .. }
         | ProgressiveTransportRequest::Edit { channel, .. }
         | ProgressiveTransportRequest::Delete { channel, .. }
         | ProgressiveTransportRequest::Typing { channel } => channel,
@@ -52,6 +54,10 @@ pub(super) async fn execute(
     ctx: &ChannelCallbackCtx,
     request: ProgressiveTransportRequest,
 ) -> ProgressiveTransportResult {
+    if matches!(&request, ProgressiveTransportRequest::OutputEvent { .. }) {
+        log::debug!("[tinyhumans][channels] hosted callback does not project module output events");
+        return ProgressiveTransportResult::Unavailable;
+    }
     if ctx.session.is_cancelled() {
         log::debug!("[tinyhumans][channels] session closed before the transport call");
         return ProgressiveTransportResult::Unavailable;
@@ -86,7 +92,37 @@ async fn send(
     request: ProgressiveTransportRequest,
 ) -> ProgressiveTransportResult {
     let result = match request {
-        ProgressiveTransportRequest::Send { channel, message } => {
+        ProgressiveTransportRequest::OutputEvent { .. } => {
+            return ProgressiveTransportResult::Unavailable;
+        }
+        ProgressiveTransportRequest::Send {
+            channel, message, ..
+        } => {
+            client
+                .send_channel_message(&channel, credential.clone(), message)
+                .await
+        }
+        ProgressiveTransportRequest::SendTyped {
+            channel,
+            turn_id,
+            channel_ref,
+            conversation,
+            sequence,
+            segment_index,
+            idempotency_key,
+            parts,
+            text,
+        } => {
+            let message = json!({
+                "text": text,
+                "parts": parts,
+                "turn_id": turn_id,
+                "channel_ref": channel_ref,
+                "conversation": conversation,
+                "sequence": sequence,
+                "segment_index": segment_index,
+                "idempotency_key": idempotency_key,
+            });
             client
                 .send_channel_message(&channel, credential.clone(), message)
                 .await
@@ -95,6 +131,7 @@ async fn send(
             channel,
             message_id,
             text,
+            ..
         } => {
             client
                 .send_channel_edit(
@@ -108,12 +145,13 @@ async fn send(
         ProgressiveTransportRequest::Delete {
             channel,
             message_id,
+            ..
         } => {
             client
                 .send_channel_delete(&channel, &message_id, credential.clone())
                 .await
         }
-        ProgressiveTransportRequest::Typing { channel } => {
+        ProgressiveTransportRequest::Typing { channel, .. } => {
             client
                 .send_channel_typing(&channel, credential.clone())
                 .await
