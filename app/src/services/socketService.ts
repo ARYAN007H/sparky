@@ -240,7 +240,10 @@ class SocketService {
         roomThreadIds.add(threadState.selectedThreadId);
       }
       for (const threadId of roomThreadIds) {
-        this.socket?.emit('thread:subscribe', { thread_id: threadId });
+        this.socket?.emit('thread:subscribe', {
+          thread_id: threadId,
+          profile_id: getCoreStateSnapshot().snapshot.auth.profileId ?? undefined,
+        });
       }
     });
 
@@ -471,7 +474,13 @@ class SocketService {
         socketWarn('Thread room subscription not acknowledged', { threadId });
         finish(false);
       }, timeoutMs);
-      socket.emit('thread:subscribe', { thread_id: threadId }, () => {
+      socket.emit(
+        'thread:subscribe',
+        {
+          thread_id: threadId,
+          profile_id: getCoreStateSnapshot().snapshot.auth.profileId ?? undefined,
+        },
+        () => {
         clearTimeout(timer);
         finish(true);
       });

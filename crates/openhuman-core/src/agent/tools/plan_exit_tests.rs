@@ -148,7 +148,7 @@ async fn plan_exit_publishes_build_run_mode_change() {
         loop {
             match events.recv().await {
                 Some((event_thread_id, mode)) if event_thread_id == thread_id && mode == "build" => {
-                    break event;
+                    break (event_thread_id, mode);
                 }
                 Some(_) => continue,
                 None => panic!("run mode event stream ended"),

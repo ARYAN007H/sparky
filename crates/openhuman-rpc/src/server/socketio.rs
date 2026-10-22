@@ -218,6 +218,8 @@ struct ChatCancelPayload {
 #[derive(Debug, Deserialize)]
 struct ThreadSubscribePayload {
     thread_id: String,
+    #[serde(default)]
+    profile_id: Option<String>,
 }
 
 /// Reply to `thread:subscribe`, so a client can order a read after the join.
@@ -538,7 +540,11 @@ pub fn attach_socketio() -> (socketioxide::layer::SocketIoLayer, SocketIo) {
                     // already holds the card.
                     if joined {
                         replay_parked_approval(&socket, thread_id);
-                        replay_parked_plan_review(&socket, thread_id);
+                        replay_parked_plan_review(
+                            &socket,
+                            thread_id,
+                            payload.profile_id.as_deref(),
+                        );
                     }
                     ack.send(&ThreadSubscribeAck { joined }).ok();
                 },
@@ -1184,8 +1190,24 @@ fn replay_parked_approval(socket: &SocketRef, thread_id: &str) {
 /// just joined that thread's room. Mirrors [`replay_parked_approval`] — a
 /// plan review is a live, in-memory park (no SQLite row), but it reaches the
 /// UI the same fire-and-forget way, so the same reconciliation applies.
-fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str) {
-    let Ok(tenant) = crate::core_host::core::runtime::DispatchCtx::ambient().tenant() else {
+fn socket_replay_tenant(
+    profile_id: Option<&str>,
+    ambient: Result<crate::core_host::core::runtime::Tenant, crate::core_host::core::runtime::NoTenant>,
+) -> Result<crate::core_host::core::runtime::Tenant, crate::core_host::core::runtime::NoTenant> {
+    match profile_id {
+        Some(profile) if !profile.trim().is_empty() => {
+            Ok(crate::core_host::core::runtime::Tenant {
+                profile: Some(profile.to_owned()),
+                agent: None,
+            })
+        }
+        _ => ambient,
+    }
+}
+
+fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str, profile_id: Option<&str>) {
+    let ambient = crate::core_host::core::runtime::DispatchCtx::ambient().tenant();
+    let Ok(tenant) = socket_replay_tenant(profile_id, ambient) else {
         return;
     };
     let Some(row) = crate::core_host::agent::plan_review::gate::global()

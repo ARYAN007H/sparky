@@ -199,6 +199,7 @@ struct ThreadIdParams {
 fn handle_set_run_mode(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<ThreadModeParams>(params)?;
+        require_owned_thread(&ctx, &p.thread_id).await?;
         let Some(mode) = parse_mode_label(&p.mode) else {
             return Err(format!("invalid mode '{}' (expected plan|build)", p.mode));
         };
@@ -215,9 +216,27 @@ fn handle_set_run_mode(ctx: DispatchCtx, params: Map<String, Value>) -> Controll
 fn handle_get_run_mode(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<ThreadIdParams>(params)?;
+        require_owned_thread(&ctx, &p.thread_id).await?;
         let mode = get_mode(&ctx, &p.thread_id);
         Ok(serde_json::json!({ "mode": mode_label(mode) }))
     })
+}
+
+async fn require_owned_thread(ctx: &DispatchCtx, thread_id: &str) -> Result<(), String> {
+    if thread_id.trim().is_empty() {
+        return Err("thread_id is required".to_string());
+    }
+    let config = ctx.load_config().await?;
+    let threads = crate::threads::store::blocking::list_threads(
+        ctx.clone(),
+        config.workspace_dir,
+    )
+    .await?;
+    if threads.iter().any(|thread| thread.id == thread_id) {
+        Ok(())
+    } else {
+        Err(format!("thread '{thread_id}' not found or not owned by caller"))
+    }
 }
 
 fn parse<T: DeserializeOwned>(params: Map<String, Value>) -> Result<T, String> {
