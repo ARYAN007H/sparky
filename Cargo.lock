@@ -9745,7 +9745,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp"
-version = "0.20.0"
+version = "0.20.1"
 dependencies = [
  "base64 0.23.1",
  "data-encoding",
@@ -9774,7 +9774,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.20.0"
+version = "0.20.1"
 dependencies = [
  "base64 0.23.1",
  "schemars",
