@@ -28,6 +28,7 @@ fn core(workspace: &std::path::Path, url: Option<&str>, args: &[&str]) -> std::p
         .env("HOME", workspace)
         .env("USERPROFILE", workspace)
         .env("OPENHUMAN_WORKSPACE", workspace)
+        .env("OPENHUMAN_MODULE_SOURCE", "linked")
         // A shared backend keeps the config document encrypted under the
         // keyring master key and fails closed without one. CI has no OS
         // keychain, so every process gets the same fixed key, the way a
