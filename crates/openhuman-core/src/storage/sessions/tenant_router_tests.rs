@@ -56,3 +56,28 @@ fn one_provider_serves_every_agent_of_a_tenant() {
     let (other, _) = router.route("u~two");
     assert!(!Arc::ptr_eq(&first, &other));
 }
+
+#[test]
+fn pinned_session_store_leases_keep_profile_and_agent_routing() {
+    let router = stores();
+    let alice_key = crate::core::runtime::session_key(&crate::core::runtime::Tenant {
+        profile: Some("alice".into()),
+        agent: Some("asha".into()),
+    });
+    let bob_key = crate::core::runtime::session_key(&crate::core::runtime::Tenant {
+        profile: Some("bob".into()),
+        agent: Some("asha".into()),
+    });
+    let alice = router.lease_for_agent(&alice_key).unwrap();
+    let alice_again = router.lease_for_agent(&alice_key).unwrap();
+    let bob = router.lease_for_agent(&bob_key).unwrap();
+
+    assert_eq!(
+        alice.stores().transcripts.destination_key(),
+        alice_again.stores().transcripts.destination_key()
+    );
+    assert_ne!(
+        alice.stores().transcripts.destination_key(),
+        bob.stores().transcripts.destination_key()
+    );
+}
