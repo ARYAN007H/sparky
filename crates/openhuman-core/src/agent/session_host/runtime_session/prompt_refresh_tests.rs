@@ -601,3 +601,55 @@ async fn a_catalogue_change_under_a_kept_prompt_carries_no_note() {
         "a catalogue change alone is not a replaced prompt"
     );
 }
+
+#[tokio::test]
+async fn a_catalogue_change_under_a_rendered_but_identical_prompt_carries_no_note() {
+    // The agent opts in and the current prompt renders identical to the
+    // recorded one, but a permanent tool was added since: the catalogue
+    // refresh changes the prefix. The prompt was not replaced, so no note.
+    let root = tempfile::tempdir().expect("tempdir");
+    let prelude = prelude(root.path(), "current", true);
+    {
+        let mut surface = prelude
+            .tool_surface
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let spec = tinytools::ToolSpec {
+            name: "A_TOOL".into(),
+            description: "d".into(),
+            parameters: serde_json::json!({"type": "object"}),
+        };
+        surface.visible_tool_specs = Arc::new(vec![Arc::new(spec)]);
+        surface.permanent_tool_names = ["A_TOOL".to_string()].into();
+    }
+    let history = [
+        Message::system("current"),
+        Message::user("earlier"),
+        Message::assistant("hello"),
+    ];
+    let mut request = request();
+    let prepared = prelude
+        .prepare_turn(
+            false,
+            &resumed(&current(), &history),
+            &snapshot(4),
+            &mut request,
+        )
+        .await
+        .expect("prepared turn");
+    let prefix = prepared
+        .prefix
+        .as_ref()
+        .expect("the refreshed catalogue is offered");
+    assert!(prefix
+        .messages()
+        .last()
+        .expect("a catalogue")
+        .text()
+        .contains("A_TOOL"));
+    assert_eq!(
+        request.input.text(),
+        "hi",
+        "a catalogue change under a kept prompt is not a replaced prompt"
+    );
+}

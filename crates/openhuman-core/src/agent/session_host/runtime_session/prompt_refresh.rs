@@ -72,6 +72,13 @@ impl OpenHumanTurnPrelude {
         } else {
             false
         };
+        // Compared before the catalogue refresh below, which changes the
+        // prefix of a kept prompt too: only the rendered prompt itself counts.
+        let changed = rendered
+            && preparation
+                .prefix
+                .as_ref()
+                .is_some_and(|prefix| prefix.messages() != view.prefix.messages());
         self.refresh_permanent_prefix(&mut preparation, view.prefix);
         if let Some(prefix) = preparation.prefix.as_ref() {
             // The runtime sends `prefix` in place of the recorded one, so the
@@ -83,10 +90,6 @@ impl OpenHumanTurnPrelude {
                 + prefix.messages().len();
         }
         if rendered {
-            let changed = preparation
-                .prefix
-                .as_ref()
-                .is_some_and(|prefix| prefix.messages() != view.prefix.messages());
             let (prefix_in_use, reason) = prompt_refresh_log_fields(changed);
             if changed {
                 tracing::info!(
