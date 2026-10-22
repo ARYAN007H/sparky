@@ -129,11 +129,7 @@ async fn a_second_run_is_a_noop_and_a_blob_already_stored_is_kept() {
     let scoped = scoped();
     scoped
         .blobs()
-        .put(
-            &ccr_key(FRESH),
-            b"written by the module".to_vec(),
-            None,
-        )
+        .put(&ccr_key(FRESH), b"written by the module".to_vec(), None)
         .await
         .unwrap();
     let first = import_into(
