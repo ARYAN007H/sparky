@@ -80,6 +80,8 @@ pub use event_bus::fresh_approval_surface_subscription;
 // Public API — operations
 #[cfg(test)]
 pub use ops::drain_queued_turns_for_test;
+#[cfg(test)]
+pub(crate) use ops::track_parallel_turn_for_test;
 pub(crate) use ops::invalidate_thread_sessions_for_tenant;
 #[cfg(test)]
 pub(crate) use ops::lock_thread_sessions_for_test;

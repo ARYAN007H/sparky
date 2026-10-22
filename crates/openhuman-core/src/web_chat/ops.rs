@@ -30,6 +30,8 @@ pub use system_turn::{run_system_turn_on_thread, SESSION_CHECKOUT_FAILURE, SYSTE
 #[cfg(test)]
 pub use state::drain_queued_turns_for_test;
 #[cfg(test)]
+pub(crate) use state::track_parallel_turn_for_test;
+#[cfg(test)]
 pub(crate) use state::in_flight;
 pub(crate) use state::invalidate_thread_sessions_for_tenant;
 #[cfg(test)]
