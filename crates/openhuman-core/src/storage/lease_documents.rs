@@ -421,10 +421,10 @@ impl LeaseStore for DocumentLeases {
                         )))
                     }
                     Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
-                    Err(error) => return Err(LeaseError::Storage(error.into())),
+                    Err(error) => return Err(LeaseError::Storage(error)),
                 }
             }
-            Err(error) => return Err(LeaseError::Storage(error.into())),
+            Err(error) => return Err(LeaseError::Storage(error)),
         }
         self.read(key)
             .await

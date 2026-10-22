@@ -64,7 +64,7 @@ impl InvocationStorageBinding {
             .unique_name()
             .ok_or_else(|| anyhow::anyhow!("module runtime connection has no unique bus name"))?;
         let serial = NEXT_INVOCATION
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
                 next.checked_add(1)
             })
             .map_err(|_| anyhow::anyhow!("invocation storage address space is exhausted"))?;

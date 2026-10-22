@@ -20,10 +20,12 @@ struct LegacyProgress {
     done: bool,
 }
 
+type MigrationProgress = (Vec<(String, u32)>, Option<i64>);
+
 /// Reads completed owner versions and the last completion timestamp from a
 /// historical Tiny Storage Drivers database without opening it through the
 /// current backend or modifying the source file.
-pub(crate) fn read(path: &Path) -> Result<(Vec<(String, u32)>, Option<i64>)> {
+pub(crate) fn read(path: &Path) -> Result<MigrationProgress> {
     let snapshot = Snapshot::of(path, "layout-status/source.db")?;
     let connection = rusqlite::Connection::open_with_flags(
         snapshot.db(),

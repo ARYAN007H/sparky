@@ -1,6 +1,7 @@
 use super::*;
 #[cfg(feature = "legacy-import")]
 use crate::storage::import::Outcome;
+#[cfg(feature = "storage-sqlite")]
 use crate::storage::{CollectionSpec, Precondition, Scope};
 use std::sync::Mutex;
 use tempfile::TempDir;

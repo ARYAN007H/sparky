@@ -19,7 +19,7 @@ pub(super) const DEVICES: &str = "devices.paired";
 /// The v1 name, still written by the legacy `devices.db` importer.
 pub(super) const LEGACY_DEVICES: &str = "paired_devices";
 /// The body version of [`DEVICES`].
-
+///
 /// Converts legacy paired-device rows into the current owner shape.
 pub(crate) fn upgrade_records(
     records: Vec<crate::storage::import::Record>,

@@ -242,15 +242,18 @@ fn import_inventory(
 }
 
 #[cfg(feature = "legacy-import")]
+type BackendForScope = (
+    Arc<dyn StorageBackend>,
+    Option<Arc<crate::profiles::host::Profile>>,
+);
+
+#[cfg(feature = "legacy-import")]
 fn backend_for_target_scope(
     backend: &Arc<dyn StorageBackend>,
     target_scope: &Scope,
     known: &Known,
     config: &crate::config::Config,
-) -> anyhow::Result<(
-    Arc<dyn StorageBackend>,
-    Option<Arc<crate::profiles::host::Profile>>,
-)> {
+) -> anyhow::Result<BackendForScope> {
     if target_scope.is_local() || target_scope.is_cluster() {
         return Ok((Arc::clone(backend), None));
     }

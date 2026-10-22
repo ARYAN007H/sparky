@@ -148,7 +148,7 @@ async fn import_into(
         .for_scope(scope)
         .map_err(|error| anyhow!("open the module scope: {:?}", error.kind()))?;
     let markers = crate::storage::documents::Repo::on(
-        &backend,
+        backend,
         scope,
         "storage::import",
         crate::storage::import_state::collection_specs,
@@ -174,7 +174,7 @@ async fn import_into(
         |condition| {
             let claimed_markers = markers.conditioned(condition)?;
             let claimed_backend = crate::storage::import_state::backend_with_condition(
-                Arc::clone(&backend),
+                Arc::clone(backend),
                 condition.clone(),
             );
             let claimed_scoped = claimed_backend

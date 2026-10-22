@@ -132,7 +132,7 @@ fn workspace_backend(workspace_dir: &Path) -> WorkspaceBackend {
     )
 }
 
-async fn open_default_backend(workspace_dir: PathBuf) -> Result<Arc<dyn StorageBackend>> {
+async fn open_default_backend(_workspace_dir: PathBuf) -> Result<Arc<dyn StorageBackend>> {
     #[cfg(test)]
     await_test_backend_open_gate().await;
 
@@ -141,17 +141,17 @@ async fn open_default_backend(workspace_dir: PathBuf) -> Result<Arc<dyn StorageB
         let persistent_url = TEST_WORKSPACE_URLS
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .get(&workspace_dir)
+            .get(&_workspace_dir)
             .cloned();
         if let Some(url) = persistent_url {
-            super::config::prepare_default_dir(&workspace_dir).with_context(|| {
+            super::config::prepare_default_dir(&_workspace_dir).with_context(|| {
                 format!(
                     "create the storage directory for {}",
-                    workspace_dir.display()
+                    _workspace_dir.display()
                 )
             })?;
             return super::open(&url).await.with_context(|| {
-                format!("open the default storage for {}", workspace_dir.display())
+                    format!("open the default storage for {}", _workspace_dir.display())
             });
         }
     }
@@ -161,26 +161,26 @@ async fn open_default_backend(workspace_dir: PathBuf) -> Result<Arc<dyn StorageB
         let backend: Arc<dyn StorageBackend> =
             Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
         super::boot::prepare_and_migrate(&backend).await?;
-        return Ok(super::fenced_backend::wrap(backend));
+        Ok(super::fenced_backend::wrap(backend))
     }
 
     #[cfg(not(test))]
     {
-        let url = super::config::default_url(&workspace_dir);
-        super::config::prepare_default_dir(&workspace_dir).with_context(|| {
+        let url = super::config::default_url(&_workspace_dir);
+        super::config::prepare_default_dir(&_workspace_dir).with_context(|| {
             format!(
                 "create the storage directory for {}",
-                workspace_dir.display()
+                _workspace_dir.display()
             )
         })?;
         tracing::debug!(
             target: "openhuman::storage",
-            workspace = %workspace_dir.display(),
+            workspace = %_workspace_dir.display(),
             "[storage::local] opening the workspace default backend (none installed)"
         );
         super::open(&url)
             .await
-            .with_context(|| format!("open the default storage for {}", workspace_dir.display()))
+            .with_context(|| format!("open the default storage for {}", _workspace_dir.display()))
     }
 }
 

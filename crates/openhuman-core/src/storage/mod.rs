@@ -117,8 +117,10 @@ impl<T: tinystoragedrivers_api::DocumentStoreExt + ?Sized> DocumentStoreExt for 
 /// asynchronous storage ports. Keeping it on its own thread also permits a
 /// synchronous facade to be called while the caller is on a current-thread
 /// Tokio runtime.
+type StorageTask = Box<dyn FnOnce(&tokio::runtime::Runtime) + Send>;
+
 struct Blocking {
-    tasks: mpsc::Sender<Box<dyn FnOnce(&tokio::runtime::Runtime) + Send>>,
+    tasks: mpsc::Sender<StorageTask>,
 }
 
 thread_local! {
@@ -127,7 +129,7 @@ thread_local! {
 
 impl Blocking {
     fn new() -> anyhow::Result<Self> {
-        let (tasks, receiver) = mpsc::channel::<Box<dyn FnOnce(&tokio::runtime::Runtime) + Send>>();
+        let (tasks, receiver) = mpsc::channel::<StorageTask>();
         let (started, ready) = mpsc::sync_channel(1);
         std::thread::Builder::new()
             .name("openhuman-storage".to_owned())
