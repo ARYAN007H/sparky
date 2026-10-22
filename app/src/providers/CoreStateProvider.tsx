@@ -315,7 +315,9 @@ export default function CoreStateProvider({ children }: { children: ReactNode })
     // unmounted refresh doesn't dispatch; the core latches configRecovered, so
     // the next live poll still surfaces it. Guarded internally against re-fire.
     maybeSurfaceConfigRecovery(rawSnapshot.configRecovered, t);
-    if (!snapshot.sessionToken) {
+    // Only a current snapshot may lift the logout guard: a poll that started
+    // before `clearSession` can answer "no token" from before the logout.
+    if (!snapshot.sessionToken && requestId === snapshotRequestIdRef.current) {
       loggingOutTokenRef.current = null;
     }
     // Capture pre-commit identity outside the setState updater so flip

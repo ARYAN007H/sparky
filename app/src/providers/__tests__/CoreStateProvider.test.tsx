@@ -1288,6 +1288,48 @@ describe('failed logout keeps the user signed out', () => {
     expect(screen.getByTestId('token').textContent).toBe('none');
   });
 
+  it('a stale no-token poll that started before the clear does not lift the guard', async () => {
+    resetCoreStateStore();
+    setActiveUserId(null);
+    vi.mocked(coreStateApi.fetchCoreAppSnapshot).mockReset();
+    vi.mocked(coreStateApi.fetchCoreAppSnapshot).mockResolvedValue(
+      makeSnapshot({ userId: 'u1', sessionToken: tok1 })
+    );
+    vi.mocked(coreStateApi.listTeams).mockResolvedValue([]);
+    vi.mocked(tauriCommands.logout).mockReset();
+    vi.mocked(tauriCommands.logout).mockRejectedValue(new Error('auth_logout timed out'));
+    let ctx: CoreStateContextValue | undefined;
+    render(
+      <CoreStateProvider>
+        <Consumer captureCtx={c => (ctx = c)} />
+      </CoreStateProvider>
+    );
+    await waitFor(() => expect(screen.getByTestId('token').textContent).toBe(tok1));
+
+    // A poll is in flight when the user logs out; it answers "no token".
+    const stalePoll = deferred<Snapshot>();
+    vi.mocked(coreStateApi.fetchCoreAppSnapshot).mockReturnValueOnce(stalePoll.promise);
+    let polling!: Promise<void>;
+    act(() => {
+      polling = ctx!.refresh();
+    });
+    let clearing!: Promise<void>;
+    act(() => {
+      clearing = ctx!.clearSession().catch(() => undefined);
+    });
+    await act(async () => {
+      stalePoll.resolve(makeSnapshot({ sessionToken: null }));
+      await polling;
+      await clearing;
+    });
+
+    // The core still holds tok1 (the logout failed): it must stay hidden.
+    await act(async () => {
+      await ctx!.refresh();
+    });
+    expect(screen.getByTestId('token').textContent).toBe('none');
+  });
+
   it('lets a new login with a different token through', async () => {
     const ctx = await renderSignedIn();
     vi.mocked(coreStateApi.fetchCoreAppSnapshot).mockResolvedValue(
