@@ -556,7 +556,7 @@ async fn deleted_thread_marker_survives_router_restart_and_refuses_async_spawn()
 #[tokio::test]
 async fn detached_registration_failure_finishes_the_announced_product_card() {
     use crate::agent::orchestration::subagent_sessions::{
-        DurableSubagentStatus, SubagentSessionStore,
+        DurableSubagentStatus,
     };
     use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
@@ -630,7 +630,7 @@ async fn detached_registration_failure_finishes_the_announced_product_card() {
     let rows = super::driver_sessions_for_parent(
         &live.data.dispatch_ctx(),
         &workspace,
-        "registration-failure-parent",
+        "registration-failure-parent-session",
         Some(thread_id),
     )
     .await
