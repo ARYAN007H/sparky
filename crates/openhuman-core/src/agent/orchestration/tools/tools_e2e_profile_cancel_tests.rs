@@ -110,7 +110,8 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
             detached_data.clone(),
         )
         .expect("detached child context")
-        .with_cancellation(detached_data.cancellation.clone());
+        .with_cancellation(detached_data.cancellation.clone())
+        .with_workspace(tinytools::WorkspaceDescriptor::new(workspace.clone()));
     let accepted = CoreContext::scope(
         Arc::clone(&alice),
         crate::agent::orchestration::tools::SpawnSubagentTool::new()
@@ -273,13 +274,6 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         &owner_scope.parent_session,
         owner_scope.parent_thread_id.as_deref(),
     );
-    let job_snapshot = alice_jobs
-        .tasks()
-        .snapshot(
-            &tinyagents_tasks::TaskId::new(alice_job.id.as_str()),
-            &job_owner,
-        )
-        .expect("Alice's detached task metadata");
     let registered = alice_jobs
         .list_for_parent_scope(
             &job_owner,
@@ -296,11 +290,10 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
                 .and_then(serde_json::Value::as_str)
                 == Some(task_id.as_str())
         }),
-        "Alice's owner/workspace/thread must list the driver task: session={:?}, cached workspace={:?}, thread={:?}, job metadata={:?}, job ids={:?}",
+        "Alice's owner/workspace/thread must list the driver task: session={:?}, cached workspace={:?}, thread={:?}, job ids={:?}",
         owner_scope.parent_session,
         owner_scope.workspace,
         owner_scope.parent_thread_id,
-        job_snapshot.metadata,
         registered
             .iter()
             .map(|job| job.id.as_str())
