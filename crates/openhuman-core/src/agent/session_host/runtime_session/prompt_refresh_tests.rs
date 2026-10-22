@@ -298,7 +298,10 @@ fn composed_prelude(root: &std::path::Path, prompt: SystemPromptBuilder) -> Open
         &model(Vec::new()),
         root,
         prompt,
-        |definition| definition.extensions.refresh_prompt_on_resume = true,
+        |definition| {
+            definition.system_prompt = PromptSource::Dynamic(());
+            definition.extensions.refresh_prompt_on_resume = true;
+        },
     ))
 }
 
