@@ -79,6 +79,22 @@ fn format_roster(entries: &[ParentRosterEntry]) -> String {
     block
 }
 
+fn workspace_scope_for_thread(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+    thread_id: &str,
+) -> tinytools::WorkspaceDescriptor {
+    crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+        ctx,
+        workspace_dir,
+        thread_id,
+    )
+    .into_iter()
+    .next()
+    .map(|(_, owner)| owner.workspace)
+    .unwrap_or_else(|| tinytools::WorkspaceDescriptor::new(workspace_dir))
+}
+
 /// Most-recent durable sessions surfaced in the roster when they are not in
 /// the live registry (cold boot / later turn). Bounds prompt growth on
 /// threads with a long delegation history.
@@ -167,7 +183,7 @@ pub(crate) async fn active_subagents_context_block(
         Some(&thread_id),
     );
     let scope = tinyagents_orchestration::subagent::ParentJobScope::new(
-        tinytools::WorkspaceDescriptor::new(workspace_dir),
+        workspace_scope_for_thread(ctx, workspace_dir, &thread_id),
         thread_id,
     );
     let block = tinyagents_orchestration::subagent::format_parent_roster_for_owner(
