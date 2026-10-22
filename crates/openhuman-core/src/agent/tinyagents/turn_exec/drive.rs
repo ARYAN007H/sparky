@@ -4,6 +4,8 @@ use super::*;
 mod controls;
 #[path = "drive/stores.rs"]
 mod stores;
+#[path = "drive/setup.rs"]
+mod setup;
 
 pub(super) async fn drive_turn(
     spec: TurnSpec<'_>,
@@ -145,39 +147,14 @@ pub(super) async fn drive_turn(
     // runtime/session already created. Retain that root config id here instead
     // of manufacturing a second literal `agent_turn` root. The driver adds the
     // `scope:root` / `scope:subagent` tag.
-    let mut config = native_subagent
-        .as_ref()
-        .map(|native| native.config.clone())
-        .unwrap_or_else(|| {
-            run_context.root_run_config(if is_subagent {
-                "openhuman-subagent"
-            } else {
-                "openhuman-agent-turn"
-            })
-        })
-        .with_max_model_calls(max_iterations)
-        .with_max_tool_calls(run_context.tool_call_limit_for(max_iterations))
-        .with_max_depth(super::super::budget::depth(&run_context))
-        .with_tag("openhuman")
-        .with_tag(if on_progress.is_some() {
-            "observed"
-        } else {
-            "unobserved"
-        });
-    // Per-turn output cap rides RunConfig now (Phase 5 groundwork): the loop
-    // stamps it onto every `ModelRequest.max_tokens` and the native model adapter
-    // adapter honors it, so the cap no longer bakes into the primary + route
-    // models. Mirrors the legacy `AGENT_TURN_MAX_OUTPUT_TOKENS` / sub-agent cap.
-    if let Some(cap) = max_output_tokens {
-        config = config.with_max_turn_output_tokens(cap);
-    }
-    let journal_run_id = config.run_id.clone();
-
-    tracing::info!(
-        model,
+    let (config, journal_run_id) = setup::run_config(
+        &mut run_context,
+        native_subagent.as_ref(),
+        is_subagent,
+        on_progress.is_some(),
         max_iterations,
-        observed = on_progress.is_some(),
-        "[tinyagents] routing turn through the runtime turn driver (shared tools)"
+        max_output_tokens,
+        model,
     );
 
     let input = crate::agent::message_convert::history_to_messages(&history);
@@ -254,29 +231,20 @@ pub(super) async fn drive_turn(
     // and never sees a failed run's usage. With `on_progress = None` the bridge
     // still records cost but its progress `send`s are inert no-ops, so there is
     // no spurious streaming; every turn has an event sink.
-    let bridge = {
-        let bridge = OpenhumanEventBridge::with_scope(
-            on_progress,
-            model,
-            provider_id.clone(),
-            max_iterations,
-            subagent_scope.clone(),
-            cursor.clone(),
-            tool_names.clone(),
-            failure_map.clone(),
-            provider_usage_carry.clone(),
-            bridge_tool_sets.clone(),
-            run_context.dispatch_ctx(),
-        );
-        bridge.set_definition(
-            run_context
-                .memory_identity
-                .as_ref()
-                .and_then(|identity| identity.agent_id.as_deref()),
-        );
-        sink.subscribe(bridge.clone());
-        bridge
-    };
+    let bridge = setup::event_bridge(
+        &sink,
+        on_progress,
+        model,
+        provider_id,
+        max_iterations,
+        subagent_scope,
+        &cursor,
+        &tool_names,
+        &failure_map,
+        &provider_usage_carry,
+        bridge_tool_sets,
+        &run_context,
+    );
 
     // Durable event journal + status store (issue #4249, 05.1). Attached *in
     // addition to* the bridge above: the EventSink fans out to both, so the
