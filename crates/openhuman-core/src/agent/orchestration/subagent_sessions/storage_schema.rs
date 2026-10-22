@@ -18,6 +18,7 @@ use tinystoragedrivers::{CollectionSpec, Result};
 use crate::storage::schema_support::{key_of, owner, time_ms};
 
 pub(super) const SESSIONS: &str = "subagents.sessions";
+pub(super) const EPOCHS: &str = "subagents.session_epochs";
 pub(super) const LEGACY_SESSIONS: &str = "subagent_sessions";
 const SCHEMA: u32 = 2;
 
@@ -26,6 +27,7 @@ const SCHEMA: u32 = 2;
 pub fn storage_schema() -> Schema {
     Schema::new(owner("subagents"))
         .collection_with(SCHEMA, spec(), ScopeClass::Agent)
+        .collection_with(1, CollectionSpec::new(EPOCHS), ScopeClass::Agent)
         .step(Step::new("sessions_v2", SESSIONS, 1, SCHEMA, sessions_v2).source(LEGACY_SESSIONS))
 }
 

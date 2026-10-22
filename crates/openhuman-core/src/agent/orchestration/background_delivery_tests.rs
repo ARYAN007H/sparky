@@ -107,3 +107,102 @@ async fn an_unexpired_completion_claim_stays_leased_after_router_reopen() {
         "sub-1"
     );
 }
+
+#[tokio::test]
+async fn upstream_delivery_claims_and_acknowledges_one_parent_batch() {
+    let router = tinyagents_tasks::CompletionRouter::new(Arc::new(
+        tinyagents_tasks::InMemoryCompletionStore::new(),
+    ));
+    for (task_id, text) in [("child-a", "A"), ("child-b", "B")] {
+        router
+            .record(tinyagents_tasks::CompletionRecord::new(
+                task_id,
+                "parent-thread",
+                "researcher",
+                tinyagents_tasks::CompletionStatus::Success,
+                tinyagents_tasks::CompletionResult::text(text),
+            ))
+            .await
+            .unwrap();
+    }
+
+    let delivery = CompletionDelivery::new(
+        CompletionDeliveryConfig {
+            debounce: Duration::ZERO,
+            recovery_delay: Duration::ZERO,
+            retry_backoff: Duration::ZERO,
+            busy_poll: Duration::ZERO,
+            max_busy_polls: 0,
+            batch_size: 32,
+        },
+        ThreadDeliveryLeases::default(),
+    );
+    let mut delivered = Vec::new();
+    let outcome = delivery
+        .deliver_once(
+            DeliveryTarget {
+                router: &router,
+                parent_key: "parent-thread",
+                tenant_key: "profile",
+                thread_key: "profile:parent-thread",
+            },
+            || false,
+            || true,
+            |batch| {
+                delivered = batch.iter().map(|record| record.task_id.clone()).collect();
+                async { Ok::<(), &'static str>(()) }
+            },
+            |_| {},
+        )
+        .await;
+
+    assert_eq!(outcome, DeliveryOutcome::Delivered { count: 2 });
+    assert_eq!(delivered, ["child-a", "child-b"]);
+    assert!(router.pending_for("parent-thread").is_empty());
+}
+
+#[tokio::test]
+async fn upstream_delivery_reports_parent_busy_without_claiming_completions() {
+    let router = tinyagents_tasks::CompletionRouter::new(Arc::new(
+        tinyagents_tasks::InMemoryCompletionStore::new(),
+    ));
+    router
+        .record(tinyagents_tasks::CompletionRecord::new(
+            "child-busy",
+            "parent-thread",
+            "researcher",
+            tinyagents_tasks::CompletionStatus::Success,
+            tinyagents_tasks::CompletionResult::text("done"),
+        ))
+        .await
+        .unwrap();
+
+    let delivery = CompletionDelivery::new(
+        CompletionDeliveryConfig {
+            debounce: Duration::ZERO,
+            recovery_delay: Duration::ZERO,
+            retry_backoff: Duration::ZERO,
+            busy_poll: Duration::ZERO,
+            max_busy_polls: 0,
+            batch_size: 32,
+        },
+        ThreadDeliveryLeases::default(),
+    );
+    let outcome = delivery
+        .deliver_once(
+            DeliveryTarget {
+                router: &router,
+                parent_key: "parent-thread",
+                tenant_key: "profile",
+                thread_key: "profile:parent-thread",
+            },
+            || true,
+            || true,
+            |_| async { Ok::<(), &'static str>(()) },
+            |_| {},
+        )
+        .await;
+
+    assert_eq!(outcome, DeliveryOutcome::ParentBusy);
+    assert_eq!(router.pending_for("parent-thread")[0].attempts, 0);
+}

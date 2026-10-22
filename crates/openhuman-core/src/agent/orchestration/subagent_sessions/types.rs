@@ -155,9 +155,10 @@ pub struct SubagentSessionUpsert {
     pub parent_epoch: Option<u64>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SubagentSessionStore {
     pub workspace_dir: PathBuf,
+    pub(crate) context: Option<std::sync::Arc<crate::core::runtime::CoreContext>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

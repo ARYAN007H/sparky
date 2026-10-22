@@ -1,5 +1,48 @@
 use super::*;
-use crate::security::{AutonomyLevel, SecurityPolicy};
+use crate::security::AutonomyLevel;
+
+#[test]
+fn update_family_registration_preserves_tool_names_and_order() {
+    let tools = registered_tools(std::sync::Arc::new(SecurityPolicy::default()));
+    let names = tools.iter().map(|tool| tool.name()).collect::<Vec<_>>();
+
+    assert_eq!(names, ["update_check", "update_apply"]);
+}
+
+#[test]
+fn update_check_name_and_permission() {
+    let tool = UpdateCheckTool::new();
+    assert_eq!(tool.name(), "update_check");
+    assert_eq!(tool.permission_level(), PermissionLevel::ReadOnly);
+}
+
+#[test]
+fn schema_is_closed_object_with_no_properties() {
+    let schema = UpdateCheckTool::new().parameters_schema();
+    assert_eq!(schema["type"], "object");
+    assert_eq!(schema["additionalProperties"], false);
+    let props = schema["properties"].as_object().expect("properties object");
+    assert!(
+        props.is_empty(),
+        "update_check takes no arguments — schema must not advertise any"
+    );
+}
+
+#[test]
+fn description_mentions_safety_and_companion_tool() {
+    let tool = UpdateCheckTool::new();
+    let desc = tool.description();
+    assert!(desc.contains("Read-only"));
+    assert!(desc.contains("update_apply"));
+    assert!(desc.contains("Does NOT download"));
+}
+
+#[test]
+fn default_constructs_same_as_new() {
+    let a = UpdateCheckTool;
+    let b = UpdateCheckTool::new();
+    assert_eq!(a.name(), b.name());
+}
 use serde_json::json;
 use std::sync::Arc;
 
@@ -20,7 +63,7 @@ fn read_only() -> Arc<SecurityPolicy> {
 }
 
 #[test]
-fn name_and_permission() {
+fn update_apply_name_and_permission() {
     let tool = UpdateApplyTool::new(supervised());
     assert_eq!(tool.name(), "update_apply");
     assert_eq!(tool.permission_level(), PermissionLevel::Dangerous);

@@ -3,8 +3,8 @@
 use super::subagent_abort_report::AbortReport;
 use crate::agent::orchestration::running_subagents;
 use crate::agent::orchestration::subagent_sessions::{
-    self, DurableSubagentStatus, SubagentSessionSelector, SubagentSessionStore,
-    SubagentSessionUpsert,
+    self, DurableSubagentSession, DurableSubagentStatus, SubagentSessionSelector,
+    SubagentSessionStore, SubagentSessionUpsert,
 };
 use crate::agent::orchestration::tools::dispatch::incomplete_stop;
 use crate::agent::subagent_host::SubagentRunOptions;
@@ -130,13 +130,14 @@ async fn steer_reusable_session(
     let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> = Arc::new(move |_| owner.clone());
     let jobs =
         (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&context.dispatch_ctx())).clone();
-    let store: Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore> = Arc::new(
-        crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
-            product_parent.workspace_dir.clone(),
-            product_parent.session_id.clone(),
-            thread_id.clone(),
-        ),
-    );
+    let store = crate::agent::orchestration::subagent_sessions::open_for_context(
+        &context.dispatch_ctx(),
+        product_parent.workspace_dir.clone(),
+        product_parent.session_id.clone(),
+        thread_id.clone(),
+        Some(jobs.clone()),
+    )
+    .map_err(|error| format!("open scoped subagent sessions: {error}"))?;
     let parent_session = product_parent.session_id.clone();
     let dispatch = SubAgentMessageTool::new(jobs)
         .with_tool_name("steer_subagent")
@@ -367,6 +368,8 @@ impl SpawnSubagentTool {
 #[path = "spawn_subagent_completion.rs"]
 mod completion;
 
+include!("spawn_subagent_driver_lookup.rs");
+include!("spawn_subagent_preflight.rs");
 include!("spawn_subagent_host_impl.rs");
 include!("spawn_subagent_request.rs");
 include!("spawn_subagent_projection.rs");

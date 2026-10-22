@@ -24,8 +24,8 @@ is adapters that hand TinyAgents the things only OpenHuman knows.
      | (stateful, per thread)            | (stateless, caller owns history)
      v                                   v
   +-----------------------------------------------------------------+
-  | agent/session_host/            agent/bus.rs + harness/graph.rs  |
-  |   builder, hooks, codec, driver                                 |
+  | agent/session_host/            agent/bus.rs + channels/runtime/ |
+  |   builder, hooks, codec, driver  turn_driver.rs                  |
   +-----------------------------------------------------------------+
      |                                   |
      v                                   v
@@ -150,9 +150,11 @@ In order:
     `AgentError`) and returns the final text.
 
 The bus path is shorter. `bus.rs` scopes the origin, sandbox mode and file
-state agent id, then calls `harness::run_channel_turn_via_graph`
-([`harness/graph.rs`](./harness/graph.rs)), which calls `TurnSpec::run`. There is
-no TinyAgents `Session`: the caller owns the history vector, and
+state agent id, then calls
+`channels::runtime::turn_driver::run_channel_turn`
+([`../channels/runtime/turn_driver.rs`](../channels/runtime/turn_driver.rs)),
+which calls `TurnSpec::run`. There is no TinyAgents `Session`: the caller owns
+the history vector, and
 `ask_user_clarification` is an early-exit tool whose question becomes the
 reply.
 
@@ -274,7 +276,7 @@ Turn execution:
 | --- | --- |
 | `session_host/` | `OpenHumanSessionHost`: builder, runtime session, driver, hooks, transcript codec, resume and recorded tools ([README](session_host/README.md)) |
 | `tinyagents/` | Adapter seam onto the TinyAgents harness: turn runner, model source, middleware stack, `host/` capability adapters, event bridge, journal, replay RPC ([README](tinyagents/README.md)) |
-| `harness/` | Agent definitions and loader, parent/fork context types, sandbox and spawn-depth context, oversized tool-result artifacts, the channel/CLI turn graph ([README](harness/README.md)) |
+| `harness/` | Agent definitions and loader, parent/fork context types, sandbox and spawn-depth context, oversized tool-result artifacts ([README](harness/README.md)) |
 | `bus.rs` | The `agent.run_turn` native request handler (`AgentTurnRequest` to `AgentTurnResponse`) |
 | `progress.rs` | `AgentProgress`, the event enum every turn streams to its observer |
 | [`progress_sink.rs`](./progress_sink.rs) | The `ProgressSink` channel type an in-process embedder hands a turn (carried on `AgentChatEnv`) |

@@ -166,10 +166,14 @@ pub fn all_tools_with_runtime_and_pack_handle(
     #[cfg(feature = "web3")]
     tools.extend(crate::web3::wallet::tools::all_agent_tools());
     tools.append(&mut vec![
-        Box::new(ScheduleTool::new(security.clone(), root_config.clone())),
+        Box::new(crate::cron::tools::ScheduleTool::new(
+            security.clone(),
+            root_config.clone(),
+        )),
         Box::new(ProxyConfigTool::new(config.clone(), security.clone())),
-        Box::new(UpdateCheckTool::new()),
-        Box::new(UpdateApplyTool::new(security.clone())),
+    ]);
+    tools.extend(crate::platform::update::registered_tools(security.clone()));
+    tools.append(&mut vec![
         Box::new(GitOperationsTool::new(
             security.clone(),
             action_dir.to_path_buf(),

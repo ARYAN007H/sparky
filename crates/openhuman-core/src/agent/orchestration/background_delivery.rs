@@ -49,7 +49,7 @@ use super::background_completions;
 use super::busy_guard::is_busy;
 use super::completion_notice::build_undelivered_notice;
 use super::completion_owners;
-use super::delivery_drain::{DrainFence, RECOVERY_BUSY_POLL};
+use super::delivery_drain::DrainFence;
 #[path = "delivery_events.rs"]
 mod delivery_events;
 use crate::core::runtime::CoreContext;
@@ -154,7 +154,13 @@ fn schedule_delivery_inner(
                 "[background_delivery] recovered drain still busy; waiting again \
                  thread_id={thread_id}"
             );
-            schedule_delivery_inner(ctx, thread_id, RECOVERY_BUSY_POLL, true, fence);
+            schedule_delivery_inner(
+                ctx,
+                thread_id,
+                CompletionDeliveryConfig::default().busy_poll,
+                true,
+                fence,
+            );
         }
     });
 }
@@ -247,8 +253,8 @@ where
             debounce: initial_delay,
             recovery_delay: RECOVERY_DELAY,
             retry_backoff: Duration::from_secs(2),
-            busy_poll: RECOVERY_BUSY_POLL,
-            max_busy_polls: super::delivery_drain::RECOVERY_BUSY_POLLS,
+            busy_poll: CompletionDeliveryConfig::default().busy_poll,
+            max_busy_polls: CompletionDeliveryConfig::default().max_busy_polls,
             batch_size: usize::MAX,
         },
         delivery_leases().clone(),
