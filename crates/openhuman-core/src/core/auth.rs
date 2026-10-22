@@ -35,8 +35,6 @@ use std::sync::OnceLock;
 
 #[cfg(unix)]
 use std::io::Write as _;
-#[cfg(unix)]
-use std::os::unix::fs::OpenOptionsExt as _;
 
 // The axum RPC-auth middleware + the `/v1` external-inference bearer helpers
 // are exclusive to the `http-server` feature (#5048). The always-compiled token
@@ -228,16 +226,17 @@ fn write_token_file(path: &Path, token: &str) -> anyhow::Result<()> {
 
     #[cfg(unix)]
     {
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(path)?;
-        // `mode` applies only when the file is created; an existing file keeps
-        // its old mode, so tighten it before the new token is written.
-        file.set_permissions(std::os::unix::fs::PermissionsExt::from_mode(0o600))?;
+        // Publish through a fresh 0600 inode and rename it over the old file:
+        // chmod on an existing file neither revokes descriptors already open on
+        // it nor survives a failed rewrite, and the old token stays intact
+        // until the rename succeeds.
+        let dir = path
+            .parent()
+            .filter(|d| !d.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        let mut file = tempfile::NamedTempFile::new_in(dir)?;
         file.write_all(token.as_bytes())?;
+        file.persist(path)?;
     }
 
     #[cfg(not(unix))]

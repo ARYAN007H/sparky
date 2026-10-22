@@ -127,3 +127,22 @@ fn token_file_tightens_preexisting_loose_permissions() {
     );
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
 }
+
+#[cfg(unix)]
+#[test]
+fn a_descriptor_open_on_the_old_token_never_sees_the_new_one() {
+    use std::io::{Read as _, Seek as _};
+
+    // Someone who opened the old (loose) file keeps that descriptor after a
+    // chmod; the rewrite must land on a new inode so it reads only the old token.
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("core.token");
+    std::fs::write(&path, "old").unwrap();
+    let mut held = std::fs::File::open(&path).unwrap();
+    write_token_file(&path, "new").unwrap();
+    let mut seen = String::new();
+    held.rewind().unwrap();
+    held.read_to_string(&mut seen).unwrap();
+    assert_eq!(seen, "old");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
+}
