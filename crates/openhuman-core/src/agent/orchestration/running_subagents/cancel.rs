@@ -102,11 +102,25 @@ pub(crate) async fn cancel_by_task_with_workspace_reason(
         session.subagent_session_id.clone(),
     )
     .map_err(|error| format!("failed to load parent epoch: {error}"))?;
-    let already_finished = job.as_ref().and_then(|job| match job.status {
-        SubAgentJobStatus::Completed => Some(FinishedOutcome::Completed),
-        SubAgentJobStatus::Failed | SubAgentJobStatus::Incomplete => Some(FinishedOutcome::Failed),
-        _ => None,
-    });
+    let already_finished = job
+        .as_ref()
+        .and_then(|job| match job.status {
+            SubAgentJobStatus::Completed => Some(FinishedOutcome::Completed),
+            SubAgentJobStatus::Failed | SubAgentJobStatus::Incomplete => {
+                Some(FinishedOutcome::Failed)
+            }
+            _ => None,
+        })
+        .or_else(|| match session.status {
+            tinyagents_orchestration::subagent::DurableSubagentStatus::Idle => {
+                Some(FinishedOutcome::Completed)
+            }
+            tinyagents_orchestration::subagent::DurableSubagentStatus::Failed
+            | tinyagents_orchestration::subagent::DurableSubagentStatus::Closed => {
+                Some(FinishedOutcome::Failed)
+            }
+            _ => None,
+        });
     let was_paused =
         session.status == tinyagents_orchestration::subagent::DurableSubagentStatus::AwaitingUser;
     if already_finished.is_none() {

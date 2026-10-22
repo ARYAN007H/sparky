@@ -175,6 +175,11 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         .get(alice_job_id.as_str())
         .expect("real child is registered in Alice's scoped driver registry");
     assert_eq!(alice_job.status, SubAgentJobStatus::Running);
+    assert!(
+        crate::agent::orchestration::completion_owners::driver_task_owner(&alice_ctx, &task_id,)
+            .is_some(),
+        "spawn records Alice's exact task owner scope"
+    );
 
     let bob_ctx = DispatchCtx::new(Arc::clone(&bob));
     let bob_job_registry = crate::core::runtime::slot_for::<

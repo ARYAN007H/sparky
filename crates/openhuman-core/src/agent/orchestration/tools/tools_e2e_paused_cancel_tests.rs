@@ -143,6 +143,14 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         Some("paused-cancel-rpc-thread")
     );
     assert!(before_row.lifecycle_key.is_some());
+    assert!(
+        crate::agent::orchestration::completion_owners::driver_task_owner(
+            &live.data.dispatch_ctx(),
+            &task_id,
+        )
+        .is_some(),
+        "spawn records the owner scope needed by the cancel RPC"
+    );
     assert_eq!(
         live.data
             .dispatch_ctx()
