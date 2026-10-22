@@ -164,12 +164,30 @@ async fn legacy_tinyflows_files_are_imported_into_a_configured_backend() {
     let before = digest(workspace.path());
     case.install();
 
-    for report in openhuman_core::storage::import::run(
+    let reports = openhuman_core::storage::import::run(
         &openhuman_core::core::runtime::DispatchCtx::process_default(),
         &config,
     )
-    .await
+    .await;
+    if !case
+        .backend()
+        .capabilities()
+        .contains(tinystoragedrivers::Capability::ConditionalWrites)
     {
+        let error = reports
+            .into_iter()
+            .find(|report| report.domain == "flows")
+            .expect("flow importer should report its capability refusal")
+            .outcome
+            .expect_err("memory backend must refuse an import without conditional writes");
+        assert!(
+            format!("{error:#}").contains("conditional_writes"),
+            "memory backend should explain why the import was refused: {error:#}"
+        );
+        assert_eq!(digest(workspace.path()), before, "a legacy file was modified");
+        return;
+    }
+    for report in reports {
         report.outcome.unwrap();
     }
 
