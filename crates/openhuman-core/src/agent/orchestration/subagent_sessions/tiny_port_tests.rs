@@ -22,14 +22,14 @@ async fn driver_session_store_uses_the_explicit_profile_scope() {
                 .session_agent(profile),
         )
     };
-    let alice = OpenHumanTinySubagentSessionStore::open_for_context(
+    let alice = open_for_context(
         &DispatchCtx::new(make_context("session-owner-alice")),
         workspace.clone(),
         "alice-session",
         Some("shared-thread".into()),
     )
     .expect("open Alice's explicitly scoped store");
-    let bob = OpenHumanTinySubagentSessionStore::open_for_context(
+    let bob = open_for_context(
         &DispatchCtx::new(make_context("session-owner-bob")),
         workspace.clone(),
         "bob-session",
@@ -58,7 +58,8 @@ async fn driver_session_store_uses_the_explicit_profile_scope() {
         task_id: task_id.into(),
         force_fresh: false,
     };
-    alice.upsert_running(upsert("alice-session", "alice-task"))
+    alice
+        .upsert_running(upsert("alice-session", "alice-task"))
         .await
         .expect("write Alice's row");
     bob.upsert_running(upsert("bob-session", "bob-task"))

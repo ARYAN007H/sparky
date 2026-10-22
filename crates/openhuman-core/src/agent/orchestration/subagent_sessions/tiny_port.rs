@@ -1,16 +1,67 @@
 //! Adapter from TinyAgents' durable subagent-session port to OpenHuman storage.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use tinyagents_orchestration::subagent::{
-    DurableSubagentSession as TinySession, DurableSubagentStatus as TinyStatus,
-    ReuseDecision as TinyReuseDecision, SubagentError, SubagentSessionSelector as TinySelector,
+    DriverSubagentSessionStore, DurableSubagentSession as TinySession,
+    DurableSubagentStatus as TinyStatus, ReuseDecision as TinyReuseDecision,
+    ScopedSubagentSessionStore, SubagentError, SubagentSessionSelector as TinySelector,
     SubagentSessionStore as TinySessionStore, SubagentSessionUpsert as TinyUpsert,
 };
 
 use super::types::{DurableSubagentSession, DurableSubagentStatus, SubagentSessionSelector};
 use super::{SubagentSessionStore, SubagentSessionUpsert};
+
+/// Opens TinyAgents' async session store in the caller's explicit storage
+/// scope and binds it to one parent session/thread. The core's storage handle
+/// is captured before returning, so later trait calls never consult ambient
+/// task-local scope.
+pub(crate) fn open_for_context(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: PathBuf,
+    parent_session: impl Into<String>,
+    parent_thread_id: Option<String>,
+    jobs: Option<tinyagents_harness_tools::subagents::SubAgentJobRegistry>,
+) -> Result<Arc<dyn TinySessionStore>, SubagentError> {
+    const DOMAIN: &str = "subagent_sessions";
+    let open_documents = || {
+        let opened = crate::storage::local::open(DOMAIN, &workspace_dir).map_err(|error| {
+            SubagentError::Persistence(format!("open session store: {error:#}"))
+        })?;
+        let scoped = opened.scoped().map_err(|error| {
+            SubagentError::Persistence(format!("scope session store: {error:#}"))
+        })?;
+        Ok::<_, SubagentError>(Arc::clone(scoped.documents()))
+    };
+    let context = ctx.resolved().ok_or_else(|| {
+        SubagentError::Persistence("subagent session store has no resolved owner scope".into())
+    })?;
+    let documents = crate::core::runtime::CoreContext::sync_scope(context, open_documents)?;
+    let driver = Arc::new(DriverSubagentSessionStore::new(documents)?);
+    let parent_session = parent_session.into();
+    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &workspace_dir,
+        &parent_session,
+        parent_thread_id.as_deref(),
+    );
+    let scoped = if let Some(jobs) = jobs {
+        ScopedSubagentSessionStore::with_close_callback(
+            driver,
+            parent_session,
+            parent_thread_id,
+            move |_session_id, _task_id, key| {
+                if let Err(error) = jobs.cancel_key_owned(key, owner.clone()) {
+                    log::debug!("[subagent_sessions] close cancellation was not applied: {error}");
+                }
+            },
+        )
+    } else {
+        ScopedSubagentSessionStore::new(driver, parent_session, parent_thread_id)
+    };
+    Ok(Arc::new(scoped))
+}
 
 /// Routes generic Jobs/Message session operations through OpenHuman's existing
 /// workspace-scoped session store. Legacy rows acquire a lifecycle key only
