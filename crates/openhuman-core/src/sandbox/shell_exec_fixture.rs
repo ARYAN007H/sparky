@@ -59,8 +59,8 @@ pub(crate) async fn run(run: NativeShellRun) -> anyhow::Result<SandboxExecResult
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
-    tinytools_std::timeout::own_process_group(command.as_std_mut());
-    match tinytools_std::timeout::output_or_kill(&mut command, run.timeout).await {
+    tinyagents_harness_tools::exec::timeout::own_process_group(command.as_std_mut());
+    match tinyagents_harness_tools::exec::timeout::output_or_kill(&mut command, run.timeout).await {
         Ok(Ok(output)) => {
             // The module streams output into the caller's meter as it reads it;
             // the fixture folds the finished output in the same way.

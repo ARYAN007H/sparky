@@ -102,7 +102,7 @@ tinyflows-import = { path = "../../vendor/tinyflows/crates/tinyflows-import", de
 # below as its own path dependency for the same "one checkout, one type
 # identity" reason `tinytools` is.
 tinyagents-hooks = { workspace = true, features = ["goals"] }
-tinyagents-harness-tools = { workspace = true, features = ["goals", "todos", "skills", "subagents", "plan-review"] }
+tinyagents-harness-tools = { workspace = true, features = ["goals", "todos", "skills", "subagents", "fs", "net", "exec", "plan-review"] }
 tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", features = [
     "sqlite",
     "multimodal",
@@ -158,7 +158,6 @@ tinyinference-voice = { path = "../../vendor/tinyagents/vendor/tinyinference/cra
 # crates. After cloning: `git submodule update --init --recursive vendor/`.
 tinytools = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinytools" }
 tinytools-agent = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinytools-agent" }
-tinytools-std = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinytools-std" }
 
 
 # TinyMemory (https://github.com/tinyhumansai/tinymemory), three crates:

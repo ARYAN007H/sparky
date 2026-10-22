@@ -1,9 +1,9 @@
 //! Network tools: GitBooks docs lookup and (under the
 //! `mcp` feature) the MCP client/setup tools, plus the host adapter for the
-//! tools that live in `tinytools_std::network` (`http_request`, `web_fetch`,
+//! tools that live in `tinyagents_harness_tools::net::network` (`http_request`, `web_fetch`,
 //! `curl`, `pushover`). [`gate`] implements `NetGate` for `SecurityPolicy` and
 //! [`host`] supplies the limits, HTML engine and x402 payment hook those tools
-//! are handed. `url_guard` (in `tinytools_std`) is the shared SSRF/allowlist
+//! are handed. `url_guard` (in `tinyagents_harness`) is the shared SSRF/allowlist
 //! validator. Registration gates are documented in `tools/impl/README.md`.
 
 mod gate;

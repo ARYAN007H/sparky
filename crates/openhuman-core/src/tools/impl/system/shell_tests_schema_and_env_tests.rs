@@ -1,4 +1,5 @@
 use super::*;
+use tinytools::ToolTimeout;
 
 #[tokio::test]
 async fn configured_shell_fails_closed_when_tinybox_analysis_is_disabled() {
@@ -296,7 +297,7 @@ fn shell_timeout_honors_explicit_per_call_value() {
     assert_eq!(
         tool.explicit_timeout(Some(9_999)),
         Some(Duration::from_secs(
-            tinytools_std::timeout::MAX_TIMEOUT_SECS
+            tinyagents_harness_tools::exec::timeout::MAX_TIMEOUT_SECS
         ))
     );
 }
