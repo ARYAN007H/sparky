@@ -1507,7 +1507,7 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
           rtLog('approval_decided', {
             thread: event.thread_id,
             request: event.request_id,
-            resolution: event.resolution,
+            resolution: event.cancel_reason,
           });
           // Only a server-recorded TERMINAL non-decision (TTL expiry, an
           // external cancel) needs handling here: an interactive decision made

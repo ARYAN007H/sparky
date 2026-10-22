@@ -920,7 +920,7 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-plan-decided',
           request_id: 'pr-decided',
           decision: 'reject',
-          resolution: 'cancelled',
+          cancel_reason: 'cancelled',
         });
       });
 

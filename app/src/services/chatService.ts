@@ -1339,7 +1339,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
         EVENTS.approvalDecided,
         e.thread_id,
         e.request_id,
-        e.cancel_reason
+        e.resolution
       );
       listeners.onApprovalDecided?.(e);
     };
@@ -1365,7 +1365,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
         EVENTS.planReviewDecided,
         e.thread_id,
         e.request_id,
-        e.resolution
+        e.cancel_reason
       );
       listeners.onPlanReviewDecided?.(e);
     };
