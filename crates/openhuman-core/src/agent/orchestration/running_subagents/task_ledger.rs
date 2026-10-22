@@ -14,8 +14,8 @@ use tinyagents_orchestration::subagent::{
     orphaned_subagent_reason, record_agent_id, record_parent_session, task_status_label,
 };
 use tinyagents_tasks::{
-    reconcile_orphaned_tasks, DriverTaskStore, InMemoryTaskStore, OrchestrationTaskFilter,
-    TaskStore, TaskStoreRegistry,
+    InMemoryTaskStore, OrchestrationTaskFilter, TaskStore, TaskStoreRegistry,
+    open_driver_task_store_or_memory, reconcile_orphaned_tasks,
 };
 
 /// One cached ledger: a workspace and the storage scope it was opened for.
@@ -49,9 +49,9 @@ fn task_stores() -> &'static TaskStoreRegistry<LedgerKey> {
 fn open_driver_store(workspace_dir: &Path) -> anyhow::Result<Arc<dyn TaskStore>> {
     let opened = crate::storage::local::open(DOMAIN, workspace_dir)?;
     let scoped = opened.scoped()?;
-    let store = DriverTaskStore::new(Arc::clone(scoped.documents()))
-        .map_err(|error| anyhow::anyhow!("start the task store bridge: {error}"))?;
-    Ok(Arc::new(store))
+    Ok(open_driver_task_store_or_memory(Arc::clone(
+        scoped.documents(),
+    )))
 }
 
 /// The cache key for this call: the storage scope joins the workspace, so two

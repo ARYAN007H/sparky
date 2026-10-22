@@ -2,8 +2,8 @@
 
 use super::*;
 use tinyagents_tasks::{
-    CompletionRouterPool, CompletionStoreReplaceOutcome, DriverCompletionStore,
-    InMemoryCompletionStore, DEFAULT_MAX_ATTEMPTS,
+    CompletionRouterPool, CompletionStoreFallback, CompletionStoreReplaceOutcome,
+    InMemoryCompletionStore, DEFAULT_MAX_ATTEMPTS, open_driver_completion_store_or_memory,
 };
 
 pub(in crate::agent::orchestration) fn router_scope_for(
@@ -37,9 +37,13 @@ pub(in crate::agent::orchestration) fn open_driver_store(
         // previous document-backed adapter. The owner API now needs the
         // backend and exact scope so it can provide its own fenced store.
         let opened = crate::storage::local::open("background_completions", workspace_dir)?;
-        let store = DriverCompletionStore::new(opened.backend, opened.scope)
-            .map_err(|error| anyhow::anyhow!("start the completion store bridge: {error}"))?;
-        Ok(Arc::new(store) as Arc<dyn CompletionStore>)
+        let fallback = if crate::storage::installed_is_shared() {
+            CompletionStoreFallback::FailClosed
+        } else {
+            CompletionStoreFallback::LocalMemory
+        };
+        open_driver_completion_store_or_memory(opened.backend, opened.scope, fallback)
+            .map_err(|error| anyhow::anyhow!("open the completion store: {error}"))
     })
 }
 
