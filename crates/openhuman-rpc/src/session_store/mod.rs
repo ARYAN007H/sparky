@@ -184,8 +184,10 @@ async fn provider_for_url_with(
         .context("opening the configured storage backend")?;
     let recover = recover_on_open
         .unwrap_or_else(|| !crate::core_host::storage::driver_is_shared(backend.driver()));
-    let provider = TenantSessionStores::new(Arc::clone(&backend), recover)
-        .context("starting the session store")?;
+    let provider = Arc::new(
+        TenantSessionStores::new(Arc::clone(&backend), recover)
+            .context("starting the session store")?,
+    );
     // Only a fully working bridge makes the backend the process's storage.
     crate::core_host::storage::install_for_url(&url, backend);
     log::info!(
