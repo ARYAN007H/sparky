@@ -4,7 +4,9 @@
 //! to that catalog: no shell, writes, network, memory, skills, MCP or delegation.
 //! Assertions inspect provider requests and attempted filesystem effects.
 
-mod common;
+#![allow(dead_code)] // Each test target includes the shared scenarios but runs one case.
+
+use crate::common;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -149,8 +151,7 @@ fn system_text(request: &Request) -> String {
         .join("\n")
 }
 
-#[test]
-fn host_only_advertises_exactly_the_host_tools_under_a_bare_prompt() {
+pub fn host_only_advertises_exactly_the_host_tools_under_a_bare_prompt() {
     let _guard = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -184,8 +185,7 @@ fn host_only_advertises_exactly_the_host_tools_under_a_bare_prompt() {
     });
 }
 
-#[test]
-fn host_only_refuses_builtin_tools_the_model_names() {
+pub fn host_only_refuses_builtin_tools_the_model_names() {
     let _guard = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -248,8 +248,7 @@ fn host_only_refuses_builtin_tools_the_model_names() {
     });
 }
 
-#[test]
-fn host_only_forces_read_only_access_and_sandbox() {
+pub fn host_only_forces_read_only_access_and_sandbox() {
     let _guard = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);

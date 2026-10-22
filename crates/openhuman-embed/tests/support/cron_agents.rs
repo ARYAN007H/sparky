@@ -6,7 +6,9 @@
 //! decides the run's recorded result. And a runtime that asks for background
 //! services runs the scheduler, then stops it when it is dropped.
 
-mod common;
+#![allow(dead_code)] // Each test target includes the shared scenarios but runs one case.
+
+use crate::common;
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -94,8 +96,7 @@ async fn wait_for_services_changed(events: &mut RuntimeEvents, running: bool) {
     .unwrap_or_else(|_| panic!("timed out waiting for services running={running}"));
 }
 
-#[test]
-fn a_scheduled_job_runs_a_runtime_agent_with_its_host_tool_as_cron() {
+pub fn a_scheduled_job_runs_a_runtime_agent_with_its_host_tool_as_cron() {
     let _lock = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -223,8 +224,7 @@ fn a_scheduled_job_runs_a_runtime_agent_with_its_host_tool_as_cron() {
     });
 }
 
-#[test]
-fn background_services_drive_the_scheduler_and_stop_with_the_runtime() {
+pub fn background_services_drive_the_scheduler_and_stop_with_the_runtime() {
     let _lock = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -330,8 +330,7 @@ fn background_services_drive_the_scheduler_and_stop_with_the_runtime() {
 /// so a system job already due at boot finds its handler in place: here the
 /// job is stored and due before the handler exists, and the first run the
 /// scheduler records is the handler's.
-#[test]
-fn deferred_services_wait_for_the_host_so_a_due_job_finds_its_handler() {
+pub fn deferred_services_wait_for_the_host_so_a_due_job_finds_its_handler() {
     let _lock = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
