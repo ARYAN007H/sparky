@@ -115,13 +115,8 @@ pub(super) fn driver_error_with_snapshot(
         // The model's streamed narration was stopped before it could repeat
         // indefinitely. Preserve the completed tools as a useful, bounded
         // partial rather than showing only the failed model's process text.
-        let results = crate::agent::session_host::turn_checkpoint::results_from_tool_outcomes(
-            &guard.tool_outcomes,
-        );
-        let evidence = crate::agent::session_host::turn_checkpoint::render_tool_results(
-            &results,
-            crate::agent::session_host::turn_checkpoint::CHECKPOINT_TOTAL_CHARS,
-        );
+        let results = crate::agent::session_host::product_copy::close_results(&guard.tool_outcomes);
+        let evidence = crate::agent::session_host::product_copy::render_close_results(&results, 4_000);
         format!(
             "I stopped a repetitive model response before it could finish. Here are the completed tool results I can report:\n{evidence}"
         )
