@@ -57,6 +57,66 @@ pub(crate) fn parent_epoch_from_sidecar(
     .map_err(|error| SubagentError::Persistence(format!("read parent epoch: {error}")))
 }
 
+pub(crate) fn set_parent_epoch_for_context(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+    session_id: String,
+    parent_epoch: Option<u64>,
+) -> Result<(), SubagentError> {
+    const DOMAIN: &str = "subagent_sessions";
+    let open_documents = || {
+        let opened = crate::storage::local::open(DOMAIN, workspace_dir).map_err(|error| {
+            SubagentError::Persistence(format!("open session store: {error:#}"))
+        })?;
+        let scoped = opened.scoped().map_err(|error| {
+            SubagentError::Persistence(format!("scope session store: {error:#}"))
+        })?;
+        Ok::<_, SubagentError>(Arc::clone(scoped.documents()))
+    };
+    let context = ctx.resolved().ok_or_else(|| {
+        SubagentError::Persistence("subagent session store has no resolved owner scope".into())
+    })?;
+    let documents = crate::core::runtime::CoreContext::sync_scope(context, open_documents)?;
+    import_parent_epoch(documents, session_id, parent_epoch)
+}
+
+pub(crate) fn host_projection(
+    session: TinySession,
+    parent_epoch: Option<u64>,
+) -> DurableSubagentSession {
+    DurableSubagentSession {
+        subagent_session_id: session.subagent_session_id,
+        parent_session: session.parent_session,
+        parent_thread_id: session.parent_thread_id,
+        worker_thread_id: session.worker_thread_id,
+        agent_id: session.agent_id,
+        display_name: session.display_name,
+        model: session.model,
+        sandbox_mode: session.sandbox_mode,
+        action_root: session.action_root,
+        task_key: session.task_key,
+        task_title: session.task_title,
+        current_task_id: session.current_task_id,
+        lifecycle_key: session.lifecycle_key,
+        parent_epoch,
+        status: match session.status {
+            TinyStatus::Running => DurableSubagentStatus::Running,
+            TinyStatus::Idle => DurableSubagentStatus::Idle,
+            TinyStatus::AwaitingUser => DurableSubagentStatus::AwaitingUser,
+            TinyStatus::Failed => DurableSubagentStatus::Failed,
+            TinyStatus::Closed => DurableSubagentStatus::Closed,
+        },
+        reusable: session.reusable,
+        latest_history: session.latest_history.map(|history| {
+            tinyagents_runtime::transcript::messages_to_display_transcript(&history)
+        }),
+        latest_error: session.latest_error,
+        created_at: session.created_at,
+        updated_at: session.updated_at,
+        last_used_at: session.last_used_at,
+    }
+}
+
 /// Opens TinyAgents' async session store in the caller's explicit storage
 /// scope and binds it to one parent session/thread. The core's storage handle
 /// is captured before returning, so later trait calls never consult ambient
