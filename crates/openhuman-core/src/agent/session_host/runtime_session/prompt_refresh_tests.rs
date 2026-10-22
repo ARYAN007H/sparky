@@ -541,35 +541,48 @@ async fn a_composed_prompt_waits_for_the_integrations_to_be_read() {
     assert_eq!(prepared.prefix, Some(current().refreshing()));
 }
 
-#[tokio::test]
-async fn refresh_log_names_the_prefix_in_use() {
-    let root = tempfile::tempdir().expect("tempdir");
-    let prelude = prelude(root.path(), "current", true);
-    let recorded = PrefixSnapshot::new(vec![Message::system("recorded")]);
-    let history = [Message::system("recorded"), Message::user("hi")];
-    let capture = LogCapture::default();
-    let subscriber = tracing_subscriber::fmt()
-        .with_writer(capture.clone())
-        .with_ansi(false)
-        .with_max_level(tracing::Level::INFO)
-        .finish();
-    let _subscriber_guard = tracing::subscriber::set_default(subscriber);
+#[test]
+fn refresh_log_names_the_prefix_in_use() {
+    std::thread::Builder::new()
+        .stack_size(crate::core::runtime::AGENT_WORKER_STACK_BYTES)
+        .spawn(|| {
+            let root = tempfile::tempdir().expect("tempdir");
+            let prelude = prelude(root.path(), "current", true);
+            let recorded = PrefixSnapshot::new(vec![Message::system("recorded")]);
+            let history = [Message::system("recorded"), Message::user("hi")];
+            let capture = LogCapture::default();
+            let subscriber = tracing_subscriber::fmt()
+                .with_writer(capture.clone())
+                .with_ansi(false)
+                .with_max_level(tracing::Level::INFO)
+                .finish();
+            let _subscriber_guard = tracing::subscriber::set_default(subscriber);
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("test runtime")
+                .block_on(async {
+                    prelude
+                        .prepare_turn(
+                            false,
+                            &resumed(&recorded, &history),
+                            &snapshot(3),
+                            &mut request(),
+                        )
+                        .await
+                        .expect("prepared turn");
+                });
 
-    prelude
-        .prepare_turn(
-            false,
-            &resumed(&recorded, &history),
-            &snapshot(3),
-            &mut request(),
-        )
-        .await
-        .expect("prepared turn");
-
-    let logs = String::from_utf8(capture.0.lock().unwrap().clone()).expect("UTF-8 logs");
-    assert!(
-        logs.contains("prefix_in_use=\"refreshed\"") && logs.contains("reason=\"prompt_changed\""),
-        "refresh log should identify the prefix and why it is used: {logs}"
-    );
+            let logs = String::from_utf8(capture.0.lock().unwrap().clone()).expect("UTF-8 logs");
+            assert!(
+                logs.contains("prefix_in_use=\"refreshed\"")
+                    && logs.contains("reason=\"prompt_changed\""),
+                "refresh log should identify the prefix and why it is used: {logs}"
+            );
+        })
+        .expect("test thread")
+        .join()
+        .expect("test thread panicked");
 }
 
 fn failing_prompt(_: &PromptContext<'_>) -> anyhow::Result<String> {
