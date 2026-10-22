@@ -15,7 +15,6 @@ use super::{
         try_create_claude_code_chat_model_for_inspection,
     },
     InspectionOutputBudgetCapability, InspectionRequestIdentity, PreparedInspectionChatModel,
-    PROVIDER_OPENHUMAN,
 };
 use crate::config::resolve_primary_cloud_provider_string;
 use crate::config::Config;

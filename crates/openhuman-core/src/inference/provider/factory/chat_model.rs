@@ -3,11 +3,17 @@
 
 use super::{
     access_gates::{emit_inference_egress, enforce_local_only_inference},
-    cloud_slug::{resolve_cloud_slug_for, resolve_cloud_slug_with_access},
+    cloud_slug::{
+        resolve_cloud_slug_for, resolve_cloud_slug_with_access,
+        try_create_cloud_slug_chat_model_from_string_with_native_tools_for,
+    },
     credentials::CredentialAccess,
+    local_runtime::try_create_local_runtime_chat_model_from_string,
     provider_for_role, BYOK_INCOMPLETE_SENTINEL, CLAUDE_AGENT_SDK_PREFIX,
-    CLAUDE_AGENT_SDK_PROVIDER, PROVIDER_OPENHUMAN,
+    subprocess_providers::OpenHumanMcpEndpoint, CLAUDE_AGENT_SDK_PROVIDER, PROVIDER_OPENHUMAN,
 };
+#[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
+use super::test_provider_override;
 use crate::config::ops::resolve_primary_cloud_provider_string;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;

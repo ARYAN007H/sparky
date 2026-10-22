@@ -44,25 +44,10 @@ pub(crate) use routing::{workload_router, ConfigRouteSource};
 
 // Factory-internal helpers shared across the implementation modules.
 use access_gates::{emit_inference_egress, enforce_local_only_inference};
-use chat_model::{unresolved_chat_model_error_for_access, with_default_temperature};
 #[cfg(test)]
 use cloud_slug::try_create_cloud_slug_chat_model;
-use cloud_slug::{
-    resolve_cloud_slug_with_access, try_create_cloud_slug_chat_model_for_inspection_with_identity,
-    try_create_cloud_slug_chat_model_from_string_with_native_tools_for,
-};
-use credentials::CredentialAccess;
-use local_runtime::{
-    try_create_local_runtime_chat_model_for_inspection,
-    try_create_local_runtime_chat_model_from_string, OptionalChatModelResult,
-};
-use managed_backend::managed_chat_model_for;
 pub(crate) use managed_backend::{
     make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread_in,
-};
-use subprocess_providers::{
-    try_create_claude_agent_sdk_chat_model_for_inspection,
-    try_create_claude_code_chat_model_for_inspection, OpenHumanMcpEndpoint,
 };
 use tinyinference_providers::route::split_model_and_temperature;
 
@@ -87,14 +72,9 @@ mod factory_tests;
 
 use crate::config::schema::cloud_providers::AuthStyle;
 use crate::config::Config;
-use crate::inference::provider::openai_codex::resolve_openai_codex_routing_for_inspection;
 use crate::security::egress::EgressLedger;
 use std::sync::Arc;
 use tinyinference_llm::model::ChatModel;
-use tinyinference_llm::providers::openai::codex::{
-    openai_codex_client_version, openai_codex_user_agent, OPENAI_CODEX_ACCOUNT_HEADER,
-    OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
-};
 
 /// Opaque per-report identity for an inspection completion. It contains the
 /// effective endpoint, exact frozen credential, and actual wire model, but
