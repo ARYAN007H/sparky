@@ -5,11 +5,11 @@ use super::support::{
     counts, envelope, message_to_record, record_to_message, run_to_completion, thread_to_summary,
     workspace_dir,
 };
-use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
+use crate::core::runtime::DispatchCtx;
+use crate::threads::ThreadsError;
 use crate::threads::store as conversations;
 use crate::threads::store::{ConversationMessagePatch, CrossThreadHit};
-use crate::threads::ThreadsError;
 use crate::threads::{
     ApiEnvelope, AppendConversationMessageRequest, ConversationMessageRecord,
     ConversationMessagesRequest, ConversationMessagesResponse, ConversationThreadSummary,
@@ -489,11 +489,9 @@ async fn thread_delete_inner(
     // completion in the gap between the two calls, then discard anything already
     // queued for delivery. Both target a thread that's being deleted, so there's
     // nowhere left to deliver to — abort + cleanup is the whole behavior.
-    let cancelled_legacy = crate::agent::orchestration::running_subagents::cancel_for_thread(
-        &ctx,
-        &request.thread_id,
-    )
-    .await;
+    let cancelled_legacy =
+        crate::agent::orchestration::running_subagents::cancel_for_thread(&ctx, &request.thread_id)
+            .await;
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&ctx);

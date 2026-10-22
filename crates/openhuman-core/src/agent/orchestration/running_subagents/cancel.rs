@@ -343,12 +343,16 @@ pub(crate) async fn cancel_for_thread(
                     cancelled += usize::from(!cancelled_job.status.is_terminal());
                 }
                 Err(error) => {
-                    log::warn!("[running_subagents] driver thread deletion cancellation failed: {error}");
+                    log::warn!(
+                        "[running_subagents] driver thread deletion cancellation failed: {error}"
+                    );
                     continue;
                 }
             }
             if let Err(error) = jobs.wait_owned(job.id.as_str(), &owner_key).await {
-                log::warn!("[running_subagents] failed waiting for deleted-thread child to settle: {error}");
+                log::warn!(
+                    "[running_subagents] failed waiting for deleted-thread child to settle: {error}"
+                );
             }
         }
     }

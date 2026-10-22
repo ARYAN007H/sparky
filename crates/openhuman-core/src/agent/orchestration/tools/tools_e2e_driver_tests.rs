@@ -316,7 +316,7 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
     use crate::agent::orchestration::background_completions::{self, BackgroundAgentOutcome};
     use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
-    use crate::threads::store::{blocking, CreateConversationThread};
+    use crate::threads::store::{CreateConversationThread, blocking};
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness::context::RunContext;
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
