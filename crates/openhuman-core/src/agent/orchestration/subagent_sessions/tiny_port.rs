@@ -13,6 +13,7 @@ use tinyagents_orchestration::subagent::{
 
 use super::types::{DurableSubagentSession, DurableSubagentStatus, SubagentSessionSelector};
 use super::{SubagentSessionStore, SubagentSessionUpsert};
+use crate::storage::DocumentStoreExt;
 
 /// Opens TinyAgents' async session store in the caller's explicit storage
 /// scope and binds it to one parent session/thread. The core's storage handle
@@ -46,7 +47,6 @@ pub(crate) fn open_for_context(
         &workspace_dir,
         &parent_session,
         parent_thread_id.as_deref(),
-        &driver,
         documents,
     )?;
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
@@ -88,7 +88,6 @@ fn import_host_sessions(
     workspace_dir: &std::path::Path,
     parent_session: &str,
     parent_thread_id: Option<&str>,
-    driver: &DriverSubagentSessionStore,
     documents: Arc<dyn crate::storage::DocumentStore>,
 ) -> Result<(), SubagentError> {
     let legacy = SubagentSessionStore::new_in_context(ctx, workspace_dir.to_path_buf())
@@ -101,29 +100,39 @@ fn import_host_sessions(
         parent_thread_id.map(str::to_owned),
     );
     for row in legacy.into_iter().filter(|row| {
-        row.parent_session == parent_session
-            && row.parent_thread_id.as_deref() == parent_thread_id
+        row.parent_session == parent_session && row.parent_thread_id.as_deref() == parent_thread_id
     }) {
         let session = converter.convert(row)?;
-        match driver.get(&session.subagent_session_id) {
-            Ok(Some(_)) => continue,
-            Ok(None) => {}
-            Err(error) => return Err(error),
+        let id = session.subagent_session_id.clone();
+        let docs = Arc::clone(&documents);
+        let existing = crate::storage::block_on(async move {
+            docs.ensure_collection(&tinystoragedrivers::CollectionSpec::new("subagent_sessions"))
+                .await?;
+            docs.get("subagent_sessions", &id).await
+        })
+        .map_err(|error| SubagentError::Persistence(format!("read driver session: {error}")))?;
+        if existing.is_some() {
+            continue;
         }
         // The driver's upsert API intentionally only creates a Running row;
         // import existing terminal/reusable state as its public durable shape.
         let doc = serde_json::to_value(&session)
             .map_err(|error| SubagentError::Persistence(format!("session encode: {error}")))?;
         crate::storage::block_on(async move {
-            documents.ensure_collection(&tinystoragedrivers::CollectionSpec::new("subagent_sessions")).await?;
-            documents.put(
-                "subagent_sessions",
-                &session.subagent_session_id,
-                doc,
-                tinystoragedrivers_core::Precondition::Absent,
-            )
-            .await
-            .map(|_| ())
+            documents
+                .ensure_collection(&tinystoragedrivers::CollectionSpec::new(
+                    "subagent_sessions",
+                ))
+                .await?;
+            documents
+                .put(
+                    "subagent_sessions",
+                    &session.subagent_session_id,
+                    doc,
+                crate::storage::Precondition::Absent,
+                )
+                .await
+                .map(|_| ())
         })
         .map_err(|error| SubagentError::Persistence(format!("import host sessions: {error}")))?;
     }

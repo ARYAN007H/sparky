@@ -43,14 +43,8 @@ async fn driver_store_imports_legacy_rows_without_losing_host_epoch() {
     .unwrap();
     legacy.save(&[row]).unwrap();
 
-    let driver = open_for_context(
-        &dispatch,
-        workspace,
-        "owner",
-        Some("thread".into()),
-        None,
-    )
-    .expect("open explicitly scoped driver store");
+    let driver = open_for_context(&dispatch, workspace, "owner", Some("thread".into()), None)
+        .expect("open explicitly scoped driver store");
     let imported = driver
         .get("legacy-task")
         .await
