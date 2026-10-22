@@ -19,7 +19,7 @@ const pkg = (name, deps = [], source = null, manifest_path) => ({
       : `/repo/vendor/${name}/Cargo.toml`),
   dependencies: deps.map(d => ({ name: d, kind: null, optional: false })),
 });
-const checkMetadata = (input, root = '/repo') => {
+const resolvedMetadata = (input) => {
   const packages = [...input.packages];
   for (const sourcePackage of [...packages]) {
     for (const dependency of sourcePackage.dependencies ?? []) {
@@ -29,22 +29,21 @@ const checkMetadata = (input, root = '/repo') => {
     }
   }
   for (const packageInfo of packages) packageInfo.id ??= packageInfo.name;
-  return checkMetadataAt(
-    {
-      packages,
-      resolve: {
-        nodes: packages.map((packageInfo) => ({
-          id: packageInfo.id,
-          deps: (packageInfo.dependencies ?? []).map((dependency) => ({
-            pkg: dependency.name,
-            dep_kinds: [{ kind: dependency.kind }],
-          })),
+  return {
+    packages,
+    resolve: {
+      nodes: packages.map((packageInfo) => ({
+        id: packageInfo.id,
+        deps: (packageInfo.dependencies ?? []).map((dependency) => ({
+          pkg: dependency.name,
+          dep_kinds: [{ kind: dependency.kind }],
         })),
-      },
+      })),
     },
-    root,
-  );
+  };
 };
+const checkMetadata = (input, root = '/repo') =>
+  checkMetadataAt(resolvedMetadata(input), root);
 const registry = 'registry+https://github.com/rust-lang/crates.io-index';
 
 test('a clean workspace passes', () => {
@@ -88,7 +87,7 @@ test('allowlisted read-only readers may depend on rusqlite, with a reason', () =
 });
 
 test('the report names the offender', () => {
-  assert.match(formatReport(checkMetadata({ packages: [pkg('tinymcp', ['rusqlite'])] })), /tinymcp: depends on rusqlite/);
+  assert.match(formatReport(checkMetadata({ packages: [pkg('tinymcp', ['rusqlite'])] })), /tinymcp: reaches rusqlite/);
   assert.match(formatReport([]), /ok/);
 });
 
@@ -97,8 +96,8 @@ test('CLI exits 1 on a violation, 0 when clean, 2 on unreadable input', () => {
   try {
     const bad = join(dir, 'bad.json');
     const good = join(dir, 'good.json');
-    writeFileSync(bad, JSON.stringify({ packages: [pkg('tinymcp', ['rusqlite'])] }));
-    writeFileSync(good, JSON.stringify({ packages: [pkg('tinymcp')] }));
+    writeFileSync(bad, JSON.stringify(resolvedMetadata({ packages: [pkg('tinymcp', ['rusqlite'])] })));
+    writeFileSync(good, JSON.stringify(resolvedMetadata({ packages: [pkg('tinymcp')] })));
     assert.equal(spawnSync('node', [CHECKER, '--metadata', bad]).status, 1);
     assert.equal(spawnSync('node', [CHECKER, '--metadata', good]).status, 0);
     assert.equal(spawnSync('node', [CHECKER, '--metadata', join(dir, 'missing.json')]).status, 2);
