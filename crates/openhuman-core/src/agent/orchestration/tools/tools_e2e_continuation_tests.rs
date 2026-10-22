@@ -183,10 +183,6 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         ),
         task_key: "pause-resume-fixture".into(),
     };
-    let saved_key = before_session
-        .lifecycle_key
-        .clone()
-        .expect("paused driver session retains lifecycle key");
     let driver_documents_for_read = Arc::clone(&driver_documents);
     let session_id = before_session.subagent_session_id.clone();
     let versioned = crate::storage::block_on(async move {
@@ -210,6 +206,10 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         .with_timezone(&chrono::Utc)
         + chrono::Duration::milliseconds(1);
     persisted.updated_at = updated_at.to_rfc3339();
+    let saved_key = persisted
+        .lifecycle_key
+        .clone()
+        .expect("corrupted paused driver session retains lifecycle key");
     let driver_documents_for_write = Arc::clone(&driver_documents);
     let session_id = before_session.subagent_session_id.clone();
     let persisted_doc = serde_json::to_value(&persisted).expect("encode corrupted driver session");
