@@ -131,12 +131,6 @@ pub(crate) fn repl_tools_for_recorded(
     )
 }
 
-/// Preserve the nested path used by the integration prelude while the actual
-/// implementation and only host-specific adapter residue live here.
-pub mod repl_tools {
-    pub(crate) use super::repl_tools_for_recorded;
-    pub use super::{is_repl_tool, repl_tools, repl_tools_for};
-}
 use tinyjuice_bus::wire::InstallRequest;
 
 use tinyjuice_bus::tools::REPL_TOOLS;

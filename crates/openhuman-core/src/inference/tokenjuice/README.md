@@ -21,7 +21,7 @@ OpenHuman-owned files:
 | [`schemas.rs`](./schemas.rs) | JSON-RPC controller schemas and handlers. |
 | [`config_patch.rs`](./config_patch.rs) | Partial update shape for the `[tokenjuice]` config block. |
 | `tinyjuice-host::generate` | Shared turn-bound, single-use summary callback tickets; OpenHuman still registers the callback bound to its active model turn. |
-| [`repl_tools.rs`](./repl_tools.rs) | OpenHuman's query-source adapter, which binds TinyJuice's shared REPL tools to the active `DispatchCtx` and module configuration. Tool declarations, artifact path checks and execution are owned by `tinyjuice-host`. |
+| `mod.rs::repl_tools_for*` | OpenHuman's query-source adapter, which binds TinyJuice's shared REPL tools to the active `DispatchCtx`, module configuration and artifact directory. Tool declarations, artifact path checks and execution are owned by `tinyjuice-host`. |
 | `tinyjuice-host::retrieve_tool` | Shared retrieval tool implementation and declaration; OpenHuman supplies the callback that reads from the module CCR store. |
 | Plain text | Compressed with TinyJuice's deterministic TextCrusher. |
 | [`savings.rs`](./savings.rs) | Thin adapter: attribution model and `agent::cost` price per input token; the module (`RecordSavings`, `SavingsStats`, `ResetSavings`) does the aggregate math and persists the `juice.savings` document in its storage (a legacy `state/tokenjuice_savings.json` is imported once). |
