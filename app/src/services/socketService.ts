@@ -12,7 +12,12 @@ import type { ChannelAuthMode, ChannelConnectionStatus, ChannelType } from '../t
 import type { UserErrorScope } from '../types/userError';
 import { IS_DEV, IS_TEST } from '../utils/config';
 import { createSafeLogData, sanitizeError } from '../utils/sanitize';
-import { getCoreRpcToken, getCoreRpcUrl, resolveCoreSocketEndpoint } from './coreRpcClient';
+import {
+  clearCoreRpcTokenCache,
+  getCoreRpcToken,
+  getCoreRpcUrl,
+  resolveCoreSocketEndpoint,
+} from './coreRpcClient';
 import { createCoreSocket } from './coreSocket';
 
 // Socket service logger using debug package
@@ -263,6 +268,9 @@ class SocketService {
     });
 
     this.socket.on('connect_error', (error: Error) => {
+      // The core may have restarted with a new bearer; make the next
+      // handshake's `auth` callback re-read it.
+      clearCoreRpcTokenCache();
       const uid = getSocketUserId();
       socketError('Connection error', { userId: uid, error: sanitizeError(error) });
       store.dispatch(setStatusForUser({ userId: uid, status: 'disconnected' }));

@@ -44,9 +44,11 @@ vi.mock('../../lib/mcp', () => ({ SocketIOMCPTransportImpl: MockMCPTransport }))
 
 // getCoreRpcUrl mock — each test sets what it needs.
 const getCoreRpcUrlMock = vi.fn<() => Promise<string>>();
+const clearCoreRpcTokenCacheMock = vi.fn();
 vi.mock('../coreRpcClient', () => ({
   getCoreRpcUrl: getCoreRpcUrlMock,
   clearCoreRpcUrlCache: vi.fn(),
+  clearCoreRpcTokenCache: clearCoreRpcTokenCacheMock,
   // socketService now reads the per-process bearer for the Socket.IO
   // handshake `auth.token` payload; tests only care that the resolve
   // chain proceeds, not what the bearer value is.
@@ -209,8 +211,11 @@ describe('socketService — socket event handler dispatches (lines 212, 230, 237
     await pollUntil(() => expect(handlers['connect_error']).toBeDefined());
 
     setBackendMock.mockClear();
+    clearCoreRpcTokenCacheMock.mockClear();
 
     handlers['connect_error']!(new Error('connection refused'));
+    // The next handshake must re-read the bearer (the core may have restarted).
+    expect(clearCoreRpcTokenCacheMock).toHaveBeenCalledTimes(1);
 
     const disconnectedCall = setBackendMock.mock.calls.find(
       ([arg]) => (arg as { value: string }).value === 'disconnected'

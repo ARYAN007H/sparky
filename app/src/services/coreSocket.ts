@@ -45,7 +45,16 @@ const DEFAULT_OPTIONS: Partial<ManagerOptions & SocketOptions> = {
 };
 
 export function createCoreSocket(baseUrl: string, opts: CoreSocketOptions): Socket {
-  const auth = { token: opts.coreToken ?? '', ...(opts.authExtras ?? {}) };
+  const extras = opts.authExtras ?? {};
+  // socket.io-client resends an object `auth` unchanged on every reconnect, so
+  // after a core restart (new per-launch bearer) it would retry the dead one
+  // forever. A function `auth` runs on every handshake and re-reads the bearer.
+  const auth = (cb: (data: object) => void) => {
+    void getCoreRpcToken().then(
+      token => cb({ token: token ?? opts.coreToken ?? '', ...extras }),
+      () => cb({ token: opts.coreToken ?? '', ...extras })
+    );
+  };
   return io(baseUrl, { ...DEFAULT_OPTIONS, ...(opts.overrides ?? {}), auth });
 }
 
