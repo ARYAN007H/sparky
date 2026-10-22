@@ -98,12 +98,14 @@ fn explicit_cloud_provider_string_routes_to_crate_native_model() {
     let _guard = crate::inference::inference_test_guard();
     let mut config = Config::default();
     config.cloud_providers.push(deepseek_entry("p_ds"));
-    let (model, model_id) = create_chat_model_from_string_with_model_id(
-        "chat",
-        "deepseek:deepseek-reasoner",
-        &config,
-        0.7,
-    )
+    let (model, model_id) = super::with_fixture_library_context(|| {
+        create_chat_model_from_string_with_model_id(
+            "chat",
+            "deepseek:deepseek-reasoner",
+            &config,
+            0.7,
+        )
+    })
     .expect("explicit cloud model must build");
     assert_eq!(model_id, "deepseek-reasoner");
     assert_eq!(
@@ -346,6 +348,7 @@ async fn native_claude_turn_routes_disclose_pinned_models() {
 #[test]
 fn openhuman_jwt_slug_preserves_forced_text_mode() {
     let _guard = crate::inference::inference_test_guard();
+    install_test_managed_provider();
     let mut config = Config::default();
     config.cloud_providers.push(oh_entry("p_oh"));
 

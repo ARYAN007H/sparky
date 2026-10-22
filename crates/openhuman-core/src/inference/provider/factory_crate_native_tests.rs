@@ -48,6 +48,15 @@ fn fixture_library_dispatch() -> crate::core::runtime::DispatchCtx {
     )
 }
 
+fn with_fixture_library_context<R>(f: impl FnOnce() -> R) -> R {
+    let context = crate::core::runtime::CoreContext::for_test_with_host_kind(
+        crate::core::types::HostKind::Library,
+        crate::core::runtime::DomainSet::full(),
+        None,
+    );
+    crate::core::runtime::CoreContext::sync_scope(context, f)
+}
+
 #[test]
 fn custom_ca_bundle_builds_a_provider_scoped_chat_client() {
     let _guard = crate::inference::inference_test_guard();

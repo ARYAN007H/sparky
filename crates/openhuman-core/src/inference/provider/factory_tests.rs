@@ -73,6 +73,7 @@ fn install_test_managed_provider() -> Arc<std::sync::Mutex<Vec<bool>>> {
                 supports_vision: Arc::new(|_| false),
                 resolve_model: Arc::new(|_, config, model| match model {
                     Some("hint:reasoning") => Some("fixture/managed-default".into()),
+                    Some("reasoning-v1") => Some("fixture/managed-default".into()),
                     Some(model) if !model.starts_with("hint:") => Some(model.into()),
                     Some(_) => None,
                     None => config
