@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tinyjuice_bus::names::methods;
 use tinyjuice_bus::repl::ReplLimits;
-use tinyjuice_bus::wire::{QueryRequest, QueryResponse};
 use tinyjuice_bus::types::{AgentTokenjuiceCompression, CompressorKind};
+use tinyjuice_bus::wire::{QueryRequest, QueryResponse};
 use tinytools::{Tool, ToolRunContext, ToolSpec};
 
 /// The host-specific query seam for TinyJuice's shared REPL tools.
@@ -67,6 +67,11 @@ fn host_repl_tools(
         tinytools_std::filesystem::FileReadTool::MAX_FILE_SIZE_BYTES,
         None,
     )
+}
+
+#[cfg(test)]
+fn repl_tools_with(source: Arc<dyn QuerySource>, limits: ReplLimits) -> Vec<Box<dyn Tool>> {
+    host_repl_tools(source, limits, None)
 }
 
 /// Whether a name is one of TinyJuice's query tools.
@@ -129,8 +134,8 @@ pub(crate) fn repl_tools_for_recorded(
 /// Preserve the nested path used by the integration prelude while the actual
 /// implementation and only host-specific adapter residue live here.
 pub mod repl_tools {
-    pub use super::{is_repl_tool, repl_tools, repl_tools_for};
     pub(crate) use super::repl_tools_for_recorded;
+    pub use super::{is_repl_tool, repl_tools, repl_tools_for};
 }
 use tinyjuice_bus::wire::InstallRequest;
 
@@ -526,6 +531,10 @@ pub fn all_tokenjuice_registered_controllers() -> Vec<crate::core::all::Register
 #[cfg(test)]
 #[path = "mod_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "repl_tools_tests.rs"]
+mod repl_tool_tests;
 
 #[cfg(test)]
 #[path = "module_stub_tests.rs"]
