@@ -189,6 +189,10 @@ function isNativeAgentProgressReference(path, text, source = text) {
   }
   if (path === `${harness}turn_runner/mod_tests.rs`)
     return /\bcrate\s*::\s*progress\s*::\s*AgentProgress\b/.test(text);
+  if (path === `${harness}progress_tests.rs`)
+    return /^\s*use\s+crate::progress::AgentProgress\s*;\s*$/m.test(
+      rustCode(source),
+    );
   return false;
 }
 
@@ -558,8 +562,11 @@ function assertSelfTests() {
     "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/types.rs";
   const testPath =
     "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/mod_tests.rs";
+  const progressTestsPath =
+    "vendor/tinyagents/crates/tinyagents-harness/src/progress_tests.rs";
   const nativeTypes =
     "use crate::progress::AgentProgress;\nProgress(Box<AgentProgress>)";
+  const progressTests = "use crate::progress::AgentProgress;";
   if (
     !isNativeAgentProgressReference(progressPath, "pub enum AgentProgress {") ||
     !isNativeAgentProgressReference(
@@ -574,6 +581,11 @@ function assertSelfTests() {
     !isNativeAgentProgressReference(
       testPath,
       "_event: crate::progress::AgentProgress",
+    ) ||
+    !isNativeAgentProgressReference(
+      progressTestsPath,
+      "let event = AgentProgress::ContextCompacting;",
+      progressTests,
     ) ||
     isNativeAgentProgressReference(
       "vendor/tinyagents/crates/tinyagents-session/src/lib.rs",
@@ -592,6 +604,11 @@ function assertSelfTests() {
     isNativeAgentProgressReference(
       testPath,
       "_event: openhuman_core::AgentProgress",
+    ) ||
+    isNativeAgentProgressReference(
+      progressTestsPath,
+      "let event = openhuman_core::AgentProgress::ContextCompacting;",
+      "use openhuman_core::AgentProgress;",
     )
   )
     throw new Error(
