@@ -1,17 +1,17 @@
 //! Debug-build harnesses for raw integration coverage of the channel runtime.
 
 pub use super::dispatch::test_support::build_channel_context_block_for_test;
-use super::dispatch::{process_channel_runtime_message, RuntimeChannelMessage};
+use super::dispatch::{RuntimeChannelMessage, process_channel_runtime_message};
 pub use super::startup::test_support::resolve_yuanbao_app_secret_for_test;
-use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, AGENT_RUN_TURN_METHOD};
-use crate::channels::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
+use crate::agent::bus::{AGENT_RUN_TURN_METHOD, AgentTurnRequest, AgentTurnResponse};
 use crate::channels::Channel;
 use crate::channels::ChannelSystemPrompt;
+use crate::channels::context::{CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext};
 use crate::config::{MultimodalConfig, MultimodalFileConfig, ReliabilityConfig};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::inference::provider::ProviderRuntimeOptions;
 use crate::progress::AgentProgress;
+use crate::tools::delegate::ProviderRuntimeOptions;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -500,9 +500,24 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
             }],
             ..Default::default()
         });
+    let timestamp = message.timestamp_unix_ms.unwrap_or_default();
+    let prepared = tinychannels_bus::module_inbound::PreparedChannelInbound {
+        message: tinychannels::legacy_message_from_inbound_envelope(&message, timestamp)
+            .unwrap_or_default(),
+        envelope: message.clone(),
+        history_key: history_key.clone(),
+        history_key_ignores_thread: expected_event_channel == "telegram",
+        thread_id: history_key.clone(),
+        client_id: expected_event_channel.clone(),
+        session_key: history_key,
+    };
     process_channel_runtime_message(
         Arc::clone(&ctx),
-        RuntimeChannelMessage::with_inbound_envelope(message),
+        RuntimeChannelMessage {
+            message,
+            authenticated_relay: false,
+            prepared_inbound: Some(prepared),
+        },
     )
     .await;
 

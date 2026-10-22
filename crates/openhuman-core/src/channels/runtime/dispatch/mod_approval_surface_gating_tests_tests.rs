@@ -1,39 +1,5 @@
 use super::channel_has_approval_surface;
-use tinychannels_bus::Channel;
-
-struct ConfiguredChannel {
-    approvals: bool,
-}
-
-#[async_trait::async_trait]
-impl Channel for ConfiguredChannel {
-    fn name(&self) -> &str {
-        "configured"
-    }
-
-    #[allow(
-        deprecated,
-        reason = "TinyChannels v22 still requires the legacy send trait method"
-    )]
-    async fn send(&self, _message: &tinychannels_bus::SendMessage) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    #[allow(
-        deprecated,
-        reason = "TinyChannels v22 still requires the legacy listener trait method"
-    )]
-    async fn listen(
-        &self,
-        _tx: tokio::sync::mpsc::Sender<tinychannels_bus::ChannelMessage>,
-    ) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    fn supports_chat_approvals(&self) -> bool {
-        self.approvals
-    }
-}
+use tinychannels_bus::ChannelCapabilities;
 
 // Sub-issue 2 of #3098: this gate is what decides whether the dispatch
 // loop sets an `ApprovalChatContext` (→ gate fires for `Prompt`-class
@@ -43,10 +9,15 @@ impl Channel for ConfiguredChannel {
 // path must not be scoped, or every parked call would TTL-deny.
 
 #[test]
-fn configured_channel_capability_controls_approval_surface() {
-    let supports_approval = ConfiguredChannel { approvals: true };
-    let no_approval = ConfiguredChannel { approvals: false };
-    assert!(channel_has_approval_surface(Some(&supports_approval)));
-    assert!(!channel_has_approval_surface(Some(&no_approval)));
-    assert!(!channel_has_approval_surface(None));
+fn configured_instances_with_chat_approvals_have_an_approval_surface() {
+    let mut capabilities = ChannelCapabilities::unknown();
+    capabilities.chat_approvals = true;
+    assert!(channel_has_approval_surface(&capabilities));
+}
+
+#[test]
+fn unknown_or_unconfigured_instances_do_not_have_an_approval_surface() {
+    assert!(!channel_has_approval_surface(
+        &ChannelCapabilities::unknown()
+    ));
 }

@@ -89,7 +89,7 @@ struct RouteCallbacks {
     deprecated,
     reason = "TinyChannels v22 Route requests still declare ChannelMessage"
 )]
-fn route_compat_message(msg: &traits::ChannelInboundEnvelope) -> traits::ChannelMessage {
+pub(crate) fn route_compat_message(msg: &traits::ChannelInboundEnvelope) -> traits::ChannelMessage {
     traits::ChannelMessage {
         id: msg.message_id.clone(),
         sender: msg.sender.id.clone(),

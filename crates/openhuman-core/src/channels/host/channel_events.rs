@@ -207,8 +207,8 @@ pub struct ChannelTurnStateSubscriber {
 }
 impl ChannelTurnStateSubscriber {
     pub fn with_config(
-        config: Arc<crate::config::Config>,
         channels: Arc<HashMap<String, Arc<dyn Channel>>>,
+        config: Arc<crate::config::Config>,
     ) -> Self {
         Self {
             workspace_dir: config.workspace_dir.clone(),

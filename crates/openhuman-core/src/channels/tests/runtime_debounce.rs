@@ -1,16 +1,15 @@
-use super::super::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
-use super::super::runtime::{run_message_dispatch_loop, RuntimeChannelMessage};
 use super::super::Channel;
-use super::common::{channel_envelope, RecordingChannel, SlowModel, TelegramRecordingChannel};
-use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
+use super::super::context::{CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext};
+use super::super::runtime::{RuntimeChannelMessage, run_message_dispatch_loop};
+use super::common::{RecordingChannel, SlowModel, TelegramRecordingChannel, channel_envelope};
+use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, mock_agent_run_turn};
 use crate::config::InboundDebounceConfig;
 use crate::core::bus_testing::MockBusGuard;
-use crate::inference::provider;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::{Notify, mpsc};
 use tokio::task::JoinHandle;
 
 #[derive(Default)]
@@ -98,7 +97,7 @@ fn runtime_with(channel: Arc<dyn Channel>) -> Arc<ChannelRuntimeContext> {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
+        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -150,7 +149,25 @@ impl Running {
 
     fn prepared(&mut self, sender: &str, content: &str) -> RuntimeChannelMessage {
         let message = self.message(sender, content);
-        RuntimeChannelMessage::with_inbound_envelope(message)
+        let history_key = format!("{}_{sender}_{sender}", self.channel);
+        let prepared = tinychannels_bus::module_inbound::PreparedChannelInbound {
+            message: tinychannels::legacy_message_from_inbound_envelope(
+                &message,
+                message.timestamp_unix_ms.unwrap_or_default(),
+            )
+            .expect("text fixture projects to the legacy prepared message"),
+            envelope: message.clone(),
+            history_key: history_key.clone(),
+            history_key_ignores_thread: false,
+            thread_id: history_key.clone(),
+            client_id: self.channel.to_string(),
+            session_key: history_key,
+        };
+        RuntimeChannelMessage {
+            message,
+            authenticated_relay: false,
+            prepared_inbound: Some(prepared),
+        }
     }
 
     async fn send_unprepared(&mut self, sender: &str, content: &str) {
@@ -239,12 +256,16 @@ async fn messages_during_a_running_turn_become_one_follow_up_that_sees_its_histo
     assert_eq!(turns.peak.load(Ordering::SeqCst), 1);
     assert!(turns.last_user(1).ends_with("second\nthird"));
     let history = turns.history(1);
-    assert!(history
-        .iter()
-        .any(|(role, content)| role == "assistant" && content == "reply 1"));
-    assert!(history
-        .iter()
-        .any(|(role, content)| role == "user" && content.ends_with("first")));
+    assert!(
+        history
+            .iter()
+            .any(|(role, content)| role == "assistant" && content == "reply 1")
+    );
+    assert!(
+        history
+            .iter()
+            .any(|(role, content)| role == "user" && content.ends_with("first"))
+    );
     run.finish().await;
     assert_eq!(channel.sent_messages.lock().await.len(), 2);
 }

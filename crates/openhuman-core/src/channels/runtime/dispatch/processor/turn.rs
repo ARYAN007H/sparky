@@ -4,7 +4,7 @@
 
 use crate::agent::bus::AgentTurnResponse;
 use crate::channels::context::{
-    compact_sender_history, is_context_window_overflow_error, ChannelRuntimeContext,
+    ChannelRuntimeContext, compact_sender_history, is_context_window_overflow_error,
 };
 use crate::channels::outbound::text_message;
 use crate::channels::routes::{get_or_create_turn_model_source, get_route_selection};
@@ -15,20 +15,20 @@ use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tinyagents_session::transcript::TranscriptMessage;
-use tinychannels_bus::context::ChatMessage;
 use tinychannels_bus::ChannelInboundEnvelope;
+use tinychannels_bus::context::ChatMessage;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 
 use super::super::helpers::{
-    build_channel_context_block, log_worker_join_result, spawn_typing_task,
-    REPLY_LOG_TRUNCATE_CHARS,
+    REPLY_LOG_TRUNCATE_CHARS, build_channel_context_block, log_worker_join_result,
+    spawn_typing_task,
 };
-use super::super::host_agent::{self, run_host_agent_turn, seed_rows, HostChannelTurn, HostRoute};
-use super::admit::{admit_runtime_message, AdmittedInbound};
+use super::super::host_agent::{self, HostChannelTurn, HostRoute, run_host_agent_turn, seed_rows};
+use super::RuntimeChannelMessage;
+use super::admit::{AdmittedInbound, admit_runtime_message};
 use super::approval::channel_has_approval_surface;
 use super::bus_turn::dispatch_bus_turn;
-use super::RuntimeChannelMessage;
 
 pub(crate) async fn process_channel_message(
     ctx: Arc<ChannelRuntimeContext>,
@@ -360,7 +360,10 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
     // "no chat context -> allow straight through" branch silently bypasses
     // every `Prompt`-class tool call, voiding the `supervised` autonomy tier
     // on the channel.
-    let approval = if channel_has_approval_surface(target_channel.as_deref()) {
+    let approval = if target_channel
+        .as_ref()
+        .is_some_and(|channel| channel_has_approval_surface(&channel.capabilities()))
+    {
         crate::security::approval::ApprovalTurnContext::chat(
             crate::security::approval::ApprovalChatContext {
                 thread_id: history_key.clone(),

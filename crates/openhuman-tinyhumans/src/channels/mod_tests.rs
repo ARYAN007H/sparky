@@ -5,7 +5,7 @@ use tinychannels_bus::module_progressive::{
     ChannelOutputEvent, ProgressiveTransportRequest, ProgressiveTransportResult,
 };
 use tokio_util::sync::CancellationToken;
-use wiremock::matchers::{method, path};
+use wiremock::matchers::{body_json, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use crate::client::HostedApiError;
@@ -110,16 +110,16 @@ async fn typed_send_preserves_v22_content_and_turn_metadata() {
     let body = json!({
         "text": "hello",
         "parts": [],
-        "turn_id": "turn-1",
-        "channel_ref": null,
-        "conversation": null,
-        "sequence": 7,
-        "segment_index": 0,
-        "idempotency_key": "turn-1:0"
+        "transportContext": {
+            "turnId": "turn-1",
+            "sequence": 7,
+            "segmentIndex": 0,
+            "idempotencyKey": "turn-1:0"
+        }
     });
     Mock::given(method("POST"))
         .and(path("/channels/telegram/messages"))
-        .and(wiremock::matchers::body_json(body.clone()))
+        .and(body_json(body))
         .respond_with(
             ResponseTemplate::new(200)
                 .set_body_json(json!({"success": true, "data": {"id": "msg-1"}})),
@@ -153,6 +153,64 @@ async fn typed_send_preserves_v22_content_and_turn_metadata() {
 }
 
 #[tokio::test]
+async fn progressive_send_forwards_turn_and_delivery_context() {
+    let tmp = tempfile::tempdir().unwrap();
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/channels/telegram/messages"))
+        .and(body_json(json!({
+            "text": "hello",
+            "transportContext": {
+                "turnId": "turn-7",
+                "channelRef": {"id": "telegram", "accountId": "account-2"},
+                "conversation": {
+                    "kind": "dm",
+                    "id": "chat-3",
+                    "scopeId": null,
+                    "parentId": null,
+                    "threadId": null,
+                    "topicId": null
+                },
+                "sequence": 4,
+                "idempotencyKey": "turn-7:reply"
+            }
+        })))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"success": true, "data": {"id": "message-9"}})),
+        )
+        .mount(&server)
+        .await;
+
+    let config = test_support::signed_in(&tmp, &server.uri());
+    let answer = serve(
+        ctx(config, Some("telegram")),
+        ChannelBackendRequest::ProgressiveTransport(Box::new(ProgressiveTransportRequest::Send {
+            channel: "telegram".into(),
+            turn_id: Some("turn-7".into()),
+            channel_ref: Some(tinychannels_bus::ChannelRef {
+                id: "telegram".into(),
+                account_id: Some("account-2".into()),
+            }),
+            conversation: Some(tinychannels_bus::ConversationRef {
+                kind: tinychannels_bus::ConversationKind::Dm,
+                id: "chat-3".into(),
+                ..Default::default()
+            }),
+            sequence: Some(4),
+            idempotency_key: Some("turn-7:reply".into()),
+            message: json!({"text": "hello"}),
+        })),
+    )
+    .await
+    .unwrap();
+    assert!(matches!(
+        answer,
+        ChannelBackendResult::ProgressiveTransport(ProgressiveTransportResult::Success(_))
+    ));
+}
+
+#[tokio::test]
 async fn hosted_callback_declines_module_output_events_without_losing_them_as_sends() {
     let tmp = tempfile::tempdir().unwrap();
     let config = test_support::signed_in(&tmp, "http://127.0.0.1:9");
@@ -176,7 +234,7 @@ async fn hosted_callback_declines_module_output_events_without_losing_them_as_se
     .unwrap();
     assert!(matches!(
         answer,
-        ChannelBackendResult::ProgressiveTransport(ProgressiveTransportResult::Unavailable)
+        ChannelBackendResult::ProgressiveTransport(ProgressiveTransportResult::Failed)
     ));
 }
 

@@ -116,23 +116,25 @@ async fn remote_status(ws: &Path, channel: &str, reply_target: &str) -> Option<S
                 tinychannels_bus::methods::EXECUTE_REMOTE,
                 (tinychannels_bus::module_remote::RemoteOperation::Execute {
                     workspace_dir: ws.to_string_lossy().into_owned(),
-                    message: tinychannels_bus::ChannelInboundEnvelope {
-                        channel: tinychannels_bus::ChannelRef {
-                            id: channel.into(),
-                            account_id: None,
-                        },
-                        message_id: "status-1".into(),
-                        conversation: tinychannels_bus::ConversationRef {
-                            id: reply_target.into(),
+                    message: crate::channels::routes::route_compat_message(
+                        &tinychannels_bus::ChannelInboundEnvelope {
+                            channel: tinychannels_bus::ChannelRef {
+                                id: channel.into(),
+                                account_id: None,
+                            },
+                            message_id: "status-1".into(),
+                            conversation: tinychannels_bus::ConversationRef {
+                                id: reply_target.into(),
+                                ..Default::default()
+                            },
+                            sender: tinychannels_bus::SenderRef {
+                                id: "alice".into(),
+                                ..Default::default()
+                            },
+                            text: "/status".into(),
                             ..Default::default()
                         },
-                        sender: tinychannels_bus::SenderRef {
-                            id: "alice".into(),
-                            ..Default::default()
-                        },
-                        text: "/status".into(),
-                        ..Default::default()
-                    },
+                    ),
                     route: tinychannels_bus::module_remote::RemoteRoute {
                         provider: "openai".into(),
                         model: "test-model".into(),

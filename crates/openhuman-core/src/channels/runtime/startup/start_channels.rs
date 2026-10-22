@@ -3,7 +3,7 @@
 
 use super::super::dispatch::run_message_dispatch_loop;
 use super::module_providers::ModuleChannelRuntime;
-use super::turn_parts::{build_channel_turn_parts, runtime_context, PromptToolDescs};
+use super::turn_parts::{PromptToolDescs, build_channel_turn_parts, runtime_context};
 use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
@@ -241,8 +241,8 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     // channel with the `remote_control` capability.
     let _turn_state_handle = bus.subscribe(Arc::new(
         crate::channels::host::ChannelTurnStateSubscriber::with_config(
-            Arc::new(config.clone()),
             Arc::clone(&channels_by_name),
+            Arc::new(config.clone()),
         ),
     ));
     // In-chat approvals (sub-issue 2 of #3098) for every channel with the
