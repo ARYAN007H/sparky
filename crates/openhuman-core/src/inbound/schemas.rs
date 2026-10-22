@@ -155,7 +155,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
             outputs: vec![json_output(
                 "result",
                 "`{results: [{turn_id, source, key, agent_id, status, text?, error?, \
-                 event_ids, created_ms, completed_ms?}]}`.",
+                 event_ids, blocked: [{event_id, reason}], created_ms, completed_ms?}]}`.",
             )],
         },
         "result_ack" => ControllerSchema {

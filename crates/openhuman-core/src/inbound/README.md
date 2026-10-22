@@ -36,6 +36,8 @@ pusher ── inbound.offer ──▶ queues (dedupe on source:event_id, debounc
                                     max_batch cap, interactive lane, instant)
                                  │ Deliver(turn)
                                  ▼
+                      per-event injection screen (blocked → result.blocked)
+                                 │
                       pinned agent turn (no triage, fresh thread,
                       TrustedAutomation{Workflow, require_approval})
                                  │ text
@@ -43,6 +45,12 @@ pusher ── inbound.offer ──▶ queues (dedupe on source:event_id, debounc
              inbound.results ◀── store ──▶ InboundTurnCompleted (wake only)
 ```
 
+- Each event's text is screened with the prompt-injection guard
+  `inference.agent_chat` uses before the prompt is rendered. A blocked event
+  is left out and listed on the result as `blocked: [{event_id, reason}]`
+  (verdict and rule codes, no text). Every event blocked: the turn completes
+  with empty `text`, no model call, and `InboundTurnCompleted` is still
+  published.
 - The events carry no text; the SSE stream only wakes a consumer. Read the
   text over `inbound.results`.
 - A delivery waits for the agent within its budget (28 s, under the module's
