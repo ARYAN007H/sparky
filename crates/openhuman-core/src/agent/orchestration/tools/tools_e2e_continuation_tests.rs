@@ -2,9 +2,7 @@ use super::*;
 
 #[tokio::test]
 async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_driver() {
-    use crate::agent::orchestration::subagent_sessions::{
-        DurableSubagentStatus,
-    };
+    use crate::agent::orchestration::subagent_sessions::DurableSubagentStatus;
     use crate::agent::orchestration::tools::SpawnSubagentTool;
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
@@ -147,18 +145,16 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     );
     let before_job_count = jobs.list().len();
 
-    let driver_documents = crate::core::runtime::CoreContext::sync_scope(
-        Arc::clone(&_core),
-        || {
+    let driver_documents =
+        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&_core), || {
             let opened = crate::storage::local::open("subagent_sessions", workspace.path())
                 .map_err(|error| format!("open driver session documents: {error:#}"))?;
             let scoped = opened
                 .scoped()
                 .map_err(|error| format!("scope driver session documents: {error:#}"))?;
             Ok::<_, String>(Arc::clone(scoped.documents()))
-        },
-    )
-    .expect("open scoped driver session documents");
+        })
+        .expect("open scoped driver session documents");
 
     // A durable host row and the checkpoint must agree on the full owner key.
     // Corrupt only its root run identity and drive the real spawn path: resume
@@ -191,10 +187,9 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         .lifecycle_key
         .clone()
         .expect("paused driver session retains lifecycle key");
-    let versioned = crate::storage::block_on(driver_documents.get(
-        "subagent_sessions",
-        &before_session.subagent_session_id,
-    ))
+    let versioned = crate::storage::block_on(
+        driver_documents.get("subagent_sessions", &before_session.subagent_session_id),
+    )
     .expect("read paused driver document")
     .expect("paused driver document exists");
     let mut persisted: tinyagents_orchestration::subagent::DurableSubagentSession =
@@ -218,7 +213,10 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     ))
     .expect("corrupt only the persisted driver lifecycle owner key");
     assert_eq!(persisted.parent_session, selector.parent_session);
-    assert_eq!(persisted.parent_thread_id.as_deref(), selector.parent_thread_id.as_deref());
+    assert_eq!(
+        persisted.parent_thread_id.as_deref(),
+        selector.parent_thread_id.as_deref()
+    );
     assert_eq!(persisted.agent_id, selector.agent_id);
     assert_eq!(persisted.task_key, selector.task_key);
     let reusable_session_id = before_session.subagent_session_id.clone();
@@ -271,17 +269,16 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         )
         .await
         .expect("refused row remains persisted")
-            .into_iter()
-            .find(|session| session.subagent_session_id == before_session.subagent_session_id)
-            .expect("paused row remains present")
-            .status,
+        .into_iter()
+        .find(|session| session.subagent_session_id == before_session.subagent_session_id)
+        .expect("paused row remains present")
+        .status,
         DurableSubagentStatus::AwaitingUser,
         "refusal leaves the paused row untouched"
     );
-    let versioned = crate::storage::block_on(driver_documents.get(
-        "subagent_sessions",
-        &before_session.subagent_session_id,
-    ))
+    let versioned = crate::storage::block_on(
+        driver_documents.get("subagent_sessions", &before_session.subagent_session_id),
+    )
     .expect("read mismatched driver session")
     .expect("mismatched driver session exists");
     let mut restored: tinyagents_orchestration::subagent::DurableSubagentSession =
