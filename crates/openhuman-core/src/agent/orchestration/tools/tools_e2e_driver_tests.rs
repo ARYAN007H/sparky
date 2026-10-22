@@ -405,12 +405,6 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         Arc::new(tinyagents_tasks::InMemoryCompletionStore::new());
     background_completions::install_store_for_test(&workspace, completion_store);
     let detached_data = live.data.detached_child();
-    let child_cancellation = detached_data.cancellation.clone();
-    let cancellation_release = release.clone();
-    let release_on_cancel = tokio::spawn(async move {
-        child_cancellation.cancelled().await;
-        cancellation_release.notify_one();
-    });
     let detached = live
         .child(
             tinyagents_harness::context::RunConfig::new("delete-live-driver-child"),
@@ -484,6 +478,28 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         scoped_jobs.iter().any(|scoped| scoped.id == job.id),
         "the driver's own scope query sees the job selected by the owner index"
     );
+    let release_on_cancel = {
+        let jobs = jobs.clone();
+        let job_id = job.id.to_string();
+        let release = release.clone();
+        tokio::spawn(async move {
+            tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                loop {
+                    if jobs
+                        .get(&job_id)
+                        .and_then(|job| job.error)
+                        .is_some_and(|error| error.contains("cancellation requested"))
+                    {
+                        break;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                }
+            })
+            .await
+            .expect("thread deletion requests cancellation before releasing child");
+            release.notify_one();
+        })
+    };
     background_completions::record_outcome(
         &dispatch,
         &workspace,
@@ -501,14 +517,18 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         "the deletion starts with a queued child completion"
     );
 
-    crate::threads::ops::thread_delete(
-        &dispatch,
-        crate::threads::DeleteConversationThreadRequest {
-            thread_id: thread_id.into(),
-            deleted_at: "2026-01-01T00:01:00Z".into(),
-        },
+    tokio::time::timeout(
+        std::time::Duration::from_secs(6),
+        crate::threads::ops::thread_delete(
+            &dispatch,
+            crate::threads::DeleteConversationThreadRequest {
+                thread_id: thread_id.into(),
+                deleted_at: "2026-01-01T00:01:00Z".into(),
+            },
+        ),
     )
     .await
+    .expect("thread deletion waits for cancellation-aware child settlement")
     .expect("delete parent thread");
 
     assert_eq!(
