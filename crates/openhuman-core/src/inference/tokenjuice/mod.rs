@@ -2,7 +2,7 @@
 
 pub mod config_patch;
 pub use tinyjuice_host::{focus, generate};
-mod repl_tools;
+pub mod repl_tools;
 pub mod savings;
 pub mod schemas;
 
