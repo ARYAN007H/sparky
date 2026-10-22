@@ -2,10 +2,12 @@
 
 Product shell around the tinyagents tool loop. The model/tool iteration
 itself runs in `crate::agent::tinyagents` (via
-`TurnSpec::run`); this module owns everything OpenHuman
-layers on top: sub-agent definitions, post-turn memory/archival hooks, and
-oversized-tool-result handling. Parent execution snapshots now live with the
-sub-agent host in [`../subagent_host/fork_context.rs`](../subagent_host/fork_context.rs).
+`TurnSpec::run`). This module owns sub-agent definitions, post-turn
+memory/archival hooks, and oversized-tool-result handling. The channel/CLI
+turn driver lives with channel runtime at
+[`../../channels/runtime/turn_driver.rs`](../../channels/runtime/turn_driver.rs).
+Parent execution snapshots live with the sub-agent host in
+[`../subagent_host/fork_context.rs`](../subagent_host/fork_context.rs).
 
 `Agent`, its per-turn lifecycle, and transcript persistence live in
 [`../session_host/`](../session_host/), not here; this module supplies the definition/prompt data
@@ -25,8 +27,6 @@ carried by the parent snapshot in [`../subagent_host/fork_context.rs`](../subage
   `../subagent_host/`, which implements the TinyAgents sub-agent lifecycle
   traits directly. This module does not export a compatibility runner of its
   own.
-- Run the channel/CLI turn graph ([`graph.rs`](./graph.rs)); all sub-agents use
-  the shared sub-agent turn graph.
 - Offload oversized worker artifacts to the filesystem, and persist oversized
   tool results as action-workspace artifacts (`artifact_offload/`,
   `tool_result_artifacts/`).
@@ -35,7 +35,6 @@ carried by the parent snapshot in [`../subagent_host/fork_context.rs`](../subage
 
 | Module | Role |
 | --- | --- |
-| `graph.rs` | `run_channel_turn_via_graph` (`pub(crate)`): the channel/CLI turn graph, thin over `TurnSpec::run`; called by the `agent.run_turn` native-bus handler in [`agent/bus.rs`](../bus.rs). |
 | `artifact_offload/` | The `outputs/` / `workspace/` convention under `action_dir`: prompt half (`contract.rs`) and host policy half (`policy.rs`); mechanics (thresholds, path resolution, pointer rendering, the writer) live in `tinyagents_harness::artifacts` and are re-exported here. |
 | `tool_result_artifacts/` | Wiring only: `new_tool_result_store` hands `tinyagents_harness::artifacts::tool_results` OpenHuman's redactor (`SanitizingRedactor`), `file_read`/`use_skill` names and `FileReadTool::MAX_FILE_SIZE_BYTES`. The store, `[tool_result_preview]` envelope, budgets and paged reads live in the crate. |
 | `required_output.rs` | Pure validate/repair/synthesize primitives (issue #4117) that guarantee a required structured-output block (for example a `thoughts` JSON block) on every accepted turn. The orchestration that calls these lives on the session in [`../session_host/turn/`](../session_host/turn/). |
@@ -85,8 +84,9 @@ turn lifecycle are in `../session_host/`; `OpenHumanSubagentHost`,
 - `../session_host/` and `../subagent_host/` build turns from the
   definitions and prompt data this module supplies; parent context types are
   owned by `../subagent_host/`.
-- `agent/bus.rs` serves the `agent.run_turn` native request through
-  `run_channel_turn_via_graph`; channels reach the harness through that bus.
+- `agent/bus.rs` serves the `agent.run_turn` native request through the
+  driver in [`channels/runtime/turn_driver.rs`](../../channels/runtime/turn_driver.rs);
+  channels reach it through that bus.
 - [`channels/runtime/dispatch/routing.rs`](../../channels/runtime/dispatch/routing.rs) consults
   `AgentDefinitionRegistry`/`ToolScope`.
 - `agent/tinyagents/middleware/credential_scrub.rs` calls

@@ -24,7 +24,7 @@ is adapters that hand TinyAgents the things only OpenHuman knows.
      | (stateful, per thread)            | (stateless, caller owns history)
      v                                   v
   +-----------------------------------------------------------------+
-  | agent/session_host/            agent/bus.rs + harness/graph.rs  |
+  | agent/session_host/            agent/bus.rs + channels/runtime/turn_driver.rs |
   |   builder, hooks, codec, driver                                 |
   +-----------------------------------------------------------------+
      |                                   |
@@ -150,8 +150,8 @@ In order:
     `AgentError`) and returns the final text.
 
 The bus path is shorter. `bus.rs` scopes the origin, sandbox mode and file
-state agent id, then calls `harness::run_channel_turn_via_graph`
-([`harness/graph.rs`](./harness/graph.rs)), which calls `TurnSpec::run`. There is
+state agent id, then calls `channels::runtime::turn_driver::run_channel_turn_via_graph`
+([`../channels/runtime/turn_driver.rs`](../channels/runtime/turn_driver.rs)), which calls `TurnSpec::run`. There is
 no TinyAgents `Session`: the caller owns the history vector, and
 `ask_user_clarification` is an early-exit tool whose question becomes the
 reply.
