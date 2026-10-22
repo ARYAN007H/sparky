@@ -151,7 +151,7 @@ async fn open_default_backend(_workspace_dir: PathBuf) -> Result<Arc<dyn Storage
                 )
             })?;
             return super::open(&url).await.with_context(|| {
-                    format!("open the default storage for {}", _workspace_dir.display())
+                format!("open the default storage for {}", _workspace_dir.display())
             });
         }
     }

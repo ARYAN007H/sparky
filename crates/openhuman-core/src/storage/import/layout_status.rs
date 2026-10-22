@@ -20,7 +20,7 @@ struct LegacyProgress {
     done: bool,
 }
 
-type MigrationProgress = (Vec<(String, u32)>, Option<i64>);
+pub(crate) type MigrationProgress = (Vec<(String, u32)>, Option<i64>);
 
 /// Reads completed owner versions and the last completion timestamp from a
 /// historical Tiny Storage Drivers database without opening it through the

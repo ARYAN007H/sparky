@@ -75,8 +75,7 @@ fn owner_conversion_preserves_driver_times_and_absolute_expiry() {
         updated_ms: Some(200),
     };
     let converted = map_legacy_collection(vec![source], "legacy", |rows| {
-        rows
-            .into_iter()
+        rows.into_iter()
             .map(|row| {
                 Ok(
                     LegacyTargetRecord::new("current", row.id, json!({"current":true}))

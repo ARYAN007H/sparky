@@ -1,11 +1,11 @@
 use super::*;
+#[cfg(feature = "storage-sqlite")]
+use sha2::Digest;
 use std::path::Path;
 #[cfg(feature = "storage-sqlite")]
 use std::sync::Arc;
 #[cfg(feature = "storage-sqlite")]
 use tinystoragedrivers::{CollectionSpec, Precondition, WriteOptions};
-#[cfg(feature = "storage-sqlite")]
-use sha2::Digest;
 
 fn hex(id: &str) -> String {
     id.bytes().map(|b| format!("{b:02x}")).collect()

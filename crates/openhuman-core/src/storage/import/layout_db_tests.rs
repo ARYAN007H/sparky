@@ -1,8 +1,8 @@
 use super::*;
 #[cfg(feature = "storage-sqlite")]
-use crate::storage::layout::test_fixtures::{fixture_docs, v1_profile};
-#[cfg(feature = "storage-sqlite")]
 use crate::storage::layout::legacy;
+#[cfg(feature = "storage-sqlite")]
+use crate::storage::layout::test_fixtures::{fixture_docs, v1_profile};
 use crate::storage::layout::Target;
 use tempfile::TempDir;
 
