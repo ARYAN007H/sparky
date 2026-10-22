@@ -106,8 +106,10 @@ fn import_host_sessions(
         let id = session.subagent_session_id.clone();
         let docs = Arc::clone(&documents);
         let existing = crate::storage::block_on(async move {
-            docs.ensure_collection(&tinystoragedrivers::CollectionSpec::new("subagent_sessions"))
-                .await?;
+            docs.ensure_collection(&tinystoragedrivers::CollectionSpec::new(
+                "subagent_sessions",
+            ))
+            .await?;
             docs.get("subagent_sessions", &id).await
         })
         .map_err(|error| SubagentError::Persistence(format!("read driver session: {error}")))?;
@@ -129,7 +131,7 @@ fn import_host_sessions(
                     "subagent_sessions",
                     &session.subagent_session_id,
                     doc,
-                crate::storage::Precondition::Absent,
+                    crate::storage::Precondition::Absent,
                 )
                 .await
                 .map(|_| ())
