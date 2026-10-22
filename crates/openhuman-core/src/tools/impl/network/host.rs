@@ -19,7 +19,7 @@ use super::gate::RoutedGate;
 use crate::config::HttpRequestConfig;
 use crate::security::approval::ApprovalChatContext;
 use crate::security::SecurityPolicy;
-use crate::tools::per_call::{context as per_call_context, PerCallTool};
+use crate::tools::per_call::{context as per_call_context, PerCallContext, PerCallTool};
 use {tinyjuice_bus::tools::summary_focus_property, tinyjuice_bus::tools::SUMMARY_FOCUS_ARG};
 
 /// The fallbacks for a `0` limit, from the `[http_request]` schema defaults, so
@@ -132,7 +132,7 @@ pub(crate) fn x402_request_tool(
     allowed_domains: Vec<String>,
     max_response_size: usize,
     timeout_secs: u64,
-) -> PerCallTool<impl Tool> {
+) -> PerCallTool<impl Tool, PerCallContext> {
     PerCallTool::new(per_call_context, move |context| {
         let chat = context.chat.as_ref();
         let gate: Arc<dyn NetGate> = Arc::new(RoutedGate::new(Arc::clone(&policy), chat));
