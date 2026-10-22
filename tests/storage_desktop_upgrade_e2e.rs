@@ -33,10 +33,10 @@ use tinystoragedrivers::Query;
 #[path = "../crates/openhuman-core/src/util/classic_transcript_fixture.rs"]
 mod classic_transcript_fixture;
 
-#[path = "support/storage_case.rs"]
-mod storage_case;
 #[path = "support/linked_modules.rs"]
 mod linked_modules;
+#[path = "support/storage_case.rs"]
+mod storage_case;
 
 use storage_case::Case;
 
