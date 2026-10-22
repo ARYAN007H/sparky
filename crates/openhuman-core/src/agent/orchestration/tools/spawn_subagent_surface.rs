@@ -130,13 +130,14 @@ async fn steer_reusable_session(
     let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> = Arc::new(move |_| owner.clone());
     let jobs =
         (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&context.dispatch_ctx())).clone();
-    let store: Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore> = Arc::new(
-        crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
-            product_parent.workspace_dir.clone(),
-            product_parent.session_id.clone(),
-            thread_id.clone(),
-        ),
-    );
+    let store = crate::agent::orchestration::subagent_sessions::open_for_context(
+        &context.dispatch_ctx(),
+        product_parent.workspace_dir.clone(),
+        product_parent.session_id.clone(),
+        thread_id.clone(),
+        Some(jobs.clone()),
+    )
+    .map_err(|error| format!("open scoped subagent sessions: {error}"))?;
     let parent_session = product_parent.session_id.clone();
     let dispatch = SubAgentMessageTool::new(jobs)
         .with_tool_name("steer_subagent")
