@@ -136,7 +136,7 @@ fn retry_backoff_override_shrinks_the_schedule_and_ignores_junk() {
 }
 
 #[test]
-fn a_dead_call_is_retried_at_the_same_cap_without_reasoning_sticky_after_two() {
+fn a_dead_call_is_retried_at_the_same_cap_without_reasoning_and_new_calls_keep_it() {
     for local_provider in [false, true] {
         let policy = run_policy_for_provider(50, false, local_provider, None);
         assert!(
@@ -145,8 +145,11 @@ fn a_dead_call_is_retried_at_the_same_cap_without_reasoning_sticky_after_two() {
         );
         assert!(
             policy.truncated_empty_reasoning_off,
-            "the call after a dead one runs without reasoning"
+            "the retry after a dead one runs without reasoning"
         );
-        assert_eq!(policy.truncated_empty_reasoning_off_sticky_after, 2);
+        assert_eq!(
+            policy.truncated_empty_reasoning_off_sticky_after, 0,
+            "new calls keep their reasoning"
+        );
     }
 }
