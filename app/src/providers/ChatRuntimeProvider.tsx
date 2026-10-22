@@ -56,6 +56,7 @@ import {
   clearPendingApprovalForThread,
   clearPendingApprovalIfRequest,
   clearPendingPlanReviewForThread,
+  clearPendingPlanReviewIfRequest,
   clearProcessingForThread,
   clearStreamingAssistantForThread,
   clearTurnApprovalForThread,
@@ -1566,6 +1567,19 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
                 toolCallId: event.tool_call_id,
                 expiresAt: event.expires_at,
               },
+            })
+          );
+        },
+        onPlanReviewDecided: event => {
+          rtLog('plan_review_decided', {
+            thread: event.thread_id,
+            request: event.request_id,
+            resolution: event.resolution,
+          });
+          dispatch(
+            clearPendingPlanReviewIfRequest({
+              threadId: event.thread_id,
+              requestId: event.request_id,
             })
           );
         },
