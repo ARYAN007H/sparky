@@ -9,7 +9,9 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tinyagents_harness::observability::{DriverStatusStore, JournalMaintenanceReport};
+use tinyagents_harness::observability::{DriverStatusStore, HarnessEventJournal, HarnessStatusStore, StoreEventJournal};
+use tinyagents_harness::events::ExecutionStatus;
+use tinyagents_harness::store::{AppendStore, DriverAppendStore};
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, StorageBackend};
 
 use crate::storage::Scope;
@@ -26,6 +28,13 @@ pub const BACKFILL_COLLECTION: &str = "openhuman.journal_backfill";
 const BACKFILL_VERSION: u64 = 1;
 const LOG: &str = "[storage::journal_maintenance]";
 const DAY_MS: u64 = 24 * 60 * 60 * 1000;
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct JournalMaintenanceReport {
+    backfilled: usize,
+    deleted: usize,
+    conflicts: usize,
+}
 
 /// Host collection storing the successful one-shot backfill marker per scope.
 pub(crate) fn collection_specs() -> Vec<CollectionSpec> {
@@ -236,16 +245,14 @@ async fn maintain_scope(
         }
     };
 
-    let statuses = DriverStatusStore::new(docs);
-    let report = tinyagents_harness::observability::maintain_run_journals(
-        &statuses,
+    let report = maintain_run_journals(
+        &DriverStatusStore::new(docs),
         storage.streams().as_ref(),
         retention_ms,
         now_ms,
         !backfill_done,
     )
-    .await
-    .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
+    .await?;
 
     if !backfill_done {
         match storage
@@ -265,6 +272,58 @@ async fn maintain_scope(
         }
     }
     Ok(report)
+}
+
+/// Host-owned retention and one-time sealing for harness event journals.
+/// TinyAgents owns the event format; OpenHuman owns the lifecycle schedule.
+async fn maintain_run_journals(
+    statuses: &dyn HarnessStatusStore,
+    streams: &dyn tinystoragedrivers::StreamStore,
+    retention_ms: u64,
+    now_ms: i64,
+    backfill: bool,
+) -> Result<JournalMaintenanceReport, crate::storage::StorageError> {
+    let journal = StoreEventJournal::new(
+        Arc::new(DriverAppendStore::journal(Arc::new(StreamsBorrowed(streams)))) as Arc<dyn AppendStore>,
+    );
+    let mut report = JournalMaintenanceReport::default();
+    for name in streams.streams(DriverAppendStore::JOURNAL_PREFIX).await? {
+        let Some(run_id) = name.strip_prefix(DriverAppendStore::JOURNAL_PREFIX) else { continue };
+        let status = statuses.get_status(run_id).await
+            .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
+        if backfill && !matches!(status.as_ref().map(|status| status.status), Some(ExecutionStatus::Running | ExecutionStatus::Pending)) {
+            journal.seal_run(run_id).await
+                .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
+            report.backfilled += 1;
+        }
+        if retention_ms == 0 { continue; }
+        let Some(info) = streams.info(&name).await? else { continue };
+        let Some(sealed_ms) = info.sealed_ms else { continue };
+        if i128::from(now_ms) - i128::from(sealed_ms) < i128::from(retention_ms) { continue; }
+        if streams.delete_sealed_stream(&name, sealed_ms).await? {
+            report.deleted += 1;
+        } else {
+            report.conflicts += 1;
+        }
+    }
+    Ok(report)
+}
+
+/// Borrowed adapter lets the public journal port share the already fenced TSD
+/// stream handle without opening a second storage scope.
+#[derive(Debug)]
+struct StreamsBorrowed<'a>(&'a dyn tinystoragedrivers::StreamStore);
+
+#[async_trait::async_trait]
+impl AppendStore for StreamsBorrowed<'_> {
+    async fn append(&self, stream: &str, value: serde_json::Value) -> tinyagents_harness::Result<u64> { self.0.append(stream, value).await.map_err(Into::into) }
+    async fn append_batch(&self, stream: &str, values: Vec<serde_json::Value>) -> tinyagents_harness::Result<u64> { self.0.append_batch(stream, values).await.map_err(Into::into) }
+    async fn append_batch_if_offset(&self, stream: &str, offset: u64, values: Vec<serde_json::Value>) -> tinyagents_harness::Result<u64> { self.0.append_batch_if_offset(stream, offset, values).await.map_err(Into::into) }
+    async fn read_window(&self, stream: &str, from: u64, limit: usize) -> tinyagents_harness::Result<Vec<serde_json::Value>> { self.0.read_window(stream, from, limit).await.map(|entries| entries.into_iter().map(|entry| entry.value).collect()).map_err(Into::into) }
+    async fn len(&self, stream: &str) -> tinyagents_harness::Result<u64> { self.0.len(stream).await.map_err(Into::into) }
+    async fn truncate_before(&self, stream: &str, offset: u64) -> tinyagents_harness::Result<u64> { self.0.truncate_before(stream, offset).await.map_err(Into::into) }
+    async fn delete_stream(&self, stream: &str) -> tinyagents_harness::Result<bool> { self.0.delete_stream(stream).await.map_err(Into::into) }
+    async fn streams(&self, prefix: &str) -> tinyagents_harness::Result<Vec<String>> { self.0.streams(prefix).await.map_err(Into::into) }
 }
 
 /// Scopes this process can safely maintain, plus the profile handles that
