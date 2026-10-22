@@ -157,9 +157,10 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
         forget_workspace_for_test, pending_for,
     };
     use crate::agent::orchestration::subagent_sessions::{
-        DriverTaskCancellation, DurableSubagentStatus, SubagentSessionSelector,
-        SubagentSessionStore, SubagentSessionUpsert, mark_finished, upsert_running,
+        DriverTaskCancellation, SubagentSessionSelector, SubagentSessionStore,
+        SubagentSessionUpsert, mark_finished, upsert_running,
     };
+    use std::sync::Arc;
     use tinyagents_orchestration::subagent::SubagentTaskKey;
     use tinyagents_tasks::CompletionStatus;
 
@@ -257,7 +258,10 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
         .into_iter()
         .find(|row| row.subagent_session_id == session.subagent_session_id)
         .expect("paused driver row remains stored");
-    assert_eq!(row.status, tinyagents_orchestration::subagent::DurableSubagentStatus::Failed);
+    assert_eq!(
+        row.status,
+        tinyagents_orchestration::subagent::DurableSubagentStatus::Failed
+    );
     let delivery = pending_for(&workspace_dir, parent_thread.as_deref().unwrap());
     assert_eq!(delivery.len(), 1);
     assert_eq!(delivery[0].status, CompletionStatus::Failed);
