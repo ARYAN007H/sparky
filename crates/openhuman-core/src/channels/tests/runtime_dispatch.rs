@@ -453,7 +453,7 @@ async fn run_resolved_route_message(message_id: &str, noise_after: usize) {
             "alice",
             "alice",
             "hello from resolved route test",
-            message_id.to_string(),
+            message_id,
             1,
             None,
             None,

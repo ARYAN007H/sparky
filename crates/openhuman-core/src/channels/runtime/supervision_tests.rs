@@ -2,6 +2,7 @@ use super::super::super::Channel;
 use super::{jitter_millis, spawn_supervised_listener, MAX_JITTER_MS};
 use std::sync::{Arc, Mutex};
 use tinychannels_bus as traits;
+use tinychannels_bus::SendMessage;
 use tokio::time::Instant;
 
 #[test]
@@ -52,7 +53,7 @@ impl Channel for ReconnectOkChannel {
         deprecated,
         reason = "TinyChannels v22 still requires the legacy send method on focused listener fixtures"
     )]
-    async fn send(&self, _message: &super::super::super::SendMessage) -> anyhow::Result<()> {
+    async fn send(&self, _message: &SendMessage) -> anyhow::Result<()> {
         Ok(())
     }
 

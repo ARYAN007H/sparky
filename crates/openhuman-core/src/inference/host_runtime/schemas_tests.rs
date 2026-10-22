@@ -1,4 +1,5 @@
 use super::*;
+use crate::agent_runs::agent_chat::params::AgentChatParams;
 use crate::core::all::assert_schema_controller_parity;
 
 #[test]
