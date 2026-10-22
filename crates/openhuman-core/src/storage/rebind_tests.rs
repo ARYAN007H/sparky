@@ -1,5 +1,7 @@
 use super::*;
+#[cfg(all(feature = "legacy-import", feature = "storage-sqlite"))]
 use crate::storage::import::Outcome;
+#[cfg(feature = "storage-sqlite")]
 use crate::storage::{CollectionSpec, Precondition, Scope};
 use std::sync::Mutex;
 use tempfile::TempDir;
@@ -34,6 +36,7 @@ impl Installed {
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn a_different_workspace_reopens_the_default_backend_there() {
     let first = TempDir::new().unwrap();
     let second = TempDir::new().unwrap();
@@ -56,6 +59,7 @@ fn a_different_workspace_reopens_the_default_backend_there() {
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn the_new_workspace_is_a_different_database() {
     let first = TempDir::new().unwrap();
     let second = TempDir::new().unwrap();
@@ -98,6 +102,7 @@ fn the_new_workspace_is_a_different_database() {
 }
 
 #[test]
+#[cfg(all(feature = "legacy-import", feature = "storage-sqlite"))]
 fn the_legacy_files_of_the_new_workspace_are_imported() {
     let first = TempDir::new().unwrap();
     let second = TempDir::new().unwrap();
@@ -192,6 +197,7 @@ fn a_backend_that_cannot_be_opened_keeps_the_previous_one() {
 }
 
 #[test]
+#[cfg(feature = "storage-sqlite")]
 fn rebinding_to_a_fresh_v2_profile_opens_its_storage_db_and_leaves_a_v1_one_alone() {
     let root = TempDir::new().unwrap();
     let v1 = TempDir::new().unwrap();
