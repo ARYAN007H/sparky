@@ -165,7 +165,7 @@ pub(super) fn try_create_claude_code_chat_model_from_string(
         egress,
     );
     let documents = match crate::storage::local::open("claude_code::provider", &workspace)
-        .and_then(|opened| opened.scoped().map_err(anyhow::Error::from))
+        .and_then(|opened| opened.scoped())
     {
         Ok(scoped) => Arc::clone(scoped.documents()),
         Err(error) => return Some(Err(error)),

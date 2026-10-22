@@ -1,5 +1,5 @@
 use super::*;
-#[cfg(feature = "legacy-import")]
+#[cfg(all(feature = "legacy-import", feature = "storage-sqlite"))]
 use crate::storage::import::Outcome;
 #[cfg(feature = "storage-sqlite")]
 use crate::storage::{CollectionSpec, Precondition, Scope};

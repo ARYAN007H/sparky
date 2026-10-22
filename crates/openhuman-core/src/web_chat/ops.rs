@@ -39,8 +39,6 @@ pub use state::parallel_in_flight_entries_for_test;
 #[cfg(test)]
 pub(crate) use state::scoped_key;
 pub(super) use state::thread_sessions;
-#[cfg(test)]
-pub(crate) use state::track_parallel_turn_for_test;
 pub use state::{cancel_should_target, in_flight_entries_for_test, invalidate_thread_sessions};
 pub(crate) use state::{event_session_id_for, key_for};
 #[cfg(test)]

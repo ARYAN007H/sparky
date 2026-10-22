@@ -102,7 +102,7 @@ impl Docs {
         T: DeserializeOwned + Serialize + Default + Send + 'static,
         R: Send + 'static,
     {
-        self.state.update(name, change).map_err(Into::into)
+        self.state.update(name, change)
     }
 
     /// Whether the one-time import of the legacy `integrations/<name>` file
@@ -134,7 +134,7 @@ impl Docs {
     #[cfg(test)]
     pub(super) fn save<T: Serialize>(&self, name: &str, value: &T) -> Result<()> {
         log::debug!("[composio:store] document save id={name}");
-        self.state.put(name, value).map_err(Into::into)
+        self.state.put(name, value)
     }
 }
 
