@@ -24,10 +24,23 @@ async fn threads_purge_inner(
     ctx: DispatchCtx,
     dir: PathBuf,
 ) -> Result<Outcome<ApiEnvelope<PurgeConversationThreadsResponse>>, String> {
+    threads_purge_inner_with_snapshot_hook(ctx, dir, || async {}).await
+}
+
+pub(crate) async fn threads_purge_inner_with_snapshot_hook<F, Fut>(
+    ctx: DispatchCtx,
+    dir: PathBuf,
+    after_snapshot: F,
+) -> Result<Outcome<ApiEnvelope<PurgeConversationThreadsResponse>>, String>
+where
+    F: FnOnce() -> Fut + Send,
+    Fut: std::future::Future<Output = ()> + Send,
+{
     // Capture and fence the parents before deleting their rows. The owner
     // index is keyed by thread, and the permanent fence prevents another child
     // from being admitted while the purge settles the jobs already running.
     let threads = conversations::blocking::list_threads(ctx.clone(), dir.clone()).await?;
+    after_snapshot().await;
     let thread_ids = threads
         .into_iter()
         .map(|thread| thread.id)
