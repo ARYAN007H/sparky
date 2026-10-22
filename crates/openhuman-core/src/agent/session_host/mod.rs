@@ -31,7 +31,7 @@
 
 #[cfg(feature = "flows")]
 pub(crate) use builder::provider_role_for_definition;
-pub use builder::{HostOnlyToolPolicy, HostTools, HostTurnTools, TurnContext};
+pub use builder::{HostTools, HostTurnTools, TurnContext};
 
 mod builder;
 mod builder_config;

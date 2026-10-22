@@ -12,13 +12,12 @@ pub(crate) use factory_resolution::provider_role_for_definition;
 mod builder_build;
 mod factory;
 mod factory_resolution;
-mod host_only;
+mod host_policy;
 mod host_tools;
 mod iteration_cap;
 mod profile_factory;
 mod setters;
 
-pub use host_only::HostOnlyToolPolicy;
 pub use host_tools::{HostTools, HostTurnTools, TurnContext};
 
 #[cfg(test)]
