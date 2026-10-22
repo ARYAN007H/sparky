@@ -44,7 +44,7 @@ fn transport_context(
     conversation: Option<tinychannels_bus::ConversationRef>,
     sequence: Option<u64>,
     idempotency_key: Option<String>,
-    receipt: Option<tinychannels_bus::MessageReceipt>,
+    receipt: Option<tinychannels_bus::channel::MessageReceipt>,
     segment_index: Option<u32>,
 ) -> Map<String, Value> {
     let mut context = Map::new();
