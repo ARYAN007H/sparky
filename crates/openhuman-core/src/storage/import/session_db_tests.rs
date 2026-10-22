@@ -128,3 +128,12 @@ fn rejects_a_database_without_classic_session_tables() {
         .to_string()
         .contains("none of the classic session database tables"));
 }
+
+#[test]
+fn rejects_malformed_legacy_json_instead_of_silently_dropping_session_state() {
+    for decode in [Decode::JsonOrEmpty, Decode::OptionalJson, Decode::JsonArray] {
+        let error = decode_value(Value::String("{".to_owned()), decode)
+            .expect_err("malformed persisted JSON must not be treated as empty state");
+        assert!(error.to_string().contains("legacy JSON"));
+    }
+}
