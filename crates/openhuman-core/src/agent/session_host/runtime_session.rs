@@ -18,7 +18,7 @@ pub(super) use usage::{account_committed_turn_against_goal, holistic_last_turn_u
 #[path = "../../memory/lifecycle/session_hooks.rs"]
 mod session_hooks;
 mod tool_rules;
-mod transcript;
+mod identity;
 #[path = "runtime_session_turn.rs"]
 mod turn;
 pub(super) use turn::begin_turn_resume;
@@ -312,20 +312,20 @@ impl OpenHumanSessionHost {
         // Thread-bound roots resume their deterministic transcript; other
         // turns keep the per-run stem path. Reuse one locator for the initial
         // binding and each resume because the runtime compares locator identity.
-        let session_locator = self.session_locator();
-        let resume_target = match self.session.clone() {
+        let injected_locator = self.session_history_locator.clone();
+        let resume_target = injected_locator.as_ref().map(|locator| match self.session.clone() {
             Some(session) => TranscriptTarget::for_session(
-                session_locator.clone(),
+                Arc::clone(locator),
                 session,
                 self.runtime_transcript_meta(),
             ),
             None => TranscriptTarget::new(
-                session_locator.clone(),
+                Arc::clone(locator),
                 self.runtime_transcript_stem(),
                 self.runtime_transcript_meta(),
             )
             .with_resume_agent(self.agent_definition_name.clone()),
-        };
+        });
         {
             let mut state = self
                 .runtime_state
@@ -353,7 +353,7 @@ impl OpenHumanSessionHost {
                     );
                     Box::pin(async move {
                         Ok(ResumePreparation {
-                            transcript: Some(resume_target),
+                            transcript: resume_target,
                         })
                     })
                 }
@@ -549,11 +549,19 @@ impl OpenHumanSessionHost {
             .hooks(hooks)
             .retain_recorded_tools(!self.host_only && !self.host_env.fresh_tool_snapshot);
         let meta = self.runtime_transcript_meta();
-        builder = match self.session.clone() {
-            Some(session) => builder.session(session_locator, session, meta),
-            None => builder
-                .transcript(session_locator, self.runtime_transcript_stem(), meta)
-                .resume_agent(self.agent_definition_name.clone()),
+        builder = if let Some(locator) = injected_locator {
+            match self.session.clone() {
+                Some(session) => builder.session(locator, session, meta),
+                None => builder
+                    .transcript(locator, self.runtime_transcript_stem(), meta)
+                    .resume_agent(self.agent_definition_name.clone()),
+            }
+        } else {
+            builder.identity_resolver(
+                self.runtime_session_key(),
+                meta,
+                Arc::new(self.session_identity_resolver()),
+            )
         };
         self.runtime_session = Some(
             builder
