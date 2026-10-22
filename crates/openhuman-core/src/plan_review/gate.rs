@@ -195,21 +195,15 @@ impl PlanReviewGate {
         self.parked.lock().get(&(scope, request_id)).cloned()
     }
 
-    /// The parked review a socket subscribed under its own profile should
-    /// replay. SaaS sockets carry that profile in their authenticated client
-    /// state; a missing id fails closed. Single-host sockets retain the host's
-    /// ambient tenant and ignore the optional profile hint.
+    /// The parked review a socket connected under its server-bound tenant
+    /// should replay. The caller must capture this tenant from trusted server
+    /// context when the socket connects; client event payloads are not identity.
     pub fn parked_review_for_socket(
         &self,
-        socket_profile_id: Option<&str>,
+        socket_tenant: &Tenant,
         thread_id: &str,
     ) -> Option<ParkedReview> {
-        let tenant = socket_tenant(
-            socket_profile_id,
-            crate::core::runtime::DispatchCtx::ambient().tenant(),
-            crate::core::runtime::is_saas(),
-        )?;
-        self.parked_review_for_thread(&tenant, thread_id)
+        self.parked_review_for_thread(socket_tenant, thread_id)
     }
 
     /// Resolve a parked review by `request_id`. Returns `true` when a waiter was
@@ -254,22 +248,6 @@ impl PlanReviewGate {
             Some(id) => self.decide(tenant, &id, resolution),
             None => false,
         }
-    }
-}
-
-fn socket_tenant(
-    profile_id: Option<&str>,
-    ambient: Result<Tenant, crate::core::runtime::tenant::NoTenant>,
-    saas: bool,
-) -> Option<Tenant> {
-    if saas {
-        let profile = profile_id.filter(|profile| !profile.trim().is_empty())?;
-        Some(Tenant {
-            profile: Some(profile.to_owned()),
-            agent: None,
-        })
-    } else {
-        ambient.ok()
     }
 }
 
