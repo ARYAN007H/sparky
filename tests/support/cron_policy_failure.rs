@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use openhuman_core::cron::{CronJobPatch, JobPolicy};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
-use tinystoragedrivers_core::{
+use tinystoragedrivers::{
     Capabilities, CollectionSpec, DocumentStore, Filter, Page, Precondition, Query, ReadCheck,
     ScopedStorage, Sort, StorageBackend, StorageError, Version, Versioned, WriteOp, WriteResult,
 };
