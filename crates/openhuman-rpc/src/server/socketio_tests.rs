@@ -1,33 +1,17 @@
 use super::{
     channel_connection_update_payload, event_alias, origin_is_allowed_with_extra,
-    publish_companion_state_changed, socket_replay_tenant, subscribe_companion_state_changed,
+    publish_companion_state_changed, subscribe_companion_state_changed, ThreadSubscribePayload,
 };
 
 #[test]
-fn plan_review_replay_uses_the_joining_sockets_profile() {
-    let ambient = crate::core_host::core::runtime::tenant::Tenant {
-        profile: Some("ambient-profile".into()),
-        agent: None,
-    };
-    let actual = socket_replay_tenant(Some("socket-profile"), Ok(ambient), true).unwrap();
-    assert_eq!(actual.profile.as_deref(), Some("socket-profile"));
-}
-
-#[test]
-fn plan_review_replay_fails_closed_without_a_saas_socket_profile() {
-    let ambient = crate::core_host::core::runtime::tenant::Tenant::default();
-    assert!(socket_replay_tenant(None, Ok(ambient), true).is_err());
-}
-
-#[test]
-fn plan_review_replay_keeps_the_host_tenant_outside_saas() {
-    let ambient = crate::core_host::core::runtime::tenant::Tenant {
-        profile: Some("host-profile".into()),
-        agent: None,
-    };
-    let actual = socket_replay_tenant(Some("ignored-client-profile"), Ok(ambient.clone()), false)
-        .unwrap();
-    assert_eq!(actual, ambient);
+fn thread_subscribe_carries_the_sockets_profile_for_review_replay() {
+    let payload: ThreadSubscribePayload = serde_json::from_value(serde_json::json!({
+        "thread_id": "thread-1",
+        "profile_id": "socket-profile",
+    }))
+    .expect("thread subscribe payload");
+    assert_eq!(payload.thread_id, "thread-1");
+    assert_eq!(payload.profile_id.as_deref(), Some("socket-profile"));
 }
 
 #[test]

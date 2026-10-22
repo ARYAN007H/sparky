@@ -1190,43 +1190,9 @@ fn replay_parked_approval(socket: &SocketRef, thread_id: &str) {
 /// just joined that thread's room. Mirrors [`replay_parked_approval`] — a
 /// plan review is a live, in-memory park (no SQLite row), but it reaches the
 /// UI the same fire-and-forget way, so the same reconciliation applies.
-fn socket_replay_tenant(
-    profile_id: Option<&str>,
-    ambient: Result<
-        crate::core_host::core::runtime::tenant::Tenant,
-        crate::core_host::core::runtime::tenant::NoTenant,
-    >,
-    saas: bool,
-) -> Result<
-    crate::core_host::core::runtime::tenant::Tenant,
-    crate::core_host::core::runtime::tenant::NoTenant,
-> {
-    if saas {
-        match profile_id.filter(|profile| !profile.trim().is_empty()) {
-            Some(profile) => {
-            Ok(crate::core_host::core::runtime::tenant::Tenant {
-                profile: Some(profile.to_owned()),
-                agent: None,
-            })
-            }
-            None => Err(crate::core_host::core::runtime::tenant::NoTenant),
-        }
-    } else {
-        ambient
-    }
-}
-
 fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str, profile_id: Option<&str>) {
-    let ambient = crate::core_host::core::runtime::DispatchCtx::ambient().tenant();
-    let Ok(tenant) = socket_replay_tenant(
-        profile_id,
-        ambient,
-        crate::core_host::core::runtime::is_saas(),
-    ) else {
-        return;
-    };
     let Some(row) = crate::core_host::agent::plan_review::gate::global()
-        .parked_review_for_thread(&tenant, thread_id)
+        .parked_review_for_socket(profile_id, thread_id)
     else {
         return;
     };

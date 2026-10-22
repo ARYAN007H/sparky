@@ -254,3 +254,30 @@ async fn parked_reviews_are_isolated_by_tenant() {
     ));
     assert_eq!(parked.await, PlanReviewResolution::Approve);
 }
+
+#[test]
+fn socket_replay_tenant_uses_the_sockets_profile_in_saas() {
+    let ambient = Tenant {
+        profile: Some("ambient-profile".into()),
+        agent: None,
+    };
+    let replay_tenant = socket_tenant(Some("socket-profile"), Ok(ambient), true)
+        .expect("socket profile must identify its review scope");
+    assert_eq!(replay_tenant.profile.as_deref(), Some("socket-profile"));
+}
+
+#[test]
+fn socket_replay_tenant_fails_closed_without_a_saas_profile() {
+    assert!(socket_tenant(None, Ok(Tenant::default()), true).is_none());
+}
+
+#[test]
+fn non_saas_socket_replay_keeps_the_host_tenant() {
+    let ambient = Tenant {
+        profile: Some("host-profile".into()),
+        agent: None,
+    };
+    let replay_tenant = socket_tenant(Some("untrusted-socket-hint"), Ok(ambient.clone()), false)
+        .expect("host tenant remains available");
+    assert_eq!(replay_tenant, ambient);
+}
