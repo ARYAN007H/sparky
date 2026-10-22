@@ -11,9 +11,9 @@ use tinyagents_orchestration::subagent::{
     SubagentSessionStore as TinySessionStore, SubagentSessionUpsert as TinyUpsert,
 };
 
+use super::tiny_port_epoch::{import_parent_epoch, parent_epoch_from_sidecar};
 use super::types::{DurableSubagentSession, DurableSubagentStatus, SubagentSessionSelector};
 use super::{SubagentSessionStore, SubagentSessionUpsert};
-use super::tiny_port_epoch::{import_parent_epoch, parent_epoch_from_sidecar};
 
 pub(crate) fn host_projection(
     session: TinySession,
