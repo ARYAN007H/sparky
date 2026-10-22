@@ -172,24 +172,24 @@ async fn legacy_tinyflows_files_are_imported_into_a_configured_backend() {
     if case.url == "memory" {
         let mut flow_error = None;
         for report in reports {
-            if report.domain == "flows" {
-                flow_error = Some(
-                    report
-                        .outcome
-                        .expect_err("memory backend must refuse an import without conditional writes"),
+            if let Err(error) = report.outcome {
+                assert!(
+                    format!("{error:#}").contains("conditional_writes"),
+                    "memory backend should explain why the {} import was refused: {error:#}",
+                    report.domain
                 );
-            } else {
-                report.outcome.unwrap();
+                if report.domain == "flows" {
+                    flow_error = Some(error);
+                }
             }
         }
-        let error = flow_error.expect("flow importer should report its capability refusal");
-        assert!(
-            format!("{error:#}").contains("conditional_writes"),
-            "memory backend should explain why the import was refused: {error:#}"
-        );
+        flow_error.expect("flow importer should report its capability refusal");
         let cron_config = config.clone();
         tokio::task::spawn_blocking(move || {
-            assert_eq!(cron::list_jobs(&cron_config).unwrap().len(), 3);
+            assert!(
+                cron::list_jobs(&cron_config).unwrap().is_empty(),
+                "memory import refusals must not leave a partial cron import"
+            );
         })
         .await
         .unwrap();
