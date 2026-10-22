@@ -89,8 +89,8 @@ async fn inspect_storage_config(check_id: &str, config: StorageConfig) -> Vec<Fi
                     Ok(storage) => {
                         drop(storage);
                         vec![Finding::pass(
-                        check_id,
-                        "The selected MongoDB server answered a read-only hello request.",
+                            check_id,
+                            "The selected MongoDB server answered a read-only hello request.",
                         )]
                     }
                     Err(_) => vec![Finding::error(
