@@ -60,7 +60,7 @@ impl std::fmt::Debug for CompletionEndpoint {
 pub async fn complete_once(
     endpoint: &CompletionEndpoint,
     request: ModelRequest,
-    budget: Option<&crate::agent::tinyagents::budget::ModelBudget>,
+    budget: Option<&tinyagents_harness::cost::ModelBudget>,
 ) -> Result<ModelResponse, String> {
     complete_once_observed(endpoint, request, budget, None).await
 }
@@ -74,7 +74,7 @@ pub async fn complete_once(
 pub async fn complete_once_observed(
     endpoint: &CompletionEndpoint,
     request: ModelRequest,
-    budget: Option<&crate::agent::tinyagents::budget::ModelBudget>,
+    budget: Option<&tinyagents_harness::cost::ModelBudget>,
     observer: Option<
         std::sync::Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>,
     >,
@@ -124,7 +124,7 @@ pub fn validate_complete_once_request(request: &ModelRequest) -> Result<(), Stri
 pub async fn complete_once_controlled(
     endpoint: &CompletionEndpoint,
     request: ModelRequest,
-    budget: Option<&crate::agent::tinyagents::budget::ModelBudget>,
+    budget: Option<&tinyagents_harness::cost::ModelBudget>,
     observer: Option<
         std::sync::Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>,
     >,
@@ -159,7 +159,7 @@ pub async fn complete_once_controlled(
     });
     if admission.is_none() {
         let model: std::sync::Arc<dyn ChatModel<()>> = match (budget, observer) {
-            (Some(budget), observer) => budget.wrap_with_observer(model, observer),
+            (Some(budget), observer) => budget.wrap_model_with_observer(model, observer),
             (None, Some(observer)) => {
                 let normalized =
                     std::sync::Arc::new(tinyagents_harness::cost::GatewayChargeModel::new(model));

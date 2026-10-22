@@ -15,10 +15,10 @@ mod prompt_surface;
 #[path = "runtime_session_usage.rs"]
 mod usage;
 pub(super) use usage::{account_committed_turn_against_goal, holistic_last_turn_usage};
+mod identity;
 #[path = "../../memory/lifecycle/session_hooks.rs"]
 mod session_hooks;
 mod tool_rules;
-mod transcript;
 #[path = "runtime_session_turn.rs"]
 mod turn;
 pub(super) use turn::begin_turn_resume;
@@ -312,20 +312,22 @@ impl OpenHumanSessionHost {
         // Thread-bound roots resume their deterministic transcript; other
         // turns keep the per-run stem path. Reuse one locator for the initial
         // binding and each resume because the runtime compares locator identity.
-        let session_locator = self.session_locator();
-        let resume_target = match self.session.clone() {
-            Some(session) => TranscriptTarget::for_session(
-                session_locator.clone(),
-                session,
-                self.runtime_transcript_meta(),
-            ),
-            None => TranscriptTarget::new(
-                session_locator.clone(),
-                self.runtime_transcript_stem(),
-                self.runtime_transcript_meta(),
-            )
-            .with_resume_agent(self.agent_definition_name.clone()),
-        };
+        let injected_locator = self.session_history_locator.clone();
+        let resume_target = injected_locator
+            .as_ref()
+            .map(|locator| match self.session.clone() {
+                Some(session) => TranscriptTarget::for_session(
+                    Arc::clone(locator),
+                    session,
+                    self.runtime_transcript_meta(),
+                ),
+                None => TranscriptTarget::new(
+                    Arc::clone(locator),
+                    self.injected_transcript_stem(),
+                    self.runtime_transcript_meta(),
+                )
+                .with_resume_agent(self.agent_definition_name.clone()),
+            });
         {
             let mut state = self
                 .runtime_state
@@ -353,7 +355,7 @@ impl OpenHumanSessionHost {
                     );
                     Box::pin(async move {
                         Ok(ResumePreparation {
-                            transcript: Some(resume_target),
+                            transcript: resume_target,
                         })
                     })
                 }
@@ -500,34 +502,7 @@ impl OpenHumanSessionHost {
                     Ok(())
                 })
             },
-            {
-                let state = self.runtime_state.clone();
-                let post_turn_hooks = self.post_turn_hooks.clone();
-                let session_id = self.event_session_id.clone();
-                let agent_id = self.agent_definition_id.clone();
-                let channel = self.event_channel.clone();
-                move |receipt| {
-                    let state = state.clone();
-                    let post_turn_hooks = post_turn_hooks.clone();
-                    let session_id = session_id.clone();
-                    let agent_id = agent_id.clone();
-                    let channel = channel.clone();
-                    Box::pin(async move {
-                        post_commit::finalize_committed_turn(
-                            &state,
-                            &post_turn_hooks,
-                            post_commit::TurnIdentity {
-                                session_id,
-                                agent_id,
-                                channel,
-                            },
-                            receipt,
-                        )
-                        .await;
-                        Ok(())
-                    })
-                }
-            },
+            |_| Box::pin(async { Ok(()) }),
             {
                 let state = self.runtime_state.clone();
                 move |terminal| {
@@ -547,13 +522,38 @@ impl OpenHumanSessionHost {
         let mut builder = SessionBuilder::new(driver)
             .codec(Arc::new(OpenHumanTranscriptCodec))
             .hooks(hooks)
+            .post_commit_sink(Arc::new(post_commit::OpenHumanPostCommitSink {
+                state: self.runtime_state.clone(),
+                hooks: self.post_turn_hooks.clone(),
+                identity: post_commit::TurnIdentityOwned {
+                    session_id: self.event_session_id.clone(),
+                    agent_id: self.agent_definition_id.clone(),
+                    channel: self.event_channel.clone(),
+                },
+            }))
             .retain_recorded_tools(!self.host_only && !self.host_env.fresh_tool_snapshot);
         let meta = self.runtime_transcript_meta();
-        builder = match self.session.clone() {
-            Some(session) => builder.session(session_locator, session, meta),
-            None => builder
-                .transcript(session_locator, self.runtime_transcript_stem(), meta)
-                .resume_agent(self.agent_definition_name.clone()),
+        builder = if let Some(locator) = injected_locator {
+            match self.session.clone() {
+                Some(session) => builder.session(locator, session, meta),
+                None => builder
+                    .transcript(locator, self.injected_transcript_stem(), meta)
+                    .resume_agent(self.agent_definition_name.clone()),
+            }
+        } else if self.thread_id.is_some() && self.session_parent_prefix.is_none() {
+            builder.identity_resolver(
+                self.runtime_session_key(),
+                meta,
+                Arc::new(self.session_identity_resolver()),
+            )
+        } else {
+            builder
+                .transcript(
+                    self.subagent_transcript_locator(),
+                    self.injected_transcript_stem(),
+                    meta,
+                )
+                .resume_agent(self.agent_definition_name.clone())
         };
         self.runtime_session = Some(
             builder

@@ -11,7 +11,7 @@
 //!
 //! 1. **Registry.** No config-derived tool is constructed and no delegation
 //!    tool is synthesised; the belt is the host's tools and nothing else.
-//! 2. **Policy.** [`HostOnlyToolPolicy`] denies every call whose name is not
+//! 2. **Policy.** `tinyagents_runtime::HostOnlyToolPolicy` denies every call whose name is not
 //!    one of the host's, before the host's own gate is consulted, so even a
 //!    model that names a built-in tool is refused.
 //! 3. **Definition.** The session runs a narrowed copy of the definition
@@ -19,90 +19,23 @@
 //!    refresh has nothing to add), no deferred tools, read-only sandbox, and
 //!    no memory context.
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
-use async_trait::async_trait;
-
-use crate::agent_registry::host_definition::AgentDefinition;
-use tinyagents_harness::context::RunContext;
-use tinyagents_harness::middleware::{PolicyDecision, ToolCallPolicy};
-use tinyinference_llm::tool::ToolCall;
-
-use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::OpenHumanSessionHost;
+use crate::agent_registry::host_definition::AgentDefinition;
 use crate::config::Config;
 use anyhow::Result;
 use tinyagents_definition::{SandboxMode, ToolScope};
 
-/// Deny-by-default gate for a host-only session.
-///
-/// A name outside `allowed` is refused outright. A name inside it is then put
-/// to the host's own gate, when the host supplied one, so host-only narrows a
-/// host's policy and never widens it.
-pub struct HostOnlyToolPolicy {
-    allowed: HashSet<String>,
-    host: Option<
-        Arc<
-            dyn tinyagents_harness::middleware::ToolCallPolicy<
-                crate::agent::tinyagents::host::OpenHumanRunContext,
-            >,
-        >,
-    >,
-}
-
-impl HostOnlyToolPolicy {
-    /// Admit exactly `allowed`, subject to `host`'s own decision.
-    #[must_use]
-    pub fn new(
-        allowed: HashSet<String>,
-        host: Option<
-            Arc<
-                dyn tinyagents_harness::middleware::ToolCallPolicy<
-                    crate::agent::tinyagents::host::OpenHumanRunContext,
-                >,
-            >,
-        >,
-    ) -> Self {
-        Self { allowed, host }
-    }
-}
-
-#[async_trait]
-impl ToolCallPolicy<OpenHumanRunContext> for HostOnlyToolPolicy {
-    fn name(&self) -> &str {
-        "host_only"
-    }
-
-    async fn check(
-        &self,
-        ctx: &RunContext<OpenHumanRunContext>,
-        call: &ToolCall,
-    ) -> PolicyDecision {
-        if !self.allowed.contains(&call.name) {
-            log::debug!(
-                "[agent::host_only] denied tool outside the host belt: {}",
-                call.name
-            );
-            return PolicyDecision::deny(format!(
-                "tool `{}` is not available to this agent",
-                call.name
-            ));
-        }
-        match &self.host {
-            Some(host) => host.check(ctx, call).await,
-            None => PolicyDecision::Allow,
-        }
-    }
-}
-
 /// The visible set of a host-only belt before the host's names are merged in:
 /// explicitly zero tools (an empty set would mean "no filter").
-pub(super) fn empty_belt() -> HashSet<String> {
-    HashSet::from([crate::agent_registry::host_definition::NO_TOOLS_SENTINEL.to_string()])
+pub(super) fn empty_belt() -> std::collections::HashSet<String> {
+    std::collections::HashSet::from([
+        crate::agent_registry::host_definition::NO_TOOLS_SENTINEL.to_string()
+    ])
 }
 
-/// The session gate: on a host-only belt, [`HostOnlyToolPolicy`] over the
+/// The session gate: on a host-only belt, TinyAgents' `HostOnlyToolPolicy` over the
 /// belt's names (`tools` holds only the host's by then) wrapping the host's
 /// own gate; otherwise the host's gate unchanged. The recovery tool and every
 /// other config-side addition are kept off the belt by the caller.
@@ -126,8 +59,11 @@ pub(super) fn session_policy(
     if !host_only {
         return host;
     }
-    let allowed = tools.iter().map(|tool| tool.name().to_string()).collect();
-    Some(Arc::new(HostOnlyToolPolicy::new(allowed, host)))
+    let allowed: std::collections::HashSet<String> =
+        tools.iter().map(|tool| tool.name().to_string()).collect();
+    Some(Arc::new(tinyagents_runtime::HostOnlyToolPolicy::new(
+        allowed, host,
+    )))
 }
 
 /// The definition a host-only session runs under: `definition` with every

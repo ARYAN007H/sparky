@@ -9,7 +9,6 @@ use crate::agent::tinyagents::SupplementalTrace;
 use helpers::{
     append_synthesized_block, driver_cancelled_with_snapshot, driver_error,
     driver_error_with_snapshot, driver_failure, ensure_snapshot_tools_are_executable,
-    repair_orphaned_tool_head,
 };
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
@@ -84,8 +83,6 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         &self,
         mut request: DriverRequest<OpenHumanRunContext>,
     ) -> Result<DriverOutcome, DriverFailure> {
-        // Heal an orphaned tool head before reading history.
-        repair_orphaned_tool_head(&mut request.history);
         // Use the policy and context prepared for this exact request.
         let tool_policy = request
             .run_context
@@ -331,11 +328,13 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         if outcome.text.trim().is_empty()
             && output.starts_with("I finished this turn without writing up a result.")
         {
-            output = crate::agent::session_host::turn_checkpoint::build_deterministic_checkpoint(
-                &crate::agent::session_host::turn_checkpoint::results_from_tool_outcomes(
-                    &outcome.tool_outcomes,
-                ),
+            let results = super::product_copy::close_results(&outcome.tool_outcomes);
+            let rendered = super::product_copy::render_close_results(&results, 4_000);
+            output = tinyagents_harness::close::checkpoint_with_copy(
+                &super::product_copy::OPENHUMAN_CLOSE_COPY,
                 self.max_iterations,
+                &rendered,
+                !results.is_empty(),
             );
         }
         let mut history = request.history;
@@ -492,7 +491,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             observed.hit_cap = outcome.hit_cap;
             observed.wrap_up_injected = outcome.wrap_up_injected;
             // Preserve the harness stop reason and the wind-down sidecar marker.
-            observed.stop = crate::agent::session_host::stop_summary::classify_stop_with_cause(
+            observed.stop = crate::agent::session_host::stop_policy::classify_stop_with_cause(
                 outcome.breaker_halt.as_deref(),
                 outcome.failure_cause.clone(),
                 observed.wind_down,

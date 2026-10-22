@@ -497,7 +497,13 @@ async fn every_prompt_names_at_least_one_tool_it_can_call() {
 /// are reworded, that judge silently grades against a different standard.
 #[test]
 fn close_verification_rubric_keeps_its_three_rules() {
-    let rubric = crate::agent::session_host::turn_checkpoint::close_verification_prompt("", "", "");
+    let rubric = tinyagents_harness::close::verification_prompt(
+        &crate::agent::session_host::product_copy::OPENHUMAN_CLOSE_COPY,
+        "",
+        "",
+        "",
+        4_000,
+    );
     for stem in [
         "1. The reply only says what the assistant will do",
         "2. The reply states something the tool records contradict",

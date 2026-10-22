@@ -7,10 +7,20 @@
 use super::types::SubagentRunError;
 use crate::agent::prompts::PromptContext;
 use crate::agent_registry::host_definition::AgentDefinition;
+use std::sync::Arc;
 use tinyagents_definition::{PromptSource, ToolScope};
 use tinyagents_harness::tool::ToolSnapshot;
 use tinyagents_orchestration::subagent::{restrict_tools_with_scope, SubagentRole};
 use tinytools::Tool;
+
+/// Adapts the owned host catalogue to TinyAgents' shared Arc-backed
+/// deduplication surface and returns the owned specs expected by dispatch.
+pub(crate) fn dedup_owned_tool_specs(specs: Vec<tinytools::ToolSpec>) -> Vec<tinytools::ToolSpec> {
+    tinyagents_runtime::dedup_visible_tool_specs(specs.into_iter().map(Arc::new).collect())
+        .into_iter()
+        .map(|spec| Arc::try_unwrap(spec).expect("newly wrapped spec has one owner"))
+        .collect()
+}
 
 // ── Prompt dialect selection ────────────────────────────────────────────
 
