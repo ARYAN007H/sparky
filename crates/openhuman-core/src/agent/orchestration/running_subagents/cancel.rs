@@ -346,7 +346,6 @@ pub(crate) async fn cancel_for_thread(
                     log::warn!(
                         "[running_subagents] driver thread deletion cancellation failed: {error}"
                     );
-                    continue;
                 }
             }
             if let Err(error) = jobs.wait_owned(job.id.as_str(), &owner_key).await {

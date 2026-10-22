@@ -478,17 +478,6 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         scoped_jobs.iter().any(|scoped| scoped.id == job.id),
         "the driver's own scope query sees the job selected by the owner index"
     );
-    let release_on_cancel = {
-        let release = release.clone();
-        tokio::spawn(async move {
-            // Give thread deletion time to request cancellation and enter its
-            // settlement wait. The running snapshot stays `Running` until the
-            // provider unwinds, so the cancellation request itself is not
-            // observable through the public job snapshot.
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-            release.notify_one();
-        })
-    };
     background_completions::record_outcome(
         &dispatch,
         &workspace,
@@ -505,6 +494,17 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         1,
         "the deletion starts with a queued child completion"
     );
+    let release_on_cancel = {
+        let release = release.clone();
+        tokio::spawn(async move {
+            // Give thread deletion time to request cancellation and enter its
+            // settlement wait. The running snapshot stays `Running` until the
+            // provider unwinds, so the cancellation request itself is not
+            // observable through the public job snapshot.
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            release.notify_one();
+        })
+    };
 
     tokio::time::timeout(
         std::time::Duration::from_secs(6),
