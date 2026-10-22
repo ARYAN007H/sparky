@@ -107,7 +107,9 @@ pub(super) struct TurnMiddlewareInputs {
     pub(super) compaction_notice: Option<super::context_wiring::CompactionNotice>,
     /// The session store the goal and `todo` tools write, whether or not this
     /// turn has the `todo` tool; the run-state block reads it.
-    pub(super) state_store: Option<Arc<dyn tinyagents_harness::store::Store>>,
+    /// With the scope the `todo` tool uses on a turn without a thread (the
+    /// session id), so a headless turn's block still finds its plan.
+    pub(super) state_store: Option<(Arc<dyn tinyagents_harness::store::Store>, String)>,
 }
 
 /// The handles the run loop reads after the drive returns.
@@ -511,9 +513,14 @@ pub(super) fn install_turn_middleware(
     // it so its `after_model` runs first and the plan check comes first.
     match todo_store {
         Some(store) if verify_before_finish::applies(is_subagent, agent_id) => {
-            harness.push_middleware(Arc::new(
-                tinyagents_harness_tools::todos::TodoSequenceMiddleware::new(store),
-            ));
+            // A thread-less turn's plan sits under the session id (the `todo`
+            // tool's fallback scope); without the same key these rules never
+            // see it.
+            let mut sequence = tinyagents_harness_tools::todos::TodoSequenceMiddleware::new(store);
+            if let Some((_, fallback_thread)) = &state_store {
+                sequence = sequence.with_fallback_thread(fallback_thread.clone());
+            }
+            harness.push_middleware(Arc::new(sequence));
         }
         _ => tracing::debug!(
             is_subagent,

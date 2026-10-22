@@ -16,7 +16,12 @@ fn install_needs_the_scope_and_a_store() {
     let installed = |store: Option<Arc<dyn Store>>, is_subagent: bool, agent: Option<&str>| {
         let mut harness = AgentHarness::<(), ()>::new();
         let before = harness.middleware().len();
-        install(&mut harness, store, is_subagent, agent);
+        install(
+            &mut harness,
+            store.map(|store| (store, "standalone".to_string())),
+            is_subagent,
+            agent,
+        );
         harness.middleware().len() - before
     };
     assert_eq!(

@@ -587,7 +587,10 @@ async fn drive_turn(
                 Arc::new(move || bridge.announce_compaction())
             }),
             state_store: run_context.parent.as_ref().map(|parent| {
-                crate::storage::sessions::stores_or_ephemeral(&parent.workspace_dir).kv
+                (
+                    crate::storage::sessions::stores_or_ephemeral(&parent.workspace_dir).kv,
+                    parent.session_id.clone(),
+                )
             }),
         },
     );

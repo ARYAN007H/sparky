@@ -24,16 +24,19 @@ pub(crate) fn applies(is_subagent: bool, agent_definition_id: Option<&str>) -> b
 }
 
 /// Installs the block for a turn in scope that has the session store the goal
-/// and `todo` tools write.
+/// and `todo` tools write, with the key the `todo` tool falls back to when the
+/// turn has no thread (the session id).
 pub(super) fn install<C: Send + Sync + 'static>(
     harness: &mut AgentHarness<(), C>,
-    store: Option<Arc<dyn Store>>,
+    source: Option<(Arc<dyn Store>, String)>,
     is_subagent: bool,
     agent_definition_id: Option<&str>,
 ) {
-    match store {
-        Some(store) if applies(is_subagent, agent_definition_id) => {
-            harness.push_middleware(Arc::new(StateBlockMiddleware::new(store)));
+    match source {
+        Some((store, fallback_thread)) if applies(is_subagent, agent_definition_id) => {
+            harness.push_middleware(Arc::new(
+                StateBlockMiddleware::new(store).with_fallback_thread(fallback_thread),
+            ));
         }
         _ => tracing::debug!(
             is_subagent,
