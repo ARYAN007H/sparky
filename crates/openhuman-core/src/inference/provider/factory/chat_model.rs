@@ -232,7 +232,7 @@ impl OpenHumanModelFactory<'_> {
                                 self.config,
                                 self.egress,
                                 context_extensions,
-                            ))
+                            ));
                         }
                     };
                     let provider = model
@@ -259,7 +259,7 @@ impl OpenHumanModelFactory<'_> {
                                 self.config,
                                 self.egress,
                                 context_extensions,
-                            ))
+                            ));
                         }
                     };
                     let route_provider = model
@@ -615,6 +615,24 @@ pub(super) fn unresolved_chat_model_error_for(
     egress: &EgressLedger,
     extensions: Option<&crate::core::slots::Extensions>,
 ) -> anyhow::Error {
+    unresolved_chat_model_error_for_access(
+        role,
+        provider,
+        config,
+        egress,
+        extensions,
+        CredentialAccess::Runtime,
+    )
+}
+
+pub(super) fn unresolved_chat_model_error_for_access(
+    role: &str,
+    provider: &str,
+    config: &Config,
+    egress: &EgressLedger,
+    extensions: Option<&crate::core::slots::Extensions>,
+    credential_access: CredentialAccess,
+) -> anyhow::Error {
     let p = provider.trim();
 
     if let Err(error) = enforce_local_only_inference(role, p) {
@@ -637,23 +655,23 @@ pub(super) fn unresolved_chat_model_error_for(
     }
 
     if p.is_empty() || p == "cloud" {
-        return unresolved_chat_model_error_for(
+        return unresolved_chat_model_error_for_access(
             role,
             &resolve_primary_cloud_provider_string(config),
             config,
             egress,
             extensions,
+            credential_access,
         );
     }
 
     #[cfg(not(test))]
-    if let Err(error) = super::access_gates::verify_session_active(config) {
-        return error;
+    if credential_access == CredentialAccess::Runtime {
+        if let Err(error) = super::access_gates::verify_session_active(config) {
+            return error;
+        }
     }
 
-    // Preserve the legacy chokepoint's disclosure ordering for invalid custom
-    // routes: after both gates pass, the attempted external destination is
-    // visible even when configuration validation then fails.
     emit_inference_egress(role, p, egress);
 
     if let Some((slug, model_with_temperature)) = p.split_once(':') {
@@ -665,7 +683,20 @@ pub(super) fn unresolved_chat_model_error_for(
             );
         }
         let (model, _) = split_model_and_temperature(model_with_temperature);
-        return match resolve_cloud_slug_for(role, slug.trim(), &model, config, extensions) {
+        let result = match credential_access {
+            CredentialAccess::Runtime => {
+                resolve_cloud_slug_for(role, slug.trim(), &model, config, extensions)
+            }
+            CredentialAccess::Inspection => resolve_cloud_slug_with_access(
+                role,
+                slug.trim(),
+                &model,
+                config,
+                extensions,
+                CredentialAccess::Inspection,
+            ),
+        };
+        return match result {
             Err(error) => error,
             Ok(_) => anyhow::anyhow!(
                 "[chat-factory] configured provider '{}' for role '{}' did not produce a crate-native chat model",

@@ -27,9 +27,10 @@ use std::sync::Arc;
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::inference_registry::{
     register_backend_error_classifier, register_catalog, register_chat_model,
-    register_config_normalizer, register_embedding, ChatModelEntry, ChatModelFactory,
-    ChatModelRequest, EmbeddingRequest, ProviderContext, ProviderModelMetadata, ReadinessProbe,
-    PROVIDER_OPENHUMAN,
+    register_config_normalizer, register_embedding, register_inspection_catalog,
+    register_inspection_chat_model, register_inspection_embedding, ChatModelEntry,
+    ChatModelFactory, ChatModelRequest, EmbeddingRequest, InspectionChatModelBuild,
+    ProviderContext, ProviderModelMetadata, ReadinessProbe, PROVIDER_OPENHUMAN,
 };
 use tinyinference_llm::model::ChatModel;
 
@@ -82,6 +83,43 @@ pub(crate) fn build_chat_model(
         true,
     )?;
     Ok((Arc::new(model), pinned))
+}
+
+fn build_chat_model_for_inspection(
+    request: &ChatModelRequest<'_, ProviderContext>,
+) -> anyhow::Result<InspectionChatModelBuild> {
+    let config = &request.context.config;
+    let pinned = request
+        .model_override
+        .map(str::trim)
+        .filter(|model| !model.is_empty())
+        .map(str::to_string)
+        .or_else(tiers::default_model)
+        .ok_or_else(|| anyhow::anyhow!("TinyHumans managed inference has no configured model"))?;
+    let default_model = request
+        .default_model
+        .map(str::trim)
+        .filter(|model| !model.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| pinned.clone());
+    let bearer = managed_session::managed_bearer_for_inspection(config)?;
+    let model = managed_model::build_chat_model_for_inspection(
+        config.api_url.as_deref(),
+        &default_model,
+        bearer.clone(),
+        request.native_tool_calling,
+        request.thread_id,
+    )?;
+    let endpoint = format!(
+        "{}/openai/v1",
+        crate::backend::url::effective_api_url(&config.api_url).trim_end_matches('/')
+    );
+    Ok(InspectionChatModelBuild {
+        model: Arc::new(model),
+        model_id: default_model,
+        endpoint,
+        credential: bearer,
+    })
 }
 
 fn readiness_probe() -> ReadinessProbe {
@@ -142,7 +180,19 @@ pub(crate) fn register(_options: &InstallOptions) {
             Ok(Box::new(managed_embedding::from_request(request)))
         }),
     );
+    register_inspection_chat_model(
+        PROVIDER_OPENHUMAN,
+        Arc::new(build_chat_model_for_inspection),
+    );
+    register_inspection_embedding(PROVIDER_OPENHUMAN, |request| {
+        managed_embedding::from_request_for_inspection(request)
+            .map(|model| Box::new(model) as Box<dyn tinyinference_embeddings::EmbeddingModel>)
+    });
     register_catalog(PROVIDER_OPENHUMAN, managed_catalog::entry());
+    register_inspection_catalog(
+        PROVIDER_OPENHUMAN,
+        managed_catalog::inspection_entry(),
+    );
     register_config_normalizer(PROVIDER_OPENHUMAN, Arc::new(tiers::normalize_config));
     register_backend_error_classifier(Arc::new(backend_error_code::classify));
     log::debug!(

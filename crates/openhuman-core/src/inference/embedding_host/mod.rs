@@ -18,11 +18,12 @@ mod rpc;
 mod schemas;
 
 pub use factory::{
-    create_embedding_provider_for_chat, create_embedding_provider_with_config,
-    create_embedding_provider_with_credentials, default_embedding_provider_for_chat,
-    default_embedding_provider_with_config,
+    create_embedding_provider_for_chat, create_embedding_provider_for_inspection,
+    create_embedding_provider_with_config, create_embedding_provider_with_credentials,
+    default_embedding_provider_for_chat, default_embedding_provider_with_config,
 };
 pub use rpc::provider_from_config;
+pub(crate) use rpc::{probe_dimensions_for_inspection, InspectionEmbeddingError};
 /// A shared embedding provider as this module's factories return it, nameable
 /// by hosts that hold one without depending on the embeddings crate.
 pub type SharedEmbeddingModel = std::sync::Arc<dyn tinyinference_embeddings::EmbeddingModel>;

@@ -33,7 +33,37 @@ pub(super) fn from_request(request: &EmbeddingRequest<'_, ProviderContext>) -> C
         request.model,
         request.dimensions,
         context.chat.clone(),
+        None,
     )
+}
+
+pub(super) fn from_request_for_inspection(
+    request: &EmbeddingRequest<'_, ProviderContext>,
+) -> tinyinference_embeddings::Result<CloudEmbeddingModel> {
+    let context = request
+        .context
+        .embedding
+        .as_ref()
+        .expect("embedding host context");
+    let config = context.config.as_ref().ok_or_else(|| {
+        tinyinference_embeddings::Error::Validation(
+            "selected managed embedding config is unavailable".to_owned(),
+        )
+    })?;
+    let bearer = super::managed_session::managed_bearer_for_inspection(config).map_err(|_| {
+        tinyinference_embeddings::Error::Validation(
+            "selected managed embedding credential is unavailable".to_owned(),
+        )
+    })?;
+    Ok(build_cloud_model(
+        config.api_url.clone(),
+        context.state_dir.clone(),
+        context.secrets_encrypt,
+        request.model,
+        request.dimensions,
+        None,
+        Some(bearer),
+    ))
 }
 
 fn build_cloud_model(
@@ -43,6 +73,7 @@ fn build_cloud_model(
     model: &str,
     dimensions: usize,
     chat: Option<ApprovalChatContext>,
+    frozen_bearer: Option<String>,
 ) -> CloudEmbeddingModel {
     let base_url = format!(
         "{}/openai/v1",
@@ -50,6 +81,9 @@ fn build_cloud_model(
     );
     let key_endpoint = base_url.clone();
     let bearer: BearerResolver = Arc::new(move || {
+        if let Some(bearer) = frozen_bearer.as_ref() {
+            return Ok(bearer.clone());
+        }
         // A stored TinyHumans API key is the bearer outright, with the
         // plaintext guard: never put the key on a non-HTTPS, non-loopback wire.
         if let Some(key) = openhuman_embed::__host::security::credentials::api_key::get_api_key_in(

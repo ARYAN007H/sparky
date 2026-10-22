@@ -74,7 +74,7 @@ function makeLinuxdeployAppDir() {
   );
   script(
     join(app, "apprun-hooks/openhuman-system-webkit.sh"),
-    "OPENHUMAN_BUNDLED_WEBKIT='libwebkit2gtk-4.1.so.0.4.1'\n",
+    "#!/bin/sh\nOPENHUMAN_BUNDLED_WEBKIT='libwebkit2gtk-4.1.so.0.0'\n",
   );
   script(join(app, "apprun-hooks/linuxdeploy-plugin-gtk.sh"), "#!/bin/sh\n");
   elf(join(app, "AppRun.wrapped"));

@@ -85,17 +85,64 @@ function normalizeExport(statement) {
 
 function isEmbedContractExport(path, lines, index) {
   const allowed = embedContractExports.get(path);
-  if (!allowed) return false;
+  const moduleExports = embedModuleContractExports.get(path);
+  if (!allowed && !moduleExports) return false;
   const remaining = lines
     .slice(index)
     .map(({ text }) => text)
     .join("\n");
   const end = remaining.indexOf(";");
-  return end >= 0 && allowed.has(normalizeExport(remaining.slice(0, end + 1)));
+  if (end < 0) return false;
+
+  const statement = normalizeExport(remaining.slice(0, end + 1));
+  if (allowed?.has(statement)) return true;
+
+  if (!moduleExports) return false;
+  return [...moduleExports].some(
+    ([module, statements]) =>
+      statements.has(statement) && isInsidePublicModule(lines, index, module),
+  );
 }
 
 // Product types need not start with `OpenHuman`, so this is an explicit,
 // reviewed inventory rather than a naming convention.
+const embedModuleContractExports = new Map([
+  [
+    "crates/openhuman-embed/src/host_internals.rs",
+    new Map([
+      [
+        "inference_registry",
+        new Set(
+          [
+            "pub use tinyinference_llm::providers::overrides::{BoxFuture, CatalogEntry, CatalogLimits, CatalogListing, CatalogRequest, ChatModelEntry, ChatModelFactory, ChatModelRequest, EmbeddingFactory, EmbeddingRequest, ProviderModelMetadata, ProviderOverrides, ReadinessProbe};",
+          ].map(normalizeExport),
+        ),
+      ],
+    ]),
+  ],
+]);
+
+function isInsidePublicModule(lines, index, module) {
+  const declaration = new RegExp(
+    `^\\s*pub\\s+mod\\s+${escapeRegex(module)}\\s*\\{`,
+  );
+  let start = -1;
+  for (let cursor = 0; cursor < index; cursor += 1) {
+    if (declaration.test(lines[cursor].text)) start = cursor;
+  }
+  if (start < 0) return false;
+
+  let depth = 0;
+  for (let cursor = start; cursor < index; cursor += 1) {
+    for (const char of lines[cursor].text) {
+      if (char === "{") depth += 1;
+      else if (char === "}") depth -= 1;
+    }
+    if (depth === 0) return false;
+  }
+  return depth === 1;
+}
+
 const openhumanDomainTypes = new Set([
   "AgentDefinitionDisplay",
   "AgentDefinitionModel",
@@ -115,6 +162,35 @@ const openhumanDomainTypes = new Set([
   "UserProfileHook",
   "WorkspacePolicy",
 ]);
+
+function isNativeAgentProgressReference(path, text, source = text) {
+  const harness = "vendor/tinyagents/crates/tinyagents-harness/src/";
+  if (
+    /\b(?:openhuman(?:_[A-Za-z0-9_]+)?|tinyagents(?:_[A-Za-z0-9_]+)?)\s*::\s*AgentProgress\b/.test(
+      text,
+    )
+  )
+    return false;
+  if (
+    path === `${harness}progress.rs` &&
+    /\bpub\s+enum\s+AgentProgress\b/.test(rustCode(source))
+  )
+    return true;
+  if (
+    path === `${harness}lib.rs` &&
+    /^\s*pub\s+use\s+progress::AgentProgress\s*;\s*$/.test(text)
+  )
+    return true;
+  if (path === `${harness}turn_runner/types.rs`) {
+    const ownsImport = /^\s*use\s+crate::progress::AgentProgress\s*;\s*$/m.test(
+      rustCode(source),
+    );
+    return ownsImport;
+  }
+  if (path === `${harness}turn_runner/mod_tests.rs`)
+    return /\bcrate\s*::\s*progress\s*::\s*AgentProgress\b/.test(text);
+  return false;
+}
 
 // Names moved out of compatibility layers. Values identify their sole owner;
 // declarations in any other TinyAgents crate are facades even if private.
@@ -476,6 +552,51 @@ function isBehaviorFreeForwarder(source) {
 }
 
 function assertSelfTests() {
+  const progressPath =
+    "vendor/tinyagents/crates/tinyagents-harness/src/progress.rs";
+  const nativeTypesPath =
+    "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/types.rs";
+  const testPath =
+    "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/mod_tests.rs";
+  const nativeTypes =
+    "use crate::progress::AgentProgress;\nProgress(Box<AgentProgress>)";
+  if (
+    !isNativeAgentProgressReference(progressPath, "pub enum AgentProgress {") ||
+    !isNativeAgentProgressReference(
+      "vendor/tinyagents/crates/tinyagents-harness/src/lib.rs",
+      "pub use progress::AgentProgress;",
+    ) ||
+    !isNativeAgentProgressReference(
+      nativeTypesPath,
+      "Progress(Box<AgentProgress>)",
+      nativeTypes,
+    ) ||
+    !isNativeAgentProgressReference(
+      testPath,
+      "_event: crate::progress::AgentProgress",
+    ) ||
+    isNativeAgentProgressReference(
+      "vendor/tinyagents/crates/tinyagents-session/src/lib.rs",
+      "pub enum AgentProgress {",
+    ) ||
+    isNativeAgentProgressReference(
+      progressPath,
+      "use openhuman_core::AgentProgress;",
+      "pub enum AgentProgress {\nuse openhuman_core::AgentProgress;",
+    ) ||
+    isNativeAgentProgressReference(
+      nativeTypesPath,
+      "use openhuman_core::AgentProgress;",
+      "use openhuman_core::AgentProgress;",
+    ) ||
+    isNativeAgentProgressReference(
+      testPath,
+      "_event: openhuman_core::AgentProgress",
+    )
+  )
+    throw new Error(
+      "agent-runtime boundary self-test: native AgentProgress allowance escaped its owner and paths",
+    );
   const embedPath = "crates/openhuman-embed/src/lib.rs";
   const policyExport = [{ text: "pub use tinytools::ToolPolicy;" }];
   if (
@@ -781,6 +902,11 @@ for (const path of await filesUnder(
           claudeCodeBridge,
           text,
         )
+      )
+        continue;
+      if (
+        name === "AgentProgress" &&
+        isNativeAgentProgressReference(relative(repoRoot, path), text, source)
       )
         continue;
       if (new RegExp(`\\b${escapeRegex(name)}\\b`).test(text)) {

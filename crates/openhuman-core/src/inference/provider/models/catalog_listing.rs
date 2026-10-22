@@ -113,16 +113,6 @@ fn no_managed_catalog() -> crate::core::Outcome<serde_json::Value> {
     )
 }
 
-pub async fn list_configured_models(
-    provider_id: &str,
-) -> Result<crate::core::Outcome<serde_json::Value>, String> {
-    let config = crate::config::Config::load_or_init()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    list_configured_models_from_config(provider_id, &config).await
-}
-
 pub async fn list_configured_models_from_config(
     provider_id: &str,
     config: &crate::config::Config,

@@ -109,6 +109,32 @@ pub(super) fn build_chat_model(
     Ok(managed)
 }
 
+/// Constructs the native managed model with a credential read once from the
+/// doctor's read-only snapshot. The closure passed to TinyInference can only
+/// return that frozen value; this path installs no mutable session-expiry hook.
+pub(super) fn build_chat_model_for_inspection(
+    api_url: Option<&str>,
+    model: &str,
+    bearer: String,
+    native_tool_calling: bool,
+    thread_id: Option<&str>,
+) -> anyhow::Result<TinyHumansModel> {
+    let endpoint = effective_api_url(&api_url.map(str::to_owned));
+    let managed = TinyHumansModel::new(
+        endpoint,
+        model,
+        super::tiers::MODEL_MANAGED_DEFAULT,
+        move || Ok(bearer.clone()),
+    )?
+    .with_cache_namespace("openhuman")
+    .with_native_tool_calling(native_tool_calling)
+    .with_thread_id(thread_id)
+    .with_error_observer(log_managed_error);
+    // Do not attach `with_managed_auth_failure_handler`: inspection must not
+    // publish expiry state or mutate the selected credential profile.
+    Ok(managed)
+}
+
 fn log_managed_error(error: &tinyinference_llm::Error, point: TinyHumansFailurePoint) {
     let operation = match point {
         TinyHumansFailurePoint::Invoke => "invoke",

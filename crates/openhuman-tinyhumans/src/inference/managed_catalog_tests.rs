@@ -206,3 +206,7 @@ async fn managed_catalog_does_not_infer_http_status_from_error_payload_text() {
     assert!(error.contains("provider returned error payload"), "{error}");
     assert!(error.contains("401 session expired"), "{error}");
 }
+
+#[cfg(test)]
+#[path = "managed_catalog_inspection_tests.rs"]
+mod inspection_tests;

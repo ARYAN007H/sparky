@@ -2,7 +2,6 @@
 //! grammar and route-kind classification live in TinyInference.
 //!
 //! - [`routing`] — role → configured provider string resolution.
-//! - [`primary_cloud`] — `primary_cloud` / legacy `inference_url` resolution.
 //! - [`access_gates`] — privacy-mode, session, and egress chokepoints.
 //! - [`credentials`] — auth-profile key lookup for cloud slugs.
 //! - [`managed_backend`] — the managed provider resolution (tier pinning, privacy gate, egress) in front of the registered chat model.
@@ -17,42 +16,54 @@ mod chat_model;
 mod cloud_slug;
 mod cloud_spec;
 mod credentials;
+mod inspection;
 mod local_runtime;
 mod managed_backend;
 mod routing;
 mod subprocess_providers;
 
+pub(crate) use chat_model::{OpenHumanModelFactory, resolves_to_managed_backend};
 pub use chat_model::{
     create_chat_model_from_string, create_chat_model_from_string_with_model_id,
     create_chat_model_in, create_chat_model_with_model_id_in, probe_inference_readiness,
 };
-pub(crate) use chat_model::{resolves_to_managed_backend, OpenHumanModelFactory};
 pub(crate) use cloud_slug::resolve_cloud_slug_for;
-pub(crate) use cloud_spec::{cloud_provider_spec, CloudCredentialResolver};
+pub(crate) use cloud_spec::{CloudCredentialResolver, cloud_provider_spec};
 pub use credentials::{auth_key_for_slug, lookup_key_for_slug};
 pub(crate) use credentials::{
     openai_bearer_is_oauth, redact_endpoint_origin, resolve_codex_routing,
 };
+pub(crate) use inspection::{
+    create_chat_model_with_identity_in_for_inspection,
+    create_chat_model_with_model_id_in_for_inspection,
+};
 pub(crate) use local_runtime::create_local_chat_model_from_string;
 pub(crate) use routing::fallback_diagnostics_for_role;
+pub(crate) use routing::{ConfigRouteSource, workload_router};
 pub use routing::{provider_for_role, role_bypasses_managed_credits};
-pub(crate) use routing::{workload_router, ConfigRouteSource};
 
 // Factory-internal helpers shared across the implementation modules.
 use access_gates::{emit_inference_egress, enforce_local_only_inference};
+use chat_model::{unresolved_chat_model_error, with_default_temperature};
 #[cfg(test)]
 use cloud_slug::try_create_cloud_slug_chat_model;
-#[cfg(test)]
-use cloud_slug::try_create_cloud_slug_chat_model_from_string;
-use cloud_slug::try_create_cloud_slug_chat_model_from_string_with_native_tools_for;
-use local_runtime::{try_create_local_runtime_chat_model_from_string, OptionalChatModelResult};
-#[cfg(test)]
-pub(crate) use managed_backend::make_openhuman_backend_model_for_thread;
+use cloud_slug::{
+    resolve_cloud_slug_with_access, try_create_cloud_slug_chat_model_for_inspection_with_identity,
+    try_create_cloud_slug_chat_model_from_string_with_native_tools_for,
+};
+use credentials::CredentialAccess;
+use local_runtime::{
+    OptionalChatModelResult, try_create_local_runtime_chat_model_for_inspection,
+    try_create_local_runtime_chat_model_from_string,
+};
 use managed_backend::managed_chat_model_for;
 pub(crate) use managed_backend::{
     make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread_in,
 };
-use subprocess_providers::OpenHumanMcpEndpoint;
+use subprocess_providers::{
+    OpenHumanMcpEndpoint, try_create_claude_agent_sdk_chat_model_for_inspection,
+    try_create_claude_code_chat_model_for_inspection,
+};
 use tinyinference_providers::route::split_model_and_temperature;
 
 /// Test-only seam: inject a mock [`ChatModel`] so e2e tests can drive the
@@ -74,16 +85,58 @@ pub mod test_provider_override;
 #[path = "factory_tests.rs"]
 mod factory_tests;
 
-use crate::config::schema::cloud_providers::AuthStyle;
 use crate::config::Config;
-use crate::security::credentials::AuthService;
+use crate::config::schema::cloud_providers::AuthStyle;
+use crate::inference::provider::openai_codex::resolve_openai_codex_routing_for_inspection;
 use crate::security::egress::EgressLedger;
 use std::sync::Arc;
 use tinyinference_llm::model::ChatModel;
 use tinyinference_llm::providers::openai::codex::{
-    openai_codex_client_version, openai_codex_user_agent, OPENAI_CODEX_ACCOUNT_HEADER,
-    OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
+    OPENAI_CODEX_ACCOUNT_HEADER, OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
+    openai_codex_client_version, openai_codex_user_agent,
 };
+
+/// Opaque per-report identity for an inspection completion. It contains the
+/// effective endpoint, exact frozen credential, and actual wire model, but
+/// deliberately has no Debug/Display implementation.
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub(crate) struct InspectionRequestIdentity {
+    endpoint: String,
+    credential: String,
+    wire_model: String,
+}
+
+impl InspectionRequestIdentity {
+    pub(crate) fn new(endpoint: String, credential: String, wire_model: String) -> Self {
+        Self {
+            endpoint,
+            credential,
+            wire_model,
+        }
+    }
+}
+
+/// Whether the resolved inspection route can enforce the requested output
+/// token ceiling on the provider request.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) enum InspectionOutputBudgetCapability {
+    /// The provider request enforces its requested output-token limit.
+    Bounded,
+    /// The provider route cannot express a bounded output-token request.
+    Unsupported,
+}
+
+/// Result shape shared by inspection-only provider constructors.
+type InspectionChatModelResult =
+    Option<anyhow::Result<(Arc<dyn ChatModel<()>>, String, String, String)>>;
+
+/// Prepared, frozen model plus its opaque deduplication identity.
+pub(crate) struct PreparedInspectionChatModel {
+    pub(crate) model: Arc<dyn ChatModel<()>>,
+    pub(crate) model_id: String,
+    pub(crate) identity: InspectionRequestIdentity,
+    pub(crate) output_budget: InspectionOutputBudgetCapability,
+}
 
 /// Sentinel meaning "use the OpenHuman backend session JWT".
 pub const PROVIDER_OPENHUMAN: &str = "openhuman";

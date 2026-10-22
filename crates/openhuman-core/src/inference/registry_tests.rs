@@ -1,13 +1,13 @@
 use super::*;
 use crate::inference::context_window::model_limits_request;
 use crate::inference::provider::factory::{
-    create_chat_model_from_string, make_openhuman_backend_model_for_thread, PROVIDER_OPENHUMAN,
+    PROVIDER_OPENHUMAN, create_chat_model_from_string, make_openhuman_backend_model_for_thread,
 };
 use async_trait::async_trait;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
-use tinyinference_llm::model::discover::DiscoveryRequest;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tinyinference_llm::model::ChatModel;
+use tinyinference_llm::model::discover::DiscoveryRequest;
 use tinyinference_llm::model::{ModelRequest, ModelResponse};
 
 type SeenModelRequests = Arc<Mutex<Vec<(String, Option<String>, Option<String>)>>>;
@@ -231,7 +231,7 @@ fn selecting_the_managed_provider_with_nothing_registered_is_backend_unavailable
 #[tokio::test]
 async fn a_registered_catalog_receives_the_entrys_provider_key() {
     use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
-    use crate::config::schema::{EphemeralRoute, EPHEMERAL_ROUTE_SLUG};
+    use crate::config::schema::{EPHEMERAL_ROUTE_SLUG, EphemeralRoute};
     let seen = Arc::new(Mutex::new(String::new()));
     crate::config::schema::cloud_providers::register_hosted_cloud_provider_policy(
         Arc::new(|slug| slug == EPHEMERAL_ROUTE_SLUG),
@@ -279,4 +279,47 @@ async fn a_registered_catalog_receives_the_entrys_provider_key() {
     unregister_catalog(PROVIDER_OPENHUMAN);
     listing.unwrap();
     assert_eq!(seen.lock().unwrap().as_str(), "entry-key");
+}
+
+#[test]
+fn inspection_model_factory_uses_the_callers_context_before_process_fallback() {
+    use crate::core::slots::Extensions;
+    use crate::inference::registry::{
+        InspectionChatModelBuild, PreparedInspectionChatModelFactory,
+        register_inspection_chat_model, register_inspection_chat_model_in,
+        unregister_inspection_chat_model,
+    };
+
+    let _guard = crate::inference::inference_test_guard();
+    let factory = |endpoint: &'static str| -> PreparedInspectionChatModelFactory {
+        Arc::new(move |_| {
+            Ok(InspectionChatModelBuild {
+                model: Arc::new(FakeModel),
+                model_id: endpoint.to_owned(),
+                endpoint: format!("https://{endpoint}.example/v1"),
+                credential: format!("{endpoint}-credential"),
+            })
+        })
+    };
+    register_inspection_chat_model(PROVIDER_OPENHUMAN, factory("process"));
+    let a = Extensions::new();
+    register_inspection_chat_model_in(&a, PROVIDER_OPENHUMAN, factory("context-a"));
+    let b = Extensions::new();
+    register_inspection_chat_model_in(&b, PROVIDER_OPENHUMAN, factory("context-b"));
+
+    let config = Config::default();
+    let build_a = crate::inference::provider::factory::managed_backend::
+        managed_chat_model_build_for_inspection(Some(&a), "chat", &config, None)
+        .expect("context A inspection provider");
+    let build_b = crate::inference::provider::factory::managed_backend::
+        managed_chat_model_build_for_inspection(Some(&b), "chat", &config, None)
+        .expect("context B inspection provider");
+    let build_process = crate::inference::provider::factory::managed_backend::
+        managed_chat_model_build_for_inspection(None, "chat", &config, None)
+        .expect("process inspection provider");
+    unregister_inspection_chat_model(PROVIDER_OPENHUMAN);
+
+    assert_eq!(build_a.endpoint, "https://context-a.example/v1");
+    assert_eq!(build_b.endpoint, "https://context-b.example/v1");
+    assert_eq!(build_process.endpoint, "https://process.example/v1");
 }
