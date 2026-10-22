@@ -35,6 +35,9 @@ fn sanitize_maps_windows_special_names_to_one_plain_component() {
         ("nul.txt", "_nul.txt"),
         ("com1.log", "_com1.log"),
         ("LPT9", "_LPT9"),
+        ("COM¹.txt", "_COM¹.txt"),
+        ("lpt³.pdf", "_lpt³.pdf"),
+        ("COM⁴.txt", "COM⁴.txt"),
         ("COM10.log", "COM10.log"),
         ("Console.txt", "Console.txt"),
     ] {

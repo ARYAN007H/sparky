@@ -181,9 +181,18 @@ fn sanitize_filename(name: &str) -> Result<String, String> {
         .next()
         .unwrap_or_default()
         .to_ascii_uppercase();
+    // Win32 also treats the superscript digits ¹ ² ³ as COM/LPT port digits.
+    let port_digit = |rest: &str| {
+        let mut chars = rest.chars();
+        matches!(
+            (chars.next(), chars.next()),
+            (Some('1'..='9' | '¹' | '²' | '³'), None)
+        )
+    };
     let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-        || ((stem.starts_with("COM") || stem.starts_with("LPT"))
-            && matches!(stem.as_bytes().get(3..), Some([b'1'..=b'9'])));
+        || ["COM", "LPT"]
+            .iter()
+            .any(|p| stem.strip_prefix(p).is_some_and(port_digit));
     if reserved {
         name.insert(0, '_');
     }
