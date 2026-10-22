@@ -17,7 +17,8 @@ function contractSourceAllowed(name, source) {
   const prefix = `git+${repository}?rev=`;
   if (!source.startsWith(prefix)) return false;
   const [revision, resolved] = source.slice(prefix.length).split('#');
-  return /^[0-9a-f]{40}$/.test(revision) && resolved === revision;
+  return /^[0-9a-f]{40}$/.test(revision) &&
+    typeof resolved === 'string' && resolved.length >= 8 && revision.startsWith(resolved);
 }
 
 export const CONTRACT_CLOSURE = new Set([

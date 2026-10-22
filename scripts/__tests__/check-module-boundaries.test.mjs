@@ -52,7 +52,7 @@ test('contracts allow pinned canonical TSD vocabulary and reject other git sourc
   const m = metadata({ 'tinyjuice-bus': [['tinystoragedrivers-types']] });
   const types = m.packages.find(pkg => pkg.name === 'tinystoragedrivers-types');
   const revision = 'a'.repeat(40);
-  types.source = `git+https://github.com/tinyhumansai/tinystoragedrivers?rev=${revision}#${revision}`;
+  types.source = `git+https://github.com/tinyhumansai/tinystoragedrivers?rev=${revision}#${revision.slice(0, 8)}`;
   assert.deepEqual(auditGraph(m, ['tinyjuice-bus'], strict, 'tinyjuice-bus').violations, []);
 
   types.source = `git+https://github.com/senamakel/tinystoragedrivers?rev=${revision}#${revision}`;
