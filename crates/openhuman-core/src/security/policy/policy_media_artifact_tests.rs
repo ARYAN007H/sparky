@@ -1,5 +1,5 @@
 use super::*;
-use crate::artifacts::{create_artifact, finalize_artifact, ArtifactKind, FileRoots};
+use crate::artifacts::{ArtifactKind, FileRoots, create_artifact, finalize_artifact};
 use std::sync::Arc;
 use tempfile::TempDir;
 
@@ -64,18 +64,24 @@ async fn ready_media_artifacts_are_readable_but_other_files_are_not() {
         ..SecurityPolicy::default()
     };
 
-    assert!(policy
-        .validate_path(&image_path.to_string_lossy())
-        .await
-        .is_ok());
-    assert!(policy
-        .validate_path(&document_path.to_string_lossy())
-        .await
-        .is_err());
-    assert!(policy
-        .validate_path(&pending_path.to_string_lossy())
-        .await
-        .is_err());
+    assert!(
+        policy
+            .validate_path(&image_path.to_string_lossy())
+            .await
+            .is_ok()
+    );
+    assert!(
+        policy
+            .validate_path(&document_path.to_string_lossy())
+            .await
+            .is_err()
+    );
+    assert!(
+        policy
+            .validate_path(&pending_path.to_string_lossy())
+            .await
+            .is_err()
+    );
 
     crate::artifacts::store::delete_artifact(&workspace, FileRoots::new(files), &image.id)
         .await

@@ -370,14 +370,16 @@ fn relative_personalities_path_resolves_under_action_dir() {
     };
 
     assert!(policy.is_path_string_allowed("personalities/alice.md"));
-    assert!(!policy.is_path_string_allowed(
-        workspace
-            .join("personalities")
-            .join("alice")
-            .join("SOUL.md")
-            .to_string_lossy()
-            .as_ref()
-    ));
+    assert!(
+        !policy.is_path_string_allowed(
+            workspace
+                .join("personalities")
+                .join("alice")
+                .join("SOUL.md")
+                .to_string_lossy()
+                .as_ref()
+        )
+    );
 }
 
 #[test]

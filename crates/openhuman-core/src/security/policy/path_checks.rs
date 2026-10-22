@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use super::types::{SecurityPolicy, TrustedAccess};
 use super::types::{
-    ACCOUNT_CONFIG_FILE, ARTIFACTS_DIR, ARTIFACT_TOOL_RESULTS_DIR, WORKSPACE_INTERNAL_DIRS,
+    ACCOUNT_CONFIG_FILE, ARTIFACT_TOOL_RESULTS_DIR, ARTIFACTS_DIR, WORKSPACE_INTERNAL_DIRS,
     WORKSPACE_INTERNAL_FILES,
 };
+use super::types::{SecurityPolicy, TrustedAccess};
 use tinytools::status::POLICY_BLOCKED_MARKER;
 
 /// Credential-store path segments, matched case-insensitively at any depth.
@@ -224,11 +224,11 @@ impl SecurityPolicy {
                         .unwrap_or(forbidden_expanded);
                     if canonical.starts_with(&forbidden_canonical) {
                         log::trace!(
-                        "[security:policy] path blocked: symlink resolves to forbidden tree (requested={}, resolved={}, forbidden={})",
-                        path,
-                        canonical.display(),
-                        forbidden_canonical.display()
-                    );
+                            "[security:policy] path blocked: symlink resolves to forbidden tree (requested={}, resolved={}, forbidden={})",
+                            path,
+                            canonical.display(),
+                            forbidden_canonical.display()
+                        );
                         return false;
                     }
                 }
