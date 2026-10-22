@@ -305,9 +305,10 @@ pub async fn open(url: &str) -> Result<Arc<dyn StorageBackend>, StorageError> {
 }
 
 /// The process's storage runtime: two worker threads that live as long as the
-/// process. A driver connected here keeps its background tasks (MongoDB's
-/// connection pool and monitors) here, off the host runtime, so callers parked
-/// on [`block_on`] cannot starve them.
+/// process. A driver connected here starts its connection-time background tasks
+/// (MongoDB's connection pool and monitors) here, off the host runtime, so
+/// callers parked on [`block_on`] cannot starve them. Cleanup tasks registered
+/// by later object drops can run on the internal [`block_on`] runtime instead.
 fn storage_runtime() -> Result<&'static tokio::runtime::Runtime, StorageError> {
     static RUNTIME: OnceLock<Result<tokio::runtime::Runtime, String>> = OnceLock::new();
     RUNTIME
