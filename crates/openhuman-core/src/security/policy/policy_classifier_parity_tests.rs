@@ -1,20 +1,20 @@
-//! Production and test classifiers must agree. Production gates a shell
-//! command through TinyBox's segment facts and
-//! `CommandAnalysis::from_shell_analysis`; most unit tests call the test-only
-//! `check_gated_command`. When the two drift, a test passes while production
-//! classifies differently. This corpus runs through both paths and checks each
-//! against the expected class (`None` = refused for a protected path).
-#![allow(deprecated)]
-
 use super::*;
 use crate::security::policy::CommandAnalysis;
 use tinybox_core::shell::scan;
 
 use crate::security::policy::CommandClass::{Destructive, Install, Network, Read, Write};
 
+// Production and test classifiers must agree. Production gates a shell
+// command through TinyBox's segment facts and
+// `CommandAnalysis::from_shell_analysis`; most unit tests call the test-only
+// `check_gated_command`. When the two drift, a test passes while production
+// classifies differently. This corpus runs through both paths and checks each
+// against the expected class (`None` = refused for a protected path).
+
 /// The production path: the facts TinyBox's `analyze_shell` returns, through
 /// the host analysis and gate. The policy is disabled so the result is the
 /// classification itself (plus the protected-path floor, which still applies).
+#[allow(deprecated)] // TinyBox's scan helpers, the same calls `analyze_shell` makes
 fn production(policy: &SecurityPolicy, command: &str) -> Option<CommandClass> {
     let facts = tinybox_bus::ShellAnalysis {
         segments: scan::split_unquoted_segments(&scan::strip_quoted_heredoc_bodies(command)),
@@ -129,6 +129,23 @@ const CORPUS: &[(&str, Option<CommandClass>)] = &[
     ("'curl' x", Some(Network)),
     ("\"cu\"rl x", Some(Network)),
     ("su''do ls", Some(Destructive)),
+    // Read-only bases and verbs whose other forms run code or change state.
+    ("rg --pre ./x pat", Some(Write)),
+    ("rg pat src", Some(Read)),
+    ("tree -o out.txt", Some(Write)),
+    ("hostname", Some(Read)),
+    ("hostname -f", Some(Read)),
+    ("hostname new-name", Some(Write)),
+    ("git remote -v", Some(Read)),
+    ("git remote add origin u", Some(Write)),
+    ("git remote set-url origin u", Some(Write)),
+    ("git reflog", Some(Read)),
+    ("git reflog expire --all", Some(Write)),
+    ("npm audit", Some(Read)),
+    ("npm audit fix", Some(Write)),
+    // A quote inside the other kind of quotes is part of the name.
+    ("./\"l's\"", Some(Write)),
+    ("'l\"s'", Some(Write)),
     // Protected paths inside option values.
     ("cat /etc/shadow", None),
     ("tool --input=/etc/shadow", None),

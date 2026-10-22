@@ -287,6 +287,8 @@ pub(super) fn is_command_executor(base: &str) -> bool {
                 | "mawk"
                 | "nawk"
                 | "perl"
+                | "php"
+                | "lua"
                 | "ruby"
                 | "bash"
                 | "sh"
@@ -312,10 +314,25 @@ pub(super) fn is_command_executor(base: &str) -> bool {
         )
 }
 
-/// The program name a shell runs for `word`: quotes removed (the shell joins
-/// `c''url` into `curl`), basename only, lowercase, `.exe` stripped.
+/// `word` as the shell passes it on: syntactic quotes removed (`c''url` is
+/// `curl`), a quote character inside the other kind of quotes kept
+/// (`"l's"` is `l's`).
+pub(super) fn shell_unquote(word: &str) -> String {
+    let (mut out, mut quote) = (String::with_capacity(word.len()), None);
+    for c in word.chars() {
+        match (quote, c) {
+            (None, '\'' | '"') => quote = Some(c),
+            (Some(open), _) if c == open => quote = None,
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// The program name a shell runs for `word`: quotes removed, basename only,
+/// lowercase, `.exe` stripped.
 pub(super) fn normalized_command_name(word: &str) -> String {
-    let unquoted = word.replace(['\'', '"'], "");
+    let unquoted = shell_unquote(word);
     let base = unquoted.rsplit(['/', '\\']).next().unwrap_or_default();
     let base = base.to_ascii_lowercase();
     base.strip_suffix(".exe").unwrap_or(&base).to_owned()
@@ -395,7 +412,7 @@ pub(super) fn classify_segment_source(source: &str) -> CommandClass {
     let (base, args) = effective_command(&words);
     let args = args
         .iter()
-        .map(|word| word.replace(['\'', '"'], "").to_ascii_lowercase())
+        .map(|word| shell_unquote(word).to_ascii_lowercase())
         .collect::<Vec<_>>();
     let joined = source.replace(['\'', '"'], "").to_ascii_lowercase();
     let class = classify_host_command(&base, &args, &joined);
@@ -481,10 +498,41 @@ pub(super) fn classify_host_command(base: &str, args: &[String], joined: &str) -
         };
     }
     if base == "git" {
+        // `git remote add|remove|set-url|update …` and `git reflog
+        // expire|delete` change the repository; their inspecting forms read.
+        let sub = args.get(1).map(String::as_str);
+        let mutates = match args.first().map(String::as_str) {
+            Some("remote") => {
+                sub.is_some_and(|s| !matches!(s, "-v" | "--verbose" | "show" | "get-url"))
+            }
+            Some("reflog") => matches!(sub, Some("expire" | "delete")),
+            _ => false,
+        };
+        if mutates {
+            return CommandClass::Write;
+        }
         return verb_class(args, GIT_READ_VERBS);
     }
     if matches!(base, "npm" | "pnpm" | "yarn") {
+        // `npm audit fix` installs remediations.
+        if args.first().is_some_and(|a| a == "audit") && args.iter().any(|a| a == "fix") {
+            return CommandClass::Write;
+        }
         return verb_class(args, NODE_PKG_READ_VERBS);
+    }
+    // Read-only bases with a flag that runs a command or writes a file.
+    let writes_via_flag = match base {
+        "rg" => args.iter().any(|a| a == "--pre" || a.starts_with("--pre=")),
+        "tree" => args.iter().any(|a| a == "-o"),
+        // `hostname NAME`, `hostname -F FILE` and `--file=FILE` set the host
+        // name; every display form is flags only.
+        "hostname" => args
+            .iter()
+            .any(|a| !a.starts_with('-') || a.starts_with("--file")),
+        _ => false,
+    };
+    if writes_via_flag {
+        return CommandClass::Write;
     }
     if base == "cargo" {
         return verb_class(args, CARGO_READ_VERBS);
