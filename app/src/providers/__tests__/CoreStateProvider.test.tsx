@@ -1216,6 +1216,73 @@ describe('session expiry fixes (#5868)', () => {
   });
 });
 
+describe('failed logout keeps the user signed out', () => {
+  async function renderSignedIn() {
+    resetCoreStateStore();
+    setActiveUserId(null);
+    vi.mocked(coreStateApi.fetchCoreAppSnapshot).mockReset();
+    // The core keeps reporting tok1 because the logout never removed it.
+    vi.mocked(coreStateApi.fetchCoreAppSnapshot).mockResolvedValue(
+      makeSnapshot({ userId: 'u1', sessionToken: 'tok1' })
+    );
+    vi.mocked(coreStateApi.listTeams).mockResolvedValue([]);
+    vi.mocked(tauriCommands.logout).mockReset();
+    vi.mocked(tauriCommands.logout).mockRejectedValue(new Error('auth_logout timed out'));
+    let ctx: CoreStateContextValue | undefined;
+    render(
+      <CoreStateProvider>
+        <Consumer captureCtx={c => (ctx = c)} />
+      </CoreStateProvider>
+    );
+    await waitFor(() => expect(screen.getByTestId('token').textContent).toBe('tok1'));
+    return () => ctx!;
+  }
+
+  it('reports the failure, retries once, and never shows the logged-out token again', async () => {
+    const ctx = await renderSignedIn();
+
+    await act(async () => {
+      await expect(ctx().clearSession()).rejects.toThrow('auth_logout timed out');
+    });
+    expect(screen.getByTestId('token').textContent).toBe('none');
+
+    // Polls long after any time window: the logged-out token stays hidden,
+    // and the failed logout is retried exactly once.
+    const realNow = Date.now;
+    const spy = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + 60_000);
+    try {
+      await act(async () => {
+        await ctx().refresh();
+      });
+      await act(async () => {
+        await ctx().refresh();
+      });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(screen.getByTestId('token').textContent).toBe('none');
+    expect(vi.mocked(tauriCommands.logout)).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets a new login with a different token through', async () => {
+    const ctx = await renderSignedIn();
+    await act(async () => {
+      await ctx()
+        .clearSession()
+        .catch(() => undefined);
+    });
+    expect(screen.getByTestId('token').textContent).toBe('none');
+
+    vi.mocked(coreStateApi.fetchCoreAppSnapshot).mockResolvedValue(
+      makeSnapshot({ userId: 'u1', sessionToken: 'tok2' })
+    );
+    await act(async () => {
+      await ctx().refresh();
+    });
+    expect(screen.getByTestId('token').textContent).toBe('tok2');
+  });
+});
+
 describe('coreStatePollFailureDebugMessage', () => {
   it('describes post-bootstrap poll failures without impossible retry counters', () => {
     expect(coreStatePollFailureDebugMessage(0)).toBeNull();
