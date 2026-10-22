@@ -5829,6 +5829,7 @@ dependencies = [
  "tinyinference-providers",
  "tinyinference-voice",
  "tinyjuice-bus",
+ "tinyjuice-host",
  "tinymcp-bus",
  "tinymemes-bus",
  "tinymemory-api",
@@ -10163,6 +10164,20 @@ dependencies = [
  "tinystoragedrivers-api",
  "tinystoragedrivers-types",
  "tokio",
+]
+
+[[package]]
+name = "tinyjuice-host"
+version = "0.11.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "log",
+ "serde_json",
+ "tinyjuice-bus",
+ "tinytools 0.6.0",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]

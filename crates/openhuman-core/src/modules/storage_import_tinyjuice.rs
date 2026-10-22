@@ -2,10 +2,10 @@
 //! module's blob storage.
 //!
 //! The compress-cache-retrieve tier used to write each offloaded original to
-//! `<workspace>/.tokenjuice/ccr/<token>`, expiring by file age. From v0.10.0
-//! the module keeps them as expiring blobs `tinyjuice_ccr/<token>` in its own
-//! scope and writes no files. A model that was handed a recovery handle before
-//! the upgrade can still fetch the original afterwards.
+//! `<workspace>/.tokenjuice/ccr/<token>`, expiring by file age. The module
+//! keeps them as expiring blobs `juice/ccr/<token>` in its own scope and writes
+//! no files. A model that was handed a recovery handle before the upgrade can
+//! still fetch the original afterwards.
 //!
 //! * **Legacy files are never modified or deleted.** They are only read.
 //! * **Nothing is overwritten.** A blob that already exists is kept.
@@ -28,7 +28,7 @@ use tinystoragedrivers_types::Capability;
 
 use crate::storage::Storage;
 
-use super::storage_grant_schemas::tinyjuice::{CCR_BLOB_PREFIX, MODULE_ID};
+use super::storage_grant_schemas::tinyjuice::MODULE_ID;
 use super::storage_import_support as support;
 use crate::core::runtime::DispatchCtx;
 
@@ -134,7 +134,7 @@ async fn import_into(
             },
             None => None,
         };
-        let key = format!("{CCR_BLOB_PREFIX}{}", original.token);
+        let key = ccr_key(&original.token);
         let present = blobs
             .head(&key)
             .await
@@ -164,6 +164,10 @@ async fn import_into(
         expired,
         skipped,
     })
+}
+
+fn ccr_key(token: &str) -> String {
+    format!("{}/{token}", tinyjuice_bus::storage::CCR_PREFIX)
 }
 
 fn is_token(name: &str) -> bool {

@@ -148,13 +148,6 @@
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/inference/host_runtime/ops/runtime_ops.rs",
-    "line": 165,
-    "text": "tokio::fs::write(&file_path, audio_bytes)",
-    "occurrence": 1
-  },
-  {
-    "rule": "json-write",
     "path": "crates/openhuman-core/src/platform/service/daemon_host.rs",
     "line": 43,
     "text": "tokio::fs::write(path, bytes)",

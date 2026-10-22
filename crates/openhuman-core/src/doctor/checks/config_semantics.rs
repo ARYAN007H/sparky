@@ -319,7 +319,6 @@ fn tokenjuice_is_custom(config: &Config) -> bool {
         || current.router_enabled != default.router_enabled
         || current.ccr_enabled != default.ccr_enabled
         || current.repl_handle_enabled != default.repl_handle_enabled
-        || current.repl_save_enabled != default.repl_save_enabled
         || current.ccr_disk_enabled != default.ccr_disk_enabled
         || current.max_cache_entries != default.max_cache_entries
         || current.max_cache_bytes != default.max_cache_bytes

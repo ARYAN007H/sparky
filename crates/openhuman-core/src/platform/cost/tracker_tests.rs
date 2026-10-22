@@ -13,7 +13,7 @@ fn enabled_config() -> CostConfig {
 
 /// A managed-backend tier slug — spend on this route is billed to OpenHuman
 /// credits and so is the only kind the local budget may gate (#5016).
-const MANAGED_MODEL: &str = "chat-v1";
+const MANAGED_MODEL: &str = "openrouter/test/managed-model";
 
 /// A bring-your-own-key model id, as reported in #5016 (OpenRouter). Spend
 /// here is billed by the user's own provider and must never gate a request.

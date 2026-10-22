@@ -149,7 +149,7 @@ pub fn child_rule_policy(
     Some(Arc::new(ToolRulePolicy {
         rules: Arc::new(set),
         context,
-        permission_ceiling: None,
+        permission_ceiling: parent.and_then(|parent| parent.permission_ceiling),
     }))
 }
 

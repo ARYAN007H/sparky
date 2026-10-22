@@ -417,7 +417,7 @@ pub(in super::super) async fn run_subagent_via_graph(
                     usage.cached_input_tokens += u.cached_input_tokens();
                     let call_cost = crate::agent::cost::call_cost(model, &u);
                     usage.cost.add(call_cost);
-                    let billed = crate::inference::provider::BilledUsage::from_counts(
+                    let billed = tinyinference_llm::usage::BilledUsage::from_counts(
                         u.input_tokens,
                         u.output_tokens,
                     )

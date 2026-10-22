@@ -33,6 +33,7 @@ export const CONTRACT_CLOSURE = new Set([
 ]);
 
 export function isImplementation(name, policy) {
+  if (policy.hostAdapterPackages?.includes(name)) return false;
   return policy.implementationPackages.includes(name) ||
     policy.implementationPrefixes.some(prefix => (name === prefix.replace(/-$/, '') || name.startsWith(prefix)) &&
       !policy.contracts.some(contract => contract.name === name));
@@ -223,7 +224,7 @@ export function linkedHostAudit(metadata, root, policy) {
 }
 
 export function validatePolicy(policy) {
-  for (const key of ['implementationPackages', 'implementationPrefixes', 'contracts', 'pendingContracts', 'exceptions']) {
+  for (const key of ['implementationPackages', 'implementationPrefixes', 'hostAdapterPackages', 'contracts', 'pendingContracts', 'exceptions']) {
     if (!Array.isArray(policy[key])) throw new Error(`policy.${key} must be an array`);
   }
   if (!policy.contracts.length || !policy.implementationPackages.length || !policy.implementationPrefixes.length) {

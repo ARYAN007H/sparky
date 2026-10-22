@@ -201,6 +201,7 @@ pub(super) fn build_host(
     let builder = crate::agent::SessionHostBuilder::new()
         .with_session_history_locator(store_locator(root))
         .chat_model(chat_model)
+        .model_name("test/session-fixture".to_string())
         .tools(tools())
         .workspace_dir(root.join("workspace"))
         .action_dir(root.to_path_buf());
@@ -468,6 +469,7 @@ fn assert_retired_tool_replay(identity_bound: bool) {
         let mut first = crate::agent::SessionHostBuilder::new()
             .with_session_history_locator(store_locator(root.path()))
             .chat_model(chat_model)
+            .model_name("test/session-fixture".to_string())
             .tools(vec![Box::new(ArchivedAudioTool)])
             .permanent_tool_names(std::collections::HashSet::from([RETIRED.to_string()]))
             .workspace_dir(workspace.clone())
@@ -509,6 +511,7 @@ fn assert_retired_tool_replay(identity_bound: bool) {
             crate::agent::SessionHostBuilder::new()
                 .with_session_history_locator(store_locator(root.path()))
                 .chat_model(chat_model)
+                .model_name("test/session-fixture".to_string())
                 .tools(tools())
                 .workspace_dir(workspace.clone())
                 .action_dir(root.path().to_path_buf())
