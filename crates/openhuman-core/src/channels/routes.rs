@@ -1,7 +1,7 @@
 //! Per-sender routing and runtime command handling.
 
 use super::context::{clear_sender_history, ChannelRouteSelection, ChannelRuntimeContext};
-use super::{Channel, ChannelSendExt, SendMessage};
+use super::{outbound::text_message, Channel};
 use crate::inference::provider;
 use std::sync::Arc;
 use tinychannels_bus as traits;
@@ -145,13 +145,13 @@ impl RouteCallbacks {
 
 pub(crate) async fn handle_runtime_command_if_needed(
     ctx: &ChannelRuntimeContext,
-    msg: &traits::ChannelMessage,
+    msg: &traits::ChannelInboundEnvelope,
     target_channel: Option<&Arc<dyn Channel>>,
     sender_key: &str,
 ) -> bool {
     // This is a host dispatch hint; the module alone parses and recognizes
     // commands. Ordinary messages avoid creating a private callback object.
-    if !msg.content.trim_start().starts_with('/') {
+    if !msg.text.trim_start().starts_with('/') {
         return false;
     }
     let current = get_route_selection(ctx, sender_key);
@@ -204,11 +204,13 @@ pub(crate) async fn handle_runtime_command_if_needed(
         }
         Err(_) => {
             if let Some(channel) = target_channel {
-                let _ = channel
-                    .send_with_outbound_intent(
-                        &SendMessage::new("Channel module unavailable.", &msg.reply_target)
-                            .in_thread(msg.thread_ts.clone()),
-                    )
+                    let _ = channel
+                    .send_typed(&text_message(
+                        &msg.channel.id,
+                        &msg.conversation.id,
+                        "Channel module unavailable.",
+                        msg.conversation.thread_id.clone(),
+                    ))
                     .await;
             }
             return true;
@@ -232,9 +234,12 @@ pub(crate) async fn handle_runtime_command_if_needed(
     };
     if let Some(channel) = target_channel {
         if channel
-            .send_with_outbound_intent(
-                &SendMessage::new(reply, &msg.reply_target).in_thread(msg.thread_ts.clone()),
-            )
+            .send_typed(&text_message(
+                &msg.channel.id,
+                &msg.conversation.id,
+                reply,
+                msg.conversation.thread_id.clone(),
+            ))
             .await
             .is_err()
         {
