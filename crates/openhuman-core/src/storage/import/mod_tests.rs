@@ -275,7 +275,7 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     // the actual TinyAgents v1 collections and stream, not already-current v2
     // rows that happen to deserialize through today's owner API.
     let source_url = format!("sqlite:{}", source_db.display());
-    let source_backend = storage::block_on_anyhow(async {
+    let source_backend = storage::block_on_anyhow(async move {
         storage::open(&source_url).await.map_err(anyhow::Error::from)
     })
     .unwrap();
@@ -285,7 +285,7 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
             .unwrap()
             .documents(),
     );
-    let legacy_threads = storage::block_on(async {
+    let legacy_threads = storage::block_on(async move {
         source_docs
             .query_all("conversation_threads_v1", &Query::all())
             .await

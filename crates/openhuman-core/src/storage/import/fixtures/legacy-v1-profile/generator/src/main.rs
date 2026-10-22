@@ -4,7 +4,6 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use tinyagents_storage_kit::Key;
 use tinystoragedrivers::secrets::{DerivedKeys, DocumentSecrets, SecretStore};
 use tinystoragedrivers::{CollectionSpec, Precondition, Scope, StorageConfig, WriteOptions};
 use zeroize::Zeroizing;
@@ -137,41 +136,6 @@ struct LegacyTranscriptKey {
     key: String,
 }
 
-/// The committed TinyAgents `ThreadDto` body in `conversations.threads`.
-#[derive(Serialize)]
-struct LegacyConversationThread {
-    id: String,
-    title: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    chat_id: Option<i64>,
-    is_active: bool,
-    created_ms: i64,
-    last_message_ms: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    parent_thread_id: Option<String>,
-    labels: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    personality_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    working_dir: Option<String>,
-    incarnation: String,
-    deleted: bool,
-    visible_end: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    messages_key: Option<String>,
-}
-
-/// A committed TinyAgents `MessageDto` stream value.
-#[derive(Serialize)]
-struct LegacyConversationMessage {
-    id: String,
-    content: String,
-    message_type: String,
-    extra_metadata: Value,
-    sender: String,
-    created_ms: i64,
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = std::env::args_os()
@@ -298,47 +262,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
     let thread_id = "fixture-thread";
+    let thread_digest = "d033a44fe04c14424be31d765b05f363fddeef939017517f69cf2914980ae87f";
     let incarnation = "6f9619ff-8b86-d011-b42d-00c04fc964ff";
-    let thread_key = Key::of([thread_id])?.as_str().to_owned();
-    let thread = LegacyConversationThread {
-        id: thread_id.into(),
-        title: "Fixture thread".into(),
-        chat_id: None,
-        is_active: true,
-        created_ms: 1_738_555_506_000,
-        last_message_ms: 1_738_555_507_000,
-        parent_thread_id: None,
-        labels: Vec::new(),
-        personality_id: None,
-        working_dir: None,
-        incarnation: incarnation.into(),
-        deleted: false,
-        visible_end: 1,
-        messages_key: None,
-    };
     put(
         user_scope.documents(),
-        "conversations.threads",
-        &thread_key,
-        serde_json::to_value(thread)?,
+        "conversation_threads_v1",
+        thread_digest,
+        json!({
+            "schema": 1,
+            "incarnation": incarnation,
+            "deleted": false,
+            "visible_end": 1,
+            "thread": {
+                "id": thread_id,
+                "title": "Fixture thread",
+                "isActive": true,
+                "messageCount": 1,
+                "lastMessageAt": "2025-02-04T04:05:07Z",
+                "createdAt": "2025-02-04T04:05:06Z",
+                "labels": ["history"]
+            }
+        }),
     )
     .await?;
-    let message = LegacyConversationMessage {
-        id: "fixture-message".into(),
-        content: "historical profile message".into(),
-        message_type: "text".into(),
-        extra_metadata: Value::Null,
-        sender: "user".into(),
-        created_ms: 1_738_555_507_000,
-    };
     user_scope
         .streams()
         .append(
-            &format!(
-                "conversations.messages/{}",
-                Key::of([thread_id, incarnation])?.as_str()
-            ),
-            serde_json::to_value(message)?,
+            &format!("conversation_messages_v1:{thread_digest}:{incarnation}"),
+            json!({
+                "schema": 1,
+                "incarnation": incarnation,
+                "message": {
+                    "id": "fixture-message",
+                    "content": "historical profile message",
+                    "type": "text",
+                    "extraMetadata": null,
+                    "sender": "user",
+                    "createdAt": "2025-02-04T04:05:07Z"
+                }
+            }),
         )
         .await?;
     // The thread owner historically keyed transcript rows by the raw thread

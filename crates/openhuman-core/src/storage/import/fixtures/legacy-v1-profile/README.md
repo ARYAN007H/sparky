@@ -24,10 +24,13 @@ owner models and writer transformations from `2d3e22636e^`:
   The approvals and threads owners migrate those into their current
   collections and ids before their public APIs read them.
 - The thread owner also has a committed thread and message in the historical
-  SQLite database. The generator's typed rows mirror TinyAgents' committed
-  `ThreadDto` and `MessageDto` storage bodies at submodule commit
-  `bed24d72c923f6daefc780e7fdbf2b2892a5b334`. The desktop owner APIs must
-  read the thread, message, and migrated transcript key after boot.
+  SQLite database. These are TinyAgents' actual v1 inputs: a
+  `conversation_threads_v1` row keyed by the thread id's SHA-256 and a
+  `conversation_messages_v1:<sha>:<incarnation>` stream whose entries carry
+  the v1 `schema`, `incarnation`, and camelCase `thread` / `message` payloads.
+  The boot schema migration converts them to the current conversation
+  collections; the fixture test reads the thread and message through the
+  current typed owner API after migration.
 - The TinyFlows catalog fixture uses its historical `flows_definitions`
   collection with `graph_json` and RFC3339 timestamps. The catalog's schema
   migration converts it, and the public `flows_list` operation must return it.
@@ -56,6 +59,7 @@ or product dependency. Regenerate a fresh database at a caller-selected path:
 cargo run --locked --manifest-path crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/generator/Cargo.toml -- /absolute/path/to/storage.db
 ```
 
-The checked-in database SHA-256 is
-`393c350410e8426abdf8f8178edc06d4ed261aa57825daa6e31ba21b29ce34e9`.
-Regenerate and verify it with `sha256sum` when updating the fixture.
+The fixture is semantically reproducible. Its SQLite bytes can differ between
+generations because `DocumentSecrets` encrypts the secret with randomized
+ciphertext; verify fixture updates by running the focused fixture test rather
+than comparing a fixed whole-file SHA-256.
