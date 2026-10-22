@@ -7,14 +7,15 @@ use super::super::factory::resolve_codex_routing;
 use super::local_runtime::synthesize_local_runtime_entry;
 use std::sync::Arc;
 use tinyinference_llm::catalog::{
-    append_query_param, endpoint_hosts_models_listing, is_openrouter_provider, list_models,
+    endpoint_hosts_models_listing, fetch::list_models, is_openrouter_provider,
     merge_openai_codex_model_hints, validate_openrouter_key, ModelInfo,
 };
 use tinyinference_llm::model::discover::DiscoveryRequest;
 use tinyinference_llm::providers::openai::codex::{
     openai_codex_client_version, openai_codex_user_agent, OpenAiCodexRouting,
-    OPENAI_CODEX_ACCOUNT_HEADER, OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
 };
+use tinyinference_llm::providers::registry::{ProviderBuildOptions, ProviderRegistry};
+use tinyinference_providers::route::ProviderRoute;
 
 /// Resolve the API key used to probe a provider's `/models` endpoint.
 ///
@@ -75,6 +76,44 @@ fn catalog_request(
         provider_key,
         client,
     })
+}
+
+/// Build a cloud catalog request through TinyInference's native provider
+/// registry, supplying OpenHuman's already-resolved endpoint, credential, and
+/// Codex routing as host inputs.
+fn discovery_request(
+    entry: &crate::config::schema::cloud_providers::CloudProviderCreds,
+    provider_key: &str,
+    routing: &OpenAiCodexRouting,
+) -> Result<DiscoveryRequest, String> {
+    // The catalog fetch does not consume a model id, but the native registry
+    // validates that a provider spec has one. Keep a private sentinel here;
+    // it is metadata only and is never sent by the catalog fetch.
+    let spec = crate::inference::provider::factory::cloud_provider_spec(entry, "catalog");
+    let route = ProviderRoute::parse(&format!("{}:catalog", entry.slug))
+        .ok_or_else(|| "cloud catalog route could not be parsed".to_string())?;
+    let query_params = routing.client_version_query(&openai_codex_client_version());
+    let user_agent = routing
+        .using_oauth
+        .then(|| openai_codex_user_agent("OpenHuman", env!("CARGO_PKG_VERSION")));
+    let options = ProviderBuildOptions {
+        auth_style: Some(entry.auth_style.into()),
+        extra_query_params: &query_params,
+        user_agent: user_agent.as_deref(),
+        codex: Some(routing),
+        ..ProviderBuildOptions::default()
+    };
+    let registry = ProviderRegistry::new(
+        crate::inference::provider::factory::CloudCredentialResolver(provider_key),
+    );
+    let request = registry
+        .discovery_request_for_route_with_options(route, Some(spec.clone()), &options)
+        .map_err(|error| error.to_string())?
+        .or_else(|| registry.discovery_request(&spec, &options).ok().flatten())
+        .ok_or_else(|| "provider has no model catalog discovery request".to_string())?;
+    Ok(request
+        .with_single_model_probe(false)
+        .with_timeout(std::time::Duration::from_secs(30)))
 }
 
 async fn run_registered_catalog(
@@ -207,15 +246,8 @@ pub async fn list_configured_models_from_config(
             OpenAiCodexRouting::standard(&entry.endpoint)
         });
 
-    let mut models_url = format!("{}/models", routing.endpoint);
-    let codex_client_version = routing.using_oauth.then(openai_codex_client_version);
-    if let Some(client_version) = codex_client_version.as_deref() {
-        models_url = append_query_param(&models_url, "client_version", client_version);
-    }
-
     log::debug!(
-        "[providers][list_models] fetching url={} slug={} codex_oauth={} account_id_header={}",
-        models_url,
+        "[providers][list_models] fetching slug={} codex_oauth={} account_id_header={}",
         entry.slug,
         routing.using_oauth,
         routing.account_id.is_some()
@@ -228,44 +260,10 @@ pub async fn list_configured_models_from_config(
             .map_err(|error| error.to_string())?;
     }
 
-    let mut request = DiscoveryRequest::new(routing.endpoint.clone(), String::new())
-        .with_listing_url(models_url.clone())
-        .with_single_model_probe(false)
-        .with_timeout(std::time::Duration::from_secs(30));
-    if routing.using_oauth {
-        request = request
-            .with_header(
-                reqwest::header::USER_AGENT.as_str(),
-                openai_codex_user_agent("OpenHuman", env!("CARGO_PKG_VERSION")),
-            )
-            .with_header(OPENAI_CODEX_ORIGINATOR_HEADER, OPENAI_CODEX_ORIGINATOR);
+    if entry.auth_style == AuthStyle::OpenhumanJwt {
+        return Err("hosted cloud catalog is unavailable without a registered host".into());
     }
-
-    request = match entry.auth_style {
-        AuthStyle::Bearer => {
-            if !api_key.is_empty() {
-                let mut r = request.with_header("Authorization", format!("Bearer {}", api_key));
-                if let Some(account_id) = routing.account_id.as_deref() {
-                    r = r.with_header(OPENAI_CODEX_ACCOUNT_HEADER, account_id);
-                }
-                r
-            } else {
-                request
-            }
-        }
-        AuthStyle::Anthropic => {
-            let mut r = request.with_header("anthropic-version", "2023-06-01");
-            if !api_key.is_empty() {
-                r = r.with_header("x-api-key", &api_key);
-            }
-            r
-        }
-        // Handled above: the managed catalog is served by the registered provider.
-        AuthStyle::OpenhumanJwt => {
-            return Err("hosted cloud catalog is unavailable without a registered host".into());
-        }
-        AuthStyle::None => request,
-    };
+    let request = discovery_request(&entry, &api_key, &routing)?;
 
     // Keep the host-built client so its proxy and custom CA policy applies to this upstream-owned catalog fetch.
     let mut models = list_models(&client, request)
