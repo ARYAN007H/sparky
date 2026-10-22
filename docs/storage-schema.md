@@ -340,6 +340,7 @@ Migration steps:
 
 | Kind | Name | Version | Scope | Indexed fields |
 | --- | --- | --- | --- | --- |
+| collection | `subagents.session_epochs` | 1 | agent |  |
 | collection | `subagents.sessions` | 2 | agent |  |
 
 Migration steps:
@@ -398,15 +399,3 @@ Migration steps:
 Migration steps:
 
 - `transcript_keys_v2`: `threads.transcript_keys` v1 to v2 from `threads_transcript_keys`
-
-## wallet
-
-| Kind | Name | Version | Scope | Indexed fields |
-| --- | --- | --- | --- | --- |
-| collection | `wallet.budgets` | 2 | module |  |
-| stream | `wallet.payments` |  | module |  |
-
-Migration steps:
-
-- `budgets_v2`: `wallet.budgets` v1 to v2 from `x402_budget`
-- `payments_v2`: `wallet.payments` v1 to v2 from `x402.payments`
