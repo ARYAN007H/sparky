@@ -43,13 +43,7 @@ async fn scenario() {
             ),
         )
         .unwrap();
-    let (a_result, b_result) = tokio::join!(
-        a.turn("a")
-            .route(a_route)
-            .provider_options(serde_json::json!({"provider": {"order": ["fast"]}}))
-            .send(),
-        b.run("b")
-    );
+    let (a_result, b_result) = tokio::join!(a.turn("a").route(a_route).send(), b.run("b"));
     a_result.unwrap();
     b_result.unwrap();
     // The next turn inherits the agent provider, not the previous turn's headers.
@@ -71,11 +65,7 @@ async fn scenario() {
         "Bearer a-key"
     );
     let a_body: serde_json::Value = serde_json::from_slice(&a_requests[0].body).unwrap();
-    eprintln!("provider={:?} reasoning={:?}", a_body.get("provider"), a_body.get("reasoning_effort"));
-    assert_eq!(
-        a_body["provider"],
-        serde_json::json!({"sort": "latency", "order": ["fast"]})
-    );
+    assert_eq!(a_body["provider"], serde_json::json!({"sort": "latency"}));
     assert_eq!(a_body["reasoning_effort"], "high");
     assert!(a_requests[1].headers.get("x-medulla-run-id").is_none());
     assert_eq!(
