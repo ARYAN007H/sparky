@@ -76,10 +76,13 @@ pub async fn learn_plan_notes(
     );
     let notes = learnings(plan);
     let total = notes.len();
-    // The queue does blocking file I/O, as it does for the memory tool.
-    let runtime = tokio::runtime::Handle::current();
-    let queued = tokio::task::spawn_blocking(move || {
-        runtime.block_on(async {
+    // The queue opens its storage under the current profile scope. Like the
+    // memory tool's writes, the work runs on a task that carries the caller's
+    // scope (the session host calls this inside the profile's scope): a bare
+    // spawn would run unscoped, and in SaaS the queue refuses every write.
+    let dispatch = crate::core::runtime::DispatchCtx::ambient();
+    let queued = dispatch
+        .spawn(async move {
             let mut queued = 0;
             for (text, kind) in notes {
                 let args = json!({
@@ -105,9 +108,8 @@ pub async fn learn_plan_notes(
             }
             queued
         })
-    })
-    .await
-    .unwrap_or(0);
+        .await
+        .unwrap_or(0);
     tracing::debug!(
         thread_id = %plan.thread_id,
         queued,
