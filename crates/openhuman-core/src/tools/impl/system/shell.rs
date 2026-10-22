@@ -160,7 +160,7 @@ impl ShellHost {
                 .map_err(|_| anyhow::anyhow!("command analysis is unavailable"))?;
             let analysis = serde_json::to_value(analysis)
                 .map_err(|_| anyhow::anyhow!("command analysis is unavailable"))?;
-            return Ok(Some(json!({ "analysis": analysis })));
+            Ok(Some(json!({ "analysis": analysis })))
         }
         #[cfg(not(feature = "modules"))]
         {
