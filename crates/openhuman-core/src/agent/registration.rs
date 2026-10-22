@@ -1,7 +1,7 @@
 //! Registration of agent dialogue and delegation tools.
 
 use super::orchestration::tools::SpawnSubagentTool;
-use super::tools::{PlanExitTool, TodoTool};
+use super::tools::TodoTool;
 use crate::config::Config;
 #[cfg(feature = "skills")]
 use crate::skills::run_workflow::{AwaitWorkflowTool, RunWorkflowTool};
@@ -35,8 +35,8 @@ pub(crate) fn dialogue_tools(action_dir: &Path, root_config: &Config) -> Vec<Box
         Box::new(TodoTool::new(root_config.workspace_dir.clone())),
         // Interactive plan-review gate: parks the live turn on a thread-scoped
         // plan the user must approve before execution (Codex/Claude plan mode).
-        Box::new(crate::plan_review::RequestPlanReviewTool::new()),
-        Box::new(PlanExitTool::new()),
+        Box::new(crate::plan_review::host::request_plan_review_tool()),
+        Box::new(super::tools::plan_exit::plan_exit_tool()),
         // Workflow composition: `run_workflow` runs another workflow as a
         // subagent and (by default) waits on its result like a function call;
         // `await_workflow` re-attaches to a run that outlived its inline wait.

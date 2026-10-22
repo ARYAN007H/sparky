@@ -3,12 +3,9 @@
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use serde_json::Value;
-use tinyagents_harness::middleware::RunModeHandle;
 use tinyagents_harness_tools::run_mode::RunModeStore;
 use tinyagents_harness_tools::{ParkedPlanReviewLookup, PlanExitHost};
-use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult, ToolRunContext};
+use tinytools::Tool;
 
 #[derive(Clone)]
 struct PlanExitScope {
@@ -85,68 +82,16 @@ struct OpenHumanParkedReviews;
 
 impl ParkedPlanReviewLookup<PlanExitScope> for OpenHumanParkedReviews {
     fn has_parked_review(&self, scope: &PlanExitScope, thread_id: &str) -> bool {
-        scope.valid
-            && crate::plan_review::gate::global()
-                .parked_review_for_thread(&scope.tenant, thread_id)
-                .is_some()
+        scope.valid && crate::plan_review::host::has_parked_review(&scope.tenant, thread_id)
     }
 }
 
-fn owner_tool() -> tinyagents_harness_tools::PlanExitTool<PlanExitScope> {
+pub(crate) fn plan_exit_tool() -> impl Tool {
     tinyagents_harness_tools::PlanExitTool::new(
         Arc::new(OpenHumanPlanExitHost),
         Arc::new(OpenHumanRunModes),
         Some(Arc::new(OpenHumanParkedReviews)),
     )
-}
-
-/// Public unit-shaped compatibility adapter around TinyAgents' tool engine.
-pub struct PlanExitTool;
-
-impl PlanExitTool {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for PlanExitTool {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[async_trait]
-impl Tool for PlanExitTool {
-    fn name(&self) -> &str {
-        tinyagents_harness_tools::PlanExitTool::<PlanExitScope>::NAME
-    }
-
-    fn description(&self) -> &str {
-        tinyagents_harness_tools::PlanExitTool::<PlanExitScope>::DESCRIPTION
-    }
-
-    fn parameters_schema(&self) -> Value {
-        owner_tool().parameters_schema()
-    }
-
-    fn permission_level(&self) -> PermissionLevel {
-        owner_tool().permission_level()
-    }
-
-    async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
-        owner_tool().execute(args).await
-    }
-
-    async fn execute_with_context(
-        &self,
-        args: Value,
-        options: ToolCallOptions,
-        context: Option<&dyn ToolRunContext>,
-    ) -> anyhow::Result<ToolResult> {
-        owner_tool()
-            .execute_with_context(args, options, context)
-            .await
-    }
 }
 
 #[cfg(test)]

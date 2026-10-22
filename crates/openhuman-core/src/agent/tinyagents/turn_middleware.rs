@@ -17,14 +17,14 @@ use async_trait::async_trait;
 use tinyagents_harness::cache::InMemoryResponseCache;
 use tinyagents_harness::host::security_gate::{GateDecision, SecurityGate, ToolCallRequest};
 use tinyagents_harness::middleware::{
-    install_unmet_deliverable, is_repeat_call_exempt, tool_sets_lookup, ResearchBudgetMiddleware,
-    ShellTurnBudget, TurnClockMiddleware, DIRECT_WEB_READ_LIMIT,
+    ApprovalGateMiddleware, ArgRecoveryMiddleware, BudgetLimits, BudgetMiddleware,
+    ContextCompressionMiddleware, MiddlewareToolOutcome, PromptCacheGuardMiddleware,
+    RepeatProgressMiddleware, RunModeHandle, ToolHandler, ToolMiddleware,
+    ToolPolicyMiddleware as TaToolPolicyMiddleware, plan_mode_middleware,
 };
 use tinyagents_harness::middleware::{
-    plan_mode_middleware, ApprovalGateMiddleware, ArgRecoveryMiddleware, BudgetLimits,
-    BudgetMiddleware, ContextCompressionMiddleware, MiddlewareToolOutcome,
-    PromptCacheGuardMiddleware, RepeatProgressMiddleware, RunModeHandle, ToolHandler,
-    ToolMiddleware, ToolPolicyMiddleware as TaToolPolicyMiddleware,
+    DIRECT_WEB_READ_LIMIT, ResearchBudgetMiddleware, ShellTurnBudget, TurnClockMiddleware,
+    install_unmet_deliverable, is_repeat_call_exempt, tool_sets_lookup,
 };
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::steering::SteeringHandle;
@@ -425,14 +425,11 @@ pub(super) fn install_turn_middleware(
     // session `todo` list, and the per-thread `goal_*` tools.
     if let Some(mode) = run_mode {
         harness.push_middleware(Arc::new(
-            plan_mode_middleware(mode, harness.tools().policies()).allow([
-                "plan_exit",
-                "request_plan_review",
-                "todo",
-                "goal_set",
-                "goal_get",
-                "goal_complete",
-            ]),
+            plan_mode_middleware(mode, harness.tools().policies()).allow(
+                tinyagents_harness::middleware::library::plan_mode_allowlist()
+                    .iter()
+                    .copied(),
+            ),
         ));
     }
 

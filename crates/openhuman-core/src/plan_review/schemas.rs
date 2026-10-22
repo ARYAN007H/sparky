@@ -2,15 +2,14 @@
 //! resolves a parked interactive turn (approve / reject / revise-with-feedback).
 
 use crate::core::runtime::DispatchCtx;
-use serde::de::DeserializeOwned;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
-use super::gate;
-use super::types::PlanReviewResolution;
+use tinyagents_harness_tools::plan_review::PlanReviewResolution;
 
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
     vec![schemas("decide")]
@@ -54,8 +53,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
             outputs: vec![FieldSchema {
                 name: "resolved",
                 ty: TypeSchema::Bool,
-                comment:
-                    "true if a parked turn was woken; false if the request was unknown/expired.",
+                comment: "true if a parked turn was woken; false if the request was unknown/expired.",
                 required: true,
             }],
         },
@@ -84,7 +82,6 @@ struct DecideParams {
 
 fn handle_decide(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let tenant = ctx.tenant().map_err(|error| error.to_string())?;
         let p = parse::<DecideParams>(params)?;
         let resolution = match p.decision.trim().to_ascii_lowercase().as_str() {
             "approve" => PlanReviewResolution::Approve,
@@ -107,7 +104,7 @@ fn handle_decide(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutu
             decision = resolution.as_str(),
             "[rpc][plan_review] decide entry"
         );
-        let resolved = gate::global().decide(&tenant, &p.request_id, resolution);
+        let resolved = super::host::decide(&ctx, &p.request_id, resolution)?;
         Ok(serde_json::json!({ "resolved": resolved }))
     })
 }
