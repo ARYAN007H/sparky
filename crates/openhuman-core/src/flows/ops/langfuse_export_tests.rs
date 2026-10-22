@@ -66,6 +66,83 @@ fn sample_observations(thread_id: &str) -> Vec<GraphObservation> {
     ]
 }
 
+fn three_node_observations(thread_id: &str) -> Vec<GraphObservation> {
+    let nodes = ["fetch", "transform", "publish"].map(NodeId::new);
+    let mk = |offset: u64, step: usize, ts_ms: u64, event: GraphEvent| GraphObservation {
+        event_id: EventId::new(format!("three-node-{offset}")),
+        run_id: RunId::new("run-three-node"),
+        root_run_id: RunId::new("run-three-node"),
+        parent_run_id: None,
+        thread_id: Some(ThreadId::new(thread_id)),
+        graph_id: GraphId::new("three-node-workflow"),
+        checkpoint_id: None,
+        namespace: Vec::new(),
+        step,
+        offset,
+        ts_ms,
+        event,
+    };
+    let mut observations = vec![mk(
+        0,
+        0,
+        1_000,
+        GraphEvent::RunStarted {
+            run_id: RunId::new("run-three-node"),
+        },
+    )];
+    let mut offset = 1;
+    for (step, node) in nodes
+        .into_iter()
+        .enumerate()
+        .map(|(index, node)| (index + 1, node))
+    {
+        observations.push(mk(
+            offset,
+            step,
+            1_000 + offset * 10,
+            GraphEvent::StepStarted {
+                step,
+                active: vec![node.clone()],
+            },
+        ));
+        offset += 1;
+        observations.push(mk(
+            offset,
+            step,
+            1_000 + offset * 10,
+            GraphEvent::NodeStarted {
+                node: node.clone(),
+                step,
+            },
+        ));
+        offset += 1;
+        observations.push(mk(
+            offset,
+            step,
+            1_000 + offset * 10,
+            GraphEvent::NodeCompleted { node, step },
+        ));
+        offset += 1;
+        observations.push(mk(
+            offset,
+            step,
+            1_000 + offset * 10,
+            GraphEvent::StepCompleted { step },
+        ));
+        offset += 1;
+    }
+    observations.push(mk(
+        offset,
+        3,
+        1_000 + offset * 10,
+        GraphEvent::RunCompleted {
+            run_id: RunId::new("run-three-node"),
+            steps: 3,
+        },
+    ));
+    observations
+}
+
 /// Finds the first span-create whose body id matches.
 fn find_span<'a>(batch: &'a [Value], id: &str) -> Option<&'a Value> {
     batch
@@ -257,6 +334,56 @@ fn batch_carries_flow_trace_and_langgraph_keys_on_node_spans() {
     let step = find_span(batch, &format!("{thread_id}:step:1")).expect("step span");
     assert_eq!(step["body"]["metadata"]["langgraph_step"], 1);
     assert_eq!(step["body"]["metadata"]["flow_id"], "flow-1");
+}
+
+#[test]
+fn three_node_flow_batch_preserves_the_run_step_and_node_span_shape() {
+    let thread_id = "flow:flow-3:uuid-3";
+    let observations = three_node_observations(thread_id);
+    let client = LangfuseClient::new(
+        "https://backend.test/telemetry/langfuse/ingestion",
+        LangfuseAuth::Bearer {
+            token: "tok".to_string(),
+        },
+    )
+    .expect("client");
+    let trace = build_flow_trace_config(
+        "Three node flow",
+        "flow-3",
+        thread_id,
+        "completed",
+        FlowRunTrigger::Rpc,
+    );
+    let batch = SpanExporter::new(client)
+        .build_ingestion_batch(trace, &flow_spans("flow-3", &observations))
+        .expect("batch");
+    let events = batch["batch"].as_array().expect("batch array");
+    let nodes = events
+        .iter()
+        .filter(|event| {
+            event["type"] == "span-create"
+                && event["body"]["metadata"]["langgraph_node"].is_string()
+        })
+        .collect::<Vec<_>>();
+    let steps = events
+        .iter()
+        .filter(|event| {
+            event["type"] == "span-create"
+                && event["body"]["metadata"]["langgraph_step"].is_number()
+                && event["body"]["metadata"]["langgraph_node"].is_null()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(events.first().expect("trace event")["type"], "trace-create");
+    assert_eq!(nodes.len(), 3);
+    assert_eq!(steps.len(), 3);
+    for node in ["fetch", "transform", "publish"] {
+        let span = nodes
+            .iter()
+            .find(|event| event["body"]["metadata"]["langgraph_node"] == node)
+            .expect("node span");
+        assert_eq!(span["body"]["traceId"], thread_id);
+        assert_eq!(span["body"]["metadata"]["flow_id"], "flow-3");
+    }
 }
 
 #[tokio::test]
