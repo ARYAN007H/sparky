@@ -27,6 +27,7 @@ async fn driver_session_store_uses_the_explicit_profile_scope() {
         workspace.clone(),
         "alice-session",
         Some("shared-thread".into()),
+        None,
     )
     .expect("open Alice's explicitly scoped store");
     let bob = open_for_context(
@@ -34,6 +35,7 @@ async fn driver_session_store_uses_the_explicit_profile_scope() {
         workspace.clone(),
         "bob-session",
         Some("shared-thread".into()),
+        None,
     )
     .expect("open Bob's explicitly scoped store");
     let upsert = |parent_session: &str, task_id: &str| TinyUpsert {
