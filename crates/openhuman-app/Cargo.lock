@@ -6770,7 +6770,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-bus"
-version = "0.1.38"
+version = "0.1.39"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6779,7 +6779,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
- "tinystoragedrivers-core",
+ "tinystoragedrivers-types 2.1.0 (git+https://github.com/tinyhumansai/tinystoragedrivers?rev=05eaada962decbab33bafa4763d2bd1a67f6b456)",
  "tokio",
 ]
 
@@ -7062,7 +7062,7 @@ dependencies = [
  "schemars 1.2.2",
  "serde",
  "serde_json",
- "tinystoragedrivers-types",
+ "tinystoragedrivers-types 2.1.0 (git+https://github.com/tinyhumansai/tinystoragedrivers?rev=2856dfa6f5b4de981a4db2801ae6be80c6432b3b)",
 ]
 
 [[package]]
@@ -7299,6 +7299,16 @@ dependencies = [
  "tinystoragedrivers-core",
  "tokio",
  "zstd",
+]
+
+[[package]]
+name = "tinystoragedrivers-types"
+version = "2.1.0"
+source = "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=05eaada962decbab33bafa4763d2bd1a67f6b456#05eaada962decbab33bafa4763d2bd1a67f6b456"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
