@@ -309,14 +309,12 @@ impl ShellTool {
         )
         .await;
         let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
-        // `allowed` = passed the in-tool security checks. `approved` = the command
-        // is Prompt-class (required human approval) and thus went through the
-        // harness ApprovalGate to reach here — distinct from `allowed`. Reads and
-        // Full-mode writes run without a prompt, so they audit as approved=false
-        // rather than over-claiming a human approval that never happened. (The
-        // gate's exact yes/no isn't threaded into tools; this is the accurate
-        // "required approval" proxy.)
-        let approved = self.external_effect_with_args(&args);
+        // `allowed` = passed the in-tool security checks. Whether a human
+        // approved the call is the harness ApprovalGate's decision, kept in its
+        // own approval record; that yes/no is not threaded into tools, so this
+        // row never claims an approval (`approved=false`). Read the gate's
+        // record for the human decision.
+        let approved = false;
         // emit_audit signature is (command, approved, allowed, …) — keep that order.
         self.emit_audit(command, approved, allowed, !result.is_error, duration_ms);
         Ok(result)
