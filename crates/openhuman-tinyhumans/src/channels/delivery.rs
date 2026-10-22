@@ -33,7 +33,7 @@ fn request_channel(request: &ProgressiveTransportRequest) -> &str {
         | ProgressiveTransportRequest::SendTyped { channel, .. }
         | ProgressiveTransportRequest::Edit { channel, .. }
         | ProgressiveTransportRequest::Delete { channel, .. }
-        | ProgressiveTransportRequest::Typing { channel } => channel,
+        | ProgressiveTransportRequest::Typing { channel, .. } => channel,
     }
 }
 
