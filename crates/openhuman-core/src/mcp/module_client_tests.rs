@@ -289,6 +289,7 @@ async fn static_tool_metadata_scrubbing_uses_confidential_module_delivery() {
         description: Some("Search docs".to_owned()),
         input_schema: serde_json::json!({"type":"object"}),
         meta: Some(serde_json::json!({"ui":{"resourceUri":"ui://search"}})),
+        annotations: None,
     };
 
     let returned = client

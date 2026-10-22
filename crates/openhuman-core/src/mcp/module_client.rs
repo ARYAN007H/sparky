@@ -262,6 +262,7 @@ impl McpConfiguredClient {
                         description: tool.description,
                         input_schema: tool.input_schema,
                         meta: None,
+                        annotations: None,
                     })
                     .collect(),
                 None => {
