@@ -349,7 +349,7 @@ impl SpawnSubagentTool {
                 parent_session.clone(),
                 completion_target.clone(),
                 session.worker_thread_id.clone(),
-                store.clone(),
+                driver_store.clone(),
                 resumed_session.subagent_session_id.clone(),
                 parent_thread_id.clone(),
             );
@@ -625,7 +625,7 @@ impl SpawnSubagentTool {
         let background_task_key = task_key.clone();
         let background_parent_session = parent_session.clone();
         let background_worker_thread_id = worker_thread_id.clone();
-        let background_store = store.clone();
+        let background_store = driver_store.clone();
         let background_subagent_session_id = durable_session.subagent_session_id.clone();
         let background_thread_id = background_worker_thread_id
             .clone()
