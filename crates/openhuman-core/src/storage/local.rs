@@ -215,14 +215,20 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
 /// Async counterpart to [`backend_for`] for boot and module-proxy paths that
 /// already run inside a future. Cold initialization is delegated to Tokio's
 /// blocking pool so the shared OnceCell initializer is driven by the storage
-/// bridge rather than by the caller's runtime. A synchronous store may wait for
-/// that same initializer, including from a current-thread runtime, without
+/// bridge rather than by the caller's runtime. When already on the bridge's
+/// runtime, initialize directly: queueing a synchronous bridge call from a
+/// bridge worker would wait on itself. A synchronous store may wait for the
+/// same initializer, including from a current-thread runtime, without
 /// preventing it from making progress.
 pub async fn backend_for_async(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
     if let Some(backend) = installed() {
         return Ok(backend);
     }
     let workspace_dir = workspace_dir.to_path_buf();
+    if super::ON_STORAGE_RUNTIME.with(std::cell::Cell::get) {
+        let cell = workspace_backend(&workspace_dir);
+        return initialized_backend(cell, workspace_dir).await;
+    }
     tokio::task::spawn_blocking(move || backend_for(&workspace_dir))
         .await
         .context("join the workspace storage opener")?
