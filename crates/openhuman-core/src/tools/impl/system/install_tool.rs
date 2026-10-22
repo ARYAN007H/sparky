@@ -20,15 +20,62 @@ impl InstallToolTool {
     }
 
     pub fn with_audit(security: Arc<SecurityPolicy>, audit: Arc<AuditLogger>) -> Self {
-        let gate = Arc::new(InstallGate { security, audit });
-        let backend: Arc<dyn ExecBackend> =
+        Self::with_backend_and_environment(
+            security,
+            audit,
             Arc::new(tinyagents_harness_tools::exec::NativeExecBackend::new(
                 tinyagents_harness_tools::exec::ShellFlavor::Posix,
-            ));
+            )),
+            install_environment(),
+        )
+    }
+
+    fn with_backend_and_environment(
+        security: Arc<SecurityPolicy>,
+        audit: Arc<AuditLogger>,
+        backend: Arc<dyn ExecBackend>,
+        environment: std::collections::BTreeMap<std::ffi::OsString, std::ffi::OsString>,
+    ) -> Self {
+        let gate = Arc::new(InstallGate {
+            security,
+            audit,
+            environment,
+        });
         Self {
             inner: InstallTool::new(gate, backend),
         }
     }
+}
+
+fn install_environment() -> std::collections::BTreeMap<std::ffi::OsString, std::ffi::OsString> {
+    let allowed = [
+        "PATH",
+        "HOME",
+        "USERPROFILE",
+        "APPDATA",
+        "LOCALAPPDATA",
+        "SYSTEMROOT",
+        "WINDIR",
+        "PATHEXT",
+        "TEMP",
+        "TMP",
+        "TMPDIR",
+        "CARGO_HOME",
+        "RUSTUP_HOME",
+        "PIPX_HOME",
+        "PIPX_BIN_DIR",
+        "NPM_CONFIG_PREFIX",
+        "HOMEBREW_PREFIX",
+        "HOMEBREW_CELLAR",
+        "HOMEBREW_REPOSITORY",
+        "XDG_CACHE_HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+    ];
+    std::env::vars_os()
+        .filter(|(name, _)| allowed.iter().any(|allowed| name == allowed))
+        .collect()
 }
 
 #[async_trait]

@@ -29,6 +29,7 @@ use super::shell::ShellHost;
 pub(super) struct InstallGate {
     pub security: Arc<SecurityPolicy>,
     pub audit: Arc<AuditLogger>,
+    pub environment: std::collections::BTreeMap<std::ffi::OsString, std::ffi::OsString>,
 }
 
 #[async_trait]
