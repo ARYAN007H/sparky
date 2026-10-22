@@ -3,20 +3,21 @@ use crate::agent::orchestration::background_completions::{
     pending_for, record_completion, TestWorkspace,
 };
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use tokio::sync::MutexGuard;
 
 async fn test_guard() -> MutexGuard<'static, ()> {
     crate::config::TEST_ENV_LOCK.lock().await
 }
 
-async fn record(ws: &Path, session: &str, task: &str, thread: &str) {
+async fn record(ws: &Path, session: &str, task: &str, summary: &str, thread: &str) {
     record_completion(
         &DispatchCtx::ambient(),
         ws,
         session,
         task,
         "researcher",
-        "done",
+        summary,
         Some(thread.to_owned()),
     )
     .await;
@@ -28,7 +29,7 @@ async fn try_deliver_applies_the_requested_turn_end_delay() {
     let workspace = TestWorkspace::new();
     let workspace_dir = workspace.path().to_path_buf();
     let thread_id = "thread-turn-end-delay";
-    record(&workspace_dir, "session-turn-end-delay", "sub-delay", thread_id).await;
+    record(&workspace_dir, "session-turn-end-delay", "sub-delay", "done", thread_id).await;
     let ctx = DispatchCtx::ambient();
     let requested_delay = Duration::from_millis(300);
     let started = std::time::Instant::now();

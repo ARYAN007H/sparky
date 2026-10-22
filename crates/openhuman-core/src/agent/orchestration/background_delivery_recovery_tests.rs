@@ -1,5 +1,8 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
+use crate::agent::orchestration::background_completions::{
+    forget_workspace_for_test, router_for_workspace,
+};
 
 #[tokio::test]
 async fn an_unexpired_completion_claim_stays_leased_after_router_reopen() {
