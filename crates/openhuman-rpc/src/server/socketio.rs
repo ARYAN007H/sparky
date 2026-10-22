@@ -69,7 +69,7 @@ struct AuthedConnection;
 /// The per-process bearer authenticates the connection but does not encode a
 /// SaaS profile, so never accept tenant selection from a later event payload.
 #[derive(Clone, Debug)]
-struct SocketTenant(crate::core_host::core::runtime::Tenant);
+struct SocketTenant(crate::core_host::agent::plan_review::gate::SocketReviewScope);
 
 /// Connection-time payload the client passes via Socket.IO's `auth` field.
 ///
@@ -286,10 +286,9 @@ pub fn attach_socketio() -> (socketioxide::layer::SocketIoLayer, SocketIo) {
                 return;
             }
             socket.extensions.insert(AuthedConnection);
-            let Some(tenant) = tenant_for_socket_connection(
-                crate::core_host::core::runtime::DispatchCtx::ambient().tenant(),
-                crate::core_host::core::runtime::is_saas(),
-            ) else {
+            let Some(tenant) = crate::core_host::agent::plan_review::gate::global()
+                .socket_scope_for_current_context()
+            else {
                 log::warn!("[socketio] rejecting socket without a tenant scope in SaaS mode");
                 let _ = socket.clone().disconnect();
                 return;
@@ -1230,19 +1229,6 @@ fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str) {
     emit_with_aliases(socket, "plan_review_request", &payload);
 }
 
-fn tenant_for_socket_connection(
-    tenant: Result<
-        crate::core_host::core::runtime::Tenant,
-        crate::core_host::core::runtime::NoTenant,
-    >,
-    saas: bool,
-) -> Option<crate::core_host::core::runtime::Tenant> {
-    match tenant {
-        Ok(tenant) => Some(tenant),
-        Err(_) if saas => None,
-        Err(_) => Some(Default::default()),
-    }
-}
 
 fn emit_with_aliases(socket: &SocketRef, name: &str, payload: &serde_json::Value) {
     let _ = socket.emit(name, payload);

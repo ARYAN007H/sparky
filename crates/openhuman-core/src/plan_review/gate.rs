@@ -68,6 +68,11 @@ pub struct PlanReviewGate {
     parked: Mutex<HashMap<(Tenant, String), ParkedReview>>,
 }
 
+/// A tenant captured from trusted server context for a live socket. Its
+/// private field prevents transport payloads from manufacturing replay scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SocketReviewScope(Tenant);
+
 impl PlanReviewGate {
     fn new(ttl: Duration) -> Self {
         Self {
@@ -200,10 +205,20 @@ impl PlanReviewGate {
     /// context when the socket connects; client event payloads are not identity.
     pub fn parked_review_for_socket(
         &self,
-        socket_tenant: &Tenant,
+        socket_tenant: &SocketReviewScope,
         thread_id: &str,
     ) -> Option<ParkedReview> {
-        self.parked_review_for_thread(socket_tenant, thread_id)
+        self.parked_review_for_thread(&socket_tenant.0, thread_id)
+    }
+
+    /// Capture this socket's replay scope from the active server context.
+    /// SaaS requests with no scoped tenant fail closed; local hosts keep their
+    /// current profile/default context for the lifetime of the socket.
+    pub fn socket_scope_for_current_context(&self) -> Option<SocketReviewScope> {
+        socket_scope_from_context(
+            crate::core::runtime::DispatchCtx::ambient().tenant(),
+            crate::core::runtime::is_saas(),
+        )
     }
 
     /// Resolve a parked review by `request_id`. Returns `true` when a waiter was
@@ -248,6 +263,17 @@ impl PlanReviewGate {
             Some(id) => self.decide(tenant, &id, resolution),
             None => false,
         }
+    }
+}
+
+fn socket_scope_from_context(
+    tenant: Result<Tenant, crate::core::runtime::tenant::NoTenant>,
+    saas: bool,
+) -> Option<SocketReviewScope> {
+    match tenant {
+        Ok(tenant) => Some(SocketReviewScope(tenant)),
+        Err(_) if saas => None,
+        Err(_) => Some(SocketReviewScope(Tenant::default())),
     }
 }
 
