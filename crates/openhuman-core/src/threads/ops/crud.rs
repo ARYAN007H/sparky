@@ -471,13 +471,29 @@ async fn thread_delete_inner(
     request: DeleteConversationThreadRequest,
 ) -> Result<Outcome<ApiEnvelope<DeleteConversationThreadResponse>>, String> {
     let dir: PathBuf = config.workspace_dir.clone();
-    let deleted = conversations::blocking::delete_thread(
+    crate::agent::orchestration::completion_owners::begin_thread_deletion(
+        &ctx,
+        &dir,
+        &request.thread_id,
+    )?;
+    let deleted = match conversations::blocking::delete_thread(
         ctx.clone(),
         dir.clone(),
         request.thread_id.clone(),
         request.deleted_at.clone(),
     )
-    .await?;
+    .await
+    {
+        Ok(deleted) => deleted,
+        Err(error) => {
+            crate::agent::orchestration::completion_owners::release_thread_deletion(
+                &ctx,
+                &dir,
+                &request.thread_id,
+            );
+            return Err(error);
+        }
+    };
     // Invalidate the in-process web-channel session BEFORE the
     // turn-state cleanup. The snapshot deletion is fallible and
     // returns early on error; if invalidation ran after, an active
@@ -505,6 +521,11 @@ async fn thread_delete_inner(
         .len();
     let cancelled = cancelled_legacy + cancelled_driver;
     let discarded = crate::agent::orchestration::background_completions::discard_for_thread(
+        &ctx,
+        &dir,
+        &request.thread_id,
+    );
+    crate::agent::orchestration::completion_owners::release_thread_deletion(
         &ctx,
         &dir,
         &request.thread_id,

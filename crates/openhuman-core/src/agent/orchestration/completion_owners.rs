@@ -110,6 +110,16 @@ fn remember_active_driver_task(
     owner: DriverTaskOwner,
     capacity: usize,
 ) -> Result<(), String> {
+    if let Some(thread_id) = owner.parent_thread_id.as_deref() {
+        let scope = driver_thread_scope(
+            owner.profile.clone(),
+            owner.workspace_dir.clone(),
+            thread_id.to_owned(),
+        );
+        if st.deleting_threads.contains(&scope) {
+            return Err("parent thread deletion is in progress".into());
+        }
+    }
     if !st.driver_tasks.contains_key(&key) && st.driver_tasks.len() >= capacity {
         return Err(format!(
             "active sub-agent owner capacity ({capacity}) is full"
@@ -132,6 +142,38 @@ fn driver_thread_scope(
         workspace_dir,
         thread_id,
     }
+}
+
+/// Close owner registration before thread deletion starts its one-time child sweep.
+pub(crate) fn begin_thread_deletion(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+    thread_id: &str,
+) -> Result<(), String> {
+    let profile = ctx
+        .tenant()
+        .map_err(|error| format!("cannot resolve profile for thread deletion: {error}"))?
+        .profile;
+    owners().deleting_threads.insert(driver_thread_scope(
+        profile,
+        workspace_dir.to_path_buf(),
+        thread_id.to_owned(),
+    ));
+    Ok(())
+}
+
+/// Release a deletion fence after either delete failure or durable parent closure.
+pub(crate) fn release_thread_deletion(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+    thread_id: &str,
+) {
+    let profile = ctx.tenant().ok().and_then(|tenant| tenant.profile);
+    owners().deleting_threads.remove(&driver_thread_scope(
+        profile,
+        workspace_dir.to_path_buf(),
+        thread_id.to_owned(),
+    ));
 }
 
 /// Move a settled task out of the non-evictable live-owner set while retaining
