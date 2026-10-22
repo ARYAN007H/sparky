@@ -63,7 +63,10 @@ fn declared_collections() -> Vec<CollectionSpec> {
     #[cfg(feature = "tinymemes")]
     collections.extend(tinymemes_bus::storage::collections());
     #[cfg(feature = "inbound-queues")]
-    collections.extend(tinyeventqueues_bus::storage::collection_specs());
+    {
+        collections.extend(tinyeventqueues_bus::storage::collection_specs());
+        collections.extend(crate::inbound::results::collection_specs());
+    }
 
     collections
 }

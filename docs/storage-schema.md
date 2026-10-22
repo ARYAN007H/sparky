@@ -113,6 +113,12 @@ Record shapes and migrations stay with their owners.
 | `history.sessions` | `agent` (`agent_definition_id`)<br>`channel` (`source_channel`)<br>`parent` (`parent_session_id`, `started_ms`)<br>`started` (`started_ms`)<br>`status_started` (`status`, `started_ms`)<br>`thread` (`thread_id`) |  |  |
 | `history.tool_calls` | `created` (`created_ms`)<br>`session_id` (`session_id`, `id`)<br>`tool` (`tool_name`) |  |  |
 
+## inbound
+
+| Kind | Name | Version | Scope | Indexed fields |
+| --- | --- | --- | --- | --- |
+| collection | `inbound.results` | 1 | tenant | `status`, `created_ms`, `source`, `created_ms` |
+
 ## juice
 
 | Collection | Indexes | Expiry field | Search fields |
