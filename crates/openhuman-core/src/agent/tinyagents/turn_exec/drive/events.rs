@@ -2,29 +2,30 @@ use super::*;
 
 pub(super) struct EventWiring {
     pub(super) sink: EventSink,
-    pub(super) bridge: OpenhumanEventBridge,
-    pub(super) turn_journal: Option<journal::TurnJournalHandle>,
-    pub(super) turn_completed_sink: Option<tokio::sync::mpsc::Sender<AgentProgress>>,
+    pub(super) bridge: Arc<OpenhumanEventBridge>,
+    pub(super) turn_journal: Option<journal::TurnJournal>,
+    pub(super) turn_completed_sink:
+        Option<tokio::sync::mpsc::Sender<crate::progress::AgentProgress>>,
 }
 
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn attach(
-    on_progress: Option<tokio::sync::mpsc::Sender<AgentProgress>>,
+    on_progress: Option<tokio::sync::mpsc::Sender<crate::progress::AgentProgress>>,
     is_subagent: bool,
     defer_turn_completed_to_caller: bool,
-    journal_run_id: String,
+    journal_run_id: tinyagents_harness::ids::RunId,
     native_subagent: Option<&NativeSubagentRunContext>,
     model: &str,
     provider_id: String,
     max_iterations: usize,
-    subagent_scope: Option<&SubagentScope>,
+    subagent_scope: Option<SubagentScope>,
     cursor: &tinyagents_harness::events::IterationCursor,
     tool_names: &crate::agent::tinyagents::observability::ToolNameMap,
     failure_map: &crate::agent::tinyagents::observability::ToolFailureMap,
     provider_usage_carry: &crate::agent::tinyagents::observability::ProviderUsageCarry,
     bridge_tool_sets: Vec<Arc<Vec<Box<dyn tinytools::Tool>>>>,
     run_context: &OpenHumanRunContext,
-    ctx: &mut tinyagents_harness::context::RunContext<OpenHumanRunContext>,
+    ctx: &tinyagents_harness::context::RunContext<OpenHumanRunContext>,
 ) -> EventWiring {
     let turn_completed_sink = (!is_subagent && !defer_turn_completed_to_caller)
         .then(|| on_progress.clone())
@@ -38,7 +39,7 @@ pub(super) async fn attach(
     // the restart-stable `{run_id}-evt-{offset}` a late-attach replay
     // reconstructs the timeline from (05.1). The same id keys the journal + status.
     let sink = EventSink::with_stream_id(journal_run_id.as_str());
-    if let Some(native) = &native_subagent {
+    if let Some(native) = native_subagent {
         *native
             .child_events
             .lock()
@@ -105,7 +106,7 @@ pub(super) async fn attach(
         ctx.config.lineage.root_run_id.clone(),
     )
     .await;
-    if let Some(native) = &native_subagent {
+    if let Some(native) = native_subagent {
         *native
             .child_journal
             .lock()
@@ -124,7 +125,6 @@ pub(super) async fn attach(
             );
         }
     }
-    ctx = ctx.with_events(sink.clone());
 
     // Per-turn controls for the driver. Best-effort thread label for the
     // delivery/requeue observability events and the metadata on any requeued

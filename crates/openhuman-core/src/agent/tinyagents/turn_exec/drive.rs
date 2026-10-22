@@ -231,14 +231,14 @@ pub(super) async fn drive_turn(
         model,
         provider_id.clone(),
         max_iterations,
-        subagent_scope.as_ref(),
+        subagent_scope.clone(),
         &cursor,
         &tool_names,
         &failure_map,
         &provider_usage_carry,
-        bridge_tool_sets,
+        bridge_tool_sets.clone(),
         &run_context,
-        &mut ctx,
+        &ctx,
     )
     .await;
     let events::EventWiring {
@@ -247,12 +247,13 @@ pub(super) async fn drive_turn(
         turn_journal,
         turn_completed_sink,
     } = event_wiring;
+    ctx = ctx.with_events(sink.clone());
 
     let controls = controls::build(
         max_iterations,
         pause_at_cap,
         early_exit_tools,
-        subagent_scope.as_ref(),
+        subagent_scope.clone(),
         message_run_queue,
         run_queue,
         is_subagent,

@@ -5,7 +5,7 @@ pub(super) fn build(
     max_iterations: usize,
     pause_at_cap: bool,
     early_exit_tools: &[&str],
-    subagent_scope: Option<&SubagentScope>,
+    subagent_scope: Option<SubagentScope>,
     message_run_queue: Option<tinyagents_harness::run_queue::RunQueueHandle>,
     run_queue: Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
     is_subagent: bool,

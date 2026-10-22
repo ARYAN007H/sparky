@@ -2,7 +2,7 @@ use super::*;
 
 pub(super) async fn attach(
     run_context: &OpenHumanRunContext,
-    tool_result_artifact_index: Option<ToolResultArtifactIndexStore>,
+    tool_result_artifact_index: Option<Arc<ToolResultArtifactIndexStore>>,
 ) -> Option<StoreRegistry> {
     // Assemble the run's store registry: the tool-result artifact index (when
     // present) and — behind the default-ON session dual-write flag — the
@@ -30,9 +30,6 @@ pub(super) async fn attach(
             "[session-store] registered session kv store on RunContext.stores under '{}'",
             crate::storage::import::live::TINYAGENTS_SESSION_KV_STORE
         );
-    }
-    if let Some(stores) = stores {
-        ctx = ctx.with_stores(stores);
     }
     stores
 }
