@@ -258,7 +258,7 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     assert!(
         refused_resume
             .output()
-            .contains("paused checkpoint does not match the reusable session"),
+            .contains("reusable session has no valid lifecycle key"),
         "refusal identifies the mismatched checkpoint: {}",
         refused_resume.output()
     );
@@ -272,21 +272,22 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         1,
         "refusal invokes no child model"
     );
+    let refused_session = super::driver_sessions_for_parent(
+        &live.data.dispatch_ctx(),
+        workspace.path(),
+        "continue-paused-e2e",
+        Some("continue-paused-e2e-thread"),
+    )
+    .await
+    .expect("refused row remains persisted")
+    .into_iter()
+    .find(|session| session.subagent_session_id == before_session.subagent_session_id)
+    .expect("paused row remains present");
+    assert_eq!(refused_session.status, DurableSubagentStatus::AwaitingUser);
     assert_eq!(
-        super::driver_sessions_for_parent(
-            &live.data.dispatch_ctx(),
-            workspace.path(),
-            "continue-paused-e2e",
-            Some("continue-paused-e2e-thread"),
-        )
-        .await
-        .expect("refused row remains persisted")
-        .into_iter()
-        .find(|session| session.subagent_session_id == before_session.subagent_session_id)
-        .expect("paused row remains present")
-        .status,
-        DurableSubagentStatus::AwaitingUser,
-        "refusal leaves the paused row untouched"
+        refused_session.lifecycle_key.as_ref(),
+        Some(&saved_key),
+        "refusal leaves the mismatched paused lifecycle key untouched"
     );
     let driver_documents_for_read = Arc::clone(&driver_documents);
     let session_id = before_session.subagent_session_id.clone();
