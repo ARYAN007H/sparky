@@ -44,6 +44,23 @@ fn import_parent_epoch(
     .map_err(|error| SubagentError::Persistence(format!("import parent epoch: {error}")))
 }
 
+pub(crate) fn parent_epoch_from_sidecar(
+    documents: Arc<dyn crate::storage::DocumentStore>,
+    session_id: String,
+) -> Result<Option<u64>, SubagentError> {
+    crate::storage::block_on(async move {
+        documents
+            .ensure_collection(&tinystoragedrivers::CollectionSpec::new(EPOCHS))
+            .await?;
+        let repo = tinystoragedrivers::Repo::<ParentEpochRecord>::new(&documents, EPOCHS)?;
+        Ok(repo
+            .get(&session_id)
+            .await?
+            .map(|(record, _)| record.parent_epoch))
+    })
+    .map_err(|error| SubagentError::Persistence(format!("read parent epoch: {error}")))
+}
+
 /// Opens TinyAgents' async session store in the caller's explicit storage
 /// scope and binds it to one parent session/thread. The core's storage handle
 /// is captured before returning, so later trait calls never consult ambient
