@@ -209,7 +209,10 @@ fn a_session_store_rebind_failure_keeps_the_previous_backend_installed() {
     );
 
     assert!(error.is_err());
-    assert!(installed.urls().is_empty(), "the new backend was not installed");
+    assert!(
+        installed.urls().is_empty(),
+        "the new backend was not installed"
+    );
 }
 
 #[test]

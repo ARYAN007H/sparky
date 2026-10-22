@@ -132,7 +132,7 @@ fn upstream_rebind_keeps_tenant_routing_and_moves_only_future_leases() {
         "profiles keep separate scopes"
     );
 
-    assert_eq!(registry.rebind(&second), 2);
+    assert_eq!(registry.rebind(&second).unwrap(), 2);
     assert!(
         Arc::ptr_eq(&*router.backend.read().unwrap(), &second),
         "new tenants open on the newly bound workspace backend"
@@ -201,7 +201,7 @@ fn failed_rebind_rolls_back_tenant_providers_already_moved() {
         .destination_key()
         .is_some_and(|key| key.starts_with("original://")));
 
-    assert_eq!(registry.rebind(&second), 0);
+    assert!(registry.rebind(&second).is_err());
     assert!(Arc::ptr_eq(&*router.backend.read().unwrap(), &first));
 
     assert!(
@@ -252,6 +252,13 @@ impl StorageBackend for MarkerStorage {
         if self.reject_bob && scope.as_str().starts_with("u:bob/") {
             return Err(StorageError::invalid_input("injected Bob tenant failure"));
         }
-        self.inner.for_scope(scope)
+        let scoped = self.inner.for_scope(scope)?;
+        Ok(ScopedStorage::new(
+            scope.clone(),
+            self.driver,
+            Arc::clone(scoped.documents()),
+            Arc::clone(scoped.streams()),
+            Arc::clone(scoped.blobs()),
+        ))
     }
 }
