@@ -964,6 +964,10 @@ impl ShellTool {
         }
     }
 
+    fn explicit_timeout(&self, requested: Option<u64>) -> Option<Duration> {
+        self.host.explicit_timeout(requested)
+    }
+
     /// Retains the workflow command entry point while the registered agent
     /// tool uses TinyAgents' generic ExecTool and the same host policy path.
     pub(crate) async fn run_with_security(
