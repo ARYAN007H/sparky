@@ -305,6 +305,10 @@ pub(crate) fn cancel_for_thread(ctx: &crate::core::runtime::DispatchCtx, thread_
         &workspace_dir,
         thread_id,
     );
+    eprintln!(
+        "thread-delete scope workspace={workspace_dir:?} thread={thread_id} owners={}",
+        scopes.len()
+    );
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(ctx);
@@ -317,7 +321,10 @@ pub(crate) fn cancel_for_thread(ctx: &crate::core::runtime::DispatchCtx, thread_
         }
         scopes_seen.push(scope.clone());
         match jobs.cancel_for_thread(&scope) {
-            Ok(count) => cancelled += count,
+            Ok(count) => {
+                eprintln!("thread-delete cancel scope={scope:?} count={count}");
+                cancelled += count;
+            }
             Err(error) => log::warn!(
                 "[running_subagents] driver thread deletion cancellation failed: {error}"
             ),
