@@ -46,6 +46,38 @@ pub(crate) fn discard_for_thread(
     removed
 }
 
+/// Durably close a deleted parent and withdraw queued results, even when its
+/// child sweep reported an unresolved task. The conversation row is already
+/// gone, so late results must remain rejected after a process restart.
+pub(crate) fn delete_parent_for_thread(
+    ctx: &DispatchCtx,
+    workspace_dir: &Path,
+    thread_id: &str,
+) -> Result<usize, String> {
+    let thread_key = key(ctx, thread_id);
+    {
+        let mut st = state();
+        st.deleted_threads.insert(thread_key.clone());
+        st.stopped_threads.remove(&thread_key);
+        st.thread_workspaces
+            .insert(thread_key, workspace_dir.to_path_buf());
+    }
+    let entry = entry_for_ctx(ctx, workspace_dir);
+    let removed = entry
+        .router
+        .delete_parent(thread_id)
+        .map_err(|error| format!("failed to persist deleted-parent marker: {error}"))?;
+    crate::agent::orchestration::completion_owners::commit_thread_deletion(
+        ctx,
+        workspace_dir,
+        thread_id,
+    )?;
+    log::debug!(
+        "[background_completions] delete_parent_for_thread thread_id={thread_id} removed={removed}"
+    );
+    Ok(removed)
+}
+
 /// Task id used by the legacy durable "this thread was deleted" marker.
 /// Current deletions use the router's `ParentDeleted` lifecycle state; this
 /// marker remains readable for rows written by older host versions.

@@ -72,7 +72,7 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
             .with_thread(thread_id),
         host_context,
     )
-    .with_workspace(workspace_descriptor);
+    .with_workspace(workspace_descriptor.clone());
     let dispatch = live.data.dispatch_ctx();
     blocking::ensure_thread(
         dispatch.clone(),
@@ -222,6 +222,18 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         "settled thread deletion releases active child owner slots"
     );
     assert!(
+        crate::agent::orchestration::completion_owners::note_driver_task(
+            &dispatch,
+            "late-child-after-parent-delete",
+            workspace.clone(),
+            workspace_descriptor.clone(),
+            parent_session.into(),
+            Some(thread_id.into()),
+        )
+        .is_err(),
+        "the permanent deletion fence refuses children that race after the sweep"
+    );
+    assert!(
         background_completions::pending_for(&workspace, thread_id).is_empty(),
         "queued child completions are discarded after cancellation"
     );
@@ -255,7 +267,7 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
 }
 
 #[tokio::test]
-async fn thread_delete_keeps_completions_when_driver_task_scope_cannot_be_resolved() {
+async fn thread_delete_closes_parent_when_driver_task_scope_cannot_be_resolved() {
     use crate::agent::orchestration::background_completions::{self, BackgroundAgentOutcome};
     use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
@@ -343,10 +355,9 @@ async fn thread_delete_keeps_completions_when_driver_task_scope_cannot_be_resolv
     assert!(result
         .expect_err("an indexed task without its driver job must fail closed")
         .contains("no live driver job or terminal durable session"));
-    assert_eq!(
-        background_completions::pending_for(&workspace, thread_id).len(),
-        1,
-        "thread deletion retains queued completions when a selected child cannot be settled"
+    assert!(
+        background_completions::pending_for(&workspace, thread_id).is_empty(),
+        "failed child settlement still durably closes a deleted parent and withdraws its queue"
     );
 
     let terminal_legacy_row = serde_json::from_value(serde_json::json!({

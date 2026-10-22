@@ -44,6 +44,20 @@ struct Owners {
     terminal_driver_tasks: HashMap<String, DriverTaskOwner>,
     terminal_driver_task_order: VecDeque<String>,
     driver_cancel_reasons: HashMap<String, String>,
+    deleting_threads: HashMap<DriverThreadScope, ThreadDeletionFence>,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct DriverThreadScope {
+    profile: Option<String>,
+    workspace_dir: PathBuf,
+    thread_id: String,
+}
+
+#[derive(Default)]
+struct ThreadDeletionFence {
+    active_attempts: usize,
+    committed: bool,
 }
 
 #[derive(Clone)]
@@ -102,6 +116,16 @@ fn remember_active_driver_task(
     owner: DriverTaskOwner,
     capacity: usize,
 ) -> Result<(), String> {
+    if let Some(thread_id) = owner.parent_thread_id.as_deref() {
+        let scope = driver_thread_scope(
+            owner.profile.clone(),
+            owner.workspace_dir.clone(),
+            thread_id.to_owned(),
+        );
+        if st.deleting_threads.contains_key(&scope) {
+            return Err("parent thread deletion is in progress".into());
+        }
+    }
     if !st.driver_tasks.contains_key(&key) && st.driver_tasks.len() >= capacity {
         return Err(format!(
             "active sub-agent owner capacity ({capacity}) is full"
@@ -112,6 +136,91 @@ fn remember_active_driver_task(
         .retain(|existing| existing != &key);
     st.driver_tasks.insert(key, owner);
     Ok(())
+}
+
+fn driver_thread_scope(
+    profile: Option<String>,
+    workspace_dir: PathBuf,
+    thread_id: String,
+) -> DriverThreadScope {
+    DriverThreadScope {
+        profile,
+        workspace_dir,
+        thread_id,
+    }
+}
+
+fn begin_thread_deletion_in(st: &mut Owners, scope: DriverThreadScope) {
+    st.deleting_threads
+        .entry(scope)
+        .or_default()
+        .active_attempts += 1;
+}
+
+fn commit_thread_deletion_in(st: &mut Owners, scope: DriverThreadScope) {
+    let fence = st.deleting_threads.entry(scope).or_default();
+    fence.committed = true;
+    fence.active_attempts = fence.active_attempts.saturating_sub(1);
+}
+
+fn release_thread_deletion_in(st: &mut Owners, scope: &DriverThreadScope) {
+    let Some(fence) = st.deleting_threads.get_mut(scope) else {
+        return;
+    };
+    fence.active_attempts = fence.active_attempts.saturating_sub(1);
+    if fence.active_attempts == 0 && !fence.committed {
+        st.deleting_threads.remove(scope);
+    }
+}
+
+/// Close owner registration before thread deletion starts its one-time child sweep.
+pub(crate) fn begin_thread_deletion(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+    thread_id: &str,
+) -> Result<(), String> {
+    let profile = ctx
+        .tenant()
+        .map_err(|error| format!("cannot resolve profile for thread deletion: {error}"))?
+        .profile;
+    let mut st = owners();
+    begin_thread_deletion_in(
+        &mut st,
+        driver_thread_scope(profile, workspace_dir.to_path_buf(), thread_id.to_owned()),
+    );
+    Ok(())
+}
+
+/// Mark that the durable deleted-parent marker was written successfully.
+pub(crate) fn commit_thread_deletion(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+    thread_id: &str,
+) -> Result<(), String> {
+    let profile = ctx
+        .tenant()
+        .map_err(|error| format!("cannot resolve profile for thread deletion: {error}"))?
+        .profile;
+    let mut st = owners();
+    commit_thread_deletion_in(
+        &mut st,
+        driver_thread_scope(profile, workspace_dir.to_path_buf(), thread_id.to_owned()),
+    );
+    Ok(())
+}
+
+/// Release a temporary deletion fence when the conversation delete itself failed.
+pub(crate) fn release_thread_deletion(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+    thread_id: &str,
+) {
+    let profile = ctx.tenant().ok().and_then(|tenant| tenant.profile);
+    let mut st = owners();
+    release_thread_deletion_in(
+        &mut st,
+        &driver_thread_scope(profile, workspace_dir.to_path_buf(), thread_id.to_owned()),
+    );
 }
 
 /// Move a settled task out of the non-evictable live-owner set while retaining
@@ -172,6 +281,19 @@ pub(crate) fn clear_driver_cancel_reason(ctx: &crate::core::runtime::DispatchCtx
     owners()
         .driver_cancel_reasons
         .remove(&driver_task_key(ctx, task_id));
+}
+
+#[cfg(test)]
+pub(crate) fn clear_driver_task_owner_for_test(
+    ctx: &crate::core::runtime::DispatchCtx,
+    task_id: &str,
+) {
+    let key = driver_task_key(ctx, task_id);
+    let mut st = owners();
+    st.driver_tasks.remove(&key);
+    st.terminal_driver_tasks.remove(&key);
+    st.terminal_driver_task_order
+        .retain(|existing| existing != &key);
 }
 
 /// Return registered task scopes for one exact workspace/thread pair.
