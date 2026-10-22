@@ -28,7 +28,7 @@ use super::super::context::{
 };
 use super::super::runtime::process_channel_message;
 use super::super::{Channel, SendMessage};
-use super::common::HistoryCaptureModel;
+use super::common::{channel_envelope, HistoryCaptureModel};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -260,12 +260,10 @@ async fn discord_thread_ts_splits_conversation_history_end_to_end() {
             None
         );
 
-    let second = traits::ChannelMessage {
-        id: "discord_msg_b".to_string(),
-        thread_ts: Some("thread-B".to_string()),
-        content: "second thread message".to_string(),
-        ..first.clone()
-    };
+    let mut second = first.clone();
+    second.message_id = "discord_msg_b".to_string();
+    second.conversation.thread_id = Some("thread-B".to_string());
+    second.text = "second thread message".to_string();
 
     // Sanity: the key function itself must split these. Without this, the
     // end-to-end expectations below would be ambiguous — is the split

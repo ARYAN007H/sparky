@@ -1,7 +1,7 @@
 use super::super::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
 use super::super::runtime::{run_message_dispatch_loop, RuntimeChannelMessage};
 use super::super::Channel;
-use super::common::{RecordingChannel, SlowModel, TelegramRecordingChannel};
+use super::common::{channel_envelope, RecordingChannel, SlowModel, TelegramRecordingChannel};
 use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::config::InboundDebounceConfig;
 use crate::core::bus_testing::MockBusGuard;
@@ -10,8 +10,6 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tinychannels_bus as traits;
-use tinychannels_bus::module_inbound::PreparedChannelInbound;
 use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinHandle;
 
@@ -130,19 +128,19 @@ impl Running {
         }
     }
 
-    fn message(&mut self, sender: &str, content: &str) -> traits::ChannelMessage {
+    fn message(&mut self, sender: &str, content: &str) -> tinychannels_bus::ChannelInboundEnvelope {
         let ts = self.next_ts;
         self.next_ts += 1;
-        traits::ChannelMessage {
-            id: format!("m{ts}"),
-            sender: sender.to_string(),
-            reply_target: sender.to_string(),
-            content: content.to_string(),
-            channel: self.channel.to_string(),
-            timestamp: ts,
-            thread_ts: None,
-            sender_name: None,
-        }
+        channel_envelope(
+            self.channel,
+            sender,
+            sender,
+            content,
+            &format!("m{ts}"),
+            ts,
+            None,
+            None,
+        )
     }
 
     async fn send(&mut self, sender: &str, content: &str) {
@@ -152,27 +150,13 @@ impl Running {
 
     fn prepared(&mut self, sender: &str, content: &str) -> RuntimeChannelMessage {
         let message = self.message(sender, content);
-        let history_key = format!("{}_{sender}_{sender}", self.channel);
-        let prepared = PreparedChannelInbound {
-            message: message.clone(),
-            envelope: Default::default(),
-            history_key: history_key.clone(),
-            thread_id: history_key.clone(),
-            client_id: self.channel.to_string(),
-            session_key: history_key,
-        };
-        RuntimeChannelMessage {
-            message,
-            inbound_envelope: None,
-            authenticated_relay: false,
-            prepared_inbound: Some(prepared),
-        }
+        RuntimeChannelMessage::with_inbound_envelope(message)
     }
 
     async fn send_unprepared(&mut self, sender: &str, content: &str) {
         let message = self.message(sender, content);
         self.tx
-            .send(RuntimeChannelMessage::from(message))
+            .send(RuntimeChannelMessage::with_inbound_envelope(message))
             .await
             .unwrap();
     }
