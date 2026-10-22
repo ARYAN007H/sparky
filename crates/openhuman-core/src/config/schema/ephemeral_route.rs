@@ -48,7 +48,7 @@ pub const EPHEMERAL_ROUTE_SLUG: &str = "ephemeral-route";
 ///
 /// Never serialized — see the module docs. `JsonSchema` is derived only because
 /// [`Config`](crate::config::Config) derives it for the whole struct.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct EphemeralRoute {
     /// OpenAI-compatible base URL, as a `cloud_providers` endpoint would be
     /// spelled (`/chat/completions` is appended to it).
