@@ -11,7 +11,7 @@
 //!
 //! 1. **Registry.** No config-derived tool is constructed and no delegation
 //!    tool is synthesised; the belt is the host's tools and nothing else.
-//! 2. **Policy.** [`HostOnlyToolPolicy`] denies every call whose name is not
+//! 2. **Policy.** `tinyagents_runtime::HostOnlyToolPolicy` denies every call whose name is not
 //!    one of the host's, before the host's own gate is consulted, so even a
 //!    model that names a built-in tool is refused.
 //! 3. **Definition.** The session runs a narrowed copy of the definition
@@ -33,7 +33,7 @@ pub(super) fn empty_belt() -> std::collections::HashSet<String> {
     std::collections::HashSet::from([crate::agent_registry::host_definition::NO_TOOLS_SENTINEL.to_string()])
 }
 
-/// The session gate: on a host-only belt, [`HostOnlyToolPolicy`] over the
+/// The session gate: on a host-only belt, TinyAgents' `HostOnlyToolPolicy` over the
 /// belt's names (`tools` holds only the host's by then) wrapping the host's
 /// own gate; otherwise the host's gate unchanged. The recovery tool and every
 /// other config-side addition are kept off the belt by the caller.
