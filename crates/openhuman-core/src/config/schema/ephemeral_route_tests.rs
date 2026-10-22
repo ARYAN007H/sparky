@@ -138,11 +138,17 @@ fn apply_carries_provider_options_and_model_reasoning_effort() {
     apply(&mut config, route);
 
     assert_eq!(
-        config.ephemeral_route.as_ref().and_then(|route| route.provider_options.clone()),
+        config
+            .ephemeral_route
+            .as_ref()
+            .and_then(|route| route.provider_options.clone()),
         Some(serde_json::json!({"provider": {"sort": "latency"}}))
     );
     assert_eq!(
-        config.runtime.reasoning_effort_by_model.get("provider/model"),
+        config
+            .runtime
+            .reasoning_effort_by_model
+            .get("provider/model"),
         Some(&"high".to_string())
     );
 }
@@ -152,7 +158,10 @@ fn an_ephemeral_route_without_options_keeps_the_provider_default() {
     let mut config = config_with_model("provider/model");
     apply(&mut config, route());
 
-    assert_eq!(config.ephemeral_route.as_ref().unwrap().provider_options, None);
+    assert_eq!(
+        config.ephemeral_route.as_ref().unwrap().provider_options,
+        None
+    );
 }
 
 #[test]

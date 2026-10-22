@@ -256,13 +256,14 @@ fn handle_agent_chat(ctx: DispatchCtx, params: Map<String, Value>) -> Controller
             p.temperature,
             p.thread_id,
             p.cwd,
-            crate::config::schema::EphemeralRoute::from_params(p.inference_url, p.api_key)
-                .map(|route| {
+            crate::config::schema::EphemeralRoute::from_params(p.inference_url, p.api_key).map(
+                |route| {
                     route
                         .with_headers(p.inference_headers)
                         .with_provider_options(p.inference_provider_options)
                         .with_reasoning_effort(p.inference_reasoning_effort)
-                }),
+                },
+            ),
             crate::inference::host_runtime::ops::AgentChatEnv::default(),
         )
         .await?

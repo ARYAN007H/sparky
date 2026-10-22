@@ -285,7 +285,11 @@ pub(crate) fn instantiate(runtime: &Runtime, spec: AgentSpec) -> Result<AgentInn
             scoped
                 .with_headers(route.headers.clone())
                 .with_provider_options(route.provider_options.clone())
-                .with_reasoning_effort(route.reasoning_effort.map(|effort| effort.as_str().to_string()))
+                .with_reasoning_effort(
+                    route
+                        .reasoning_effort
+                        .map(|effort| effort.as_str().to_string()),
+                )
         })
     });
     let mut overrides = openhuman_core::agent::host_overrides::HostOverrides::default();

@@ -60,7 +60,8 @@ pub(super) fn overlay_response_usage(
 /// keeps this facade's dispatch string in lockstep with the registered
 /// controller rather than duplicating the wire name.
 ///
-/// Where one turn's inference should go.
+/// Where one turn's inference should go, including provider defaults and
+/// reasoning effort for the selected model.
 ///
 /// Both halves are required together: an endpoint with no credential and a
 /// credential with no endpoint are each half a statement, and the core ignores
