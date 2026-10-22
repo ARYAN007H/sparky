@@ -1,6 +1,6 @@
 use super::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tinychannels_bus::{ChannelMessage, ChannelOutboundMessage};
+use tinychannels_bus::ChannelOutboundMessage;
 use tokio::sync::mpsc;
 
 struct MockChannel {
@@ -66,7 +66,10 @@ impl Channel for MockChannel {
         deprecated,
         reason = "TinyChannels v22 still requires the legacy listener method on focused fixtures"
     )]
-    async fn listen(&self, _tx: mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
+    async fn listen(
+        &self,
+        _tx: mpsc::Sender<tinychannels_bus::ChannelMessage>,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
     #[allow(
