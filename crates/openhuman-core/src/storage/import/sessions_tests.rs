@@ -285,7 +285,20 @@ fn legacy_workspace(config: &Config) {
             cost_usd REAL NOT NULL DEFAULT 0.0, transcript_path TEXT,
             started_at TEXT NOT NULL, ended_at TEXT);
          INSERT INTO sessions (id, agent_definition_id, agent_definition_name, session_key, started_at)
-         VALUES ('sess-1', 'orchestrator', 'Orchestrator', 'thread-1', '2026-01-01T00:00:00Z');",
+         VALUES ('sess-1', 'orchestrator', 'Orchestrator', 'thread-1', '2026-01-01T00:00:00Z');
+         CREATE TABLE session_messages (
+            id INTEGER PRIMARY KEY, session_id TEXT NOT NULL, role TEXT NOT NULL,
+            content TEXT NOT NULL, reasoning_content TEXT, model TEXT,
+            input_tokens INTEGER, output_tokens INTEGER, cost_usd REAL,
+            created_at TEXT NOT NULL);
+         INSERT INTO session_messages (id, session_id, role, content, created_at)
+         VALUES (37, 'sess-1', 'user', 'preserved row', '2026-01-02T03:04:05Z');
+         CREATE TABLE session_tool_calls (
+            id INTEGER PRIMARY KEY, session_id TEXT NOT NULL, message_id INTEGER,
+            tool_name TEXT NOT NULL, tool_input TEXT, tool_output TEXT,
+            status TEXT NOT NULL, duration_ms INTEGER, created_at TEXT NOT NULL);
+         INSERT INTO session_tool_calls (id, session_id, message_id, tool_name, status, created_at)
+         VALUES (9, 'sess-1', 37, 'lookup', 'completed', '2026-01-02T03:05:06Z');",
     )
     .unwrap();
 }
@@ -316,6 +329,26 @@ fn a_classic_workspace_moves_into_the_backend_and_its_files_are_untouched() {
     // The in-flight turn snapshot is the default agent's.
     let default = provider.try_for_agent(DEFAULT_AGENT).unwrap();
     assert!(default.turn_states.get("thread-1").unwrap().is_some());
+    let ledger = provider.driver_run_ledger(DEFAULT_AGENT).unwrap();
+    let (messages, calls) = crate::storage::block_on_anyhow(async {
+        use tinyagents_session::run_ledger::history::SessionHistoryStore;
+        Ok::<_, anyhow::Error>((
+            ledger.list_messages("sess-1", None).await?,
+            ledger.list_tool_calls("sess-1", None).await?,
+        ))
+    })
+    .unwrap();
+    assert_eq!(messages[0].id, 37);
+    assert_eq!(
+        messages[0].created_at.to_rfc3339(),
+        "2026-01-02T03:04:05+00:00"
+    );
+    assert_eq!(calls[0].id, 9);
+    assert_eq!(calls[0].message_id, Some(37));
+    assert_eq!(
+        calls[0].created_at.to_rfc3339(),
+        "2026-01-02T03:05:06+00:00"
+    );
     assert_eq!(
         tree(dir.path()),
         before,
@@ -387,8 +420,16 @@ fn database_import_totals_source_families_not_derived_fts_rows() {
         already_present: read - imported,
     };
     let counts = [
-        counts(1, 1), counts(2, 1), counts(3, 2), counts(4, 3), counts(5, 4),
-        counts(6, 5), counts(7, 6), counts(8, 7), counts(9, 8), counts(10, 9),
+        counts(1, 1),
+        counts(2, 1),
+        counts(3, 2),
+        counts(4, 3),
+        counts(5, 4),
+        counts(6, 5),
+        counts(7, 6),
+        counts(8, 7),
+        counts(9, 8),
+        counts(10, 9),
         counts(11, 10),
     ];
     assert_eq!(database_totals(counts), (66, 56));
