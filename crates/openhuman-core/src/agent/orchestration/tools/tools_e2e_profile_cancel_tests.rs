@@ -191,6 +191,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
             Some(&workspace),
             Some("foreign profile cancellation"),
         )
+        .await
     })
     .await
     .expect("foreign profile cancellation lookup");
@@ -232,6 +233,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
             None,
             None,
         )
+        .await
         .expect("unbound SaaS control refusal")
         .is_none(),
         "SaaS cancellation without a profile fails closed"
@@ -265,6 +267,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
             Some(&workspace),
             Some("owner requested stop"),
         )
+        .await
     })
     .await
     .expect("owner cancellation lookup");

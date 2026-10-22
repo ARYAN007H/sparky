@@ -266,7 +266,13 @@ pub(super) fn make_completion(
                                             session.current_task_id.as_deref()
                                                 == Some(outcome.task_id.as_str())
                                         })
-                                        .and_then(|session| session.latest_error),
+                                        .and_then(|session| session.latest_error)
+                                        .or_else(|| {
+                                            crate::agent::orchestration::completion_owners::take_driver_cancel_reason(
+                                                &background_dispatch,
+                                                &outcome.task_id,
+                                            )
+                                        }),
                                     Err(error) => {
                                         log::warn!(
                                             "[subagent_reuse] cancellation reason lookup failed subagent_session_id={} task_id={} error={error}",

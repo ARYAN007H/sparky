@@ -106,7 +106,8 @@ async fn close_reusable_driver_session(
             &session.subagent_session_id,
             parent_session,
             workspace_dir,
-        );
+        )
+        .await;
     }
     let (Some(task_id), Some(lifecycle_key)) = (
         session.current_task_id.as_deref(),
