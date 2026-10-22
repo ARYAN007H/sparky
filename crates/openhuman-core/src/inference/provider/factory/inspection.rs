@@ -1,7 +1,10 @@
 //! Read-only provider preparation for doctor inspections.
 
 use super::{
-    chat_model::{resolves_to_managed_backend, unresolved_chat_model_error_for_access, with_default_temperature},
+    chat_model::{
+        resolves_to_managed_backend, unresolved_chat_model_error_for_access,
+        with_default_temperature,
+    },
     cloud_slug::try_create_cloud_slug_chat_model_for_inspection_with_identity,
     credentials::CredentialAccess,
     local_runtime::try_create_local_runtime_chat_model_for_inspection,
@@ -11,7 +14,7 @@ use super::{
         try_create_claude_agent_sdk_chat_model_for_inspection,
         try_create_claude_code_chat_model_for_inspection,
     },
-    InspectionOutputBudgetCapability, PreparedInspectionChatModel, InspectionRequestIdentity,
+    InspectionOutputBudgetCapability, InspectionRequestIdentity, PreparedInspectionChatModel,
     PROVIDER_OPENHUMAN,
 };
 use crate::config::resolve_primary_cloud_provider_string;

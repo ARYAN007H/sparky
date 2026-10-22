@@ -92,7 +92,11 @@ fn discovery_request(
     let spec = crate::inference::provider::factory::cloud_provider_spec(entry, "catalog");
     let route = ProviderRoute::parse(&format!("{}:catalog", entry.slug))
         .ok_or_else(|| "cloud catalog route could not be parsed".to_string())?;
-    let query_params = routing.client_version_query(&openai_codex_client_version());
+    let query_params = if routing.using_oauth {
+        routing.client_version_query(&openai_codex_client_version())
+    } else {
+        Vec::new()
+    };
     let user_agent = routing
         .using_oauth
         .then(|| openai_codex_user_agent("OpenHuman", env!("CARGO_PKG_VERSION")));
@@ -106,11 +110,16 @@ fn discovery_request(
     let registry = ProviderRegistry::new(
         crate::inference::provider::factory::CloudCredentialResolver(provider_key),
     );
-    let request = registry
+    let request = match registry
         .discovery_request_for_route_with_options(route, Some(spec.clone()), &options)
         .map_err(|error| error.to_string())?
-        .or_else(|| registry.discovery_request(&spec, &options).ok().flatten())
-        .ok_or_else(|| "provider has no model catalog discovery request".to_string())?;
+    {
+        Some(request) => request,
+        None => registry
+            .discovery_request(&spec, &options)
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| "provider has no model catalog discovery request".to_string())?,
+    };
     Ok(request
         .with_single_model_probe(false)
         .with_timeout(std::time::Duration::from_secs(30)))

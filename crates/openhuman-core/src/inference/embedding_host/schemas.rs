@@ -7,7 +7,9 @@ use serde_json::{Map, Value};
 use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use crate::inference::schema_fields::{json_output, optional_string, optional_u64, required_string};
+use crate::inference::schema_fields::{
+    json_output, optional_string, optional_u64, required_string,
+};
 
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
     vec![

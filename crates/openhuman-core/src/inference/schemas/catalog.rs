@@ -2,7 +2,9 @@
 //! function, plus the field-shape helpers they are built from.
 
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use crate::inference::schema_fields::{json_output, optional_string, optional_u64, required_string};
+use crate::inference::schema_fields::{
+    json_output, optional_string, optional_u64, required_string,
+};
 
 pub fn schemas(function: &str) -> ControllerSchema {
     match function {
@@ -352,4 +354,3 @@ fn optional_json(name: &'static str, comment: &'static str) -> FieldSchema {
         required: false,
     }
 }
-

@@ -276,11 +276,11 @@ pub(super) async fn list_models(
                 .http_status()
                 .is_some_and(|status| managed_401_means_signed_out(status, session_attached))
             {
-            log::info!(
-                "[tinyhumans][inference] managed catalog unavailable: backend rejected the session token (401)"
-            );
-            return empty_catalog("session not accepted");
-        }
+                log::info!(
+                    "[tinyhumans][inference] managed catalog unavailable: backend rejected the session token (401)"
+                );
+                return empty_catalog("session not accepted");
+            }
             return Err(error.to_string());
         }
     };

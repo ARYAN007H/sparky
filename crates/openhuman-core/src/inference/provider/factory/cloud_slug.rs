@@ -2,11 +2,11 @@
 //! abstract-tier remapping, credentials, codex routing) and the crate-native builders.
 
 use super::{
-    access_gates::{enforce_local_only_inference, emit_inference_egress},
+    access_gates::{emit_inference_egress, enforce_local_only_inference},
     credentials::CredentialAccess,
     openai_bearer_is_oauth, provider_for_role, resolve_codex_routing,
-    InspectionOutputBudgetCapability, OptionalChatModelResult, PROVIDER_OPENHUMAN,
-    CLAUDE_AGENT_SDK_PREFIX, CLAUDE_AGENT_SDK_PROVIDER,
+    InspectionOutputBudgetCapability, OptionalChatModelResult, CLAUDE_AGENT_SDK_PREFIX,
+    CLAUDE_AGENT_SDK_PROVIDER, PROVIDER_OPENHUMAN,
 };
 use crate::config::ops::resolve_primary_cloud_provider_string;
 use crate::config::schema::cloud_providers::AuthStyle;

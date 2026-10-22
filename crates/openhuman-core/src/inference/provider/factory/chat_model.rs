@@ -13,8 +13,8 @@ use super::{
         try_create_local_runtime_chat_model_from_string, OptionalChatModelResult,
     },
     managed_backend::{make_openhuman_backend_model_for_thread_in, managed_chat_model_for},
-    provider_for_role, resolves_to_managed_backend, OpenHumanMcpEndpoint,
-    CLAUDE_AGENT_SDK_PREFIX, CLAUDE_AGENT_SDK_PROVIDER, PROVIDER_OPENHUMAN,
+    provider_for_role, resolves_to_managed_backend, OpenHumanMcpEndpoint, CLAUDE_AGENT_SDK_PREFIX,
+    CLAUDE_AGENT_SDK_PROVIDER, PROVIDER_OPENHUMAN,
 };
 use crate::config::ops::resolve_primary_cloud_provider_string;
 use crate::config::schema::cloud_providers::AuthStyle;
