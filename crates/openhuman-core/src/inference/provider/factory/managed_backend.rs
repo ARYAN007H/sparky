@@ -7,7 +7,6 @@
 //! `BACKEND_UNAVAILABLE:` sentinel.
 
 use super::*;
-use tinyinference_llm::providers::overrides::ChatModelRequest;
 
 type ManagedChatModel = (
     std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>>,

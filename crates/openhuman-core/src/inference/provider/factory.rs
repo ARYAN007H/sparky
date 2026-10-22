@@ -44,9 +44,7 @@ pub(crate) use routing::{workload_router, ConfigRouteSource};
 
 // Factory-internal helpers shared across the implementation modules.
 use access_gates::{emit_inference_egress, enforce_local_only_inference};
-use chat_model::{
-    unresolved_chat_model_error, unresolved_chat_model_error_for_access, with_default_temperature,
-};
+use chat_model::{unresolved_chat_model_error_for_access, with_default_temperature};
 #[cfg(test)]
 use cloud_slug::try_create_cloud_slug_chat_model;
 use cloud_slug::{

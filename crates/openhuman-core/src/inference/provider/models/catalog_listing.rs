@@ -15,7 +15,6 @@ use tinyinference_llm::providers::openai::codex::{
     openai_codex_client_version, openai_codex_user_agent, OpenAiCodexRouting,
     OPENAI_CODEX_ACCOUNT_HEADER, OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
 };
-use tinyinference_llm::providers::overrides::CatalogEntry;
 
 /// Resolve the API key used to probe a provider's `/models` endpoint.
 ///
