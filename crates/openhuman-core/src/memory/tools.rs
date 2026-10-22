@@ -195,10 +195,7 @@ impl MemoryTool {
             };
             let outcome = if is_write_action(&args) {
                 let write_dispatch = dispatch.clone();
-                match write_dispatch
-                    .spawn(async move { call.await })
-                    .await
-                {
+                match write_dispatch.spawn(async move { call.await }).await {
                     Ok(result) => result,
                     Err(_) => {
                         return ToolResult::error(render_error(
