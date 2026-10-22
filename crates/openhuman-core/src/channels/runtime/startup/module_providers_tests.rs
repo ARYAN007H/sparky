@@ -1,8 +1,6 @@
 use super::outbound_intent;
 use tinychannels_bus::channel::{ContentPart, OutboundContentPart};
-use tinychannels_bus::{
-    ChannelOutboundMessage, ChannelRef, ConversationRef, OutboundPayload,
-};
+use tinychannels_bus::{ChannelOutboundMessage, ChannelRef, ConversationRef, OutboundPayload};
 
 #[test]
 fn outbound_channel_message_becomes_an_equivalent_intent() {
