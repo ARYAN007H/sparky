@@ -75,8 +75,13 @@ async fn driver_store_imports_legacy_rows_without_losing_host_epoch() {
             .clone()
     });
     assert_eq!(
-        parent_epoch_from_sidecar(documents, "legacy-session".into()).unwrap(),
+        parent_epoch_from_sidecar(Arc::clone(&documents), "legacy-session".into()).unwrap(),
         Some(7)
+    );
+    import_parent_epoch(Arc::clone(&documents), "legacy-session".into(), None).unwrap();
+    assert_eq!(
+        parent_epoch_from_sidecar(documents, "legacy-session".into()).unwrap(),
+        None
     );
 }
 
