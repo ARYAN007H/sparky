@@ -77,8 +77,9 @@ async fn resuming_after_owner_cache_loss_registers_live_task_before_launch() {
         "restart-resume-owner-parent",
         "restart-resume-owner-thread",
     );
+    let spawn_tool = SpawnSubagentTool::new();
     let spawn = || {
-        SpawnSubagentTool::new().execute_with_live_parent_context(
+        spawn_tool.execute_with_live_parent_context(
             json!({
                 "agent_id": "task_manager_agent",
                 "prompt": "Investigate the restart-resume owner fixture",
