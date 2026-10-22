@@ -7,7 +7,7 @@ use std::path::Path;
 use sha2::Digest;
 use tempfile::TempDir;
 
-use super::{Target, legacy};
+use super::{legacy, Target};
 use crate::config::Config;
 use crate::storage::{self, DocumentStoreExt, Precondition, Scope};
 

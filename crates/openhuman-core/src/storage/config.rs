@@ -26,8 +26,8 @@
 
 use std::path::Path;
 
-use crate::config::Config;
 use crate::config::schema::profile_layout::{LayoutVersion, ProfileLayout};
+use crate::config::Config;
 
 /// The directory under the workspace the v1 default backend lives in.
 pub const DEFAULT_DIR: &str = "storage";

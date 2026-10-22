@@ -5,7 +5,7 @@
 
 use serde_json::{Map, Value};
 
-use super::{Options, Target, migrate, restore, status};
+use super::{migrate, restore, status, Options, Target};
 use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::runtime::DispatchCtx;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};

@@ -67,12 +67,10 @@ fn scan_classifies_a_v1_workspace_and_totals_it() {
 #[test]
 fn a_missing_workspace_is_an_empty_plan() {
     let dir = tempfile::TempDir::new().unwrap();
-    assert!(
-        scan(&dir.path().join("workspace"))
-            .unwrap()
-            .entries
-            .is_empty()
-    );
+    assert!(scan(&dir.path().join("workspace"))
+        .unwrap()
+        .entries
+        .is_empty());
 }
 
 #[test]

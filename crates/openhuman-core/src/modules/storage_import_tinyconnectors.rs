@@ -26,7 +26,7 @@
 use std::path::Path;
 
 use crate::storage::{CollectionSpec, Storage};
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use serde_json::Value;
 use tinystoragedrivers_types::WriteOptions;
 

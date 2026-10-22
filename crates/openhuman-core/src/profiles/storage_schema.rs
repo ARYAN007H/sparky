@@ -17,8 +17,8 @@ use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, Storage};
 
 use crate::storage::schema_support::{
-    Body, LegacySourceRecord as SourceRecord, LegacyTargetRecord as TargetRecord, key_of,
-    key_of_parts, map_legacy_collection,
+    key_of, key_of_parts, map_legacy_collection, Body, LegacySourceRecord as SourceRecord,
+    LegacyTargetRecord as TargetRecord,
 };
 
 /// The v2 collection: one document per profile.

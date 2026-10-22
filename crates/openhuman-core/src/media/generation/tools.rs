@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinyagents_harness::media::{GenerateImageTool, GenerateVideoTool, MediaOutput};
 use tinyagents_harness::tinyinference_image::ImageGenerator;
 use tinyagents_harness::tinyinference_video::{VideoGenerator, WaitPolicy};

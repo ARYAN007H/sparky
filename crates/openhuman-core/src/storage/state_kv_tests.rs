@@ -260,13 +260,8 @@ fn typed_quarantine_validation_is_cached_per_backend_scope_name_and_type() {
     std::fs::write(&second_legacy, r#"{"ok":true}"#).unwrap();
 
     let backend = crate::storage::test_support::sqlite_backend().unwrap();
-    let local = StateKv::on_backend(
-        &backend.backend,
-        &Scope::local(),
-        "test_owner",
-        "state",
-    )
-    .unwrap();
+    let local =
+        StateKv::on_backend(&backend.backend, &Scope::local(), "test_owner", "state").unwrap();
     local
         .import_file_quarantining::<CountedA>("first", &first_legacy)
         .unwrap();

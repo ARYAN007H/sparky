@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::storage::rusqlite;
-use crate::storage::test_support::{SqliteBackend, sqlite_backend};
+use crate::storage::test_support::{sqlite_backend, SqliteBackend};
 
 #[path = "profile_fixture_tests.rs"]
 mod profile_fixture_tests;
@@ -253,7 +253,7 @@ fn a_marker_row_an_older_build_wrote_counts_as_a_finished_import() {
 #[cfg(feature = "storage-sqlite")]
 #[tokio::test(flavor = "multi_thread")]
 async fn historical_profile_fixture_conversation_survives_layout_copy_and_owner_migration() {
-    use crate::storage::layout::{Target, db};
+    use crate::storage::layout::{db, Target};
     use crate::storage::{self, Scope};
     use tinyagents_session::threads::{ConversationPersistence, DriverConversationStore};
     use tinyagents_storage_kit::{MigrateOptions, Registry, ScopedStorage};
@@ -351,18 +351,16 @@ fn processes_importing_one_workspace_at_once_import_it_once() {
         .filter(|o| matches!(o, Outcome::Imported { .. }))
         .count();
     assert_eq!(imports, 1, "exactly one process imports: {outcomes:?}");
-    assert!(
-        outcomes
-            .iter()
-            .all(|o| !matches!(o, Outcome::Imported { .. })
-                || matches!(
-                    o,
-                    Outcome::Imported {
-                        found: 20,
-                        written: 20
-                    }
-                ))
-    );
+    assert!(outcomes
+        .iter()
+        .all(|o| !matches!(o, Outcome::Imported { .. })
+            || matches!(
+                o,
+                Outcome::Imported {
+                    found: 20,
+                    written: 20
+                }
+            )));
     assert!(is_done(&backend, &config, &source).unwrap());
     assert_eq!(dump(&backend, &source, "devices.paired").len(), 20);
 }
@@ -530,11 +528,9 @@ async fn without_an_installed_backend_the_host_import_does_nothing() {
     legacy_device(&config, "chan-a", "Phone", false);
     assert!(crate::storage::installed().is_none());
 
-    assert!(
-        run(&crate::core::runtime::DispatchCtx::unbound(), &config)
-            .await
-            .is_empty()
-    );
+    assert!(run(&crate::core::runtime::DispatchCtx::unbound(), &config)
+        .await
+        .is_empty());
 }
 
 #[test]

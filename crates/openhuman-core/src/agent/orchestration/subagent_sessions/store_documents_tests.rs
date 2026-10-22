@@ -68,7 +68,9 @@ fn save_upserts_sessions_and_keeps_the_others() {
 #[test]
 fn scopes_do_not_see_each_others_sessions() {
     let storage = memory_backend();
-    docs_in(storage.as_ref(), "alice").save(&[session("a")]).unwrap();
+    docs_in(storage.as_ref(), "alice")
+        .save(&[session("a")])
+        .unwrap();
     assert!(docs_in(storage.as_ref(), "bob").load().unwrap().is_empty());
     assert_eq!(docs_in(storage.as_ref(), "alice").load().unwrap().len(), 1);
 }

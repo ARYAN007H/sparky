@@ -17,8 +17,8 @@ use std::time::Duration;
 use tinystoragedrivers::{Scope, StorageBackend};
 use tinystoragedrivers_api::BlobStore;
 use tinystoragedrivers_types::{
-    BlobListPage, MAX_BLOB_LIST_PAGE_ITEMS, Result as StorageResult, SEALED_BLOB_PREFIX,
-    StorageError, is_reserved_blob_key,
+    is_reserved_blob_key, BlobListPage, Result as StorageResult, StorageError,
+    MAX_BLOB_LIST_PAGE_ITEMS, SEALED_BLOB_PREFIX,
 };
 
 /// How often the sweeper wakes. Lapsed blobs are already invisible to readers,

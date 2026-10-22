@@ -52,9 +52,7 @@ fn hashed_segments_use_the_stable_lowercase_base32_alphabet() {
     let segment = first.as_str().strip_prefix("u:~").unwrap();
     assert_eq!(segment.len(), 26);
     assert_eq!(segment, "sxpjfw7gwtcgocxriok7rbxl7t");
-    assert!(
-        segment
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || (b'2'..=b'7').contains(&byte))
-    );
+    assert!(segment
+        .bytes()
+        .all(|byte| byte.is_ascii_lowercase() || (b'2'..=b'7').contains(&byte)));
 }

@@ -142,7 +142,6 @@ struct WorkspaceBinding {
 }
 
 impl CoreContext {
-
     /// The host that constructed this context (Tauri shell / CLI / Docker).
     pub fn host_kind(&self) -> HostKind {
         self.host_kind

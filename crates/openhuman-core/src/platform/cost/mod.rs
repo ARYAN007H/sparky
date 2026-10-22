@@ -19,7 +19,7 @@ pub use global::{
     init_global, rebind_global, record_embedding_usage, record_provider_usage,
     record_provider_usage_scoped, seed_tenant_tracker, try_global,
 };
-pub use route::{CostRoute, route_for_model};
+pub use route::{route_for_model, CostRoute};
 pub use schemas::{
     all_controller_schemas as all_cost_controller_schemas,
     all_registered_controllers as all_cost_registered_controllers,

@@ -151,9 +151,9 @@ pub struct MoveReport {
 
 #[path = "scope_move_boot.rs"]
 mod boot;
+pub use boot::run_from_config;
 #[cfg(test)]
 pub(crate) use boot::IMPORT_DOMAIN;
-pub use boot::run_from_config;
 
 /// Copies the rows in a source inventory to their mapped v2 scopes.
 ///

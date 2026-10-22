@@ -59,8 +59,8 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError, Weak};
 
 use tinystoragedrivers_types::WriteCondition;
 
-use super::StorageError;
 use super::lease::LeaseStore;
+use super::StorageError;
 
 /// Why a fenced write was refused.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

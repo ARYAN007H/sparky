@@ -116,7 +116,10 @@ async fn inspect_storage_config(check_id: &str, config: StorageConfig) -> Vec<Fi
 }
 
 fn sqlite_probe(path: &std::path::Path) -> bool {
-    let file = if path.extension().is_some_and(|ext| ext == "db" || ext == "sqlite") {
+    let file = if path
+        .extension()
+        .is_some_and(|ext| ext == "db" || ext == "sqlite")
+    {
         path.to_path_buf()
     } else {
         path.join("storage.db")

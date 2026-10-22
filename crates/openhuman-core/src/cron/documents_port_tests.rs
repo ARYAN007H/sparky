@@ -1,5 +1,5 @@
 use super::*;
-use crate::storage::{Scope, StorageBackend, test_support::memory_backend};
+use crate::storage::{test_support::memory_backend, Scope, StorageBackend};
 use serde_json::json;
 use tinyflows_bus::schedule::{DOCUMENT_INTERFACE, DOCUMENT_METHOD};
 
@@ -188,12 +188,11 @@ async fn shared_schedule_records_are_owner_scoped_and_never_scanned() {
     )
     .await;
     assert!(record.get("error").is_none(), "{record}");
-    assert!(
-        docs.get("tsd.counters", "cron/runs")
-            .await
-            .unwrap()
-            .is_some()
-    );
+    assert!(docs
+        .get("tsd.counters", "cron/runs")
+        .await
+        .unwrap()
+        .is_some());
 
     let requests = [
         json!({"op":"get","collection":"tsd.counters","id":"other/runs"}),

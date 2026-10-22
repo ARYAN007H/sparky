@@ -8,7 +8,7 @@ use tinyagents_harness::tinyinference_video::{MockVideoGenerator, MockVideoScrip
 use tinytools::{PermissionLevel, Tool, ToolCategory};
 
 use super::{
-    IMAGE_TOOL_NAME, LIST_MODELS_TOOL_NAME, VIDEO_TOOL_NAME, media_tools_from, reference_policy,
+    media_tools_from, reference_policy, IMAGE_TOOL_NAME, LIST_MODELS_TOOL_NAME, VIDEO_TOOL_NAME,
 };
 use crate::media::generation::MediaGenerators;
 

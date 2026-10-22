@@ -23,7 +23,7 @@
 use std::path::Path;
 
 use crate::storage::Storage;
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 
 use super::storage_grant_schemas::tinywallet::{MODULE_ID, PAYMENTS_STREAM};
 use super::storage_import_support as support;

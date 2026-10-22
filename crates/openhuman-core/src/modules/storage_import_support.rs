@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::storage::{DocumentStore, Precondition, Storage};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use serde_json::Value;
 use sha2::Digest;
 use tinystoragedrivers::ErrorKind;

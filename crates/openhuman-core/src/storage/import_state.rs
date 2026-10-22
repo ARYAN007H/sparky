@@ -14,7 +14,7 @@ use tinystoragedrivers::{
     StorageBackend, StorageError, Versioned, WriteCondition, WriteOp,
 };
 
-use super::{DocumentStoreExt, documents::Repo};
+use super::{documents::Repo, DocumentStoreExt};
 
 /// How long a claim blocks other processes before it can be taken over.
 pub const CLAIM_TTL_MS: i64 = 10 * 60 * 1000;

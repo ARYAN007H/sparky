@@ -13,9 +13,8 @@ fn profile() -> ProfileId {
 /// session store (no workspace files), as a SaaS host installs.
 fn context_with_store() -> (Arc<CoreContext>, Arc<dyn SessionStoreProvider>) {
     let backend = memory_backend();
-    let provider: Arc<dyn SessionStoreProvider> = Arc::new(
-        crate::storage::sessions::TenantSessionStores::new(backend, false).unwrap(),
-    );
+    let provider: Arc<dyn SessionStoreProvider> =
+        Arc::new(crate::storage::sessions::TenantSessionStores::new(backend, false).unwrap());
     let mut overrides = crate::agent::host_overrides::HostOverrides::default();
     overrides.session_store = Some(Arc::clone(&provider));
     let overlay = ContextOverlay::new(

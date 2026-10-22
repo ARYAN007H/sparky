@@ -77,20 +77,20 @@ use std::sync::Arc;
 
 use anyhow::Result;
 #[cfg(feature = "legacy-import")]
-use anyhow::{Context, anyhow};
+use anyhow::{anyhow, Context};
 #[cfg(feature = "legacy-import")]
 use sha2::Digest;
 use tinystoragedrivers::CollectionSpec;
 #[cfg(feature = "legacy-import")]
 use tinystoragedrivers::{ErrorKind, Precondition, WriteOptions};
 
-use super::StorageBackend;
 #[cfg(feature = "legacy-import")]
 use super::block_on;
 #[cfg(feature = "legacy-import")]
 use super::documents::Repo;
 #[cfg(feature = "legacy-import")]
 use super::rusqlite;
+use super::StorageBackend;
 use crate::config::Config;
 #[cfg(feature = "legacy-import")]
 use rusqlite::Connection;
@@ -288,9 +288,7 @@ pub fn run_all(backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Report
     let mut reports = run_with(backend, config, &sources());
     reports.extend(tinyflows::run_with(backend, config));
     reports.extend(sessions::run_with(backend, config));
-    reports.push(crate::storage::scope_move::run_from_config(
-        backend, config,
-    ));
+    reports.push(crate::storage::scope_move::run_from_config(backend, config));
     reports
 }
 

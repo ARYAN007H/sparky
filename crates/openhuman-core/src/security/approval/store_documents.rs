@@ -24,21 +24,21 @@
 
 use std::sync::Arc;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::config::Config;
 use crate::storage::documents::compare_and_swap;
 use crate::storage::local;
 use crate::storage::schema_support::fresh_key;
-use crate::storage::{DocumentStore, DocumentStoreExt, Storage, StorageError, block_on};
+use crate::storage::{block_on, DocumentStore, DocumentStoreExt, Storage, StorageError};
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Filter, Precondition, Query, Sort, Versioned};
 
 #[cfg(feature = "legacy-import")]
 use super::storage_schema::legacy_collections;
 use super::storage_schema::specs;
-pub(super) use super::storage_schema::{APPROVALS, FLOW_TRUST, trust_id};
+pub(super) use super::storage_schema::{trust_id, APPROVALS, FLOW_TRUST};
 
 use super::types::{
     ApprovalAuditEntry, ApprovalDecision, ApprovalSourceContext, ExecutionOutcome, PendingApproval,

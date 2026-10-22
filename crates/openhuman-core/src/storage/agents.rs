@@ -28,11 +28,11 @@ use std::collections::{BTreeMap, HashSet};
 use std::future::Future;
 use std::sync::{Arc, LazyLock, Mutex};
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinystoragedrivers::{CollectionSpec, Precondition, Query};
 
 use super::schema_support::key_of;
-use super::{DocumentStoreExt, StorageBackend, block_on, installed};
+use super::{block_on, installed, DocumentStoreExt, StorageBackend};
 use crate::core::runtime::{AgentContextRegistry, CoreContext, DispatchCtx};
 
 /// The `local`-scope collection recording which agents have their own scope.

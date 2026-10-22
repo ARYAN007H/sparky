@@ -10,21 +10,20 @@ use std::time::Duration;
 use std::{
     path::PathBuf,
     sync::{
-        Arc,
         atomic::{AtomicBool, Ordering},
+        Arc,
     },
 };
 
 use async_trait::async_trait;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{Map, Value};
 use tinymcp_bus::{
-    McpRemoteTool, ScrubStaticToolsRequest, ServerArgumentsValidation, SupervisorBatch,
-    ValidateServerArgumentsRequest,
     agent_tools::{McpToolPresentation, PrepareAgentToolsRequest},
     client_lifecycle::{CleanupAction, ConfiguredLifecycle, Fault, Poll, Retire, Step},
     config::{McpClientConfig, OpenConfiguredRequest, OpenConfiguredResponse, TransitionStatus},
-    names,
+    names, McpRemoteTool, ScrubStaticToolsRequest, ServerArgumentsValidation, SupervisorBatch,
+    ValidateServerArgumentsRequest,
 };
 
 use crate::config::Config;

@@ -32,8 +32,8 @@ use std::sync::Arc;
 #[cfg(test)]
 use crate::storage::StorageBackend;
 use crate::storage::{CollectionSpec, DocumentStore, Precondition, Storage};
-use anyhow::{Context, Result, anyhow};
-use serde_json::{Value, json};
+use anyhow::{anyhow, Context, Result};
+use serde_json::{json, Value};
 use sha2::Digest;
 use tinystoragedrivers::ErrorKind;
 use tinystoragedrivers_api::SecretStore;

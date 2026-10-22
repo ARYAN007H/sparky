@@ -66,8 +66,17 @@ fn scopes_do_not_see_each_others_artifacts() {
     docs_in(storage.as_ref(), "alice")
         .put_meta(&meta("a", 1, None))
         .unwrap();
-    assert!(docs_in(storage.as_ref(), "bob").list_meta().unwrap().is_empty());
-    assert_eq!(docs_in(storage.as_ref(), "alice").list_meta().unwrap().len(), 1);
+    assert!(docs_in(storage.as_ref(), "bob")
+        .list_meta()
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        docs_in(storage.as_ref(), "alice")
+            .list_meta()
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 #[test]

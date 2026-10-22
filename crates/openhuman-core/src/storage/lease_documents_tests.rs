@@ -4,8 +4,8 @@ use super::*;
 
 use std::time::Duration;
 
-use crate::storage::test_support::SqliteBackend;
 use crate::storage::test_support::memory_backend;
+use crate::storage::test_support::SqliteBackend;
 use tinystoragedrivers_types::{CollectionSpec, Precondition, Scope};
 
 const TTL: Duration = Duration::from_millis(1_000);
@@ -29,13 +29,15 @@ async fn doctor_holder_inspection_does_not_declare_the_lease_collection() {
         .unwrap();
     let spec = CollectionSpec::new(LEASE_COLLECTION);
 
-    assert!(documents.documents()
+    assert!(documents
+        .documents()
         .validate_collection_spec(&spec)
         .await
         .is_err());
     assert!(leases.holder_readonly("alice").await.unwrap().is_none());
     assert!(
-        documents.documents()
+        documents
+            .documents()
             .validate_collection_spec(&spec)
             .await
             .is_err(),

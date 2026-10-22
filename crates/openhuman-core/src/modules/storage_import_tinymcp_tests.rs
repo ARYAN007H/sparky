@@ -2,8 +2,8 @@ use super::*;
 use crate::storage::lease::LeaseStore as _;
 use crate::storage::{Scope, Storage};
 use std::sync::Arc;
-use tinystoragedrivers::StorageBackend;
 use tinystoragedrivers::secrets::{DerivedKeys, KeyProvider, SecretStore};
+use tinystoragedrivers::StorageBackend;
 use zeroize::Zeroizing;
 
 /// The first-generation schema: no `transport`, `deployment_url`, `enabled` or
@@ -138,13 +138,12 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
     let env: std::collections::BTreeMap<String, String> = serde_json::from_slice(&stored).unwrap();
     assert_eq!(env["API_KEY"], "sk-secret");
     assert_eq!(env["REGION"], "eu");
-    assert!(
-        rig.secrets()
-            .get("mcp_client_env/srv-2")
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(rig
+        .secrets()
+        .get("mcp_client_env/srv-2")
+        .await
+        .unwrap()
+        .is_none());
 
     let audit = scoped
         .streams()
@@ -189,12 +188,10 @@ async fn the_legacy_files_are_left_untouched() {
     import(&rig, legacy.path()).await.unwrap();
     let after = [CLIENTS_DB, AUDIT_DB].map(|path| digest(&legacy.path().join(path)));
     assert_eq!(before, after);
-    assert!(
-        !legacy
-            .path()
-            .join("mcp_clients/mcp_clients.db-wal")
-            .exists()
-    );
+    assert!(!legacy
+        .path()
+        .join("mcp_clients/mcp_clients.db-wal")
+        .exists());
 }
 
 #[tokio::test]

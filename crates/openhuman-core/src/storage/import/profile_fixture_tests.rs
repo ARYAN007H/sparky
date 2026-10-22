@@ -3,7 +3,7 @@ use super::*;
 #[tokio::test(flavor = "multi_thread")]
 async fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrection() {
     use crate::profiles::{ProfileId, ProfileRegistry};
-    use crate::storage::layout::{Target, legacy};
+    use crate::storage::layout::{legacy, Target};
     use crate::storage::{self, Scope};
     use tinystoragedrivers::Query;
 
@@ -124,11 +124,10 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     assert_eq!(cost.len(), 1);
     let mut cost_body = cost[0].doc.clone();
     let cost_ms = cost_body["ts_ms"].as_i64().unwrap();
-    cost_body["usage"]["timestamp"] = serde_json::json!(
-        chrono::DateTime::from_timestamp_millis(cost_ms)
+    cost_body["usage"]["timestamp"] =
+        serde_json::json!(chrono::DateTime::from_timestamp_millis(cost_ms)
             .unwrap()
-            .to_rfc3339()
-    );
+            .to_rfc3339());
     let cost_record: crate::platform::cost::types::CostRecord =
         serde_json::from_value(cost_body).unwrap();
     assert_eq!(cost_record.id, "cost-0001");
@@ -141,11 +140,10 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     assert_eq!(artifact.len(), 1);
     let mut artifact_body = artifact[0].doc.clone();
     let created_ms = artifact_body["created_ms"].as_i64().unwrap();
-    artifact_body["created_at"] = serde_json::json!(
-        chrono::DateTime::from_timestamp_millis(created_ms)
+    artifact_body["created_at"] =
+        serde_json::json!(chrono::DateTime::from_timestamp_millis(created_ms)
             .unwrap()
-            .to_rfc3339()
-    );
+            .to_rfc3339());
     let artifact_meta: crate::artifacts::types::ArtifactMeta =
         serde_json::from_value(artifact_body).unwrap();
     assert_eq!(artifact_meta.id, "artifact-1");

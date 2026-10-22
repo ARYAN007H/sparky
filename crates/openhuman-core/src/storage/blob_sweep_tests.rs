@@ -226,7 +226,12 @@ impl StorageBackend for HungSweep {
 async fn a_hung_scope_sweep_times_out_and_counts_as_zero() {
     let inner = backend_with_clock();
     let hung = HungSweep(inner);
-    let removed = sweep_scope_within(&hung, &Scope::new("local").unwrap(), Duration::from_secs(30)).await;
+    let removed = sweep_scope_within(
+        &hung,
+        &Scope::new("local").unwrap(),
+        Duration::from_secs(30),
+    )
+    .await;
     assert_eq!(removed, 0);
 }
 

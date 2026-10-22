@@ -21,8 +21,8 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 
-use super::StorageBackend;
 use super::import;
+use super::StorageBackend;
 use crate::config::Config;
 
 /// What a rebind did.

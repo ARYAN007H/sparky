@@ -83,7 +83,10 @@ pub(crate) fn store_for(
 ) -> Result<Arc<dyn LeaseStore>, String> {
     match backend {
         Some(backend) => {
-            log::info!("[profiles][lease] cluster leases on configured storage node={node} ttl_ms={}", ttl.as_millis());
+            log::info!(
+                "[profiles][lease] cluster leases on configured storage node={node} ttl_ms={}",
+                ttl.as_millis()
+            );
             if !crate::storage::backend_has_cross_process_cas(backend.as_ref()) {
                 log::warn!("[profiles][lease] configured storage does not claim SharedAcrossProcesses: its leases exclude only this process");
             }

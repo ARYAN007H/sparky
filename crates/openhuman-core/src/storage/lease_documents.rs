@@ -14,10 +14,10 @@ use tinystoragedrivers_types::{
     Filter, Scope as DriverScope, Version, Versioned, WriteCondition, WriteOptions,
 };
 
-use super::StorageError;
 use super::lease::{
-    CLUSTER_SCOPE, LEASE_COLLECTION, LeaseError, LeaseGrant, LeaseRecord, LeaseStore, validate_key,
+    validate_key, LeaseError, LeaseGrant, LeaseRecord, LeaseStore, CLUSTER_SCOPE, LEASE_COLLECTION,
 };
+use super::StorageError;
 
 /// The owner namespace of the host's process-placement lease documents.
 pub const LEASE_OWNER: &str = "profiles";
@@ -403,13 +403,23 @@ impl LeaseStore for DocumentLeases {
 
     async fn holder_readonly(&self, key: &str) -> Result<Option<LeaseRecord>, LeaseError> {
         validate_key(key)?;
-        match self.docs.validate_collection_spec(&CollectionSpec::new(LEASE_COLLECTION)).await {
+        match self
+            .docs
+            .validate_collection_spec(&CollectionSpec::new(LEASE_COLLECTION))
+            .await
+        {
             Ok(()) => {}
             Err(error) if error.kind() == ErrorKind::NotFound => {
-                match self.docs.validate_collection_spec(&CollectionSpec::new("leases")).await {
-                    Ok(()) => return Err(LeaseError::Storage(StorageError::backend(
-                        "legacy profile leases require explicit storage migration",
-                    ))),
+                match self
+                    .docs
+                    .validate_collection_spec(&CollectionSpec::new("leases"))
+                    .await
+                {
+                    Ok(()) => {
+                        return Err(LeaseError::Storage(StorageError::backend(
+                            "legacy profile leases require explicit storage migration",
+                        )))
+                    }
                     Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
                     Err(error) => return Err(LeaseError::Storage(error.into())),
                 }

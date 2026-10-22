@@ -102,9 +102,12 @@ fn adopted_secrets_do_not_cross_scopes() {
     let os = MockBackend::new();
     os.set("u:k", "v").unwrap();
     let storage = memory_backend();
-    get_adopting(storage_secrets_in(storage.as_ref(), "alice"), "u:k", "k", || {
-        os.get("u:k").ok().flatten()
-    })
+    get_adopting(
+        storage_secrets_in(storage.as_ref(), "alice"),
+        "u:k",
+        "k",
+        || os.get("u:k").ok().flatten(),
+    )
     .unwrap();
     let other = storage_secrets_in(storage.as_ref(), "bob");
     assert_eq!(

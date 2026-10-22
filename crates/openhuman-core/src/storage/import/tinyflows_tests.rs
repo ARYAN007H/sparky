@@ -1,16 +1,16 @@
 use super::*;
 use crate::cron::client::testing as cron_store;
+use crate::storage::test_support::{sqlite_backend, SqliteBackend};
 use crate::storage::Scope;
-use crate::storage::test_support::{SqliteBackend, sqlite_backend};
-use serde_json::Value;
 use serde_json::json;
+use serde_json::Value;
 use sha2::Digest;
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use tempfile::TempDir;
 use tinyflows::engine::Checkpointer;
-use tinyflows_drivers::DriverCheckpointer;
 use tinyflows_drivers::catalog::FlowCatalogDocuments;
+use tinyflows_drivers::DriverCheckpointer;
 
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("src/storage/import/fixtures/tinyflows")
@@ -535,22 +535,18 @@ async fn catalog_and_schedule_owner_migrations_cover_existing_scopes() {
 
     for scope in [Scope::local(), profile] {
         let scoped = backend.for_scope(&scope).unwrap();
-        assert!(
-            scoped
-                .documents()
-                .get("flows.definitions", "missing")
-                .await
-                .unwrap()
-                .is_none()
-        );
-        assert!(
-            scoped
-                .documents()
-                .get("cron.jobs", "missing")
-                .await
-                .unwrap()
-                .is_none()
-        );
+        assert!(scoped
+            .documents()
+            .get("flows.definitions", "missing")
+            .await
+            .unwrap()
+            .is_none());
+        assert!(scoped
+            .documents()
+            .get("cron.jobs", "missing")
+            .await
+            .unwrap()
+            .is_none());
     }
 }
 

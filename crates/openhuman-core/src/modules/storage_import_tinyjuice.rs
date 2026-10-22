@@ -23,7 +23,7 @@
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use tinystoragedrivers_types::Capability;
 
 use crate::storage::Storage;

@@ -25,14 +25,14 @@
 use std::path::Path;
 
 use anyhow::Result;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use serde_json::Value;
 use tinystoragedrivers_types::{Capability, Query, StorageError};
 
 use crate::storage::documents::Repo;
 use crate::storage::import_state;
-use crate::storage::{DocumentStoreExt, Storage, state_kv::StateKv};
+use crate::storage::{state_kv::StateKv, DocumentStoreExt, Storage};
 
 /// The `tsd.kv` owner and namespace of the state values.
 const KV_OWNER: &str = "composio";
