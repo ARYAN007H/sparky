@@ -526,11 +526,21 @@ pub(crate) fn stop_for_thread(
 /// tombstones the parent completion queues.
 pub(crate) async fn cancel_all(
     ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &Path,
     thread_ids: &[String],
 ) -> Result<Vec<String>, String> {
     let mut cancelled_threads = Vec::new();
     let mut failures = Vec::new();
     for thread_id in thread_ids {
+        if crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+            ctx,
+            workspace_dir,
+            thread_id,
+        )
+        .is_empty()
+        {
+            continue;
+        }
         match cancel_for_thread(ctx, thread_id).await {
             Ok(count) if count > 0 => cancelled_threads.push(thread_id.clone()),
             Ok(_) => {}

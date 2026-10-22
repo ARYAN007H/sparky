@@ -63,7 +63,7 @@ async fn threads_purge_inner(
     // driver jobs, then durably tombstone each parent before the final queue
     // wipe so a late result cannot be delivered after purge returns.
     use crate::agent::orchestration::{background_completions, running_subagents};
-    let cancellation = running_subagents::cancel_all(&ctx, &thread_ids).await;
+    let cancellation = running_subagents::cancel_all(&ctx, &dir, &thread_ids).await;
     let cancelled_threads = cancellation.as_ref().map_or(0, Vec::len);
     let mut discarded = 0;
     let mut cleanup_failures = Vec::new();
