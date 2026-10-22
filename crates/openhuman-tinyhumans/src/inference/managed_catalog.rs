@@ -15,14 +15,16 @@ use openhuman_embed::__host::inference_registry::{
     PreparedInspectionCatalog, ProviderContext,
 };
 use openhuman_embed::__host::security::credentials::session_support::{
-    classify_session_token, load_app_session_profile, publish_local_session_expiry,
-    resolve_backend_credential, BackendCredential, SessionTokenCheck,
+    BackendCredential, SessionTokenCheck, classify_session_token, load_app_session_profile,
+    publish_local_session_expiry, resolve_backend_credential,
 };
 use openhuman_embed::__host::util::url::join_url;
 use std::sync::Arc;
 use tinyinference_llm::catalog::{append_query_param, parse_models_response};
 use tinyinference_llm::model::discover::DiscoveryRequest;
-use tinyinference_llm::providers::tinyhumans::{discovery_request, list_models as fetch_model_catalog};
+use tinyinference_llm::providers::tinyhumans::{
+    discovery_request, list_models as fetch_model_catalog,
+};
 
 use super::PROVIDER_OPENHUMAN;
 use crate::backend::headers::attribution_headers;
@@ -71,8 +73,8 @@ pub(super) fn inspection_entry() -> InspectionCatalogListing {
     Arc::new(|config: Config, request: InspectionCatalogRequest| {
         Box::pin(async move {
             use openhuman_embed::__host::security::credentials::session_support::{
-                check_session_backend, classify_session_token, load_app_session_profile_read_only,
-                SessionTokenCheck,
+                SessionTokenCheck, check_session_backend, classify_session_token,
+                load_app_session_profile_read_only,
             };
 
             let profile = load_app_session_profile_read_only(&config)
