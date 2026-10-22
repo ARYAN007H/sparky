@@ -295,8 +295,6 @@ async fn stopping_a_paused_driver_releases_its_active_owner() {
         }),
         vec![],
     );
-    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(32);
-    parent.on_progress = Some(progress_tx);
     parent.all_tools = Arc::new(vec![ask_tool]);
     parent.all_tool_specs = Arc::new(vec![ask_spec.clone()]);
     parent.visible_tool_specs = Arc::new(vec![ask_spec]);
@@ -338,16 +336,24 @@ async fn stopping_a_paused_driver_releases_its_active_owner() {
         .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
         .and_then(|value| value["task_id"].as_str().map(str::to_owned))
         .expect("accepted task id");
+    let dispatch = live.data.dispatch_ctx();
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
-            if matches!(progress_rx.recv().await, Some(crate::progress::AgentProgress::SubagentAwaitingUser { task_id: ref id, .. }) if id == &task_id) {
+            let paused = jobs.list().into_iter().any(|job| {
+                job.extensions
+                    .get("task_id")
+                    .and_then(serde_json::Value::as_str)
+                    == Some(task_id.as_str())
+                    && job.status == SubAgentJobStatus::AwaitingInput
+            });
+            if paused {
                 break;
             }
+            tokio::task::yield_now().await;
         }
     })
     .await
-    .expect("child reaches AwaitingInput");
-    let dispatch = live.data.dispatch_ctx();
+    .expect("selected child reaches AwaitingInput in its driver job");
     assert_eq!(
         crate::agent::orchestration::running_subagents::stop_for_thread(&dispatch, thread_id),
         vec![task_id.clone()]
