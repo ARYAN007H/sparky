@@ -78,6 +78,21 @@ impl SubagentSessionStore {
         })
     }
 
+    /// Finds one row for the TinyAgents migration adapter. Unlike `load`, this
+    /// performs an indexed read after any one-time legacy-file import and does
+    /// not rewrite the host session row.
+    pub(super) fn find_task_for_import(
+        &self,
+        task_id: &str,
+    ) -> Result<Option<DurableSubagentSession>, String> {
+        self.in_scope(|| {
+            let docs = super::store_documents::current(&self.workspace_dir)
+                .map_err(|err| format!("{err:#}"))?;
+            self.import_legacy(&docs)?;
+            docs.find_task(task_id).map_err(|err| format!("{err:#}"))
+        })
+    }
+
     pub fn save(&self, sessions: &[DurableSubagentSession]) -> Result<(), String> {
         self.in_scope(|| {
             let docs = super::store_documents::current(&self.workspace_dir)

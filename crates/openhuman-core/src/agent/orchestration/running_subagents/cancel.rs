@@ -241,7 +241,7 @@ fn terminal_legacy_session(
         subagent_session_id: Some(session.subagent_session_id),
         workspace_dir: workspace_dir.to_path_buf(),
         parent_thread_id: session.parent_thread_id,
-        parent_epoch: session.parent_epoch,
+        parent_epoch: None,
         already_finished: Some(already_finished),
         driver_pause: None,
         driver_managed: false,

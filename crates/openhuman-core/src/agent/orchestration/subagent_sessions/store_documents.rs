@@ -27,7 +27,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tinyagents_session::transcript::TranscriptMessage;
-use tinystoragedrivers::{CollectionSpec, Query, Sort};
+use tinystoragedrivers::{CollectionSpec, Filter, Query, Sort};
 
 use super::storage_schema::{SESSIONS, spec};
 use super::types::{DurableSubagentSession, DurableSubagentStatus};
@@ -204,6 +204,29 @@ impl Docs {
             .into_iter()
             .map(|item| Ok(serde_json::from_value::<StoredSession>(item.doc)?.into()))
             .collect()
+    }
+
+    /// Looks up one legacy task row for the TinyAgents import adapter without
+    /// loading or rewriting the host collection. The one-time JSON import is
+    /// performed by the caller before this indexed document query.
+    pub(super) fn find_task(&self, task_id: &str) -> Result<Option<DurableSubagentSession>> {
+        let task_id = task_id.to_owned();
+        let stored = self.0.run(|docs| async move {
+            docs.query_all(
+                SESSIONS,
+                &Query::filter(Filter::eq("current_task_id", task_id)),
+            )
+            .await
+        })?;
+        let sessions = stored
+            .into_iter()
+            .map(|item| {
+                serde_json::from_value::<StoredSession>(item.doc)
+                    .map(DurableSubagentSession::from)
+                    .map_err(Into::into)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(sessions.into_iter().next())
     }
 
     /// Atomically mutate one session from its current stored value. Live
