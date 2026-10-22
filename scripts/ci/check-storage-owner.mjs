@@ -44,7 +44,7 @@ export const FORBIDDEN_DEPS = [
   'aws-sdk-s3',
   'lapin',           // AMQP client (RabbitMQ)
   'amq-protocol',    // AMQP wire protocol
-  'object_store',
+  'object-store',
   'sqlx',
   'redb',
   'sled',
