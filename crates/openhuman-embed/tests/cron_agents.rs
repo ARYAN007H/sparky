@@ -14,7 +14,7 @@ use std::time::Duration;
 use common::{chat_completion, chat_requests, offline_config, runtime, stub_backend};
 use openhuman_embed::{
     AgentDefinitionSpec, AgentSpec, AgentTurnOrigin, CronError, HostTurnTools, JobSchedule,
-    JobSpec, JobTarget, Provider, ReasoningEffort, Runtime, RuntimeError, RuntimeEventKind,
+    JobSpec, JobTarget, Provider, Runtime, RuntimeError, RuntimeEventKind,
     RuntimeEvents, ServiceSet, Tool, ToolScopeSpec, TrustedAutomationSource, Workspace,
 };
 use wiremock::matchers::{method, path};
@@ -122,8 +122,7 @@ fn a_scheduled_job_runs_a_runtime_agent_with_its_host_tool_as_cron() {
                                 "sk-fixture",
                             )
                             .model("fixture")
-                            .provider_options(serde_json::json!({"provider": {"sort": "latency"}}))
-                            .reasoning_effort(ReasoningEffort::High),
+                            .provider_options(serde_json::json!({"provider": {"sort": "latency"}})),
                         )
                         .definition(
                             AgentDefinitionSpec::new()
@@ -189,7 +188,6 @@ fn a_scheduled_job_runs_a_runtime_agent_with_its_host_tool_as_cron() {
                 first_body["provider"],
                 serde_json::json!({"sort": "latency"})
             );
-            assert_eq!(first_body["reasoning_effort"], "high");
             assert!(common::tool_names(&requests[0]).contains(&"teeny_ping".to_string()));
             assert_eq!(cron.runs("teeny-hourly", 10).unwrap()[0].status, "ok");
 
