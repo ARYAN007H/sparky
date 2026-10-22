@@ -15,9 +15,8 @@
 //! request paths already go through [`super::blocking`], which keeps that off
 //! the async workers.
 
-use std::path::{Path, PathBuf};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, OnceLock, Weak};
 
 use super::ConversationPurgeStats;
@@ -106,11 +105,7 @@ impl Drop for ThreadPurgeGuard {
 
 /// Closes workspace thread admission and waits for in-flight creates to settle.
 ///
-/// # Errors
-///
-/// This currently has no recoverable error path; the result type keeps the
-/// purge caller's setup failures uniform with other storage admission errors.
-pub(crate) fn begin_thread_purge(workspace_dir: &Path) -> Result<ThreadPurgeGuard, String> {
+pub(crate) fn begin_thread_purge(workspace_dir: &Path) -> ThreadPurgeGuard {
     let admission = thread_admission(workspace_dir);
     let mut state = admission
         .state
@@ -130,7 +125,7 @@ pub(crate) fn begin_thread_purge(workspace_dir: &Path) -> Result<ThreadPurgeGuar
             .unwrap_or_else(|error| error.into_inner());
     }
     drop(state);
-    Ok(ThreadPurgeGuard(admission))
+    ThreadPurgeGuard(admission)
 }
 
 const DOMAIN: &str = "threads::store";

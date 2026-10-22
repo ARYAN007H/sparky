@@ -286,9 +286,13 @@ async fn thread_creation_cannot_enter_the_snapshot_to_purge_window() {
         personality_id: None,
         working_dir: None,
     };
-    blocking::ensure_thread(ctx.clone(), workspace.clone(), make_thread("purge-race-existing"))
-        .await
-        .expect("seed a thread for the purge snapshot");
+    blocking::ensure_thread(
+        ctx.clone(),
+        workspace.clone(),
+        make_thread("purge-race-existing"),
+    )
+    .await
+    .expect("seed a thread for the purge snapshot");
 
     let (snapshot_tx, snapshot_rx) = tokio::sync::oneshot::channel();
     let (release_tx, release_rx) = tokio::sync::oneshot::channel();
@@ -335,7 +339,10 @@ async fn thread_creation_cannot_enter_the_snapshot_to_purge_window() {
         .expect("thread_upsert task joins");
 
     let _ = release_tx.send(());
-    purge.await.expect("purge task joins").expect("purge succeeds");
+    purge
+        .await
+        .expect("purge task joins")
+        .expect("purge succeeds");
 
     assert!(
         direct_result.is_err(),
