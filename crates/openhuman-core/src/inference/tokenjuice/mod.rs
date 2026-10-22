@@ -17,6 +17,12 @@ pub struct TokenjuiceRetrieveTool(tinyjuice_host::retrieve_tool::RetrieveToolOut
 
 impl TokenjuiceRetrieveTool {
     pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for TokenjuiceRetrieveTool {
+    fn default() -> Self {
         Self(tinyjuice_host::retrieve_tool::RetrieveToolOutputTool::new(
             std::sync::Arc::new(|token, range| {
                 Box::pin(async move { retrieve(token, range).await })
