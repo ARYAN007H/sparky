@@ -429,7 +429,7 @@ fn a_classic_workspace_moves_into_the_backend_and_its_files_are_untouched() {
     let default = provider.try_for_agent(DEFAULT_AGENT).unwrap();
     assert!(default.turn_states.get("thread-1").unwrap().is_some());
     let ledger = provider.driver_run_ledger(DEFAULT_AGENT).unwrap();
-    let (messages, calls) = crate::storage::block_on_anyhow(async {
+    let (messages, calls) = crate::storage::block_on_anyhow(async move {
         use tinyagents_session::run_ledger::history::SessionHistoryStore;
         Ok::<_, anyhow::Error>((
             ledger.list_messages("sess-1", None).await?,
