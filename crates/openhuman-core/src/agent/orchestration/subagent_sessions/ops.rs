@@ -13,7 +13,7 @@ use super::types::{
 mod driver;
 #[cfg(test)]
 use driver::record_cancel_reason;
-pub use tinyagents_orchestration::subagent::{normalize_task_key, task_title_from_prompt};
+pub use tinyagents_orchestration::subagent::normalize_task_key;
 pub use driver::{
     cancel_driver_job_by_task, cancel_driver_job_for_observed_session,
     cancel_driver_jobs_for_thread, mark_driver_pause_cancelled, resolve_lifecycle_key,
