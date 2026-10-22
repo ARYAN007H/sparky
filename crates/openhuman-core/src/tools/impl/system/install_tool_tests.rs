@@ -143,7 +143,10 @@ async fn install_backend_receives_only_the_explicit_install_environment() {
     let expected = BTreeMap::from([
         (OsString::from("PATH"), OsString::from("/toolchain/bin")),
         (OsString::from("HOME"), OsString::from("/home/operator")),
-        (OsString::from("CARGO_HOME"), OsString::from("/home/operator/.cargo")),
+        (
+            OsString::from("CARGO_HOME"),
+            OsString::from("/home/operator/.cargo"),
+        ),
     ]);
     let backend = Arc::new(RecordingBackend::default());
     let tool = InstallToolTool::with_backend_and_environment(
@@ -175,19 +178,34 @@ fn install_environment_filters_host_variables_without_dropping_package_manager_p
     let filtered = filter_install_environment([
         (OsString::from("PATH"), OsString::from("/tools/bin")),
         (OsString::from("HOME"), OsString::from("/home/operator")),
-        (OsString::from("CARGO_HOME"), OsString::from("/home/operator/.cargo")),
+        (
+            OsString::from("CARGO_HOME"),
+            OsString::from("/home/operator/.cargo"),
+        ),
         (OsString::from("SystemRoot"), OsString::from("C:\\Windows")),
         (OsString::from("GH_TOKEN"), OsString::from("secret")),
-        (OsString::from("AWS_ACCESS_KEY_ID"), OsString::from("secret")),
+        (
+            OsString::from("AWS_ACCESS_KEY_ID"),
+            OsString::from("secret"),
+        ),
     ]);
 
-    assert_eq!(filtered.get(OsStr::new("PATH")), Some(&OsString::from("/tools/bin")));
-    assert_eq!(filtered.get(OsStr::new("HOME")), Some(&OsString::from("/home/operator")));
+    assert_eq!(
+        filtered.get(OsStr::new("PATH")),
+        Some(&OsString::from("/tools/bin"))
+    );
+    assert_eq!(
+        filtered.get(OsStr::new("HOME")),
+        Some(&OsString::from("/home/operator"))
+    );
     assert_eq!(
         filtered.get(OsStr::new("CARGO_HOME")),
         Some(&OsString::from("/home/operator/.cargo"))
     );
-    assert_eq!(filtered.get(OsStr::new("SystemRoot")), Some(&OsString::from("C:\\Windows")));
+    assert_eq!(
+        filtered.get(OsStr::new("SystemRoot")),
+        Some(&OsString::from("C:\\Windows"))
+    );
     assert!(!filtered.contains_key(OsStr::new("GH_TOKEN")));
     assert!(!filtered.contains_key(OsStr::new("AWS_ACCESS_KEY_ID")));
 }
