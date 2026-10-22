@@ -183,34 +183,31 @@ pub(crate) async fn cancel_by_task_with_workspace_reason(
 }
 
 /// Preserve late-cancel reporting for durable terminal sessions that predate
-/// the in-memory TinyAgents owner index. This is a read-only compatibility
-/// lookup; live cancellation always requires the owner-scoped driver registry.
+/// the in-memory TinyAgents owner index. A narrow migration adapter locates a
+/// terminal host row, imports it into the scoped driver store, and returns the
+/// driver's durable projection; live cancellation still requires the owner
+/// registry.
 fn terminal_legacy_session(
     ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &Path,
     task_id: &str,
 ) -> Result<Option<CancelledSubagent>, String> {
-    use crate::agent::orchestration::subagent_sessions::{
-        DurableSubagentStatus, SubagentSessionStore,
-    };
-
-    let store = if ctx.resolved().is_some() {
-        SubagentSessionStore::new_in_context(ctx, workspace_dir.to_path_buf())?
-    } else {
-        SubagentSessionStore::new(workspace_dir.to_path_buf())
-    };
-    let Some(session) = store
-        .load()?
-        .into_iter()
-        .find(|session| session.current_task_id.as_deref() == Some(task_id))
-    else {
+    let Some(session) = crate::agent::orchestration::subagent_sessions::import_terminal_task_for_context(
+        ctx,
+        workspace_dir.to_path_buf(),
+        task_id,
+    )
+    .await
+    .map_err(|error| format!("failed to read terminal legacy subagent session: {error}"))? else {
         return Ok(None);
     };
     let already_finished = match session.status {
-        DurableSubagentStatus::Failed if session.lifecycle_key.is_none() => {
+        tinyagents_orchestration::subagent::DurableSubagentStatus::Failed
+            if session.lifecycle_key.is_none() =>
+        {
             Some(FinishedOutcome::Failed)
         }
-        DurableSubagentStatus::Idle => {
+        tinyagents_orchestration::subagent::DurableSubagentStatus::Idle => {
             let Some(key) = session.lifecycle_key.as_ref() else {
                 return Ok(None);
             };
@@ -230,10 +227,10 @@ fn terminal_legacy_session(
                 | tinyagents_orchestration::subagent::SubagentOutcomeKind::AwaitingInput(_) => None,
             }
         }
-        DurableSubagentStatus::Running
-        | DurableSubagentStatus::AwaitingUser
-        | DurableSubagentStatus::Failed
-        | DurableSubagentStatus::Closed => None,
+        tinyagents_orchestration::subagent::DurableSubagentStatus::Running
+        | tinyagents_orchestration::subagent::DurableSubagentStatus::AwaitingUser
+        | tinyagents_orchestration::subagent::DurableSubagentStatus::Failed
+        | tinyagents_orchestration::subagent::DurableSubagentStatus::Closed => None,
     };
     let Some(already_finished) = already_finished else {
         return Ok(None);
