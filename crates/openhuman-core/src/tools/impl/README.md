@@ -35,7 +35,7 @@ tested but no production assembly site constructs it today.
 
 ## Notes
 
-- The update tools are owned and registered from [`platform/update/tools.rs`](../platform/update/tools.rs), alongside the update domain they call.
+- The update tools are owned and registered from [`platform/update/tools.rs`](../../platform/update/tools.rs), alongside the update domain they call.
 
 - `document/` and `presentation/` are kept structurally parallel (validate
   input, allocate artifact, generate bytes off the async runtime, finalize or
