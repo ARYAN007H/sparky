@@ -174,10 +174,19 @@ impl AuthProfilesStore {
                         // secrets can serve it; a keychain-only profile cannot,
                         // and resolving it without secrets would drop it and
                         // let the next write erase it (and its keychain entry).
-                        let has_json_secrets = p.access_token.is_some()
-                            || p.refresh_token.is_some()
-                            || p.id_token.is_some()
-                            || p.token.is_some();
+                        // The secret the profile kind needs must be in JSON:
+                        // an OAuth profile without its access token there
+                        // would still be dropped below.
+                        let has_json_secrets = match parse_profile_kind(&p.kind) {
+                            Ok(AuthProfileKind::OAuth) => p.access_token.is_some(),
+                            Ok(AuthProfileKind::Token) => p.token.is_some(),
+                            Err(_) => {
+                                p.access_token.is_some()
+                                    || p.refresh_token.is_some()
+                                    || p.id_token.is_some()
+                                    || p.token.is_some()
+                            }
+                        };
                         if !has_json_secrets {
                             log::warn!(
                                 "[auth] keychain read failed for keychain-only profile_id={id}; \
