@@ -645,38 +645,36 @@ async fn thread_delete_keeps_completions_when_driver_task_scope_cannot_be_resolv
 
     assert!(result
         .expect_err("an indexed task without its driver job must fail closed")
-        .contains("no matching driver job"));
+        .contains("no live driver job or terminal durable session"));
     assert_eq!(
         background_completions::pending_for(&workspace, thread_id).len(),
         1,
         "thread deletion retains queued completions when a selected child cannot be settled"
     );
 
-    let terminal_legacy_row = serde_json::from_value(
-        serde_json::json!({
-            "subagentSessionId": "pruned-terminal-session",
-            "parentSession": parent_session,
-            "parentThreadId": thread_id,
-            "workerThreadId": null,
-            "agentId": "task_manager_agent",
-            "displayName": null,
-            "model": null,
-            "sandboxMode": "workspace",
-            "actionRoot": null,
-            "taskKey": "pruned-terminal-task",
-            "taskTitle": "Completed before registry pruning",
-            "currentTaskId": "stale-driver-task",
-            "status": "idle",
-            "reusable": true,
-            "latestHistory": [],
-            "latestError": null,
-            "createdAt": "2026-01-01T00:00:00Z",
-            "updatedAt": "2026-01-01T00:00:00Z",
-            "lastUsedAt": "2026-01-01T00:00:00Z",
-            "parentEpoch": null,
-            "lifecycleKey": null
-        }),
-    )
+    let terminal_legacy_row = serde_json::from_value(serde_json::json!({
+        "subagentSessionId": "pruned-terminal-session",
+        "parentSession": parent_session,
+        "parentThreadId": thread_id,
+        "workerThreadId": null,
+        "agentId": "task_manager_agent",
+        "displayName": null,
+        "model": null,
+        "sandboxMode": "workspace",
+        "actionRoot": null,
+        "taskKey": "pruned-terminal-task",
+        "taskTitle": "Completed before registry pruning",
+        "currentTaskId": "stale-driver-task",
+        "status": "idle",
+        "reusable": true,
+        "latestHistory": [],
+        "latestError": null,
+        "createdAt": "2026-01-01T00:00:00Z",
+        "updatedAt": "2026-01-01T00:00:00Z",
+        "lastUsedAt": "2026-01-01T00:00:00Z",
+        "parentEpoch": null,
+        "lifecycleKey": null
+    }))
     .expect("deserialize terminal legacy session");
     crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new_in_context(
         &dispatch,
