@@ -48,7 +48,13 @@ impl InstallToolTool {
 }
 
 fn install_environment() -> std::collections::BTreeMap<std::ffi::OsString, std::ffi::OsString> {
-    let allowed = [
+    filter_install_environment(std::env::vars_os())
+}
+
+fn filter_install_environment(
+    variables: impl IntoIterator<Item = (std::ffi::OsString, std::ffi::OsString)>,
+) -> std::collections::BTreeMap<std::ffi::OsString, std::ffi::OsString> {
+    const ALLOWED: &[&str] = &[
         "PATH",
         "HOME",
         "USERPROFILE",
@@ -73,8 +79,15 @@ fn install_environment() -> std::collections::BTreeMap<std::ffi::OsString, std::
         "XDG_DATA_HOME",
         "XDG_STATE_HOME",
     ];
-    std::env::vars_os()
-        .filter(|(name, _)| allowed.iter().any(|allowed| name == allowed))
+    variables
+        .into_iter()
+        .filter(|(name, _)| {
+            name.to_str().is_some_and(|name| {
+                ALLOWED
+                    .iter()
+                    .any(|allowed| name.eq_ignore_ascii_case(allowed))
+            })
+        })
         .collect()
 }
 

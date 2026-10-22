@@ -84,7 +84,7 @@ impl ExecGate for InstallGate {
         }
         Ok(ExecPermit {
             action_dir: PathBuf::from(&self.security.workspace_dir),
-            environment: Default::default(),
+            environment: self.environment.clone(),
             backend_selection: "native".into(),
             backend_capability: ExecBackendCapability::new(NativeExecCapability),
         })
