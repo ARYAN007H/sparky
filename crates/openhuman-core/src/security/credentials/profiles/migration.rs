@@ -169,8 +169,22 @@ impl AuthProfilesStore {
                         }
                         (at, rt, it, tok)
                     }
-                    Err(_e) => {
-                        // Keychain I/O error — fall through to JSON decrypt path.
+                    Err(e) => {
+                        // Keychain read error. JSON still holding this profile's
+                        // secrets can serve it; a keychain-only profile cannot,
+                        // and resolving it without secrets would drop it and
+                        // let the next write erase it (and its keychain entry).
+                        let has_json_secrets = p.access_token.is_some()
+                            || p.refresh_token.is_some()
+                            || p.id_token.is_some()
+                            || p.token.is_some();
+                        if !has_json_secrets {
+                            log::warn!(
+                                "[auth] keychain read failed for keychain-only profile_id={id}; \
+                                 refusing to load a partial view"
+                            );
+                            return Err(e);
+                        }
                         log::warn!(
                             "[auth] keychain error for profile_id={id}; falling back to JSON"
                         );
