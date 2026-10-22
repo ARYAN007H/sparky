@@ -245,7 +245,7 @@ pub(crate) fn render_stop_summary(results: &[CheckpointToolResult], stop_note: &
     tracing::debug!(
         reason = kind.key(),
         results = results.len(),
-        "[turn_checkpoint] rendering deterministic stop summary"
+        "[session-host] rendering stopped-turn summary"
     );
     let groups = tinyagents_harness::turn_stop::group_stop_results(results, |content| {
         short_error_line(content)
