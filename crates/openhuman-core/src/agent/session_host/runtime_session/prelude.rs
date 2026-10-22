@@ -381,8 +381,8 @@ fn granted_tool_specs(
                 || !crate::agent::tinyagents::tool_registration::is_thread_goal_tool(&spec.name)
         })
         .map(|spec| spec.as_ref().clone())
-        .collect::<Vec<_>>();
-    specs // RED-CHECK
+        .collect();
+    super::super::builder::dedup_visible_tool_specs(specs)
 }
 
 #[cfg(test)]
