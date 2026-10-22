@@ -139,6 +139,28 @@ pub(super) fn with_unbuffered_python(
     env
 }
 
+/// Point a native child's temp dir at the agent's granted scratch dir
+/// (`/tmp/openhuman`, a ReadWrite trusted root — see SecurityPolicy
+/// `from_config`) so `python3 tempfile` / `mktemp` / `$TMPDIR` writes land in a
+/// sandboxed, readable location instead of the world-shared /tmp.
+pub(super) fn use_scratch_tmp(env: &mut std::collections::BTreeMap<String, String>) {
+    let scratch_dir = crate::security::openhuman_scratch_dir();
+    if let (true, Some(scratch)) = (scratch_dir.is_dir(), scratch_dir.to_str()) {
+        tracing::debug!(
+            scratch_dir = %scratch_dir.display(),
+            "[shell] overriding TMPDIR/TMP/TEMP to the openhuman scratch dir"
+        );
+        for name in ["TMPDIR", "TMP", "TEMP"] {
+            env.insert(name.to_owned(), scratch.to_owned());
+        }
+    } else {
+        tracing::debug!(
+            scratch_dir = %scratch_dir.display(),
+            "[shell] scratch dir missing — leaving TMPDIR/TMP/TEMP to the module"
+        );
+    }
+}
+
 /// The [`PYTHON_ENV_DEFAULTS`] a child gets, each one the parent's own value
 /// when `lookup` has one.
 pub(super) fn python_env_defaults(
@@ -206,5 +228,109 @@ pub(super) fn extend_explicit_environment(
                 std::ffi::OsString::from(value),
             )
         }));
+    }
+}
+
+/// When a command still running is handed back as a process, unless the call
+/// says otherwise (`yield_after_secs`).
+pub(super) const DEFAULT_YIELD_AFTER_SECS: u64 = 120;
+
+/// The yield point a call asked for: the default when absent, none for `0`.
+pub(super) fn yield_after(requested: Option<u64>) -> Option<Duration> {
+    match requested.unwrap_or(DEFAULT_YIELD_AFTER_SECS) {
+        0 => None,
+        secs => Some(Duration::from_secs(secs.min(3600))),
+    }
+}
+
+/// The result of a call that came back with its command still running.
+pub(super) fn yielded_output(
+    id: &str,
+    elapsed: Duration,
+    timeout: Duration,
+    stdout: &str,
+    stderr: &str,
+) -> String {
+    let mut out = format!(
+        "Still running as process {id} after {}; it keeps running (it stops at its {} timeout).",
+        human_duration(elapsed),
+        human_duration(timeout),
+    );
+    out.push_str(&printed(stdout, stderr, "Output so far:", "No output yet."));
+    out.push_str(&format!(
+        "\nFollow it with shell_process {{\"process\": \"{id}\"}} to wait for more output or the \
+         end, or {{\"process\": \"{id}\", \"action\": \"kill\"}} to stop it. Do not start the \
+         command again while it runs."
+    ));
+    out
+}
+
+/// Run a native shell command for a `shell` call. In a turn with room for
+/// another process, a command still running at its yield point is handed to
+/// the turn's registry and comes back as a process id; direct dispatch (no run
+/// context) and a turn already following its limit of processes wait for the
+/// end as before.
+pub(super) async fn run_native(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &crate::config::Config,
+    mut run: crate::sandbox::shell_exec::NativeShellRun,
+    requested_yield: Option<u64>,
+    context: Option<&dyn tinytools::ToolRunContext>,
+) -> ToolResult {
+    use crate::sandbox::shell_exec::{run_yielding, ShellRunOutcome};
+    let processes = crate::agent::tinyagents::host::run_context::shell_processes_for_tool(context)
+        .filter(|processes| processes.has_room());
+    if processes.is_some() {
+        run.yield_after = yield_after(requested_yield);
+    }
+    let (command, timeout) = (run.command.clone(), run.timeout);
+    let started = std::time::Instant::now();
+    match run_yielding(ctx, config, run).await {
+        Ok(ShellRunOutcome::Running(live)) => {
+            let Some(processes) = processes else {
+                // Unreachable: no yield point without a registry. The dropped
+                // handle stops the process.
+                return ToolResult::error("Command was left running unexpectedly.");
+            };
+            let (stdout, stderr) = (live.stdout.clone(), live.stderr.clone());
+            let id = processes.adopt(live, &command, started, timeout);
+            ToolResult::success(yielded_output(
+                &id,
+                started.elapsed(),
+                timeout,
+                &stdout,
+                &stderr,
+            ))
+        }
+        Ok(ShellRunOutcome::Finished(result)) => exec_result(Ok(result), timeout),
+        Err(error) => exec_result(Err(error), timeout),
+    }
+}
+
+/// `label` and the non-empty streams, or `empty` when both are empty.
+pub(super) fn printed(stdout: &str, stderr: &str, label: &str, empty: &str) -> String {
+    let (stdout, stderr) = (stdout.trim_end(), stderr.trim_end());
+    if stdout.is_empty() && stderr.is_empty() {
+        return format!(" {empty}");
+    }
+    let mut out = format!(" {label}");
+    if !stdout.is_empty() {
+        out.push_str("\n[stdout]\n");
+        out.push_str(stdout);
+    }
+    if !stderr.is_empty() {
+        out.push_str("\n[stderr]\n");
+        out.push_str(stderr);
+    }
+    out
+}
+
+/// `45s`, `2m 0s`, `1h 5m`.
+pub(super) fn human_duration(duration: Duration) -> String {
+    let secs = duration.as_secs();
+    match secs {
+        0..=59 => format!("{secs}s"),
+        60..=3599 => format!("{}m {}s", secs / 60, secs % 60),
+        _ => format!("{}h {}m", secs / 3600, (secs % 3600) / 60),
     }
 }

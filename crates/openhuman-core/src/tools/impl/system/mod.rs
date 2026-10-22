@@ -11,6 +11,7 @@ mod retrieve_tool_output;
 mod schedule;
 mod shell;
 mod shell_description;
+mod shell_process;
 mod shell_saas;
 mod shell_support;
 mod update_apply;
@@ -26,6 +27,7 @@ pub use proxy_config::ProxyConfigTool;
 pub use retrieve_tool_output::{retrieve_tool_output_tool, RetrieveToolOutputTool};
 pub use schedule::ScheduleTool;
 pub use shell::ShellTool;
+pub use shell_process::ShellProcessTool;
 pub use update_apply::UpdateApplyTool;
 pub use update_check::UpdateCheckTool;
 

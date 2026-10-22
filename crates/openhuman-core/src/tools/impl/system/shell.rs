@@ -194,6 +194,12 @@ impl Tool for ShellTool {
                     "minimum": 0,
                     "maximum": 3600,
                     "description": "Optional wall-clock timeout (seconds, up to 3600) for this command before it is killed. Use a larger value for long-running work (builds, test suites, solvers). Omitted or 0 runs without a deadline."
+                },
+                "yield_after_secs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3600,
+                    "description": "Seconds after which a command that is still running comes back with its output so far and keeps running as a process you follow with `shell_process`. Default 120; 0 waits for the command to end."
                 }
             },
             "required": ["command"]
@@ -299,12 +305,20 @@ impl ShellTool {
         // `tool_timeout::explicit_call_timeout_*`. Shell has no default deadline
         // (issue #4023) — long scripts must run to completion.
         let requested_timeout = args.get("timeout_secs").and_then(|v| v.as_u64());
+        let requested_yield = args.get("yield_after_secs").and_then(|v| v.as_u64());
         let start = Instant::now();
         let (allowed, result) = crate::sandbox::shell_progress::with_shell_progress(
             context,
             crate::sandbox::shell_progress::HEARTBEAT_INTERVAL,
             |meter| {
-                self.run_with_security_in_context(ctx, command, requested_timeout, context, meter)
+                self.run_with_security_in_context(
+                    ctx,
+                    command,
+                    requested_timeout,
+                    requested_yield,
+                    context,
+                    meter,
+                )
             },
         )
         .await;
@@ -338,7 +352,7 @@ impl ShellTool {
         command: &str,
         requested_timeout: Option<u64>,
     ) -> (bool, ToolResult) {
-        self.run_with_security_in_context(ctx, command, requested_timeout, None, None)
+        self.run_with_security_in_context(ctx, command, requested_timeout, None, None, None)
             .await
     }
 
@@ -347,6 +361,7 @@ impl ShellTool {
         ctx: &DispatchCtx,
         command: &str,
         requested_timeout: Option<u64>,
+        requested_yield: Option<u64>,
         context: Option<&dyn ToolRunContext>,
         meter: Option<crate::sandbox::shell_progress::ShellOutputMeter>,
     ) -> (bool, ToolResult) {
@@ -589,25 +604,7 @@ impl ShellTool {
             env.insert(key, value);
         }
 
-        // Point the child's temp dir at the agent's granted scratch dir
-        // (`/tmp/openhuman`, a ReadWrite trusted root — see SecurityPolicy
-        // `from_config`) so `python3 tempfile` / `mktemp` / `$TMPDIR` writes land
-        // in a sandboxed, readable location instead of the world-shared /tmp.
-        let scratch_dir = crate::security::openhuman_scratch_dir();
-        if let (true, Some(scratch)) = (scratch_dir.is_dir(), scratch_dir.to_str()) {
-            tracing::debug!(
-                scratch_dir = %scratch_dir.display(),
-                "[shell] overriding TMPDIR/TMP/TEMP to the openhuman scratch dir"
-            );
-            for name in ["TMPDIR", "TMP", "TEMP"] {
-                env.insert(name.to_owned(), scratch.to_owned());
-            }
-        } else {
-            tracing::debug!(
-                scratch_dir = %scratch_dir.display(),
-                "[shell] scratch dir missing — leaving TMPDIR/TMP/TEMP to the module"
-            );
-        }
+        super::shell_support::use_scratch_tmp(&mut env);
 
         // No default deadline — only a caller-supplied `timeout_secs` bounds the
         // run (issue #4023). TinyBox needs a finite budget, so an unbounded call
@@ -644,8 +641,9 @@ impl ShellTool {
         run.python_utf8 = true;
         run.hide_window = self.runtime.hide_window();
         run.meter = meter;
-        let result = crate::sandbox::shell_exec::run(ctx, &config, run).await;
-        (true, exec_result(result, effective))
+        let result =
+            super::shell_support::run_native(ctx, &config, run, requested_yield, context).await;
+        (true, result)
     }
 
     /// Execute a command through the sandbox backend. Called when the
