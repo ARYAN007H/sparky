@@ -187,11 +187,16 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         .lifecycle_key
         .clone()
         .expect("paused driver session retains lifecycle key");
-    let versioned = crate::storage::block_on(
-        driver_documents.get("subagent_sessions", &before_session.subagent_session_id),
-    )
+    let driver_documents_for_read = Arc::clone(&driver_documents);
+    let session_id = before_session.subagent_session_id.clone();
+    let versioned = crate::storage::block_on(async move {
+        driver_documents_for_read
+            .get("subagent_sessions", &session_id)
+            .await
+    })
     .expect("read paused driver document")
     .expect("paused driver document exists");
+    let precondition = versioned.unchanged();
     let mut persisted: tinyagents_orchestration::subagent::DurableSubagentSession =
         serde_json::from_value(versioned.doc).expect("decode paused driver document");
     persisted
@@ -205,12 +210,19 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         .with_timezone(&chrono::Utc)
         + chrono::Duration::milliseconds(1);
     persisted.updated_at = updated_at.to_rfc3339();
-    crate::storage::block_on(driver_documents.put(
-        "subagent_sessions",
-        &before_session.subagent_session_id,
-        serde_json::to_value(&persisted).expect("encode corrupted driver session"),
-        versioned.unchanged(),
-    ))
+    let driver_documents_for_write = Arc::clone(&driver_documents);
+    let session_id = before_session.subagent_session_id.clone();
+    let persisted_doc = serde_json::to_value(&persisted).expect("encode corrupted driver session");
+    crate::storage::block_on(async move {
+        driver_documents_for_write
+            .put(
+                "subagent_sessions",
+                &session_id,
+                persisted_doc,
+                precondition,
+            )
+            .await
+    })
     .expect("corrupt only the persisted driver lifecycle owner key");
     assert_eq!(persisted.parent_session, selector.parent_session);
     assert_eq!(
@@ -276,11 +288,16 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         DurableSubagentStatus::AwaitingUser,
         "refusal leaves the paused row untouched"
     );
-    let versioned = crate::storage::block_on(
-        driver_documents.get("subagent_sessions", &before_session.subagent_session_id),
-    )
+    let driver_documents_for_read = Arc::clone(&driver_documents);
+    let session_id = before_session.subagent_session_id.clone();
+    let versioned = crate::storage::block_on(async move {
+        driver_documents_for_read
+            .get("subagent_sessions", &session_id)
+            .await
+    })
     .expect("read mismatched driver session")
     .expect("mismatched driver session exists");
+    let precondition = versioned.unchanged();
     let mut restored: tinyagents_orchestration::subagent::DurableSubagentSession =
         serde_json::from_value(versioned.doc).expect("decode mismatched driver session");
     restored.lifecycle_key = Some(original_lifecycle_key.clone());
@@ -289,12 +306,14 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         .with_timezone(&chrono::Utc)
         + chrono::Duration::milliseconds(1);
     restored.updated_at = updated_at.to_rfc3339();
-    crate::storage::block_on(driver_documents.put(
-        "subagent_sessions",
-        &before_session.subagent_session_id,
-        serde_json::to_value(&restored).expect("encode restored driver session"),
-        versioned.unchanged(),
-    ))
+    let driver_documents_for_write = Arc::clone(&driver_documents);
+    let session_id = before_session.subagent_session_id.clone();
+    let restored_doc = serde_json::to_value(&restored).expect("encode restored driver session");
+    crate::storage::block_on(async move {
+        driver_documents_for_write
+            .put("subagent_sessions", &session_id, restored_doc, precondition)
+            .await
+    })
     .expect("restore persisted lifecycle key for valid continuation");
     assert_eq!(
         restored.lifecycle_key.as_ref(),
