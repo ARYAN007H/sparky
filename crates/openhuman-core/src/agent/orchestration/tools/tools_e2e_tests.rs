@@ -311,7 +311,8 @@ async fn failed_async_child_is_reported_to_the_parent_without_a_success_result()
         .expect("the asynchronous spawn request is accepted");
     assert!(
         !accepted.is_error,
-        "child failure is delivered asynchronously"
+        "child failure is delivered asynchronously: {}",
+        accepted.output()
     );
 
     let failure_result = tokio::time::timeout(std::time::Duration::from_secs(120), async {
@@ -366,7 +367,7 @@ async fn unexecuted_tool_call_stub_is_projected_as_incomplete_not_success() {
         )
         .await
         .expect("the asynchronous spawn request is accepted");
-    assert!(!accepted.is_error, "completion is asynchronous");
+    assert!(!accepted.is_error, "completion is asynchronous: {}", accepted.output());
 
     let completed = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
