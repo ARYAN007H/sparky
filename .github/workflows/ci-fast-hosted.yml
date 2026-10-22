@@ -47,6 +47,8 @@ jobs:
           AUTHOR: ${{ github.event.pull_request.user.login }}
           ACTOR: ${{ github.actor }}
           ASSOCIATION: ${{ github.event.pull_request.author_association }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+          SINCE: ${{ github.event.pull_request.updated_at }}
         run: bash scripts/ci/ci-fast-route.sh
 
   lanes:
