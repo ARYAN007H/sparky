@@ -321,7 +321,8 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
     use crate::threads::store::{CreateConversationThread, blocking};
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness::context::RunContext;
-    use tinyagents_harness_tools::subagents::{SubAgentJobRegistry, SubAgentJobStatus};
+    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
     struct GatedModel {
         started: tokio::sync::mpsc::Sender<()>,
@@ -457,7 +458,7 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         "the deletion starts with a queued child completion"
     );
 
-    crate::threads::thread_delete(
+    crate::threads::ops::thread_delete(
         &dispatch,
         crate::threads::DeleteConversationThreadRequest {
             thread_id: thread_id.into(),
