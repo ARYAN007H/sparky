@@ -176,10 +176,12 @@ fn sanitize_filename(name: &str) -> Result<String, String> {
     if name.is_empty() {
         return Err(format!("filename has no usable characters: {trimmed:?}"));
     }
+    // Windows ignores spaces before the extension, so `CON .txt` is `CON`.
     let stem = name
         .split('.')
         .next()
         .unwrap_or_default()
+        .trim_end_matches(' ')
         .to_ascii_uppercase();
     // Win32 also treats the superscript digits ¹ ² ³ as COM/LPT port digits.
     let port_digit = |rest: &str| {
@@ -189,10 +191,12 @@ fn sanitize_filename(name: &str) -> Result<String, String> {
             (Some('1'..='9' | '¹' | '²' | '³'), None)
         )
     };
-    let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-        || ["COM", "LPT"]
-            .iter()
-            .any(|p| stem.strip_prefix(p).is_some_and(port_digit));
+    let reserved = matches!(
+        stem.as_str(),
+        "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+    ) || ["COM", "LPT"]
+        .iter()
+        .any(|p| stem.strip_prefix(p).is_some_and(port_digit));
     if reserved {
         name.insert(0, '_');
     }
