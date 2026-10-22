@@ -241,6 +241,7 @@ impl OpenHumanTurnPrelude {
         // replaces or leaves it with the goal tools. Turns with the run-state
         // block see the goal there, current on every call, so it is not also
         // prepended to the user's message.
+        run_context.goal_suppressed = turn.overrides.suppress_active_goal;
         let active_goal = if turn.overrides.suppress_active_goal {
             None
         } else {

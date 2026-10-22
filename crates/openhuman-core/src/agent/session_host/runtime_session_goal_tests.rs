@@ -106,3 +106,35 @@ async fn a_turn_without_the_state_block_still_carries_the_active_goal() {
         "{message}"
     );
 }
+
+/// A turn that suppresses the thread goal tells the run context, so the
+/// run-state block (which reads the goal from the store) stays off that turn.
+#[tokio::test]
+async fn a_suppressed_goal_reaches_the_run_context() {
+    let (host, tmp) = host_for("orchestrator");
+    goal_store::set(&store(&tmp), THREAD, "Migrate the auth schema", None)
+        .await
+        .unwrap();
+    let prelude = host
+        .runtime_state
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .prelude
+        .clone()
+        .expect("prelude");
+    for suppress in [false, true] {
+        let inputs = crate::agent::session_host::types::TurnInputs {
+            overrides: crate::agent::session_host::types::TurnOverrides {
+                suppress_active_goal: suppress,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut run_context = OpenHumanRunContext::new();
+        let message = prelude
+            .enrich_request("hey", &inputs, &mut run_context)
+            .await;
+        assert_eq!(run_context.goal_suppressed, suppress);
+        assert!(!message.contains("Migrate the auth schema"), "{message}");
+    }
+}

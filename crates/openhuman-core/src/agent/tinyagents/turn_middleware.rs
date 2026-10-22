@@ -110,6 +110,8 @@ pub(super) struct TurnMiddlewareInputs {
     /// With the scope the `todo` tool uses on a turn without a thread (the
     /// session id), so a headless turn's block still finds its plan.
     pub(super) state_store: Option<(Arc<dyn tinyagents_harness::store::Store>, String)>,
+    /// The turn suppresses the thread goal (`TurnOverrides::suppress_active_goal`).
+    pub(super) goal_suppressed: bool,
 }
 
 /// The handles the run loop reads after the drive returns.
@@ -163,6 +165,7 @@ pub(super) fn install_turn_middleware(
         todo_store,
         compaction_notice,
         state_store,
+        goal_suppressed,
     } = inputs;
     let super::host::HarnessHostPolicy {
         stop_hooks,
@@ -531,7 +534,7 @@ pub(super) fn install_turn_middleware(
     // The goal, the plan and the turn's tool-call facts on every model call,
     // request-only. On these turns the goal is not prepended to the user's
     // message (see `state_block`).
-    super::state_block::install(harness, state_store, is_subagent, agent_id);
+    super::state_block::install(harness, state_store, is_subagent, agent_id, goal_suppressed);
 
     // Direct web lookup is bounded. Once enough search/fetch results have
     // returned, the web tools leave the request so the run works with what it

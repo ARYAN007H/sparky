@@ -34,12 +34,26 @@ pub(crate) fn applies(is_subagent: bool, agent_definition_id: Option<&str>) -> b
 /// Installs the block for a turn in scope that has the session store the goal
 /// and `todo` tools write, with the key the `todo` tool falls back to when the
 /// turn has no thread (the session id).
+///
+/// A turn that suppresses the thread goal (`goal_suppressed`, from
+/// `TurnOverrides::suppress_active_goal`: a conversational reply, a flow or a
+/// cron run) gets no block: the block reads the goal from the store, and the
+/// goal must not reach that turn. Until TinyAgents' `hide_goal` is pinned, the
+/// plan and notes are left out with it, as on a turn without the block.
 pub(super) fn install<C: Send + Sync + 'static>(
     harness: &mut AgentHarness<(), C>,
     source: Option<(Arc<dyn Store>, String)>,
     is_subagent: bool,
     agent_definition_id: Option<&str>,
+    goal_suppressed: bool,
 ) {
+    if goal_suppressed {
+        tracing::debug!(
+            agent = agent_definition_id.unwrap_or("<none>"),
+            "[state_block] not installed: this turn suppresses the thread goal"
+        );
+        return;
+    }
     match source {
         Some((store, fallback_thread)) if applies(is_subagent, agent_definition_id) => {
             harness.push_middleware(Arc::new(

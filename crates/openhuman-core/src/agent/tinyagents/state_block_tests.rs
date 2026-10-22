@@ -21,6 +21,7 @@ fn install_needs_the_scope_and_a_store() {
             store.map(|store| (store, "standalone".to_string())),
             is_subagent,
             agent,
+            false,
         );
         harness.middleware().len() - before
     };
@@ -34,6 +35,27 @@ fn install_needs_the_scope_and_a_store() {
         0
     );
     assert_eq!(installed(Some(store), false, Some("planner")), 0);
+}
+
+/// A turn that suppresses the thread goal (`suppress_active_goal`) gets no
+/// block: the block would show the goal it must not see.
+#[test]
+fn a_turn_that_suppresses_the_goal_gets_no_block() {
+    let store: Arc<dyn Store> = Arc::new(InMemoryStore::default());
+    let installed = |goal_suppressed: bool| {
+        let mut harness = AgentHarness::<(), ()>::new();
+        let before = harness.middleware().len();
+        install(
+            &mut harness,
+            Some((store.clone(), "standalone".to_string())),
+            false,
+            Some("orchestrator"),
+            goal_suppressed,
+        );
+        harness.middleware().len() - before
+    };
+    assert_eq!(installed(false), 1);
+    assert_eq!(installed(true), 0);
 }
 
 #[tokio::test]

@@ -592,6 +592,7 @@ async fn drive_turn(
                     parent.session_id.clone(),
                 )
             }),
+            goal_suppressed: run_context.goal_suppressed,
         },
     );
     if let Some(scope) = run_context.response_shape.clone() {
