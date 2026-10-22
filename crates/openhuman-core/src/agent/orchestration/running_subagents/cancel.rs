@@ -520,17 +520,31 @@ pub(crate) fn stop_for_thread(
     Vec::new()
 }
 
-/// Abort and drop **every** registered sub-agent. Called on a full thread purge
-/// where no parent thread survives. Returns the **distinct parent thread ids**
-/// that had sub-agents, so the purge path can tombstone them in
-/// [`super::super::background_completions`] and drop any straggler completion
-/// that wins the cooperative-abort race. Headless sub-agents (no parent thread)
-/// are still aborted but contribute no id.
-pub(crate) fn cancel_all(ctx: &crate::core::runtime::DispatchCtx) -> Vec<String> {
-    let _ = ctx;
-    // Known legacy limitation tracked by #216: full purge still does not
-    // enumerate upstream driver jobs. Keep this behavior explicit here.
-    Vec::new()
+/// Abort and settle children of every thread removed by a full purge. The
+/// owner index selects each thread's live TinyAgents jobs, while
+/// [`cancel_for_thread`] waits for their terminal callbacks before the caller
+/// tombstones the parent completion queues.
+pub(crate) async fn cancel_all(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_ids: &[String],
+) -> Result<Vec<String>, String> {
+    let mut cancelled_threads = Vec::new();
+    let mut failures = Vec::new();
+    for thread_id in thread_ids {
+        match cancel_for_thread(ctx, thread_id).await {
+            Ok(count) if count > 0 => cancelled_threads.push(thread_id.clone()),
+            Ok(_) => {}
+            Err(error) => failures.push(format!("thread {thread_id}: {error}")),
+        }
+    }
+    if failures.is_empty() {
+        Ok(cancelled_threads)
+    } else {
+        Err(format!(
+            "could not safely settle all thread-owned driver jobs: {}",
+            failures.join("; ")
+        ))
+    }
 }
 
 pub(crate) fn now_ms() -> u64 {
