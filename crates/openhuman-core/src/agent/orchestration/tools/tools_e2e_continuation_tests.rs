@@ -383,7 +383,7 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     .expect("resume completion projection follows durable settlement");
     assert!(provider.saw("Inspect the README and continue."));
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
-    let requests = provider.seen.lock();
+    let requests = provider.seen.lock().clone();
     assert_eq!(requests.len(), 2);
     let resumed_request = &requests[1];
     assert!(resumed_request.contains("Investigate the pause-resume fixture"));
@@ -395,8 +395,6 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         1,
         "the answer is appended to the resumed history exactly once"
     );
-    drop(requests);
-
     let completed_job = jobs
         .get(paused_job.id.as_str())
         .expect("continuation reuses the same registered job");

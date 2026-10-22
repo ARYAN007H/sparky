@@ -123,12 +123,10 @@ pub(crate) async fn active_subagents_context_block(
     workspace: Option<&tinytools::WorkspaceDescriptor>,
 ) -> Option<String> {
     admit_workspace(ctx, workspace_dir).ok()?;
-    let Some(thread_id) = crate::agent::orchestration::background_completions::thread_for_session(
+    let thread_id = crate::agent::orchestration::background_completions::thread_for_session(
         ctx,
         parent_session,
-    ) else {
-        return None;
-    };
+    )?;
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(ctx);

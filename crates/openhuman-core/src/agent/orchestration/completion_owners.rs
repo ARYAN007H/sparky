@@ -141,13 +141,13 @@ pub(crate) fn driver_tasks_for_thread(
     let profile = ctx.tenant().ok().and_then(|tenant| tenant.profile);
     owners()
         .driver_tasks
-        .iter()
-        .filter_map(|(_, owner)| {
-            (owner.profile == profile
+        .values()
+        .filter(|owner| {
+            owner.profile == profile
                 && owner.workspace_dir == workspace_dir
-                && owner.parent_thread_id.as_deref() == Some(thread_id))
-            .then(|| (owner.task_id.clone(), owner.clone()))
+                && owner.parent_thread_id.as_deref() == Some(thread_id)
         })
+        .map(|owner| (owner.task_id.clone(), owner.clone()))
         .collect()
 }
 
@@ -159,13 +159,13 @@ pub(crate) fn driver_tasks_for_parent(
     let profile = ctx.tenant().ok().and_then(|tenant| tenant.profile);
     owners()
         .driver_tasks
-        .iter()
-        .filter_map(|(_, owner)| {
-            (owner.profile == profile
+        .values()
+        .filter(|owner| {
+            owner.profile == profile
                 && owner.workspace_dir == workspace_dir
-                && owner.parent_session == parent_session)
-                .then(|| (owner.task_id.clone(), owner.clone()))
+                && owner.parent_session == parent_session
         })
+        .map(|owner| (owner.task_id.clone(), owner.clone()))
         .collect()
 }
 

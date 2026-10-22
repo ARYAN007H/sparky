@@ -13,12 +13,12 @@ use super::types::{
 mod driver;
 #[cfg(test)]
 use driver::record_cancel_reason;
+#[cfg(test)]
+pub(crate) use driver::{cancel_driver_job_by_task, mark_driver_pause_cancelled};
 pub use driver::{
     cancel_driver_job_for_observed_session, cancel_driver_jobs_for_thread,
     resolve_driver_lifecycle_key, resolve_lifecycle_key, DriverTaskCancellation,
 };
-#[cfg(test)]
-pub(crate) use driver::{cancel_driver_job_by_task, mark_driver_pause_cancelled};
 pub use tinyagents_orchestration::subagent::normalize_task_key;
 
 pub fn action_root_key(path: Option<&Path>) -> Option<String> {
