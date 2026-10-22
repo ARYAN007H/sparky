@@ -290,11 +290,6 @@ fn native_provider_metadata_resolves_by_context_and_preserves_request_fields() {
             provider,
             &format!("{label}/alias")
         ));
-        assert!(crate::inference::registry::provider_model_is_raw_for(
-            extensions,
-            provider,
-            &format!("{label}/raw")
-        ));
         assert!(
             crate::inference::registry::provider_model_supports_vision_for(
                 extensions,
@@ -324,26 +319,42 @@ fn native_provider_metadata_resolves_by_context_and_preserves_request_fields() {
             ),
             Some(window)
         );
-        assert_eq!(
-            crate::inference::registry::provider_default_pricing_for(extensions, provider),
-            Some((format!("{label}/priced"), 1.25, 2.5))
-        );
         let mut request = tinyinference_llm::model::ModelRequest::new(vec![]);
         request.model = Some(format!("{label}/raw"));
         request.max_tokens = Some(37);
         request.metadata = json!({"caller": "kept"});
-        let request = crate::inference::registry::provider_request_without_reasoning_for(
-            extensions, provider, request,
+        let ambient_extensions = extensions.cloned().unwrap_or_else(Extensions::new);
+        let ambient = crate::core::runtime::CoreContext::for_test_with_extensions(
+            crate::core::runtime::DomainSet::full(),
+            None,
+            ambient_extensions,
         );
-        assert_eq!(
-            request.model.as_deref(),
-            Some(format!("{label}/raw").as_str())
-        );
-        assert_eq!(request.max_tokens, Some(37));
-        assert_eq!(
-            request.metadata,
-            json!({"caller": "kept", "reasoning_removed_by": label})
-        );
+        crate::core::runtime::CoreContext::sync_scope(ambient, || {
+            assert!(crate::inference::registry::provider_model_is_raw(
+                provider,
+                &format!("{label}/raw")
+            ));
+            assert_eq!(
+                crate::inference::registry::provider_default_pricing(provider),
+                Some((format!("{label}/priced"), 1.25, 2.5))
+            );
+            let mut request = tinyinference_llm::model::ModelRequest::new(vec![]);
+            request.model = Some(format!("{label}/raw"));
+            request.max_tokens = Some(37);
+            request.metadata = json!({"caller": "kept"});
+            let request = crate::inference::registry::provider_request_without_reasoning(
+                provider, request,
+            );
+            assert_eq!(
+                request.model.as_deref(),
+                Some(format!("{label}/raw").as_str())
+            );
+            assert_eq!(request.max_tokens, Some(37));
+            assert_eq!(
+                request.metadata,
+                json!({"caller": "kept", "reasoning_removed_by": label})
+            );
+        });
     };
 
     verify(None, "process", 101);

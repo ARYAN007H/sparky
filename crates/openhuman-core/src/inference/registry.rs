@@ -101,7 +101,7 @@ impl ProviderContext {
     }
 }
 
-pub use tinyinference_llm::providers::overrides::{
+use tinyinference_llm::providers::overrides::{
     BoxFuture, CatalogEntry, CatalogLimits, CatalogRequest, ChatModelEntry, ChatModelFactory,
     ChatModelRequest, EmbeddingFactory, EmbeddingRequest, ProviderModelMetadata, ProviderOverrides,
     ReadinessProbe,
@@ -260,14 +260,6 @@ pub fn provider_default_pricing(provider_id: &str) -> Option<(String, f64, f64)>
     (hooks.default_pricing)()
 }
 
-pub(crate) fn provider_default_pricing_for(
-    extensions: Option<&Extensions>,
-    provider_id: &str,
-) -> Option<(String, f64, f64)> {
-    let hooks = chat_model_for(extensions, provider_id)?.models?;
-    (hooks.default_pricing)()
-}
-
 /// The workload role assigned to a provider-specific model alias.
 pub fn provider_model_role(provider_id: &str, model: &str) -> Option<String> {
     let hooks = provider_model_hooks(provider_id)?;
@@ -304,19 +296,6 @@ pub fn provider_model_is_raw(provider_id: &str, model: &str) -> bool {
     !model.is_empty()
         && !model.starts_with("hint:")
         && provider_model_hooks(provider_id).is_none_or(|hooks| (hooks.is_raw_model)(model))
-}
-
-pub(crate) fn provider_model_is_raw_for(
-    extensions: Option<&Extensions>,
-    provider_id: &str,
-    model: &str,
-) -> bool {
-    let model = model.trim();
-    !model.is_empty()
-        && !model.starts_with("hint:")
-        && chat_model_for(extensions, provider_id)
-            .and_then(|entry| entry.models)
-            .is_none_or(|hooks| (hooks.is_raw_model)(model))
 }
 
 /// Whether the provider says `model` supports image input.
@@ -385,17 +364,6 @@ pub fn provider_request_without_reasoning(
     request: tinyinference_llm::model::ModelRequest,
 ) -> tinyinference_llm::model::ModelRequest {
     match provider_model_hooks(provider_id) {
-        Some(hooks) => (hooks.without_reasoning)(request),
-        None => request,
-    }
-}
-
-pub(crate) fn provider_request_without_reasoning_for(
-    extensions: Option<&Extensions>,
-    provider_id: &str,
-    request: tinyinference_llm::model::ModelRequest,
-) -> tinyinference_llm::model::ModelRequest {
-    match chat_model_for(extensions, provider_id).and_then(|entry| entry.models) {
         Some(hooks) => (hooks.without_reasoning)(request),
         None => request,
     }

@@ -376,10 +376,12 @@ pub mod inference_registry {
         register_config_normalizer, register_config_normalizer_in, register_embedding,
         register_embedding_in, resolve_provider_model, unregister_backend_error_classifier,
         unregister_catalog, unregister_chat_model, unregister_embedding,
-        BackendErrorClassification, BackendErrorClassifier, BackendErrorKind, BoxFuture,
-        CatalogCallContext, CatalogEntry, CatalogHostRequest, CatalogLimits, CatalogRequest,
-        ChatModelEntry, ChatModelFactory, ChatModelRequest, ConfigNormalizer, EmbeddingCallContext,
-        EmbeddingFactory, EmbeddingRequest, ProviderContext, ProviderModelMetadata,
+        BackendErrorClassification, BackendErrorClassifier, BackendErrorKind, CatalogCallContext,
+        CatalogHostRequest, ConfigNormalizer, EmbeddingCallContext, ProviderContext,
+    };
+    pub use tinyinference_llm::providers::overrides::{
+        BoxFuture, CatalogEntry, CatalogLimits, CatalogRequest, ChatModelEntry, ChatModelFactory,
+        ChatModelRequest, EmbeddingFactory, EmbeddingRequest, ProviderModelMetadata,
         ProviderOverrides, ReadinessProbe,
     };
 }
