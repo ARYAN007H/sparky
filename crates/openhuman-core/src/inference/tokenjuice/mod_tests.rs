@@ -89,10 +89,14 @@ fn host_tools_keep_the_published_recovery_names_and_schemas() {
     );
     for (tool, (name, schema)) in tools.iter().zip(expected) {
         assert_eq!(tool.name(), name);
+        let actual = serde_json::to_vec(&tool.parameters_schema()).unwrap();
+        let expected = serde_json::to_vec(&schema).unwrap();
         assert_eq!(
-            serde_json::to_vec(&tool.parameters_schema()).unwrap(),
-            serde_json::to_vec(&schema).unwrap(),
-            "schema changed for {name}"
+            actual,
+            expected,
+            "schema changed for {name}: actual={}, expected={}",
+            String::from_utf8_lossy(&actual),
+            String::from_utf8_lossy(&expected),
         );
     }
 }
