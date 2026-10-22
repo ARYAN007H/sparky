@@ -452,8 +452,10 @@ fn scoped_instance_advertises_exactly_the_allowlist() {
         schema["properties"]["agent_id"]["enum"],
         serde_json::json!(["agent_memory", "workflow_builder"])
     );
-    assert!(schema["properties"]["agent_id"]["description"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("only these are dispatchable"));
+    assert!(
+        schema["properties"]["agent_id"]["description"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("only these are dispatchable")
+    );
 }

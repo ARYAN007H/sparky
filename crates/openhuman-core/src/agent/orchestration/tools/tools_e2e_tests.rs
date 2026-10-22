@@ -377,7 +377,11 @@ async fn unexecuted_tool_call_stub_is_projected_as_incomplete_not_success() {
         )
         .await
         .expect("the asynchronous spawn request is accepted");
-    assert!(!accepted.is_error, "completion is asynchronous: {}", accepted.output());
+    assert!(
+        !accepted.is_error,
+        "completion is asynchronous: {}",
+        accepted.output()
+    );
 
     let completed = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
