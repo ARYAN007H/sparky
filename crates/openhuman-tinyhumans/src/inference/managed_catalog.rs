@@ -310,7 +310,6 @@ pub(super) fn limits_request(model: &str, config: &Config) -> Option<DiscoveryRe
         return None;
     }
     let inference_base = effective_api_url(&config.api_url);
-    let endpoint = format!("{}/openai/v1", inference_base.trim_end_matches('/'));
     let listing_url = catalog_url(config);
     let auth = match resolve_backend_credential(config) {
         Ok(BackendCredential::ApiKey(key)) if is_managed_endpoint_for_api_key(&listing_url) => {
