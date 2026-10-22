@@ -435,3 +435,72 @@ fn managed_options_builder_uses_the_ambient_native_provider_entry() {
         "ambient/pinned"
     );
 }
+
+#[test]
+fn managed_builder_uses_the_entry_selected_before_metadata_resolution() {
+    use crate::core::slots::Extensions;
+    use crate::inference::registry::{
+        register_chat_model_in, ChatModelEntry, ProviderContext, ProviderModelMetadata,
+    };
+    use std::sync::Arc;
+
+    let _guard = crate::inference::inference_test_guard();
+    let provider = crate::inference::provider::factory::PROVIDER_OPENHUMAN;
+    let extensions = Extensions::new();
+    let replacement = ChatModelEntry::<ProviderContext> {
+        build: Arc::new(|_| {
+            Ok((
+                Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
+                    "replacement",
+                ])),
+                "replacement-factory".to_string(),
+            ))
+        }),
+        probe: None,
+        models: None,
+    };
+    let replacement_for_resolver = replacement.clone();
+    let extensions_for_resolver = extensions.clone();
+    let entry = ChatModelEntry::<ProviderContext> {
+        build: Arc::new(|_| {
+            Ok((
+                Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
+                    "selected",
+                ])),
+                "selected-factory".to_string(),
+            ))
+        }),
+        probe: None,
+        models: Some(ProviderModelMetadata {
+            default_model: Arc::new(|| None),
+            role_for_model: Arc::new(|_| None),
+            is_alias: Arc::new(|_| false),
+            is_raw_model: Arc::new(|_| false),
+            supports_vision: Arc::new(|_| false),
+            resolve_model: Arc::new(move |_, _, _| {
+                register_chat_model_in(
+                    &extensions_for_resolver,
+                    provider,
+                    replacement_for_resolver.clone(),
+                );
+                Some("snapshot/model".to_string())
+            }),
+            context_window: Arc::new(|_| None),
+            default_pricing: Arc::new(|| None),
+            without_reasoning: Arc::new(|request| request),
+        }),
+    };
+    register_chat_model_in(&extensions, provider, entry);
+
+    let built = crate::inference::provider::factory::make_openhuman_backend_model_for_thread_in(
+        Some(&extensions),
+        "chat",
+        &Config::default(),
+        None,
+        true,
+        None,
+        &crate::security::egress::EgressLedger::none(),
+    )
+    .expect("the selected entry must remain usable after its registry slot changes");
+    assert_eq!(built.1, "selected-factory");
+}
