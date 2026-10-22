@@ -139,9 +139,9 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
     use crate::config::test_env::EnvVarGuard;
     use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
     use crate::inference::registry::{
-        register_chat_model, register_inspection_chat_model, ChatModelEntry,
-        InspectionChatModelFactory,
+        register_chat_model, register_inspection_chat_model, InspectionChatModelFactory,
     };
+    use tinyinference_llm::providers::overrides::ChatModelEntry;
 
     struct ManagedModel {
         generations: Arc<AtomicUsize>,

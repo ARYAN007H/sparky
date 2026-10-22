@@ -6,7 +6,7 @@ use crate::config::Config;
 use crate::core::runtime::{CoreContext, DomainSet};
 use crate::doctor::{DoctorCtx, DoctorOptions, DoctorTier, Finding, FindingSeverity};
 use serde_json::{json, Value};
-use tinyinference_llm::providers::overrides::ChatModelRequest;
+use tinyinference_llm::providers::overrides::{ChatModelEntry, ChatModelRequest};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -299,8 +299,7 @@ async fn live_probe_uses_selected_doctor_config_inside_another_ambient_context()
 #[tokio::test]
 async fn managed_chat_probe_uses_the_inspection_only_factory_callback() {
     use crate::inference::registry::{
-        register_chat_model_in, register_inspection_chat_model_in, ChatModelEntry,
-        InspectionChatModelFactory,
+        register_chat_model_in, register_inspection_chat_model_in, InspectionChatModelFactory,
     };
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
