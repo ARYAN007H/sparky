@@ -51,17 +51,6 @@ fn registered_controllers_all_in_inference_namespace() {
 }
 
 #[test]
-fn agent_chat_controllers_are_registered_by_agent_runs_only() {
-    let functions: Vec<_> = all_registered_controllers()
-        .into_iter()
-        .map(|controller| controller.schema.function)
-        .collect();
-
-    assert!(!functions.contains(&"agent_chat"));
-    assert!(!functions.contains(&"agent_chat_simple"));
-}
-
-#[test]
 fn field_builder_helpers_are_correct_shape() {
     let r = required_string("k", "c");
     assert!(r.required);

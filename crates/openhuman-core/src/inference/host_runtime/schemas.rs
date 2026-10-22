@@ -72,8 +72,6 @@ struct LocalAiTtsParams {
 
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
     vec![
-        schemas("agent_chat"),
-        schemas("agent_chat_simple"),
         schemas("transcribe"),
         schemas("transcribe_bytes"),
         schemas("tts"),
@@ -83,14 +81,6 @@ pub fn all_controller_schemas() -> Vec<ControllerSchema> {
 
 pub fn all_registered_controllers() -> Vec<RegisteredController> {
     vec![
-        RegisteredController {
-            schema: schemas("agent_chat"),
-            handler: handle_agent_chat,
-        },
-        RegisteredController {
-            schema: schemas("agent_chat_simple"),
-            handler: handle_agent_chat_simple,
-        },
         RegisteredController {
             schema: schemas("transcribe"),
             handler: handle_local_ai_transcribe,
