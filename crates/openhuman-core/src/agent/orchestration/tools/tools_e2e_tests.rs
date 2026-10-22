@@ -13,6 +13,38 @@ use tinytools_agent::dialect::ToolCallFormat;
 
 const SPAWN_SUBAGENT_CANARY: &str = "tool-e2e-spawn-subagent-canary";
 
+pub(super) async fn driver_sessions_for_parent(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &Path,
+    parent_session: &str,
+    parent_thread_id: Option<&str>,
+) -> Result<Vec<crate::agent::orchestration::subagent_sessions::DurableSubagentSession>, String> {
+    use crate::agent::orchestration::subagent_sessions::{
+        host_projection, open_for_context, parent_epoch_for_context,
+    };
+
+    let sessions = open_for_context(
+        ctx,
+        workspace_dir.to_path_buf(),
+        parent_session,
+        parent_thread_id.map(str::to_owned),
+        None,
+    )
+    .map_err(|error| error.to_string())?
+    .list_for_parent(parent_session, parent_thread_id)
+    .await
+    .map_err(|error| error.to_string())?;
+    sessions
+        .into_iter()
+        .map(|session| {
+            let parent_epoch =
+                parent_epoch_for_context(ctx, workspace_dir, session.subagent_session_id.clone())
+                    .map_err(|error| error.to_string())?;
+            Ok(host_projection(session, parent_epoch))
+        })
+        .collect()
+}
+
 #[tokio::test]
 async fn spawn_subagent_returns_async_reference_and_runs_child_e2e() {
     let workspace = tempfile::TempDir::new().expect("workspace");
@@ -207,7 +239,7 @@ async fn spawn_subagent_reports_a_stopped_child_as_incomplete_progress() {
                     stop,
                     ..
                 }) if agent_id == "task_manager_agent" && event_task_id == task_id => {
-                    break (output, stop)
+                    break (output, stop);
                 }
                 Some(crate::progress::AgentProgress::SubagentFailed {
                     agent_id,
@@ -262,7 +294,12 @@ async fn failed_async_child_is_reported_to_the_parent_without_a_success_result()
         vec![],
     );
     parent.on_progress = Some(progress_tx);
-    let live = super::live_parent_run_context("failed-async-child", parent);
+    let (live, _core) = continuation_tests::core_backed_live_parent(
+        workspace.path(),
+        parent,
+        "failed-async-child-session",
+        "failed-async-child-thread",
+    );
     let accepted = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
@@ -279,7 +316,8 @@ async fn failed_async_child_is_reported_to_the_parent_without_a_success_result()
         .expect("the asynchronous spawn request is accepted");
     assert!(
         !accepted.is_error,
-        "child failure is delivered asynchronously"
+        "child failure is delivered asynchronously: {}",
+        accepted.output()
     );
 
     let failure_result = tokio::time::timeout(std::time::Duration::from_secs(120), async {
@@ -300,7 +338,7 @@ async fn failed_async_child_is_reported_to_the_parent_without_a_success_result()
         panic!("asynchronous child failure reaches the parent after {elapsed}; provider calls={invocation_count}")
     });
     assert!(
-        failure.starts_with("spawn_subagent failed and did not complete."),
+        failure.starts_with("spawn_subagent failed and did not complete"),
         "failure copy remains recognizable to the parent: {failure}"
     );
     assert!(failure.contains("scripted provider outage"), "{failure}");
@@ -319,7 +357,12 @@ async fn unexecuted_tool_call_stub_is_projected_as_incomplete_not_success() {
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(32);
     let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
     parent.on_progress = Some(progress_tx);
-    let live = super::live_parent_run_context("stub-async-child", parent);
+    let (live, _core) = continuation_tests::core_backed_live_parent(
+        workspace.path(),
+        parent,
+        "stub-async-child-session",
+        "stub-async-child-thread",
+    );
     let accepted = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
@@ -334,7 +377,11 @@ async fn unexecuted_tool_call_stub_is_projected_as_incomplete_not_success() {
         )
         .await
         .expect("the asynchronous spawn request is accepted");
-    assert!(!accepted.is_error, "completion is asynchronous");
+    assert!(
+        !accepted.is_error,
+        "completion is asynchronous: {}",
+        accepted.output()
+    );
 
     let completed = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
@@ -571,9 +618,13 @@ mod driver_reuse_tests;
 mod driver_tests;
 #[path = "tools_e2e_profile_cancel_tests.rs"]
 mod profile_cancel_tests;
+#[path = "tools_e2e_thread_delete_tests.rs"]
+mod thread_delete_tests;
 
 #[path = "tools_e2e_continuation_tests.rs"]
 mod continuation_tests;
+#[path = "tools_e2e_resume_owner_tests.rs"]
+mod resume_owner_tests;
 
 #[path = "tools_e2e_paused_cancel_tests.rs"]
 mod paused_cancel_tests;

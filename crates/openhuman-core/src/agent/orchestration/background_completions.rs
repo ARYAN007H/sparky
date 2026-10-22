@@ -27,8 +27,8 @@ mod store_adapter;
 mod thread_index;
 use parent_lifecycle::is_marked_deleted;
 pub(crate) use parent_lifecycle::{
-    clear_all, discard_for_thread, discard_pending_for_thread, finish_stop_for_thread,
-    mark_stopped_task_if_thread_stopped, resume_stopped_thread,
+    clear_all, delete_parent_for_thread, discard_for_thread, discard_pending_for_thread,
+    finish_stop_for_thread, mark_stopped_task_if_thread_stopped, resume_stopped_thread,
 };
 pub(crate) use store_adapter::router_for_workspace_ctx;
 pub(super) use store_adapter::{
@@ -38,9 +38,10 @@ pub(super) use store_adapter::{
 pub(super) use store_adapter::{
     entry_for, router_for_workspace, router_scope, test_store_overrides,
 };
-use thread_index::{key, note_thread_workspace};
+use thread_index::key;
 pub(crate) use thread_index::{
-    note_session_thread, router_for_thread, thread_for_session, workspace_for_thread,
+    note_session_thread, note_thread_workspace, router_for_thread, thread_for_session,
+    workspace_for_thread,
 };
 
 use std::path::{Path, PathBuf};

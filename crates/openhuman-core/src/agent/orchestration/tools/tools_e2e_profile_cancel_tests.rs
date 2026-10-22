@@ -26,9 +26,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         return;
     }
 
-    use crate::agent::orchestration::subagent_sessions::{
-        DurableSubagentStatus, SubagentSessionStore,
-    };
+    use crate::agent::orchestration::subagent_sessions::DurableSubagentStatus;
     use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
@@ -105,14 +103,9 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         tinyagents_harness::context::RunConfig::new("profile-cancel-parent").with_thread(thread_id),
         host,
     );
-    let detached_data = live.data.detached_child();
-    let detached = live
-        .child(
-            tinyagents_harness::context::RunConfig::new("profile-cancel-child"),
-            detached_data.clone(),
-        )
-        .expect("detached child context")
-        .with_cancellation(detached_data.cancellation.clone());
+    let detached =
+        crate::agent::subagent_host::detached_subagent_parent(&live, "profile-cancel-child")
+            .expect("detached child context");
     let accepted = CoreContext::scope(
         Arc::clone(&alice),
         crate::agent::orchestration::tools::SpawnSubagentTool::new()
@@ -147,12 +140,17 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
     let alice_jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&alice_ctx);
-    let store = SubagentSessionStore::new(workspace.clone());
-    let row_before = CoreContext::sync_scope(Arc::clone(&alice), || store.load())
-        .expect("durable child row readable")
-        .into_iter()
-        .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
-        .expect("durable row belongs to the live child");
+    let row_before = super::driver_sessions_for_parent(
+        &alice_ctx,
+        &workspace,
+        "shared-profile-parent-session",
+        Some(thread_id),
+    )
+    .await
+    .expect("driver child row readable")
+    .into_iter()
+    .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
+    .expect("durable row belongs to the live child");
     assert_eq!(row_before.status, DurableSubagentStatus::Running);
     assert_eq!(row_before.parent_session, "shared-profile-parent-session");
     assert_eq!(row_before.parent_thread_id.as_deref(), Some(thread_id));
@@ -172,6 +170,11 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         .get(alice_job_id.as_str())
         .expect("real child is registered in Alice's scoped driver registry");
     assert_eq!(alice_job.status, SubAgentJobStatus::Running);
+    assert!(
+        crate::agent::orchestration::completion_owners::driver_task_owner(&alice_ctx, &task_id,)
+            .is_some(),
+        "spawn records Alice's exact task owner scope"
+    );
 
     let bob_ctx = DispatchCtx::new(Arc::clone(&bob));
     let bob_job_registry = crate::core::runtime::slot_for::<
@@ -188,6 +191,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
             Some(&workspace),
             Some("foreign profile cancellation"),
         )
+        .await
     })
     .await
     .expect("foreign profile cancellation lookup");
@@ -200,11 +204,17 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         SubAgentJobStatus::Running,
         "foreign cancellation leaves the owner job running"
     );
-    let after_bob = CoreContext::sync_scope(Arc::clone(&alice), || store.load())
-        .expect("durable child row remains readable")
-        .into_iter()
-        .find(|row| row.subagent_session_id == row_before.subagent_session_id)
-        .expect("foreign attempt keeps Alice's durable row");
+    let after_bob = super::driver_sessions_for_parent(
+        &alice_ctx,
+        &workspace,
+        "shared-profile-parent-session",
+        Some(thread_id),
+    )
+    .await
+    .expect("driver child row remains readable")
+    .into_iter()
+    .find(|row| row.subagent_session_id == row_before.subagent_session_id)
+    .expect("foreign attempt keeps Alice's durable row");
     assert_eq!(after_bob.status, DurableSubagentStatus::Running);
     assert_eq!(after_bob.current_task_id, row_before.current_task_id);
     assert_eq!(after_bob.latest_error, row_before.latest_error);
@@ -223,15 +233,22 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
             None,
             None,
         )
+        .await
         .expect("unbound SaaS control refusal")
         .is_none(),
         "SaaS cancellation without a profile fails closed"
     );
-    let after_unbound = CoreContext::sync_scope(Arc::clone(&alice), || store.load())
-        .expect("unbound attempt leaves durable child row readable")
-        .into_iter()
-        .find(|row| row.subagent_session_id == row_before.subagent_session_id)
-        .expect("unbound attempt keeps Alice's durable row");
+    let after_unbound = super::driver_sessions_for_parent(
+        &alice_ctx,
+        &workspace,
+        "shared-profile-parent-session",
+        Some(thread_id),
+    )
+    .await
+    .expect("unbound attempt leaves driver child row readable")
+    .into_iter()
+    .find(|row| row.subagent_session_id == row_before.subagent_session_id)
+    .expect("unbound attempt keeps Alice's durable row");
     assert_eq!(after_unbound.status, DurableSubagentStatus::Running);
     assert_eq!(after_unbound.current_task_id, row_before.current_task_id);
     assert_eq!(after_unbound.latest_error, row_before.latest_error);
@@ -243,6 +260,40 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         "neither rejected control attempt emits an Alice completion"
     );
 
+    let owner_scope =
+        crate::agent::orchestration::completion_owners::driver_task_owner(&alice_ctx, &task_id)
+            .expect("Alice's cached owner scope");
+    let job_owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &owner_scope.workspace_dir,
+        &owner_scope.parent_session,
+        owner_scope.parent_thread_id.as_deref(),
+    );
+    let registered = alice_jobs
+        .list_for_parent_scope(
+            &job_owner,
+            &tinyagents_orchestration::subagent::ParentJobScope::new(
+                owner_scope.workspace.clone(),
+                owner_scope.parent_thread_id.as_deref().unwrap_or_default(),
+            ),
+        )
+        .expect("Alice's exact driver job scope");
+    assert!(
+        registered.iter().any(|job| {
+            job.extensions
+                .get("task_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(task_id.as_str())
+        }),
+        "Alice's owner/workspace/thread must list the driver task: session={:?}, cached workspace={:?}, thread={:?}, job ids={:?}",
+        owner_scope.parent_session,
+        owner_scope.workspace,
+        owner_scope.parent_thread_id,
+        registered
+            .iter()
+            .map(|job| job.id.as_str())
+            .collect::<Vec<_>>(),
+    );
+
     let owner_cancel = CoreContext::scope(Arc::clone(&alice), async {
         crate::agent::orchestration::running_subagents::cancel_by_task_with_workspace_reason(
             &alice_ctx,
@@ -250,6 +301,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
             Some(&workspace),
             Some("owner requested stop"),
         )
+        .await
     })
     .await
     .expect("owner cancellation lookup");

@@ -1,3 +1,5 @@
+use tinyagents_harness::cache::CacheLayoutEvent;
+
 /// Surface the crate `PromptCacheGuardMiddleware`'s recorded
 /// [`CacheLayoutEvent`]s as structured `[cache]` warnings (issue #4249, 03.2).
 ///
@@ -21,5 +23,3 @@ pub(crate) fn surface_cache_layout_events(model: &str, events: &[CacheLayoutEven
         );
     }
 }
-use tinyagents_harness::cache::CacheLayoutEvent;
-

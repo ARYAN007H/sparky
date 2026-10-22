@@ -100,7 +100,7 @@ Responses project the crate's own `AgentObservation` and `HarnessRunStatus` serd
 ## Used by
 
 - [`agent/session_host/runtime_session/`](../session_host/runtime_session/): the chat-turn route into `TurnSpec::run`.
-- [`agent/harness/graph.rs`](../harness/graph.rs): the channel/CLI bus turn route.
+- [`channels/runtime/turn_driver.rs`](../../channels/runtime/turn_driver.rs): the channel/CLI bus turn route.
 - [`agent/subagent_host/`](../subagent_host/): the sub-agent spawn route. It and the session route both build their context-window summarizer through `TurnModelSource::build_summarizer`.
 - [`agent/session_host/builder/setters.rs`](../session_host/builder/setters.rs), `agent/subagent_host/ops/{provider,runner}.rs`, `channels/`: construct `TurnModelSource`.
 - [`agent/bus.rs`](../bus.rs): reads `TinyagentsTurnOutcome::resolved_route` after a turn.

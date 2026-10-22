@@ -384,6 +384,37 @@ pub fn resolve_lifecycle_key(
     Ok(key)
 }
 
+/// Resolves and validates a task lifecycle key through the authenticated
+/// TinyAgents session port. Product spawn/resume paths use this instead of
+/// consulting the legacy host collection.
+pub async fn resolve_driver_lifecycle_key(
+    store: &dyn tinyagents_orchestration::subagent::SubagentSessionStore,
+    session_or_task_id: &str,
+    checkpoint_dir: &Path,
+) -> Result<tinyagents_orchestration::subagent::SubagentTaskKey, String> {
+    let session = store
+        .get(session_or_task_id)
+        .await
+        .map_err(|error| format!("read durable subagent session: {error}"))?
+        .ok_or_else(|| "durable subagent session not found".to_string())?;
+    let task_id = session
+        .current_task_id
+        .as_deref()
+        .ok_or_else(|| "durable subagent session has no current task".to_string())?;
+    let key = if let Some(key) = session.lifecycle_key {
+        key
+    } else {
+        crate::agent::subagent_host::load_subagent_checkpoint(checkpoint_dir, task_id)
+            .map_err(|error| format!("legacy subagent checkpoint unavailable: {error}"))?
+            .task_key
+            .ok_or_else(|| "legacy subagent checkpoint has no lifecycle key".to_string())?
+    };
+    if key.task_id != task_id || key.thread_id.as_deref() != session.parent_thread_id.as_deref() {
+        return Err("durable subagent lifecycle key does not match its owned session".into());
+    }
+    Ok(key)
+}
+
 #[cfg(test)]
 #[path = "ops_driver_tests.rs"]
 mod tests;
