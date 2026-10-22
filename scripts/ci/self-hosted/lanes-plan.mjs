@@ -513,6 +513,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
             " agent_registry::agents::loader:: commands::ops::tests:: memory::people::contacts_gate_tests::" +
             " memory::layout_migration::" +
             " doctor::checks::" +
+            " core::schema_test_support::" +
             " openhuman::config:: openhuman::platform::socket::event_handlers:: tools::schemas:: tools::ops::tests::",
         },
         {
