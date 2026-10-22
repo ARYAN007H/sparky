@@ -425,6 +425,17 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         .await
         .expect("spawn tool execution");
     assert!(!spawned.is_error, "{}", spawned.output());
+    let accepted_ref = spawned
+        .output()
+        .split("[async_subagent_ref]\n")
+        .nth(1)
+        .and_then(|value| value.split("\n[/async_subagent_ref]").next())
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .expect("accepted child envelope contains its task ID");
+    let task_id = accepted_ref["task_id"]
+        .as_str()
+        .expect("accepted task ID")
+        .to_owned();
     tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
         .await
         .expect("child reaches its gated provider call")
@@ -435,12 +446,9 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         .list()
         .into_iter()
         .find(|job| {
-            job.status == SubAgentJobStatus::Running
-                && job.agent == "task_manager_agent"
-                && job.extensions.get("task_id").and_then(serde_json::Value::as_str).is_some()
+            job.status == SubAgentJobStatus::Running && job.agent == "task_manager_agent"
         })
         .expect("spawned child is live in the TinyAgents job registry");
-    let task_id = job.extensions["task_id"].as_str().unwrap().to_owned();
     background_completions::record_outcome(
         &dispatch,
         &workspace,
