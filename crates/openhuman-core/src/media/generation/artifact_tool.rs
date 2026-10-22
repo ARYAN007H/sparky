@@ -41,7 +41,7 @@ struct MediaArtifactPolicy {
     allowed_references: Option<super::tools::MediaReferenceAllowlist>,
 }
 
-impl<T: Tool> MediaArtifactTool<T> {
+impl<T: Tool + 'static> MediaArtifactTool<T> {
     /// Creates the host adapter for a media generation tool.
     pub fn new(
         inner: T,
@@ -58,7 +58,7 @@ impl<T: Tool> MediaArtifactTool<T> {
             blobs: None,
             allowed_references: None,
         }));
-        let upstream_kind = match kind {
+        let upstream_kind = match &kind {
             ArtifactKind::Image => MediaArtifactKind::Image,
             _ => MediaArtifactKind::Video,
         };
@@ -99,7 +99,7 @@ impl<T: Tool> MediaArtifactTool<T> {
         self.policy
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .allowed_references = Some(allowed_references);
+            .allowed_references = Some(Arc::clone(&allowed_references));
         self.allowed_references = Some(allowed_references);
         self
     }
@@ -141,8 +141,9 @@ impl<T: Tool> MediaArtifactTool<T> {
             allowed_references,
         } = self;
         let build: MediaInnerFactory<T> = Arc::new(build);
+        let per_call_policy = Arc::clone(&policy);
         let inner = inner.with_per_call_inner(Arc::new(move |progress, context| {
-            ReferenceRefreshTool::new(build(progress, context), Arc::clone(&policy))
+            ReferenceRefreshTool::new(build(progress, context), Arc::clone(&per_call_policy))
         }));
         Self {
             inner,
@@ -155,7 +156,7 @@ impl<T: Tool> MediaArtifactTool<T> {
 }
 
 #[async_trait]
-impl<T: Tool> Tool for MediaArtifactTool<T> {
+impl<T: Tool + 'static> Tool for MediaArtifactTool<T> {
     fn name(&self) -> &str {
         self.inner.name()
     }
