@@ -1,6 +1,6 @@
 //! `OpenHumanSessionHost::from_config` factory methods and internal `build_session_agent_inner` constructor.
 
-use super::{factory_resolution::provider_role_for_definition, should_synthesize_delegation_tools};
+use super::should_synthesize_delegation_tools;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::session_host::types::OpenHumanSessionHost;
 use crate::agent_registry::host_definition::{
