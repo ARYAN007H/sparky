@@ -19,8 +19,8 @@ pub struct ThreadLiveStateRequest {
 
 /// Response for [`goal_get`]: the thread's current goal, or `None` when the
 /// thread has none. Mirrors the `goal` field on `ThreadGoalUpdated` /
-/// `thread_goal_updated` — a raw `Value` because `ThreadGoal` is owned by
-/// `tinyagents-graph`.
+/// `thread_goal_updated` — a raw `Value` to keep the RPC contract independent
+/// of the harness tool's internal goal type.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ThreadGoalGetResponse {
     pub goal: Option<serde_json::Value>,
