@@ -505,9 +505,23 @@ async fn thread_delete_inner(
     // completion in the gap between the two calls, then discard anything already
     // queued for delivery. Both target a thread that's being deleted, so there's
     // nowhere left to deliver to — abort + cleanup is the whole behavior.
-    let cancelled_legacy =
-        crate::agent::orchestration::running_subagents::cancel_for_thread(&ctx, &request.thread_id)
-            .await?;
+    let cancelled_legacy = match crate::agent::orchestration::running_subagents::cancel_for_thread(
+        &ctx,
+        &request.thread_id,
+    )
+    .await
+    {
+        Ok(cancelled) => cancelled,
+        Err(error) => {
+            crate::agent::orchestration::background_completions::delete_parent_for_thread(
+                &ctx,
+                &dir,
+                &request.thread_id,
+            )
+            .map_err(|close_error| format!("{error}; {close_error}"))?;
+            return Err(error);
+        }
+    };
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&ctx);
@@ -520,11 +534,11 @@ async fn thread_delete_inner(
         )
         .len();
     let cancelled = cancelled_legacy + cancelled_driver;
-    let discarded = crate::agent::orchestration::background_completions::discard_for_thread(
+    let discarded = crate::agent::orchestration::background_completions::delete_parent_for_thread(
         &ctx,
         &dir,
         &request.thread_id,
-    );
+    )?;
     log::debug!(
         "[threads] thread_delete thread_id={} cancelled_subagents={} discarded_completions={}",
         request.thread_id,

@@ -27,8 +27,8 @@ mod store_adapter;
 mod thread_index;
 use parent_lifecycle::is_marked_deleted;
 pub(crate) use parent_lifecycle::{
-    clear_all, discard_for_thread, discard_pending_for_thread, finish_stop_for_thread,
-    mark_stopped_task_if_thread_stopped, resume_stopped_thread,
+    clear_all, delete_parent_for_thread, discard_for_thread, discard_pending_for_thread,
+    finish_stop_for_thread, mark_stopped_task_if_thread_stopped, resume_stopped_thread,
 };
 pub(crate) use store_adapter::router_for_workspace_ctx;
 pub(super) use store_adapter::{
