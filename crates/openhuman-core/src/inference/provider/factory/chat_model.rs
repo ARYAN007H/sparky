@@ -1,13 +1,33 @@
 //! One-shot `create_chat_model*` entry points, the readiness probe, the
 //! default-temperature wrapper, and the unresolved-route error builder.
 
-use super::*;
+#[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
+use super::test_provider_override;
+use super::{
+    access_gates::{emit_inference_egress, enforce_local_only_inference},
+    cloud_slug::{
+        resolve_cloud_slug_for, resolve_cloud_slug_with_access,
+        try_create_cloud_slug_chat_model_from_string_with_native_tools_for,
+    },
+    credentials::CredentialAccess,
+    local_runtime::try_create_local_runtime_chat_model_from_string,
+    provider_for_role,
+    subprocess_providers::OpenHumanMcpEndpoint,
+    BYOK_INCOMPLETE_SENTINEL, CLAUDE_AGENT_SDK_PREFIX, CLAUDE_AGENT_SDK_PROVIDER,
+    PROVIDER_OPENHUMAN,
+};
 use crate::config::ops::resolve_primary_cloud_provider_string;
+use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
+use crate::security::egress::EgressLedger;
+use std::sync::Arc;
 use tinyagents_harness::host::{
     BuildOpts, ModelBuildGate, ModelBuildRequest, ModelFactory, ModelPurpose,
 };
-use tinyinference_llm::model::{ModelRequestDefaults, ProfileOverrideModel, ResolvedModelRoute};
+use tinyinference_llm::model::{
+    ChatModel, ModelRequestDefaults, ProfileOverrideModel, ResolvedModelRoute,
+};
+use tinyinference_providers::route::split_model_and_temperature;
 use tinyinference_providers::route::{ProviderRoute, RouteKind};
 
 /// OpenHuman's host policy and construction adapter for a harness turn.

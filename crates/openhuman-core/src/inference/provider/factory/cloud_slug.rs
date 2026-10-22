@@ -1,17 +1,34 @@
 //! `<slug>:<model>` BYOK cloud providers: shared slug resolution (model fallback,
 //! abstract-tier remapping, credentials, codex routing) and the crate-native builders.
 
-use super::*;
+use super::{
+    access_gates::enforce_local_only_inference, cloud_spec, credentials::CredentialAccess,
+    local_runtime::OptionalChatModelResult, managed_backend::managed_chat_model_for,
+    openai_bearer_is_oauth, provider_for_role, redact_endpoint_origin, resolve_codex_routing,
+    InspectionOutputBudgetCapability, BYOK_INCOMPLETE_SENTINEL, CLAUDE_AGENT_SDK_PREFIX,
+    CLAUDE_AGENT_SDK_PROVIDER, PROVIDER_OPENHUMAN,
+};
 use crate::config::ops::resolve_primary_cloud_provider_string;
+use crate::config::schema::cloud_providers::AuthStyle;
+use crate::config::Config;
 #[cfg(not(test))]
 use crate::inference::provider::factory::access_gates::verify_backend_session_active;
 #[cfg(not(test))]
 use crate::inference::provider::factory::access_gates::verify_session_active;
 use crate::inference::provider::fallback_diagnostics;
+use crate::inference::provider::openai_codex::resolve_openai_codex_routing_for_inspection;
+use crate::security::egress::EgressLedger;
+use std::sync::Arc;
+use tinyinference_llm::model::ChatModel;
 use tinyinference_llm::providers::anthropic::endpoint_is_anthropic_messages;
+use tinyinference_llm::providers::openai::codex::{
+    openai_codex_client_version, openai_codex_user_agent, OPENAI_CODEX_ACCOUNT_HEADER,
+    OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
+};
 use tinyinference_llm::providers::registry::{
     resolve_slug_model, ProviderBuildOptions, ProviderRegistry,
 };
+use tinyinference_providers::route::split_model_and_temperature;
 
 type CloudSlugInspectionChatModelResult = Option<
     anyhow::Result<(

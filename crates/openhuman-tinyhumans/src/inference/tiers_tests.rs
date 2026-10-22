@@ -226,6 +226,20 @@ fn managed_tier_vocabulary_maps_aliases_and_leaves_concrete_ids_raw() {
 }
 
 #[test]
+fn managed_hint_roles_follow_the_native_workload_route_order() {
+    let native = tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS
+        .iter()
+        .map(|route| route.strip_prefix("hint:").expect("native hint route"))
+        .collect::<Vec<_>>();
+    for (route, role) in tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS
+        .iter()
+        .zip(native)
+    {
+        assert_eq!(role_for_model(route), Some(role.to_string()));
+    }
+}
+
+#[test]
 fn hosted_vision_capabilities_cover_managed_aliases_and_media_models() {
     for model in [
         MODEL_MANAGED_DEFAULT,

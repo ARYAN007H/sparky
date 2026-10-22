@@ -36,6 +36,7 @@ pub mod provider_model;
 pub mod readiness;
 pub(crate) mod reasoning;
 pub mod registry;
+pub(crate) mod schema_fields;
 mod schemas;
 pub mod tokenjuice;
 pub mod turn_models;

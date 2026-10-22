@@ -20,7 +20,9 @@ use openhuman_embed::__host::security::credentials::session_support::{
 };
 use openhuman_embed::__host::util::url::join_url;
 use std::sync::Arc;
-use tinyinference_llm::catalog::{append_query_param, parse_models_response};
+use tinyinference_llm::catalog::{
+    append_query_param, list_models as fetch_model_catalog, parse_models_response,
+};
 use tinyinference_llm::model::discover::DiscoveryRequest;
 
 use super::PROVIDER_OPENHUMAN;
@@ -177,14 +179,6 @@ pub(super) fn managed_401_means_signed_out(status: u16, session_attached: bool) 
     status == 401 && session_attached
 }
 
-fn truncate(text: &str, max_chars: usize) -> String {
-    if text.chars().count() <= max_chars {
-        return text.to_string();
-    }
-    let cut: String = text.chars().take(max_chars).collect();
-    format!("{cut}...")
-}
-
 /// What authenticates a listing request: the live session token, or the
 /// entry's provider-scoped key when there is no live session.
 #[derive(Debug, PartialEq, Eq)]
@@ -250,11 +244,18 @@ pub(super) async fn list_models(
     // request that carried only a provider key describes that key, not the
     // session.
     let session_attached = attach && session_token;
-    let mut request = client.get(&url);
+    let mut request = DiscoveryRequest::new(&url, "")
+        .with_listing_url(url.clone())
+        .with_single_model_probe(false)
+        .with_timeout(std::time::Duration::from_secs(30));
     if attach {
-        request = request.header("Authorization", format!("Bearer {token}"));
+        request = request.with_header("Authorization", format!("Bearer {token}"));
         if let Ok(headers) = attribution_headers() {
-            request = request.headers(headers);
+            for (name, value) in headers.iter() {
+                if let Ok(value) = value.to_str() {
+                    request = request.with_header(name.as_str(), value);
+                }
+            }
         }
     } else {
         log::warn!(
@@ -262,55 +263,21 @@ pub(super) async fn list_models(
         );
     }
 
-    let response = request
-        .send()
-        .await
-        .map_err(|e| format!("[providers][list_models] HTTP request failed: {e}"))?;
-    let status = response.status();
-    if !status.is_success() {
-        if managed_401_means_signed_out(status.as_u16(), session_attached) {
-            log::info!(
-                "[tinyhumans][inference] managed catalog unavailable: backend rejected the session token (401)"
-            );
-            return empty_catalog("session not accepted");
+    let models = match fetch_model_catalog(&client, request).await {
+        Ok(models) => models,
+        Err(error) => {
+            if error
+                .http_status()
+                .is_some_and(|status| managed_401_means_signed_out(status, session_attached))
+            {
+                log::info!(
+                    "[tinyhumans][inference] managed catalog unavailable: backend rejected the session token (401)"
+                );
+                return empty_catalog("session not accepted");
+            }
+            return Err(error.to_string());
         }
-        let body = response.text().await.unwrap_or_default();
-        let sanitized = tinyinference_core::sanitize::sanitize_api_error(&body);
-        return Err(format!(
-            "provider returned {}: {}",
-            status.as_u16(),
-            truncate(&sanitized, 300)
-        ));
-    }
-
-    let raw_body = response
-        .text()
-        .await
-        .map_err(|e| format!("[providers][list_models] failed to read response body: {e}"))?;
-    let body: serde_json::Value = serde_json::from_str(&raw_body).map_err(|e| {
-        let snippet = truncate(
-            &tinyinference_core::sanitize::sanitize_api_error(&raw_body),
-            300,
-        );
-        format!("[providers][list_models] failed to parse JSON: {e} (body: {snippet})")
-    })?;
-    if let Some(err_field) = body.get("error") {
-        let msg = err_field
-            .as_str()
-            .map(str::to_string)
-            .or_else(|| {
-                err_field
-                    .get("message")
-                    .and_then(|m| m.as_str())
-                    .map(str::to_string)
-            })
-            .unwrap_or_else(|| err_field.to_string());
-        return Err(format!(
-            "provider returned error payload: {}",
-            tinyinference_core::sanitize::sanitize_api_error(&msg)
-        ));
-    }
-    let models = parse_models_response(&body).map_err(|error| error.to_string())?;
+    };
     log::info!(
         "[tinyhumans][inference] managed catalog fetched {} models",
         models.len()

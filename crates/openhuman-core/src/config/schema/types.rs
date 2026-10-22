@@ -23,3 +23,7 @@ use crate::config::schema::{CapabilityProviderTrustState, TeamModelConfig};
 #[cfg(test)]
 #[path = "types_model_pin_tests.rs"]
 mod model_pin_tests;
+
+#[cfg(test)]
+#[path = "types_model_ids_tests.rs"]
+mod model_ids_tests;
