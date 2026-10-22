@@ -1,4 +1,67 @@
-use super::*;
+use super::{OPENHUMAN_CLOSE_COPY, close_results, render_close_results};
+
+type CheckpointToolResult = tinyagents_harness::close::CloseToolResult;
+const CHECKPOINT_TOTAL_CHARS: usize = 4_000;
+const GROUNDING_TOTAL_CHARS: usize = 16_000;
+const MAX_ITER_CHECKPOINT_INSTRUCTION: &str = OPENHUMAN_CLOSE_COPY.max_iteration_instruction;
+const FINAL_WRITE_INSTRUCTION: &str = OPENHUMAN_CLOSE_COPY.final_write_instruction;
+const FINAL_ANSWER_INSTRUCTION: &str = OPENHUMAN_CLOSE_COPY.final_answer_instruction;
+const TRUNCATED_ANSWER_INSTRUCTION: &str = OPENHUMAN_CLOSE_COPY.truncated_answer_instruction;
+
+fn build_deterministic_checkpoint(results: &[CheckpointToolResult], steps: usize) -> String {
+    let rendered = render_close_results(results, CHECKPOINT_TOTAL_CHARS);
+    tinyagents_harness::close::checkpoint_with_copy(
+        &OPENHUMAN_CLOSE_COPY,
+        steps,
+        &rendered,
+        !results.is_empty(),
+    )
+}
+
+fn results_from_tool_outcomes(
+    outcomes: &[tinyagents_harness::turn_outcome::ToolCallOutcome],
+) -> Vec<CheckpointToolResult> {
+    close_results(outcomes)
+}
+
+fn render_tool_results(results: &[CheckpointToolResult], total_budget: usize) -> String {
+    render_close_results(results, total_budget)
+}
+
+fn build_deterministic_final_summary(results: &[CheckpointToolResult]) -> String {
+    let rendered = render_close_results(results, CHECKPOINT_TOTAL_CHARS);
+    tinyagents_harness::close::final_summary_with_copy(
+        &OPENHUMAN_CLOSE_COPY,
+        &rendered,
+        !results.is_empty(),
+    )
+}
+
+fn final_answer_instruction(stop_reason: Option<&str>, truncated: bool, records: &str) -> String {
+    tinyagents_harness::close::final_answer_instruction(
+        &OPENHUMAN_CLOSE_COPY,
+        stop_reason,
+        truncated,
+        records,
+    )
+}
+
+fn close_verification_prompt(user_request: &str, records: &str, reply: &str) -> String {
+    tinyagents_harness::close::verification_prompt(
+        &OPENHUMAN_CLOSE_COPY,
+        user_request,
+        records,
+        reply,
+        CHECKPOINT_TOTAL_CHARS,
+    )
+}
+
+fn close_repair_instruction(
+    instruction: &str,
+    violation: tinyagents_harness::close::CloseViolation,
+) -> String {
+    tinyagents_harness::close::repair_with_copy(&OPENHUMAN_CLOSE_COPY, instruction, violation)
+}
 
 fn result(name: &str, success: bool, content: &str) -> CheckpointToolResult {
     CheckpointToolResult {
@@ -406,19 +469,28 @@ fn the_repair_re_ask_names_the_violation_and_repeats_the_instruction() {
     let instruction =
         final_answer_instruction(None, false, "\n- `read_file` — ok\n  > config found\n");
 
-    let quoted = close_repair_instruction(&instruction, CloseViolation::QuotedHarnessText);
+    let quoted = close_repair_instruction(
+        &instruction,
+        tinyagents_harness::close::CloseViolation::QuotedInstruction,
+    );
     assert!(quoted.contains("repeated these directions"), "{quoted}");
     assert!(
         quoted.contains(&instruction),
         "the original instruction must ride along: {quoted}"
     );
 
-    let unverified = close_repair_instruction(&instruction, CloseViolation::Unverified);
+    let unverified = close_repair_instruction(
+        &instruction,
+        tinyagents_harness::close::CloseViolation::Unverified,
+    );
     assert!(
         unverified.contains("did not pass the check"),
         "{unverified}"
     );
-    let empty = close_repair_instruction(&instruction, CloseViolation::NoReply);
+    let empty = close_repair_instruction(
+        &instruction,
+        tinyagents_harness::close::CloseViolation::NoReply,
+    );
     assert!(empty.contains("empty or tried to call a tool"), "{empty}");
 }
 
