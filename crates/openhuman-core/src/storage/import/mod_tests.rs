@@ -250,7 +250,7 @@ fn a_marker_row_an_older_build_wrote_counts_as_a_finished_import() {
 #[cfg(feature = "storage-sqlite")]
 #[tokio::test(flavor = "multi_thread")]
 async fn historical_profile_fixture_conversation_survives_layout_copy_and_owner_migration() {
-    use crate::storage::layout::{Target, db};
+    use crate::storage::layout::{db, Target};
     use crate::storage::{self, Scope};
     use tinyagents_session::threads::{ConversationPersistence, DriverConversationStore};
     use tinyagents_storage_kit::{MigrateOptions, Registry, ScopedStorage};
@@ -269,11 +269,8 @@ async fn historical_profile_fixture_conversation_survives_layout_copy_and_owner_
     // migration, then run the conversation owner's normal registered schema.
     db::copy(&source_db, &target.storage_db()).unwrap();
     let destination_url = format!("sqlite:{}", target.storage_db().display());
-    let destination = crate::storage::test_support::sqlite_backend_in(
-        root,
-        destination_url.clone(),
-    )
-    .unwrap();
+    let destination =
+        crate::storage::test_support::sqlite_backend_in(root, destination_url.clone()).unwrap();
     let backend = Arc::clone(&destination.backend);
     let _installed =
         crate::storage::test_support::install_for_test(&destination_url, Arc::clone(&backend));
@@ -354,7 +351,9 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     // rows that happen to deserialize through today's owner API.
     let source_url = format!("sqlite:{}", source_db.display());
     let source_backend = storage::block_on_anyhow(async move {
-        storage::open(&source_url).await.map_err(anyhow::Error::from)
+        storage::open(&source_url)
+            .await
+            .map_err(anyhow::Error::from)
     })
     .unwrap();
     let source_docs = Arc::clone(
@@ -370,7 +369,10 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     })
     .unwrap();
     assert_eq!(legacy_threads.len(), 1, "fixture contains a v1 thread row");
-    assert_eq!(legacy_threads[0].id, "d033a44fe04c14424be31d765b05f363fddeef939017517f69cf2914980ae87f");
+    assert_eq!(
+        legacy_threads[0].id,
+        "d033a44fe04c14424be31d765b05f363fddeef939017517f69cf2914980ae87f"
+    );
 
     let config = Config {
         config_path,
