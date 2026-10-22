@@ -271,6 +271,29 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     std::fs::create_dir_all(source_db.parent().unwrap()).unwrap();
     std::fs::copy(&fixture, &source_db).unwrap();
 
+    // Pin the fixture's input format: the conversation migration must receive
+    // the actual TinyAgents v1 collections and stream, not already-current v2
+    // rows that happen to deserialize through today's owner API.
+    let source_url = format!("sqlite:{}", source_db.display());
+    let source_backend = storage::block_on_anyhow(async {
+        storage::open(&source_url).await.map_err(anyhow::Error::from)
+    })
+    .unwrap();
+    let source_docs = Arc::clone(
+        source_backend
+            .for_scope(&Scope::local())
+            .unwrap()
+            .documents(),
+    );
+    let legacy_threads = storage::block_on(async {
+        source_docs
+            .query_all("conversation_threads_v1", &Query::all())
+            .await
+    })
+    .unwrap();
+    assert_eq!(legacy_threads.len(), 1, "fixture contains a v1 thread row");
+    assert_eq!(legacy_threads[0].id, "d033a44fe04c14424be31d765b05f363fddeef939017517f69cf2914980ae87f");
+
     let config = Config {
         config_path,
         workspace_dir: target.workspace(),
@@ -414,6 +437,22 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     assert_eq!(thread_keys.len(), 1, "historical thread key remains readable");
     assert_eq!(secrets.len(), 1, "historical secret remains readable");
     assert_eq!(flows.len(), 1, "historical flow remains readable");
+
+    // Read conversations through the current typed owner API after layout
+    // migration and its owner schema migration have completed.
+    let conversations = crate::threads::store::ConversationStore::new(
+        crate::core::runtime::DispatchCtx::ambient(),
+        target.workspace(),
+    );
+    let threads = conversations.list_threads().unwrap();
+    assert_eq!(threads.len(), 1);
+    assert_eq!(threads[0].id, "fixture-thread");
+    assert_eq!(threads[0].title, "Fixture thread");
+    assert_eq!(threads[0].message_count, 1);
+    let messages = conversations.get_messages("fixture-thread").unwrap();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].id, "fixture-message");
+    assert_eq!(messages[0].content, "historical profile message");
 
     let delete_scope = backend.for_scope(&Scope::local()).unwrap();
     let docs = Arc::clone(delete_scope.documents());
