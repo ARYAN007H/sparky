@@ -255,14 +255,10 @@ async fn action_directory_without_write_access_is_an_error() {
         FindingSeverity::Error
     };
     assert_eq!(
-        findings[0].severity,
-        expected_severity,
+        findings[0].severity, expected_severity,
         "action-directory probe should reflect effective write access"
     );
-    assert_eq!(
-        findings[0].config_path.as_deref(),
-        Some("action_dir")
-    );
+    assert_eq!(findings[0].config_path.as_deref(), Some("action_dir"));
     assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
 }
 
