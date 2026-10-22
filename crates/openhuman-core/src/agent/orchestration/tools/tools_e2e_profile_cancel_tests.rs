@@ -103,15 +103,9 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         tinyagents_harness::context::RunConfig::new("profile-cancel-parent").with_thread(thread_id),
         host,
     );
-    let detached_data = live.data.detached_child();
-    let detached = live
-        .child(
-            tinyagents_harness::context::RunConfig::new("profile-cancel-child"),
-            detached_data.clone(),
-        )
-        .expect("detached child context")
-        .with_cancellation(detached_data.cancellation.clone())
-        .with_workspace(tinytools::WorkspaceDescriptor::new(workspace.clone()));
+    let detached =
+        crate::agent::subagent_host::detached_subagent_parent(&live, "profile-cancel-child")
+            .expect("detached child context");
     let accepted = CoreContext::scope(
         Arc::clone(&alice),
         crate::agent::orchestration::tools::SpawnSubagentTool::new()
