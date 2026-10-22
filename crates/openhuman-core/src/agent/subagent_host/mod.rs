@@ -33,7 +33,7 @@
 //! | File              | Contents                                                    |
 //! | ----------------- | ----------------------------------------------------------- |
 //! | `types.rs`        | `SubagentRun{Options,Outcome,Error}`, `SubagentMode`        |
-//! | `ops/`            | typed/fork mode and TinyAgents graph route                 |
+//! | `ops/`            | typed/fork mode and orchestration route                    |
 //! | `tool_prep.rs`    | Tool filtering + prompt loading + prompt protocol block     |
 
 mod autonomous;

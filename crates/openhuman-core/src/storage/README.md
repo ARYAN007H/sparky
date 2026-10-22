@@ -281,8 +281,8 @@ without fencing).
   backend through `flows::catalog_storage` and its `CatalogStorage` bus
   contract; the Schedule service accesses cron documents through
   `cron::documents_port`. The modules own their schemas, migrations, flow state,
-  and run checkpoints. The delegation graph's checkpointer uses
-  tinyagents-graph's `DriverCheckpointer`.
+  and run checkpoints. TinyFlows' `DriverCheckpointer` schema and migrations
+  are declared by `tinyflows_drivers::graph_checkpoint_schema()`.
 - `block_on_anyhow(future)`: `block_on` for those stores, whose errors are
   `anyhow::Error`.
 - Approvals (`security::approval`), through `store_documents.rs`.

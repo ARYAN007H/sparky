@@ -7,7 +7,6 @@ fn every_owner_composes_without_collision() {
     for expected in [
         "harness",
         "session",
-        "graph",
         "tasks",
         "approvals",
         "devices",

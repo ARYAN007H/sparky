@@ -65,6 +65,24 @@ fn subscribe_companion_state_changed() -> tokio::sync::broadcast::Receiver<Value
 #[derive(Clone, Copy, Debug)]
 struct AuthedConnection;
 
+/// Tenant captured from the server-side context when the socket connects.
+/// The per-process bearer authenticates the connection but does not encode a
+/// SaaS profile, so never accept tenant selection from a later event payload.
+#[derive(Clone, Debug)]
+struct SocketTenant(crate::core_host::agent::plan_review::gate::SocketReviewScope);
+
+/// Bind replay tenancy from the HTTP request extensions retained by
+/// Socket.IO. Its async connect callback is spawned independently of the
+/// Axum request task, so task-local ambient context is not a reliable carrier.
+fn socket_tenant_from_request_extensions(
+    extensions: &axum::http::Extensions,
+) -> Option<SocketTenant> {
+    let dispatch = extensions.get::<crate::core_host::core::runtime::DispatchCtx>()?;
+    let scope =
+        crate::core_host::agent::plan_review::gate::global().socket_scope_for_dispatch(dispatch)?;
+    Some(SocketTenant(scope))
+}
+
 /// Connection-time payload the client passes via Socket.IO's `auth` field.
 ///
 /// Browsers do not let `EventSource` / `WebSocket` clients attach custom
@@ -216,10 +234,9 @@ struct ChatCancelPayload {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ThreadSubscribePayload {
     thread_id: String,
-    #[serde(default)]
-    profile_id: Option<String>,
 }
 
 /// Reply to `thread:subscribe`, so a client can order a read after the join.
@@ -281,6 +298,14 @@ pub fn attach_socketio() -> (socketioxide::layer::SocketIoLayer, SocketIo) {
                 return;
             }
             socket.extensions.insert(AuthedConnection);
+            let Some(tenant) = socket_tenant_from_request_extensions(
+                &socket.req_parts().extensions,
+            ) else {
+                log::warn!("[socketio] rejecting socket without a tenant scope in SaaS mode");
+                let _ = socket.clone().disconnect();
+                return;
+            };
+            socket.extensions.insert(tenant);
 
             log::info!("[socketio] client connected id={client_id} (authenticated)");
             // Join a room named after the client ID for targeted event delivery.
@@ -540,11 +565,7 @@ pub fn attach_socketio() -> (socketioxide::layer::SocketIoLayer, SocketIo) {
                     // already holds the card.
                     if joined {
                         replay_parked_approval(&socket, thread_id);
-                        replay_parked_plan_review(
-                            &socket,
-                            thread_id,
-                            payload.profile_id.as_deref(),
-                        );
+                        replay_parked_plan_review(&socket, thread_id);
                     }
                     ack.send(&ThreadSubscribeAck { joined }).ok();
                 },
@@ -1190,9 +1211,12 @@ fn replay_parked_approval(socket: &SocketRef, thread_id: &str) {
 /// just joined that thread's room. Mirrors [`replay_parked_approval`] — a
 /// plan review is a live, in-memory park (no SQLite row), but it reaches the
 /// UI the same fire-and-forget way, so the same reconciliation applies.
-fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str, profile_id: Option<&str>) {
+fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str) {
+    let Some(tenant) = socket.extensions.get::<SocketTenant>() else {
+        return;
+    };
     let Some(row) = crate::core_host::agent::plan_review::gate::global()
-        .parked_review_for_socket(profile_id, thread_id)
+        .parked_review_for_socket(&tenant.0, thread_id)
     else {
         return;
     };

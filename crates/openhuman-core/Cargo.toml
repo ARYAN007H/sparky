@@ -53,6 +53,7 @@ crate-type = ["rlib"]
 # contracts. Unconditional because cron and module callbacks remain available
 # without the OpenHuman `flows` surface; engine and catalog implementations are
 # reached only through the loaded module's bus endpoints.
+tinyflows = { path = "../../vendor/tinyflows/crates/tinyflows" }
 tinyflows-bus = { path = "../../vendor/tinyflows/crates/tinyflows-bus" }
 # Reads the stores tinyflows hosts used before storage moved onto the ports
 # (`flows.db`, `jobs.db`, `checkpoints.db`, drafts). Only its pure SQLite readers
@@ -74,11 +75,11 @@ tinyflows-import = { path = "../../vendor/tinyflows/crates/tinyflows-import", de
 # work): there is no longer a single `tinyagents` package. openhuman now depends
 # directly on the members it actually uses — `tinyagents-harness` (agent loop,
 # tools, middleware), `tinyagents-hooks` (host-provided lifecycle and stop
-# hooks), `tinyagents-graph` (durable state graphs),
+# hooks),
 # `tinyagents-registry` (capability/model registry), and
 # `tinyagents-session` (durable session history + run ledger, previously gated
 # behind this crate's own `sqlite` feature — it is its own always-on crate now).
-# The `sqlite` feature is enabled on the harness/graph crates now that openhuman's
+# The `sqlite` feature is enabled on the harness now that openhuman's
 # direct rusqlite pin is aligned to 0.40, avoiding duplicate `links = "sqlite3"`
 # native bindings. Durable graph checkpoints still use `SqlRunLedgerCheckpointer`
 # until the migration re-points those rows to the crate checkpointer.
@@ -114,10 +115,6 @@ tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-defi
 # Agents, the Sarvam cascade) and executes its tool calls through the turn
 # harness pipeline. Only the `voice` feature's `voice::live` uses it.
 tinyagents-live = { path = "../../vendor/tinyagents/crates/tinyagents-live", optional = true }
-tinyagents-graph = { path = "../../vendor/tinyagents/crates/tinyagents-graph", features = [
-    "sqlite",
-    "storage-drivers",
-] }
 tinyagents-registry = { path = "../../vendor/tinyagents/crates/tinyagents-registry" }
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session", features = ["storage-drivers"] }
 # The storage ports and the URL-to-backend facade (`storage` domain). No driver
