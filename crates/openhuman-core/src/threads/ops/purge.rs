@@ -64,6 +64,7 @@ async fn threads_purge_inner(
     // wipe so a late result cannot be delivered after purge returns.
     use crate::agent::orchestration::{background_completions, running_subagents};
     let cancellation = running_subagents::cancel_all(&ctx, &thread_ids).await;
+    let cancelled_threads = cancellation.as_ref().map_or(0, Vec::len);
     let mut discarded = 0;
     let mut cleanup_failures = Vec::new();
     for thread_id in &thread_ids {
@@ -86,7 +87,7 @@ async fn threads_purge_inner(
     }
     log::debug!(
         "[threads] threads_purge cancelled_threads={} discarded_completions={}",
-        thread_ids.len(),
+        cancelled_threads,
         discarded
     );
     // Threads are gone, so any orphan turn snapshots can never be
