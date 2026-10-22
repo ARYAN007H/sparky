@@ -1,12 +1,25 @@
-//! Local-only privacy mode means the prompt stays on this machine. Two routes
-//! named "local" break that: an Ollama `-cloud` tag, which the local daemon
-//! proxies to ollama.com, and a local-runtime prefix whose endpoint is another
-//! host (it gets the prompt and the `local_ai` bearer key). Only loopback counts
-//! as local; a LAN address is another machine.
-
 use super::*;
+use crate::config::test_env::EnvVarGuard;
 use crate::config::PrivacyMode;
 use crate::inference::provider::factory::access_gates::local_only_violation;
+
+// Local-only privacy mode means the prompt stays on this machine. Two routes
+// named "local" break that: an Ollama `-cloud` tag, which the local daemon
+// proxies to ollama.com, and a local-runtime prefix whose endpoint is another
+// host (it gets the prompt and the `local_ai` bearer key). Only loopback counts
+// as local; a LAN address is another machine.
+
+/// Environment overrides that take precedence over `local_ai.base_url`.
+const ENDPOINT_ENV: &[&str] = &[
+    "OPENHUMAN_LOCAL_INFERENCE_URL",
+    "LOCAL_OPENAI_URL",
+    "OPENHUMAN_LM_STUDIO_BASE_URL",
+    "LM_STUDIO_BASE_URL",
+    "OPENHUMAN_OLLAMA_BASE_URL",
+    "OLLAMA_HOST",
+    "MLX_SERVER_URL",
+    "OMLX_SERVER_URL",
+];
 
 fn local_ai_at(base_url: &str) -> Config {
     let mut config = Config::default();
@@ -39,6 +52,7 @@ fn local_only_refuses_ollama_cloud_proxied_models() {
 #[test]
 fn local_only_refuses_a_local_runtime_pointed_at_another_host() {
     let _guard = crate::inference::inference_test_guard();
+    let _env = EnvVarGuard::locked_unset_many(ENDPOINT_ENV);
     let _mode = crate::security::live_policy::test_privacy_scope(PrivacyMode::LocalOnly);
     for (provider, base_url) in [
         ("local-openai:m", "https://gpu.example.invalid/v1"),
@@ -75,6 +89,9 @@ async fn a_local_runtime_pointed_at_another_host_is_recorded_as_external_egress(
     use crate::security::egress::EgressDescriptor;
     use std::time::Duration;
 
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let _env = EnvVarGuard::locked_unset_many_async(ENDPOINT_ENV).await;
+    let _mode = crate::security::live_policy::test_privacy_scope(PrivacyMode::Standard);
     crate::core::bus::init().await.expect("bus init");
     let mut rx = BUS.get().unwrap().receiver();
 
@@ -111,4 +128,30 @@ async fn a_local_runtime_pointed_at_another_host_is_recorded_as_external_egress(
             Err(_) => panic!("timed out before egress sentinel arrived"),
         }
     }
+}
+
+/// A request may name a different model than the route was built for (a flow
+/// node's pinned model): an Ollama route built for a local tag must still
+/// refuse a `-cloud` tag at request time under local-only.
+#[tokio::test]
+async fn local_only_refuses_a_cloud_tag_named_per_request() {
+    use tinyinference_llm::model::ModelRequest;
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let _env = EnvVarGuard::locked_unset_many_async(ENDPOINT_ENV).await;
+    let _mode = crate::security::live_policy::test_privacy_scope(PrivacyMode::LocalOnly);
+    let (model, _) = create_test_chat_model_from_string(
+        "chat",
+        "ollama:llama3",
+        &local_ai_at("http://127.0.0.1:9/v1"),
+    )
+    .expect("a local Ollama tag builds under local-only");
+
+    let error = model
+        .invoke(
+            &(),
+            ModelRequest::new(Vec::new()).with_model("gpt-oss:120b-cloud"),
+        )
+        .await
+        .expect_err("a per-request cloud tag must be refused before dispatch");
+    assert!(error.to_string().contains("Local-only"), "{error}");
 }

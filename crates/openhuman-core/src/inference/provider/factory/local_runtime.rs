@@ -4,7 +4,7 @@
 use super::*;
 use crate::inference::provider::factory::access_gates::{
     enforce_local_only_endpoint, is_loopback_endpoint, is_ollama_cloud_model,
-    verify_provider_session,
+    verify_provider_session, LocalOnlyRequestGuard,
 };
 use tinyinference_llm::providers::openai::build_local_runtime_chat_model;
 use tinyinference_llm::providers::openai::AuthStyle as CompatAuthStyle;
@@ -167,6 +167,11 @@ fn try_create_local_runtime_chat_model_from_string_with_identity(
         resolved.temperature,
         resolved.num_ctx,
     );
+    let chat: Arc<dyn ChatModel<()>> = if resolved.kind.as_str() == "ollama" {
+        Arc::new(LocalOnlyRequestGuard { inner: chat })
+    } else {
+        chat
+    };
     Some(Ok((chat, resolved.model)))
 }
 

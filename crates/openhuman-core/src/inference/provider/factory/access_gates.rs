@@ -98,6 +98,76 @@ pub(super) fn is_loopback_endpoint(endpoint: &str) -> bool {
     }
 }
 
+/// Local-only for the model a request actually names. A caller may override
+/// the route's model per request (a flow node's pinned model, for one), so an
+/// Ollama route built for `llama3` can still be asked for a `*-cloud` tag.
+pub(super) struct LocalOnlyRequestGuard {
+    pub(super) inner: std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>>,
+}
+
+impl LocalOnlyRequestGuard {
+    fn check(
+        &self,
+        request: &tinyinference_llm::model::ModelRequest,
+    ) -> tinyinference_llm::Result<()> {
+        let Some(model) = request
+            .model
+            .as_deref()
+            .filter(|m| is_ollama_cloud_model(&format!("ollama:{m}")))
+        else {
+            return Ok(());
+        };
+        enforce_local_only_inference("request", &format!("ollama:{model}"))
+            .map_err(|e| tinyinference_llm::Error::Validation(e.to_string()))
+    }
+}
+
+#[async_trait::async_trait]
+impl tinyinference_llm::model::ChatModel<()> for LocalOnlyRequestGuard {
+    fn profile(&self) -> Option<&tinyinference_llm::model::ModelProfile> {
+        self.inner.profile()
+    }
+    fn supports_input(
+        &self,
+        modality: tinyinference_llm::model::InputModality,
+        mime_type: &str,
+        source: tinyinference_llm::model::InputSource,
+    ) -> bool {
+        self.inner.supports_input(modality, mime_type, source)
+    }
+    fn cache_identity(&self) -> Option<String> {
+        self.inner.cache_identity()
+    }
+    fn tracks_physical_attempts(&self) -> bool {
+        self.inner.tracks_physical_attempts()
+    }
+    fn has_pre_invocation_admission_gate(&self) -> bool {
+        self.inner.has_pre_invocation_admission_gate()
+    }
+    async fn invoke(
+        &self,
+        state: &(),
+        request: tinyinference_llm::model::ModelRequest,
+    ) -> tinyinference_llm::Result<tinyinference_llm::model::ModelResponse> {
+        self.check(&request)?;
+        self.inner.invoke(state, request).await
+    }
+    async fn stream(
+        &self,
+        state: &(),
+        request: tinyinference_llm::model::ModelRequest,
+    ) -> tinyinference_llm::Result<tinyinference_llm::model::ModelStream> {
+        self.check(&request)?;
+        self.inner.stream(state, request).await
+    }
+    async fn fetch_deferred(
+        &self,
+        handle: &tinyinference_llm::model::DeferredHandle,
+    ) -> tinyinference_llm::Result<tinyinference_llm::model::DeferredStatus> {
+        self.inner.fetch_deferred(handle).await
+    }
+}
+
 /// Privacy Mode `LocalOnly` for a resolved local-runtime endpoint: refuse
 /// one that is not loopback (the prompt and the `local_ai` key would go there).
 pub(super) fn enforce_local_only_endpoint(role: &str, endpoint: &str) -> anyhow::Result<()> {
