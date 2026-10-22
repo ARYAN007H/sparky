@@ -230,7 +230,7 @@ async fn collect_process(
     mut abandoned: tokio::sync::oneshot::Receiver<std::convert::Infallible>,
     meter: Option<super::shell_progress::ShellOutputMeter>,
 ) -> anyhow::Result<SandboxExecResult> {
-    use contract::{ExecutionFailure, ExecutionState, OutputStream};
+    use contract::{ExecutionState, OutputStream};
     use tokio::sync::oneshot::error::TryRecvError;
 
     let deadline = tokio::time::Instant::now() + timeout;
@@ -285,11 +285,10 @@ async fn collect_process(
             }
             ExecutionState::Cancelled if has_chunks => continue,
             ExecutionState::Cancelled => break requested_cancel,
-            ExecutionState::Failed {
-                code: ExecutionFailure::CleanupFailed,
-            } => anyhow::bail!("TinyBox retained native process cleanup for retry"),
-            ExecutionState::Failed { .. } => {
-                anyhow::bail!("TinyBox native shell execution failed")
+            ExecutionState::Failed { .. } if has_chunks => continue,
+            ExecutionState::Failed { code } => {
+                tracing::debug!(?code, "[sandbox:shell] TinyBox reported a failed execution");
+                break failure_timed_out(code)?;
             }
         }
     };
@@ -306,6 +305,29 @@ async fn collect_process(
         },
         timed_out,
     })
+}
+
+/// What a terminal TinyBox failure means for the command. The module enforces
+/// the same runtime budget the host waits for, so a command that runs to its
+/// limit usually ends as `TimedOut` before the host's own cancel lands: that is
+/// the command's timeout, reported like one (`Ok(true)`). Anything else is a
+/// real sandbox failure, named by its code.
+#[cfg(feature = "modules")]
+fn failure_timed_out(code: contract::ExecutionFailure) -> anyhow::Result<bool> {
+    use contract::ExecutionFailure;
+    match code {
+        ExecutionFailure::TimedOut => Ok(true),
+        ExecutionFailure::CleanupFailed => {
+            anyhow::bail!("TinyBox retained native process cleanup for retry")
+        }
+        ExecutionFailure::OutputLimit => anyhow::bail!(
+            "TinyBox stopped the command: its output exceeded the execution output limit"
+        ),
+        ExecutionFailure::StartFailed => {
+            anyhow::bail!("TinyBox native shell execution failed: the command could not start")
+        }
+        other => anyhow::bail!("TinyBox native shell execution failed ({other:?})"),
+    }
 }
 
 #[cfg(feature = "modules")]
