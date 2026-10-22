@@ -110,6 +110,15 @@ pub async fn apply_autonomy_settings(
         config.autonomy.forbidden_paths = forbidden_paths;
     }
     if let Some(trusted_roots) = update.trusted_roots {
+        if let Some(root) = trusted_roots
+            .iter()
+            .find(|root| !std::path::Path::new(&super::expand_tilde(&root.path)).is_absolute())
+        {
+            return Err(format!(
+                "trusted root must be an absolute path (got {:?})",
+                root.path
+            ));
+        }
         config.autonomy.trusted_roots = trusted_roots;
     }
     if let Some(allow_tool_install) = update.allow_tool_install {

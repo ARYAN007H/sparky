@@ -568,6 +568,12 @@ impl SecurityPolicy {
                 return false;
             }
             let root_path = PathBuf::from(self.expand_tilde(&root.path));
+            // `Path::starts_with("")` is true for every path, and a relative
+            // root resolves against the process CWD: only an absolute root
+            // grants anything.
+            if !root_path.is_absolute() {
+                return false;
+            }
             let canonical_root = root_path
                 .canonicalize()
                 .unwrap_or_else(|_| root_path.clone());
