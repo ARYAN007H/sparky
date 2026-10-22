@@ -102,25 +102,39 @@ pub(crate) async fn cancel_by_task_with_workspace_reason(
         session.subagent_session_id.clone(),
     )
     .map_err(|error| format!("failed to load parent epoch: {error}"))?;
-    let already_finished = job
-        .as_ref()
-        .and_then(|job| match job.status {
-            SubAgentJobStatus::Completed => Some(FinishedOutcome::Completed),
-            SubAgentJobStatus::Failed | SubAgentJobStatus::Incomplete => {
-                Some(FinishedOutcome::Failed)
-            }
-            _ => None,
-        })
-        .or_else(|| match session.status {
-            tinyagents_orchestration::subagent::DurableSubagentStatus::Idle => {
+    let typed_finished = || -> Result<Option<FinishedOutcome>, String> {
+        let Some(key) = session.lifecycle_key.as_ref() else {
+            return Ok(None);
+        };
+        let Some(outcome) =
+            crate::agent::subagent_host::load_terminal_outcome(&owner_scope.workspace_dir, key)?
+        else {
+            return Ok(None);
+        };
+        Ok(match outcome.status {
+            tinyagents_orchestration::subagent::SubagentOutcomeKind::Completed => {
                 Some(FinishedOutcome::Completed)
             }
-            tinyagents_orchestration::subagent::DurableSubagentStatus::Failed
-            | tinyagents_orchestration::subagent::DurableSubagentStatus::Closed => {
+            tinyagents_orchestration::subagent::SubagentOutcomeKind::Incomplete(_) => {
                 Some(FinishedOutcome::Failed)
             }
-            _ => None,
-        });
+            tinyagents_orchestration::subagent::SubagentOutcomeKind::Cancelled
+            | tinyagents_orchestration::subagent::SubagentOutcomeKind::AwaitingInput(_) => None,
+        })
+    };
+    let already_finished = match session.status {
+        tinyagents_orchestration::subagent::DurableSubagentStatus::Idle => typed_finished()?,
+        tinyagents_orchestration::subagent::DurableSubagentStatus::Failed => {
+            match typed_finished()? {
+                Some(finished) => Some(finished),
+                None if session.lifecycle_key.is_none() => Some(FinishedOutcome::Failed),
+                None => None,
+            }
+        }
+        tinyagents_orchestration::subagent::DurableSubagentStatus::Running
+        | tinyagents_orchestration::subagent::DurableSubagentStatus::AwaitingUser
+        | tinyagents_orchestration::subagent::DurableSubagentStatus::Closed => None,
+    };
     let was_paused =
         session.status == tinyagents_orchestration::subagent::DurableSubagentStatus::AwaitingUser;
     if already_finished.is_none() {

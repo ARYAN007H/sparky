@@ -51,14 +51,15 @@ impl SpawnSubagentTool {
             .or(run_context.thread_id.as_deref())
             .map(str::to_owned);
 
-        let store = match SubagentSessionStore::new_in_context(&dispatch, parent.workspace_dir.clone()) {
-            Ok(store) => store,
-            Err(error) => {
-                return Ok(ToolResult::error(format!(
-                    "spawn_subagent: failed to open the caller-scoped session store: {error}"
-                )));
-            }
-        };
+        let store =
+            match SubagentSessionStore::new_in_context(&dispatch, parent.workspace_dir.clone()) {
+                Ok(store) => store,
+                Err(error) => {
+                    return Ok(ToolResult::error(format!(
+                        "spawn_subagent: failed to open the caller-scoped session store: {error}"
+                    )));
+                }
+            };
         let jobs = crate::core::runtime::slot_for::<
             tinyagents_harness_tools::subagents::SubAgentJobRegistry,
         >(&dispatch);
@@ -175,9 +176,7 @@ impl SpawnSubagentTool {
                     )
                     .await
                     {
-                        return Ok(ToolResult::error(format!(
-                            "spawn_subagent: {error}"
-                        )));
+                        return Ok(ToolResult::error(format!("spawn_subagent: {error}")));
                     }
                 }
                 Ok(None) => {}
@@ -261,19 +260,20 @@ impl SpawnSubagentTool {
                 ));
             }
             let checkpoint_resume = crate::agent::subagent_host::checkpoint_resume(&checkpoint);
-            let completion_target = match crate::agent::orchestration::background_completions::CompletionTarget::new(
-                dispatch.clone(),
-                parent.workspace_dir.clone(),
-                parent_session.clone(),
-                parent_thread_id.clone(),
-            ) {
-                Ok(target) => target,
-                Err(error) => {
-                    return Ok(ToolResult::error(format!(
-                        "spawn_subagent: parent lifecycle admission failed: {error}"
-                    )));
-                }
-            };
+            let completion_target =
+                match crate::agent::orchestration::background_completions::CompletionTarget::new(
+                    dispatch.clone(),
+                    parent.workspace_dir.clone(),
+                    parent_session.clone(),
+                    parent_thread_id.clone(),
+                ) {
+                    Ok(target) => target,
+                    Err(error) => {
+                        return Ok(ToolResult::error(format!(
+                            "spawn_subagent: parent lifecycle admission failed: {error}"
+                        )));
+                    }
+                };
             if let Some(thread_id) = parent_thread_id.as_deref() {
                 if crate::agent::orchestration::background_completions::mark_stopped_task_if_thread_stopped(
                     &dispatch,
@@ -383,9 +383,9 @@ impl SpawnSubagentTool {
                 let message = error.to_string();
                 let _ = driver_store
                     .mark_failed(
-                    &resumed_session.subagent_session_id,
-                    task_id,
-                    message.clone(),
+                        &resumed_session.subagent_session_id,
+                        task_id,
+                        message.clone(),
                     )
                     .await;
                 completion_target
@@ -492,19 +492,20 @@ impl SpawnSubagentTool {
         // Capture the admitted parent generation before creating a worker
         // thread, writing a durable running session, or publishing spawn
         // events. A denied lifecycle admission must leave no phantom child.
-        let completion_target = match crate::agent::orchestration::background_completions::CompletionTarget::new(
-            dispatch.clone(),
-            parent.workspace_dir.clone(),
-            parent_session.clone(),
-            parent_thread_id.clone(),
-        ) {
-            Ok(target) => target,
-            Err(error) => {
-                return Ok(ToolResult::error(format!(
-                    "spawn_subagent: parent lifecycle admission failed: {error}"
-                )));
-            }
-        };
+        let completion_target =
+            match crate::agent::orchestration::background_completions::CompletionTarget::new(
+                dispatch.clone(),
+                parent.workspace_dir.clone(),
+                parent_session.clone(),
+                parent_thread_id.clone(),
+            ) {
+                Ok(target) => target,
+                Err(error) => {
+                    return Ok(ToolResult::error(format!(
+                        "spawn_subagent: parent lifecycle admission failed: {error}"
+                    )));
+                }
+            };
         let worker_thread_id = reusable
             .as_ref()
             .and_then(|session| session.worker_thread_id.clone())
@@ -553,7 +554,7 @@ impl SpawnSubagentTool {
                         parent_thread_id.clone(),
                     ),
                 ),
-            parent_epoch: completion_target.parent_epoch(),
+                parent_epoch: completion_target.parent_epoch(),
             },
             force_fresh,
         )
@@ -612,7 +613,7 @@ impl SpawnSubagentTool {
             &dispatch,
             &task_id,
             parent.workspace_dir.clone(),
-            task_workspace,
+            task_workspace.clone(),
             parent_session.clone(),
             parent_thread_id.clone(),
         );
@@ -694,7 +695,7 @@ impl SpawnSubagentTool {
             worker_thread_id: background_worker_thread_id,
             initial_history,
             checkpoint_dir: None,
-            workspace_descriptor,
+            workspace_descriptor: Some(task_workspace),
             run_queue: None,
             message_run_queue: None,
         };
