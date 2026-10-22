@@ -1,3 +1,6 @@
+
+/// Transient backend API failures (gateway hiccups, scheduled downtime).
+/// Match by event tags written by report_error at the authed_json call site.
 #[cfg(feature = "crash-reporting")]
 pub fn is_transient_backend_api_failure(event: &sentry::protocol::Event<'_>) -> bool {
     is_transient_domain_failure(event, "backend_api")

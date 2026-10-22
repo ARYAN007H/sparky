@@ -680,21 +680,3 @@ pub fn report_warning_message(message: &str, domain: &str, operation: &str, extr
         );
     }
 }
-
-/// Returns true when a Sentry event is a per-attempt provider HTTP failure
-/// that the reliable-provider layer already handles via retry + fallback.
-///
-/// The primary suppression lives at the call site
-/// (`crate::inference::provider::http_error::should_report_provider_http_failure`),
-/// which short-circuits transient codes before `report_error` ever fires.
-/// This helper is intended for use inside the `sentry::ClientOptions`
-/// `before_send` hook as defense-in-depth — it catches any future call
-/// site that emits a `tracing::error!` with the same shape but bypasses
-/// the classifier.
-///
-/// Match criteria (all required):
-/// - tag `domain == "llm_provider"` — pins the filter to provider-originated
-///   events so an unrelated subsystem emitting `failure=non_2xx`/`status=503`
-///   for its own reasons doesn't get silently dropped
-/// - tag `failure == "non_2xx"` (the marker set by `ops::api_error`)
-/// - tag `status` parses to one of [`TRANSIENT_PROVIDER_HTTP_STATUSES`]
