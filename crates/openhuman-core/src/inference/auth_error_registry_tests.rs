@@ -247,7 +247,7 @@ fn auth_errors_stay_in_the_scope_that_recorded_them() {
         let workspace_b = tempfile::tempdir().expect("workspace B");
         let context_a = CoreContext::for_test(DomainSet::full(), Some(workspace_a.path().into()));
         let context_b = CoreContext::for_test(DomainSet::full(), Some(workspace_b.path().into()));
-        let rpc_providers = |context: CoreContext| {
+        let rpc_providers = |context: std::sync::Arc<CoreContext>| {
             CoreContext::scope(context, async {
                 let outcome = crate::inference::ops::inference_provider_auth_errors()
                     .await
