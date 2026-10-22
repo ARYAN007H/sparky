@@ -1,4 +1,5 @@
 use super::*;
+use crate::{ReasoningEffort, Route};
 
 #[test]
 fn openai_compatible_carries_both_halves() {

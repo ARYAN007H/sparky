@@ -63,6 +63,13 @@ pub struct EphemeralRoute {
     /// Custom headers scoped to this endpoint, never copied to unrelated providers.
     #[serde(default)]
     pub headers: Vec<(String, String)>,
+    /// Provider-specific options used as defaults for this route's requests.
+    /// A request's own options are merged over these values.
+    #[serde(default)]
+    pub provider_options: Option<serde_json::Value>,
+    /// Reasoning effort pinned to this route's model, when configured.
+    #[serde(default)]
+    pub reasoning_effort: Option<String>,
 }
 
 impl std::fmt::Debug for EphemeralRoute {
@@ -74,6 +81,8 @@ impl std::fmt::Debug for EphemeralRoute {
             )
             .field("api_key", &"[redacted]")
             .field("header_count", &self.headers.len())
+            .field("provider_options", &self.provider_options.is_some())
+            .field("reasoning_effort", &self.reasoning_effort)
             .finish()
     }
 }
@@ -91,12 +100,26 @@ impl EphemeralRoute {
             endpoint,
             api_key,
             headers: Vec::new(),
+            provider_options: None,
+            reasoning_effort: None,
         })
     }
 
     /// Attach the embedding host's per-route headers.
     pub fn with_headers(mut self, headers: Vec<(String, String)>) -> Self {
         self.headers = headers;
+        self
+    }
+
+    /// Set provider-specific defaults for this route.
+    pub fn with_provider_options(mut self, options: Option<serde_json::Value>) -> Self {
+        self.provider_options = options;
+        self
+    }
+
+    /// Set the route model's reasoning effort.
+    pub fn with_reasoning_effort(mut self, effort: Option<String>) -> Self {
+        self.reasoning_effort = effort;
         self
     }
 }
@@ -131,6 +154,12 @@ pub fn apply(config: &mut crate::config::Config, route: EphemeralRoute) {
     };
 
     let provider_string = format!("{EPHEMERAL_ROUTE_SLUG}:{model}");
+    if let Some(effort) = route.reasoning_effort.as_deref() {
+        config
+            .runtime
+            .reasoning_effort_by_model
+            .insert(model.clone(), effort.to_string());
+    }
     let route_is_unchanged = config.ephemeral_route.as_ref() == Some(&route);
     let roles_match = [
         config.chat_provider.as_deref(),
