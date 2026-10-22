@@ -1,4 +1,3 @@
-use super::shell_description::{command_param_description, shell_description};
 #[cfg(feature = "modules")]
 use super::shell_support::container_environment;
 use super::shell_support::{command_failure, exec_result, python_utf8_env, tool_timeout_message};
