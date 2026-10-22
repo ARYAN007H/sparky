@@ -14,18 +14,29 @@ use openhuman_embed::profiles::ProfileCredentialKind;
 use openhuman_embed::{CronDelivery, CronReply, JobOrigin, ProfileRuntime, SaasConfig};
 use wiremock::{Mock, Request, Respond, ResponseTemplate};
 
-const CORRECTION: &str = "NO_REPLY is not allowed for this task";
+const CORRECTION: &str = "which is not allowed for this task";
 const REMINDER: &str = "Remind the user to drink water";
 const NEWSLETTER: &str = "Send the user the weekly newsletter summary";
 const CONDITIONAL: &str = "Check the inbox; reply NO_REPLY if nothing changed";
+
+fn user_messages(body: &serde_json::Value) -> String {
+    body["messages"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|m| m["role"] == "user")
+        .map(|m| m["content"].to_string())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
 
 /// First answers are silent in three spellings; corrective turns get text.
 struct Reply;
 impl Respond for Reply {
     fn respond(&self, request: &Request) -> ResponseTemplate {
         let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
-        let prompt = last_user_message(&body);
-        let corrected = prompt.contains(CORRECTION);
+        let prompt = user_messages(&body);
+        let corrected = last_user_message(&body).contains(CORRECTION);
         let text = if prompt.contains("drink water") {
             if corrected {
                 "Time to drink water!"
@@ -155,18 +166,26 @@ async fn scenario() {
     );
 
     let requests = inference.received_requests().await.unwrap();
-    let corrective = requests
+    let bodies: Vec<serde_json::Value> = requests
         .iter()
         .filter(|request| request.url.path().ends_with("chat/completions"))
-        .filter(|request| {
-            let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
-            last_user_message(&body).contains(CORRECTION)
-        })
-        .count();
+        .map(|request| serde_json::from_slice(&request.body).unwrap())
+        .collect();
+    let (corrective, _first): (Vec<_>, Vec<_>) = bodies
+        .iter()
+        .partition(|body| last_user_message(body).contains(CORRECTION));
     assert_eq!(
-        corrective, 2,
+        corrective.len(),
+        2,
         "one corrective turn per reminder, none for the check"
     );
+    for body in &corrective {
+        let last = last_user_message(body);
+        assert!(
+            !last.contains("drink water") && !last.contains("newsletter"),
+            "the corrective turn must not replay the job prompt: {last}"
+        );
+    }
 
     let handle = runtime.open(user).await.unwrap();
     let config = handle.context().embedder_config().unwrap().clone();
