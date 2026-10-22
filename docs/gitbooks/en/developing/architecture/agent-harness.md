@@ -649,7 +649,7 @@ direct `tinyagents-orchestration::subagent` lifecycle. There is no
 | `mod.rs` / `model.rs` / `tools.rs` / `convert.rs` | `RunPolicy` / `ChatModel` / `Tool` / message adapters (incl. unknown-tool policy and out-of-band reasoning forwarding).                                                                                                                                                        |
 | `observability.rs`                                | Harness `AgentEvent` → `AgentProgress` + cost; `GraphTracingSink` for graph events.                                                                                                                                                                                            |
 | `orchestration.rs`                                | Re-exported `graph::orchestration` task-store types; map-reduce fanout uses the TinyAgents SDK surface directly.                                                                                                                                                           |
-| `delegation.rs`                                   | The durable `plan → execute ⇄ review → finalize` delegation graph (production worker wired in `orchestration::delegation`), checkpointed via TinyAgents' own `SqliteCheckpointer`.    |
+| `delegation.rs`                                   | The durable `plan → execute ⇄ review → finalize` delegation graph (production worker wired in `orchestration::delegation`), checkpointed to the session database.    |
 
 Orchestration on graphs (`crates/openhuman-core/src/agent/orchestration/`):
 
