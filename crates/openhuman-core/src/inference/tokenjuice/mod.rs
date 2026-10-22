@@ -2,15 +2,136 @@
 
 pub mod config_patch;
 pub use tinyjuice_host::{focus, generate};
-pub mod repl_tools;
 pub mod savings;
 pub mod schemas;
 
 use crate::core::runtime::DispatchCtx;
+use async_trait::async_trait;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tinyjuice_bus::names::methods;
+use tinyjuice_bus::repl::ReplLimits;
+use tinyjuice_bus::wire::{QueryRequest, QueryResponse};
 use tinyjuice_bus::types::{AgentTokenjuiceCompression, CompressorKind};
+use tinytools::{Tool, ToolRunContext, ToolSpec};
 
-pub use repl_tools::{is_repl_tool, repl_tools, repl_tools_for};
+/// The host-specific query seam for TinyJuice's shared REPL tools.
+#[async_trait]
+trait QuerySource: Send + Sync {
+    async fn query(
+        &self,
+        ctx: &DispatchCtx,
+        request: QueryRequest,
+    ) -> Result<QueryResponse, String>;
+}
+
+struct ModuleSource(Option<Arc<crate::config::Config>>);
+
+#[async_trait]
+impl QuerySource for ModuleSource {
+    async fn query(
+        &self,
+        ctx: &DispatchCtx,
+        request: QueryRequest,
+    ) -> Result<QueryResponse, String> {
+        match &self.0 {
+            Some(config) => query_for_config(config, request).await,
+            None => query(ctx, request).await,
+        }
+    }
+}
+
+struct QueryBridge(Arc<dyn QuerySource>);
+
+#[async_trait]
+impl tinyjuice_host::repl_tools::QuerySource for QueryBridge {
+    async fn query(
+        &self,
+        context: Option<&dyn ToolRunContext>,
+        request: QueryRequest,
+    ) -> Result<QueryResponse, String> {
+        let ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
+        self.0.query(&ctx, request).await
+    }
+}
+
+fn host_repl_tools(
+    source: Arc<dyn QuerySource>,
+    limits: ReplLimits,
+    artifacts_dir: Option<PathBuf>,
+) -> Vec<Box<dyn Tool>> {
+    tinyjuice_host::repl_tools::repl_tools(
+        Arc::new(QueryBridge(source)),
+        limits,
+        artifacts_dir,
+        tinytools_std::filesystem::FileReadTool::MAX_FILE_SIZE_BYTES,
+        None,
+    )
+}
+
+/// Whether a name is one of TinyJuice's query tools.
+pub fn is_repl_tool(name: &str) -> bool {
+    tinyjuice_bus::tools::REPL_TOOLS.contains(&name)
+}
+
+/// Build TinyJuice's query tools against the ambient runtime context.
+pub fn repl_tools() -> Vec<Box<dyn Tool>> {
+    host_repl_tools(Arc::new(ModuleSource(None)), ReplLimits::default(), None)
+}
+
+/// Offer query tools only when enabled handle storage can produce handles.
+pub fn repl_tools_for(config: &crate::config::Config) -> Vec<Box<dyn Tool>> {
+    if !repl_handle_active(config) {
+        return Vec::new();
+    }
+    host_repl_tools(
+        Arc::new(ModuleSource(Some(Arc::new(config.clone())))),
+        ReplLimits::default(),
+        Some(crate::security::policy::tool_result_artifacts_dir(
+            &config.workspace_dir,
+        )),
+    )
+}
+
+pub(crate) fn repl_tools_for_recorded(
+    config: Option<&crate::config::Config>,
+    workspace_dir: &Path,
+    recorded: &[ToolSpec],
+) -> Vec<Box<dyn Tool>> {
+    let current = tinyjuice_bus::tools::repl_tool_declarations();
+    let declarations = recorded
+        .iter()
+        .filter(|spec| is_repl_tool(&spec.name))
+        .filter_map(|spec| {
+            let current = current.iter().find(|item| item.name == spec.name)?;
+            Some(tinyjuice_bus::tools::ReplToolDeclaration {
+                name: spec.name.clone(),
+                op: current.op.clone(),
+                description: spec.description.clone(),
+                parameters: spec.parameters.clone(),
+            })
+        })
+        .collect();
+    tinyjuice_host::repl_tools::repl_tools_with_declarations(
+        declarations,
+        Arc::new(QueryBridge(Arc::new(ModuleSource(
+            config.cloned().map(Arc::new),
+        )))),
+        ReplLimits::default(),
+        Some(crate::security::policy::tool_result_artifacts_dir(
+            workspace_dir,
+        )),
+        tinytools_std::filesystem::FileReadTool::MAX_FILE_SIZE_BYTES,
+        None,
+    )
+}
+
+/// Preserve the nested path used by the integration prelude while the actual
+/// implementation and only host-specific adapter residue live here.
+pub mod repl_tools {
+    pub use super::{is_repl_tool, repl_tools, repl_tools_for};
+    pub(crate) use super::repl_tools_for_recorded;
+}
 use tinyjuice_bus::wire::InstallRequest;
 
 use tinyjuice_bus::tools::REPL_TOOLS;
