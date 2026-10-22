@@ -179,14 +179,6 @@ pub(super) fn managed_401_means_signed_out(status: u16, session_attached: bool) 
     status == 401 && session_attached
 }
 
-fn truncate(text: &str, max_chars: usize) -> String {
-    if text.chars().count() <= max_chars {
-        return text.to_string();
-    }
-    let cut: String = text.chars().take(max_chars).collect();
-    format!("{cut}...")
-}
-
 /// What authenticates a listing request: the live session token, or the
 /// entry's provider-scoped key when there is no live session.
 #[derive(Debug, PartialEq, Eq)]
