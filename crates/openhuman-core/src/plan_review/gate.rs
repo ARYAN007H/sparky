@@ -128,11 +128,14 @@ impl PlanReviewGate {
         // before `rx.await` completes (turn cancel, supervisor shutdown).
         // Without this, a cancelled review would leak entries that could be
         // re-decided against a dead turn or replayed as still-pending.
-        let _guard = ParkGuard {
+        let mut guard = ParkGuard {
             gate: self,
             tenant: scope,
             request_id: request_id.clone(),
             thread_id: thread_id.clone(),
+            client_id: client_id.clone(),
+            tool_call_id: tool_call_id.clone(),
+            completed: false,
         };
 
         tracing::info!(
@@ -152,29 +155,25 @@ impl PlanReviewGate {
             expires_at: Some(expires_at),
         });
 
-        let (resolution, timed_out_or_dropped) = match tokio::time::timeout(self.ttl, rx).await {
-            Ok(Ok(resolution)) => (resolution, false),
-            // Sender dropped (decided elsewhere / shutdown) or TTL elapsed →
-            // fail closed: never execute a plan the user didn't approve.
-            Ok(Err(_)) | Err(_) => {
+        let (resolution, terminal_reason) = match tokio::time::timeout(self.ttl, rx).await {
+            Ok(Ok(resolution)) => (resolution, None),
+            Ok(Err(_)) => {
                 tracing::warn!(
                     request_id = %request_id,
-                    "[plan_review::gate] review unresolved (timeout/dropped) → reject"
+                    "[plan_review::gate] review sender dropped → reject"
                 );
-                (PlanReviewResolution::Reject, true)
+                (PlanReviewResolution::Reject, Some("cancelled"))
+            }
+            Err(_) => {
+                tracing::warn!(
+                    request_id = %request_id,
+                    "[plan_review::gate] review timed out → reject"
+                );
+                (PlanReviewResolution::Reject, Some("expired"))
             }
         };
 
-        // `_guard` drops here on the normal path too (cleanup is idempotent with
-        // `decide`, which already removed the waiter).
-        BUS.publish(DomainEvent::PlanReviewDecided {
-            request_id: request_id.clone(),
-            decision: resolution.as_str().to_string(),
-            thread_id,
-            client_id,
-            tool_call_id,
-            resolution: timed_out_or_dropped.then(|| "expired".to_string()),
-        });
+        guard.publish_decided(&resolution, terminal_reason);
         tracing::info!(
             request_id = %request_id,
             decision = resolution.as_str(),
@@ -248,10 +247,33 @@ struct ParkGuard<'a> {
     tenant: Tenant,
     request_id: String,
     thread_id: Option<String>,
+    client_id: Option<String>,
+    tool_call_id: Option<String>,
+    completed: bool,
+}
+
+impl ParkGuard<'_> {
+    fn publish_decided(&mut self, decision: &PlanReviewResolution, resolution: Option<&str>) {
+        if self.completed {
+            return;
+        }
+        BUS.publish(DomainEvent::PlanReviewDecided {
+            request_id: self.request_id.clone(),
+            decision: decision.as_str().to_string(),
+            thread_id: self.thread_id.clone(),
+            client_id: self.client_id.clone(),
+            tool_call_id: self.tool_call_id.clone(),
+            resolution: resolution.map(str::to_string),
+        });
+        self.completed = true;
+    }
 }
 
 impl Drop for ParkGuard<'_> {
     fn drop(&mut self) {
+        // Dropping the parked future is a terminal cancellation too. Publish
+        // before removing routing metadata so the frontend can clear its card.
+        self.publish_decided(&PlanReviewResolution::Reject, Some("cancelled"));
         self.gate
             .waiters
             .lock()
