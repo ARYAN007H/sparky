@@ -386,6 +386,9 @@ pub(crate) async fn cancel_for_thread(
             .into_iter()
             .filter(|job| !job.status.is_terminal())
             .collect::<Vec<_>>();
+        if live_jobs.is_empty() {
+            crate::agent::orchestration::completion_owners::finish_driver_task(ctx, &task_id);
+        }
         for job in live_jobs {
             match jobs.cancel_owned(job.id.as_str(), &owner_key) {
                 Ok(cancelled_job) => {
