@@ -267,6 +267,95 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
 }
 
 #[tokio::test]
+async fn thread_creation_cannot_enter_the_snapshot_to_purge_window() {
+    use crate::config::test_env::EnvVarGuard;
+    use crate::threads::store::{blocking, ConversationStore, CreateConversationThread};
+
+    let scratch = tempfile::tempdir().expect("isolated purge race fixture");
+    let workspace = scratch.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("create workspace");
+    let _env = EnvVarGuard::locked_async()
+        .await
+        .workspace_unlocked(&workspace);
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let make_thread = |id: &str| CreateConversationThread {
+        id: id.into(),
+        title: format!("Purge race {id}"),
+        created_at: "2026-01-01T00:00:00Z".into(),
+        parent_thread_id: None,
+        labels: None,
+        personality_id: None,
+        working_dir: None,
+    };
+    blocking::ensure_thread(ctx.clone(), workspace.clone(), make_thread("purge-race-existing"))
+        .await
+        .expect("seed a thread for the purge snapshot");
+
+    let (snapshot_tx, snapshot_rx) = tokio::sync::oneshot::channel();
+    let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+    let purge_ctx = ctx.clone();
+    let purge_workspace = workspace.clone();
+    let purge = tokio::spawn(async move {
+        crate::threads::ops::threads_purge_inner_with_snapshot_hook(
+            purge_ctx,
+            purge_workspace,
+            || async move {
+                let _ = snapshot_tx.send(());
+                let _ = release_rx.await;
+            },
+        )
+        .await
+    });
+    snapshot_rx
+        .await
+        .expect("purge has captured its thread snapshot");
+
+    // Exercise both the synchronous facade directly (which many non-RPC
+    // callers use) and the request path used by thread_upsert. They must not
+    // create a row after the purge snapshot but before the store-wide delete.
+    let direct_result = ConversationStore::new(ctx.clone(), workspace.clone())
+        .ensure_thread(make_thread("purge-race-direct-facade"));
+    let request_ctx = ctx.clone();
+    let request_result = tokio::spawn(async move {
+        crate::threads::ops::thread_upsert(
+            &request_ctx,
+            crate::threads::UpsertConversationThreadRequest {
+                id: "purge-race-rpc-upsert".into(),
+                title: "Purge race RPC upsert".into(),
+                created_at: "2026-01-01T00:00:00Z".into(),
+                parent_thread_id: None,
+                labels: None,
+                personality_id: None,
+            },
+        )
+        .await
+    });
+    let rpc_result = tokio::time::timeout(std::time::Duration::from_secs(3), request_result)
+        .await
+        .expect("thread_upsert returns while purge is active")
+        .expect("thread_upsert task joins");
+
+    let _ = release_tx.send(());
+    purge.await.expect("purge task joins").expect("purge succeeds");
+
+    assert!(
+        direct_result.is_err(),
+        "direct ConversationStore ensures must be refused during workspace purge"
+    );
+    assert!(
+        rpc_result.is_err(),
+        "RPC upserts must be refused during workspace purge"
+    );
+    assert!(
+        blocking::list_threads(ctx, workspace)
+            .await
+            .expect("list threads after purge")
+            .is_empty(),
+        "no creator can add an un-fenced parent during the snapshot/purge window"
+    );
+}
+
+#[tokio::test]
 async fn thread_delete_closes_parent_when_driver_task_scope_cannot_be_resolved() {
     use crate::agent::orchestration::background_completions::{self, BackgroundAgentOutcome};
     use crate::agent::tinyagents::host::OpenHumanRunContext;
