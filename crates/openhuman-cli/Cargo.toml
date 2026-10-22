@@ -145,6 +145,13 @@ name = "storage_flows_e2e"
 path = "../../tests/storage_flows_e2e.rs"
 
 [[test]]
+# Starts with no configured backend to exercise TinyFlows' workspace fallback
+# in an isolated module runtime.
+name = "storage_flows_fallback_e2e"
+path = "../../tests/storage_flows_fallback_e2e.rs"
+required-features = ["flows", "modules", "linked-modules", "storage-sqlite"]
+
+[[test]]
 # Its own binary: it installs a storage backend into the process-wide slot and
 # sets the keyring master-key environment.
 name = "storage_secrets_e2e"
