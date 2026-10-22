@@ -62,3 +62,7 @@ pub(crate) fn render_close_results(
         },
     )
 }
+
+#[cfg(test)]
+#[path = "product_copy_tests.rs"]
+mod tests;
