@@ -32,6 +32,8 @@ fn turn_request_field_names_match_the_controller() {
         inference_url: Some("https://example.invalid/v1".into()),
         api_key: Some("k".into()),
         inference_headers: vec![("x-worker".into(), "a".into())],
+        inference_provider_options: Some(serde_json::json!({"provider": {"sort": "latency"}})),
+        inference_reasoning_effort: Some("high".into()),
         agent_id: Some("a".into()),
     };
 
