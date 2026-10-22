@@ -194,8 +194,11 @@ class SocketService {
       // Only a bearer for the core this socket targets: after a gateway
       // switch the fresh bearer belongs to another endpoint, so fall back to
       // this socket's own instead of handing it to the old core.
-      resolveToken: async () =>
-        (await resolveCoreSocketBaseUrl()) === backendUrl ? getCoreRpcToken() : null,
+      resolveToken: async () => {
+        const fresh = await getCoreRpcToken();
+        // Checked after the read, so a switch during it can't leak the bearer.
+        return (await resolveCoreSocketBaseUrl()) === backendUrl ? fresh : null;
+      },
       overrides: {
         path: endpoint.path,
         ...(endpoint.transports ? { transports: endpoint.transports } : {}),
@@ -271,7 +274,7 @@ class SocketService {
       store.dispatch(setStatusForUser({ userId: uid, status: 'disconnected' }));
       store.dispatch(setSocketIdForUser({ userId: uid, socketId: null }));
       store.dispatch(setBackend({ value: 'disconnected', error: reason }));
-      if (reason === 'io server disconnect') void this.retryRejectedHandshake(socket);
+      if (reason === 'io server disconnect') void this.retryRejectedHandshake(socket, backendUrl);
     });
 
     this.socket.on('connect_error', (error: Error) => {
@@ -397,11 +400,13 @@ class SocketService {
    * the bearer and reconnect — only when it changed, so a bearer the core
    * genuinely rejects does not loop.
    */
-  private async retryRejectedHandshake(socket: Socket): Promise<void> {
+  private async retryRejectedHandshake(socket: Socket, backendUrl: string): Promise<void> {
     const used = lastHandshakeToken(socket);
     clearCoreRpcTokenCache();
     const fresh = await getCoreRpcToken();
-    if (this.socket === socket && fresh && fresh !== used) {
+    // After a gateway switch this socket targets the old core; leave it be.
+    const sameCore = (await resolveCoreSocketBaseUrl()) === backendUrl;
+    if (this.socket === socket && sameCore && fresh && fresh !== used) {
       socketLog('Core rejected the socket bearer; reconnecting with the refreshed one');
       socket.connect();
     }

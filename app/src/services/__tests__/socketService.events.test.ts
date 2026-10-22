@@ -247,7 +247,7 @@ describe('socketService — socket event handler dispatches (lines 212, 230, 237
     // Forget the initial connect so only a reconnect is counted.
     const connect = (mockSocket as { connect: ReturnType<typeof vi.fn> }).connect;
     connect.mockClear();
-    return { handlers, connect };
+    return { handlers, connect, auth: auth! };
   }
 
   it('reconnects with the refreshed bearer after the core rejects the handshake', async () => {
@@ -256,6 +256,25 @@ describe('socketService — socket event handler dispatches (lines 212, 230, 237
     handlers['disconnect']!('io server disconnect');
     await pollUntil(() => expect(connect).toHaveBeenCalledTimes(1));
     expect(clearCoreRpcTokenCacheMock).toHaveBeenCalled();
+  });
+
+  it('does not reconnect the old socket after the active core changed', async () => {
+    const { handlers, connect } = await connectAndHandshake();
+    getCoreRpcTokenMock.mockResolvedValue('core-b-bearer');
+    getCoreRpcUrlMock.mockResolvedValue('http://127.0.0.1:9999/rpc');
+    handlers['disconnect']!('io server disconnect');
+    await new Promise(r => setTimeout(r, 50));
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('keeps its own bearer when the active core changes during the bearer read', async () => {
+    const { auth } = await connectAndHandshake();
+    getCoreRpcTokenMock.mockImplementation(async () => {
+      getCoreRpcUrlMock.mockResolvedValue('http://127.0.0.1:9999/rpc');
+      return 'core-b-bearer';
+    });
+    const sent = await new Promise<object>(resolve => auth(resolve));
+    expect(sent).toMatchObject({ token: 'mock-core-bearer' });
   });
 
   it('does not loop when the core rejects the same bearer again', async () => {
