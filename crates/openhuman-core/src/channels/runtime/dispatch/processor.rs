@@ -30,7 +30,7 @@ use crate::inbound_debounce::{KeyedDebouncer, Push};
 use in_order::InOrder;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
-use tinychannels_bus::{ChannelInboundEnvelope, ChannelMessage};
+use tinychannels_bus::ChannelInboundEnvelope;
 use tokio::task::JoinSet;
 use tokio::time::Instant;
 
@@ -39,20 +39,17 @@ use tokio::time::Instant;
 /// callback; it is never reconstructed from envelope metadata.
 #[derive(Clone)]
 pub(crate) struct RuntimeChannelMessage {
-    pub(crate) message: ChannelMessage,
-    pub(crate) inbound_envelope: Option<ChannelInboundEnvelope>,
+    pub(crate) message: ChannelInboundEnvelope,
     pub(crate) authenticated_relay: bool,
     pub(crate) prepared_inbound: Option<tinychannels_bus::module_inbound::PreparedChannelInbound>,
 }
 
 impl RuntimeChannelMessage {
     pub(crate) fn with_inbound_envelope(
-        message: ChannelMessage,
-        inbound_envelope: ChannelInboundEnvelope,
+        message: ChannelInboundEnvelope,
     ) -> Self {
         Self {
             message,
-            inbound_envelope: Some(inbound_envelope),
             authenticated_relay: false,
             prepared_inbound: None,
         }
@@ -62,22 +59,8 @@ impl RuntimeChannelMessage {
         delivery: tinychannels_bus::module_relay::RelayInboundDelivery,
     ) -> Self {
         Self {
-            // The module's PrepareChannelInbound operation supplies the
-            // normalized legacy projection before the processor consumes it.
-            message: ChannelMessage::default(),
-            inbound_envelope: Some(delivery.envelope),
+            message: delivery.envelope,
             authenticated_relay: delivery.delivered_via_authenticated_relay,
-            prepared_inbound: None,
-        }
-    }
-}
-
-impl From<ChannelMessage> for RuntimeChannelMessage {
-    fn from(message: ChannelMessage) -> Self {
-        Self {
-            message,
-            inbound_envelope: None,
-            authenticated_relay: false,
             prepared_inbound: None,
         }
     }
