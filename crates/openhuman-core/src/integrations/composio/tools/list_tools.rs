@@ -1,6 +1,6 @@
 //! The `composio_list_tools` agent tool.
 
-use crate::tools::schema_cache::static_schema;
+use tinyagents_harness_tools::static_schema;
 use std::collections::HashSet;
 use std::sync::Arc;
 

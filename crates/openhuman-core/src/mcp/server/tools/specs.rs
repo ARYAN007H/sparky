@@ -1,4 +1,4 @@
-use crate::tools::schema_cache::static_schema;
+use tinyagents_harness_tools::static_schema;
 use serde_json::{json, Value};
 use tinymcp_bus::ServerToolSpec;
 
