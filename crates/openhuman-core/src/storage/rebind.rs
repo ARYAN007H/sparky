@@ -59,8 +59,9 @@ pub fn rebind(config: &Config) -> Result<Option<Rebound>> {
 
 /// [`rebind`] with the URL the host installed and the installation made
 /// explicit, so the rule is testable without touching the process's slot.
-/// `install` receives the new URL and backend and returns how many session
-/// stores it moved.
+/// `install` receives the new URL and backend, and returns the number of
+/// session stores moved or an error that prevents the new backend from being
+/// installed.
 pub(crate) fn rebind_with(
     config: &Config,
     current: Option<String>,
