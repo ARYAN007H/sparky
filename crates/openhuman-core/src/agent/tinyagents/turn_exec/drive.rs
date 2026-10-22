@@ -194,9 +194,6 @@ pub(super) async fn drive_turn(
         is_subagent,
         defer_turn_completed_to_caller,
     );
-    // The EventSink is created unconditionally (bridge, cap pauser and the
-    // durable journal of issue #4249, 05.1 all subscribe; it is inert when
-    // nothing does), so an unobserved turn stays reconstructable.
     //
     // Mint the durable run id *before* the sink and seed the sink stream prefix
     // with it (`with_stream_id`), so every persisted observation's `event_id` is
