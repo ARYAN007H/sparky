@@ -278,7 +278,7 @@ async fn maintain_scope(
 /// TinyAgents owns the event format; OpenHuman owns the lifecycle schedule.
 async fn maintain_run_journals(
     statuses: &dyn HarnessStatusStore,
-    streams: &dyn tinystoragedrivers::StreamStore,
+    streams: &dyn tinystoragedrivers::api::StreamStore,
     retention_ms: u64,
     now_ms: i64,
     backfill: bool,
