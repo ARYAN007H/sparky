@@ -274,9 +274,8 @@ async fn thread_creation_cannot_enter_the_snapshot_to_purge_window() {
     let scratch = tempfile::tempdir().expect("isolated purge race fixture");
     let workspace = scratch.path().join("workspace");
     std::fs::create_dir_all(&workspace).expect("create workspace");
-    let _env = EnvVarGuard::locked_async()
-        .await
-        .workspace_unlocked(&workspace);
+    let _env_lock = EnvVarGuard::locked_async().await;
+    let _workspace_env = EnvVarGuard::workspace_unlocked(&workspace);
     let ctx = crate::core::runtime::DispatchCtx::ambient();
     let make_thread = |id: &str| CreateConversationThread {
         id: id.into(),
