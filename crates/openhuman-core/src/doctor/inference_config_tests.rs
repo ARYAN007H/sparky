@@ -96,7 +96,7 @@ async fn an_unregistered_chat_provider_reports_its_config_path() {
 
 #[tokio::test]
 async fn a_byok_cloud_fallback_without_a_key_reports_construction_failure() {
-    use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
+    use crate::config::schema::cloud_providers::CloudProviderCreds;
     use crate::config::test_env::EnvVarGuard;
 
     let _inference_guard = crate::inference::inference_test_guard_async().await;
