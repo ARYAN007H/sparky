@@ -48,6 +48,22 @@ async fn threads_purge_inner(
         }
         fenced.push(thread_id.clone());
     }
+    // Settle the children while their owner scopes are still known. If the
+    // context cannot safely cancel an indexed job, leave the parent threads in
+    // place so the caller can retry rather than orphaning that live job after
+    // the purge removes its thread row.
+    use crate::agent::orchestration::running_subagents;
+    let cancelled_threads = match running_subagents::cancel_all(&ctx, &dir, &thread_ids).await {
+        Ok(cancelled) => cancelled.len(),
+        Err(error) => {
+            for thread_id in &fenced {
+                crate::agent::orchestration::completion_owners::release_thread_deletion(
+                    &ctx, &dir, thread_id,
+                );
+            }
+            return Err(error);
+        }
+    };
     let stats = match conversations::blocking::purge_threads(ctx.clone(), dir.clone()).await {
         Ok(stats) => stats,
         Err(error) => {
@@ -62,23 +78,21 @@ async fn threads_purge_inner(
     // No parent thread survives a purge. Cancel and settle each thread's live
     // driver jobs, then durably tombstone each parent before the final queue
     // wipe so a late result cannot be delivered after purge returns.
-    use crate::agent::orchestration::{background_completions, running_subagents};
-    let cancellation = running_subagents::cancel_all(&ctx, &dir, &thread_ids).await;
-    let cancelled_threads = cancellation.as_ref().map_or(0, Vec::len);
+    use crate::agent::orchestration::background_completions;
     let mut discarded = 0;
     let mut cleanup_failures = Vec::new();
     for thread_id in &thread_ids {
+        // Install the in-memory late-result fence before the durable marker.
+        // `delete_parent_for_thread` persists the same lifecycle transition.
+        discarded += background_completions::discard_for_thread(&ctx, &dir, thread_id);
         match background_completions::delete_parent_for_thread(&ctx, &dir, thread_id) {
-            Ok(count) => discarded += count,
+            Ok(_) => {}
             Err(error) => cleanup_failures.push(format!(
                 "failed to close purged thread {thread_id}: {error}"
             )),
         }
     }
     discarded += background_completions::clear_all(&ctx, &dir);
-    if let Err(error) = cancellation {
-        cleanup_failures.push(error);
-    }
     if !cleanup_failures.is_empty() {
         return Err(format!(
             "threads purged but child cleanup failed: {}",
