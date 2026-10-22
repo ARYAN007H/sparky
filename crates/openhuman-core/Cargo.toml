@@ -106,6 +106,7 @@ tinyagents-harness-tools = { workspace = true, features = ["goals", "todos", "sk
 tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", features = [
     "sqlite",
     "multimodal",
+    "json-schema",
 ] }
 tinybox-bus = { path = "../../vendor/tinybox/crates/tinybox-bus", features = ["storage"] }
 tiny-artifacts = { path = "../../vendor/tiny-artifacts/crates/tiny-artifacts" }

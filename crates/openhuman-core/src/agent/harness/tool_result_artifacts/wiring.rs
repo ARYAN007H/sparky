@@ -14,7 +14,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::agent::harness::tool_result_artifacts::{new_tool_result_store, HostArtifactStore};
+use super::{new_tool_result_store, HostArtifactStore};
 use crate::security::policy::tool_result_artifacts_dir;
 use crate::storage::sessions::artifact_blobs_for;
 use tinystoragedrivers::{MemoryStorage, Scope, StorageBackend};
@@ -116,5 +116,5 @@ fn prune_materialized(root: &Path, ttl: std::time::Duration) -> usize {
 }
 
 #[cfg(test)]
-#[path = "artifact_wiring_tests.rs"]
+#[path = "wiring_tests.rs"]
 mod tests;

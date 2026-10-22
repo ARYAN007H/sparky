@@ -17,7 +17,7 @@ use tinytools::{Tool, ToolSpec};
 use tinytools_agent::dialect::TranscriptEntry;
 
 use super::transcript::persist_subagent_transcript;
-use crate::threads::worker_mirror::mirror_worker_thread;
+use crate::agent::subagent_host::ops::mirror_worker_thread;
 
 #[path = "dispatch_helpers.rs"]
 mod helpers;

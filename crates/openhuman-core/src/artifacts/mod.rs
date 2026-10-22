@@ -1,4 +1,3 @@
-pub(crate) mod artifact_wiring;
 pub mod files;
 pub mod migrate;
 pub mod ops;

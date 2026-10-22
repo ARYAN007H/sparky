@@ -15,7 +15,7 @@ impl OpenHumanSessionHost {
         };
         let autocompact_enabled = context_config.enabled && context_config.autocompact_enabled;
         let compaction = context_config.compaction_settings();
-        let artifact_store = crate::artifacts::artifact_wiring::build_artifact_store(
+        let artifact_store = crate::agent::harness::tool_result_artifacts::build_artifact_store(
             &self.workspace_dir,
             &self.event_session_id,
         );
@@ -26,7 +26,7 @@ impl OpenHumanSessionHost {
         let context_mw = TurnContextMiddleware {
             tool_result_budget_bytes,
             payload_summarizer: self.payload_summarizer.clone().filter(|_| juice_on),
-            // Rooted outside the project; see `artifact_wiring` (#6408, #6483).
+            // Rooted outside the project; see `tool_result_artifacts` (#6408, #6483).
             artifact_store: Some(artifact_store),
             tokenjuice_compaction_enabled: tokenjuice_compaction_enabled && juice_on,
             tokenjuice_compression: self.tokenjuice_compression,
