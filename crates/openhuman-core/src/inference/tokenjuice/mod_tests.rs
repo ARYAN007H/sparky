@@ -7,9 +7,10 @@ fn host_tools_keep_the_published_recovery_names_and_schemas() {
     // Pin the actual tool the registry constructs before removing the local
     // forwarding wrapper; this protects the model-facing contract byte for
     // byte across the ownership move to tinyjuice-host.
-    let retrieve = tinyjuice_host::retrieve_tool::RetrieveToolOutputTool::new(
-        std::sync::Arc::new(|_, _| Box::pin(async { Ok(None) })),
-    );
+    let retrieve =
+        tinyjuice_host::retrieve_tool::RetrieveToolOutputTool::new(std::sync::Arc::new(|_, _| {
+            Box::pin(async { Ok(None) })
+        }));
     assert_eq!(retrieve.name(), "juice_retrieve");
     assert_eq!(
         retrieve.permission_level(),
