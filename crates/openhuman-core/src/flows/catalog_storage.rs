@@ -394,15 +394,15 @@ struct CatalogStoragePort {
 #[tinybus::interface(name = "ai.tinyhumans.tinyflows.CatalogStorage")]
 impl CatalogStoragePort {
     async fn doc_capabilities(&self) -> BusResult<CatalogStorageReply> {
-        let result = self
-            .scope
-            .documents()
-            .await
-            .map(|documents| catalog::CatalogStorageCapabilities {
-                record_metadata: documents
-                    .capabilities()
-                    .contains(Capability::RecordMetadata),
-            });
+        let result =
+            self.scope
+                .documents()
+                .await
+                .map(|documents| catalog::CatalogStorageCapabilities {
+                    record_metadata: documents
+                        .capabilities()
+                        .contains(Capability::RecordMetadata),
+                });
         Ok(catalog_reply(result))
     }
 
@@ -410,11 +410,7 @@ impl CatalogStoragePort {
         let result = async {
             allowed_collection(&request.spec.name)?;
             let spec: CollectionSpec = decoded(encoded(request.spec)?)?;
-            self.scope
-                .documents()
-                .await?
-                .ensure_collection(&spec)
-                .await
+            self.scope.documents().await?.ensure_collection(&spec).await
         }
         .await;
         Ok(catalog_reply(result))
