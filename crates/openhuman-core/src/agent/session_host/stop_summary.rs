@@ -16,16 +16,11 @@
 //! locale table can replace [`StopReasonKind::copy`] without touching the
 //! classification.
 
-use std::fmt::Write as _;
-
 use super::turn_checkpoint::CheckpointToolResult;
 use tinyagents_harness::turn_stop::TurnStop;
 
 /// Longest error line shown for one tool, in characters.
 const ERROR_LINE_CHARS: usize = 120;
-
-/// Most result lines listed; the rest are counted.
-const MAX_LISTED: usize = 8;
 
 /// Maps an unclassified breaker stop to the product's stable stop category.
 fn stop_fallback_class(note: &str) -> &'static str {
@@ -244,22 +239,6 @@ pub(crate) fn short_error_line(content: &str) -> String {
     format!("{}…", cut.trim_end())
 }
 
-/// One collapsed line: a tool, whether it succeeded, the error line for a
-/// failure, and how many results it stands for.
-struct Group {
-    name: String,
-    success: bool,
-    error: String,
-    count: usize,
-}
-
-fn times(count: usize) -> String {
-    match count {
-        1 => String::new(),
-        n => format!(" {n} times"),
-    }
-}
-
 /// The user-facing reply for a turn the breaker stopped with `stop_note`.
 pub(crate) fn render_stop_summary(results: &[CheckpointToolResult], stop_note: &str) -> String {
     let kind = StopReasonKind::from_stop_note(stop_note);
@@ -268,51 +247,14 @@ pub(crate) fn render_stop_summary(results: &[CheckpointToolResult], stop_note: &
         results = results.len(),
         "[turn_checkpoint] rendering deterministic stop summary"
     );
-    let mut groups: Vec<Group> = Vec::new();
-    for result in results {
-        let error = if result.success {
-            String::new()
-        } else {
-            short_error_line(&result.content)
-        };
-        match groups
-            .iter_mut()
-            .find(|g| g.name == result.name && g.success == result.success && g.error == error)
-        {
-            Some(group) => group.count += 1,
-            None => groups.push(Group {
-                name: result.name.clone(),
-                success: result.success,
-                error,
-                count: 1,
-            }),
-        }
-    }
-
-    let mut out = format!("I stopped this turn early because {}.\n", kind.copy());
-    if !groups.is_empty() {
-        out.push_str("\n**What happened**\n");
-        // Show the most recent groups (the immediate blocker is last), in
-        // chronological order.
-        let shown_from = groups.len().saturating_sub(MAX_LISTED);
-        for group in groups.iter().skip(shown_from) {
-            let name = crate::util::truncate_with_ellipsis(&group.name, 60);
-            let count = times(group.count);
-            let _ = if group.success {
-                writeln!(out, "- `{name}` succeeded{count}")
-            } else if group.error.is_empty() {
-                writeln!(out, "- `{name}` failed{count}")
-            } else {
-                writeln!(out, "- `{name}` failed{count}: {}", group.error)
-            };
-        }
-        let hidden: usize = groups.iter().take(shown_from).map(|g| g.count).sum();
-        if hidden > 0 {
-            let _ = writeln!(out, "- …and {hidden} more tool call(s)");
-        }
-    }
-    out.push_str("\nTell me how you'd like to proceed, or ask me to try again.");
-    out
+    let groups = tinyagents_harness::turn_stop::group_stop_results(results, |content| {
+        short_error_line(content)
+    });
+    tinyagents_harness::turn_stop::render_stop_summary_with_copy(
+        kind.copy(),
+        &groups,
+        &super::product_copy::OPENHUMAN_STOP_COPY,
+    )
 }
 
 #[cfg(test)]

@@ -208,7 +208,8 @@ fn a_policy_refusal_class_halt_names_the_security_settings() {
 /// most recent ones so the failure that stopped the turn stays visible.
 #[test]
 fn a_capped_summary_keeps_the_most_recent_groups() {
-    let mut results: Vec<_> = (0..MAX_LISTED + 2)
+    // The user-facing summary shows the newest eight groups.
+    let mut results: Vec<_> = (0..10)
         .map(|i| result(&format!("early_tool_{i}"), true, "ok"))
         .collect();
     results.push(result("final_blocker", false, "boom happened"));
