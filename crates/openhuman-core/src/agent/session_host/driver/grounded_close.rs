@@ -239,9 +239,9 @@ fn classified_halt_close(outcome: &TinyagentsTurnOutcome) -> Option<GroundedClos
     if !reason.starts_with("Stopping after ") {
         return None;
     }
-    let records = results_from_tool_outcomes(&outcome.tool_outcomes);
+    let records = product_copy::close_results(&outcome.tool_outcomes);
     Some(GroundedClose {
-        output: build_deterministic_final_summary(&records, Some(reason)),
+        output: stop_summary::deterministic_final_summary(&records, Some(reason)),
         usage: RepairUsage::default(),
     })
 }
