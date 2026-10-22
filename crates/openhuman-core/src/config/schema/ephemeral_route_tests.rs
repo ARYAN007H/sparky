@@ -242,7 +242,27 @@ fn reapplying_the_same_route_is_a_no_op() {
         ),
         roles_before
     );
-    assert!(!logs.text().contains("INFO"));
+    let text = logs.text();
+    assert!(text.contains("DEBUG"), "expected a debug log: {text:?}");
+    assert!(!text.contains("INFO"));
+}
+
+#[test]
+fn reapplying_the_same_route_repairs_a_changed_role_pin() {
+    let mut config = config_with_model("x/y");
+    apply(&mut config, route());
+    config.coding_provider = Some("other-provider:model".into());
+    let (logs, _guard) = capture_logs();
+
+    apply(&mut config, route());
+
+    assert_eq!(
+        config.coding_provider.as_deref(),
+        Some(format!("{EPHEMERAL_ROUTE_SLUG}:x/y").as_str())
+    );
+    let text = logs.text();
+    assert!(text.contains("DEBUG"), "expected a debug log: {text:?}");
+    assert!(!text.contains("INFO"));
 }
 
 #[test]
