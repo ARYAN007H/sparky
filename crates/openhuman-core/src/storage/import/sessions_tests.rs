@@ -90,6 +90,7 @@ fn transcript_replay_keeps_background_provenance_for_messages_and_compaction() {
         serde_json::json!({
             "role": "assistant",
             "content": content,
+            "request_id": key,
             "background": {
                 "idempotency_key": key,
                 "provenance": { "kind": "cron", "job": "daily" }
@@ -101,6 +102,13 @@ fn transcript_replay_keeps_background_provenance_for_messages_and_compaction() {
     let contents = [
         serde_json::json!({"_meta": meta}),
         first,
+        serde_json::json!({
+            "role": "tool",
+            "content": "tool failed",
+            "tool_call_id": "call-1",
+            "failure": true,
+            "failure_detail": "provider refused"
+        }),
         serde_json::json!({"kind": "compaction", "replacement": [compacted]}),
     ];
     std::fs::write(
@@ -130,7 +138,17 @@ fn transcript_replay_keeps_background_provenance_for_messages_and_compaction() {
             provenance: serde_json::json!({ "kind": "cron", "job": "daily" }),
         })
     );
-    let DisplayRecord::Compaction(compaction) = &display.records[1] else {
+    let DisplayRecord::Message(tool_result) = &display.records[1] else {
+        panic!("expected the imported failed tool result");
+    };
+    assert_eq!(
+        tool_result.message.tool_failure,
+        Some(tinyagents_session::transcript::ToolFailure {
+            failed: true,
+            detail: Some("provider refused".into()),
+        })
+    );
+    let DisplayRecord::Compaction(compaction) = &display.records[2] else {
         panic!("expected the imported compaction record");
     };
     assert_eq!(
@@ -140,6 +158,9 @@ fn transcript_replay_keeps_background_provenance_for_messages_and_compaction() {
             provenance: serde_json::json!({ "kind": "cron", "job": "daily" }),
         })
     );
+    let logical = history.messages().unwrap();
+    assert_eq!(logical[0].request_id.as_deref(), Some("run-2"));
+    assert!(logical[0].preserve_request_id);
 }
 
 #[test]

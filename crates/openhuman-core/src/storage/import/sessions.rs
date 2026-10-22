@@ -418,6 +418,21 @@ fn decode_display_message(
                 .unwrap_or_default() as u32,
         });
     message.turn_usage = turn_usage.clone();
+    message.preserve_request_id = true;
+    let failed = value
+        .get("failure")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let failure_detail = value
+        .get("failure_detail")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned);
+    if failed || failure_detail.is_some() {
+        message.tool_failure = Some(tinyagents_session::transcript::ToolFailure {
+            failed,
+            detail: failure_detail.clone(),
+        });
+    }
     let reasoning_content = value
         .get("reasoning_content")
         .and_then(serde_json::Value::as_str)
@@ -441,14 +456,8 @@ fn decode_display_message(
             .map(str::to_owned),
         reasoning_content,
         turn_usage,
-        failure: value
-            .get("failure")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false),
-        failure_detail: value
-            .get("failure_detail")
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_owned),
+        failure: failed,
+        failure_detail,
         background: value
             .get("background")
             .cloned()
