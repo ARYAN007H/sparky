@@ -423,26 +423,8 @@ impl OpenHumanSessionHost {
         // a host provider. The `agent_harness_e2e` mock now serves SSE for streaming,
         // so the crate-native streaming path is exercised end-to-end.
         //
-        // Resolve the per-turn iteration cap in one place so an explicit
-        // operator override takes precedence over the selected definition,
-        // while definitions still take precedence over the global default.
-        let mut effective_agent_config = config.agent.clone();
-        let effective_cap =
-            super::iteration_cap::resolve_max_tool_iterations(&config.agent, target_def);
-        if let Some(def) = target_def {
-            log::info!(
-                "[agent::builder] resolved iteration cap for agent_id={}: \
-                 definition.max_iterations={} iteration_policy={:?} -> effective={} \
-                 (global default {}, explicit override {:?})",
-                agent_id,
-                def.max_iterations,
-                def.iteration_policy,
-                effective_cap,
-                config.agent.max_tool_iterations,
-                config.agent.max_tool_iterations_override,
-            );
-        }
-        effective_agent_config.max_tool_iterations = effective_cap;
+        let effective_agent_config =
+            helpers::effective_agent_config(config, target_def, agent_id);
         let merged_host_tools = super::host_tools::merge_for_turn(
             ctx,
             host,

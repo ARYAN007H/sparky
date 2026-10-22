@@ -112,6 +112,34 @@ pub(super) fn effective_settings(
     (effective_temperature, effective_omit_memory_context, effective_tokenjuice_compression)
 }
 
+pub(super) fn effective_agent_config(
+    config: &Config,
+    target_def: Option<&crate::agent_registry::host_definition::AgentDefinition>,
+    agent_id: &str,
+) -> crate::config::AgentConfig {
+    // Resolve the per-turn iteration cap in one place so an explicit
+    // operator override takes precedence over the selected definition,
+    // while definitions still take precedence over the global default.
+    let mut effective_agent_config = config.agent.clone();
+    let effective_cap =
+        super::iteration_cap::resolve_max_tool_iterations(&config.agent, target_def);
+    if let Some(def) = target_def {
+        log::info!(
+        "[agent::builder] resolved iteration cap for agent_id={}: \
+         definition.max_iterations={} iteration_policy={:?} -> effective={} \
+         (global default {}, explicit override {:?})",
+        agent_id,
+        def.max_iterations,
+        def.iteration_policy,
+        effective_cap,
+        config.agent.max_tool_iterations,
+        config.agent.max_tool_iterations_override,
+        );
+    }
+    effective_agent_config.max_tool_iterations = effective_cap;
+    effective_agent_config
+}
+
 pub(super) fn payload_summarizer(
     host_only: bool,
     agent_id: &str,
