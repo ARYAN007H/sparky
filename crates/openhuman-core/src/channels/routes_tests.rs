@@ -729,7 +729,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     assert!(sent_text(&sent[2]).contains("→ `Telegram"));
     assert!(sent
         .iter()
-        .all(|message| message.thread_ts.as_deref() == Some("42")));
+        .all(|message| message.thread_id.as_deref() == Some("42")));
 }
 
 #[tokio::test]
