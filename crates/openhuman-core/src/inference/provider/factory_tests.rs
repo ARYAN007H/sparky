@@ -203,7 +203,8 @@ fn inspection_requires_credentials_for_explicit_authenticated_cloud_routes() {
     );
     assert!(
         runtime.is_ok(),
-        "runtime construction preserves explicit routes before a key is saved"
+        "runtime construction preserves explicit routes before a key is saved: {:?}",
+        runtime.err()
     );
 
     provider.auth_style = AuthStyle::Anthropic;
