@@ -189,6 +189,10 @@ function isNativeAgentProgressReference(path, text, source = text) {
   }
   if (path === `${harness}turn_runner/mod_tests.rs`)
     return /\bcrate\s*::\s*progress\s*::\s*AgentProgress\b/.test(text);
+  if (path === `${harness}progress_tests.rs`)
+    return /^\s*use\s+crate::progress::AgentProgress\s*;\s*$/m.test(
+      rustCode(source),
+    );
   return false;
 }
 
