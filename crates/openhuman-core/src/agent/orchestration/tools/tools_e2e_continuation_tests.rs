@@ -397,12 +397,10 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
 
 #[tokio::test]
 async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
-    use crate::agent::orchestration::subagent_sessions::{
-        DurableSubagentStatus, SubagentSessionStore,
-    };
+    use crate::agent::orchestration::subagent_sessions::open_for_context;
     use crate::agent::orchestration::tools::SpawnSubagentTool;
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
-    use tinyagents_orchestration::subagent::SubAgentJobStatus;
+    use tinyagents_orchestration::subagent::{DurableSubagentStatus, SubAgentJobStatus};
 
     let _lock = crate::config::TEST_ENV_LOCK.lock().await;
     let _ = AgentDefinitionRegistry::init_global_builtins();
@@ -438,9 +436,17 @@ async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
     assert!(!first.is_error, "{}", first.output());
     wait_completed(&mut progress_rx).await;
 
-    let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
+    let sessions = open_for_context(
+        &live.data.dispatch_ctx(),
+        workspace.path().to_path_buf(),
+        "idle-reuse-e2e",
+        Some("idle-reuse-e2e-thread".into()),
+        None,
+    )
+    .expect("open driver sessions");
     let first_session = sessions
-        .load()
+        .list_for_parent("idle-reuse-e2e", Some("idle-reuse-e2e-thread"))
+        .await
         .expect("first session list")
         .into_iter()
         .find(|session| session.task_key == "idle-history-fixture")
@@ -482,7 +488,8 @@ async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
     assert!(!second.is_error, "{}", second.output());
     wait_completed(&mut progress_rx).await;
     let second_session = sessions
-        .load()
+        .list_for_parent("idle-reuse-e2e", Some("idle-reuse-e2e-thread"))
+        .await
         .expect("follow-up session list")
         .into_iter()
         .find(|session| session.subagent_session_id == original_session_id)

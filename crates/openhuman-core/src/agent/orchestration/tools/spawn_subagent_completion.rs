@@ -12,7 +12,7 @@ async fn mark_driver_finished(
     session_id: &str,
     task_id: &str,
     status: &SubagentRunStatus,
-    history: &[tinyagents_session::transcript::TranscriptMessage],
+    history: Vec<tinyagents_session::transcript::TranscriptMessage>,
 ) -> Result<(), String> {
     let status = match subagent_sessions::DurableSubagentStatus::from_run_status(status) {
         subagent_sessions::DurableSubagentStatus::Running => {
@@ -31,7 +31,7 @@ async fn mark_driver_finished(
             tinyagents_orchestration::subagent::DurableSubagentStatus::Closed
         }
     };
-    let history = tinyagents_runtime::transcript::transcript_to_messages(history);
+    let history = tinyagents_runtime::transcript::transcript_to_messages(&history);
     if store
         .mark_finished(session_id, task_id, status, history)
         .await
