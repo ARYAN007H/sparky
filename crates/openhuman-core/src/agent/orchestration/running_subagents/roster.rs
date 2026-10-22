@@ -2,6 +2,7 @@
 //! `[active_subagents]` context block.
 
 use super::registry::admit_workspace;
+use tinyagents_orchestration::subagent::{DurableSubagentSessionSummary, ParentRosterEntry};
 
 #[cfg(test)]
 #[path = "roster_tests.rs"]
@@ -10,6 +11,72 @@ mod tests;
 /// The single supported follow-up path for a durable sub-agent task.
 fn roster_guidance() -> &'static str {
     "reuse its task_key with spawn_subagent to continue or answer a clarification; completed results are delivered automatically."
+}
+
+/// Apply OpenHuman's prompt wording to the owner-scoped data supplied by
+/// TinyAgents. Keeping this formatter here lets the host own product language
+/// while the upstream registry remains the source of live job state.
+fn format_roster(entries: &[ParentRosterEntry]) -> String {
+    if entries.is_empty() {
+        return String::new();
+    }
+    let mut block = format!(
+        "[active_subagents]\n\
+         You have {} sub-agent worker(s). This is your authoritative roster — trust it over memory. Track each by \
+         subagent_session_id. {} Never fabricate a result for a worker still running \
+         or one that has failed.\n",
+        entries.len(),
+        roster_guidance()
+    );
+    for entry in entries {
+        let session = entry.session.as_ref();
+        let (session_id, task_id, task_title, status) = if let Some(session) = session {
+            (
+                session.subagent_session_id.as_str(),
+                session
+                    .current_task_id
+                    .as_deref()
+                    .unwrap_or(entry.task_id.as_str()),
+                session.task_title.as_str(),
+                match session.status {
+                    tinyagents_orchestration::subagent::DurableSubagentStatus::Running => "running",
+                    tinyagents_orchestration::subagent::DurableSubagentStatus::Idle => "idle",
+                    tinyagents_orchestration::subagent::DurableSubagentStatus::AwaitingUser => {
+                        "awaiting_user"
+                    }
+                    tinyagents_orchestration::subagent::DurableSubagentStatus::Failed => "failed",
+                    tinyagents_orchestration::subagent::DurableSubagentStatus::Closed => "closed",
+                },
+            )
+        } else if let Some(job) = entry.live_job.as_ref() {
+            (
+                "(live)",
+                entry.task_id.as_str(),
+                "(no durable session)",
+                match job.status {
+                    tinyagents_orchestration::subagent::SubAgentJobStatus::Queued => "queued",
+                    tinyagents_orchestration::subagent::SubAgentJobStatus::Running => "running",
+                    tinyagents_orchestration::subagent::SubAgentJobStatus::AwaitingInput => {
+                        "awaiting_user"
+                    }
+                    tinyagents_orchestration::subagent::SubAgentJobStatus::Completed => "completed",
+                    tinyagents_orchestration::subagent::SubAgentJobStatus::Failed => "failed",
+                    tinyagents_orchestration::subagent::SubAgentJobStatus::Incomplete => {
+                        "incomplete"
+                    }
+                    tinyagents_orchestration::subagent::SubAgentJobStatus::Cancelled => "cancelled",
+                },
+            )
+        } else {
+            continue;
+        };
+        block.push_str(&format!(
+            "- {} · session={} · task={} · status={} · about: {}\n",
+            entry.agent_id, session_id, task_id, status, task_title
+        ));
+    }
+    block.push_str("[/active_subagents]\n\n");
+    block
 }
 
 /// Most-recent durable sessions surfaced in the roster when they are not in
@@ -39,18 +106,25 @@ pub(crate) fn active_subagents_context_block(
     let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore {
         workspace_dir: workspace_dir.to_path_buf(),
     };
-    let durable: Vec<_> = match crate::agent::orchestration::subagent_sessions::list_for_parent(
-        &store,
-        parent_session,
-        None,
-    ) {
+    let load = || {
+        crate::agent::orchestration::subagent_sessions::list_for_parent(
+            &store,
+            parent_session,
+            None,
+        )
+    };
+    let durable = match ctx.resolved() {
+        Some(context) => crate::core::runtime::CoreContext::sync_scope(context, load),
+        None => load(),
+    };
+    let durable: Vec<DurableSubagentSessionSummary> = match durable {
         Ok(sessions) => sessions
             .into_iter()
-            .filter(|s| {
-                use crate::agent::orchestration::subagent_sessions::DurableSubagentStatus;
-                s.status != DurableSubagentStatus::Closed
+            .filter(|session| {
+                session.status != tinyagents_orchestration::subagent::DurableSubagentStatus::Closed
             })
             .take(DURABLE_ROSTER_CAP)
+            .map(|session| DurableSubagentSessionSummary::from(&session))
             .collect(),
         Err(err) => {
             log::warn!(
@@ -60,33 +134,31 @@ pub(crate) fn active_subagents_context_block(
         }
     };
 
-    if durable.is_empty() {
+    let Some(thread_id) = crate::agent::orchestration::background_completions::thread_for_session(
+        ctx,
+        parent_session,
+    ) else {
         return None;
-    }
-    let mut block = format!(
-        "[active_subagents]\n\
-         You have {} sub-agent worker(s) from earlier turns. This is your authoritative \
-         roster — trust it over memory. Track each by \
-         subagent_session_id. {} Never fabricate a result for a worker still running \
-         or one that has failed.\n",
-        durable.len(),
-        roster_guidance()
+    };
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    >(ctx);
+    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        workspace_dir,
+        parent_session,
+        Some(&thread_id),
     );
-    for s in &durable {
-        use crate::agent::orchestration::subagent_sessions::DurableSubagentStatus;
-        let status = match s.status {
-            DurableSubagentStatus::Running => "running",
-            DurableSubagentStatus::Idle => "idle",
-            DurableSubagentStatus::AwaitingUser => "awaiting_user",
-            DurableSubagentStatus::Failed => "failed",
-            DurableSubagentStatus::Closed => "closed",
-        };
-        let task = s.current_task_id.as_deref().unwrap_or("(none)");
-        block.push_str(&format!(
-            "- {} · session={} · task={} · status={} · about: {}\n",
-            s.agent_id, s.subagent_session_id, task, status, s.task_title
-        ));
-    }
-    block.push_str("[/active_subagents]\n\n");
-    Some(block)
+    let scope = tinyagents_orchestration::subagent::ParentJobScope::new(
+        tinytools::WorkspaceDescriptor::new(workspace_dir),
+        thread_id,
+    );
+    let block = tinyagents_orchestration::subagent::format_parent_roster_for_owner(
+        &jobs,
+        &owner,
+        &scope,
+        &durable,
+        format_roster,
+    )
+    .ok()?;
+    (!block.is_empty()).then_some(block)
 }
