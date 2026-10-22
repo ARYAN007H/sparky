@@ -474,9 +474,12 @@ async fn apply_autonomy_settings_rejects_a_relative_or_empty_trusted_root() {
     for root in ["", "  ", ".", "rel/dir"] {
         let tmp = tempdir().unwrap();
         let mut cfg = tmp_config(&tmp);
+        let enabled_before = cfg.autonomy.enabled;
         let err = apply_autonomy_settings(
             &mut cfg,
             AutonomySettingsPatch {
+                // A rejected patch must not half-apply its other fields.
+                enabled: Some(!enabled_before),
                 trusted_roots: Some(vec![crate::security::TrustedRoot {
                     path: root.into(),
                     access: crate::security::TrustedAccess::ReadWrite,
@@ -491,5 +494,6 @@ async fn apply_autonomy_settings_rejects_a_relative_or_empty_trusted_root() {
             "expected validation error, got: {err}"
         );
         assert!(cfg.autonomy.trusted_roots.is_empty());
+        assert_eq!(cfg.autonomy.enabled, enabled_before, "patch half-applied");
     }
 }

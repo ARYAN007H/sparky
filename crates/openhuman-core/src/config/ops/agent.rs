@@ -85,6 +85,18 @@ pub async fn apply_autonomy_settings(
 ) -> Result<Outcome<serde_json::Value>, String> {
     use crate::security::AutonomyLevel;
 
+    // Validate before changing anything, so a rejected patch leaves `config` as it was.
+    if let Some(root) = update
+        .trusted_roots
+        .iter()
+        .flatten()
+        .find(|root| !std::path::Path::new(&super::expand_tilde(&root.path)).is_absolute())
+    {
+        return Err(format!(
+            "trusted root must be an absolute path (got {:?})",
+            root.path
+        ));
+    }
     if let Some(enabled) = update.enabled {
         config.autonomy.enabled = enabled;
     }
@@ -110,15 +122,6 @@ pub async fn apply_autonomy_settings(
         config.autonomy.forbidden_paths = forbidden_paths;
     }
     if let Some(trusted_roots) = update.trusted_roots {
-        if let Some(root) = trusted_roots
-            .iter()
-            .find(|root| !std::path::Path::new(&super::expand_tilde(&root.path)).is_absolute())
-        {
-            return Err(format!(
-                "trusted root must be an absolute path (got {:?})",
-                root.path
-            ));
-        }
         config.autonomy.trusted_roots = trusted_roots;
     }
     if let Some(allow_tool_install) = update.allow_tool_install {
