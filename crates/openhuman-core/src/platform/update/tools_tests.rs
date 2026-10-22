@@ -2,6 +2,14 @@ use super::*;
 use crate::security::AutonomyLevel;
 
 #[test]
+fn update_family_registration_preserves_tool_names_and_order() {
+    let tools = registered_tools(std::sync::Arc::new(SecurityPolicy::default()));
+    let names = tools.iter().map(|tool| tool.name()).collect::<Vec<_>>();
+
+    assert_eq!(names, ["update_check", "update_apply"]);
+}
+
+#[test]
 fn update_check_name_and_permission() {
     let tool = UpdateCheckTool::new();
     assert_eq!(tool.name(), "update_check");

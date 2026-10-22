@@ -223,6 +223,14 @@ impl UpdateApplyTool {
     }
 }
 
+/// Build the update domain's tools in their persisted catalogue order.
+pub(crate) fn registered_tools(security: Arc<SecurityPolicy>) -> Vec<Box<dyn Tool>> {
+    vec![
+        Box::new(UpdateCheckTool::new()),
+        Box::new(UpdateApplyTool::new(security)),
+    ]
+}
+
 #[cfg(test)]
 #[path = "tools_tests.rs"]
 mod tests;
