@@ -16,7 +16,7 @@
 //! locale table can replace [`StopReasonKind::copy`] without touching the
 //! classification.
 
-use super::turn_checkpoint::CheckpointToolResult;
+use tinyagents_harness::close::CloseToolResult as CheckpointToolResult;
 use tinyagents_harness::turn_stop::TurnStop;
 
 /// Longest error line shown for one tool, in characters.
@@ -254,6 +254,29 @@ pub(crate) fn render_stop_summary(results: &[CheckpointToolResult], stop_note: &
         kind.copy(),
         &groups,
         &super::product_copy::OPENHUMAN_STOP_COPY,
+    )
+}
+
+/// Deterministic final fallback using OpenHuman copy and stop classification.
+pub(crate) fn deterministic_final_summary(
+    results: &[CheckpointToolResult],
+    stop_reason: Option<&str>,
+) -> String {
+    if let Some(reason) = stop_reason {
+        return render_stop_summary(results, reason);
+    }
+    if results.is_empty() {
+        return tinyagents_harness::close::final_summary_with_copy(
+            &super::product_copy::OPENHUMAN_CLOSE_COPY,
+            "",
+            false,
+        );
+    }
+    let rendered = super::product_copy::render_close_results(results, 4_000);
+    tinyagents_harness::close::final_summary_with_copy(
+        &super::product_copy::OPENHUMAN_CLOSE_COPY,
+        &rendered,
+        true,
     )
 }
 

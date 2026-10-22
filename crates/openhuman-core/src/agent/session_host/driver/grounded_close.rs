@@ -414,17 +414,7 @@ pub(super) async fn close_if_needed(
                 !records.is_empty(),
             )
         } else {
-            match stop_reason {
-                Some(reason) => stop_summary::render_stop_summary(&records, reason),
-                None => {
-                    let summary = product_copy::render_close_results(&records, 4_000);
-                    tinyagents_harness::close::final_summary_with_copy(
-                        &product_copy::OPENHUMAN_CLOSE_COPY,
-                        &summary,
-                        !records.is_empty(),
-                    )
-                }
-            }
+            stop_summary::deterministic_final_summary(&records, stop_reason)
         }
     };
 

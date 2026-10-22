@@ -37,7 +37,7 @@ mod builder;
 mod builder_config;
 mod codec;
 mod driver;
-mod product_copy;
+pub(crate) mod product_copy;
 // Tool surface for live voice sessions (`voice::live`).
 #[cfg(feature = "voice")]
 mod live_tools;
