@@ -224,9 +224,16 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
     };
 
     forget_workspace_for_test(&workspace_dir);
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace_dir.clone();
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config,
+    );
+    let ctx = DispatchCtx::new(Arc::clone(&core));
     assert!(
         settle_paused_driver_cancel(
-            &DispatchCtx::process_default(),
+            &ctx,
             &observed,
             observed.parent_epoch,
             Some("user requested stop")
@@ -235,8 +242,22 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
         .expect("paused cancellation settles")
     );
 
-    let row = store.load().unwrap().remove(0);
-    assert_eq!(row.status, DurableSubagentStatus::Failed);
+    let driver = crate::agent::orchestration::subagent_sessions::open_for_context(
+        &ctx,
+        workspace_dir.clone(),
+        parent_session,
+        parent_thread.clone(),
+        None,
+    )
+    .expect("scoped driver session store");
+    let row = driver
+        .list_for_parent(parent_session, parent_thread.as_deref())
+        .await
+        .expect("driver session list")
+        .into_iter()
+        .find(|row| row.subagent_session_id == session.subagent_session_id)
+        .expect("paused driver row remains stored");
+    assert_eq!(row.status, tinyagents_orchestration::subagent::DurableSubagentStatus::Failed);
     let delivery = pending_for(&workspace_dir, parent_thread.as_deref().unwrap());
     assert_eq!(delivery.len(), 1);
     assert_eq!(delivery[0].status, CompletionStatus::Failed);
