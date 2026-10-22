@@ -1,6 +1,7 @@
 async fn find_reusable_driver_session(
     driver: &std::sync::Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore>,
-    legacy: &SubagentSessionStore,
+    ctx: &DispatchCtx,
+    workspace_dir: &std::path::Path,
     selector: &SubagentSessionSelector,
 ) -> Result<Option<DurableSubagentSession>, String> {
     let driver_selector = tinyagents_orchestration::subagent::SubagentSessionSelector {
@@ -25,15 +26,16 @@ async fn find_reusable_driver_session(
     ) else {
         return Ok(None);
     };
-
-    legacy
-        .load()
-        .map(|sessions| {
-            sessions.into_iter().find(|session| {
-                session.subagent_session_id == selected.subagent_session_id
-                    && session.matches_selector(selector)
-            })
-        })
+    let parent_epoch = subagent_sessions::parent_epoch_for_context(
+        ctx,
+        workspace_dir,
+        selected.subagent_session_id.clone(),
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(Some(subagent_sessions::host_projection(
+        selected,
+        parent_epoch,
+    )))
 }
 
 async fn upsert_driver_session(

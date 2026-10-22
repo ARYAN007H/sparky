@@ -57,6 +57,30 @@ pub(crate) fn parent_epoch_from_sidecar(
     .map_err(|error| SubagentError::Persistence(format!("read parent epoch: {error}")))
 }
 
+pub(crate) fn parent_epoch_for_context(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+    session_id: String,
+) -> Result<Option<u64>, SubagentError> {
+    let open_documents = || {
+        let opened =
+            crate::storage::local::open("subagent_sessions", workspace_dir).map_err(|error| {
+                SubagentError::Persistence(format!("open session store: {error:#}"))
+            })?;
+        let scoped = opened.scoped().map_err(|error| {
+            SubagentError::Persistence(format!("scope session store: {error:#}"))
+        })?;
+        Ok::<_, SubagentError>(Arc::clone(scoped.documents()))
+    };
+    let context = ctx.resolved().ok_or_else(|| {
+        SubagentError::Persistence("subagent session store has no resolved owner scope".into())
+    })?;
+    parent_epoch_from_sidecar(
+        crate::core::runtime::CoreContext::sync_scope(context, open_documents)?,
+        session_id,
+    )
+}
+
 pub(crate) fn set_parent_epoch_for_context(
     ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &std::path::Path,

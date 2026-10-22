@@ -14,7 +14,9 @@ pub use ops::{
 };
 #[cfg(test)]
 pub(crate) use tiny_port::OpenHumanTinySubagentSessionStore;
-pub(crate) use tiny_port::{host_projection, open_for_context, set_parent_epoch_for_context};
+pub(crate) use tiny_port::{
+    host_projection, open_for_context, parent_epoch_for_context, set_parent_epoch_for_context,
+};
 pub use types::{
     DurableSubagentStatus, SubagentSessionSelector, SubagentSessionStore, SubagentSessionUpsert,
 };

@@ -155,7 +155,14 @@ impl SpawnSubagentTool {
         };
 
         let reusable = if force_fresh {
-            match find_reusable_driver_session(&driver_store, &store, &selector).await {
+            match find_reusable_driver_session(
+                &driver_store,
+                &dispatch,
+                &parent.workspace_dir,
+                &selector,
+            )
+            .await
+            {
                 Ok(Some(session)) => {
                     let jobs = crate::core::runtime::slot_for::<
                         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
@@ -203,7 +210,14 @@ impl SpawnSubagentTool {
             }
             None
         } else {
-            match find_reusable_driver_session(&driver_store, &store, &selector).await {
+            match find_reusable_driver_session(
+                &driver_store,
+                &dispatch,
+                &parent.workspace_dir,
+                &selector,
+            )
+            .await
+            {
                 Ok(session) => session,
                 Err(err) => {
                     log::warn!(
