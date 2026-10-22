@@ -78,22 +78,6 @@ Capability {
         privacy: DERIVED_TO_BACKEND,
     },
 Capability {
-        id: "voice.ptt",
-        name: "Global push-to-talk",
-        domain: "voice",
-        category: CapabilityCategory::Conversation,
-        description: "Hold a global hotkey from anywhere on the desktop to dictate into the \
-                      active chat thread. Press opens the mic, release commits the transcript, \
-                      and an always-on-top overlay shows listening/idle state without stealing \
-                      focus. Cross-platform via tauri-plugin-global-shortcut (macOS, Windows, \
-                      Linux/X11); requires microphone access and a global shortcut binding. \
-                      Optional speak_reply plays the agent's response through local TTS.",
-        how_to: "Settings → Voice → Push-to-Talk: pick a shortcut, grant microphone access, \
-                 then hold the configured hotkey from any window.",
-        status: CapabilityStatus::Beta,
-        privacy: DERIVED_TO_BACKEND,
-    },
-Capability {
         id: "voice.live_agent",
         name: "Live voice agent",
         domain: "voice",
@@ -575,6 +559,16 @@ Capability {
         how_to: "Call openhuman.tool_registry_list over core JSON-RPC, or openhuman.tool_registry_get with a tool_id such as memory.recall.",
         status: CapabilityStatus::Beta,
         privacy: LOCAL_RAW,
+    },
+Capability {
+        id: "intelligence.doctor_health",
+        name: "Health Diagnostics",
+        domain: "doctor",
+        category: CapabilityCategory::Intelligence,
+        description: "Inspect OpenHuman configuration and runtime health with a structured diagnostic report of checks and repair hints. The default tier uses local and bounded read-only checks; live probes that can spend inference tokens require an explicit request.",
+        how_to: "Ask the assistant to run doctor_health when diagnosing a configuration or runtime problem",
+        status: CapabilityStatus::Beta,
+        privacy: DIAGNOSTICS_TO_BACKEND,
     },
 Capability {
         id: "intelligence.orchestrator_worker_thread",

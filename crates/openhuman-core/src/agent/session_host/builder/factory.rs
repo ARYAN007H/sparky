@@ -1,6 +1,6 @@
 //! `OpenHumanSessionHost::from_config` factory methods and internal `build_session_agent_inner` constructor.
 
-use super::should_synthesize_delegation_tools;
+use super::{factory_resolution::provider_role_for_definition, should_synthesize_delegation_tools};
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::session_host::types::OpenHumanSessionHost;
 use crate::agent_registry::host_definition::{
@@ -19,6 +19,8 @@ use tinytools_agent::dialect::{
     CodeDialect, CodeStyle, NativeDialect, PFormatDialect, ToolCallFormat, ToolDialect, XmlDialect,
 };
 
+#[path = "factory_tool_registry.rs"]
+mod tool_registry;
 #[path = "factory_workflows.rs"]
 mod workflows;
 
@@ -188,24 +190,23 @@ impl OpenHumanSessionHost {
         let tool_config: Arc<Config> = Arc::clone(&base_config);
 
         // Host-only (`host_only.rs`): no config-derived tool is even built.
-        let mut tools = if host_only {
-            Vec::new()
-        } else {
-            tools::ops::all_tools_with_runtime(
-                Arc::clone(&tool_config),
-                &security,
-                runtime,
-                audit,
-                &tool_config.browser,
-                &tool_config.http_request,
-                &tool_config.action_dir,
-                &tool_config.agents,
-                &tool_config,
-                workspace_descriptor
-                    .as_ref()
-                    .map(|descriptor| descriptor.root.as_path()),
-            )
-        };
+        let (mut tools, pack_registry_handle) =
+            tool_registry::make_tool_registry(host_only, || {
+                tools::ops::all_tools_with_runtime_and_pack_handle(
+                    Arc::clone(&tool_config),
+                    &security,
+                    runtime,
+                    audit,
+                    &tool_config.browser,
+                    &tool_config.http_request,
+                    &tool_config.action_dir,
+                    &tool_config.agents,
+                    &tool_config,
+                    workspace_descriptor
+                        .as_ref()
+                        .map(|descriptor| descriptor.root.as_path()),
+                )
+            });
 
         // Filter tools by the user preference loaded above.
         if !enabled_tools.is_empty() {
@@ -314,7 +315,7 @@ impl OpenHumanSessionHost {
         // Build prompt builder — either the default "orchestrator /
         // main agent" layout that bootstraps from workspace identity
         // files, OR a narrow per-agent builder that injects the target
-        // definition's `prompt.md` body and respects its `omit_*` flags.
+        // definition's archetype body and respects its `omit_*` flags.
         //
         // The narrow path is selected whenever we resolved a
         // non-orchestrator definition from the registry. The orchestrator
@@ -327,7 +328,7 @@ impl OpenHumanSessionHost {
         // unavailable (pre-startup, tests). `PromptSource::Dynamic`
         // agents install a [`DynamicPromptSection`] that re-runs the
         // builder against the live [`PromptContext`] at `build_system_prompt`
-        // time, so late `connected_integrations` land in the prompt.
+        // time, so late integrations and the flow archetype land in the prompt.
         // `Inline`/`File` sources still resolve to just the archetype
         // body and get wrapped by [`SystemPromptBuilder::for_subagent`].
         let prompt_builder = match target_def {
@@ -780,6 +781,7 @@ impl OpenHumanSessionHost {
         let mut builder = OpenHumanSessionHost::builder()
             .crate_native_provider(ctx, provider_role, Arc::clone(&base_config))
             .tools(tools)
+            .pack_registry_handle(pack_registry_handle)
             .synthesized_tools(delegation_tools)
             .visible_tool_names(visible)
             .withheld_tool_names(withheld_tool_names)
@@ -795,7 +797,7 @@ impl OpenHumanSessionHost {
             .workspace_dir(config.workspace_dir.clone())
             .action_dir(config.action_dir.clone())
             .workspace_descriptor(workspace_descriptor)
-            .workflows(workflows::session_workflows(config, host_only))
+            .workflows(workflows::session_workflows(ctx, config, host_only))
             .post_turn_hooks(post_turn_hooks)
             .agent_definition_name(agent_id.to_string())
             .omit_memory_context(effective_omit_memory_context)
@@ -917,5 +919,3 @@ pub(super) fn resolve_target_definition(
         agent_id
     ))
 }
-
-use super::factory_resolution::provider_role_for_definition;

@@ -6,9 +6,12 @@ fn ctx(dir: &str) -> Arc<CoreContext> {
         host_kind: HostKind::Cli,
         workspace_binding: RwLock::new(Arc::new(RwLock::new(WorkspaceBinding {
             workspace_dir: Some(PathBuf::from(dir)),
+            config_path: None,
         }))),
         domains: crate::core::runtime::DomainSet::full(),
         tool_groups: Default::default(),
+        autonomy_tier_source: AutonomyTierSource::LiveConfig,
+        autonomy_tier_ceiling: None,
         components: Default::default(),
         embedder_config: None,
         latest_embedder_config: None,
@@ -39,25 +42,7 @@ fn ctx(dir: &str) -> Arc<CoreContext> {
 // configures boot and watches its turns run somewhere else entirely.
 
 fn ctx_with_config(config: crate::config::Config) -> Arc<CoreContext> {
-    Arc::new(CoreContext {
-        host_kind: HostKind::Cli,
-        workspace_binding: RwLock::new(Arc::new(RwLock::new(WorkspaceBinding {
-            workspace_dir: Some(config.workspace_dir.clone()),
-        }))),
-        domains: crate::core::runtime::DomainSet::full(),
-        tool_groups: Default::default(),
-        components: Default::default(),
-        embedder_config: Some(config),
-        latest_embedder_config: None,
-        user_skill_roots: true,
-        extensions: Default::default(),
-        turn_origin: None,
-        channel_thread: None,
-        session_agent: None,
-        profile: None,
-        agent: Default::default(),
-        bare: false,
-    })
+    CoreContext::for_test_with_config(crate::core::runtime::DomainSet::full(), config)
 }
 
 #[test]
@@ -385,9 +370,12 @@ fn degraded_context_rejects_workspace_bound_stores() {
         host_kind: HostKind::Cli,
         workspace_binding: RwLock::new(Arc::new(RwLock::new(WorkspaceBinding {
             workspace_dir: None,
+            config_path: None,
         }))),
         domains: crate::core::runtime::DomainSet::full(),
         tool_groups: Default::default(),
+        autonomy_tier_source: AutonomyTierSource::LiveConfig,
+        autonomy_tier_ceiling: None,
         components: Default::default(),
         embedder_config: None,
         latest_embedder_config: None,
@@ -417,3 +405,14 @@ fn degraded_context_rejects_workspace_bound_stores() {
 
 #[path = "context_turn_origin_tests.rs"]
 mod turn_origin_tests;
+#[test]
+fn inspection_context_uses_captured_autonomy_tier_without_a_ceiling() {
+    let context = CoreContext::for_inspection(crate::config::Config::default());
+
+    assert_eq!(
+        context.autonomy_tier_source(),
+        AutonomyTierSource::Captured,
+        "inspection runs against its explicitly supplied config snapshot"
+    );
+    assert_eq!(context.autonomy_tier_ceiling(), None);
+}

@@ -2,6 +2,8 @@
 //! each `tinyagents` [`AgentEvent`] onto an [`AgentProgress`] update (or a
 //! grep-friendly trace lines for events with no UI surface.
 
+use std::sync::atomic::Ordering;
+
 use tinyagents_harness::cache::CacheLayoutEvent;
 use tinyagents_harness::events::{AgentEvent, EventListener, EventRecord};
 
@@ -16,6 +18,16 @@ impl EventListener for OpenhumanEventBridge {
             return;
         }
         match &record.event {
+            // The turn is live. The web channel turns this into `inference_start`
+            // (and starts its liveness beats and the run-ledger entry), which is
+            // how a client learns a turn began that it did not send itself — one
+            // started right after a Stop, or from another window. Only the
+            // top-level run of a parent bridge announces it, and only once.
+            AgentEvent::RunStarted { .. } => {
+                if self.scope.is_none() && !self.turn_announced.swap(true, Ordering::SeqCst) {
+                    self.send(AgentProgress::TurnStarted);
+                }
+            }
             AgentEvent::ModelStarted { .. } => {
                 let iteration = tinyagents_harness::events::advance_iteration(&self.cursor);
                 match &self.scope {
@@ -725,26 +737,4 @@ impl OpenhumanEventBridge {
     }
 }
 
-/// Surface the crate `PromptCacheGuardMiddleware`'s recorded
-/// [`CacheLayoutEvent`]s as structured `[cache]` warnings (issue #4249, 03.2).
-///
-/// The guard records a layout event whenever the cacheable prompt prefix changes
-/// between turns (volatile content — a timestamp, uuid, injected memory, etc. —
-/// silently busting the provider KV-cache prefix). This is the crate-native
-/// replacement for the deleted `CacheAlignMiddleware` free-text warn-log:
-/// instead of a token-pattern heuristic it reports the exact before/after
-/// cacheable segment ids. Drained by the turn loop after the run and logged
-/// here. The warn-only `CacheAlignMiddleware` shadow was deleted in C3; this
-/// guard is now the sole owner of KV-cache-prefix drift detection.
-pub(crate) fn surface_cache_layout_events(model: &str, events: &[CacheLayoutEvent]) {
-    for event in events {
-        tracing::warn!(
-            model,
-            changed_prefix = event.changed_prefix,
-            volatile_only = event.volatile_only,
-            segments_before = ?event.segment_ids_before,
-            segments_after = ?event.segment_ids_after,
-            "[cache] prompt-cache prefix changed across turns — KV-cache prefix may not hit; keep dynamic content out of the system prompt / stable tool set"
-        );
-    }
-}
+include!("event_projection_cache_layout.rs");

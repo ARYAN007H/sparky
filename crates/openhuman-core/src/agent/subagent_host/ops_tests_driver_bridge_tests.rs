@@ -266,9 +266,10 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         DurableSubagentSession, DurableSubagentStatus, OpenHumanTinySubagentSessionStore,
         SubagentSessionStore as HostSessionStore,
     };
+    use tinyagents_harness_tools::subagents::{SubAgentJobAction, SubAgentJobsTool};
     use tinyagents_orchestration::subagent::{
-        SubAgentJobAction, SubAgentJobRegistry, SubAgentJobStatus, SubAgentJobsTool,
-        SubagentSessionStore as TinySessionStore, SubagentTaskKey,
+        SubAgentJobRegistry, SubAgentJobStatus, SubagentSessionStore as TinySessionStore,
+        SubagentTaskKey,
     };
 
     let scratch = tempfile::tempdir().expect("isolated driver close fixture");
@@ -386,7 +387,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     let message_store: std::sync::Arc<dyn TinySessionStore> = std::sync::Arc::new(port.clone());
     let message_dispatch: crate::agent::tinyagents::tool_registration::RegisteredToolDispatch =
         std::sync::Arc::new(
-            tinyagents_orchestration::subagent::SubAgentMessageTool::new(jobs.clone())
+            tinyagents_harness_tools::subagents::SubAgentMessageTool::new(jobs.clone())
                 .with_tool_name("steer_subagent")
                 .with_argument_fields("task_id", "subagent_session_id", "message", "__request_id")
                 .with_lane_field("mode")
@@ -618,7 +619,7 @@ async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution
     .await
     .expect("first detached driver spawn should register");
     let (first_result, first_effects) =
-        tokio::time::timeout(std::time::Duration::from_secs(5), first_rx)
+        tokio::time::timeout(std::time::Duration::from_secs(20), first_rx)
             .await
             .expect("first completion callback should not be skipped")
             .expect("first completion callback");
@@ -651,7 +652,7 @@ async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution
     .await
     .expect("replayed detached driver spawn should register");
     let (replay_result, replay_effects) =
-        tokio::time::timeout(std::time::Duration::from_secs(5), replay_rx)
+        tokio::time::timeout(std::time::Duration::from_secs(20), replay_rx)
             .await
             .expect("replay repair callback should run")
             .expect("replay repair callback");

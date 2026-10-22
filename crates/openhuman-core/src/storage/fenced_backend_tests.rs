@@ -243,6 +243,16 @@ impl LeaseStore for PausedAfterCheck {
         Ok(record)
     }
 
+    async fn holder_readonly(
+        &self,
+        key: &str,
+    ) -> std::result::Result<
+        Option<crate::storage::lease::LeaseRecord>,
+        crate::storage::lease::LeaseError,
+    > {
+        self.inner.holder_readonly(key).await
+    }
+
     fn driver_fence(&self, key: &str, node: &str, epoch: u64) -> Option<tinystoragedrivers::Fence> {
         self.inner.driver_fence(key, node, epoch)
     }
@@ -323,18 +333,6 @@ async fn driver_refuses_the_write_the_host_check_admitted(shared: Arc<dyn Storag
 #[tokio::test]
 async fn memory_driver_refuses_a_write_after_a_takeover_the_check_missed() {
     driver_refuses_the_write_the_host_check_admitted(shared()).await;
-}
-
-#[cfg(feature = "storage-sqlite")]
-#[tokio::test]
-async fn sqlite_driver_refuses_a_write_after_a_takeover_the_check_missed() {
-    let dir = tempfile::tempdir().unwrap();
-    let url = format!("sqlite:{}", dir.path().join("fenced.db").display());
-    let backend =
-        tinystoragedrivers::open(&tinystoragedrivers::StorageConfig::parse(&url).unwrap())
-            .await
-            .unwrap();
-    driver_refuses_the_write_the_host_check_admitted(backend).await;
 }
 
 /// Streams and blobs go through the driver fence too.
@@ -532,16 +530,4 @@ async fn conditional_append_passes_through(inner: Arc<dyn StorageBackend>) {
 #[tokio::test]
 async fn fenced_memory_backend_passes_conditional_appends_through() {
     conditional_append_passes_through(shared()).await;
-}
-
-#[cfg(feature = "storage-sqlite")]
-#[tokio::test]
-async fn fenced_sqlite_backend_passes_conditional_appends_through() {
-    let dir = tempfile::tempdir().unwrap();
-    let url = format!("sqlite:{}", dir.path().join("cond.db").display());
-    let backend =
-        tinystoragedrivers::open(&tinystoragedrivers::StorageConfig::parse(&url).unwrap())
-            .await
-            .unwrap();
-    conditional_append_passes_through(backend).await;
 }

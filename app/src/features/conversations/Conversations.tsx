@@ -635,7 +635,7 @@ const Conversations = ({
     let cancelled = false;
     (async () => {
       try {
-        const hint = composerModelOverride ?? CHAT_MODEL_HINT;
+        const hint = composerModelOverride ?? persistedDefaultModel ?? CHAT_MODEL_HINT;
         const res = await callCoreRpc<{ model: string }>({
           method: 'openhuman.inference_resolve_model',
           params: { hint },
@@ -652,7 +652,7 @@ const Conversations = ({
     return () => {
       cancelled = true;
     };
-  }, [composerModelOverride]);
+  }, [composerModelOverride, persistedDefaultModel]);
 
   // One-shot guard for the Stop/ESC partial-preservation path (#4862): request
   // ids whose partial reply has already been persisted, so a repeated Stop/ESC
@@ -891,37 +891,6 @@ const Conversations = ({
       void dispatch(fetchAndHydrateTurnState(selectedThreadId));
     }
   }, [selectedThreadId, dispatch]);
-
-  useEffect(() => {
-    const onDictationInsert = (event: Event) => {
-      const customEvent = event as CustomEvent<{ text?: string; autoSend?: boolean }>;
-      const text = customEvent.detail?.text?.trim();
-      if (!text) return;
-
-      customEvent.preventDefault();
-
-      // When autoSend is set (hotkey dictation), dispatch the transcript directly
-      // to the agent without going through the text composer.
-      if (customEvent.detail?.autoSend) {
-        void handleSendMessageRef.current?.(text);
-        return;
-      }
-
-      // A dictated draft needs a text surface where the user can inspect and
-      // send it. The mic-first composer has neither, so hand it back first.
-      setComposerOverride('text');
-      setInputValue(prev => {
-        const base = prev.trim();
-        if (!base) return text;
-        return `${base}${base.endsWith(' ') ? '' : ' '}${text}`;
-      });
-    };
-
-    window.addEventListener('dictation://insert-text', onDictationInsert as EventListener);
-    return () =>
-      window.removeEventListener('dictation://insert-text', onDictationInsert as EventListener);
-    // `setInputValue` is `useThreadDraft`'s stable setter.
-  }, [setInputValue]);
 
   useEffect(() => {
     if (preserveSendErrorForRestoredDraftRef.current) {
@@ -2328,7 +2297,7 @@ const Conversations = ({
           : 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
       }>
       <AssistantUiChat
-        model={composerModelOverride ?? resolvedModel ?? CHAT_MODEL_HINT}
+        model={composerModelOverride ?? persistedDefaultModel ?? resolvedModel ?? CHAT_MODEL_HINT}
         modelContextWindow={composerModelContextWindow}
         composerHeader={assistantComposerHeader}
         composerFooterExtras={assistantComposerFooterExtras}

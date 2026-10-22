@@ -74,14 +74,7 @@ impl OpenHumanTurnPrelude {
             .map_err(|error| anyhow::anyhow!(error.to_string()))?
         };
         let prefix = if cold {
-            let tiered = self.build_system_prompt_tiered()?;
-            Some(tinyagents_runtime::PrefixSnapshot::new(
-                tiered
-                    .system_messages()
-                    .into_iter()
-                    .map(Message::system)
-                    .collect(),
-            ))
+            Some(self.cold_prompt_prefix().await?)
         } else {
             None
         };
@@ -91,7 +84,32 @@ impl OpenHumanTurnPrelude {
         })
     }
 
+    /// The prompt a new session starts with, rendered now: one system
+    /// message per cache tier, with the definition's flow archetype when it
+    /// has one. A resumed thread that refreshes its prompt
+    /// (`prompt_refresh.rs`) renders it here too, so an unchanged prompt
+    /// compares equal to the one its transcript recorded.
+    pub(super) async fn cold_prompt_prefix(&self) -> Result<tinyagents_runtime::PrefixSnapshot> {
+        let flow_archetype_text = super::prompt::flow_archetype_text(self, true).await?;
+        let tiered =
+            self.build_system_prompt_tiered_with_flow_archetype(flow_archetype_text.as_deref())?;
+        Ok(tinyagents_runtime::PrefixSnapshot::new(
+            tiered
+                .system_messages()
+                .into_iter()
+                .map(Message::system)
+                .collect(),
+        ))
+    }
+
     pub(super) fn build_system_prompt_tiered(&self) -> Result<crate::agent::prompts::TieredPrompt> {
+        self.build_system_prompt_tiered_with_flow_archetype(None)
+    }
+
+    pub(super) fn build_system_prompt_tiered_with_flow_archetype(
+        &self,
+        flow_archetype_text: Option<&str>,
+    ) -> Result<crate::agent::prompts::TieredPrompt> {
         use crate::agent::prompts::{PromptContext, PromptTool};
         let surface = self
             .tool_surface
@@ -150,6 +168,7 @@ impl OpenHumanTurnPrelude {
             workspace_dir: &self.workspace_dir,
             model_name: &self.model_name,
             agent_id: &self.agent_definition_name,
+            flow_archetype_text,
             tools: &prompt_tools,
             workflows: &mutable.workflows,
             dispatcher_instructions: &instructions,
@@ -239,7 +258,7 @@ impl OpenHumanTurnPrelude {
             }
         };
         if let Some(goal) = &active_goal {
-            if let Some(block) = tinyagents_graph::goals::active_goal_context_block(goal) {
+            if let Some(block) = tinyagents_harness_tools::goals::active_goal_context_block(goal) {
                 context.push_str(&block);
             }
             if let Some(hook) = tinyagents_hooks::stop::GoalBudgetStopHook::for_goal(

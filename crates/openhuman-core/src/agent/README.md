@@ -221,8 +221,10 @@ coding workers, and background completion delivery. See
 An `AgentDefinition` ([`../agent_registry/host_definition.rs`](../agent_registry/host_definition.rs), vocabulary in `tinyagents-definition`) is an archetype: id, tier,
 prompt source, model spec, `ToolScope`, `SandboxMode`, iteration policy and
 allowed sub-agents. Built-ins live in `../agent_registry/agents/<id>/` as an
-`agent.toml` plus `prompt.md` (orchestrator, planner, critic, summarizer,
-trigger_triage, trigger_reactor, vision_agent and others). Custom
+`agent.toml` plus a prompt builder. Most use a sibling `prompt.md` for their
+archetype (orchestrator, planner, critic, summarizer, trigger_triage,
+trigger_reactor, vision_agent and others); the workflow builder and discovery
+agents fetch their archetypes from TinyFlows Copilot over the module bus. Custom
 definitions are TOML files under `<workspace>/agents/*.toml`, with
 `~/.openhuman/agents/*.toml` as a fallback (`tinyagents_definition::DefinitionSet::load_dirs`, driven from [`../agent_registry/host_definition.rs`](../agent_registry/host_definition.rs)).
 `AgentDefinitionRegistry` holds the merged set; `agent.reload_definitions`
@@ -295,7 +297,7 @@ Delegation and coordination:
 | `subagent_host/` | Runs a child agent: definition, model and tool narrowing, prompt, checkpoints, progress ([README](subagent_host/README.md)) |
 | `orchestration/` | Spawn/steer/wait tools, teams, command center, workflow runs, worktrees, background delivery ([README](orchestration/README.md)) |
 | `triage/` | Classifies `TriggerEnvelope`s and escalates ([README](triage/README.md)) |
-| `goals/` | Host adapters around `tinyagents_graph::goals` and the `goal_*` tools ([README](goals/README.md)) |
+| `goals/` | Host adapters around `tinyagents_harness_tools::goals` and the `goal_*` tools ([README](goals/README.md)) |
 | `todos/` | Session-scoped todo list over the TinyAgents todo store ([README](todos/README.md)) |
 | [`../plan_review/`](../plan_review/) | `request_plan_review` gate that parks a web-chat turn until the user decides |
 | [`tools.rs`](./tools.rs), `tools/` | Loop control tools: `delegate`, `plan_exit`, `todo`, `run_workflow`/`await_workflow` (with `skills`) ([README](tools/README.md)) |

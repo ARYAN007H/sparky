@@ -89,14 +89,12 @@ async fn a_new_artifact_shares_one_id_and_one_file_between_card_and_record() {
     );
     // The version holds its own copy; the files folder shows the newest.
     let file = record.latest().unwrap().file.clone().unwrap();
-    let kept = crate::artifacts::tiny_store::version_files_dir(&workspace)
-        .join("artifacts/files")
-        .join(&id)
-        .join("v1.pptx");
-    assert_eq!(file.key, format!("artifacts/files/{id}/v1.pptx"));
+    let expected_key = format!("artifacts/files/{id}/v1.pptx");
+    assert_eq!(file.key, expected_key);
+    let kept = crate::artifacts::tiny_store::stored_file_path(&workspace, &file);
     assert_eq!(
-        crate::artifacts::tiny_store::stored_file_path(&workspace, &file),
-        kept
+        kept,
+        crate::artifacts::tiny_store::version_files_dir(&workspace).join(&expected_key)
     );
     assert_eq!(
         files_in(&files),

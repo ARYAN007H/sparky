@@ -71,10 +71,6 @@ pub use providers::slack;
 #[cfg(all(feature = "channels", test))]
 pub use providers::telegram;
 #[cfg(all(feature = "channels", test))]
-pub use providers::whatsapp;
-#[cfg(all(feature = "whatsapp-web", test))]
-pub use providers::whatsapp_web;
-#[cfg(all(feature = "channels", test))]
 pub use providers::yuanbao;
 
 #[cfg(all(feature = "channels", test))]
@@ -102,17 +98,11 @@ pub use slack::SlackChannel;
 #[cfg(all(feature = "channels", test))]
 pub use telegram::TelegramChannel;
 #[cfg(all(feature = "channels", test))]
-pub use whatsapp::WhatsAppChannel;
-#[cfg(all(feature = "whatsapp-web", test))]
-pub use whatsapp_web::WhatsAppWebChannel;
-#[cfg(all(feature = "channels", test))]
 pub use yuanbao::YuanbaoChannel;
 
 #[cfg(all(feature = "channels", any(test, debug_assertions)))]
 pub use runtime::test_support;
 
-#[cfg(feature = "channels")]
-pub use commands::doctor_channels;
 #[cfg(feature = "channels")]
 // Channel system-prompt assembly lives in
 // `crate::channels::prompt` alongside the rest of

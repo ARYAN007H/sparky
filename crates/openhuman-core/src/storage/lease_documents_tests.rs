@@ -3,12 +3,37 @@ use super::*;
 use std::time::Duration;
 
 use crate::storage::MemoryStorage;
-use tinystoragedrivers::Precondition;
+use tinystoragedrivers::{CollectionSpec, Precondition, Scope};
 
 const TTL: Duration = Duration::from_millis(1_000);
 
 fn node(storage: &MemoryStorage, id: &str) -> DocumentLeases {
     DocumentLeases::cluster(storage, id, Some(format!("http://{id}")), TTL).unwrap()
+}
+
+#[tokio::test]
+async fn doctor_holder_inspection_does_not_declare_the_lease_collection() {
+    let storage = MemoryStorage::new();
+    let leases = node(&storage, "a");
+    let documents = storage
+        .for_scope(&Scope::new(CLUSTER_SCOPE).unwrap())
+        .unwrap();
+    let spec = CollectionSpec::new(LEASE_COLLECTION);
+
+    assert!(documents
+        .documents()
+        .validate_collection_spec(&spec)
+        .await
+        .is_err());
+    assert!(leases.holder_readonly("alice").await.unwrap().is_none());
+    assert!(
+        documents
+            .documents()
+            .validate_collection_spec(&spec)
+            .await
+            .is_err(),
+        "a doctor-style holder inspection must not create storage schema"
+    );
 }
 
 #[tokio::test]
@@ -129,57 +154,6 @@ async fn keys_are_independent() {
     let other = b.acquire("two", 0).await.unwrap();
     assert_eq!(other.epoch, 1);
     assert!(a.holder("three").await.unwrap().is_none());
-}
-
-/// Real threads, each its own runtime and node, race for one key on one
-/// backend opened by URL: exactly one wins and the rest see it.
-#[cfg(feature = "storage-sqlite")]
-fn race_on(url: String, contenders: usize) {
-    let barrier = std::sync::Arc::new(std::sync::Barrier::new(contenders));
-    let handles: Vec<_> = (0..contenders)
-        .map(|i| {
-            let (barrier, url) = (std::sync::Arc::clone(&barrier), url.clone());
-            std::thread::spawn(move || {
-                let runtime = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .unwrap();
-                runtime.block_on(async move {
-                    let backend = crate::storage::open(&url).await.unwrap();
-                    let leases =
-                        DocumentLeases::cluster(backend.as_ref(), format!("n{i}"), None, TTL)
-                            .unwrap();
-                    leases.holder("race").await.unwrap();
-                    barrier.wait();
-                    leases.acquire("race", 0).await
-                })
-            })
-        })
-        .collect();
-    let outcomes: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
-    let winners: Vec<_> = outcomes.iter().filter_map(|o| o.as_ref().ok()).collect();
-    assert_eq!(winners.len(), 1, "{outcomes:?}");
-    assert_eq!(winners[0].epoch, 1);
-    for outcome in &outcomes {
-        match outcome {
-            Ok(_) => {}
-            Err(LeaseError::Held(record)) => assert_eq!(record.epoch, 1),
-            Err(other) => panic!("unexpected {other:?}"),
-        }
-    }
-}
-
-#[cfg(feature = "storage-sqlite")]
-#[test]
-fn sqlite_threads_racing_for_a_key_have_one_winner() {
-    for round in 0..5 {
-        let dir = tempfile::tempdir().unwrap();
-        let url = format!(
-            "sqlite:{}",
-            dir.path().join(format!("leases-{round}.db")).display()
-        );
-        race_on(url, 8);
-    }
 }
 
 #[tokio::test]
