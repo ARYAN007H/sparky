@@ -48,10 +48,18 @@ impl Channel for ReconnectOkChannel {
         "reconnect-ok"
     }
 
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v22 still requires the legacy send method on focused listener fixtures"
+    )]
     async fn send(&self, _message: &super::super::super::SendMessage) -> anyhow::Result<()> {
         Ok(())
     }
 
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v22 still requires the legacy listener method on focused fixtures"
+    )]
     async fn listen(
         &self,
         _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,

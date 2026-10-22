@@ -1,6 +1,6 @@
 use super::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tinychannels_bus::ChannelMessage;
+use tinychannels_bus::{ChannelMessage, ChannelOutboundMessage};
 use tokio::sync::mpsc;
 
 struct MockChannel {
@@ -57,15 +57,23 @@ impl Channel for MockChannel {
     fn proactive_target(&self) -> Option<String> {
         self.target.clone()
     }
-    async fn send(&self, _message: &SendMessage) -> anyhow::Result<()> {
+    async fn send_typed(&self, _message: &ChannelOutboundMessage) -> anyhow::Result<()> {
         self.send_count.fetch_add(1, Ordering::SeqCst);
+        self.outbound_intent_count.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
-    async fn send_idempotent(&self, message: &SendMessage) -> anyhow::Result<()> {
-        self.outbound_intent_count.fetch_add(1, Ordering::SeqCst);
-        self.send(message).await
-    }
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v22 still requires the legacy listener method on focused fixtures"
+    )]
     async fn listen(&self, _tx: mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
+        Ok(())
+    }
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v22 still requires the legacy send method on focused fixtures"
+    )]
+    async fn send(&self, _message: &SendMessage) -> anyhow::Result<()> {
         Ok(())
     }
 }
