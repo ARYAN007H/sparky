@@ -1,4 +1,98 @@
 use super::*;
+use serde_json::json;
+use tinytools::Tool;
+
+#[test]
+fn host_tools_keep_the_published_recovery_names_and_schemas() {
+    let retrieve = TokenjuiceRetrieveTool::new();
+    assert_eq!(retrieve.name(), "juice_retrieve");
+    assert_eq!(retrieve.permission_level(), tinytools::PermissionLevel::ReadOnly);
+    assert!(!retrieve.external_effect());
+    assert_eq!(
+        serde_json::to_vec(&retrieve.parameters_schema()).unwrap(),
+        serde_json::to_vec(&json!({
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string",
+                    "description": "The token named in the output's footer (or a ⟦tj:…⟧ marker's hash)."
+                },
+                "range": {
+                    "type": "object",
+                    "description": "Optional slice of the original to return.",
+                    "properties": {
+                        "start": { "type": "integer", "minimum": 0 },
+                        "end": { "type": "integer", "minimum": 0 },
+                        "unit": { "type": "string", "enum": ["bytes", "lines"] }
+                    },
+                    "required": ["start", "end"]
+                }
+            },
+            "required": ["token"]
+        }))
+        .unwrap()
+    );
+
+    let expected = [
+        (
+            "juice_find",
+            json!({
+                "type": "object",
+                "properties": {
+                    "handle": { "type": "string", "description": "the handle named in the output's footer" },
+                    "query": { "type": "string" },
+                    "mode": { "type": "string", "enum": ["text", "grep", "regex", "rank", "sed", "awk", "jq"] },
+                    "ignore_case": { "type": "boolean" },
+                    "context": { "type": "integer" },
+                    "top_k": { "type": "integer" },
+                    "scope": { "type": "string" },
+                    "unit": { "type": "string", "enum": ["lines", "chars"] }
+                },
+                "required": ["handle", "query"]
+            }),
+        ),
+        (
+            "juice_extract",
+            json!({
+                "type": "object",
+                "properties": {
+                    "handle": { "type": "string", "description": "the handle named in the output's footer" },
+                    "what": { "type": "string", "enum": ["links", "headings"] },
+                    "scope": { "type": "string" },
+                    "unit": { "type": "string", "enum": ["lines", "chars"] }
+                },
+                "required": ["handle", "what"]
+            }),
+        ),
+        (
+            "juice_summarize",
+            json!({
+                "type": "object",
+                "properties": {
+                    "handle": { "type": "string", "description": "the handle named in the output's footer" },
+                    "hint": { "type": "string", "description": "what you need from it" },
+                    "max_chars": { "type": "integer" },
+                    "scope": { "type": "string" },
+                    "unit": { "type": "string", "enum": ["lines", "chars"] }
+                },
+                "required": ["handle"]
+            }),
+        ),
+    ];
+    let tools = repl_tools();
+    assert_eq!(
+        tools.iter().map(|tool| tool.name()).collect::<Vec<_>>(),
+        expected.iter().map(|(name, _)| *name).collect::<Vec<_>>()
+    );
+    for (tool, (name, schema)) in tools.iter().zip(expected) {
+        assert_eq!(tool.name(), name);
+        assert_eq!(
+            serde_json::to_vec(&tool.parameters_schema()).unwrap(),
+            serde_json::to_vec(&schema).unwrap(),
+            "schema changed for {name}"
+        );
+    }
+}
 
 #[test]
 fn recovery_tool_aliases_remain_stable() {
