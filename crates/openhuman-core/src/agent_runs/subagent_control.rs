@@ -90,7 +90,8 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
             &task_id,
             None,
             reason.as_deref(),
-        )?;
+        )
+        .await?;
         if cancelled_subagent.is_none()
             && ctx.resolved().is_none()
             && !crate::core::runtime::is_saas()
@@ -105,7 +106,8 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                 &task_id,
                 Some(&config.workspace_dir),
                 reason.as_deref(),
-            )?;
+            )
+            .await?;
         }
         let (cancelled, outcome) = match cancelled_subagent {
             // Finished before the click landed (it stays registered until the
