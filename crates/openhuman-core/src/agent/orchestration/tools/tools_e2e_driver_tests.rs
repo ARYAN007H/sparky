@@ -225,7 +225,9 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
     let wait = SubAgentJobsTool::new((*jobs).clone())
         .with_fixed_action(tinyagents_harness_tools::subagents::SubAgentJobAction::Await)
         .with_identifier_fields("task_id", "subagent_session_id")
-        .with_sessions(session_port, |_| "force-fresh-parent-session".to_owned())
+        .with_sessions(session_port.clone(), |_| {
+            "force-fresh-parent-session".to_owned()
+        })
         .with_owner_scope(Arc::new({
             let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
                 &workspace,
