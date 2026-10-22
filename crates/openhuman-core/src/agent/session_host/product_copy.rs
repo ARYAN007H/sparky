@@ -40,7 +40,7 @@ pub(crate) fn render_close_results(
             per_result_cap: 800,
             truncation_marker: "… [truncated]",
             total_budget,
-            render_block: |result| {
+            render_block: |result: &tinyagents_harness::close::CloseToolResult| {
                 let status = if result.success { "ok" } else { "failed" };
                 let mut block = format!("\n- `{}` — {}\n", result.name, status);
                 for line in result.content.lines() {
