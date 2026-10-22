@@ -216,7 +216,6 @@ impl OpenHumanSessionHost {
                 &tool_config.browser,
                 &tool_config.http_request,
                 &tool_config.action_dir,
-                &tool_config.agents,
                 &tool_config,
                 workspace_descriptor
                     .as_ref()

@@ -1,5 +1,5 @@
 use super::super::all;
-use crate::core::{ControllerSchema, TypeSchema};
+use crate::core::ControllerSchema;
 use std::collections::BTreeMap;
 
 /// Prints the general help message listing available commands and namespaces.

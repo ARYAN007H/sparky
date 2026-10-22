@@ -329,7 +329,7 @@ fn retired_specialist_aliases_are_not_packed() {
 /// schema, leaving unrelated packs available to direct calls.
 #[test]
 fn spawn_tool_schema_closes_only_reachable_specialist_packs() {
-    let raw = registry_with_all(&[
+    let (raw, _handle) = registry_with_all(&[
         "skill_registry_install",
         "media_generate_image",
         "propose_workflow",

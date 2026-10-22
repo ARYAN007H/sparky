@@ -89,7 +89,6 @@ pub fn all_tools_with_runtime(
         browser_config,
         http_config,
         action_dir,
-        agents,
         root_config,
         approval_workspace_root,
     )
@@ -110,7 +109,6 @@ pub fn all_tools_with_runtime_and_pack_handle(
     browser_config: &crate::config::BrowserConfig,
     http_config: &crate::config::HttpRequestConfig,
     action_dir: &std::path::Path,
-    agents: &HashMap<String, DelegateAgentConfig>,
     root_config: &crate::config::Config,
     approval_workspace_root: Option<&std::path::Path>,
 ) -> (

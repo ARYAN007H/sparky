@@ -21,3 +21,5 @@ pub(crate) fn surface_cache_layout_events(model: &str, events: &[CacheLayoutEven
         );
     }
 }
+use tinyagents_harness::cache::CacheLayoutEvent;
+
