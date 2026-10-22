@@ -737,3 +737,6 @@ fn configured_role_ids_are_registered_as_live_checks_for_that_config() {
     }
     assert!(!by_id.contains_key("inference/live/embeddings"));
 }
+
+#[path = "inference_live_identity_tests.rs"]
+mod identity_tests;
