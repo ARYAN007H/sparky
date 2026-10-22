@@ -214,10 +214,8 @@ fn terminal_legacy_session(
             let Some(key) = session.lifecycle_key.as_ref() else {
                 return Ok(None);
             };
-            let Some(outcome) = crate::agent::subagent_host::load_terminal_outcome(
-                workspace_dir,
-                key,
-            )?
+            let Some(outcome) =
+                crate::agent::subagent_host::load_terminal_outcome(workspace_dir, key)?
             else {
                 return Ok(None);
             };
@@ -229,9 +227,7 @@ fn terminal_legacy_session(
                     Some(FinishedOutcome::Failed)
                 }
                 tinyagents_orchestration::subagent::SubagentOutcomeKind::Cancelled
-                | tinyagents_orchestration::subagent::SubagentOutcomeKind::AwaitingInput(_) => {
-                    None
-                }
+                | tinyagents_orchestration::subagent::SubagentOutcomeKind::AwaitingInput(_) => None,
             }
         }
         DurableSubagentStatus::Running

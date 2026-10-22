@@ -38,12 +38,14 @@ fn list_for_parent_without_thread_id_does_not_filter_by_thread() {
 
     let all = list_for_parent(&store, "parent-a", None).unwrap();
     assert_eq!(all.len(), 2);
-    assert!(all
-        .iter()
-        .any(|session| session.subagent_session_id == first.subagent_session_id));
-    assert!(all
-        .iter()
-        .any(|session| session.subagent_session_id == second.subagent_session_id));
+    assert!(
+        all.iter()
+            .any(|session| session.subagent_session_id == first.subagent_session_id)
+    );
+    assert!(
+        all.iter()
+            .any(|session| session.subagent_session_id == second.subagent_session_id)
+    );
 
     let thread_a = list_for_parent(&store, "parent-a", Some("thread-a")).unwrap();
     assert_eq!(thread_a.len(), 1);
@@ -54,14 +56,16 @@ fn list_for_parent_without_thread_id_does_not_filter_by_thread() {
 fn missing_session_updates_return_errors() {
     let dir = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
-    assert!(mark_finished(
-        &store,
-        "missing",
-        "sub-1",
-        &SubagentRunStatus::Completed,
-        vec![]
-    )
-    .is_err());
+    assert!(
+        mark_finished(
+            &store,
+            "missing",
+            "sub-1",
+            &SubagentRunStatus::Completed,
+            vec![]
+        )
+        .is_err()
+    );
     assert!(mark_failed(&store, "missing", "sub-1", "boom".into()).is_err());
     assert!(!close(&store, "missing").unwrap());
 }
