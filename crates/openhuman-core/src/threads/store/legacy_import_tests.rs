@@ -162,7 +162,7 @@ fn legacy_tsd_v1_threads_and_messages_are_migrated_before_owner_reads() {
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].id, thread_id);
     assert_eq!(listed[0].title, "Historical thread");
-    let messages = store.get_messages(thread_id).unwrap();
+    let messages = store.get_messages(&thread_id).unwrap();
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0].id, "legacy-message");
     assert_eq!(messages[0].content, "message from the TSD v1 profile");
