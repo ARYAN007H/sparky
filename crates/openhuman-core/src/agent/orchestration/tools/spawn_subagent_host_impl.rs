@@ -341,9 +341,7 @@ impl SpawnSubagentTool {
                 completion_target
                     .failed(task_id, &definition.id, &message)
                     .await;
-                crate::agent::orchestration::completion_owners::finish_driver_task(
-                    &dispatch, task_id,
-                );
+                crate::agent::orchestration::completion_owners::finish_driver_task(&dispatch, task_id);
                 return Ok(ToolResult::error(format!("spawn_subagent: {message}")));
             }
             if let Err(error) = crate::agent::subagent_host::resume_async_via_driver_tool(
@@ -368,9 +366,7 @@ impl SpawnSubagentTool {
                 completion_target
                     .failed(task_id, &definition.id, &message)
                     .await;
-                crate::agent::orchestration::completion_owners::finish_driver_task(
-                    &dispatch, task_id,
-                );
+                crate::agent::orchestration::completion_owners::finish_driver_task(&dispatch, task_id);
                 crate::agent::orchestration::subagent_events::publish_subagent_failed(
                     parent_session,
                     task_id.to_owned(),
