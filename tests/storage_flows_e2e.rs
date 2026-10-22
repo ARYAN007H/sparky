@@ -180,7 +180,11 @@ async fn legacy_tinyflows_files_are_imported_into_a_configured_backend() {
             format!("{error:#}").contains("conditional_writes"),
             "memory backend should explain why the import was refused: {error:#}"
         );
-        assert_eq!(digest(workspace.path()), before, "a legacy file was modified");
+        assert_eq!(
+            digest(workspace.path()),
+            before,
+            "a legacy file was modified"
+        );
         return;
     }
     for report in reports {
