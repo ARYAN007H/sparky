@@ -68,7 +68,7 @@ impl StorageBackend for Backend {
         Ok(Storage::new(
             Arc::new(Documents {
                 inner: Arc::clone(inner.documents()),
-                scope: scope.to_string(),
+                scope: scope.as_str().to_string(),
                 faults: Arc::clone(&self.faults),
             }),
             Arc::clone(inner.streams()),
@@ -226,7 +226,7 @@ fn next_run_of(config: &Config, job_id: &str) -> chrono::DateTime<chrono::Utc> {
 
 /// Writes `policy` as the raw `policy` field of `job_id`'s document, bypassing
 /// the store's own validation.
-async fn put_raw_policy(docs: &ScopedStorage, job_id: &str, policy: serde_json::Value) {
+async fn put_raw_policy(docs: &Storage, job_id: &str, policy: serde_json::Value) {
     let mut stored = docs.documents().get(JOBS, job_id).await.unwrap().unwrap();
     stored.doc["policy"] = policy;
     docs.documents()
