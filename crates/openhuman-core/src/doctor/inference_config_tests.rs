@@ -141,7 +141,7 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
     use crate::config::test_env::EnvVarGuard;
     use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
     use crate::inference::registry::InspectionChatModelFactory;
-    use tinyinference_llm::providers::overrides::ChatModelEntry;
+    use tinyinference_llm::providers::overrides::{ChatModelEntry, ProviderModelMetadata};
 
     struct ManagedModel {
         generations: Arc<AtomicUsize>,
@@ -210,7 +210,27 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
                 ))
             }),
             probe: None,
-            models: None,
+            models: Some(ProviderModelMetadata {
+                default_model: Arc::new(|| Some("managed-test-model".to_owned())),
+                role_for_model: Arc::new(|model| {
+                    (model == "hint:reasoning").then(|| "reasoning".to_owned())
+                }),
+                is_alias: Arc::new(|model| model.starts_with("hint:")),
+                is_raw_model: Arc::new(|model| !model.starts_with("hint:")),
+                supports_vision: Arc::new(|_| false),
+                resolve_model: Arc::new(|_, config, model| match model {
+                    Some(model) if !model.starts_with("hint:") => Some(model.to_owned()),
+                    Some(_) => Some("managed-test-model".to_owned()),
+                    None => config
+                        .config
+                        .default_model
+                        .clone()
+                        .or_else(|| Some("managed-test-model".to_owned())),
+                }),
+                context_window: Arc::new(|_| None),
+                default_pricing: Arc::new(|| None),
+                without_reasoning: Arc::new(|request| request),
+            }),
         },
     );
     let mut config = isolated_config(temp.path());
