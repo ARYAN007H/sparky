@@ -184,11 +184,10 @@ pub(crate) fn begin_thread_deletion(
         .map_err(|error| format!("cannot resolve profile for thread deletion: {error}"))?
         .profile;
     let mut st = owners();
-    begin_thread_deletion_in(&mut st, driver_thread_scope(
-        profile,
-        workspace_dir.to_path_buf(),
-        thread_id.to_owned(),
-    ));
+    begin_thread_deletion_in(
+        &mut st,
+        driver_thread_scope(profile, workspace_dir.to_path_buf(), thread_id.to_owned()),
+    );
     Ok(())
 }
 
@@ -203,11 +202,10 @@ pub(crate) fn commit_thread_deletion(
         .map_err(|error| format!("cannot resolve profile for thread deletion: {error}"))?
         .profile;
     let mut st = owners();
-    commit_thread_deletion_in(&mut st, driver_thread_scope(
-        profile,
-        workspace_dir.to_path_buf(),
-        thread_id.to_owned(),
-    ));
+    commit_thread_deletion_in(
+        &mut st,
+        driver_thread_scope(profile, workspace_dir.to_path_buf(), thread_id.to_owned()),
+    );
     Ok(())
 }
 
@@ -219,11 +217,10 @@ pub(crate) fn release_thread_deletion(
 ) {
     let profile = ctx.tenant().ok().and_then(|tenant| tenant.profile);
     let mut st = owners();
-    release_thread_deletion_in(&mut st, &driver_thread_scope(
-        profile,
-        workspace_dir.to_path_buf(),
-        thread_id.to_owned(),
-    ));
+    release_thread_deletion_in(
+        &mut st,
+        &driver_thread_scope(profile, workspace_dir.to_path_buf(), thread_id.to_owned()),
+    );
 }
 
 /// Move a settled task out of the non-evictable live-owner set while retaining

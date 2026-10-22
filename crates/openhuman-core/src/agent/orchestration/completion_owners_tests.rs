@@ -55,11 +55,14 @@ fn deleting_thread_refuses_late_owner_registration_but_keeps_prior_owner() {
         ACTIVE_DRIVER_TASKS_CAP,
     )
     .expect("register live child before deletion starts");
-    st.deleting_threads.insert(driver_thread_scope(
-        existing.profile.clone(),
-        existing.workspace_dir.clone(),
-        existing.parent_thread_id.clone().expect("thread owner"),
-    ));
+    begin_thread_deletion_in(
+        &mut st,
+        driver_thread_scope(
+            existing.profile.clone(),
+            existing.workspace_dir.clone(),
+            existing.parent_thread_id.clone().expect("thread owner"),
+        ),
+    );
 
     let late = owner("late");
     let result = remember_active_driver_task(&mut st, "late".into(), late, ACTIVE_DRIVER_TASKS_CAP);

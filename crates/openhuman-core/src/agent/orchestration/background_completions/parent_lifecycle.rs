@@ -67,6 +67,11 @@ pub(crate) fn delete_parent_for_thread(
         .router
         .delete_parent(thread_id)
         .map_err(|error| format!("failed to persist deleted-parent marker: {error}"))?;
+    crate::agent::orchestration::completion_owners::commit_thread_deletion(
+        ctx,
+        workspace_dir,
+        thread_id,
+    )?;
     log::debug!(
         "[background_completions] delete_parent_for_thread thread_id={thread_id} removed={removed}"
     );
