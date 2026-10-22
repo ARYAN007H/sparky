@@ -25,7 +25,7 @@ const USER_ID = 'e2e-tool-shell-git';
  * RPC and registry contract end-to-end, and skip the LLM-driven assertion
  * with an explicit reason. The execution path itself is covered by the Rust
  * unit suite under `crates/openhuman-core/src/tools/impl/system/shell.rs` and
- * `tinyagents-harness-tools filesystem/git_operations/mod.rs`.
+ * `tinyagents-harness-tools fs/filesystem/git_operations.rs`.
  *
  * What this spec proves end-to-end:
  *  - 6.2.1 — the agent runtime is up and the `orchestrator` definition, which
@@ -47,7 +47,7 @@ const USER_ID = 'e2e-tool-shell-git';
  *  - 6.2.4 — same fixture supports a Node-side commit, proving that a write
  *    op is structurally feasible against the resolved workspace. The full
  *    sidecar-driven write path is exercised by
- *    tinyagents-harness-tools `filesystem/git_operations/test.rs`.
+ *    tinyagents-harness-tools `fs/filesystem/git_operations.rs` tests.
  *
  * Future: when the harness gains a deterministic mock-LLM that emits
  * structured tool_calls (tracked alongside #68 in skill-execution-flow), the
