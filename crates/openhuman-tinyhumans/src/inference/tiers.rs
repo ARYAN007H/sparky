@@ -27,16 +27,12 @@ pub(crate) fn legacy_tier_role(model: &str) -> Option<&'static str> {
 }
 
 fn hint_role(model: &str) -> Option<&'static str> {
-    match model.trim().strip_prefix("hint:")? {
-        "chat" => Some("chat"),
-        "reasoning" => Some("reasoning"),
-        "agentic" => Some("agentic"),
-        "coding" => Some("coding"),
-        "burst" => Some("burst"),
-        "summarization" => Some("summarization"),
-        "vision" => Some("vision"),
-        _ => None,
-    }
+    let route = model.trim();
+    tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS
+        .iter()
+        .copied()
+        .find(|candidate| *candidate == route)?
+        .strip_prefix("hint:")
 }
 
 pub(crate) fn role_for_model(model: &str) -> Option<String> {
