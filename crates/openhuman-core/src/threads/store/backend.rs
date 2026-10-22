@@ -163,11 +163,12 @@ impl ConversationStore {
         repo.once_per_backend("schema", || {
             let leased_storage = owner_storage.clone();
             storage::block_on(async move {
+                let migration_storage = leased_storage.clone();
                 tinyagents_storage_kit::with_migration_lease(
                     &leased_storage,
                     "conversations",
                     move |_| async move {
-                        let docs = Arc::clone(leased_storage.documents());
+                        let docs = Arc::clone(migration_storage.documents());
                         DriverConversationStore::prepare_schema(docs.as_ref()).await?;
                         DriverConversationStore::prepare_append_schema(docs.as_ref()).await?;
                         for spec in tinyagents_storage_kit::primitives::collection_specs() {
@@ -178,7 +179,7 @@ impl ConversationStore {
                         ])?;
                         registry
                             .migrate(
-                                &leased_storage,
+                                &migration_storage,
                                 &tinyagents_storage_kit::MigrateOptions::new(),
                             )
                             .await?;
