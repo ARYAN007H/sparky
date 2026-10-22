@@ -31,6 +31,7 @@ async fn find_reusable_driver_session(
         .map(|sessions| {
             sessions.into_iter().find(|session| {
                 session.subagent_session_id == selected.subagent_session_id
+                    && session.matches_selector(selector)
             })
         })
 }
