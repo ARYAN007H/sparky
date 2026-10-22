@@ -368,6 +368,7 @@ impl SpawnSubagentTool {
 #[path = "spawn_subagent_completion.rs"]
 mod completion;
 
+include!("spawn_subagent_driver_lookup.rs");
 include!("spawn_subagent_host_impl.rs");
 include!("spawn_subagent_request.rs");
 include!("spawn_subagent_projection.rs");
