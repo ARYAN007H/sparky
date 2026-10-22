@@ -83,9 +83,6 @@ impl SpawnSubagentTool {
         let task_workspace = workspace_descriptor
             .clone()
             .unwrap_or_else(|| tinytools::WorkspaceDescriptor::new(parent.workspace_dir.clone()));
-        let detached_parent_with_workspace = (*detached_parent)
-            .clone()
-            .with_workspace(task_workspace.clone());
         let resolved_model = definition.model.resolve(parent.model_name.as_str());
         let target_model = model_override.as_deref().unwrap_or(&resolved_model);
         if crate::attachments::should_forward_parent_images(&prompt)
@@ -342,7 +339,7 @@ impl SpawnSubagentTool {
 
             let completion = completion::make_completion(
                 dispatch.clone().into_core(),
-                detached_parent_with_workspace.data.origin.clone(),
+                detached_parent.data.origin.clone(),
                 progress_sink.clone(),
                 parent.workspace_dir.clone(),
                 dispatch.clone(),
@@ -367,7 +364,7 @@ impl SpawnSubagentTool {
                         .clone()
                         .unwrap_or_else(|| resumed_session.subagent_session_id.clone()),
                 ),
-                run_context: detached_parent_with_workspace.data.child(),
+                run_context: detached_parent.data.child(),
                 worker_thread_id: session.worker_thread_id.clone(),
                 initial_history: None,
                 checkpoint_dir: Some(checkpoint_dir),
@@ -376,7 +373,7 @@ impl SpawnSubagentTool {
                 message_run_queue: None,
             };
             if let Err(error) = crate::agent::subagent_host::resume_async_via_driver_tool(
-                &detached_parent_with_workspace,
+                detached_parent,
                 original_key,
                 checkpoint_resume,
                 definition.clone(),
@@ -431,7 +428,7 @@ impl SpawnSubagentTool {
             if session.status == DurableSubagentStatus::Running {
                 if let Some(ref running_task_id) = session.current_task_id {
                     match steer_reusable_session(
-                        &detached_parent_with_workspace,
+                        detached_parent,
                         &session.subagent_session_id,
                         follow_up_prompt.clone(),
                     )
@@ -555,7 +552,7 @@ impl SpawnSubagentTool {
                 task_id: task_id.clone(),
                 lifecycle_key: Some(
                     tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
-                        &detached_parent_with_workspace,
+                        detached_parent,
                         task_id.clone(),
                         parent_thread_id.clone(),
                     ),
@@ -664,7 +661,7 @@ impl SpawnSubagentTool {
             background_parent_thread_id.as_deref().unwrap_or("none")
         );
         let completion_core = dispatch.clone().into_core();
-        let completion_origin = detached_parent_with_workspace.data.origin.clone();
+        let completion_origin = detached_parent.data.origin.clone();
         let completion_worker_thread_id = background_worker_thread_id.clone();
         let registration_progress = progress_sink.clone();
         let registration_completion_target = completion_target.clone();
@@ -694,7 +691,7 @@ impl SpawnSubagentTool {
             model_override,
             task_id: Some(task_id.clone()),
             thread_id: Some(background_thread_id),
-            run_context: detached_parent_with_workspace.data.child(),
+            run_context: detached_parent.data.child(),
             worker_thread_id: background_worker_thread_id,
             initial_history,
             checkpoint_dir: None,
@@ -703,7 +700,7 @@ impl SpawnSubagentTool {
             message_run_queue: None,
         };
         if let Err(error) = crate::agent::subagent_host::spawn_async_via_driver_tool(
-            &detached_parent_with_workspace,
+            detached_parent,
             definition.clone(),
             background_prompt,
             options,

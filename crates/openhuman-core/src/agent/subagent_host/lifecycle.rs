@@ -26,8 +26,8 @@ mod checkpoint;
 #[path = "lifecycle_outcome.rs"]
 mod outcome;
 use checkpoint::absolute_checkpoint_dir;
-pub(super) use driver_adapter::outcome_to_host;
 use driver_adapter::HostInvocation;
+pub(super) use driver_adapter::outcome_to_host;
 
 #[path = "lifecycle/driver_result.rs"]
 mod driver_result;
@@ -47,10 +47,29 @@ pub(crate) fn detached_subagent_parent(
 ) -> anyhow::Result<RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>> {
     let data = parent.data.detached_child();
     let cancellation = data.cancellation.clone();
+    let workspace = parent
+        .workspace()
+        .cloned()
+        .or_else(|| {
+            data.parent
+                .as_ref()
+                .and_then(|context| context.workspace_descriptor.clone())
+        })
+        .or_else(|| {
+            data.parent
+                .as_ref()
+                .map(|context| tinytools::WorkspaceDescriptor::new(context.workspace_dir.clone()))
+        });
     let config = RunConfig::new(format!("{run_name}-{}", uuid::Uuid::new_v4()));
     parent
         .child(config, data)
-        .map(|context| context.with_cancellation(cancellation))
+        .map(|context| {
+            let context = context.with_cancellation(cancellation);
+            match workspace {
+                Some(workspace) => context.with_workspace(workspace),
+                None => context,
+            }
+        })
         .map_err(|error| anyhow::anyhow!(error.to_string()))
 }
 
@@ -84,13 +103,13 @@ pub(crate) async fn spawn_async_via_driver_tool(
     input: String,
     options: SubagentRunOptions,
     completion: impl Fn(
-            String,
-            Result<SubagentRunOutcome, String>,
-            bool,
-        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-        + Send
-        + Sync
-        + 'static,
+        String,
+        Result<SubagentRunOutcome, String>,
+        bool,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+    + Send
+    + Sync
+    + 'static,
 ) -> Result<String, SubagentRunError> {
     spawn_async_via_driver_tool_using_jobs(
         parent, definition, input, options, None, None, completion,
@@ -108,13 +127,13 @@ pub(crate) async fn resume_async_via_driver_tool(
     input: String,
     options: SubagentRunOptions,
     completion: impl Fn(
-            String,
-            Result<SubagentRunOutcome, String>,
-            bool,
-        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-        + Send
-        + Sync
-        + 'static,
+        String,
+        Result<SubagentRunOutcome, String>,
+        bool,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+    + Send
+    + Sync
+    + 'static,
 ) -> Result<String, SubagentRunError> {
     spawn_async_via_driver_tool_using_jobs(
         parent,
@@ -136,13 +155,13 @@ pub(crate) async fn spawn_async_via_driver_tool_with_jobs(
     options: SubagentRunOptions,
     jobs: tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     completion: impl Fn(
-            String,
-            Result<SubagentRunOutcome, String>,
-            bool,
-        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-        + Send
-        + Sync
-        + 'static,
+        String,
+        Result<SubagentRunOutcome, String>,
+        bool,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+    + Send
+    + Sync
+    + 'static,
 ) -> Result<String, SubagentRunError> {
     spawn_async_via_driver_tool_using_jobs(
         parent,
@@ -164,13 +183,13 @@ async fn spawn_async_via_driver_tool_using_jobs(
     jobs: Option<tinyagents_harness_tools::subagents::SubAgentJobRegistry>,
     continuation: Option<(SubagentTaskKey, SubagentResume)>,
     completion: impl Fn(
-            String,
-            Result<SubagentRunOutcome, String>,
-            bool,
-        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-        + Send
-        + Sync
-        + 'static,
+        String,
+        Result<SubagentRunOutcome, String>,
+        bool,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+    + Send
+    + Sync
+    + 'static,
 ) -> Result<String, SubagentRunError> {
     let task_id = continuation
         .as_ref()
