@@ -231,8 +231,24 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
         Some(temp.path().to_path_buf()),
         extensions,
     );
-    let findings =
-        crate::core::runtime::CoreContext::scope(core_context, run_only(config, CONSTRUCT)).await;
+    let findings = crate::core::runtime::CoreContext::scope(core_context, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        let resolved = dispatch
+            .resolved()
+            .expect("doctor inspection should run in the scoped core context");
+        assert!(crate::inference::registry::chat_model_for(
+            Some(resolved.extensions()),
+            PROVIDER_OPENHUMAN,
+        )
+        .is_some());
+        assert!(crate::inference::registry::inspection_chat_model_for(
+            Some(resolved.extensions()),
+            PROVIDER_OPENHUMAN,
+        )
+        .is_some());
+        run_only(config, CONSTRUCT).await
+    })
+    .await;
     assert_eq!(filesystem_snapshot(temp.path()), before);
 
     assert!(
