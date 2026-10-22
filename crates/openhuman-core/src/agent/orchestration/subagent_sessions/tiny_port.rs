@@ -46,21 +46,158 @@ pub(crate) fn open_for_context(
         &parent_session,
         parent_thread_id.as_deref(),
     );
-    let scoped = if let Some(jobs) = jobs {
-        ScopedSubagentSessionStore::with_close_callback(
-            driver,
-            parent_session,
-            parent_thread_id,
+    let scoped: Arc<dyn TinySessionStore> = if let Some(jobs) = jobs {
+        Arc::new(ScopedSubagentSessionStore::with_close_callback(
+            Arc::clone(&driver),
+            parent_session.clone(),
+            parent_thread_id.clone(),
             move |_session_id, _task_id, key| {
                 if let Err(error) = jobs.cancel_key_owned(key, owner.clone()) {
                     log::debug!("[subagent_sessions] close cancellation was not applied: {error}");
                 }
             },
-        )
+        ))
     } else {
-        ScopedSubagentSessionStore::new(driver, parent_session, parent_thread_id)
+        Arc::new(ScopedSubagentSessionStore::new(
+            Arc::clone(&driver),
+            parent_session.clone(),
+            parent_thread_id.clone(),
+        ))
     };
-    Ok(Arc::new(scoped))
+    Ok(Arc::new(TaskIdSessionLookup {
+        inner: scoped,
+        parent_session,
+        parent_thread_id,
+    }))
+}
+
+/// Host compatibility seam: public orchestration tools historically accept a
+/// task id as well as a durable session id. TinyAgents owns the durable store
+/// and owner checks; this adapter only resolves that task-id alias in the
+/// already owner-scoped row set.
+struct TaskIdSessionLookup {
+    inner: Arc<dyn TinySessionStore>,
+    parent_session: String,
+    parent_thread_id: Option<String>,
+}
+
+#[async_trait]
+impl TinySessionStore for TaskIdSessionLookup {
+    async fn list_for_parent(
+        &self,
+        parent_session: &str,
+        parent_thread_id: Option<&str>,
+    ) -> Result<Vec<TinySession>, SubagentError> {
+        self.inner
+            .list_for_parent(parent_session, parent_thread_id)
+            .await
+    }
+
+    async fn get(&self, id: &str) -> Result<Option<TinySession>, SubagentError> {
+        if let Some(session) = self.inner.get(id).await? {
+            return Ok(Some(session));
+        }
+        let mut matches = self
+            .inner
+            .list_for_parent(&self.parent_session, self.parent_thread_id.as_deref())
+            .await?
+            .into_iter()
+            .filter(|session| session.current_task_id.as_deref() == Some(id));
+        let session = matches.next();
+        if matches.next().is_some() {
+            return Err(SubagentError::InvalidRequest(
+                "subagent task id is ambiguous within the authenticated owner scope".into(),
+            ));
+        }
+        Ok(session)
+    }
+
+    async fn upsert_running(
+        &self,
+        upsert: TinyUpsert,
+    ) -> Result<(TinySession, TinyReuseDecision), SubagentError> {
+        self.inner.upsert_running(upsert).await
+    }
+
+    async fn close(&self, id: &str) -> Result<bool, SubagentError> {
+        self.inner.close(id).await
+    }
+
+    async fn close_if_current(
+        &self,
+        id: &str,
+        task_id: &str,
+        lifecycle_key: &tinyagents_orchestration::subagent::SubagentTaskKey,
+        parent_session: &str,
+        parent_thread_id: Option<&str>,
+    ) -> Result<bool, SubagentError> {
+        self.inner
+            .close_if_current(id, task_id, lifecycle_key, parent_session, parent_thread_id)
+            .await
+    }
+
+    async fn mark_finished(
+        &self,
+        id: &str,
+        task_id: &str,
+        status: TinyStatus,
+        history: Vec<tinyinference_llm::message::Message>,
+    ) -> Result<bool, SubagentError> {
+        self.inner.mark_finished(id, task_id, status, history).await
+    }
+
+    async fn mark_finished_if_current(
+        &self,
+        id: &str,
+        task_id: &str,
+        lifecycle_key: &tinyagents_orchestration::subagent::SubagentTaskKey,
+        parent_session: &str,
+        parent_thread_id: Option<&str>,
+        status: TinyStatus,
+        history: Vec<tinyinference_llm::message::Message>,
+    ) -> Result<bool, SubagentError> {
+        self.inner
+            .mark_finished_if_current(
+                id,
+                task_id,
+                lifecycle_key,
+                parent_session,
+                parent_thread_id,
+                status,
+                history,
+            )
+            .await
+    }
+
+    async fn mark_failed(
+        &self,
+        id: &str,
+        task_id: &str,
+        error: String,
+    ) -> Result<bool, SubagentError> {
+        self.inner.mark_failed(id, task_id, error).await
+    }
+
+    async fn mark_failed_if_current(
+        &self,
+        id: &str,
+        task_id: &str,
+        lifecycle_key: &tinyagents_orchestration::subagent::SubagentTaskKey,
+        parent_session: &str,
+        parent_thread_id: Option<&str>,
+        error: String,
+    ) -> Result<bool, SubagentError> {
+        self.inner
+            .mark_failed_if_current(
+                id,
+                task_id,
+                lifecycle_key,
+                parent_session,
+                parent_thread_id,
+                error,
+            )
+            .await
+    }
 }
 
 /// Routes generic Jobs/Message session operations through OpenHuman's existing
