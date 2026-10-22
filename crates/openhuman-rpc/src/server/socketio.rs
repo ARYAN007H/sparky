@@ -1196,24 +1196,33 @@ fn socket_replay_tenant(
         crate::core_host::core::runtime::tenant::Tenant,
         crate::core_host::core::runtime::tenant::NoTenant,
     >,
+    saas: bool,
 ) -> Result<
     crate::core_host::core::runtime::tenant::Tenant,
     crate::core_host::core::runtime::tenant::NoTenant,
 > {
-    match profile_id {
-        Some(profile) if !profile.trim().is_empty() => {
+    if saas {
+        match profile_id.filter(|profile| !profile.trim().is_empty()) {
+            Some(profile) => {
             Ok(crate::core_host::core::runtime::tenant::Tenant {
                 profile: Some(profile.to_owned()),
                 agent: None,
             })
+            }
+            None => Err(crate::core_host::core::runtime::tenant::NoTenant),
         }
-        _ => ambient,
+    } else {
+        ambient
     }
 }
 
 fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str, profile_id: Option<&str>) {
     let ambient = crate::core_host::core::runtime::DispatchCtx::ambient().tenant();
-    let Ok(tenant) = socket_replay_tenant(profile_id, ambient) else {
+    let Ok(tenant) = socket_replay_tenant(
+        profile_id,
+        ambient,
+        crate::core_host::core::runtime::is_saas(),
+    ) else {
         return;
     };
     let Some(row) = crate::core_host::agent::plan_review::gate::global()

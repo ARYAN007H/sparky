@@ -9,8 +9,25 @@ fn plan_review_replay_uses_the_joining_sockets_profile() {
         profile: Some("ambient-profile".into()),
         agent: None,
     };
-    let actual = socket_replay_tenant(Some("socket-profile"), Ok(ambient)).unwrap();
+    let actual = socket_replay_tenant(Some("socket-profile"), Ok(ambient), true).unwrap();
     assert_eq!(actual.profile.as_deref(), Some("socket-profile"));
+}
+
+#[test]
+fn plan_review_replay_fails_closed_without_a_saas_socket_profile() {
+    let ambient = crate::core_host::core::runtime::tenant::Tenant::default();
+    assert!(socket_replay_tenant(None, Ok(ambient), true).is_err());
+}
+
+#[test]
+fn plan_review_replay_keeps_the_host_tenant_outside_saas() {
+    let ambient = crate::core_host::core::runtime::tenant::Tenant {
+        profile: Some("host-profile".into()),
+        agent: None,
+    };
+    let actual = socket_replay_tenant(Some("ignored-client-profile"), Ok(ambient.clone()), false)
+        .unwrap();
+    assert_eq!(actual, ambient);
 }
 
 #[test]
