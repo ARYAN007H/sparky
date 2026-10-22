@@ -36,7 +36,7 @@ use tiny_artifacts::{
 use super::files::FileRoots;
 use super::types::ArtifactKind as LegacyArtifactKind;
 use crate::security::approval::ApprovalChatContext;
-use crate::tools::per_call::PerCallTool;
+use crate::tools::per_call::{context as per_call_context, PerCallTool};
 
 /// Subdirectory under the artifacts root holding versioned records.
 const VERSIONED_SUBDIR: &str = "versioned";
@@ -600,32 +600,40 @@ pub fn registered_tools(
     let mut tools: Vec<Box<dyn tinytools::Tool>> = Vec::new();
     {
         let (service, author) = (service.clone(), author.clone());
-        tools.push(Box::new(PerCallTool::new(move |chat, _| {
-            tiny_artifacts::CreateArtifactTool::new(service(chat), author.clone())
-        })));
+        tools.push(Box::new(PerCallTool::new(
+            per_call_context,
+            move |context| {
+                tiny_artifacts::CreateArtifactTool::new(service(context.chat.as_ref()), author.clone())
+            },
+        )));
     }
     tools.push(Box::new(tiny_artifacts::ReadArtifactTool::new(service(
         None,
     ))));
     {
         let (service, author) = (service.clone(), author.clone());
-        tools.push(Box::new(PerCallTool::new(move |chat, _| {
-            tiny_artifacts::UpdateArtifactTool::new(service(chat), author.clone())
-        })));
+        tools.push(Box::new(PerCallTool::new(
+            per_call_context,
+            move |context| {
+                tiny_artifacts::UpdateArtifactTool::new(service(context.chat.as_ref()), author.clone())
+            },
+        )));
     }
     tools.push(Box::new(tiny_artifacts::ListArtifactsTool::new(service(
         None,
     ))));
     {
         let service = service.clone();
-        tools.push(Box::new(PerCallTool::new(move |chat, _| {
-            tiny_artifacts::DeleteArtifactTool::new(service(chat))
-        })));
+        tools.push(Box::new(PerCallTool::new(
+            per_call_context,
+            move |context| tiny_artifacts::DeleteArtifactTool::new(service(context.chat.as_ref())),
+        )));
     }
     if can_publish {
-        tools.push(Box::new(PerCallTool::new(move |chat, _| {
-            tiny_artifacts::ShareArtifactTool::new(service(chat))
-        })));
+        tools.push(Box::new(PerCallTool::new(
+            per_call_context,
+            move |context| tiny_artifacts::ShareArtifactTool::new(service(context.chat.as_ref())),
+        )));
     }
     tools
 }

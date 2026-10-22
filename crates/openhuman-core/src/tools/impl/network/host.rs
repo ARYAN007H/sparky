@@ -18,7 +18,7 @@ use super::gate::RoutedGate;
 use crate::config::HttpRequestConfig;
 use crate::security::approval::ApprovalChatContext;
 use crate::security::SecurityPolicy;
-use crate::tools::per_call::PerCallTool;
+use crate::tools::per_call::{context as per_call_context, PerCallTool};
 use {tinyjuice_bus::tools::summary_focus_property, tinyjuice_bus::tools::SUMMARY_FOCUS_ARG};
 
 /// The fallbacks for a `0` limit, from the `[http_request]` schema defaults, so
@@ -109,16 +109,20 @@ pub fn routed_http_request_tool(
     max_response_size: usize,
     timeout_secs: u64,
 ) -> PerCallTool<HttpRequestTool> {
-    PerCallTool::new(move |chat, ctx| {
-        http_request_tool_for(
-            ctx,
-            Arc::new(RoutedGate::new(Arc::clone(&policy), chat)),
-            chat,
-            allowed_domains.clone(),
-            max_response_size,
-            timeout_secs,
-        )
-    })
+    PerCallTool::new(
+        per_call_context,
+        move |context| {
+            let chat = context.chat.as_ref();
+            http_request_tool_for(
+                &context.dispatch,
+                Arc::new(RoutedGate::new(Arc::clone(&policy), chat)),
+                chat,
+                allowed_domains.clone(),
+                max_response_size,
+                timeout_secs,
+            )
+        },
+    )
 }
 
 /// Dedicated x402 agent entry point backed by the same host HTTP policy and
@@ -131,20 +135,24 @@ pub(crate) fn x402_request_tool(
     max_response_size: usize,
     timeout_secs: u64,
 ) -> PerCallTool<impl Tool> {
-    PerCallTool::new(move |chat, ctx| {
-        let gate: Arc<dyn NetGate> = Arc::new(RoutedGate::new(Arc::clone(&policy), chat));
-        X402RequestTool {
-            gate: Arc::clone(&gate),
-            inner: http_request_tool_for(
-                ctx,
-                gate,
-                chat,
-                allowed_domains.clone(),
-                max_response_size,
-                timeout_secs,
-            ),
-        }
-    })
+    PerCallTool::new(
+        per_call_context,
+        move |context| {
+            let chat = context.chat.as_ref();
+            let gate: Arc<dyn NetGate> = Arc::new(RoutedGate::new(Arc::clone(&policy), chat));
+            X402RequestTool {
+                gate: Arc::clone(&gate),
+                inner: http_request_tool_for(
+                    &context.dispatch,
+                    gate,
+                    chat,
+                    allowed_domains.clone(),
+                    max_response_size,
+                    timeout_secs,
+                ),
+            }
+        },
+    )
 }
 
 #[cfg(feature = "web3")]
@@ -194,16 +202,19 @@ pub fn routed_curl_tool(
     max_download_bytes: u64,
     timeout_secs: u64,
 ) -> PerCallTool<CurlTool> {
-    PerCallTool::new(move |chat, _ctx| {
-        CurlTool::new(
-            Arc::new(RoutedGate::new(Arc::clone(&policy), chat)),
-            allowed_domains.clone(),
-            action_dir.clone(),
-            dest_subdir.clone(),
-            max_download_bytes,
-            timeout_secs,
-        )
-    })
+    PerCallTool::new(
+        per_call_context,
+        move |context| {
+            CurlTool::new(
+                Arc::new(RoutedGate::new(Arc::clone(&policy), context.chat.as_ref())),
+                allowed_domains.clone(),
+                action_dir.clone(),
+                dest_subdir.clone(),
+                max_download_bytes,
+                timeout_secs,
+            )
+        },
+    )
 }
 
 /// `web_fetch` for chat turns: built for each call around that call's chat, so
@@ -214,15 +225,18 @@ pub fn routed_web_fetch_tool(
     max_bytes: Option<usize>,
     timeout_secs: Option<u64>,
 ) -> PerCallTool<WebFetchTool> {
-    PerCallTool::new(move |chat, ctx| {
-        web_fetch_tool(
-            ctx,
-            Arc::new(RoutedGate::new(Arc::clone(&policy), chat)),
-            allowed_domains.clone(),
-            max_bytes,
-            timeout_secs,
-        )
-    })
+    PerCallTool::new(
+        per_call_context,
+        move |context| {
+            web_fetch_tool(
+                &context.dispatch,
+                Arc::new(RoutedGate::new(Arc::clone(&policy), context.chat.as_ref())),
+                allowed_domains.clone(),
+                max_bytes,
+                timeout_secs,
+            )
+        },
+    )
 }
 
 /// `web_fetch`, converting HTML through TinyJuice and opting into TinyJuice's
