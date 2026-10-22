@@ -35,7 +35,7 @@ impl crate::inference::turn_models::TurnModels {
     /// Wrap every concrete route and summarizer below harness retries/fallback.
     pub(crate) fn with_host_controls(
         mut self,
-        budget: Option<&ModelBudget>,
+        budget: Option<&tinyagents_harness::cost::ModelBudget>,
         admission: Option<Arc<dyn PhysicalDispatchAdmission>>,
     ) -> Self {
         if budget.is_none() && admission.is_none() {
