@@ -41,7 +41,7 @@ const LEGACY_LIMIT_ENTRIES = [
   ["crates/openhuman-core/src/core/all_tests.rs", 1465],
   ["crates/openhuman-core/src/core/events.rs", 1697],
   ["crates/openhuman-core/src/core/events_tests.rs", 988],
-  ["crates/openhuman-core/src/core/observability.rs", 3357],
+  ["crates/openhuman-core/src/core/observability.rs", 3351],
 ];
 const LEGACY_LIMITS = new Map(LEGACY_LIMIT_ENTRIES);
 
