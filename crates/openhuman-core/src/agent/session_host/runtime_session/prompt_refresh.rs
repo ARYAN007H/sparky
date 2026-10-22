@@ -33,6 +33,14 @@ use super::OpenHumanTurnPrelude;
 use crate::agent::message_convert::{user_message_from_text, user_text_with_markers};
 use crate::agent::tinyagents::middleware::turn_context::TranscriptSnapshotSink;
 
+fn prompt_refresh_log_fields(prompt_changed: bool) -> (&'static str, &'static str) {
+    if prompt_changed {
+        ("refreshed", "prompt_changed")
+    } else {
+        ("kept", "unchanged")
+    }
+}
+
 /// Prepended to the user's message on the turn a resumed thread's prompt is
 /// replaced; the turn's record keeps it, so later turns see where the change
 /// happened.
@@ -79,11 +87,12 @@ impl OpenHumanTurnPrelude {
                 .prefix
                 .as_ref()
                 .is_some_and(|prefix| prefix.messages() != view.prefix.messages());
+            let (prefix_in_use, reason) = prompt_refresh_log_fields(changed);
             if changed {
                 tracing::info!(
                     thread_id = ?self.thread_id,
-                    prefix_in_use = "refreshed",
-                    reason = "prompt_changed",
+                    prefix_in_use,
+                    reason,
                     recorded_segments = view.prefix.messages().len(),
                     "[session] refresh_prompt_on_resume"
                 );
@@ -92,8 +101,8 @@ impl OpenHumanTurnPrelude {
             } else {
                 tracing::info!(
                     thread_id = ?self.thread_id,
-                    prefix_in_use = "kept",
-                    reason = "unchanged",
+                    prefix_in_use,
+                    reason,
                     "[session] refresh_prompt_on_resume"
                 );
             }
