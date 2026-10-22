@@ -38,6 +38,17 @@ mod storage_case;
 
 use storage_case::Case;
 
+#[cfg(unix)]
+fn make_workspace_private(workspace: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+
+    std::fs::set_permissions(workspace, std::fs::Permissions::from_mode(0o700))
+        .expect("make the test workspace private");
+}
+
+#[cfg(not(unix))]
+fn make_workspace_private(_workspace: &Path) {}
+
 /// The committed tinyflows workspace (written by the retired tinyflows-sqlite
 /// writers): flows, revisions, runs, drafts, checkpoints and cron jobs.
 fn tinyflows_fixture() -> PathBuf {
@@ -445,6 +456,7 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
     std::env::set_var("OPENHUMAN_WORKSPACE", workspace);
     std::env::set_var("OPENHUMAN_MODULE_SOURCE", "linked");
     let fixture = desktop_workspace(workspace);
+    make_workspace_private(workspace);
     let before = tree(workspace);
     assert!(
         before.len() > 15,
