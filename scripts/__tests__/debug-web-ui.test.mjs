@@ -118,10 +118,16 @@ test("core RPC client bounds a stalled request and propagates its timeout", asyn
     hangingFetch,
     5,
   );
-
-  await assert.rejects(rpc("openhuman.auth_get_state"), {
-    name: "TimeoutError",
-  });
+  // AbortSignal.timeout uses an unref'd timer. Keep the test process alive so
+  // the simulated stalled fetch can observe that timer without real network I/O.
+  const keepAlive = setInterval(() => {}, 1_000);
+  try {
+    await assert.rejects(rpc("openhuman.auth_get_state"), {
+      name: "TimeoutError",
+    });
+  } finally {
+    clearInterval(keepAlive);
+  }
   assert.equal(signal.aborted, true);
 });
 
