@@ -535,6 +535,103 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
 }
 
 #[tokio::test]
+async fn thread_delete_keeps_completions_when_driver_task_scope_cannot_be_resolved() {
+    use crate::agent::orchestration::background_completions::{self, BackgroundAgentOutcome};
+    use crate::agent::tinyagents::host::OpenHumanRunContext;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::threads::store::{blocking, CreateConversationThread};
+    use crate::tools::toolpacks::ToolGroups;
+    use tinyagents_harness::context::RunContext;
+
+    let scratch = tempfile::tempdir().expect("isolated unresolved-driver fixture");
+    let workspace = scratch.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("create workspace");
+    let thread_id = "delete-unresolved-driver-parent-thread";
+    let parent_session = "delete-unresolved-driver-parent-session";
+    let mut parent = parent_context(&workspace, Arc::new(ScriptedModel::new(vec![])), vec![]);
+    let workspace_descriptor = tinytools::WorkspaceDescriptor::new(workspace.clone());
+    parent.workspace_descriptor = Some(workspace_descriptor.clone());
+    parent.session_id = parent_session.into();
+
+    let definitions = Arc::new(AgentDefinitionRegistry::builtins_only());
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.clone();
+    config.components.juice = false;
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).definitions(definitions),
+    );
+    let mut host_context = OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_parent(parent);
+    host_context.thread_id = Some(thread_id.into());
+    let live = RunContext::<OpenHumanRunContext>::new(
+        tinyagents_harness::context::RunConfig::new("delete-unresolved-driver-parent")
+            .with_thread(thread_id),
+        host_context,
+    )
+    .with_workspace(workspace_descriptor.clone());
+    let dispatch = live.data.dispatch_ctx();
+    blocking::ensure_thread(
+        dispatch.clone(),
+        workspace.clone(),
+        CreateConversationThread {
+            id: thread_id.into(),
+            title: "Delete unresolved driver parent".into(),
+            created_at: "2026-01-01T00:00:00Z".into(),
+            parent_thread_id: None,
+            labels: None,
+            personality_id: None,
+            working_dir: None,
+        },
+    )
+    .await
+    .expect("persist parent thread before deletion");
+
+    let completion_store: Arc<dyn tinyagents_tasks::CompletionStore> =
+        Arc::new(tinyagents_tasks::InMemoryCompletionStore::new());
+    background_completions::install_store_for_test(&workspace, completion_store);
+    background_completions::record_outcome(
+        &dispatch,
+        &workspace,
+        parent_session,
+        "stale-driver-task".into(),
+        "task_manager_agent",
+        "queued child result",
+        Some(thread_id.into()),
+        BackgroundAgentOutcome::Completed,
+    )
+    .await;
+    crate::agent::orchestration::completion_owners::note_driver_task(
+        &dispatch,
+        "stale-driver-task",
+        workspace.clone(),
+        workspace_descriptor,
+        parent_session.into(),
+        Some(thread_id.into()),
+    );
+
+    let result = crate::threads::ops::thread_delete(
+        &dispatch,
+        crate::threads::DeleteConversationThreadRequest {
+            thread_id: thread_id.into(),
+            deleted_at: "2026-01-01T00:01:00Z".into(),
+        },
+    )
+    .await;
+
+    assert!(
+        result
+            .expect_err("an indexed task without its driver job must fail closed")
+            .contains("no matching driver job")
+    );
+    assert_eq!(
+        background_completions::pending_for(&workspace, thread_id).len(),
+        1,
+        "thread deletion retains queued completions when a selected child cannot be settled"
+    );
+}
+
+#[tokio::test]
 async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
     use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};

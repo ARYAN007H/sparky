@@ -338,6 +338,12 @@ pub(crate) async fn cancel_for_thread(
                 continue;
             }
         };
+        if matching_jobs.is_empty() {
+            failures.push(format!(
+                "owner index task {task_id} has no matching driver job in its parent scope"
+            ));
+            continue;
+        }
         for job in matching_jobs {
             match jobs.cancel_owned(job.id.as_str(), &owner_key) {
                 Ok(cancelled_job) => {
