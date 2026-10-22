@@ -28,31 +28,32 @@ struct TenantStoreRegistry {
 #[derive(Default)]
 struct TenantStoreRegistryState {
     backends: Vec<Weak<RwLock<Arc<dyn StorageBackend>>>>,
+    tenants: Vec<Weak<Mutex<HashMap<Scope, Arc<RebindableSessionStores>>>>>,
     current_backend: Option<Arc<dyn StorageBackend>>,
 }
 
 impl TenantStoreRegistry {
     fn rebind(&self, backend: &Arc<dyn StorageBackend>) -> usize {
         let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        let routers = state
+        let backends = state
             .backends
+            .iter()
+            .filter_map(Weak::upgrade)
+            .collect::<Vec<_>>();
+        let tenant_maps = state
+            .tenants
             .iter()
             .filter_map(Weak::upgrade)
             .collect::<Vec<_>>();
         // `route` locks tenants before reading the backend. Keep that lock
         // order while preventing new providers from appearing during rebind.
-        let tenant_maps = routers
+        let tenant_maps = tenant_maps
             .iter()
-            .map(|router| {
-                router
-                    .tenants
-                    .lock()
-                    .unwrap_or_else(PoisonError::into_inner)
-            })
+            .map(|tenants| tenants.lock().unwrap_or_else(PoisonError::into_inner))
             .collect::<Vec<_>>();
-        let mut bindings = routers
+        let mut bindings = backends
             .iter()
-            .map(|router| router.backend.write().unwrap_or_else(PoisonError::into_inner))
+            .map(|backend| backend.write().unwrap_or_else(PoisonError::into_inner))
             .collect::<Vec<_>>();
 
         let mut providers = tenant_maps
@@ -98,17 +99,24 @@ impl TenantStoreRegistry {
             **current = Arc::clone(backend);
         }
         state.backends.retain(|weak| weak.strong_count() > 0);
+        state.tenants.retain(|weak| weak.strong_count() > 0);
         state.current_backend = Some(Arc::clone(backend));
         moved.len()
     }
 
-    fn register_backend(&self, backend: &Arc<RwLock<Arc<dyn StorageBackend>>>) {
+    fn register_backend(
+        &self,
+        backend: &Arc<RwLock<Arc<dyn StorageBackend>>>,
+        tenants: &Arc<Mutex<HashMap<Scope, Arc<RebindableSessionStores>>>>,
+    ) {
         let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(current) = &state.current_backend {
             *backend.write().unwrap_or_else(PoisonError::into_inner) = Arc::clone(current);
         }
         state.backends.retain(|weak| weak.strong_count() > 0);
         state.backends.push(Arc::downgrade(backend));
+        state.tenants.retain(|weak| weak.strong_count() > 0);
+        state.tenants.push(Arc::downgrade(tenants));
     }
 }
 
@@ -125,7 +133,7 @@ pub struct TenantSessionStores {
     backend: Arc<RwLock<Arc<dyn StorageBackend>>>,
     recover_on_open: bool,
     admission: SchemaAdmission,
-    tenants: Mutex<HashMap<Scope, Arc<RebindableSessionStores>>>,
+    tenants: Arc<Mutex<HashMap<Scope, Arc<RebindableSessionStores>>>>,
     registry: Arc<TenantStoreRegistry>,
     /// Names this router in [`SessionStoreProvider::destination_key`].
     id: uuid::Uuid,
@@ -153,7 +161,7 @@ impl TenantSessionStores {
             backend: Arc::new(RwLock::new(backend)),
             recover_on_open,
             admission,
-            tenants: Mutex::new(HashMap::new()),
+            tenants: Arc::new(Mutex::new(HashMap::new())),
             registry,
             id: uuid::Uuid::new_v4(),
         }
@@ -174,7 +182,9 @@ impl TenantSessionStores {
             SchemaAdmission::Declare,
             Arc::clone(&PROCESS_SESSION_STORES),
         );
-        router.registry.register_backend(&router.backend);
+        router
+            .registry
+            .register_backend(&router.backend, &router.tenants);
         Ok(router)
     }
 
