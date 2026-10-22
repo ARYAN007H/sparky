@@ -123,11 +123,27 @@ async fn cancel_of_a_legacy_failed_run_reports_its_outcome_and_rewrites_nothing(
     let ctx = DispatchCtx::new(Arc::clone(&core));
     let mut params = Map::new();
     params.insert("taskId".into(), json!("sub-rpc-failed"));
-    let out = handle_subagent_cancel(ctx, params)
+    let out = handle_subagent_cancel(ctx.clone(), params)
         .await
         .expect("handler ok");
     assert_eq!(field(&out, "cancelled"), Some(json!(false)));
     assert_eq!(field(&out, "outcome"), Some(json!("failed")));
+    let driver = crate::agent::orchestration::subagent_sessions::open_for_context(
+        &ctx,
+        workspace.path().to_path_buf(),
+        "session-rpc",
+        Some("thread-rpc".into()),
+        None,
+    )
+    .expect("driver session store");
+    let imported = driver
+        .list_for_parent("session-rpc", Some("thread-rpc"))
+        .await
+        .expect("driver rows");
+    assert!(imported.iter().any(|session| {
+        session.current_task_id.as_deref() == Some("sub-rpc-failed")
+            && session.status == tinyagents_orchestration::subagent::DurableSubagentStatus::Failed
+    }));
     assert_eq!(
         serde_json::to_string(&store.load().expect("store still readable")).expect("encode"),
         before,

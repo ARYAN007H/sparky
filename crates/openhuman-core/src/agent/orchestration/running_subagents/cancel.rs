@@ -192,13 +192,15 @@ fn terminal_legacy_session(
     workspace_dir: &Path,
     task_id: &str,
 ) -> Result<Option<CancelledSubagent>, String> {
-    let Some(session) = crate::agent::orchestration::subagent_sessions::import_terminal_task_for_context(
-        ctx,
-        workspace_dir.to_path_buf(),
-        task_id,
-    )
-    .await
-    .map_err(|error| format!("failed to read terminal legacy subagent session: {error}"))? else {
+    let Some(session) =
+        crate::agent::orchestration::subagent_sessions::import_terminal_task_for_context(
+            ctx,
+            workspace_dir.to_path_buf(),
+            task_id,
+        )
+        .await
+        .map_err(|error| format!("failed to read terminal legacy subagent session: {error}"))?
+    else {
         return Ok(None);
     };
     let already_finished = match session.status {

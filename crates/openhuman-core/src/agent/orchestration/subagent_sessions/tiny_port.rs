@@ -205,7 +205,10 @@ pub(crate) async fn import_terminal_task_for_context(
         .find_task_for_import(task_id)
         .map_err(SubagentError::Persistence)?;
     let Some(row) = legacy.filter(|row| {
-        matches!(row.status, DurableSubagentStatus::Idle | DurableSubagentStatus::Failed)
+        matches!(
+            row.status,
+            DurableSubagentStatus::Idle | DurableSubagentStatus::Failed
+        )
     }) else {
         return Ok(None);
     };
@@ -233,9 +236,10 @@ fn documents_for_context(
     workspace_dir: &std::path::Path,
 ) -> Result<Arc<dyn crate::storage::DocumentStore>, SubagentError> {
     let open_documents = || {
-        let opened = crate::storage::local::open("subagent_sessions", workspace_dir).map_err(
-            |error| SubagentError::Persistence(format!("open session store: {error:#}")),
-        )?;
+        let opened =
+            crate::storage::local::open("subagent_sessions", workspace_dir).map_err(|error| {
+                SubagentError::Persistence(format!("open session store: {error:#}"))
+            })?;
         let scoped = opened.scoped().map_err(|error| {
             SubagentError::Persistence(format!("scope session store: {error:#}"))
         })?;
@@ -302,8 +306,10 @@ fn import_host_session(
     let id = session.subagent_session_id.clone();
     let docs = Arc::clone(&documents);
     let existing = crate::storage::block_on(async move {
-        docs.ensure_collection(&tinystoragedrivers::CollectionSpec::new("subagent_sessions"))
-            .await?;
+        docs.ensure_collection(&tinystoragedrivers::CollectionSpec::new(
+            "subagent_sessions",
+        ))
+        .await?;
         docs.get("subagent_sessions", &id).await
     })
     .map_err(|error| SubagentError::Persistence(format!("read driver session: {error}")))?;
@@ -317,7 +323,9 @@ fn import_host_session(
     let write_docs = Arc::clone(&documents);
     crate::storage::block_on(async move {
         write_docs
-            .ensure_collection(&tinystoragedrivers::CollectionSpec::new("subagent_sessions"))
+            .ensure_collection(&tinystoragedrivers::CollectionSpec::new(
+                "subagent_sessions",
+            ))
             .await?;
         match write_docs
             .put(
