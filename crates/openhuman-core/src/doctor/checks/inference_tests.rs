@@ -490,11 +490,8 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
         Some(temp.path().to_path_buf()),
         extensions,
     );
-    let findings = crate::core::runtime::CoreContext::scope(
-        core_context,
-        run_only(config, CONSTRUCT),
-    )
-    .await;
+    let findings =
+        crate::core::runtime::CoreContext::scope(core_context, run_only(config, CONSTRUCT)).await;
     assert_eq!(filesystem_snapshot(temp.path()), before);
 
     assert!(

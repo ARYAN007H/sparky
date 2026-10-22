@@ -136,7 +136,7 @@ async fn a_byok_cloud_fallback_without_a_key_reports_construction_failure() {
 #[tokio::test]
 async fn a_fully_configured_managed_default_constructs_cleanly() {
     use crate::config::schema::cloud_providers::{
-    register_hosted_cloud_provider_policy_in, AuthStyle, CloudProviderCreds,
+        register_hosted_cloud_provider_policy_in, AuthStyle, CloudProviderCreds,
     };
     use crate::config::test_env::EnvVarGuard;
     use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
@@ -231,11 +231,8 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
         Some(temp.path().to_path_buf()),
         extensions,
     );
-    let findings = crate::core::runtime::CoreContext::scope(
-        core_context,
-        run_only(config, CONSTRUCT),
-    )
-    .await;
+    let findings =
+        crate::core::runtime::CoreContext::scope(core_context, run_only(config, CONSTRUCT)).await;
     assert_eq!(filesystem_snapshot(temp.path()), before);
 
     assert!(
@@ -268,4 +265,3 @@ async fn an_out_of_range_temperature_reports_the_role_setting() {
     assert_eq!(result.severity, FindingSeverity::Error);
     assert_eq!(result.config_path.as_deref(), Some("default_temperature"));
 }
-
