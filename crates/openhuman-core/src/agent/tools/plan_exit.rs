@@ -3,9 +3,10 @@
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
+use tinyagents_harness::middleware::RunModeHandle;
 use tinyagents_harness_tools::run_mode::RunModeStore;
 use tinyagents_harness_tools::{ParkedPlanReviewLookup, PlanExitHost};
-use tinytools::Tool;
+use tinytools::{Tool, ToolRunContext};
 
 #[derive(Clone)]
 struct PlanExitScope {
