@@ -239,9 +239,8 @@ impl PinnedAgent for ScriptedAgent {
 
 /// A results store in fresh memory storage.
 pub(crate) fn memory_results() -> Results {
-    let storage = tinystoragedrivers_testkit::memory_storage(
-        &crate::storage::Scope::new("local").unwrap(),
-    );
+    let storage =
+        tinystoragedrivers_testkit::memory_storage(&crate::storage::Scope::new("local").unwrap());
     Results::over(&storage)
 }
 

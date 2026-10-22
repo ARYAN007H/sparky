@@ -15,7 +15,10 @@ async fn boot_prepares_every_linked_owner_collection_in_shared_scopes() {
     let report = prepare_and_migrate(&backend).await.unwrap();
 
     assert_eq!(report.scopes, 2);
-    let expected = owners.iter().map(|owner| owner.collections.len()).sum::<usize>();
+    let expected = owners
+        .iter()
+        .map(|owner| owner.collections.len())
+        .sum::<usize>();
     assert_eq!(report.collections, expected * report.scopes);
     for scope in [Scope::local(), Scope::new("cluster").unwrap()] {
         let storage = backend.for_scope(&scope).unwrap();
@@ -27,7 +30,10 @@ async fn boot_prepares_every_linked_owner_collection_in_shared_scopes() {
                     .query_all(&collection.name, &tinystoragedrivers_types::Query::all())
                     .await
                     .unwrap_or_else(|error| {
-                        panic!("{} from {} in {scope}: {error}", collection.name, owner.crate_name)
+                        panic!(
+                            "{} from {} in {scope}: {error}",
+                            collection.name, owner.crate_name
+                        )
                     });
             }
         }

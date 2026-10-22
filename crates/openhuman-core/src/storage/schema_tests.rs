@@ -6,7 +6,11 @@ fn every_linked_crate_exposes_its_valid_collection_declarations() {
     let mut crates = std::collections::HashSet::new();
     let mut names = std::collections::HashSet::new();
     for owner in &owners {
-        assert!(crates.insert(owner.crate_name), "duplicate crate {}", owner.crate_name);
+        assert!(
+            crates.insert(owner.crate_name),
+            "duplicate crate {}",
+            owner.crate_name
+        );
         for spec in &owner.collections {
             spec.validate().expect("owner collection is valid");
             assert!(

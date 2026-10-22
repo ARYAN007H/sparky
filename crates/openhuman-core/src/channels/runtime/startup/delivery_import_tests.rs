@@ -8,9 +8,9 @@ fn entry(id: &str, at: u64) -> DeliveryQueueEntry {
         id,
         ChannelOutboundIntent {
             idempotency_key: id.to_owned(),
-        channel_ref: None,
-        conversation_ref: None,
-        turn_id: None,
+            channel_ref: None,
+            conversation_ref: None,
+            turn_id: None,
             channel_id: "telegram".into(),
             conversation_id: "chat-1".into(),
             reply_to_id: None,

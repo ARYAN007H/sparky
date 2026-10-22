@@ -20,6 +20,7 @@ fn main() {
                 "crate": owner.crate_name,
                 "collections": owner.collections,
             })).collect::<Vec<_>>(),
-        })).unwrap()
+        }))
+        .unwrap()
     );
 }

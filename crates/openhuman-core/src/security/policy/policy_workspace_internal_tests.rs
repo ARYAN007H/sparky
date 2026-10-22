@@ -20,12 +20,10 @@ fn is_workspace_internal_path_blocks_state_dirs() {
     assert!(policy.is_workspace_internal_path(&ws.join("memory").join("namespaces")));
     assert!(policy.is_workspace_internal_path(&ws.join("memory-alice").join("memory.db")));
     assert!(policy.is_workspace_internal_path(&ws.join("memory_tree-alice").join("tree")));
-    assert!(
-        policy.is_workspace_internal_path(
-            &ws.join("session_raw-alice")
-                .join("1700000000_orchestrator.jsonl")
-        )
-    );
+    assert!(policy.is_workspace_internal_path(
+        &ws.join("session_raw-alice")
+            .join("1700000000_orchestrator.jsonl")
+    ));
     assert!(policy.is_workspace_internal_path(&ws.join("sessions")));
     assert!(policy.is_workspace_internal_path(&ws.join("state")));
     assert!(policy.is_workspace_internal_path(&ws.join("cron")));
@@ -33,15 +31,13 @@ fn is_workspace_internal_path_blocks_state_dirs() {
     assert!(
         policy.is_workspace_internal_path(&ws.join("personalities").join("alice").join("SOUL.md"))
     );
-    assert!(
-        policy.is_workspace_internal_path(
-            &ws.join("personalities")
-                .join("alice")
-                .join("skills")
-                .join("private-skill")
-                .join("SKILL.md")
-        )
-    );
+    assert!(policy.is_workspace_internal_path(
+        &ws.join("personalities")
+            .join("alice")
+            .join("skills")
+            .join("private-skill")
+            .join("SKILL.md")
+    ));
     assert!(policy.is_workspace_internal_path(&ws.join("approval")));
     assert!(policy.is_workspace_internal_path(&ws.join("mcp_clients")));
     assert!(policy.is_workspace_internal_path(&ws.join("codegraph")));
@@ -124,21 +120,17 @@ async fn artifact_metadata_is_internal_but_tool_results_are_not() {
     let meta = record.join("meta.json");
     assert!(!policy.is_path_string_allowed(&meta.to_string_lossy()));
     assert!(policy.validate_path(&meta.to_string_lossy()).await.is_err());
-    assert!(
-        policy
-            .validate_parent_path(&record.join("args.json").to_string_lossy())
-            .await
-            .is_err()
-    );
+    assert!(policy
+        .validate_parent_path(&record.join("args.json").to_string_lossy())
+        .await
+        .is_err());
 
     let result = results.join("call-1.txt");
     assert!(policy.is_path_string_allowed(&result.to_string_lossy()));
-    assert!(
-        policy
-            .validate_path(&result.to_string_lossy())
-            .await
-            .is_ok()
-    );
+    assert!(policy
+        .validate_path(&result.to_string_lossy())
+        .await
+        .is_ok());
 }
 
 #[tokio::test]
@@ -162,16 +154,14 @@ async fn trusted_root_cannot_expose_workspace_internal_state() {
 
     assert!(!policy.is_path_string_allowed(&soul.to_string_lossy()));
     assert!(policy.validate_path(&soul.to_string_lossy()).await.is_err());
-    assert!(
-        policy
-            .validate_parent_path(
-                &ws.join("session_raw-alice")
-                    .join("new.jsonl")
-                    .to_string_lossy()
-            )
-            .await
-            .is_err()
-    );
+    assert!(policy
+        .validate_parent_path(
+            &ws.join("session_raw-alice")
+                .join("new.jsonl")
+                .to_string_lossy()
+        )
+        .await
+        .is_err());
 }
 
 #[test]
@@ -222,17 +212,13 @@ async fn the_account_config_beside_the_workspace_is_internal() {
     };
 
     assert!(!policy.is_path_string_allowed(&config.to_string_lossy()));
-    assert!(
-        policy
-            .validate_path(&config.to_string_lossy())
-            .await
-            .is_err()
-    );
-    assert!(
-        policy
-            .validate_parent_path(&config.to_string_lossy())
-            .await
-            .is_err()
-    );
+    assert!(policy
+        .validate_path(&config.to_string_lossy())
+        .await
+        .is_err());
+    assert!(policy
+        .validate_parent_path(&config.to_string_lossy())
+        .await
+        .is_err());
     assert!(policy.validate_path(&notes.to_string_lossy()).await.is_ok());
 }

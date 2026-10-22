@@ -7,7 +7,10 @@ async fn boot_prepares_each_linked_crates_collections_on_host_scopes() {
 
     let report = prepare_and_migrate(&backend).await.unwrap();
     let owners = super::super::schema::collection_owners().unwrap();
-    let declared = owners.iter().map(|owner| owner.collections.len()).sum::<usize>();
+    let declared = owners
+        .iter()
+        .map(|owner| owner.collections.len())
+        .sum::<usize>();
     assert_eq!(report.scopes, 2);
     assert_eq!(report.collections, declared * report.scopes);
 

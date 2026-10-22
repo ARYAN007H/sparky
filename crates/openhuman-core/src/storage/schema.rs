@@ -29,19 +29,31 @@ pub fn collection_owners() -> Result<Vec<CollectionOwner>, StorageError> {
 
 fn declared_collections() -> Vec<CollectionOwner> {
     let mut owners = vec![
-        owner("tinyagents-harness", tinyagents_harness::storage::collections()),
-        owner("tinyagents-session", tinyagents_session::port::collections()),
+        owner(
+            "tinyagents-harness",
+            tinyagents_harness::storage::collections(),
+        ),
+        owner(
+            "tinyagents-session",
+            tinyagents_session::port::collections(),
+        ),
         owner("tinyagents-graph", tinyagents_graph::storage::collections()),
         owner("tinyagents-tasks", tinyagents_tasks::collections()),
         owner("openhuman-core", host_collections()),
     ];
 
     #[cfg(feature = "skills")]
-    owners.push(owner("tinyskills-drivers", tinyskills_drivers::collections()));
+    owners.push(owner(
+        "tinyskills-drivers",
+        tinyskills_drivers::collections(),
+    ));
 
     #[cfg(feature = "modules")]
     {
-        owners.push(owner("tinymcp-bus", tinymcp_bus::storage::collection_specs()));
+        owners.push(owner(
+            "tinymcp-bus",
+            tinymcp_bus::storage::collection_specs(),
+        ));
         owners.push(owner(
             "tinychannels-bus",
             tinychannels_bus::storage::collections()
@@ -63,7 +75,10 @@ fn declared_collections() -> Vec<CollectionOwner> {
                 .map(CollectionSpec::new)
                 .collect(),
         ));
-        owners.push(owner("tinyjuice-bus", tinyjuice_bus::storage::collections()));
+        owners.push(owner(
+            "tinyjuice-bus",
+            tinyjuice_bus::storage::collections(),
+        ));
     }
 
     #[cfg(feature = "web3")]
@@ -113,7 +128,10 @@ fn host_collections() -> Vec<CollectionSpec> {
 }
 
 fn owner(crate_name: &'static str, collections: Vec<CollectionSpec>) -> CollectionOwner {
-    CollectionOwner { crate_name, collections }
+    CollectionOwner {
+        crate_name,
+        collections,
+    }
 }
 
 /// Collections declared by one loadable module owner.

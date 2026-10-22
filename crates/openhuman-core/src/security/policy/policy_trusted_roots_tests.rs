@@ -177,12 +177,10 @@ async fn validate_parent_path_blocks_symlinked_parent_dir() {
         forbidden_paths: vec![],
         ..SecurityPolicy::default()
     };
-    assert!(
-        policy
-            .validate_parent_path("subdir/newfile.txt")
-            .await
-            .is_err()
-    );
+    assert!(policy
+        .validate_parent_path("subdir/newfile.txt")
+        .await
+        .is_err());
 }
 
 #[cfg(unix)]
@@ -226,12 +224,10 @@ async fn validate_parent_path_blocks_forbidden_path() {
         ..SecurityPolicy::default()
     };
     // Writing a new file directly into the forbidden dir must be blocked.
-    assert!(
-        policy
-            .validate_parent_path("secrets/output.csv")
-            .await
-            .is_err()
-    );
+    assert!(policy
+        .validate_parent_path("secrets/output.csv")
+        .await
+        .is_err());
 }
 
 // ── tilde expansion in validate_path / validate_parent_path ──────────────────
@@ -462,10 +458,9 @@ fn supervised_runs_approved_redirects_but_blocks_hidden_execution() {
             .is_ok(),
         "stderr-dup redirect 2>&1 must run after approval"
     );
-    assert!(
-        p.check_gated_command("pip show yfinance 2>/dev/null")
-            .is_ok()
-    );
+    assert!(p
+        .check_gated_command("pip show yfinance 2>/dev/null")
+        .is_ok());
     assert!(p.check_gated_command("ls -la | grep foo").is_ok());
     assert!(p.check_gated_command("echo done > out.txt").is_ok());
 
