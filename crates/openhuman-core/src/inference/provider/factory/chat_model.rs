@@ -1,6 +1,8 @@
 //! One-shot `create_chat_model*` entry points, the readiness probe, the
 //! default-temperature wrapper, and the unresolved-route error builder.
 
+#[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
+use super::test_provider_override;
 use super::{
     access_gates::{emit_inference_egress, enforce_local_only_inference},
     cloud_slug::{
@@ -9,11 +11,11 @@ use super::{
     },
     credentials::CredentialAccess,
     local_runtime::try_create_local_runtime_chat_model_from_string,
-    provider_for_role, BYOK_INCOMPLETE_SENTINEL, CLAUDE_AGENT_SDK_PREFIX,
-    subprocess_providers::OpenHumanMcpEndpoint, CLAUDE_AGENT_SDK_PROVIDER, PROVIDER_OPENHUMAN,
+    provider_for_role,
+    subprocess_providers::OpenHumanMcpEndpoint,
+    BYOK_INCOMPLETE_SENTINEL, CLAUDE_AGENT_SDK_PREFIX, CLAUDE_AGENT_SDK_PROVIDER,
+    PROVIDER_OPENHUMAN,
 };
-#[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
-use super::test_provider_override;
 use crate::config::ops::resolve_primary_cloud_provider_string;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
