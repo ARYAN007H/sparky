@@ -421,7 +421,7 @@ tinyvoice-bus = { path = "../../vendor/tinyvoice/crates/tinyvoice-bus", optional
 # no gate to hang off.
 #
 # After cloning: `git submodule update --init vendor/tinyjuice`.
-tinyjuice-bus = { path = "../../vendor/tinyjuice/crates/tinyjuice-bus" }
+tinyjuice-bus = { path = "../../vendor/tinyjuice/crates/tinyjuice-bus", features = ["storage"] }
 tinyjuice-host = { path = "../../vendor/tinyjuice/crates/tinyjuice-host" }
 
 # Transport-free vocabulary for the compiled TinyHosts provider module.

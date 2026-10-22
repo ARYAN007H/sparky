@@ -49,17 +49,7 @@ pub fn owner_schemas() -> Vec<Schema> {
         schemas.push(tinychannels_bus::storage::storage_schema());
         schemas.push(tinyconnectors_bus::storage::storage_schema());
         schemas.push(tinybox_bus::storage::storage_schema());
-        schemas.push(
-            Schema::new(crate::storage::schema_support::owner("juice"))
-                .collection_with(
-                    1,
-                    tinystoragedrivers::CollectionSpec::new(
-                        tinyjuice_bus::storage::SAVINGS_COLLECTION,
-                    ),
-                    ScopeClass::Module,
-                )
-                .blobs(tinyjuice_bus::storage::CCR_PREFIX, ScopeClass::Module),
-        );
+        schemas.push(tinyjuice_bus::storage::storage_schema());
     }
     #[cfg(feature = "web3")]
     schemas.push(tinywallet_bus::storage::storage_schema());
