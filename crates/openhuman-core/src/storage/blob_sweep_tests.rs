@@ -87,7 +87,7 @@ async fn module_blob_scopes_are_swept_alongside_the_acting_scope() {
         &crate::core::runtime::DispatchCtx::host_default(),
     );
     assert!(!module_scopes.is_empty(), "TinyJuice owns expiring blobs");
-    put_expiring(&backend, &module_scopes[0], "tinyjuice_ccr/t", 10).await;
+    put_expiring(&backend, &module_scopes[0], "juice/ccr/t", 10).await;
     now.store(2_000, Ordering::SeqCst);
     assert_eq!(sweep_all(backend).await, 1);
 }
@@ -138,7 +138,7 @@ async fn sweep_profiles_reaches_the_modules_scopes_for_that_profile() {
     let (now, backend) = backend_with_clock();
     let module_scopes = crate::modules::expiring_blob_module_scopes_for("acme");
     assert!(!module_scopes.is_empty(), "TinyJuice owns expiring blobs");
-    put_expiring(&backend, &module_scopes[0], "tinyjuice_ccr/t", 10).await;
+    put_expiring(&backend, &module_scopes[0], "juice/ccr/t", 10).await;
     now.store(2_000, Ordering::SeqCst);
     assert_eq!(
         sweep_profiles(backend.as_ref(), &["acme".to_string()]).await,

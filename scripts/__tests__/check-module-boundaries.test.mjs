@@ -16,6 +16,14 @@ function metadata(edges, names = {}) {
 }
 
 test('checked-in inventory has explicit owners and reasoned exceptions', () => validatePolicy(policy));
+test('TinyJuice host adapter is allowed while implementation dependencies remain audited', () => {
+  assert.equal(isImplementation('tinyjuice-host', policy), false);
+  assert.equal(isImplementation('tinyjuice-core', policy), true);
+  const m = metadata({ host: [['tinyjuice-host']], 'tinyjuice-host': [['tinyjuice']] });
+  assert.deepEqual(auditGraph(m, ['host'], policy).violations.map(v => v.path), [
+    ['host', 'tinyjuice-host', 'tinyjuice'],
+  ]);
+});
 test('host traversal rejects direct, wrapper and build dependencies', () => {
   const m = metadata({ host: [['wrapper'], ['tinyvoice', 'build']], wrapper: [['tinyjuice']] });
   const result = auditGraph(m, ['host'], strict);
@@ -288,6 +296,7 @@ test('a package-scoped normal tree still rejects an activated implementation wri
 
 test('host boundary audit ignores writer features unified only by unrelated workspace dev fixtures', () => {
   const root = resolve(new URL('../..', import.meta.url).pathname);
+  mkdirSync(join(root, 'target'), { recursive: true });
   const harnessRoot = mkdtempSync(join(root, 'target', 'module-boundaries-host-isolation-'));
   try {
     mkdirSync(join(harnessRoot, 'scripts', 'ci'), { recursive: true });

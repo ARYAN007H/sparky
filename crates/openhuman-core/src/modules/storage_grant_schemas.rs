@@ -180,8 +180,6 @@ pub(super) mod tinyeventqueues {
 
 pub(super) mod tinyjuice {
     pub(crate) const MODULE_ID: &str = "tinyjuice";
-    /// The v1 CCR blob prefix the importer writes.
-    pub(crate) const CCR_BLOB_PREFIX: &str = "tinyjuice_ccr/";
 }
 
 #[cfg(test)]
