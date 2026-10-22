@@ -61,33 +61,12 @@ impl tinytools::Tool for TokenjuiceRetrieveTool {
 
 use tinyjuice_bus::wire::InstallRequest;
 
-use tinyjuice_bus::tools::{LEGACY_RETRIEVE, REPL_TOOLS, RETRIEVE};
+use tinyjuice_bus::tools::REPL_TOOLS;
+pub use tinyjuice_host::recovery::{
+    is_recovery_tool, summary_failed_notice, CompactedToolOutput, RECOVERY_TOOL_NAMES,
+    RECOVERY_TOOL_VISIBLE,
+};
 pub const LEGACY_RETRIEVE_TOOL_NAME: &str = "retrieve_tool_output";
-/// Every name the recovery surface answers to: the live tool plus the two
-/// migration aliases a replayed transcript may still call.
-pub const RECOVERY_TOOL_NAMES: &[&str] = &[
-    RETRIEVE,
-    LEGACY_RETRIEVE,
-    "tokenjuice_retrieve",
-    LEGACY_RETRIEVE_TOOL_NAME,
-];
-
-/// The recovery tool a curated (`ToolScope::Named`) belt is guaranteed to
-/// advertise. Only the live tool: the aliases stay registered so an old
-/// transcript replays, but putting all three on the wire charged every
-/// Named agent for three copies of one schema.
-pub const RECOVERY_TOOL_VISIBLE: &[&str] = &[RETRIEVE];
-
-pub fn is_recovery_tool(name: &str) -> bool {
-    RECOVERY_TOOL_NAMES.contains(&name)
-}
-
-/// Build TinyJuice's retrieval adapter over the OpenHuman module lookup.
-pub fn retrieve_tool() -> TokenjuiceRetrieveTool {
-    TokenjuiceRetrieveTool::new(std::sync::Arc::new(|token, range| {
-        Box::pin(async move { retrieve(token, range).await })
-    }))
-}
 
 /// Whether the `[components] juice` switch is on. Off means turns truncate
 /// tool output only: no compaction, no summary, no `juice_*` / recovery tools,
@@ -259,42 +238,6 @@ pub struct ToolOutputCompaction<'a> {
 }
 
 /// What came back for one tool result.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CompactedToolOutput {
-    pub text: String,
-    /// Prefix after the host's caps: the summary stage ran and wrote nothing.
-    pub notice: Option<String>,
-    /// Set when `text` is a model-written summary of this many bytes.
-    pub summarized_from_bytes: Option<usize>,
-}
-
-impl CompactedToolOutput {
-    fn unchanged(text: String) -> Self {
-        Self {
-            text,
-            notice: None,
-            summarized_from_bytes: None,
-        }
-    }
-
-    /// The content untouched, disclosing the summary that did not happen when
-    /// one was wanted.
-    fn passthrough(text: String, wants_summary: bool) -> Self {
-        Self {
-            notice: wants_summary.then(summary_failed_notice),
-            ..Self::unchanged(text)
-        }
-    }
-}
-
-/// TinyJuice's own notice for a summary that was attempted and not produced,
-/// so a host-side failure reads the same as a module-side one.
-pub fn summary_failed_notice() -> String {
-    tinyjuice_bus::summary::UnavailableReason::Failed
-        .notice()
-        .to_string()
-}
-
 /// Deadline for `CompactWith`. It may wait on a summary model call, which the
 /// module itself bounds at 300s; this sits just past that so the module's own
 /// timeout is the one that fires.
