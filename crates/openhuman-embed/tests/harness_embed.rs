@@ -281,9 +281,8 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
                 "two serial + {CONCURRENT_TURNS} concurrent turns"
             );
 
-            // The first session's transcript landed in the harness agent's
-            // own store under the workspace (the path-based transcript files
-            // are gone). A harness session id is its thread id.
+            // The first session's transcript landed in the runtime's store
+            // for the harness agent. A harness session id is its thread id.
             let transcripts = openhuman_core::storage::sessions::transcripts_for("harness")
                 .expect("the harness agent's runtime session store");
             assert!(
