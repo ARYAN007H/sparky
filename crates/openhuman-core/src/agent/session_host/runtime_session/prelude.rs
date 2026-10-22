@@ -286,6 +286,7 @@ impl OpenHumanTurnPrelude {
                 &self.dispatch_ctx(),
                 &self.event_session_id,
                 &self.workspace_dir,
+                self.workspace_descriptor.as_ref(),
             )
             .await
         {

@@ -83,16 +83,19 @@ fn workspace_scope_for_thread(
     ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &std::path::Path,
     thread_id: &str,
+    workspace: Option<&tinytools::WorkspaceDescriptor>,
 ) -> tinytools::WorkspaceDescriptor {
-    crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
-        ctx,
-        workspace_dir,
-        thread_id,
-    )
-    .into_iter()
-    .next()
-    .map(|(_, owner)| owner.workspace)
-    .unwrap_or_else(|| tinytools::WorkspaceDescriptor::new(workspace_dir))
+    workspace.cloned().unwrap_or_else(|| {
+        crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+            ctx,
+            workspace_dir,
+            thread_id,
+        )
+        .into_iter()
+        .next()
+        .map(|(_, owner)| owner.workspace)
+        .unwrap_or_else(|| tinytools::WorkspaceDescriptor::new(workspace_dir))
+    })
 }
 
 /// Most-recent durable sessions surfaced in the roster when they are not in
@@ -117,6 +120,7 @@ pub(crate) async fn active_subagents_context_block(
     ctx: &crate::core::runtime::DispatchCtx,
     parent_session: &str,
     workspace_dir: &std::path::Path,
+    workspace: Option<&tinytools::WorkspaceDescriptor>,
 ) -> Option<String> {
     admit_workspace(ctx, workspace_dir).ok()?;
     let Some(thread_id) = crate::agent::orchestration::background_completions::thread_for_session(
@@ -183,7 +187,7 @@ pub(crate) async fn active_subagents_context_block(
         Some(&thread_id),
     );
     let scope = tinyagents_orchestration::subagent::ParentJobScope::new(
-        workspace_scope_for_thread(ctx, workspace_dir, &thread_id),
+        workspace_scope_for_thread(ctx, workspace_dir, &thread_id, workspace),
         thread_id,
     );
     let block = tinyagents_orchestration::subagent::format_parent_roster_for_owner(

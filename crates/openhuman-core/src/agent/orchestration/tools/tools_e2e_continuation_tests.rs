@@ -415,12 +415,16 @@ async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
     parent.session_id = "idle-reuse-e2e".into();
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(64);
     parent.on_progress = Some(progress_tx);
-    let (live, _core) = core_backed_live_parent(
+    let (mut live, _core) = core_backed_live_parent(
         workspace.path(),
         parent,
         "idle-reuse-e2e",
         "idle-reuse-e2e-thread",
     );
+    let workspace_descriptor = tinytools::WorkspaceDescriptor::new(workspace.path())
+        .with_trusted_root(workspace.path().join("shared-worktree"))
+        .with_policy_id("idle-roster-policy");
+    live.workspace = Some(workspace_descriptor.clone());
     assert!(live.data.dispatch_ctx().resolved().is_some());
     let tool = SpawnSubagentTool::new();
     let first = tool
@@ -461,6 +465,7 @@ async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
         &live.data.dispatch_ctx(),
         "idle-reuse-e2e",
         workspace.path(),
+        Some(&workspace_descriptor),
     )
     .await
     .expect("driver-backed child appears in the parent roster");
