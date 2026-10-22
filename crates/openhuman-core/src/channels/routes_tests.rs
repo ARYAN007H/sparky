@@ -109,12 +109,15 @@ async fn module_route_help_response(
             timestamp: 0,
             thread_ts: None,
             sender_name: None,
+            reply_to_id: None,
+            topic_id: None,
         }),
         route: RemoteRoute {
             provider: "openai".into(),
             model: "gpt-5".into(),
         },
         history_len: 0,
+        capabilities: None,
         providers,
     };
     let response: ChannelControlResult = crate::channels::module_fixture::client()
@@ -235,6 +238,8 @@ fn model_command_messages_use_thread_aware_history_keys() {
         timestamp: 0,
         thread_ts: Some("thread-1".into()),
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     };
     assert_eq!(
         super::super::context::conversation_history_key(&msg),
@@ -321,6 +326,8 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
         timestamp: 0,
         thread_ts: Some("thread-1".into()),
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     };
 
     let handled = handle_runtime_command_if_needed(
@@ -359,6 +366,8 @@ async fn handle_runtime_command_set_model_clears_sender_history_and_persists_rou
         timestamp: 0,
         thread_ts: None,
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     };
 
     let handled = handle_runtime_command_if_needed(
@@ -403,6 +412,8 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
         timestamp: 0,
         thread_ts: Some("42".into()),
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     };
 
     let handled = handle_runtime_command_if_needed(
@@ -436,6 +447,8 @@ async fn handle_runtime_command_without_target_channel_still_consumes_command() 
         timestamp: 0,
         thread_ts: None,
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     };
 
     let handled =
@@ -457,6 +470,8 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
         timestamp: 0,
         thread_ts: Some("42".into()),
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     };
 
     let handled = handle_runtime_command_if_needed(
@@ -494,6 +509,8 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
         timestamp: 0,
         thread_ts: Some("42".into()),
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     };
 
     let handled = handle_runtime_command_if_needed(
@@ -536,6 +553,8 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         timestamp: 0,
         thread_ts: Some("42".into()),
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     };
     assert!(
         handle_runtime_command_if_needed(
@@ -589,6 +608,8 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         timestamp: 0,
         thread_ts: Some("42".into()),
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     };
     assert!(
         handle_runtime_command_if_needed(
@@ -609,6 +630,8 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         timestamp: 0,
         thread_ts: Some("42".into()),
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     };
     assert!(
         handle_runtime_command_if_needed(
@@ -663,6 +686,8 @@ async fn handle_runtime_command_telegram_new_reports_unavailable_storage() {
         timestamp: 0,
         thread_ts: Some("42".into()),
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     };
     assert!(
         handle_runtime_command_if_needed(

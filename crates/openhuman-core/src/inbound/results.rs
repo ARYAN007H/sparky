@@ -213,8 +213,8 @@ impl Results {
     }
 
     #[cfg(test)]
-    pub(crate) fn over(scoped: &crate::storage::ScopedStorage) -> Self {
-        Self(Repo::over(scoped, DOMAIN, specs))
+    pub(crate) fn over(scoped: &crate::storage::Storage) -> Self {
+        Self(Repo::over(scoped, DOMAIN, collection_specs))
     }
 
     /// Record `stored` unless its turn is already recorded; either way, the

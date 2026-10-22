@@ -39,5 +39,5 @@ async fn learning_is_durably_queued_even_when_the_backend_refuses_writes() {
     assert!(!result.is_error, "{}", result.text());
     let value: serde_json::Value = serde_json::from_str(&result.text()).unwrap();
     assert_eq!(value["status"], "queued; not yet saved to memory");
-    assert_eq!(super::tool_writes::drain(&config).await, 0);
+    assert_eq!(crate::memory::tool_writes::drain(&config).await, 0);
 }

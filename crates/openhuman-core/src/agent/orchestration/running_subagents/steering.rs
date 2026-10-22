@@ -24,7 +24,7 @@ pub async fn steer(
         SteerAccess::Owner(&owner),
         text,
         lane,
-        |metadata, lane, text| async move {
+        |metadata: super::registry::RunningSubagentMetadata, lane: QueueLane, text: String| async move {
             metadata
                 .run_queue
                 .push(
@@ -77,7 +77,7 @@ pub(crate) async fn steer_control(
         SteerAccess::Trusted,
         text,
         lane,
-        |metadata, lane, text| async move {
+        |metadata: super::registry::RunningSubagentMetadata, lane: QueueLane, text: String| async move {
             metadata
                 .run_queue
                 .push(

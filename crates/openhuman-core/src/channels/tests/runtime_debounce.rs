@@ -142,6 +142,8 @@ impl Running {
             timestamp: ts,
             thread_ts: None,
             sender_name: None,
+            reply_to_id: None,
+            topic_id: None,
         }
     }
 
@@ -157,6 +159,7 @@ impl Running {
             message: message.clone(),
             envelope: Default::default(),
             history_key: history_key.clone(),
+            history_key_ignores_thread: false,
             thread_id: history_key.clone(),
             client_id: self.channel.to_string(),
             session_key: history_key,

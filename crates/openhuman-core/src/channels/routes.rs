@@ -181,6 +181,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
                         model: current.model,
                     },
                     history_len,
+                    capabilities: target_channel.map(|channel| Box::new(channel.capabilities())),
                     providers: provider_descriptors(),
                 },),
             )

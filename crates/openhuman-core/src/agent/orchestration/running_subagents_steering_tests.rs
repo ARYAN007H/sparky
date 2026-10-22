@@ -1,5 +1,5 @@
 use super::*;
-use tinyagents_orchestration::subagent::SteerError;
+use tinyagents_orchestration::steering::SteerError;
 
 #[tokio::test]
 async fn steer_pushes_into_the_subagent_queue() {
@@ -126,7 +126,7 @@ async fn steer_after_terminal_is_rejected() {
             QueueLane::Steer
         )
         .await,
-        Err(SteerError::AlreadyDone)
+        Err(SteerError::Unknown)
     );
     prune("task-term");
 }
