@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use tinyagents_harness_tools::media::{
     ArtifactFiling, FiledArtifact, GeneratedArtifact, MediaArtifactKind,
-    MediaInnerFactory, MediaJobProgress, MediaProgressFn,
+    MediaInnerFactory,
 };
 use tinytools::{
     PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolPolicy, ToolResult, ToolRunContext,
@@ -21,7 +21,6 @@ use tokio::io::AsyncWriteExt;
 
 use crate::artifacts::production::Production;
 use crate::artifacts::ArtifactKind;
-use crate::security::approval::ApprovalChatContext;
 
 /// A host adapter that retains OpenHuman artifact behavior while delegating
 /// generic media result handling to TinyAgents' harness-tools crate.
@@ -102,7 +101,6 @@ impl<T: Tool> MediaArtifactTool<T> {
             ReferenceRefreshTool::new(build(progress, context), Arc::clone(&policy))
         }));
         Self { inner, policy }
-        self
     }
 }
 
@@ -300,14 +298,12 @@ impl OpenHumanArtifactFiling {
         source: &Path,
     ) -> Result<u64, String> {
         let size = production.complete().await?;
-        self.delete_blob_after_finalize(
-            &self
-                .0
-                .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner),
-            source,
-        )
-        .await;
+        let policy = self
+            .0
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        self.delete_blob_after_finalize(&policy, source).await;
         Ok(size)
     }
 
@@ -340,10 +336,7 @@ struct ReferenceRefreshTool<T: Tool> {
 }
 
 impl<T: Tool> ReferenceRefreshTool<T> {
-    fn new(
-        inner: T,
-        policy: Arc<RwLock<MediaArtifactPolicy>>,
-    ) -> Self {
+    fn new(inner: T, policy: Arc<RwLock<MediaArtifactPolicy>>) -> Self {
         Self { inner, policy }
     }
 
@@ -411,19 +404,45 @@ impl<T: Tool> ReferenceRefreshTool<T> {
 
 #[async_trait]
 impl<T: Tool> Tool for ReferenceRefreshTool<T> {
-    fn name(&self) -> &str { self.inner.name() }
-    fn description(&self) -> &str { self.inner.description() }
-    fn parameters_schema(&self) -> Value { self.inner.parameters_schema() }
-    fn policy(&self) -> ToolPolicy { self.inner.policy() }
-    fn permission_level(&self) -> PermissionLevel { self.inner.permission_level() }
-    fn permission_level_with_args(&self, args: &Value) -> PermissionLevel { self.inner.permission_level_with_args(args) }
-    fn scope(&self) -> ToolScope { self.inner.scope() }
-    fn category(&self) -> ToolCategory { self.inner.category() }
-    fn external_effect(&self) -> bool { self.inner.external_effect() }
-    fn external_effect_with_args(&self, args: &Value) -> bool { self.inner.external_effect_with_args(args) }
-    fn timeout_policy(&self, args: &Value) -> ToolTimeout { self.inner.timeout_policy(args) }
-    fn supports_markdown(&self) -> bool { self.inner.supports_markdown() }
-    fn max_result_size_chars(&self) -> Option<usize> { self.inner.max_result_size_chars() }
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+    fn description(&self) -> &str {
+        self.inner.description()
+    }
+    fn parameters_schema(&self) -> Value {
+        self.inner.parameters_schema()
+    }
+    fn policy(&self) -> ToolPolicy {
+        self.inner.policy()
+    }
+    fn permission_level(&self) -> PermissionLevel {
+        self.inner.permission_level()
+    }
+    fn permission_level_with_args(&self, args: &Value) -> PermissionLevel {
+        self.inner.permission_level_with_args(args)
+    }
+    fn scope(&self) -> ToolScope {
+        self.inner.scope()
+    }
+    fn category(&self) -> ToolCategory {
+        self.inner.category()
+    }
+    fn external_effect(&self) -> bool {
+        self.inner.external_effect()
+    }
+    fn external_effect_with_args(&self, args: &Value) -> bool {
+        self.inner.external_effect_with_args(args)
+    }
+    fn timeout_policy(&self, args: &Value) -> ToolTimeout {
+        self.inner.timeout_policy(args)
+    }
+    fn supports_markdown(&self) -> bool {
+        self.inner.supports_markdown()
+    }
+    fn max_result_size_chars(&self) -> Option<usize> {
+        self.inner.max_result_size_chars()
+    }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
         self.execute_with_context(args, ToolCallOptions::default(), None).await
