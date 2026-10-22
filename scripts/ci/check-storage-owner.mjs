@@ -2,14 +2,16 @@
 // Storage-owner gate (tinyhumansai/openhuman#7642, part of #7522).
 //
 // tinystoragedrivers is the only crate family allowed to own a storage
-// backend. This check reads `cargo metadata` for the root workspace and for
+// backend. The standalone `tinystoragedrivers-types` contract is data-only and
+// may be a pinned git dependency when a vendored driver checkout predates it.
+// This check reads `cargo metadata` for the root workspace and for
 // `crates/openhuman-app` and fails when
 //   1. a first-party package (path or git source, i.e. not a crates.io
 //      dependency) outside `tinystoragedrivers*` declares a dependency on one
 //      of FORBIDDEN_DEPS (any kind, optional or not), or
 //   2. a first-party package outside `tinystoragedrivers*` is named
 //      `*-sqlite`, `*-mongodb` or `*-file`.
-//   3. a `tinystoragedrivers*` package in the resolved graph is not built from
+//   3. a storage/backend `tinystoragedrivers*` package in the resolved graph is not built from
 //      a path under `vendor/tinystoragedrivers/` (a registry or git source
 //      means some manifest escaped the root `[patch]` onto the vendored copy,
 //      for example a module that bumped its tag past the vendored commit),
@@ -56,7 +58,7 @@ export const ALLOWLIST = {
 
 export const MANIFESTS = ['Cargo.toml', 'crates/openhuman-app/Cargo.toml'];
 
-const isOwner = name => name.startsWith('tinystoragedrivers');
+const isOwner = name => name.startsWith('tinystoragedrivers') && name !== 'tinystoragedrivers-types';
 
 /** First-party = built from a path or a git source, not from a registry. */
 const isFirstParty = pkg => !pkg.source || pkg.source.startsWith('git+');

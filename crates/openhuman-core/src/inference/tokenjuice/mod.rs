@@ -2,64 +2,111 @@
 
 pub mod config_patch;
 pub use tinyjuice_host::{focus, generate};
-pub mod repl_tools;
 pub mod savings;
 pub mod schemas;
 
 use crate::core::runtime::DispatchCtx;
+use async_trait::async_trait;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tinyjuice_bus::names::methods;
+use tinyjuice_bus::repl::ReplLimits;
 use tinyjuice_bus::types::{AgentTokenjuiceCompression, CompressorKind};
+use tinyjuice_bus::wire::{QueryRequest, QueryResponse};
+use tinytools::{Tool, ToolRunContext, ToolSpec};
 
-pub use repl_tools::{is_repl_tool, repl_tools, repl_tools_for};
-/// Compatibility constructor for the tool registry; execution and its
-/// declaration are owned by TinyJuice's host crate.
-pub struct TokenjuiceRetrieveTool(tinyjuice_host::retrieve_tool::RetrieveToolOutputTool);
+struct ModuleSource(Option<Arc<crate::config::Config>>);
 
-impl TokenjuiceRetrieveTool {
-    pub fn new() -> Self {
-        Self::default()
+#[async_trait]
+impl tinyjuice_host::repl_tools::QuerySource for ModuleSource {
+    async fn query(
+        &self,
+        context: Option<&dyn ToolRunContext>,
+        request: QueryRequest,
+    ) -> Result<QueryResponse, String> {
+        let ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
+        match &self.0 {
+            Some(config) => query_for_config(config, request).await,
+            None => query(&ctx, request).await,
+        }
     }
 }
 
-impl Default for TokenjuiceRetrieveTool {
-    fn default() -> Self {
-        Self(tinyjuice_host::retrieve_tool::RetrieveToolOutputTool::new(
-            std::sync::Arc::new(|token, range| {
-                Box::pin(async move { retrieve(token, range).await })
-            }),
-        ))
-    }
+fn host_repl_tools(
+    source: Arc<dyn tinyjuice_host::repl_tools::QuerySource>,
+    limits: ReplLimits,
+    artifacts_dir: Option<PathBuf>,
+) -> Vec<Box<dyn Tool>> {
+    tinyjuice_host::repl_tools::repl_tools(
+        source,
+        limits,
+        artifacts_dir,
+        tinytools_std::filesystem::FileReadTool::MAX_FILE_SIZE_BYTES,
+        None,
+    )
 }
 
-#[async_trait::async_trait]
-impl tinytools::Tool for TokenjuiceRetrieveTool {
-    fn name(&self) -> &str {
-        tinytools::Tool::name(&self.0)
-    }
+#[cfg(test)]
+fn repl_tools_with(
+    source: Arc<dyn tinyjuice_host::repl_tools::QuerySource>,
+    limits: ReplLimits,
+) -> Vec<Box<dyn Tool>> {
+    host_repl_tools(source, limits, None)
+}
 
-    fn description(&self) -> &str {
-        tinytools::Tool::description(&self.0)
-    }
+/// Whether a name is one of TinyJuice's query tools.
+pub fn is_repl_tool(name: &str) -> bool {
+    tinyjuice_bus::tools::REPL_TOOLS.contains(&name)
+}
 
-    fn parameters_schema(&self) -> serde_json::Value {
-        tinytools::Tool::parameters_schema(&self.0)
-    }
+/// Build TinyJuice's query tools against the ambient runtime context.
+pub fn repl_tools() -> Vec<Box<dyn Tool>> {
+    host_repl_tools(Arc::new(ModuleSource(None)), ReplLimits::default(), None)
+}
 
-    fn permission_level(&self) -> tinytools::PermissionLevel {
-        tinytools::Tool::permission_level(&self.0)
+/// Offer query tools only when enabled handle storage can produce handles.
+pub fn repl_tools_for(config: &crate::config::Config) -> Vec<Box<dyn Tool>> {
+    if !repl_handle_active(config) {
+        return Vec::new();
     }
+    host_repl_tools(
+        Arc::new(ModuleSource(Some(Arc::new(config.clone())))),
+        ReplLimits::default(),
+        Some(crate::security::policy::tool_result_artifacts_dir(
+            &config.workspace_dir,
+        )),
+    )
+}
 
-    fn is_concurrency_safe(&self, args: &serde_json::Value) -> bool {
-        tinytools::Tool::is_concurrency_safe(&self.0, args)
-    }
-
-    fn external_effect(&self) -> bool {
-        tinytools::Tool::external_effect(&self.0)
-    }
-
-    async fn execute(&self, args: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
-        tinytools::Tool::execute(&self.0, args).await
-    }
+pub(crate) fn repl_tools_for_recorded(
+    config: Option<&crate::config::Config>,
+    workspace_dir: &Path,
+    recorded: &[ToolSpec],
+) -> Vec<Box<dyn Tool>> {
+    let current = tinyjuice_bus::tools::repl_tool_declarations();
+    let declarations = recorded
+        .iter()
+        .filter(|spec| is_repl_tool(&spec.name))
+        .filter_map(|spec| {
+            let current = current.iter().find(|item| item.name == spec.name)?;
+            Some(tinyjuice_bus::tools::ReplToolDeclaration {
+                name: spec.name.clone(),
+                op: current.op.clone(),
+                description: spec.description.clone(),
+                parameters: spec.parameters.clone(),
+            })
+        })
+        .collect();
+    tinyjuice_host::repl_tools::repl_tools_with_declarations(
+        declarations,
+        Arc::new(ModuleSource(config.cloned().map(Arc::new))),
+        ReplLimits::default(),
+        Some(crate::security::policy::tool_result_artifacts_dir(
+            workspace_dir,
+        )),
+        tinytools_std::filesystem::FileReadTool::MAX_FILE_SIZE_BYTES,
+        None,
+    )
 }
 
 use tinyjuice_bus::wire::InstallRequest;
@@ -69,7 +116,6 @@ pub use tinyjuice_host::recovery::{
     is_recovery_tool, summary_failed_notice, CompactedToolOutput, RECOVERY_TOOL_NAMES,
     RECOVERY_TOOL_VISIBLE,
 };
-pub const LEGACY_RETRIEVE_TOOL_NAME: &str = RECOVERY_TOOL_NAMES[3];
 
 /// Whether the `[components] juice` switch is on. Off means turns truncate
 /// tool output only: no compaction, no summary, no `juice_*` / recovery tools,
@@ -457,6 +503,10 @@ pub fn all_tokenjuice_registered_controllers() -> Vec<crate::core::all::Register
 #[cfg(test)]
 #[path = "mod_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "repl_tools_tests.rs"]
+mod repl_tool_tests;
 
 #[cfg(test)]
 #[path = "module_stub_tests.rs"]

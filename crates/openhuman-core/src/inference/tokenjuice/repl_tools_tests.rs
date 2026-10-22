@@ -8,8 +8,13 @@ use tinytools::ToolCallOptions;
 struct CoreRecordingSource(Mutex<Vec<Option<Arc<crate::core::runtime::CoreContext>>>>);
 
 #[async_trait]
-impl QuerySource for CoreRecordingSource {
-    async fn query(&self, ctx: &DispatchCtx, _: QueryRequest) -> Result<QueryResponse, String> {
+impl tinyjuice_host::repl_tools::QuerySource for CoreRecordingSource {
+    async fn query(
+        &self,
+        context: Option<&dyn tinytools::ToolRunContext>,
+        _: QueryRequest,
+    ) -> Result<QueryResponse, String> {
+        let ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
         self.0.lock().unwrap().push(ctx.core().cloned());
         Ok(Ok(ReplOutput::Text { text: "ok".into() }))
     }
