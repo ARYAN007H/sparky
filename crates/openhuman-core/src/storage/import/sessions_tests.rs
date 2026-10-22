@@ -80,6 +80,69 @@ fn host_jsonl_reader_preserves_meta_usage_typed_rows_and_tool_state() {
 }
 
 #[test]
+fn transcript_replay_keeps_background_provenance_for_messages_and_compaction() {
+    use tinyagents_session::transcript::{BackgroundOrigin, DisplayRecord};
+
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("thread.orchestrator.jsonl");
+    let meta = serde_json::to_value(meta("thread", "orchestrator")).unwrap();
+    let background_row = |content: &str, key: &str| {
+        serde_json::json!({
+            "role": "assistant",
+            "content": content,
+            "background": {
+                "idempotency_key": key,
+                "provenance": { "kind": "cron", "job": "daily" }
+            }
+        })
+    };
+    let first = background_row("scheduled result", "run-1");
+    let compacted = background_row("compacted scheduled result", "run-2");
+    let contents = [
+        serde_json::json!({"_meta": meta}),
+        first,
+        serde_json::json!({"kind": "compaction", "replacement": [compacted]}),
+    ];
+    std::fs::write(
+        &path,
+        contents
+            .iter()
+            .map(serde_json::Value::to_string)
+            .collect::<Vec<_>>()
+            .join("\n"),
+    )
+    .unwrap();
+
+    let (meta, tools, records) = super::decode_transcript(&path).unwrap();
+    let backend = backend();
+    let stores = session_provider(&backend).try_for_agent("orchestrator").unwrap();
+    let history = stores.transcripts.open_stem("thread.orchestrator", meta.clone()).unwrap();
+    super::replay_transcript(history.as_ref(), &meta, tools.as_ref(), records).unwrap();
+
+    let display = history.read_display().unwrap().unwrap();
+    let DisplayRecord::Message(first) = &display.records[0] else {
+        panic!("expected the imported background message");
+    };
+    assert_eq!(
+        first.background,
+        Some(BackgroundOrigin {
+            idempotency_key: "run-1".into(),
+            provenance: serde_json::json!({ "kind": "cron", "job": "daily" }),
+        })
+    );
+    let DisplayRecord::Compaction(compaction) = &display.records[1] else {
+        panic!("expected the imported compaction record");
+    };
+    assert_eq!(
+        compaction.replacement[0].background,
+        Some(BackgroundOrigin {
+            idempotency_key: "run-2".into(),
+            provenance: serde_json::json!({ "kind": "cron", "job": "daily" }),
+        })
+    );
+}
+
+#[test]
 fn profile_phase_out_rewrites_imported_bytes_without_mutating_legacy_source() {
     use tinyagents_session::transcript::DisplayRecord;
 

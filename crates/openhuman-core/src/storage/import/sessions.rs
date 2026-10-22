@@ -457,6 +457,23 @@ fn decode_display_message(
     })
 }
 
+fn stored_transcript_row(display: &DisplayMessage) -> TranscriptMessage {
+    let mut row = display.message.clone();
+    if let Some(origin) = &display.background {
+        let mut metadata = match row.extra_metadata.take() {
+            Some(serde_json::Value::Object(metadata)) => metadata,
+            Some(value) => serde_json::Map::from_iter([("value".into(), value)]),
+            None => serde_json::Map::new(),
+        };
+        metadata.insert(
+            tinyagents_session::transcript::BACKGROUND_METADATA_KEY.into(),
+            serde_json::to_value(origin).unwrap_or(serde_json::Value::Null),
+        );
+        row.extra_metadata = Some(serde_json::Value::Object(metadata));
+    }
+    row
+}
+
 fn replay_transcript(
     history: &dyn TranscriptHistory,
     meta: &TranscriptMeta,
@@ -474,7 +491,7 @@ fn replay_transcript(
             return Ok(());
         }
         let mut next = logical.clone();
-        next.extend(group.iter().map(|message| message.message.clone()));
+        next.extend(group.iter().map(|message| stored_transcript_row(message)));
         let usage = group
             .iter()
             .rev()
@@ -537,7 +554,7 @@ fn replay_transcript(
                 let next = marker
                     .replacement
                     .into_iter()
-                    .map(|message| message.message)
+                    .map(|message| stored_transcript_row(&message))
                     .collect::<Vec<_>>();
                 history.append_turn(TranscriptTurn {
                     prev: &logical,
