@@ -106,8 +106,7 @@ fn legacy_tsd_v1_threads_and_messages_are_migrated_before_owner_reads() {
     crate::storage::block_on(async move {
         let docs = scoped.documents();
         docs.ensure_collection(&CollectionSpec::new("conversation_threads_v1"))
-            .await
-            ?;
+            .await?;
         docs.put_with(
             "conversation_threads_v1",
             &legacy_digest,
@@ -129,8 +128,7 @@ fn legacy_tsd_v1_threads_and_messages_are_migrated_before_owner_reads() {
             Precondition::Absent,
             WriteOptions::new().created_ms(1_700_000_000_000),
         )
-        .await
-        ?;
+        .await?;
         scoped
             .streams()
             .append(
@@ -148,8 +146,7 @@ fn legacy_tsd_v1_threads_and_messages_are_migrated_before_owner_reads() {
                     }
                 }),
             )
-            .await
-            ?;
+            .await?;
         Ok::<(), crate::storage::StorageError>(())
     })
     .unwrap();
@@ -243,10 +240,12 @@ fn threads_round_trip_through_the_backend_store() {
         .unwrap();
     assert_eq!(appended.id, "a");
     assert_eq!(store.get_messages("t").unwrap().len(), 1);
-    assert!(!store
-        .search_cross_thread_messages("needle", 5, None)
-        .unwrap()
-        .is_empty());
+    assert!(
+        !store
+            .search_cross_thread_messages("needle", 5, None)
+            .unwrap()
+            .is_empty()
+    );
     assert!(store.delete_thread("t", "2026-01-02T00:00:00Z").unwrap());
     assert!(store.list_threads().unwrap().is_empty());
 }
