@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use tinyagents_orchestration::subagent::{
-    task_id_for_session_in_records, FinishedOutcome, WaitError,
+    FinishedOutcome, ParentJobScope, SubAgentJobStatus,
 };
 
 use super::registry::admit_workspace;
@@ -40,7 +40,7 @@ pub(crate) struct CancelledSubagent {
 /// an unknown task when its durable selector could not be read. TinyAgents' job
 /// registry is the live authority; the former host detached-task table was
 /// never populated by production spawns.
-pub(crate) fn cancel_by_task_with_workspace_reason(
+pub(crate) async fn cancel_by_task_with_workspace_reason(
     ctx: &crate::core::runtime::DispatchCtx,
     task_id: &str,
     fallback_workspace: Option<&Path>,
@@ -54,66 +54,149 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
     let Some(workspace_dir) = workspace_dir else {
         return Ok(None);
     };
-    let store =
-        crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new_in_context(
-            ctx,
-            workspace_dir.clone(),
-        )?;
+    let Some(owner_scope) = crate::agent::orchestration::completion_owners::driver_task_owner(
+        ctx, task_id,
+    ) else {
+        return Ok(None);
+    };
+    let Some(parent_thread_id) = owner_scope.parent_thread_id.as_deref() else {
+        return Ok(None);
+    };
+    if owner_scope.workspace_dir != workspace_dir {
+        return Ok(None);
+    }
+    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &owner_scope.workspace_dir,
+        &owner_scope.parent_session,
+        Some(parent_thread_id),
+    );
+    let scope = ParentJobScope::new(owner_scope.workspace.clone(), parent_thread_id);
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(ctx);
-    let selected = crate::agent::orchestration::subagent_sessions::cancel_driver_job_by_task(
-        &store,
-        &workspace_dir.join(".openhuman/subagent_checkpoints"),
-        &jobs,
-        task_id,
-        reason,
-    )?;
-    let parent_epoch = selected.as_ref().and_then(|selected| selected.parent_epoch);
-    let driver_pause = selected
-        .as_ref()
-        .filter(|selected| selected.was_paused)
-        .cloned();
-    Ok(selected.map(|selected| CancelledSubagent {
+    let job = jobs
+        .list_for_parent_scope(&owner, &scope)
+        .map_err(|error| format!("failed to list owned driver jobs: {error}"))?
+        .into_iter()
+        .find(|job| {
+            job.extensions
+                .get("task_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(task_id)
+        });
+    let session_store = crate::agent::orchestration::subagent_sessions::open_for_context(
+        ctx,
+        owner_scope.workspace_dir.clone(),
+        owner_scope.parent_session.clone(),
+        owner_scope.parent_thread_id.clone(),
+        Some((*jobs).clone()),
+    )
+    .map_err(|error| format!("failed to open owner-scoped driver sessions: {error}"))?;
+    let session = session_store
+        .list_for_parent(
+            &owner_scope.parent_session,
+            Some(parent_thread_id),
+        )
+        .await
+        .map_err(|error| format!("failed to load owner-scoped driver sessions: {error}"))?
+        .into_iter()
+        .find(|session| session.current_task_id.as_deref() == Some(task_id));
+    let Some(session) = session else {
+        return Ok(None);
+    };
+    let parent_epoch = crate::agent::orchestration::subagent_sessions::parent_epoch_for_context(
+        ctx,
+        &owner_scope.workspace_dir,
+        session.subagent_session_id.clone(),
+    )
+    .map_err(|error| format!("failed to load parent epoch: {error}"))?;
+    let already_finished = job.as_ref().and_then(|job| match job.status {
+        SubAgentJobStatus::Completed => Some(FinishedOutcome::Completed),
+        SubAgentJobStatus::Failed | SubAgentJobStatus::Incomplete => {
+            Some(FinishedOutcome::Failed)
+        }
+        _ => None,
+    });
+    let was_paused = session.status
+        == tinyagents_orchestration::subagent::DurableSubagentStatus::AwaitingUser;
+    if already_finished.is_none() {
+        let Some(job) = job else {
+            return Ok(None);
+        };
+        if let Some(reason) = reason {
+            let reason = reason.trim();
+            if !reason.is_empty() {
+                crate::agent::orchestration::completion_owners::note_driver_cancel_reason(
+                    ctx, task_id, reason,
+                );
+            }
+        }
+        if jobs.cancel_owned(job.id.as_str(), &owner).is_err() {
+            crate::agent::orchestration::completion_owners::clear_driver_cancel_reason(
+                ctx, task_id,
+            );
+            return Ok(None);
+        }
+    }
+    let selected = crate::agent::orchestration::subagent_sessions::DriverTaskCancellation {
+        task_id: task_id.to_owned(),
+        agent_id: session.agent_id,
+        parent_session: owner_scope.parent_session,
+        subagent_session_id: session.subagent_session_id,
+        workspace_dir: owner_scope.workspace_dir,
+        parent_thread_id: owner_scope.parent_thread_id,
+        parent_epoch,
+        already_finished,
+        was_paused,
+        lifecycle_key: session.lifecycle_key,
+    };
+    let driver_pause = was_paused.then_some(selected.clone());
+    Ok(Some(CancelledSubagent {
         agent_id: selected.agent_id,
         parent_session: selected.parent_session,
         subagent_session_id: Some(selected.subagent_session_id),
         workspace_dir: selected.workspace_dir,
         parent_thread_id: selected.parent_thread_id,
-        parent_epoch,
+        parent_epoch: selected.parent_epoch,
         already_finished: selected.already_finished,
         driver_pause,
         driver_managed: true,
     }))
 }
 
-pub(crate) fn cancel_by_session_in_workspace(
+pub(crate) async fn cancel_by_session_in_workspace(
     ctx: &crate::core::runtime::DispatchCtx,
     subagent_session_id: &str,
     parent_session: &str,
     workspace_dir: &Path,
 ) -> Option<CancelledSubagent> {
-    let task_id =
-        task_id_for_session_in_workspace(ctx, subagent_session_id, parent_session, workspace_dir)
-            .ok()?;
+    let owner_scope = crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+        ctx,
+        workspace_dir,
+        "",
+    )
+    .into_iter()
+    .map(|(_, owner)| owner)
+    .find(|owner| owner.parent_session == parent_session);
+    let owner_scope = owner_scope?;
+    let task_id = crate::agent::orchestration::subagent_sessions::open_for_context(
+        ctx,
+        workspace_dir.to_path_buf(),
+        parent_session,
+        owner_scope.parent_thread_id.clone(),
+        None,
+    )
+    .ok()?
+    .list_for_parent(parent_session, owner_scope.parent_thread_id.as_deref())
+    .await
+    .ok()?
+    .into_iter()
+    .find(|session| session.subagent_session_id == subagent_session_id)?
+    .current_task_id?;
     cancel_by_task_with_workspace_reason(ctx, &task_id, Some(workspace_dir), None)
+        .await
         .ok()
         .flatten()
-}
-
-fn task_id_for_session_in_workspace(
-    ctx: &crate::core::runtime::DispatchCtx,
-    subagent_session_id: &str,
-    parent_session: &str,
-    workspace_dir: &Path,
-) -> Result<String, WaitError> {
-    admit_workspace(ctx, workspace_dir)?;
-    let store = scoped_task_store(ctx, workspace_dir)?;
-    task_id_for_session_in_records(
-        tinyagents_orchestration::subagent::list_subagent_records(store.as_ref()),
-        subagent_session_id,
-        parent_session,
-    )
 }
 
 /// Abort and drop every running sub-agent whose parent chat thread is
@@ -146,21 +229,56 @@ pub(crate) fn stop_for_thread(
             let jobs = crate::core::runtime::slot_for::<
                 tinyagents_harness_tools::subagents::SubAgentJobRegistry,
             >(ctx);
-            let driver_stopped =
-                crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new_in_context(
-                    ctx,
-                    workspace_dir.clone(),
-                )
-                .map(|store| {
-                    crate::agent::orchestration::subagent_sessions::cancel_driver_jobs_for_thread(
-                    &store,
-                    &workspace_dir,
-                    &jobs,
-                    thread_id,
-                    )
-                })
-                .unwrap_or_default();
-            for task_id in driver_stopped {
+            let scopes = crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+                ctx,
+                &workspace_dir,
+                thread_id,
+            );
+            let mut task_ids = Vec::new();
+            let mut stopped_scopes = Vec::new();
+            for (task_id, owner_scope) in scopes {
+                let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+                    &owner_scope.workspace_dir,
+                    &owner_scope.parent_session,
+                    owner_scope.parent_thread_id.as_deref(),
+                );
+                let Some(parent_thread_id) = owner_scope.parent_thread_id.as_deref() else {
+                    continue;
+                };
+                let scope = ParentJobScope::new(
+                    owner_scope.workspace.clone(),
+                    parent_thread_id,
+                );
+                let has_live_task = jobs
+                    .list_for_parent_scope(&owner, &scope)
+                    .ok()
+                    .is_some_and(|jobs| {
+                        jobs.iter().any(|job| {
+                            job.extensions
+                                .get("task_id")
+                                .and_then(serde_json::Value::as_str)
+                                == Some(task_id.as_str())
+                                && matches!(
+                                    job.status,
+                                    SubAgentJobStatus::Queued
+                                        | SubAgentJobStatus::Running
+                                        | SubAgentJobStatus::AwaitingInput
+                                )
+                        })
+                    });
+                if has_live_task {
+                    task_ids.push(task_id);
+                    if !stopped_scopes.contains(&scope) {
+                        stopped_scopes.push(scope);
+                    }
+                }
+            }
+            for scope in stopped_scopes {
+                if let Err(error) = jobs.cancel_for_thread(&scope) {
+                    log::warn!("[running_subagents] driver thread stop failed: {error}");
+                }
+            }
+            for task_id in task_ids {
                 if !task_ids.contains(&task_id) {
                     task_ids.push(task_id);
                 }
