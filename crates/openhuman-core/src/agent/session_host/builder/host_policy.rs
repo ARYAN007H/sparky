@@ -21,8 +21,8 @@
 
 use std::sync::Arc;
 
-use crate::agent_registry::host_definition::AgentDefinition;
 use crate::agent::OpenHumanSessionHost;
+use crate::agent_registry::host_definition::AgentDefinition;
 use crate::config::Config;
 use anyhow::Result;
 use tinyagents_definition::{SandboxMode, ToolScope};
@@ -30,7 +30,9 @@ use tinyagents_definition::{SandboxMode, ToolScope};
 /// The visible set of a host-only belt before the host's names are merged in:
 /// explicitly zero tools (an empty set would mean "no filter").
 pub(super) fn empty_belt() -> std::collections::HashSet<String> {
-    std::collections::HashSet::from([crate::agent_registry::host_definition::NO_TOOLS_SENTINEL.to_string()])
+    std::collections::HashSet::from([
+        crate::agent_registry::host_definition::NO_TOOLS_SENTINEL.to_string()
+    ])
 }
 
 /// The session gate: on a host-only belt, TinyAgents' `HostOnlyToolPolicy` over the
@@ -57,7 +59,8 @@ pub(super) fn session_policy(
     if !host_only {
         return host;
     }
-    let allowed = tools.iter().map(|tool| tool.name().to_string()).collect();
+    let allowed: std::collections::HashSet<String> =
+        tools.iter().map(|tool| tool.name().to_string()).collect();
     Some(Arc::new(tinyagents_runtime::HostOnlyToolPolicy::new(
         allowed, host,
     )))

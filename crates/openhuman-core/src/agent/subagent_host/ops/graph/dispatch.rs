@@ -542,7 +542,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     // host boundary, then acknowledge it on the parent stream so the linked
     // sub-agent span cannot close ahead of its child record.
     if let Some(terminal) = outcome.deferred_terminal.take() {
-        let stop = crate::agent::session_host::stop_summary::classify_stop_with_cause(
+        let stop = crate::agent::session_host::stop_policy::classify_stop_with_cause(
             outcome.breaker_halt.as_deref(),
             outcome.failure_cause.clone(),
             false,

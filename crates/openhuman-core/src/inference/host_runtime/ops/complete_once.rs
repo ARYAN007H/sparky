@@ -159,7 +159,7 @@ pub async fn complete_once_controlled(
     });
     if admission.is_none() {
         let model: std::sync::Arc<dyn ChatModel<()>> = match (budget, observer) {
-            (Some(budget), observer) => budget.wrap_with_observer(model, observer),
+            (Some(budget), observer) => budget.wrap_model_with_observer(model, observer),
             (None, Some(observer)) => {
                 let normalized =
                     std::sync::Arc::new(tinyagents_harness::cost::GatewayChargeModel::new(model));

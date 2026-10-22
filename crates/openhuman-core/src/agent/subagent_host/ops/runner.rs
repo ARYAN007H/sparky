@@ -11,10 +11,9 @@ use std::time::Instant;
 
 use crate::agent::prompts::render_subagent_system_prompt_with_format;
 use crate::agent::prompts::{PromptContext, SubagentRenderOptions};
-use crate::agent::session_host::dedup_visible_tool_specs;
 use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::subagent_host::tool_prep::{
-    filter_definition_tool_indices, subagent_prompt_protocol,
+    dedup_owned_tool_specs, filter_definition_tool_indices, subagent_prompt_protocol,
 };
 use crate::agent::subagent_host::types::{
     SubagentMode, SubagentRunError, SubagentRunOptions, SubagentRunOutcome,
@@ -523,7 +522,7 @@ async fn run_typed_mode(
         .iter()
         .map(|&i| parent.all_tools[i].name().to_string())
         .collect();
-    let filtered_specs = dedup_visible_tool_specs(filtered_specs);
+    let filtered_specs = dedup_owned_tool_specs(filtered_specs);
 
     tracing::debug!(
         agent_id = %definition.id,

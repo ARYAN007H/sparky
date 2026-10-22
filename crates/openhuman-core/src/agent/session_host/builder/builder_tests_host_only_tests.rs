@@ -142,10 +142,7 @@ fn a_host_only_session_runs_a_definition_that_cannot_delegate_or_act() {
 
 #[tokio::test]
 async fn the_host_only_policy_admits_only_host_names() {
-    let policy = tinyagents_runtime::HostOnlyToolPolicy::new(
-        ["read_file".to_string()].into_iter().collect(),
-        None,
-    );
+    let policy = tinyagents_runtime::HostOnlyToolPolicy::new(["read_file".to_string()], None);
 
     assert_eq!(
         {
@@ -181,7 +178,7 @@ async fn the_host_only_policy_still_consults_the_hosts_own_gate() {
         }
     }
     let policy = tinyagents_runtime::HostOnlyToolPolicy::new(
-        ["read_file".to_string()].into_iter().collect(),
+        ["read_file".to_string()],
         Some(Arc::new(DenyAll)),
     );
 
