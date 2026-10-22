@@ -33,7 +33,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use tinyagents_session::port::{SessionStoreProvider, TurnStates};
-use tinyagents_session::run_ledger::history::SessionHistoryImport;
+use tinyagents_session::run_ledger::history::{SessionHistoryImport, SessionHistoryStore};
 use tinyagents_session::run_ledger::RunLedgerStore;
 use tinyagents_session::run_ledger::{AgentFamilyImport, ImportCounts, LegacyLedgerRows};
 use tinyagents_session::transcript::{
