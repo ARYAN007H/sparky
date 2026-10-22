@@ -405,6 +405,12 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         Arc::new(tinyagents_tasks::InMemoryCompletionStore::new());
     background_completions::install_store_for_test(&workspace, completion_store);
     let detached_data = live.data.detached_child();
+    let child_cancellation = detached_data.cancellation.clone();
+    let cancellation_release = release.clone();
+    let release_on_cancel = tokio::spawn(async move {
+        child_cancellation.cancelled().await;
+        cancellation_release.notify_one();
+    });
     let detached = live
         .child(
             tinyagents_harness::context::RunConfig::new("delete-live-driver-child"),
@@ -514,7 +520,9 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         background_completions::pending_for(&workspace, thread_id).is_empty(),
         "queued child completions are discarded after cancellation"
     );
-    release.notify_waiters();
+    release_on_cancel
+        .await
+        .expect("cancellation-aware child release task completes");
 }
 
 #[tokio::test]
