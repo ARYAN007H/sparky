@@ -83,6 +83,17 @@ impl EncryptedFileBackend {
     pub fn new(_workspace_dir: &Path) -> Self {
         Self
     }
+
+    /// Read one profile secret without initializing keyring state.
+    ///
+    /// This adapter cannot read encrypted files, so the lookup fails closed
+    /// with the same unavailable error as every other operation.
+    pub fn get_profile_read_only(
+        &self,
+        _namespaced_key: &str,
+    ) -> Result<Option<String>, SecretStorageError> {
+        Err(unavailable())
+    }
 }
 
 impl SecretBackend for EncryptedFileBackend {
