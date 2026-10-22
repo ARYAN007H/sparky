@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "build_helpers.rs"]
+mod helpers;
+
 impl OpenHumanSessionHost {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn build_session_agent_inner_with_turn_model_source(
@@ -135,55 +138,8 @@ impl OpenHumanSessionHost {
         // time, so late integrations and the flow archetype land in the prompt.
         // `Inline`/`File` sources still resolve to just the archetype
         // body and get wrapped by [`SystemPromptBuilder::for_subagent`].
-        let prompt_builder = match target_def {
-            Some(def) => match &def.system_prompt {
-                PromptSource::Dynamic(()) => SystemPromptBuilder::from_dynamic(def.prompt_fn()?),
-                PromptSource::Verbatim(text) => SystemPromptBuilder::verbatim(text.clone()),
-                PromptSource::Inline(text) => SystemPromptBuilder::for_subagent(
-                    text.clone(),
-                    def.extensions.omit_identity,
-                    def.extensions.omit_safety_preamble,
-                ),
-                PromptSource::File { path } => {
-                    let prompt_root = config.workspace_dir.join("agent").join("prompts");
-                    let workspace_path = prompt_root.join(path);
-                    let body_text = if workspace_path.is_file() {
-                        match crate::security::validate_path_within_root(
-                            &workspace_path,
-                            &prompt_root,
-                        ) {
-                            Ok(resolved) => {
-                                std::fs::read_to_string(&resolved).unwrap_or_else(|e| {
-                                    log::warn!(
-                                        "[agent::builder] failed to read prompt {}: {e} — using empty body",
-                                        workspace_path.display()
-                                    );
-                                    String::new()
-                                })
-                            }
-                            Err(e) => {
-                                log::warn!(
-                                    "[agent::builder] prompt path rejected: {e} — using empty body"
-                                );
-                                String::new()
-                            }
-                        }
-                    } else {
-                        log::debug!(
-                            "[agent::builder] prompt file {} not found — using empty body",
-                            path
-                        );
-                        String::new()
-                    };
-                    SystemPromptBuilder::for_subagent(
-                        body_text,
-                        def.extensions.omit_identity,
-                        def.extensions.omit_safety_preamble,
-                    )
-                }
-            },
-            None => SystemPromptBuilder::with_defaults(),
-        };
+        let prompt_builder = helpers::prompt_builder(target_def, config);
+
         let post_turn_hooks: Vec<Arc<dyn tinyagents_harness::host::LearningSink>> =
             crate::agent::hooks::embedder_post_turn_hooks_in(ctx);
 
@@ -500,43 +456,7 @@ impl OpenHumanSessionHost {
         // agent definition. Every other agent id gets
         // `None` and their tool results stay untouched (the summarizer
         // itself MUST be `None` to avoid recursive self-summarization).
-        let payload_summarizer: Option<
-            std::sync::Arc<crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer>,
-        > = if !host_only && super::summarizes_tool_output(agent_id, config) {
-            match crate::agent_registry::host_definition::AgentDefinitionRegistry::current() {
-                Some(reg) => match reg.get("summarizer") {
-                    Some(summarizer_def) => {
-                        log::info!(
-                            "[agent::builder] wiring payload_summarizer for orchestrator: \
-                             threshold_tokens={} max_tokens={}",
-                            config.context.summarizer_payload_threshold_tokens,
-                            config.context.summarizer_max_payload_tokens
-                        );
-                        Some(std::sync::Arc::new(
-                            crate::agent::tinyagents::payload_summarizer::SubagentPayloadSummarizer::new(
-                                summarizer_def.clone(),
-                            ),
-                        ))
-                    }
-                    None => {
-                        log::warn!(
-                            "[agent::builder] orchestrator requested payload_summarizer but \
-                             `summarizer` definition is not in the registry — proceeding without it"
-                        );
-                        None
-                    }
-                },
-                None => {
-                    log::warn!(
-                        "[agent::builder] orchestrator requested payload_summarizer but \
-                         AgentDefinitionRegistry is not initialised — proceeding without it"
-                    );
-                    None
-                }
-            }
-        } else {
-            None
-        };
+        let payload_summarizer = helpers::payload_summarizer(host_only, agent_id, config);
 
         // Crate-native turn models (Phase 3 P3-B): the production main-turn agent
         // builds crate `ChatModel`s from `(provider_role, config)` without retaining
