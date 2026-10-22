@@ -268,13 +268,21 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
     let owner_scope =
         crate::agent::orchestration::completion_owners::driver_task_owner(&alice_ctx, &task_id)
             .expect("Alice's cached owner scope");
+    let job_owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &owner_scope.workspace_dir,
+        &owner_scope.parent_session,
+        owner_scope.parent_thread_id.as_deref(),
+    );
+    let job_snapshot = alice_jobs
+        .tasks()
+        .snapshot(
+            &tinyagents_tasks::TaskId::new(alice_job.id.as_str()),
+            &job_owner,
+        )
+        .expect("Alice's detached task metadata");
     let registered = alice_jobs
         .list_for_parent_scope(
-            &crate::agent::tinyagents::tool_registration::subagent_owner_key(
-                &owner_scope.workspace_dir,
-                &owner_scope.parent_session,
-                owner_scope.parent_thread_id.as_deref(),
-            ),
+            &job_owner,
             &tinyagents_orchestration::subagent::ParentJobScope::new(
                 owner_scope.workspace.clone(),
                 owner_scope.parent_thread_id.as_deref().unwrap_or_default(),
@@ -288,10 +296,11 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
                 .and_then(serde_json::Value::as_str)
                 == Some(task_id.as_str())
         }),
-        "Alice's owner/workspace/thread must list the driver task: session={:?}, workspace={:?}, thread={:?}, job ids={:?}",
+        "Alice's owner/workspace/thread must list the driver task: session={:?}, cached workspace={:?}, thread={:?}, job metadata={:?}, job ids={:?}",
         owner_scope.parent_session,
         owner_scope.workspace,
         owner_scope.parent_thread_id,
+        job_snapshot.metadata,
         registered
             .iter()
             .map(|job| job.id.as_str())
