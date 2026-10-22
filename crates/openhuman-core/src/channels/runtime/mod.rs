@@ -22,9 +22,9 @@ pub(crate) use startup::start_channels_with_session;
 #[cfg(feature = "channels")]
 pub(crate) use dispatch::process_channel_message;
 #[cfg(feature = "channels")]
-pub(crate) use dispatch::{RuntimeChannelMessage, process_channel_runtime_message};
+pub(crate) use dispatch::{process_channel_runtime_message, RuntimeChannelMessage};
 #[cfg(feature = "channels")]
-pub(crate) use startup::{PromptToolDescs, build_channel_turn_parts, runtime_context};
+pub(crate) use startup::{build_channel_turn_parts, runtime_context, PromptToolDescs};
 
 #[cfg(feature = "channels")]
 #[cfg(any(test, debug_assertions))]
