@@ -532,7 +532,7 @@ async fn wait_completed(
                 Some(crate::progress::AgentProgress::SubagentCompleted { agent_id, .. })
                     if agent_id == "task_manager_agent" =>
                 {
-                    break
+                    break;
                 }
                 Some(crate::progress::AgentProgress::SubagentFailed { error, .. }) => {
                     panic!("child failed before completion: {error}")
@@ -592,7 +592,7 @@ impl tinyinference_llm::model::ChatModel<()> for TwoTurnModel {
             call => {
                 return Err(tinyinference_llm::Error::Model(format!(
                     "unexpected call {call}"
-                )))
+                )));
             }
         };
         Ok(tinyinference_llm::model::ModelResponse::assistant(answer))

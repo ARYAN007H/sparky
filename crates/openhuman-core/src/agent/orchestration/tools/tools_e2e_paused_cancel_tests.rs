@@ -5,9 +5,7 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
     use crate::agent::orchestration::background_completions::{
         forget_workspace_for_test, pending_for_ctx,
     };
-    use crate::agent::orchestration::subagent_sessions::{
-        DurableSubagentStatus,
-    };
+    use crate::agent::orchestration::subagent_sessions::DurableSubagentStatus;
     use crate::agent::orchestration::tools::SpawnSubagentTool;
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
@@ -133,11 +131,11 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         &parent_session,
         Some("paused-cancel-rpc-thread"),
     )
-        .await
-        .expect("paused driver session list")
-        .into_iter()
-        .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
-        .expect("actual paused durable session remains available");
+    .await
+    .expect("paused driver session list")
+    .into_iter()
+    .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
+    .expect("actual paused durable session remains available");
     assert_eq!(before_row.status, DurableSubagentStatus::AwaitingUser);
     assert_eq!(before_row.parent_session, parent_session);
     assert_eq!(
@@ -182,17 +180,23 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
             .status,
         SubAgentJobStatus::Cancelled
     ));
-    let row = SubagentSessionStore::new(workspace.path().to_path_buf())
-        .load()
-        .expect("durable session")
-        .into_iter()
-        .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
-        .expect("cancelled durable session remains available");
+    let row = super::driver_sessions_for_parent(
+        &live.data.dispatch_ctx(),
+        workspace.path(),
+        &parent_session,
+        Some("paused-cancel-rpc-thread"),
+    )
+    .await
+    .expect("driver session")
+    .into_iter()
+    .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
+    .expect("cancelled durable session remains available");
     assert_eq!(row.status, DurableSubagentStatus::Failed);
-    assert!(row
-        .latest_error
-        .as_deref()
-        .is_some_and(|error| error.contains("user requested stop")));
+    assert!(
+        row.latest_error
+            .as_deref()
+            .is_some_and(|error| error.contains("user requested stop"))
+    );
     let deliveries = pending_for_ctx(
         &live.data.dispatch_ctx(),
         workspace.path(),

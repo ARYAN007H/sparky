@@ -151,11 +151,11 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         "shared-profile-parent-session",
         Some(thread_id),
     )
-        .await
-        .expect("driver child row readable")
-        .into_iter()
-        .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
-        .expect("durable row belongs to the live child");
+    .await
+    .expect("driver child row readable")
+    .into_iter()
+    .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
+    .expect("durable row belongs to the live child");
     assert_eq!(row_before.status, DurableSubagentStatus::Running);
     assert_eq!(row_before.parent_session, "shared-profile-parent-session");
     assert_eq!(row_before.parent_thread_id.as_deref(), Some(thread_id));
@@ -209,11 +209,11 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         "shared-profile-parent-session",
         Some(thread_id),
     )
-        .await
-        .expect("driver child row remains readable")
-        .into_iter()
-        .find(|row| row.subagent_session_id == row_before.subagent_session_id)
-        .expect("foreign attempt keeps Alice's durable row");
+    .await
+    .expect("driver child row remains readable")
+    .into_iter()
+    .find(|row| row.subagent_session_id == row_before.subagent_session_id)
+    .expect("foreign attempt keeps Alice's durable row");
     assert_eq!(after_bob.status, DurableSubagentStatus::Running);
     assert_eq!(after_bob.current_task_id, row_before.current_task_id);
     assert_eq!(after_bob.latest_error, row_before.latest_error);
@@ -242,11 +242,11 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         "shared-profile-parent-session",
         Some(thread_id),
     )
-        .await
-        .expect("unbound attempt leaves driver child row readable")
-        .into_iter()
-        .find(|row| row.subagent_session_id == row_before.subagent_session_id)
-        .expect("unbound attempt keeps Alice's durable row");
+    .await
+    .expect("unbound attempt leaves driver child row readable")
+    .into_iter()
+    .find(|row| row.subagent_session_id == row_before.subagent_session_id)
+    .expect("unbound attempt keeps Alice's durable row");
     assert_eq!(after_unbound.status, DurableSubagentStatus::Running);
     assert_eq!(after_unbound.current_task_id, row_before.current_task_id);
     assert_eq!(after_unbound.latest_error, row_before.latest_error);

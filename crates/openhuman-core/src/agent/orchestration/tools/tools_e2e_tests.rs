@@ -37,12 +37,9 @@ pub(super) async fn driver_sessions_for_parent(
     sessions
         .into_iter()
         .map(|session| {
-            let parent_epoch = parent_epoch_for_context(
-                ctx,
-                workspace_dir,
-                session.subagent_session_id.clone(),
-            )
-            .map_err(|error| error.to_string())?;
+            let parent_epoch =
+                parent_epoch_for_context(ctx, workspace_dir, session.subagent_session_id.clone())
+                    .map_err(|error| error.to_string())?;
             Ok(host_projection(session, parent_epoch))
         })
         .collect()
@@ -242,7 +239,7 @@ async fn spawn_subagent_reports_a_stopped_child_as_incomplete_progress() {
                     stop,
                     ..
                 }) if agent_id == "task_manager_agent" && event_task_id == task_id => {
-                    break (output, stop)
+                    break (output, stop);
                 }
                 Some(crate::progress::AgentProgress::SubagentFailed {
                     agent_id,
