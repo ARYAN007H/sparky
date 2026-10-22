@@ -39,23 +39,67 @@ impl TenantStoreRegistry {
             .iter()
             .filter_map(Weak::upgrade)
             .collect::<Vec<_>>();
+        // `route` locks tenants before reading the backend. Keep that lock
+        // order while preventing new providers from appearing during rebind.
+        let tenant_maps = routers
+            .iter()
+            .map(|router| {
+                router
+                    .tenants
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+            })
+            .collect::<Vec<_>>();
         let mut bindings = routers
             .iter()
-            .map(|router| router.write().unwrap_or_else(PoisonError::into_inner))
+            .map(|router| router.backend.write().unwrap_or_else(PoisonError::into_inner))
             .collect::<Vec<_>>();
-        let rebound = match self.providers.rebind(Arc::clone(backend)) {
-            Ok(rebound) => rebound,
-            Err(error) => {
-                tracing::error!(target: "openhuman::storage", %error, "[session_store] could not rebind session providers");
-                return 0;
+
+        let mut providers = tenant_maps
+            .iter()
+            .zip(&bindings)
+            .flat_map(|(tenants, current_backend)| {
+                tenants.iter().map(move |(tenant, provider)| {
+                    (
+                        tenant.as_str().to_owned(),
+                        Arc::clone(provider),
+                        Arc::clone(current_backend),
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+        // A stable order makes a later-provider failure deterministic and
+        // keeps rollback behavior predictable across runs.
+        providers.sort_by(|left, right| left.0.cmp(&right.0));
+
+        let mut moved = Vec::with_capacity(providers.len());
+        for (_, provider, old_backend) in &providers {
+            if let Err(error) = provider.rebind(Arc::clone(backend)) {
+                let mut rollback_failures = Vec::new();
+                for (moved_provider, moved_backend) in moved.iter().rev() {
+                    if let Err(rollback_error) = moved_provider.rebind(Arc::clone(moved_backend)) {
+                        rollback_failures.push(rollback_error.to_string());
+                    }
+                }
+                if rollback_failures.is_empty() {
+                    tracing::error!(target: "openhuman::storage", %error, "[session_store] tenant provider rebind failed; prior providers were restored");
+                    return 0;
+                }
+                tracing::error!(target: "openhuman::storage", %error, rollback_errors = ?rollback_failures, restored = moved.len() - rollback_failures.len(), "[session_store] tenant provider rebind and rollback failed; providers may remain split across backends");
+                // The return count is intentionally non-zero when rollback
+                // could not restore every provider, so callers cannot mistake
+                // this for a clean no-op.
+                return rollback_failures.len();
             }
-        };
+            moved.push((Arc::clone(provider), Arc::clone(old_backend)));
+        }
+
         for current in &mut bindings {
             **current = Arc::clone(backend);
         }
         state.backends.retain(|weak| weak.strong_count() > 0);
         state.current_backend = Some(Arc::clone(backend));
-        rebound
+        moved.len()
     }
 
     fn register_backend(&self, backend: &Arc<RwLock<Arc<dyn StorageBackend>>>) {
