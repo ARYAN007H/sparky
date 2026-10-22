@@ -205,6 +205,41 @@ pub(crate) fn open_for_context(
     }))
 }
 
+/// Imports one terminal legacy task into TinyAgents' scoped session store and
+/// returns the port's view of it. The legacy read only discovers the parent
+/// scope; all terminal reporting is based on the migrated driver row.
+pub(crate) async fn import_terminal_task_for_context(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: PathBuf,
+    task_id: &str,
+) -> Result<Option<TinySession>, SubagentError> {
+    let legacy = SubagentSessionStore::new_in_context(ctx, workspace_dir.clone())
+        .map_err(SubagentError::Persistence)?
+        .load()
+        .map_err(SubagentError::Persistence)?;
+    let Some(row) = legacy.into_iter().find(|row| {
+        row.current_task_id.as_deref() == Some(task_id)
+            && matches!(row.status, DurableSubagentStatus::Idle | DurableSubagentStatus::Failed)
+    }) else {
+        return Ok(None);
+    };
+    let parent_session = row.parent_session;
+    let parent_thread_id = row.parent_thread_id;
+    let store = open_for_context(
+        ctx,
+        workspace_dir,
+        parent_session.clone(),
+        parent_thread_id.clone(),
+        None,
+    )?;
+    let session = store
+        .list_for_parent(&parent_session, parent_thread_id.as_deref())
+        .await?
+        .into_iter()
+        .find(|session| session.current_task_id.as_deref() == Some(task_id));
+    Ok(session)
+}
+
 /// Copies the pre-driver host collection into TinyAgents' collection without
 /// removing or rewriting the source rows. The old collection remains the
 /// owner of OpenHuman-only `parent_epoch` until the host's epoch sidecar is
