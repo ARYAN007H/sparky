@@ -20,14 +20,17 @@ set -euo pipefail
 # outcome: EX63 lanes skipped means outsider, anything else means
 # the EX63 is handling it.
 decide_from_ci_fast() {
-  local run_id="" lanes=""
+  local run_id="" lanes="" since=""
+  # SINCE is spliced into the jq filter, so accept only an ISO timestamp.
+  if [[ "${SINCE:-}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+    since="${SINCE}"
+  fi
   for _ in $(seq 1 36); do
     # Only a run started by this event: marking a draft ready re-runs
     # ci-fast.yml on the same head commit, and the draft's earlier run (EX63
     # skipped) must not answer for it.
     run_id="$(gh api "repos/${REPO}/actions/workflows/ci-fast.yml/runs?head_sha=${HEAD_SHA}&per_page=5" \
-      --arg since "${SINCE:-}" \
-      --jq '[.workflow_runs[] | select(.event == "pull_request_target" and .created_at >= $since)] | sort_by(.created_at) | last | .id // empty' 2>/dev/null || true)"
+      --jq '[.workflow_runs[] | select(.event == "pull_request_target" and .created_at >= "'"${since}"'")] | sort_by(.created_at) | last | .id // empty' 2>/dev/null || true)"
     if [ -n "${run_id}" ]; then
       # A member run materialises "Lanes / CI Fast (EX63)"; an
       # outsider run leaves the skipped call job "Lanes" alone.
