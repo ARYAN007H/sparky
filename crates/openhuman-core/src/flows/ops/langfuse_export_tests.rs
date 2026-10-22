@@ -128,7 +128,12 @@ fn otlp_flow_trace_puts_flow_attributes_on_every_span() {
         "completed",
         FlowRunTrigger::Rpc,
     );
-    let requests = flow_otlp_requests(&SpanExporter::new(client), trace, "flow-1", &sample_observations(thread_id))
+    let requests = flow_otlp_requests(
+        &SpanExporter::new(client),
+        trace,
+        "flow-1",
+        &sample_observations(thread_id),
+    )
     .expect("otlp requests");
     let resource = &requests[0]["resourceSpans"][0];
     assert_eq!(
