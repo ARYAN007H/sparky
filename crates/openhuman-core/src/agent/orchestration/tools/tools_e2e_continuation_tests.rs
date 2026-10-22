@@ -258,7 +258,7 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     assert!(
         refused_resume
             .output()
-            .contains("reusable session has no valid lifecycle key"),
+            .contains("paused checkpoint does not match the reusable session"),
         "refusal identifies the mismatched checkpoint: {}",
         refused_resume.output()
     );
