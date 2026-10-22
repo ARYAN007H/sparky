@@ -452,6 +452,15 @@ async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
         .find(|session| session.task_key == "idle-history-fixture")
         .expect("first durable session");
     assert_eq!(first_session.status, DurableSubagentStatus::Idle);
+    let roster = crate::agent::orchestration::running_subagents::active_subagents_context_block(
+        &live.data.dispatch_ctx(),
+        "idle-reuse-e2e",
+        workspace.path(),
+    )
+    .await
+    .expect("driver-backed child appears in the parent roster");
+    assert!(roster.contains(&first_session.subagent_session_id));
+    assert!(roster.contains(first_session.current_task_id.as_deref().unwrap()));
     let original_session_id = first_session.subagent_session_id.clone();
     let first_task_id = first_session
         .current_task_id
