@@ -50,7 +50,7 @@ pub fn owner_schemas() -> Vec<Schema> {
         schemas.push(tinyconnectors_bus::storage::storage_schema());
         schemas.push(tinybox_bus::storage::storage_schema());
         schemas.push(
-            Schema::new(crate::storage::schema_support::owner("tinyjuice"))
+            Schema::new(crate::storage::schema_support::owner("juice"))
                 .collection_with(
                     1,
                     tinystoragedrivers::CollectionSpec::new(
