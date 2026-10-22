@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tinytools::ToolRunContext;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult, ToolTimeout};
 use tinyagents_harness_tools::exec::{
@@ -103,35 +103,6 @@ impl ShellHost {
         }
     }
 
-    /// Emit a single `CommandExecution` audit event. A write failure is logged
-    /// as a structured warning but not propagated — audit must never block or
-    /// fail a tool call, yet a silently broken audit trail must not go
-    /// unnoticed.
-    fn emit_audit(
-        &self,
-        command: &str,
-        approved: bool,
-        allowed: bool,
-        success: bool,
-        duration_ms: u64,
-    ) {
-        if let Err(error) = self.audit.log_command_event(CommandExecutionLog {
-            channel: "tool:shell",
-            command,
-            risk_level: "unknown",
-            approved,
-            allowed,
-            success,
-            duration_ms,
-        }) {
-            tracing::warn!(
-                error = %error,
-                channel = "tool:shell",
-                "[shell] failed to persist command execution audit event"
-            );
-        }
-    }
-
     /// Resolve the working directory for this shell invocation.
     ///
     /// Returns the root from a [`WorkspaceDescriptor`] threaded into this
@@ -167,82 +138,12 @@ impl ShellHost {
     }
 }
 
-#[async_trait]
-impl Tool for ShellHost {
-    fn name(&self) -> &str {
-        "shell"
+impl ShellHost {
+    fn external_effect_with_args(&self, args: &Value) -> bool {
+        args.get("command").and_then(Value::as_str).is_some_and(|command| !command.is_empty())
     }
 
-    fn description(&self) -> &str {
-        shell_description(self.runtime.shell_flavor())
-    }
-
-    fn parameters_schema(&self) -> serde_json::Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "command": {
-                    "type": "string",
-                    "description": command_param_description(self.runtime.shell_flavor())
-                },
-                "category": {
-                    "type": "string",
-                    "enum": ["read", "write", "network", "install", "destructive"],
-                    "description": "Optional self-declared risk; can only raise the approval requirement."
-                },
-                "timeout_secs": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 3600,
-                    "description": "Optional wall-clock timeout (seconds, up to 3600) for this command before it is killed. Use a larger value for long-running work (builds, test suites, solvers). Omitted or 0 runs without a deadline."
-                }
-            },
-            "required": ["command"]
-        })
-    }
-
-    /// Cap shell output at ~30k chars before threading into history.
-    /// Verbose commands (`find /`, dependency installs, log dumps)
-    /// can otherwise blow past 100k chars in one call. The agent
-    /// rarely needs the full firehose — a head/tail/grep follow-up is
-    /// the right move when it does.
-    fn max_result_size_chars(&self) -> Option<usize> {
-        Some(30_000)
-    }
-
-    /// Shell runs scripts that legitimately take a long time, so it runs
-    /// unbounded unless the caller passes an explicit `timeout_secs`. This
-    /// keeps the harness from hard-killing a long command at the global tool
-    /// timeout (issue #4023).
-    fn timeout_policy(&self, args: &serde_json::Value) -> ToolTimeout {
-        match args.get("timeout_secs").and_then(|v| v.as_u64()) {
-            // `0` (or absent) means "no deadline".
-            None | Some(0) => ToolTimeout::Unbounded,
-            Some(secs) => ToolTimeout::Millis(secs.saturating_mul(1000)),
-        }
-    }
-
-    fn permission_level(&self) -> PermissionLevel {
-        PermissionLevel::Execute
-    }
-
-    /// Whether this shell call must be approved by the human before it runs.
-    /// True for any command the current tier prompts on (Write / Network /
-    /// Destructive in ask-before-edit; Network / Destructive in Full). The
-    /// harness routes these through the `ApprovalGate`; the read-only `Block`
-    /// and the structural guard are enforced in `run_with_security`.
-    fn external_effect_with_args(&self, args: &serde_json::Value) -> bool {
-        let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
-        // This synchronous declaration cannot consult TinyBox. Be
-        // conservative here; the host authorization gate uses the exact
-        // per-call TinyBox analysis and applies the configured tier.
-        !command.is_empty()
-    }
-
-    async fn prepare_authorization(
-        &self,
-        args: &serde_json::Value,
-    ) -> anyhow::Result<Option<serde_json::Value>> {
+    async fn prepare_authorization(&self, args: &Value) -> anyhow::Result<Option<Value>> {
         #[cfg(feature = "modules")]
         {
             let config = self
@@ -265,62 +166,6 @@ impl Tool for ShellHost {
             let _ = args;
             Err(anyhow::anyhow!("command analysis is unavailable"))
         }
-    }
-
-    async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
-        self.execute_in_context(&dispatch_ctx_for_tool(None), args, None)
-            .await
-    }
-
-    async fn execute_with_context(
-        &self,
-        args: serde_json::Value,
-        _options: ToolCallOptions,
-        context: Option<&dyn ToolRunContext>,
-    ) -> anyhow::Result<ToolResult> {
-        self.execute_in_context(&dispatch_ctx_for_tool(context), args, context)
-            .await
-    }
-}
-
-impl ShellHost {
-    async fn execute_in_context(
-        &self,
-        ctx: &DispatchCtx,
-        args: serde_json::Value,
-        context: Option<&dyn ToolRunContext>,
-    ) -> anyhow::Result<ToolResult> {
-        let command = args
-            .get("command")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("Missing 'command' parameter"))?;
-
-        // Optional per-call wall-clock budget. `None`/`0` ⇒ run unbounded;
-        // a positive value is clamped downstream by
-        // `tool_timeout::explicit_call_timeout_*`. Shell has no default deadline
-        // (issue #4023) — long scripts must run to completion.
-        let requested_timeout = args.get("timeout_secs").and_then(|v| v.as_u64());
-        let start = Instant::now();
-        let (allowed, result) = crate::sandbox::shell_progress::with_shell_progress(
-            context,
-            crate::sandbox::shell_progress::HEARTBEAT_INTERVAL,
-            |meter| {
-                self.run_with_security_in_context(ctx, command, requested_timeout, context, meter)
-            },
-        )
-        .await;
-        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
-        // `allowed` = passed the in-tool security checks. `approved` = the command
-        // is Prompt-class (required human approval) and thus went through the
-        // harness ApprovalGate to reach here — distinct from `allowed`. Reads and
-        // Full-mode writes run without a prompt, so they audit as approved=false
-        // rather than over-claiming a human approval that never happened. (The
-        // gate's exact yes/no isn't threaded into tools; this is the accurate
-        // "required approval" proxy.)
-        let approved = self.external_effect_with_args(&args);
-        // emit_audit signature is (command, approved, allowed, …) — keep that order.
-        self.emit_audit(command, approved, allowed, !result.is_error, duration_ms);
-        Ok(result)
     }
 }
 
