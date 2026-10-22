@@ -89,7 +89,14 @@ impl SpawnSubagentTool {
             .or(run_context.thread_id.as_deref())
             .map(str::to_owned);
 
-        let store = SubagentSessionStore::new(parent.workspace_dir.clone());
+        let store = match SubagentSessionStore::new_in_context(&dispatch, parent.workspace_dir.clone()) {
+            Ok(store) => store,
+            Err(error) => {
+                return Ok(ToolResult::error(format!(
+                    "spawn_subagent: failed to open the caller-scoped session store: {error}"
+                )));
+            }
+        };
         let workspace_descriptor = tool_context
             .and_then(|ctx| ctx.workspace().cloned())
             .or_else(|| run_context.workspace.clone());
