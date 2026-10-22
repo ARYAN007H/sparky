@@ -63,7 +63,7 @@ pub use tinyjuice_host::recovery::{
     is_recovery_tool, summary_failed_notice, CompactedToolOutput, RECOVERY_TOOL_NAMES,
     RECOVERY_TOOL_VISIBLE,
 };
-pub const LEGACY_RETRIEVE_TOOL_NAME: &str = "retrieve_tool_output";
+pub const LEGACY_RETRIEVE_TOOL_NAME: &str = RECOVERY_TOOL_NAMES[3];
 
 /// Whether the `[components] juice` switch is on. Off means turns truncate
 /// tool output only: no compaction, no summary, no `juice_*` / recovery tools,
