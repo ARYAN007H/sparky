@@ -104,12 +104,14 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&dispatch);
-    let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
-        workspace.path().to_path_buf(),
-    );
-    let before_scoped =
-        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&core), || store.load())
-            .expect("load live durable row");
+    let before_scoped = super::driver_sessions_for_parent(
+        &dispatch,
+        workspace.path(),
+        "stop-detached-subagent-session",
+        Some(thread_id),
+    )
+    .await
+    .expect("load live driver row");
     let row_before = before_scoped
         .iter()
         .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
@@ -160,9 +162,14 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
         jobs.get(job.id.as_str()).unwrap().status,
         tinyagents_orchestration::subagent::SubAgentJobStatus::Running
     );
-    let after_scoped =
-        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&core), || store.load())
-            .expect("scoped cancel leaves durable row readable");
+    let after_scoped = super::driver_sessions_for_parent(
+        &dispatch,
+        workspace.path(),
+        "stop-detached-subagent-session",
+        Some(thread_id),
+    )
+    .await
+    .expect("scoped cancel leaves driver row readable");
     assert_eq!(
         serde_json::to_string(&after_scoped).expect("encode row after scoped cancel"),
         before_scoped,
@@ -300,9 +307,15 @@ async fn cancel_of_a_completed_driver_child_reports_completed_without_rewriting_
     .await
     .expect("child completed before the late cancel");
 
-    let store = SubagentSessionStore::new(workspace.path().to_path_buf());
-    let before = CoreContext::sync_scope(Arc::clone(&core), || store.load())
-        .expect("load completed durable row");
+    let dispatch = DispatchCtx::new(Arc::clone(&core));
+    let before = super::driver_sessions_for_parent(
+        &dispatch,
+        workspace.path(),
+        "completed-cancel-parent-session",
+        Some(thread_id),
+    )
+    .await
+    .expect("load completed driver row");
     assert!(before.iter().any(|row| {
         row.current_task_id.as_deref() == Some(task_id.as_str())
             && row.parent_session == "completed-cancel-parent-session"
@@ -320,9 +333,17 @@ async fn cancel_of_a_completed_driver_child_reports_completed_without_rewriting_
         .expect("late cancel handler");
     assert_eq!(output["cancelled"], serde_json::json!(false));
     assert_eq!(output["outcome"], serde_json::json!("completed"));
-    let after_snapshot = CoreContext::sync_scope(Arc::clone(&core), || store.load())
-        .map(|rows| serde_json::to_string(&rows).expect("encode rows after cancel"))
-        .expect("load row after cancel");
+    let after_snapshot = serde_json::to_string(
+        &super::driver_sessions_for_parent(
+            &dispatch,
+            workspace.path(),
+            "completed-cancel-parent-session",
+            Some(thread_id),
+        )
+        .await
+        .expect("load driver row after cancel"),
+    )
+    .expect("encode rows after cancel");
     assert_eq!(
         after_snapshot, before_snapshot,
         "late cancel must not rewrite completed state"
