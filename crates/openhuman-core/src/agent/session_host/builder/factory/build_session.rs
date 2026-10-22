@@ -138,7 +138,7 @@ impl OpenHumanSessionHost {
         // time, so late integrations and the flow archetype land in the prompt.
         // `Inline`/`File` sources still resolve to just the archetype
         // body and get wrapped by [`SystemPromptBuilder::for_subagent`].
-        let prompt_builder = helpers::prompt_builder(target_def, config);
+        let prompt_builder = helpers::prompt_builder(target_def, config)?;
 
         let post_turn_hooks: Vec<Arc<dyn tinyagents_harness::host::LearningSink>> =
             crate::agent::hooks::embedder_post_turn_hooks_in(ctx);
@@ -417,7 +417,7 @@ impl OpenHumanSessionHost {
             .permanent_tool_names(merged_host_tools.permanent)
             .deferred_tools(target_def.map_or_else(Vec::new, |d| d.deferred_tools.clone()))
             .tool_dispatcher(tool_dispatcher)
-            .prompt_builder(prompt_builder?)
+            .prompt_builder(prompt_builder)
             .config(effective_agent_config)
             .context_config(config.context.clone())
             .model_name(model_name)
