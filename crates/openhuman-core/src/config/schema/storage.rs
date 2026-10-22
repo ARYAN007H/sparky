@@ -79,19 +79,22 @@ impl std::fmt::Debug for StorageConfig {
 /// query string and fragment dropped (they can carry tokens, such as MongoDB's
 /// `authMechanismProperties`).
 pub fn redact_url(url: &str) -> String {
-    // Userinfo ends at the LAST `@`, so an unencoded `?`, `#` or `/` in the
-    // password can't end it early. A query that holds an `@` hides the host
-    // too, which errs on the safe side.
-    let (mut out, rest) = match url.split_once("://") {
-        Some((scheme, rest)) => match rest.rsplit_once('@') {
-            Some((_, host)) => (format!("{scheme}://***@"), host),
-            None => (format!("{scheme}://"), rest),
-        },
-        None => (String::new(), url),
+    // Userinfo follows `//` (with or without a scheme) and ends at the LAST
+    // `@`, so an unencoded `?`, `#` or `/` in the password can't end it early.
+    // A `?` or `#` before that `@` could as well be a query holding an `@`:
+    // everything after `//` is hidden then.
+    let (head, rest) = url.find("//").map_or(("", url), |at| url.split_at(at + 2));
+    let (userinfo, host) = match rest.rsplit_once('@') {
+        Some((userinfo, host)) => (Some(userinfo), host),
+        None => (None, rest),
     };
-    let end = rest.find(['?', '#']).unwrap_or(rest.len());
-    out.push_str(&rest[..end]);
-    if end < rest.len() {
+    if userinfo.is_some_and(|userinfo| userinfo.contains(['?', '#'])) {
+        return format!("{head}***");
+    }
+    let end = host.find(['?', '#']).unwrap_or(host.len());
+    let mask = if userinfo.is_some() { "***@" } else { "" };
+    let mut out = format!("{head}{mask}{}", &host[..end]);
+    if end < host.len() {
         out.push_str("?***");
     }
     out

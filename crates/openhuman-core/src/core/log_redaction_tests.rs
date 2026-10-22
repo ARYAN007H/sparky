@@ -55,3 +55,23 @@ fn scrubs_snake_case_and_json_quoted_tokens() {
         "cancellation_token=abc"
     );
 }
+
+#[test]
+fn scrubs_a_quoted_value_through_its_closing_quote() {
+    let out = scrub_secrets(r#"{"password":"correct horse, battery; p&ss \"x\" y","user":"a"}"#);
+    for leaked in ["horse", "battery", "p&ss", " y\""] {
+        assert!(!out.contains(leaked), "{leaked} in {out}");
+    }
+    assert!(out.ends_with(r#","user":"a"}"#), "{out}");
+    // An unterminated quoted value is still redacted.
+    let out = scrub_secrets(r#""token":"abc123"#);
+    assert!(!out.contains("abc123"), "{out}");
+}
+
+#[test]
+fn scrubs_a_short_basic_authorization_header() {
+    assert_eq!(
+        scrub_secrets("Authorization: Basic dTpw"),
+        "Authorization: Basic [REDACTED]"
+    );
+}

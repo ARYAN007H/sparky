@@ -16,12 +16,24 @@ static SECRET_PATTERNS: Lazy<Vec<(Regex, &'static str)>> = Lazy::new(|| {
     vec![
         // Matches "Bearer <token>" and redacts the token.
         (Regex::new(r"(?i)(bearer\s+)\S+").unwrap(), "${1}[REDACTED]"),
+        // A named credential key with a quoted value: `"password":"a b, c"`.
+        // The value runs to its closing quote (escapes included), so spaces
+        // and delimiters inside it can't end the match early.
+        (
+            Regex::new(r#"(?i)\b((?:access_|refresh_|id_|auth_|session_|bearer_)?token|api[_-]?key|client_secret|password)("?\s*[=:]\s*")(?:[^"\\]|\\.)*""#).unwrap(),
+            "${1}${2}[REDACTED]\"",
+        ),
         // Matches a named credential key and redacts its value: `api_key=…`,
         // `access_token=…`, and JSON-quoted `"token":"…"`. The key list is an
         // allowlist so `cancellation_token=` and the like stay intact.
         (
             Regex::new(r#"(?i)\b((?:access_|refresh_|id_|auth_|session_|bearer_)?token|api[_-]?key|client_secret|password)("?\s*[=:]\s*"?)[^\s"&,;}]+"#).unwrap(),
             "${1}${2}[REDACTED]",
+        ),
+        // An `Authorization: Basic …` header, however short its credential.
+        (
+            Regex::new(r#"(?i)(authorization["']?\s*[:=]\s*["']?basic\s+)[A-Za-z0-9+/]+=*"#).unwrap(),
+            "${1}[REDACTED]",
         ),
         // HTTP Basic credentials.
         (
