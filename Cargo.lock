@@ -8763,7 +8763,6 @@ dependencies = [
  "tinyagents-harness",
  "tinyagents-storage-kit",
  "tinyinference-llm 0.5.0",
- "tinytools 0.6.0",
  "tokio",
  "tracing",
 ]
