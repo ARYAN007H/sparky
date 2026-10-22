@@ -1,7 +1,7 @@
 //! Per-sender routing and runtime command handling.
 
-use super::context::{clear_sender_history, ChannelRouteSelection, ChannelRuntimeContext};
-use super::{outbound::text_message, Channel};
+use super::context::{ChannelRouteSelection, ChannelRuntimeContext, clear_sender_history};
+use super::{Channel, outbound::text_message};
 use crate::inference::provider;
 use std::sync::Arc;
 use tinychannels_bus as traits;
@@ -81,6 +81,27 @@ struct RouteCallbacks {
     core_context: Option<Arc<crate::core::runtime::CoreContext>>,
     tenant: crate::core::runtime::Tenant,
     cancellation: tokio_util::sync::CancellationToken,
+}
+
+/// Project the v22 envelope into the legacy shape still required by the
+/// module's `ChannelControlRequest::Route` contract.
+#[allow(
+    deprecated,
+    reason = "TinyChannels v22 Route requests still declare ChannelMessage"
+)]
+fn route_compat_message(msg: &traits::ChannelInboundEnvelope) -> traits::ChannelMessage {
+    traits::ChannelMessage {
+        id: msg.message_id.clone(),
+        sender: msg.sender.id.clone(),
+        reply_target: msg.conversation.id.clone(),
+        content: msg.text.clone(),
+        channel: msg.channel.id.clone(),
+        timestamp: msg.timestamp_unix_ms.unwrap_or_default(),
+        thread_ts: msg.conversation.thread_id.clone(),
+        reply_to_id: msg.reply_to_id.clone(),
+        topic_id: msg.conversation.topic_id.clone(),
+        sender_name: msg.sender.name.clone(),
+    }
 }
 
 impl RouteCallbacks {
@@ -175,7 +196,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
                 tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL,
                 (ChannelControlRequest::Route {
                     workspace_dir: ctx.workspace_dir.to_string_lossy().into_owned(),
-                    message: Box::new(msg.clone()),
+                    message: Box::new(route_compat_message(msg)),
                     capabilities: target_channel.map(|channel| Box::new(channel.capabilities())),
                     route: tinychannels_bus::module_remote::RemoteRoute {
                         provider: current.provider,

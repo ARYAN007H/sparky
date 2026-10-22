@@ -1,6 +1,6 @@
 use super::*;
 use crate::channels::context::{
-    conversation_history_key, ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap,
+    ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap, conversation_history_key,
 };
 use crate::channels::host::ChannelTurnStateSubscriber;
 use crate::core::events::DomainEvent;
@@ -45,6 +45,38 @@ fn inbound(
         text: text.into(),
         ..Default::default()
     }
+}
+
+#[test]
+#[allow(
+    deprecated,
+    reason = "The route contract still requires the v21 ChannelMessage projection"
+)]
+fn route_compat_message_preserves_legacy_addressing_and_sender_metadata() {
+    let mut message = inbound(
+        "message-1",
+        "sender-1",
+        "conversation-1",
+        "/status",
+        "telegram",
+        Some("thread-1".into()),
+    );
+    message.timestamp_unix_ms = Some(123);
+    message.reply_to_id = Some("reply-1".into());
+    message.conversation.topic_id = Some("topic-1".into());
+    message.sender.name = Some("Alice".into());
+
+    let legacy = super::route_compat_message(&message);
+    assert_eq!(legacy.id, "message-1");
+    assert_eq!(legacy.sender, "sender-1");
+    assert_eq!(legacy.reply_target, "conversation-1");
+    assert_eq!(legacy.content, "/status");
+    assert_eq!(legacy.channel, "telegram");
+    assert_eq!(legacy.timestamp, 123);
+    assert_eq!(legacy.thread_ts.as_deref(), Some("thread-1"));
+    assert_eq!(legacy.reply_to_id.as_deref(), Some("reply-1"));
+    assert_eq!(legacy.topic_id.as_deref(), Some("topic-1"));
+    assert_eq!(legacy.sender_name.as_deref(), Some("Alice"));
 }
 
 struct DummyTool;
@@ -420,12 +452,13 @@ async fn handle_runtime_command_set_model_clears_sender_history_and_persists_rou
     .await;
     assert!(handled);
 
-    assert!(ctx
-        .conversation_histories
-        .lock()
-        .unwrap()
-        .get(key)
-        .is_none());
+    assert!(
+        ctx.conversation_histories
+            .lock()
+            .unwrap()
+            .get(key)
+            .is_none()
+    );
     assert_eq!(
         get_route_selection(&ctx, key),
         ChannelRouteSelection {
@@ -547,7 +580,9 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(sent_text(&sent[0]).contains("No conversation threads yet. Send `/new` to create one."));
+    assert!(
+        sent_text(&sent[0]).contains("No conversation threads yet. Send `/new` to create one.")
+    );
     assert_eq!(sent[0].thread_id.as_deref(), Some("42"));
 }
 
@@ -582,12 +617,13 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         )
         .await
     );
-    assert!(ctx
-        .conversation_histories
-        .lock()
-        .unwrap()
-        .get(sender_key)
-        .is_none());
+    assert!(
+        ctx.conversation_histories
+            .lock()
+            .unwrap()
+            .get(sender_key)
+            .is_none()
+    );
 
     ctx.conversation_histories
         .lock()
@@ -666,9 +702,10 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 
     assert!(sent_text(&sent[2]).contains("**Recent sessions**"));
     assert!(sent_text(&sent[2]).contains("→ `Telegram"));
-    assert!(sent
-        .iter()
-        .all(|message| message.thread_ts.as_deref() == Some("42")));
+    assert!(
+        sent.iter()
+            .all(|message| message.thread_ts.as_deref() == Some("42"))
+    );
 }
 
 #[tokio::test]
