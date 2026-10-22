@@ -1,7 +1,7 @@
 use super::*;
 use std::sync::Mutex;
 use tinyjuice_bus::repl::ReplOutput;
-use tinytools::{Tool, ToolCallOptions};
+use tinytools::ToolCallOptions;
 
 /// Records which core context the OpenHuman adapter forwards to module calls.
 #[derive(Default)]
