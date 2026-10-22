@@ -3008,7 +3008,10 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         .expect("manual host handler start signal remains open");
     caller.abort();
     match caller.await {
-        Err(error) => assert!(error.is_cancelled(), "caller task failed unexpectedly: {error}"),
+        Err(error) => assert!(
+            error.is_cancelled(),
+            "caller task failed unexpectedly: {error}"
+        ),
         Ok(response) => {
             let queued_ack = peel_logs_envelope(assert_no_jsonrpc_error(
                 &response,
