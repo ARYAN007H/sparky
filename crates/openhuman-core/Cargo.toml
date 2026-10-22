@@ -53,6 +53,7 @@ crate-type = ["rlib"]
 # contracts. Unconditional because cron and module callbacks remain available
 # without the OpenHuman `flows` surface; engine and catalog implementations are
 # reached only through the loaded module's bus endpoints.
+tinyflows = { path = "../../vendor/tinyflows/crates/tinyflows" }
 tinyflows-bus = { path = "../../vendor/tinyflows/crates/tinyflows-bus" }
 # Reads the stores tinyflows hosts used before storage moved onto the ports
 # (`flows.db`, `jobs.db`, `checkpoints.db`, drafts). Only its pure SQLite readers
