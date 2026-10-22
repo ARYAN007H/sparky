@@ -86,8 +86,8 @@ use crate::agent::tinyagents::policy_denial::PolicyDenial;
 use crate::security::approval::{
     redact_args, summarize_action, ApprovalGate, ApprovalTurnContext, GateOutcome,
 };
+use crate::security::policy::CommandClass;
 use crate::security::policy::{GateDecision as PolicyGateDecision, SecurityPolicy};
-use tinybox_bus::CommandClass;
 use tinytools::{PermissionLevel, Tool};
 use tinytools::{ToolPolicyAction, ToolPolicySession};
 
@@ -291,7 +291,7 @@ impl OpenHumanSecurityGate {
         args: &serde_json::Value,
         analysis: &serde_json::Value,
     ) -> std::result::Result<PolicyGateDecision, String> {
-        let analysis: crate::modules::tinybox::contract::CommandAnalysis =
+        let analysis: crate::security::policy::CommandAnalysis =
             serde_json::from_value(analysis.clone())
                 .map_err(|_| "TinyBox command analysis is invalid".to_owned())?;
         let mut class: CommandClass = policy.check_gated_command_analysis(&analysis)?;
