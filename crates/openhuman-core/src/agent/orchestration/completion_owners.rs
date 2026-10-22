@@ -44,7 +44,7 @@ struct Owners {
     terminal_driver_tasks: HashMap<String, DriverTaskOwner>,
     terminal_driver_task_order: VecDeque<String>,
     driver_cancel_reasons: HashMap<String, String>,
-    deleting_threads: std::collections::HashSet<DriverThreadScope>,
+    deleting_threads: HashMap<DriverThreadScope, ThreadDeletionFence>,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -52,6 +52,12 @@ struct DriverThreadScope {
     profile: Option<String>,
     workspace_dir: PathBuf,
     thread_id: String,
+}
+
+#[derive(Default)]
+struct ThreadDeletionFence {
+    active_attempts: usize,
+    committed: bool,
 }
 
 #[derive(Clone)]
@@ -116,7 +122,7 @@ fn remember_active_driver_task(
             owner.workspace_dir.clone(),
             thread_id.to_owned(),
         );
-        if st.deleting_threads.contains(&scope) {
+        if st.deleting_threads.contains_key(&scope) {
             return Err("parent thread deletion is in progress".into());
         }
     }
@@ -144,6 +150,29 @@ fn driver_thread_scope(
     }
 }
 
+fn begin_thread_deletion_in(st: &mut Owners, scope: DriverThreadScope) {
+    st.deleting_threads
+        .entry(scope)
+        .or_default()
+        .active_attempts += 1;
+}
+
+fn commit_thread_deletion_in(st: &mut Owners, scope: DriverThreadScope) {
+    let fence = st.deleting_threads.entry(scope).or_default();
+    fence.committed = true;
+    fence.active_attempts = fence.active_attempts.saturating_sub(1);
+}
+
+fn release_thread_deletion_in(st: &mut Owners, scope: &DriverThreadScope) {
+    let Some(fence) = st.deleting_threads.get_mut(scope) else {
+        return;
+    };
+    fence.active_attempts = fence.active_attempts.saturating_sub(1);
+    if fence.active_attempts == 0 && !fence.committed {
+        st.deleting_threads.remove(scope);
+    }
+}
+
 /// Close owner registration before thread deletion starts its one-time child sweep.
 pub(crate) fn begin_thread_deletion(
     ctx: &crate::core::runtime::DispatchCtx,
@@ -154,7 +183,8 @@ pub(crate) fn begin_thread_deletion(
         .tenant()
         .map_err(|error| format!("cannot resolve profile for thread deletion: {error}"))?
         .profile;
-    owners().deleting_threads.insert(driver_thread_scope(
+    let mut st = owners();
+    begin_thread_deletion_in(&mut st, driver_thread_scope(
         profile,
         workspace_dir.to_path_buf(),
         thread_id.to_owned(),
@@ -172,7 +202,8 @@ pub(crate) fn commit_thread_deletion(
         .tenant()
         .map_err(|error| format!("cannot resolve profile for thread deletion: {error}"))?
         .profile;
-    owners().deleting_threads.insert(driver_thread_scope(
+    let mut st = owners();
+    commit_thread_deletion_in(&mut st, driver_thread_scope(
         profile,
         workspace_dir.to_path_buf(),
         thread_id.to_owned(),
@@ -187,7 +218,8 @@ pub(crate) fn release_thread_deletion(
     thread_id: &str,
 ) {
     let profile = ctx.tenant().ok().and_then(|tenant| tenant.profile);
-    owners().deleting_threads.remove(&driver_thread_scope(
+    let mut st = owners();
+    release_thread_deletion_in(&mut st, &driver_thread_scope(
         profile,
         workspace_dir.to_path_buf(),
         thread_id.to_owned(),
