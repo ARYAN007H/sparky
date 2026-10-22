@@ -26,10 +26,14 @@ async fn with_library_test_context_async<F: std::future::Future>(
     crate::core::runtime::CoreContext::scope(context, f()).await
 }
 
-struct ManagedRouteFixtureModel;
+struct ManagedRouteFixtureModel(tinyinference_llm::model::ModelProfile);
 
 #[async_trait::async_trait]
 impl ChatModel<()> for ManagedRouteFixtureModel {
+    fn profile(&self) -> Option<&tinyinference_llm::model::ModelProfile> {
+        Some(&self.0)
+    }
+
     async fn invoke(
         &self,
         _state: &(),
@@ -53,8 +57,13 @@ fn install_test_managed_provider() -> Arc<std::sync::Mutex<Vec<bool>>> {
         ChatModelEntry {
             build: Arc::new(move |request| {
                 seen.lock().unwrap().push(request.native_tool_calling);
+                let mut profile = tinyinference_llm::model::ModelProfile::default();
+                profile.provider = Some("managed".to_string());
+                profile.tool_calling = request.native_tool_calling;
+                profile.parallel_tool_calls = request.native_tool_calling;
+                profile.streaming_tool_chunks = request.native_tool_calling;
                 Ok((
-                    Arc::new(ManagedRouteFixtureModel),
+                    Arc::new(ManagedRouteFixtureModel(profile)),
                     request
                         .model_override
                         .or(request.default_model)
