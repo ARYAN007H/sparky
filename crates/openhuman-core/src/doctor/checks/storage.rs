@@ -84,11 +84,15 @@ async fn inspect_storage_config(check_id: &str, config: StorageConfig) -> Vec<Fi
         StorageConfig::MongoDb { uri, database } => {
             #[cfg(feature = "storage-mongodb")]
             {
-                match tinystoragedrivers::MongoStorage::connect(&uri, &database).await {
-                    Ok(_) => vec![Finding::pass(
+                let config = StorageConfig::MongoDb { uri, database };
+                match tinystoragedrivers::open(&config).await {
+                    Ok(storage) => {
+                        drop(storage);
+                        vec![Finding::pass(
                         check_id,
                         "The selected MongoDB server answered a read-only hello request.",
-                    )],
+                        )]
+                    }
                     Err(_) => vec![Finding::error(
                         check_id,
                         "The selected MongoDB server could not be reached.",
