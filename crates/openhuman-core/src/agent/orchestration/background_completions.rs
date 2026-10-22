@@ -38,7 +38,7 @@ pub(super) use store_adapter::{
 pub(super) use store_adapter::{
     entry_for, router_for_workspace, router_scope, test_store_overrides,
 };
-use thread_index::{key, note_thread_workspace};
+use thread_index::key;
 pub(crate) use thread_index::{
     note_session_thread, note_thread_workspace, router_for_thread, thread_for_session,
     workspace_for_thread,
@@ -49,7 +49,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use tinyagents_orchestration::subagent::{
-    record_detached_completion, DetachedCompletionTarget, DetachedSubagentStatus,
+    DetachedCompletionTarget, DetachedSubagentStatus, record_detached_completion,
 };
 use tinyagents_tasks::{
     CompletionRecord, CompletionResult, CompletionRouter, CompletionState, CompletionStore,
@@ -57,15 +57,15 @@ use tinyagents_tasks::{
 };
 
 use super::completion_notice::BackgroundCompletionFormatter;
-pub(crate) use super::completion_notice::{BackgroundAgentOutcome, AWAITING_INPUT_LABEL};
+pub(crate) use super::completion_notice::{AWAITING_INPUT_LABEL, BackgroundAgentOutcome};
+pub(crate) use super::completion_target::CompletionTarget;
 use super::completion_target::awaiting_input_record_id;
 #[cfg(test)]
 pub(crate) use super::completion_target::claim_recovery;
 #[cfg(test)]
 pub(crate) use super::completion_target::tests::{
-    forget_workspace_for_test, install_store_for_test, TestWorkspace,
+    TestWorkspace, forget_workspace_for_test, install_store_for_test,
 };
-pub(crate) use super::completion_target::CompletionTarget;
 pub(crate) use super::completion_target::{claim_recovery_ctx, forget_recovery_ctx};
 
 /// How long a settled record (delivered / gave up / tombstoned) is kept before
