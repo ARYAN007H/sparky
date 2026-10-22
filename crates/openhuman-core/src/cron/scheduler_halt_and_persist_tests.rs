@@ -315,6 +315,8 @@ async fn run_agent_job_returns_error_without_provider_key() {
             true,
         )
         .expect("store isolated test session");
+    crate::inference::provider::factory::access_gates::verify_backend_session_active(&config)
+        .expect("test session satisfies the backend gate");
     let mut job = test_job("");
     job.job_type = JobType::Agent;
     job.prompt = Some("Say hello".into());
