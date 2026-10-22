@@ -406,13 +406,6 @@
     "occurrence": 1
   },
   {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/inference/host_runtime/ops/runtime_ops.rs",
-    "line": 32,
-    "text": "tokio::spawn(async move {",
-    "occurrence": 1
-  },
-  {
     "rule": "ambient-config",
     "path": "crates/openhuman-core/src/inference/http/backend.rs",
     "line": 43,
@@ -438,13 +431,6 @@
     "path": "crates/openhuman-core/src/inference/provider/factory/access_gates.rs",
     "line": 222,
     "text": "crate::core::runtime::context::CoreContext::current()",
-    "occurrence": 1
-  },
-  {
-    "rule": "ambient-config",
-    "path": "crates/openhuman-core/src/inference/provider/ops/models/catalog_listing.rs",
-    "line": 84,
-    "text": "let config = crate::config::Config::load_or_init()",
     "occurrence": 1
   },
   {

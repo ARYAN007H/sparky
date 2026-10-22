@@ -28,7 +28,16 @@ const embedContractExports = new Map(
     ],
     [
       "crates/openhuman-embed/src/budget.rs",
-      ["pub use tinyinference_llm::model::budget::{Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits};"],
+      [
+        "pub use tinyagents_harness::cost::{ControlledDispatchError, DispatchModelOptions, DispatchRefusal, DispatchRefusalReason, PhysicalDispatchAdmission, PhysicalDispatchPermit};",
+        "pub use tinyinference_llm::model::budget::{Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits};",
+      ],
+    ],
+    [
+      "crates/openhuman-embed/src/complete.rs",
+      [
+        "pub use tinyagents_harness::observability::{PhysicalDispatchMetadata, PhysicalDispatchObserver, PhysicalDispatchOutcome, PhysicalDispatchStatus, PhysicalDispatchTerminal, PhysicalDispatchUsage};",
+      ],
     ],
     [
       "crates/openhuman-embed/src/config.rs",
@@ -471,7 +480,11 @@ function assertSelfTests() {
   const policyExport = [{ text: "pub use tinytools::ToolPolicy;" }];
   if (
     !isEmbedContractExport(embedPath, policyExport, 0) ||
-    isEmbedContractExport("crates/openhuman-core/src/lib.rs", policyExport, 0) ||
+    isEmbedContractExport(
+      "crates/openhuman-core/src/lib.rs",
+      policyExport,
+      0,
+    ) ||
     isEmbedContractExport(
       embedPath,
       [{ text: "pub use tinytools::{ToolPolicy, ToolRegistry};" }],
@@ -500,14 +513,20 @@ function assertSelfTests() {
       "agent-runtime boundary self-test: embed tool injection contract must stay exact",
     );
   const stopExport = [
-    { text: "pub use tinyagents_harness::middleware::{StopDecision, StopHook};" },
+    {
+      text: "pub use tinyagents_harness::middleware::{StopDecision, StopHook};",
+    },
   ];
   if (
     !isEmbedContractExport(embedPath, stopExport, 0) ||
     isEmbedContractExport("crates/openhuman-core/src/lib.rs", stopExport, 0) ||
     isEmbedContractExport(
       embedPath,
-      [{ text: "pub use tinyagents_harness::middleware::{StopDecision, StopHook, TurnState};" }],
+      [
+        {
+          text: "pub use tinyagents_harness::middleware::{StopDecision, StopHook, TurnState};",
+        },
+      ],
       0,
     )
   )
@@ -662,7 +681,7 @@ for (const path of await filesUnder(
         );
       const namesTaskLocalAccessor = taskLocalAccessors.some(
         (name) =>
-          new RegExp(`\\b${escapeRegex(name)}\\s*\\(`).test(text) ||
+          new RegExp(`(?<!\\.)\\b${escapeRegex(name)}\\s*\\(`).test(text) ||
           (/\b(?:pub(?:\([^)]*\))?\s+)?use\b/.test(text) &&
             new RegExp(`\\b${escapeRegex(name)}\\b`).test(text)),
       );
