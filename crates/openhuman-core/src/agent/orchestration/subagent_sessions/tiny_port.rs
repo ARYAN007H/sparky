@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use tinyagents_orchestration::subagent::{
     DriverSubagentSessionStore, DurableSubagentSession as TinySession,
     DurableSubagentStatus as TinyStatus, ReuseDecision as TinyReuseDecision,
@@ -13,6 +14,35 @@ use tinyagents_orchestration::subagent::{
 
 use super::types::{DurableSubagentSession, DurableSubagentStatus, SubagentSessionSelector};
 use super::{SubagentSessionStore, SubagentSessionUpsert};
+
+const EPOCHS: &str = "subagents.session_epochs";
+
+#[derive(Deserialize, Serialize)]
+struct ParentEpochRecord {
+    parent_epoch: u64,
+}
+
+fn import_parent_epoch(
+    documents: Arc<dyn crate::storage::DocumentStore>,
+    session_id: String,
+    parent_epoch: Option<u64>,
+) -> Result<(), SubagentError> {
+    let Some(parent_epoch) = parent_epoch else {
+        return Ok(());
+    };
+    crate::storage::block_on(async move {
+        documents
+            .ensure_collection(&tinystoragedrivers::CollectionSpec::new(EPOCHS))
+            .await?;
+        let repo = tinystoragedrivers::Repo::<ParentEpochRecord>::new(&documents, EPOCHS)?;
+        repo.update(&session_id, move |_| {
+            Ok(Some(ParentEpochRecord { parent_epoch }))
+        })
+        .await?;
+        Ok(())
+    })
+    .map_err(|error| SubagentError::Persistence(format!("import parent epoch: {error}")))
+}
 
 /// Opens TinyAgents' async session store in the caller's explicit storage
 /// scope and binds it to one parent session/thread. The core's storage handle
@@ -101,6 +131,11 @@ fn import_host_sessions(
     for row in legacy.into_iter().filter(|row| {
         row.parent_session == parent_session && row.parent_thread_id.as_deref() == parent_thread_id
     }) {
+        import_parent_epoch(
+            Arc::clone(&documents),
+            row.subagent_session_id.clone(),
+            row.parent_epoch,
+        )?;
         let session = converter.convert(row)?;
         let id = session.subagent_session_id.clone();
         let docs = Arc::clone(&documents);
