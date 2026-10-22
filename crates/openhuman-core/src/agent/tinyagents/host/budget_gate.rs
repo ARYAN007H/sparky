@@ -238,8 +238,8 @@ impl OpenHumanBudgetGate {
             Some(est.model.clone())
         };
         // With no model to name, the call still counts against every budget
-        // that doesn't depend on it (global, thread, agent, user agent); only
-        // a model-scoped budget can't match it.
+        // that doesn't depend on it (global, thread, agent, user agent);
+        // model-scoped budgets skip an empty model (`budget::bucket_of`).
         let model = model.unwrap_or_else(|| {
             log::debug!(
                 "[tinyagents][budget] no model for estimate; checking model-independent budgets"

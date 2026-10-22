@@ -256,7 +256,12 @@ fn auth_errors_stay_in_the_scope_that_recorded_them() {
                     .as_array()
                     .expect("errors array")
                     .iter()
-                    .map(|error| error["provider"].as_str().unwrap_or_default().to_owned())
+                    .map(|error| {
+                        (
+                            error["provider"].as_str().unwrap_or_default().to_owned(),
+                            error["status"].as_u64().unwrap_or_default(),
+                        )
+                    })
                     .collect::<Vec<_>>()
             })
         };
@@ -267,11 +272,22 @@ fn auth_errors_stay_in_the_scope_that_recorded_them() {
         })
         .await;
         CoreContext::scope(context_b.clone(), async {
-            record("shared-provider", 401);
+            record("shared-provider", 403);
         })
         .await;
 
-        assert_eq!(rpc_providers(context_b.clone()).await, ["shared-provider"]);
+        // Each scope sees its own failures, with its own status.
+        assert_eq!(
+            rpc_providers(context_b.clone()).await,
+            [("shared-provider".to_owned(), 403)]
+        );
+        assert_eq!(
+            rpc_providers(context_a.clone()).await,
+            [
+                ("shared-provider".to_owned(), 401),
+                ("tenant-a-only".to_owned(), 401)
+            ]
+        );
 
         CoreContext::scope(context_a.clone(), async {
             clear("shared-provider");
@@ -279,10 +295,13 @@ fn auth_errors_stay_in_the_scope_that_recorded_them() {
         .await;
         assert_eq!(
             rpc_providers(context_b).await,
-            ["shared-provider"],
+            [("shared-provider".to_owned(), 403)],
             "tenant A re-keying cleared tenant B's notice"
         );
-        assert_eq!(rpc_providers(context_a).await, ["tenant-a-only"]);
+        assert_eq!(
+            rpc_providers(context_a).await,
+            [("tenant-a-only".to_owned(), 401)]
+        );
         reset_for_tests();
     });
 }

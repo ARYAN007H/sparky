@@ -19,7 +19,7 @@
 //! and an unguarded publish would re-flood the notification center the same
 //! way the raw error flooded Sentry.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -59,17 +59,23 @@ pub fn auth_error_message(provider: &str, status: u16) -> String {
 /// a 401 that repeats per-retry doesn't re-notify. An existing entry is
 /// refreshed (status / timestamp) and returns `false`.
 pub fn record(provider: &str, status: u16) -> bool {
-    let scope = current_scope();
+    let timestamp_ms = now_ms();
     let changed = registry().record(ProviderAuthError {
         provider: provider.to_string(),
         status,
         message: auth_error_message(provider, status),
-        timestamp_ms: now_ms(),
+        timestamp_ms,
     });
     let mut origins = origins().lock().unwrap_or_else(|error| error.into_inner());
     let entry = origins.entry(provider.to_owned()).or_default();
-    if let Some(scope) = scope {
-        entry.scopes.insert(scope);
+    if let CurrentScope::Bound(scope) = current_scope() {
+        entry.scopes.insert(
+            scope,
+            ScopedFailure {
+                status,
+                timestamp_ms,
+            },
+        );
     } else {
         entry.unscoped = true;
     }
@@ -83,10 +89,21 @@ pub fn record(provider: &str, status: u16) -> bool {
 /// fresh failure re-notifies.
 pub fn clear(provider: &str) -> bool {
     let mut origins = origins().lock().unwrap_or_else(|error| error.into_inner());
-    if let (Some(scope), Some(origin)) = (current_scope(), origins.get_mut(provider)) {
-        origin.scopes.remove(&scope);
-        if !origin.scopes.is_empty() || origin.unscoped {
+    match current_scope() {
+        CurrentScope::Unbound => {}
+        CurrentScope::Unresolved(error) => {
+            log::warn!(
+                "[auth-errors] clear provider={provider} skipped: scope unresolved ({error})"
+            );
             return false;
+        }
+        CurrentScope::Bound(scope) => {
+            if let Some(origin) = origins.get_mut(provider) {
+                origin.scopes.remove(&scope);
+                if !origin.scopes.is_empty() || origin.unscoped {
+                    return false;
+                }
+            }
         }
     }
     origins.remove(provider);
@@ -99,28 +116,58 @@ pub fn snapshot() -> Vec<ProviderAuthError> {
     registry().snapshot()
 }
 
-/// The auth errors the current workspace/tenant may see: those it recorded.
-/// Without a bound context (a single-user process) every error is its own.
-pub fn snapshot_current_scope() -> Vec<ProviderAuthError> {
-    let Some(scope) = current_scope() else {
-        return snapshot();
+/// The auth errors the current workspace/tenant may see: those it recorded,
+/// with its own status and time. Without a bound context (a single-user
+/// process) every error is its own; a bound context whose workspace can't be
+/// resolved gets an error rather than every scope's failures.
+pub fn snapshot_current_scope() -> Result<Vec<ProviderAuthError>, String> {
+    let scope = match current_scope() {
+        CurrentScope::Unbound => return Ok(snapshot()),
+        CurrentScope::Unresolved(error) => return Err(error),
+        CurrentScope::Bound(scope) => scope,
     };
     let origins = origins().lock().unwrap_or_else(|error| error.into_inner());
-    registry()
+    Ok(registry()
         .snapshot()
         .into_iter()
-        .filter(|error| {
-            origins
-                .get(&error.provider)
-                .is_some_and(|origin| origin.scopes.contains(&scope))
+        .filter_map(|error| {
+            let own = origins.get(&error.provider)?.scopes.get(&scope)?;
+            Some(own.view(error))
         })
-        .collect()
+        .collect())
 }
 
 #[derive(Default)]
 struct ErrorOrigins {
-    scopes: HashSet<ScopeIdentity>,
+    /// Each scope's own latest failure for the provider.
+    scopes: HashMap<ScopeIdentity, ScopedFailure>,
     unscoped: bool,
+}
+
+#[derive(Clone, Copy)]
+struct ScopedFailure {
+    status: u16,
+    timestamp_ms: u64,
+}
+
+impl ScopedFailure {
+    /// `error` as this scope saw it.
+    fn view(self, error: ProviderAuthError) -> ProviderAuthError {
+        ProviderAuthError {
+            message: auth_error_message(&error.provider, self.status),
+            status: self.status,
+            timestamp_ms: self.timestamp_ms,
+            provider: error.provider,
+        }
+    }
+}
+
+enum CurrentScope {
+    /// No core context is bound (a single-user process).
+    Unbound,
+    /// A bound context whose workspace binding could not be read.
+    Unresolved(String),
+    Bound(ScopeIdentity),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -135,14 +182,18 @@ fn origins() -> &'static Mutex<HashMap<String, ErrorOrigins>> {
     ORIGINS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn current_scope() -> Option<ScopeIdentity> {
-    let context = crate::core::runtime::CoreContext::current()?;
-    let (workspace, config_path) = context.workspace_config_binding().ok()?;
-    Some(ScopeIdentity {
-        workspace,
-        config_path,
-        tenant: context.profile().unwrap_or_default().to_owned(),
-    })
+fn current_scope() -> CurrentScope {
+    let Some(context) = crate::core::runtime::CoreContext::current() else {
+        return CurrentScope::Unbound;
+    };
+    match context.workspace_config_binding() {
+        Ok((workspace, config_path)) => CurrentScope::Bound(ScopeIdentity {
+            workspace,
+            config_path,
+            tenant: context.profile().unwrap_or_default().to_owned(),
+        }),
+        Err(error) => CurrentScope::Unresolved(error),
+    }
 }
 
 /// Auth failures scoped to the current workspace/tenant. Known foreign
@@ -167,7 +218,7 @@ pub fn snapshot_for_scope(
             let Some(origin) = origins.get(&error.provider) else {
                 return false;
             };
-            let partial_match = origin.scopes.iter().any(|recorded| {
+            let partial_match = origin.scopes.keys().any(|recorded| {
                 recorded.config_path.is_none()
                     && recorded.workspace == scope.workspace
                     && recorded.tenant == scope.tenant
@@ -175,7 +226,7 @@ pub fn snapshot_for_scope(
             if partial_match {
                 has_unscoped = true;
             }
-            if origin.scopes.contains(&scope) {
+            if origin.scopes.contains_key(&scope) {
                 return true;
             }
             if !partial_match {
