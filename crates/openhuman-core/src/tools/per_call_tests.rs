@@ -48,8 +48,8 @@ fn chat(thread: &str) -> ApprovalChatContext {
 }
 
 fn tool() -> PerCallTool<Probe> {
-    PerCallTool::new(|chat, _ctx| Probe {
-        built_for: chat.cloned(),
+    PerCallTool::new(super::context, |context| Probe {
+        built_for: context.chat,
     })
 }
 
@@ -120,10 +120,10 @@ async fn each_call_is_built_around_its_runs_dispatch_context() {
 
     let seen: Arc<Mutex<Vec<Option<Arc<CoreContext>>>>> = Arc::default();
     let sink = Arc::clone(&seen);
-    let tool = PerCallTool::new(move |chat, ctx: &DispatchCtx| {
-        sink.lock().unwrap().push(ctx.core().cloned());
+    let tool = PerCallTool::new(super::context, move |context| {
+        sink.lock().unwrap().push(context.dispatch.core().cloned());
         Probe {
-            built_for: chat.cloned(),
+            built_for: context.chat,
         }
     });
     seen.lock().unwrap().clear();

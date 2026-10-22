@@ -27,3 +27,7 @@ pub(crate) fn context(context: Option<&dyn ToolRunContext>) -> PerCallContext {
         dispatch: dispatch_ctx_for_tool(context),
     }
 }
+
+#[cfg(test)]
+#[path = "per_call_tests.rs"]
+mod tests;
