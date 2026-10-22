@@ -90,7 +90,8 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
             &task_id,
             None,
             reason.as_deref(),
-        )?;
+        )
+        .await?;
         if cancelled_subagent.is_none()
             && ctx.resolved().is_none()
             && !crate::core::runtime::is_saas()
@@ -105,7 +106,8 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                 &task_id,
                 Some(&config.workspace_dir),
                 reason.as_deref(),
-            )?;
+            )
+            .await?;
         }
         let (cancelled, outcome) = match cancelled_subagent {
             // Finished before the click landed (it stays registered until the
@@ -130,15 +132,21 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     // A paused job has already returned from that hook, so this
                     // handler settles and reports that one terminal transition.
                     if let Some(paused) = meta.driver_pause.as_ref() {
-                        settle_paused_driver_cancel(
+                        let transitioned = settle_paused_driver_cancel(
                             &ctx,
                             paused,
                             meta.parent_epoch,
                             reason.as_deref(),
                         )
                         .await?;
+                        if !transitioned {
+                            (false, Some("unknown"))
+                        } else {
+                            (true, None)
+                        }
+                    } else {
+                        (true, None)
                     }
-                    (true, None)
                 } else {
                     let summary = match reason.as_deref().map(str::trim).filter(|r| !r.is_empty()) {
                         Some(r) => format!(
@@ -201,14 +209,27 @@ async fn settle_paused_driver_cancel(
     parent_epoch: Option<u64>,
     reason: Option<&str>,
 ) -> Result<bool, String> {
-    let store = subagent_sessions::SubagentSessionStore::new(paused.workspace_dir.clone());
-    let transitioned = subagent_sessions::mark_driver_pause_cancelled(&store, paused)
+    if paused.lifecycle_key.is_none() {
+        return Err("subagent_cancel: paused driver child has no lifecycle key".into());
+    }
+    let store = subagent_sessions::open_for_context(
+        ctx,
+        paused.workspace_dir.clone(),
+        paused.parent_session.clone(),
+        paused.parent_thread_id.clone(),
+        None,
+    )
+    .map_err(|error| format!("subagent_cancel: failed to open paused child store: {error}"))?;
+    let error = match reason.map(str::trim).filter(|reason| !reason.is_empty()) {
+        Some(reason) => format!("cancelled by user. Reason: {reason}"),
+        None => "cancelled by user".to_string(),
+    };
+    let transitioned = store
+        .mark_failed(&paused.subagent_session_id, &paused.task_id, error.clone())
+        .await
         .map_err(|error| format!("subagent_cancel: failed to settle paused child: {error}"))?;
     if transitioned {
-        let error = match reason.map(str::trim).filter(|reason| !reason.is_empty()) {
-            Some(reason) => format!("cancelled by user. Reason: {reason}"),
-            None => "cancelled by user".to_string(),
-        };
+        crate::agent::orchestration::completion_owners::finish_driver_task(ctx, &paused.task_id);
         let parent_epoch = paused
             .parent_thread_id
             .as_ref()

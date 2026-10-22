@@ -3,7 +3,6 @@
 
 mod cancel;
 mod registry;
-mod resolve;
 mod roster;
 mod task_ledger;
 

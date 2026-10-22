@@ -123,11 +123,27 @@ async fn cancel_of_a_legacy_failed_run_reports_its_outcome_and_rewrites_nothing(
     let ctx = DispatchCtx::new(Arc::clone(&core));
     let mut params = Map::new();
     params.insert("taskId".into(), json!("sub-rpc-failed"));
-    let out = handle_subagent_cancel(ctx, params)
+    let out = handle_subagent_cancel(ctx.clone(), params)
         .await
         .expect("handler ok");
     assert_eq!(field(&out, "cancelled"), Some(json!(false)));
     assert_eq!(field(&out, "outcome"), Some(json!("failed")));
+    let driver = crate::agent::orchestration::subagent_sessions::open_for_context(
+        &ctx,
+        workspace.path().to_path_buf(),
+        "session-rpc",
+        Some("thread-rpc".into()),
+        None,
+    )
+    .expect("driver session store");
+    let imported = driver
+        .list_for_parent("session-rpc", Some("thread-rpc"))
+        .await
+        .expect("driver rows");
+    assert!(imported.iter().any(|session| {
+        session.current_task_id.as_deref() == Some("sub-rpc-failed")
+            && session.status == tinyagents_orchestration::subagent::DurableSubagentStatus::Failed
+    }));
     assert_eq!(
         serde_json::to_string(&store.load().expect("store still readable")).expect("encode"),
         before,
@@ -141,9 +157,10 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
         forget_workspace_for_test, pending_for,
     };
     use crate::agent::orchestration::subagent_sessions::{
-        mark_finished, upsert_running, DriverTaskCancellation, DurableSubagentStatus,
-        SubagentSessionSelector, SubagentSessionStore, SubagentSessionUpsert,
+        mark_finished, upsert_running, DriverTaskCancellation, SubagentSessionSelector,
+        SubagentSessionStore, SubagentSessionUpsert,
     };
+    use std::sync::Arc;
     use tinyagents_orchestration::subagent::SubagentTaskKey;
     use tinyagents_tasks::CompletionStatus;
 
@@ -208,8 +225,24 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
     };
 
     forget_workspace_for_test(&workspace_dir);
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace_dir.clone();
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config,
+    );
+    let ctx = DispatchCtx::new(Arc::clone(&core));
+    crate::agent::orchestration::completion_owners::note_driver_task(
+        &ctx,
+        task_id,
+        workspace_dir.clone(),
+        tinytools::WorkspaceDescriptor::new(workspace_dir.clone()),
+        parent_session.into(),
+        parent_thread.clone(),
+    )
+    .expect("paused child owner registered");
     assert!(settle_paused_driver_cancel(
-        &DispatchCtx::process_default(),
+        &ctx,
         &observed,
         observed.parent_epoch,
         Some("user requested stop")
@@ -217,8 +250,34 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
     .await
     .expect("paused cancellation settles"));
 
-    let row = store.load().unwrap().remove(0);
-    assert_eq!(row.status, DurableSubagentStatus::Failed);
+    let driver = crate::agent::orchestration::subagent_sessions::open_for_context(
+        &ctx,
+        workspace_dir.clone(),
+        parent_session,
+        parent_thread.clone(),
+        None,
+    )
+    .expect("scoped driver session store");
+    let row = driver
+        .list_for_parent(parent_session, parent_thread.as_deref())
+        .await
+        .expect("driver session list")
+        .into_iter()
+        .find(|row| row.subagent_session_id == session.subagent_session_id)
+        .expect("paused driver row remains stored");
+    assert_eq!(
+        row.status,
+        tinyagents_orchestration::subagent::DurableSubagentStatus::Failed
+    );
+    assert!(
+        crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+            &ctx,
+            &workspace_dir,
+            parent_thread.as_deref().expect("parent thread"),
+        )
+        .is_empty(),
+        "settled paused child releases its active owner slot"
+    );
     let delivery = pending_for(&workspace_dir, parent_thread.as_deref().unwrap());
     assert_eq!(delivery.len(), 1);
     assert_eq!(delivery[0].status, CompletionStatus::Failed);

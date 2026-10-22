@@ -47,10 +47,29 @@ pub(crate) fn detached_subagent_parent(
 ) -> anyhow::Result<RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>> {
     let data = parent.data.detached_child();
     let cancellation = data.cancellation.clone();
+    let workspace = parent
+        .workspace
+        .clone()
+        .or_else(|| {
+            data.parent
+                .as_ref()
+                .and_then(|context| context.workspace_descriptor.clone())
+        })
+        .or_else(|| {
+            data.parent
+                .as_ref()
+                .map(|context| tinytools::WorkspaceDescriptor::new(context.workspace_dir.clone()))
+        });
     let config = RunConfig::new(format!("{run_name}-{}", uuid::Uuid::new_v4()));
     parent
         .child(config, data)
-        .map(|context| context.with_cancellation(cancellation))
+        .map(|context| {
+            let context = context.with_cancellation(cancellation);
+            match workspace {
+                Some(workspace) => context.with_workspace(workspace),
+                None => context,
+            }
+        })
         .map_err(|error| anyhow::anyhow!(error.to_string()))
 }
 

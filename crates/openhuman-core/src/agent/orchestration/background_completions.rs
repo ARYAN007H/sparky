@@ -38,9 +38,10 @@ pub(super) use store_adapter::{
 pub(super) use store_adapter::{
     entry_for, router_for_workspace, router_scope, test_store_overrides,
 };
-use thread_index::{key, note_thread_workspace};
+use thread_index::key;
 pub(crate) use thread_index::{
-    note_session_thread, router_for_thread, thread_for_session, workspace_for_thread,
+    note_session_thread, note_thread_workspace, router_for_thread, thread_for_session,
+    workspace_for_thread,
 };
 
 use std::path::{Path, PathBuf};

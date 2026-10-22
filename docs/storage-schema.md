@@ -340,6 +340,7 @@ Migration steps:
 
 | Kind | Name | Version | Scope | Indexed fields |
 | --- | --- | --- | --- | --- |
+| collection | `subagents.session_epochs` | 1 | agent |  |
 | collection | `subagents.sessions` | 2 | agent |  |
 
 Migration steps:

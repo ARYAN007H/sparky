@@ -11,11 +11,11 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
 use tinyagents_orchestration::subagent::{
-    orphaned_subagent_reason, record_agent_id, record_parent_session, task_status_label,
+    orphaned_subagent_reason, record_agent_id, record_parent_session, task_status_label, WaitError,
 };
 use tinyagents_tasks::{
-    reconcile_orphaned_tasks, DriverTaskStore, InMemoryTaskStore, OrchestrationTaskFilter,
-    TaskStore, TaskStoreRegistry,
+    open_driver_task_store_or_memory, reconcile_orphaned_tasks, InMemoryTaskStore,
+    OrchestrationTaskFilter, TaskStore, TaskStoreRegistry,
 };
 
 /// One cached ledger: a workspace and the storage scope it was opened for.
@@ -49,9 +49,9 @@ fn task_stores() -> &'static TaskStoreRegistry<LedgerKey> {
 fn open_driver_store(workspace_dir: &Path) -> anyhow::Result<Arc<dyn TaskStore>> {
     let opened = crate::storage::local::open(DOMAIN, workspace_dir)?;
     let scoped = opened.scoped()?;
-    let store = DriverTaskStore::new(Arc::clone(scoped.documents()))
-        .map_err(|error| anyhow::anyhow!("start the task store bridge: {error}"))?;
-    Ok(Arc::new(store))
+    Ok(open_driver_task_store_or_memory(Arc::clone(
+        scoped.documents(),
+    )))
 }
 
 /// The cache key for this call: the storage scope joins the workspace, so two
@@ -87,6 +87,24 @@ pub(crate) fn task_store_for_workspace(workspace_dir: &Path) -> Arc<dyn TaskStor
             Arc::new(InMemoryTaskStore::new())
         }
     }
+}
+
+/// Open the caller's task store in its captured scope. SaaS calls without a
+/// resolved owner fail closed rather than falling back to ambient storage.
+pub(super) fn scoped_task_store(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &Path,
+) -> Result<Arc<dyn TaskStore>, WaitError> {
+    if let Some(context) = ctx.resolved() {
+        return Ok(crate::core::runtime::CoreContext::sync_scope(
+            context,
+            || task_store_for_workspace(workspace_dir),
+        ));
+    }
+    if crate::core::runtime::is_saas() {
+        return Err(WaitError::NotOwned);
+    }
+    Ok(task_store_for_workspace(workspace_dir))
 }
 
 /// Restart/resume reconciliation for detached sub-agents (issue #4249 / 07.2

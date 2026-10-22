@@ -4,19 +4,24 @@ mod store;
 pub use storage_schema::storage_schema;
 mod store_documents;
 mod tiny_port;
+mod tiny_port_epoch;
 mod types;
 
+#[cfg(test)]
+pub(crate) use ops::cancel_driver_job_by_task;
 pub use ops::{
-    action_root_key, cancel_driver_job_by_task, cancel_driver_job_for_observed_session,
-    cancel_driver_jobs_for_thread, close_if_current, find_reusable, list_for_parent,
-    mark_driver_pause_cancelled, mark_failed, mark_finished, normalize_task_key,
-    resolve_lifecycle_key, reuse_decision, upsert_running, DriverTaskCancellation,
+    action_root_key, cancel_driver_job_for_observed_session, cancel_driver_jobs_for_thread,
+    close_if_current, find_reusable, list_for_parent, mark_failed, mark_finished,
+    normalize_task_key, resolve_driver_lifecycle_key, resolve_lifecycle_key, reuse_decision,
+    upsert_running, DriverTaskCancellation,
 };
+#[cfg(test)]
 pub(crate) use tiny_port::OpenHumanTinySubagentSessionStore;
+pub(crate) use tiny_port::{host_projection, import_terminal_task_for_context, open_for_context};
+pub(crate) use tiny_port_epoch::{parent_epoch_for_context, set_parent_epoch_for_context};
 pub use types::{
     DurableSubagentStatus, SubagentSessionSelector, SubagentSessionStore, SubagentSessionUpsert,
 };
-// Test-only: the host keeps the raw durable row private to its persistence
-// adapter and exposes scoped operations to production callers.
-#[cfg(test)]
-pub use types::DurableSubagentSession;
+// The spawn compatibility adapter retains this host projection while the
+// remaining lifecycle writers migrate to TinyAgents' durable store.
+pub(crate) use types::DurableSubagentSession;

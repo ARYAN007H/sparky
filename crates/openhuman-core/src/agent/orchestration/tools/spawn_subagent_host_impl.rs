@@ -11,25 +11,19 @@ impl SpawnSubagentTool {
             >,
         >,
     ) -> anyhow::Result<ToolResult> {
-        let dispatch = run_context.dispatch_ctx();
-        let AsyncSpawnArgs {
+        spawn_subagent_preflight!(
+            dispatch,
             agent_id,
-            mut prompt,
+            prompt,
             context,
             model_override,
             task_title,
             task_key,
             force_fresh,
-        } = decode_async_spawn_args(&args);
-
-        if let Some(refusal) = refuse_empty_spawn_args(&agent_id, &prompt) {
-            return Ok(refusal);
-        }
-        let Some(detached_parent) = detached_parent else {
-            return Ok(ToolResult::error(
-                "spawn_subagent requires a live harness run context.",
-            ));
-        };
+            run_context,
+            args,
+            detached_parent
+        );
 
         let parent = match run_context.parent.clone() {
             Some(parent) => parent,
@@ -48,39 +42,7 @@ impl SpawnSubagentTool {
             )));
         }
 
-        let registry =
-            match AgentDefinitionRegistry::for_core_context(run_context.dispatch_ctx().into_core())
-            {
-                Some(registry) => registry,
-                None => {
-                    return Ok(ToolResult::error(
-                        "spawn_subagent: AgentDefinitionRegistry has not been initialised",
-                    ));
-                }
-            };
-        let definition = match registry.get(&agent_id).cloned() {
-            Some(definition) => definition,
-            None => {
-                let available: Vec<&str> = registry.list().iter().map(|d| d.id.as_str()).collect();
-                return Ok(ToolResult::error(format!(
-                    "spawn_subagent: unknown agent_id '{agent_id}'. Available: {}",
-                    available.join(", ")
-                )));
-            }
-        };
-
-        if !parent.allowed_subagent_ids.contains(&definition.id) {
-            log::warn!(
-                "[spawn_subagent] blocked subagent outside allowlist parent={} requested={} allowed={:?}",
-                parent.agent_definition_id,
-                definition.id,
-                parent.allowed_subagent_ids
-            );
-            return Ok(ToolResult::error(format!(
-                "spawn_subagent: agent '{}' is not in parent agent '{}' subagents.allowlist",
-                definition.id, parent.agent_definition_id
-            )));
-        }
+        spawn_subagent_definition!(definition, run_context, agent_id, parent);
 
         let parent_session = parent.session_id.clone();
         let progress_sink = parent.on_progress.clone();
@@ -89,10 +51,38 @@ impl SpawnSubagentTool {
             .or(run_context.thread_id.as_deref())
             .map(str::to_owned);
 
-        let store = SubagentSessionStore::new(parent.workspace_dir.clone());
+        let store =
+            match SubagentSessionStore::new_in_context(&dispatch, parent.workspace_dir.clone()) {
+                Ok(store) => store,
+                Err(error) => {
+                    return Ok(ToolResult::error(format!(
+                        "spawn_subagent: failed to open the caller-scoped session store: {error}"
+                    )));
+                }
+            };
+        let jobs = crate::core::runtime::slot_for::<
+            tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        >(&dispatch);
+        let driver_store = match subagent_sessions::open_for_context(
+            &dispatch,
+            parent.workspace_dir.clone(),
+            parent_session.clone(),
+            parent_thread_id.clone(),
+            Some((*jobs).clone()),
+        ) {
+            Ok(store) => store,
+            Err(error) => {
+                return Ok(ToolResult::error(format!(
+                    "spawn_subagent: failed to open the caller-scoped driver session store: {error}"
+                )));
+            }
+        };
         let workspace_descriptor = tool_context
             .and_then(|ctx| ctx.workspace().cloned())
             .or_else(|| run_context.workspace.clone());
+        let task_workspace = workspace_descriptor
+            .clone()
+            .unwrap_or_else(|| tinytools::WorkspaceDescriptor::new(parent.workspace_dir.clone()));
         let resolved_model = definition.model.resolve(parent.model_name.as_str());
         let target_model = model_override.as_deref().unwrap_or(&resolved_model);
         if crate::attachments::should_forward_parent_images(&prompt)
@@ -168,68 +158,18 @@ impl SpawnSubagentTool {
             task_key: task_key.clone(),
         };
 
-        let reusable = if force_fresh {
-            match subagent_sessions::find_reusable(&store, &selector) {
-                Ok(Some(session)) => {
-                    let jobs = crate::core::runtime::slot_for::<
-                        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
-                    >(&dispatch);
-                    let cancelled = subagent_sessions::cancel_driver_job_for_observed_session(
-                        &store,
-                        &parent.workspace_dir.join(".openhuman/subagent_checkpoints"),
-                        &jobs,
-                        &session,
-                        &parent_session,
-                        parent_thread_id.as_deref(),
-                    );
-                    if !cancelled {
-                        let _ = running_subagents::cancel_by_session_in_workspace(
-                            &dispatch,
-                            &session.subagent_session_id,
-                            &parent_session,
-                            &parent.workspace_dir,
-                        );
-                    }
-                    match subagent_sessions::close_if_current(&store, &session) {
-                        Ok(true) => {}
-                        Ok(false) => {
-                            return Ok(ToolResult::error(
-                                "spawn_subagent: reusable session changed during fresh start; retry with the current session",
-                            ));
-                        }
-                        Err(err) => {
-                            return Ok(ToolResult::error(format!(
-                                "spawn_subagent: failed to close reusable session: {err}"
-                            )));
-                        }
-                    }
-                }
-                Ok(None) => {}
-                Err(err) => {
-                    log::warn!(
-                        "[subagent_reuse] fresh lookup failed parent_thread_id={} agent_id={} task_key={} error={}",
-                        parent_thread_id.as_deref().unwrap_or("none"),
-                        definition.id,
-                        task_key,
-                        err
-                    );
-                }
-            }
-            None
-        } else {
-            match subagent_sessions::find_reusable(&store, &selector) {
-                Ok(session) => session,
-                Err(err) => {
-                    log::warn!(
-                        "[subagent_reuse] lookup failed parent_thread_id={} agent_id={} task_key={} error={}",
-                        parent_thread_id.as_deref().unwrap_or("none"),
-                        definition.id,
-                        task_key,
-                        err
-                    );
-                    None
-                }
-            }
+        let reusable = match reusable_driver_session_for_spawn(
+            &driver_store,
+            &store,
+            &dispatch,
+            &parent.workspace_dir,
+            &selector,
+            force_fresh,
+        )
+        .await
+        {
+            Ok(reusable) => reusable,
+            Err(error) => return Ok(ToolResult::error(format!("spawn_subagent: {error}"))),
         };
         let reuse_decision = subagent_sessions::reuse_decision(reusable.as_ref(), force_fresh);
         let follow_up_prompt = reusable_follow_up_message(&prompt, context.as_deref());
@@ -244,13 +184,13 @@ impl SpawnSubagentTool {
                 ));
             };
             let checkpoint_dir = parent.workspace_dir.join(".openhuman/subagent_checkpoints");
-            let original_key = match subagent_sessions::resolve_lifecycle_key(
-                &store,
+            let original_key = match subagent_sessions::resolve_driver_lifecycle_key(
+                driver_store.as_ref(),
                 &session.subagent_session_id,
-                &parent_session,
-                parent_thread_id.as_deref(),
                 &checkpoint_dir,
-            ) {
+            )
+            .await
+            {
                 Ok(key) => key,
                 Err(error) => {
                     return Ok(ToolResult::error(format!(
@@ -278,19 +218,20 @@ impl SpawnSubagentTool {
                 ));
             }
             let checkpoint_resume = crate::agent::subagent_host::checkpoint_resume(&checkpoint);
-            let completion_target = match crate::agent::orchestration::background_completions::CompletionTarget::new(
-                dispatch.clone(),
-                parent.workspace_dir.clone(),
-                parent_session.clone(),
-                parent_thread_id.clone(),
-            ) {
-                Ok(target) => target,
-                Err(error) => {
-                    return Ok(ToolResult::error(format!(
-                        "spawn_subagent: parent lifecycle admission failed: {error}"
-                    )));
-                }
-            };
+            let completion_target =
+                match crate::agent::orchestration::background_completions::CompletionTarget::new(
+                    dispatch.clone(),
+                    parent.workspace_dir.clone(),
+                    parent_session.clone(),
+                    parent_thread_id.clone(),
+                ) {
+                    Ok(target) => target,
+                    Err(error) => {
+                        return Ok(ToolResult::error(format!(
+                            "spawn_subagent: parent lifecycle admission failed: {error}"
+                        )));
+                    }
+                };
             if let Some(thread_id) = parent_thread_id.as_deref() {
                 if crate::agent::orchestration::background_completions::mark_stopped_task_if_thread_stopped(
                     &dispatch,
@@ -303,8 +244,10 @@ impl SpawnSubagentTool {
                     ));
                 }
             }
-            let resumed_session = match subagent_sessions::upsert_running(
-                &store,
+            let resumed_session = match upsert_driver_session(
+                &driver_store,
+                &dispatch,
+                &parent.workspace_dir,
                 SubagentSessionUpsert {
                     selector: selector.clone(),
                     display_name: Some(definition.display_name().to_string()),
@@ -314,8 +257,10 @@ impl SpawnSubagentTool {
                     lifecycle_key: Some(original_key.clone()),
                     parent_epoch: completion_target.parent_epoch(),
                 },
-                Some(session),
-            ) {
+                false,
+            )
+            .await
+            {
                 Ok(session) => session,
                 Err(error) => {
                     return Ok(ToolResult::error(format!(
@@ -331,21 +276,16 @@ impl SpawnSubagentTool {
                 task_id.to_owned(),
                 follow_up_prompt.chars().count(),
             );
-            if let Some(progress) = progress_sink.as_ref() {
-                let _ = progress
-                    .send(AgentProgress::SubagentSpawned {
-                        agent_id: definition.id.clone(),
-                        task_id: task_id.to_owned(),
-                        mode: "async".to_string(),
-                        dedicated_thread: session.worker_thread_id.is_some(),
-                        prompt_chars: follow_up_prompt.chars().count(),
-                        prompt: follow_up_prompt.clone(),
-                        worker_thread_id: session.worker_thread_id.clone(),
-                        display_name: Some(definition.display_name().to_string()),
-                        parent_call_id: crate::tools::host_extensions::tool_call_id(tool_context),
-                    })
-                    .await;
-            }
+            completion::report_spawned_progress(
+                progress_sink.clone(),
+                definition.id.clone(),
+                task_id.to_owned(),
+                follow_up_prompt.clone(),
+                session.worker_thread_id.clone(),
+                definition.display_name().to_string(),
+                crate::tools::host_extensions::tool_call_id(tool_context),
+            )
+            .await;
 
             let completion = completion::make_completion(
                 dispatch.clone().into_core(),
@@ -359,7 +299,7 @@ impl SpawnSubagentTool {
                 parent_session.clone(),
                 completion_target.clone(),
                 session.worker_thread_id.clone(),
-                store.clone(),
+                driver_store.clone(),
                 resumed_session.subagent_session_id.clone(),
                 parent_thread_id.clone(),
             );
@@ -394,12 +334,13 @@ impl SpawnSubagentTool {
             .await
             {
                 let message = error.to_string();
-                let _ = subagent_sessions::mark_failed(
-                    &store,
-                    &resumed_session.subagent_session_id,
-                    task_id,
-                    message.clone(),
-                );
+                let _ = driver_store
+                    .mark_failed(
+                        &resumed_session.subagent_session_id,
+                        task_id,
+                        message.clone(),
+                    )
+                    .await;
                 completion_target
                     .failed(task_id, &definition.id, &message)
                     .await;
@@ -501,22 +442,22 @@ impl SpawnSubagentTool {
                 ));
             }
         }
-        // Capture the admitted parent generation before creating a worker
-        // thread, writing a durable running session, or publishing spawn
-        // events. A denied lifecycle admission must leave no phantom child.
-        let completion_target = match crate::agent::orchestration::background_completions::CompletionTarget::new(
-            dispatch.clone(),
-            parent.workspace_dir.clone(),
-            parent_session.clone(),
-            parent_thread_id.clone(),
-        ) {
-            Ok(target) => target,
-            Err(error) => {
-                return Ok(ToolResult::error(format!(
-                    "spawn_subagent: parent lifecycle admission failed: {error}"
-                )));
-            }
-        };
+        // Capture the admitted parent generation before worker/session creation.
+        // Denied lifecycle admission must leave no phantom child or spawn event.
+        let completion_target =
+            match crate::agent::orchestration::background_completions::CompletionTarget::new(
+                dispatch.clone(),
+                parent.workspace_dir.clone(),
+                parent_session.clone(),
+                parent_thread_id.clone(),
+            ) {
+                Ok(target) => target,
+                Err(error) => {
+                    return Ok(ToolResult::error(format!(
+                        "spawn_subagent: parent lifecycle admission failed: {error}"
+                    )));
+                }
+            };
         let worker_thread_id = reusable
             .as_ref()
             .and_then(|session| session.worker_thread_id.clone())
@@ -548,8 +489,10 @@ impl SpawnSubagentTool {
                 );
             }
         }
-        let durable_session = match subagent_sessions::upsert_running(
-            &store,
+        let durable_session = match upsert_driver_session(
+            &driver_store,
+            &dispatch,
+            &parent.workspace_dir,
             SubagentSessionUpsert {
                 selector,
                 display_name: Some(definition.display_name().to_string()),
@@ -563,10 +506,12 @@ impl SpawnSubagentTool {
                         parent_thread_id.clone(),
                     ),
                 ),
-            parent_epoch: completion_target.parent_epoch(),
+                parent_epoch: completion_target.parent_epoch(),
             },
-            reusable.as_ref(),
-        ) {
+            force_fresh,
+        )
+        .await
+        {
             Ok(session) => session,
             Err(err) => {
                 log::warn!(
@@ -601,6 +546,45 @@ impl SpawnSubagentTool {
             task_key
         );
 
+        if let Some(thread_id) = parent_thread_id.as_deref() {
+            crate::agent::orchestration::background_completions::note_thread_workspace(
+                &dispatch,
+                thread_id,
+                &parent.workspace_dir,
+            );
+            crate::agent::orchestration::background_completions::note_session_thread(
+                &dispatch,
+                &parent_session,
+                thread_id,
+            );
+        }
+        if let Err(error) = crate::agent::orchestration::completion_owners::note_driver_task(
+            &dispatch,
+            &task_id,
+            parent.workspace_dir.clone(),
+            task_workspace.clone(),
+            parent_session.clone(),
+            parent_thread_id.clone(),
+        ) {
+            if let Err(store_error) = driver_store
+                .mark_failed(
+                    &durable_session.subagent_session_id,
+                    &task_id,
+                    error.clone(),
+                )
+                .await
+            {
+                log::warn!(
+                    "[subagent_reuse] mark_failed after owner admission refusal failed subagent_session_id={} task_id={} error={store_error}",
+                    durable_session.subagent_session_id,
+                    task_id
+                );
+            }
+            return Ok(ToolResult::error(format!(
+                "spawn_subagent: registration refused: {error}"
+            )));
+        }
+
         crate::agent::orchestration::subagent_events::publish_subagent_spawned(
             parent_session.clone(),
             definition.id.clone(),
@@ -608,21 +592,16 @@ impl SpawnSubagentTool {
             task_id.clone(),
             prompt.chars().count(),
         );
-        if let Some(ref tx) = progress_sink {
-            let _ = tx
-                .send(AgentProgress::SubagentSpawned {
-                    agent_id: definition.id.clone(),
-                    task_id: task_id.clone(),
-                    mode: "async".to_string(),
-                    dedicated_thread: worker_thread_id.is_some(),
-                    prompt_chars: prompt.chars().count(),
-                    prompt: prompt.clone(),
-                    worker_thread_id: worker_thread_id.clone(),
-                    display_name: Some(definition.display_name().to_string()),
-                    parent_call_id: crate::tools::host_extensions::tool_call_id(tool_context),
-                })
-                .await;
-        }
+        completion::report_spawned_progress(
+            progress_sink.clone(),
+            definition.id.clone(),
+            task_id.clone(),
+            prompt.clone(),
+            worker_thread_id.clone(),
+            definition.display_name().to_string(),
+            crate::tools::host_extensions::tool_call_id(tool_context),
+        )
+        .await;
 
         let background_workspace_dir = parent.workspace_dir.clone();
         let background_dispatch = dispatch.clone();
@@ -631,7 +610,7 @@ impl SpawnSubagentTool {
         let background_task_key = task_key.clone();
         let background_parent_session = parent_session.clone();
         let background_worker_thread_id = worker_thread_id.clone();
-        let background_store = store.clone();
+        let background_store = driver_store.clone();
         let background_subagent_session_id = durable_session.subagent_session_id.clone();
         let background_thread_id = background_worker_thread_id
             .clone()
@@ -678,7 +657,7 @@ impl SpawnSubagentTool {
             worker_thread_id: background_worker_thread_id,
             initial_history,
             checkpoint_dir: None,
-            workspace_descriptor,
+            workspace_descriptor: Some(task_workspace),
             run_queue: None,
             message_run_queue: None,
         };
@@ -691,12 +670,14 @@ impl SpawnSubagentTool {
         )
         .await
         {
-            if let Err(store_err) = subagent_sessions::mark_failed(
-                &store,
-                &durable_session.subagent_session_id,
-                &task_id,
-                error.to_string(),
-            ) {
+            if let Err(store_err) = driver_store
+                .mark_failed(
+                    &durable_session.subagent_session_id,
+                    &task_id,
+                    error.to_string(),
+                )
+                .await
+            {
                 log::warn!(
                     "[subagent_reuse] mark_failed after driver registration error subagent_session_id={} task_id={} agent_id={} error={}",
                     durable_session.subagent_session_id,
@@ -714,6 +695,10 @@ impl SpawnSubagentTool {
                 registration_task_id.clone(),
                 registration_agent_id.clone(),
                 message.clone(),
+            );
+            crate::agent::orchestration::completion_owners::finish_driver_task(
+                &dispatch,
+                &registration_task_id,
             );
             if let Some(progress) = registration_progress {
                 let _ = progress

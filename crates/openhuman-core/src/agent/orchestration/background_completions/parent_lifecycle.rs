@@ -183,7 +183,9 @@ pub(crate) fn mark_stopped_task_if_thread_stopped(
                         );
                     }
                     if let Err(tombstone_error) = entry.router.tombstone(task_id) {
-                        log::warn!("[background_completions] tombstone failed task_id={task_id} error={tombstone_error}");
+                        log::warn!(
+                            "[background_completions] tombstone failed task_id={task_id} error={tombstone_error}"
+                        );
                     }
                     let mut st = state();
                     if st
