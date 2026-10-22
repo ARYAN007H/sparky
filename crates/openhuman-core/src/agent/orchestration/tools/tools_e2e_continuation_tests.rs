@@ -3,7 +3,7 @@ use super::*;
 #[tokio::test]
 async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_driver() {
     use crate::agent::orchestration::subagent_sessions::{
-        DurableSubagentStatus, SubagentSessionStore,
+        DurableSubagentStatus,
     };
     use crate::agent::orchestration::tools::SpawnSubagentTool;
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
@@ -12,7 +12,6 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     let _lock = crate::config::TEST_ENV_LOCK.lock().await;
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
-    let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
     let provider = Arc::new(PauseThenAnswerModel {
         calls: std::sync::atomic::AtomicUsize::new(0),
         seen: Mutex::new(Vec::new()),
@@ -148,6 +147,19 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     );
     let before_job_count = jobs.list().len();
 
+    let driver_documents = crate::core::runtime::CoreContext::sync_scope(
+        Arc::clone(&_core),
+        || {
+            let opened = crate::storage::local::open("subagent_sessions", workspace.path())
+                .map_err(|error| format!("open driver session documents: {error:#}"))?;
+            let scoped = opened
+                .scoped()
+                .map_err(|error| format!("scope driver session documents: {error:#}"))?;
+            Ok::<_, String>(Arc::clone(scoped.documents()))
+        },
+    )
+    .expect("open scoped driver session documents");
+
     // A durable host row and the checkpoint must agree on the full owner key.
     // Corrupt only its root run identity and drive the real spawn path: resume
     // must refuse before mutating the paused row or admitting another child.
@@ -175,57 +187,41 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         ),
         task_key: "pause-resume-fixture".into(),
     };
-    let (saved_key, reusable_session_id) = crate::core::runtime::CoreContext::sync_scope(
-        Arc::clone(&_core),
-        || {
-            let mut records = sessions.load().expect("load paused row before corruption");
-            let row = records
-                .iter_mut()
-                .find(|session| session.subagent_session_id == before_session.subagent_session_id)
-                .expect("paused row to corrupt");
-            row.lifecycle_key
-                .as_mut()
-                .expect("paused session retains lifecycle key")
-                .root_run_id
-                .push_str("-mismatch");
-            let updated_at = chrono::DateTime::parse_from_rfc3339(&row.updated_at)
-                .expect("persisted update timestamp")
-                .with_timezone(&chrono::Utc)
-                + chrono::Duration::milliseconds(1);
-            row.updated_at = updated_at.to_rfc3339();
-            sessions
-                .save(&records)
-                .expect("corrupt only the persisted lifecycle owner key");
-            let reread = sessions.load().expect("reread corrupted paused row");
-            let persisted = reread
-                .iter()
-                .find(|session| session.subagent_session_id == before_session.subagent_session_id)
-                .expect("corrupted paused row remains persisted");
-            let reusable = crate::agent::orchestration::subagent_sessions::find_reusable(
-                &sessions,
-                &selector,
-            )
-            .expect("find matching paused session")
-            .unwrap_or_else(|| {
-                panic!(
-                    "exact spawn selector did not select corrupted paused row: selector={selector:?}; persisted=(parent_session={:?}, parent_thread_id={:?}, agent_id={:?}, model={:?}, sandbox_mode={:?}, action_root={:?}, task_key={:?}, status={:?}, reusable={})",
-                    persisted.parent_session,
-                    persisted.parent_thread_id,
-                    persisted.agent_id,
-                    persisted.model,
-                    persisted.sandbox_mode,
-                    persisted.action_root,
-                    persisted.task_key,
-                    persisted.status,
-                    persisted.reusable,
-                )
-            });
-            (
-                persisted.lifecycle_key.clone().expect("persisted key"),
-                reusable.subagent_session_id,
-            )
-        },
-    );
+    let saved_key = before_session
+        .lifecycle_key
+        .clone()
+        .expect("paused driver session retains lifecycle key");
+    let versioned = crate::storage::block_on(driver_documents.get(
+        "subagent_sessions",
+        &before_session.subagent_session_id,
+    ))
+    .expect("read paused driver document")
+    .expect("paused driver document exists");
+    let mut persisted: tinyagents_orchestration::subagent::DurableSubagentSession =
+        serde_json::from_value(versioned.doc).expect("decode paused driver document");
+    persisted
+        .lifecycle_key
+        .as_mut()
+        .expect("paused driver session retains lifecycle key")
+        .root_run_id
+        .push_str("-mismatch");
+    let updated_at = chrono::DateTime::parse_from_rfc3339(&persisted.updated_at)
+        .expect("persisted update timestamp")
+        .with_timezone(&chrono::Utc)
+        + chrono::Duration::milliseconds(1);
+    persisted.updated_at = updated_at.to_rfc3339();
+    crate::storage::block_on(driver_documents.put(
+        "subagent_sessions",
+        &before_session.subagent_session_id,
+        serde_json::to_value(&persisted).expect("encode corrupted driver session"),
+        versioned.unchanged(),
+    ))
+    .expect("corrupt only the persisted driver lifecycle owner key");
+    assert_eq!(persisted.parent_session, selector.parent_session);
+    assert_eq!(persisted.parent_thread_id.as_deref(), selector.parent_thread_id.as_deref());
+    assert_eq!(persisted.agent_id, selector.agent_id);
+    assert_eq!(persisted.task_key, selector.task_key);
+    let reusable_session_id = before_session.subagent_session_id.clone();
     assert_ne!(saved_key, original_lifecycle_key);
     assert_eq!(
         reusable_session_id, before_session.subagent_session_id,
@@ -267,8 +263,14 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         "refusal invokes no child model"
     );
     assert_eq!(
-        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&_core), || sessions.load())
-            .expect("refused row remains persisted")
+        super::driver_sessions_for_parent(
+            &live.data.dispatch_ctx(),
+            workspace.path(),
+            "continue-paused-e2e",
+            Some("continue-paused-e2e-thread"),
+        )
+        .await
+        .expect("refused row remains persisted")
             .into_iter()
             .find(|session| session.subagent_session_id == before_session.subagent_session_id)
             .expect("paused row remains present")
@@ -276,32 +278,32 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         DurableSubagentStatus::AwaitingUser,
         "refusal leaves the paused row untouched"
     );
-    crate::core::runtime::CoreContext::sync_scope(Arc::clone(&_core), || {
-        let mut restored_records = sessions.load().expect("mismatched sessions");
-        let row = restored_records
-            .iter_mut()
-            .find(|session| session.subagent_session_id == before_session.subagent_session_id)
-            .expect("paused row to restore");
-        row.lifecycle_key = Some(original_lifecycle_key.clone());
-        let updated_at = chrono::DateTime::parse_from_rfc3339(&row.updated_at)
-            .expect("corrupted update timestamp")
-            .with_timezone(&chrono::Utc)
-            + chrono::Duration::milliseconds(1);
-        row.updated_at = updated_at.to_rfc3339();
-        sessions
-            .save(&restored_records)
-            .expect("restore the persisted lifecycle key for the valid continuation");
-        let restored = sessions.load().expect("reread restored paused row");
-        let restored = restored
-            .iter()
-            .find(|session| session.subagent_session_id == before_session.subagent_session_id)
-            .expect("restored paused row remains persisted");
-        assert_eq!(
-            restored.lifecycle_key.as_ref(),
-            Some(&original_lifecycle_key),
-            "valid continuation starts only after the original lifecycle key is restored"
-        );
-    });
+    let versioned = crate::storage::block_on(driver_documents.get(
+        "subagent_sessions",
+        &before_session.subagent_session_id,
+    ))
+    .expect("read mismatched driver session")
+    .expect("mismatched driver session exists");
+    let mut restored: tinyagents_orchestration::subagent::DurableSubagentSession =
+        serde_json::from_value(versioned.doc).expect("decode mismatched driver session");
+    restored.lifecycle_key = Some(original_lifecycle_key.clone());
+    let updated_at = chrono::DateTime::parse_from_rfc3339(&restored.updated_at)
+        .expect("corrupted update timestamp")
+        .with_timezone(&chrono::Utc)
+        + chrono::Duration::milliseconds(1);
+    restored.updated_at = updated_at.to_rfc3339();
+    crate::storage::block_on(driver_documents.put(
+        "subagent_sessions",
+        &before_session.subagent_session_id,
+        serde_json::to_value(&restored).expect("encode restored driver session"),
+        versioned.unchanged(),
+    ))
+    .expect("restore persisted lifecycle key for valid continuation");
+    assert_eq!(
+        restored.lifecycle_key.as_ref(),
+        Some(&original_lifecycle_key),
+        "valid continuation starts only after the original lifecycle key is restored"
+    );
 
     let resumed = crate::core::runtime::CoreContext::scope(
         Arc::clone(&_core),
@@ -387,12 +389,17 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         completed_job.output.as_deref(),
         Some("paused-child-resumed-answer")
     );
-    let completed_session =
-        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&_core), || sessions.load())
-            .expect("completed session list")
-            .into_iter()
-            .find(|session| session.current_task_id.as_deref() == Some(task_id.as_str()))
-            .expect("completed row still owns the original task");
+    let completed_session = super::driver_sessions_for_parent(
+        &live.data.dispatch_ctx(),
+        workspace.path(),
+        "continue-paused-e2e",
+        Some("continue-paused-e2e-thread"),
+    )
+    .await
+    .expect("completed session list")
+    .into_iter()
+    .find(|session| session.current_task_id.as_deref() == Some(task_id.as_str()))
+    .expect("completed row still owns the original task");
     assert_eq!(
         completed_session.lifecycle_key.as_ref(),
         Some(&original_lifecycle_key),
