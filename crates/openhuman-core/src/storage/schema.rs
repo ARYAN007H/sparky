@@ -1,37 +1,106 @@
-//! The host's composed v2 owner collection declarations.
+//! Collection declarations grouped by the crate that owns each record.
 //!
-//! Owner crates expose pure `CollectionSpec` values. The host prepares those
-//! declarations on each known scope before installing module grants; the
-//! owner remains responsible for its own record shapes and migrations.
+//! Storage v2 has no global schema registry. At startup the host asks every
+//! linked owner for its declarations and calls `ensure_collection` for each
+//! one. Owners retain control of their record shapes and migrations.
 
-use std::collections::BTreeMap;
+use tinystoragedrivers::{CollectionSpec, StorageError};
 
-use tinystoragedrivers::CollectionSpec;
-
-use super::StorageError;
-
-/// Every collection this build links, with duplicate declarations merged and
-/// validated before any backend is touched.
-pub fn owner_collections() -> Result<Vec<CollectionSpec>, StorageError> {
-    let mut collections = BTreeMap::<String, CollectionSpec>::new();
-    for spec in declared_collections() {
-        if let Some(existing) = collections.get(&spec.name) {
-            let merged = existing.merge(&spec)?;
-            collections.insert(spec.name.clone(), merged);
-        } else {
-            spec.validate()?;
-            collections.insert(spec.name.clone(), spec);
-        }
-    }
-    Ok(collections.into_values().collect())
+/// One linked crate's collection declarations.
+#[derive(Clone, Debug)]
+pub struct CollectionOwner {
+    /// Cargo package that declared these collections.
+    pub crate_name: &'static str,
+    /// The owner's complete collection declarations.
+    pub collections: Vec<CollectionSpec>,
 }
 
-fn declared_collections() -> Vec<CollectionSpec> {
+/// Every linked owner's declarations, validated without combining owners.
+pub fn collection_owners() -> Result<Vec<CollectionOwner>, StorageError> {
+    let mut owners = declared_collections();
+    for owner in &owners {
+        for collection in &owner.collections {
+            collection.validate()?;
+        }
+    }
+    owners.sort_by_key(|owner| owner.crate_name);
+    Ok(owners)
+}
+
+fn declared_collections() -> Vec<CollectionOwner> {
+    let mut owners = vec![
+        owner("tinyagents-harness", tinyagents_harness::storage::collections()),
+        owner("tinyagents-session", tinyagents_session::port::collections()),
+        owner("tinyagents-graph", tinyagents_graph::storage::collections()),
+        owner("tinyagents-tasks", tinyagents_tasks::collections()),
+        owner("openhuman-core", host_collections()),
+    ];
+
+    #[cfg(feature = "skills")]
+    owners.push(owner("tinyskills-drivers", tinyskills_drivers::collections()));
+
+    #[cfg(feature = "modules")]
+    {
+        owners.push(owner("tinymcp-bus", tinymcp_bus::storage::collection_specs()));
+        owners.push(owner(
+            "tinychannels-bus",
+            tinychannels_bus::storage::collections()
+                .into_iter()
+                .map(CollectionSpec::new)
+                .collect(),
+        ));
+        owners.push(owner(
+            "tinyconnectors-bus",
+            tinyconnectors_bus::storage::collections()
+                .into_iter()
+                .map(|collection| CollectionSpec::new(collection.name))
+                .collect(),
+        ));
+        owners.push(owner(
+            "tinybox-bus",
+            tinybox_bus::storage::collections()
+                .into_iter()
+                .map(CollectionSpec::new)
+                .collect(),
+        ));
+        owners.push(owner("tinyjuice-bus", tinyjuice_bus::storage::collections()));
+    }
+
+    #[cfg(feature = "web3")]
+    owners.push(owner(
+        "tinywallet-bus",
+        tinywallet_bus::storage::collections()
+            .into_iter()
+            .map(|collection| CollectionSpec::new(collection.name))
+            .collect(),
+    ));
+
+    #[cfg(feature = "tinymemes")]
+    owners.push(owner(
+        "tinymemes-bus",
+        tinymemes_bus::storage::collections()
+            .into_iter()
+            .map(CollectionSpec::new)
+            .collect(),
+    ));
+
+    #[cfg(feature = "inbound-queues")]
+    {
+        owners.push(owner(
+            "tinyeventqueues-bus",
+            tinyeventqueues_bus::storage::collection_specs(),
+        ));
+        owners.push(owner(
+            "openhuman-core-inbound",
+            crate::inbound::results::collection_specs(),
+        ));
+    }
+
+    owners
+}
+
+fn host_collections() -> Vec<CollectionSpec> {
     let mut collections = Vec::new();
-    collections.extend(tinyagents_harness::storage::collections());
-    collections.extend(tinyagents_session::port::collections());
-    collections.extend(tinyagents_graph::storage::collections());
-    collections.extend(tinyagents_tasks::collections());
     collections.extend(crate::security::approval::collection_specs());
     collections.extend(crate::security::devices::collection_specs());
     collections.extend(crate::desktop::notifications::collection_specs());
@@ -44,48 +113,11 @@ fn declared_collections() -> Vec<CollectionSpec> {
     collections.extend(crate::agent::orchestration::subagent_sessions::collection_specs());
     collections.extend(super::agents::collection_specs());
     collections.extend(super::journal_maintenance::collection_specs());
-
-    #[cfg(feature = "skills")]
-    collections.extend(tinyskills_drivers::collections());
-    #[cfg(feature = "modules")]
-    {
-        collections.extend(tinymcp_bus::storage::collection_specs());
-        collections.extend(
-            tinychannels_bus::storage::collections()
-                .into_iter()
-                .map(CollectionSpec::new),
-        );
-        collections.extend(
-            tinyconnectors_bus::storage::collections()
-                .into_iter()
-                .map(|collection| CollectionSpec::new(collection.name)),
-        );
-        collections.extend(
-            tinybox_bus::storage::collections()
-                .into_iter()
-                .map(CollectionSpec::new),
-        );
-        collections.extend(tinyjuice_bus::storage::collections());
-    }
-    #[cfg(feature = "web3")]
-    collections.extend(
-        tinywallet_bus::storage::collections()
-            .into_iter()
-            .map(|collection| CollectionSpec::new(collection.name)),
-    );
-    #[cfg(feature = "tinymemes")]
-    collections.extend(
-        tinymemes_bus::storage::collections()
-            .into_iter()
-            .map(CollectionSpec::new),
-    );
-    #[cfg(feature = "inbound-queues")]
-    {
-        collections.extend(tinyeventqueues_bus::storage::collection_specs());
-        collections.extend(crate::inbound::results::collection_specs());
-    }
-
     collections
+}
+
+fn owner(crate_name: &'static str, collections: Vec<CollectionSpec>) -> CollectionOwner {
+    CollectionOwner { crate_name, collections }
 }
 
 /// Collections declared by one loadable module owner.

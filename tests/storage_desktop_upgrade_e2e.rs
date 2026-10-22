@@ -412,11 +412,12 @@ async fn host_documents(backend: &dyn StorageBackend) -> usize {
     let docs = backend.for_scope(&Scope::local()).unwrap();
     let mut total = 0;
     // The importers write the v2 collections of the owners behind each source.
-    let collections = openhuman_core::storage::schema::owner_collections().unwrap();
+    let owners = openhuman_core::storage::schema::collection_owners().unwrap();
     for source in import::sources() {
         let prefix = format!("{}.", source.owner);
-        for spec in collections
+        for spec in owners
             .iter()
+            .flat_map(|owner| &owner.collections)
             .filter(|spec| spec.name.starts_with(&prefix))
         {
             docs.documents().ensure_collection(spec).await.unwrap();
