@@ -60,7 +60,7 @@ async fn the_public_pack_builder_returns_the_handle_its_tool_uses() {
     bind_pack_registry(&returned, &registry);
     let tool = registry.iter().find(|tool| tool.name() == "use_skill").expect("pack tool registered");
 
-    let recovered = pack_registry_handle(tool).expect(
+    let recovered = pack_registry_handle(tool.as_ref()).expect(
         "a pack tool must yield its PackRegistryHandle through the erased \
          host extension; None here is the silent-downcast failure that makes \
          toolpacks::ops skip the registry",
