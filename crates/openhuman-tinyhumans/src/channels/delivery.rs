@@ -6,10 +6,10 @@
 
 use openhuman_embed::__host::channel_callback::ChannelCallbackCtx;
 use openhuman_embed::__host::security::credentials::session_support::{
-    get_session_token, is_local_session_token, BackendCredential,
+    BackendCredential, get_session_token, is_local_session_token,
 };
 use reqwest::Method;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use tinychannels_bus::module_progressive::{
     ProgressiveTransportRequest, ProgressiveTransportResult,
 };
@@ -261,15 +261,8 @@ async fn send(
             channel_ref,
             conversation,
         } => {
-            let context = transport_context(
-                turn_id,
-                channel_ref,
-                conversation,
-                None,
-                None,
-                None,
-                None,
-            );
+            let context =
+                transport_context(turn_id, channel_ref, conversation, None, None, None, None);
             if context.is_empty() {
                 client
                     .send_channel_typing(&channel, credential.clone())

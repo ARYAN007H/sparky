@@ -19,7 +19,7 @@ mod messaging;
 
 #[cfg(feature = "channels")]
 use openhuman_embed::__host::channel_callback::{
-    register_channel_callback, CallbackFuture, ChannelCallbackCtx,
+    CallbackFuture, ChannelCallbackCtx, register_channel_callback,
 };
 #[cfg(feature = "channels")]
 use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult};

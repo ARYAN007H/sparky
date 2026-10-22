@@ -22,9 +22,12 @@ fn ctx(
 }
 
 fn typing(channel: &str) -> ChannelBackendRequest {
-    ChannelBackendRequest::ProgressiveTransport(ProgressiveTransportRequest::Typing {
+    ChannelBackendRequest::ProgressiveTransport(Box::new(ProgressiveTransportRequest::Typing {
         channel: channel.to_string(),
-    })
+        turn_id: None,
+        channel_ref: None,
+        conversation: None,
+    }))
 }
 
 // Route absence and message absence need different recoveries in the
@@ -133,24 +136,22 @@ async fn progressive_send_forwards_turn_and_delivery_context() {
     let config = test_support::signed_in(&tmp, &server.uri());
     let answer = serve(
         ctx(config, Some("telegram")),
-        ChannelBackendRequest::ProgressiveTransport(Box::new(
-            ProgressiveTransportRequest::Send {
-                channel: "telegram".into(),
-                turn_id: Some("turn-7".into()),
-                channel_ref: Some(tinychannels_bus::ChannelRef {
-                    id: "telegram".into(),
-                    account_id: Some("account-2".into()),
-                }),
-                conversation: Some(tinychannels_bus::ConversationRef {
-                    kind: tinychannels_bus::ConversationKind::Dm,
-                    id: "chat-3".into(),
-                    ..Default::default()
-                }),
-                sequence: Some(4),
-                idempotency_key: Some("turn-7:reply".into()),
-                message: json!({"text": "hello"}),
-            },
-        )),
+        ChannelBackendRequest::ProgressiveTransport(Box::new(ProgressiveTransportRequest::Send {
+            channel: "telegram".into(),
+            turn_id: Some("turn-7".into()),
+            channel_ref: Some(tinychannels_bus::ChannelRef {
+                id: "telegram".into(),
+                account_id: Some("account-2".into()),
+            }),
+            conversation: Some(tinychannels_bus::ConversationRef {
+                kind: tinychannels_bus::ConversationKind::Dm,
+                id: "chat-3".into(),
+                ..Default::default()
+            }),
+            sequence: Some(4),
+            idempotency_key: Some("turn-7:reply".into()),
+            message: json!({"text": "hello"}),
+        })),
     )
     .await
     .unwrap();
