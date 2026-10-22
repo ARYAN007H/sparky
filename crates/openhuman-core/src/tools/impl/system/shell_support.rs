@@ -7,15 +7,16 @@ use tinytools::ToolResult;
 pub(super) const COMMAND_TIMEOUT_EXIT_CODE: i32 = 124;
 /// Appended to an exit-124 failure: the command's own `timeout` fired, not the
 /// tool's (#6953). Without it, `exit code 124 [stdout] ok` reads like a bug.
-pub(super) const COMMAND_TIMEOUT_NOTE: &str = "[exit 124: the command's own `timeout` limit expired; the shell tool's timeout_secs did not fire]";
+pub(super) const COMMAND_TIMEOUT_NOTE: &str =
+    "[exit 124: the command's own `timeout` limit expired; the shell tool's deadline did not fire]";
 
-/// The result when the tool's own `timeout_secs` deadline killed the command.
-/// It stays the first line of the result: TinyAgents' shell turn-budget note
-/// recognises a fired deadline by this prefix.
+/// The result when the tool's deadline killed the command: in a turn, the
+/// turn's remaining budget (TinyAgents' `ShellTurnBudget` clamp); outside one,
+/// the caller's `timeout_secs`. It stays the first line of the result:
+/// TinyAgents' shell turn-budget note recognises a fired deadline by this
+/// prefix.
 pub(super) fn tool_timeout_message(secs: u64) -> String {
-    format!(
-        "Command timed out after {secs}s and was killed: the shell tool's timeout_secs limit fired."
-    )
+    format!("Command timed out after {secs}s and was killed: the shell tool's deadline fired.")
 }
 
 /// [`tinytools::command_failure`], plus [`COMMAND_TIMEOUT_NOTE`] on exit 124.
@@ -231,16 +232,39 @@ pub(super) fn extend_explicit_environment(
     }
 }
 
+/// The argument a turn's `shell` call carries its yield point in. The model
+/// writes it as `timeout_secs`; the turn moves it here before TinyAgents'
+/// turn-budget clamp writes the command's deadline into `timeout_secs`
+/// (`agent::tinyagents::middleware::shell_yield`).
+pub(crate) const YIELD_AFTER_ARG: &str = "yield_after_secs";
 /// When a command still running is handed back as a process, unless the call
-/// says otherwise (`yield_after_secs`).
+/// says otherwise.
 pub(super) const DEFAULT_YIELD_AFTER_SECS: u64 = 120;
+/// The latest a call may ask to come back.
+pub(super) const MAX_YIELD_AFTER_SECS: u64 = 600;
+/// The earliest the deadline-relative cap brings the yield point forward to.
+pub(super) const MIN_YIELD_AFTER_SECS: u64 = 30;
 
-/// The yield point a call asked for: the default when absent, none for `0`.
-pub(super) fn yield_after(requested: Option<u64>) -> Option<Duration> {
-    match requested.unwrap_or(DEFAULT_YIELD_AFTER_SECS) {
-        0 => None,
-        secs => Some(Duration::from_secs(secs.min(3600))),
+/// The yield point for `command` with `deadline` to run: the requested time
+/// (default 120 s, at most 600 s), but no later than an eighth of the deadline
+/// (and not earlier than 30 s for that cap), so a command started late in a
+/// turn still comes back before the turn's deadline kills it. None for `0`, and
+/// none for a deliberate wait (a command that starts with `sleep`), which would
+/// only come back with nothing to show.
+pub(super) fn yield_after(
+    requested: Option<u64>,
+    deadline: Duration,
+    command: &str,
+) -> Option<Duration> {
+    let secs = requested
+        .unwrap_or(DEFAULT_YIELD_AFTER_SECS)
+        .min(MAX_YIELD_AFTER_SECS);
+    let first = command.split_whitespace().next();
+    if secs == 0 || first == Some("sleep") {
+        return None;
     }
+    let cap = (deadline.as_secs() / 8).max(MIN_YIELD_AFTER_SECS);
+    Some(Duration::from_secs(secs.min(cap)))
 }
 
 /// The result of a call that came back with its command still running.
@@ -281,7 +305,7 @@ pub(super) async fn run_native(
     let processes = crate::agent::tinyagents::host::run_context::shell_processes_for_tool(context)
         .filter(|processes| processes.has_room());
     if processes.is_some() {
-        run.yield_after = yield_after(requested_yield);
+        run.yield_after = yield_after(requested_yield, run.timeout, &run.command);
     }
     let (command, timeout) = (run.command.clone(), run.timeout);
     let started = std::time::Instant::now();
@@ -334,3 +358,7 @@ pub(super) fn human_duration(duration: Duration) -> String {
         _ => format!("{}h {}m", secs / 3600, (secs % 3600) / 60),
     }
 }
+
+#[cfg(test)]
+#[path = "shell_support_tests.rs"]
+mod tests;

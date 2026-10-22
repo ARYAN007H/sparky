@@ -193,13 +193,7 @@ impl Tool for ShellTool {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 3600,
-                    "description": "Optional wall-clock timeout (seconds, up to 3600) for this command before it is killed. Use a larger value for long-running work (builds, test suites, solvers). Omitted or 0 runs without a deadline."
-                },
-                "yield_after_secs": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 3600,
-                    "description": "Seconds after which a command that is still running comes back with its output so far and keeps running as a process you follow with `shell_process`. Default 120; 0 waits for the command to end."
+                    "description": "Optional: how long (seconds) to wait before coming back. A command still running then returns its output so far and keeps running as a process you follow with `shell_process`. Default 120, at most 600; 0 waits for the command to end. It does not kill the command: put `timeout N` in the command for that."
                 }
             },
             "required": ["command"]
@@ -300,12 +294,14 @@ impl ShellTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'command' parameter"))?;
 
-        // Optional per-call wall-clock budget. `None`/`0` ⇒ run unbounded;
-        // a positive value is clamped downstream by
-        // `tool_timeout::explicit_call_timeout_*`. Shell has no default deadline
-        // (issue #4023) — long scripts must run to completion.
+        // The command's deadline: in a turn, what TinyAgents' turn-budget clamp
+        // wrote (the model's own `timeout_secs` is its yield point, moved to
+        // `YIELD_AFTER_ARG` by `middleware::shell_yield`); outside a turn, the
+        // caller's. `None`/`0` ⇒ unbounded (issue #4023).
         let requested_timeout = args.get("timeout_secs").and_then(|v| v.as_u64());
-        let requested_yield = args.get("yield_after_secs").and_then(|v| v.as_u64());
+        let requested_yield = args
+            .get(super::shell_support::YIELD_AFTER_ARG)
+            .and_then(|v| v.as_u64());
         let start = Instant::now();
         let (allowed, result) = crate::sandbox::shell_progress::with_shell_progress(
             context,

@@ -76,12 +76,28 @@ async fn yield_after_zero_waits_for_the_end() {
 
 #[cfg(not(windows))]
 #[tokio::test]
+async fn a_deliberate_wait_runs_to_its_end() {
+    let run = test_turn_run();
+    let call = ToolExecutionContext::from_run_context(&run, CallId::new("c1"));
+    let result = shell()
+        .execute_with_context(
+            json!({"command": "sleep 2; echo done", "yield_after_secs": 1}),
+            ToolCallOptions::default(),
+            Some(&call),
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.output().trim(), "done");
+}
+
+#[cfg(not(windows))]
+#[tokio::test]
 async fn a_failing_end_reads_like_a_failed_shell_call() {
     let run = test_turn_run();
     let call = ToolExecutionContext::from_run_context(&run, CallId::new("c1"));
     let yielded = shell()
         .execute_with_context(
-            json!({"command": "sleep 2; echo broke >&2; exit 3", "yield_after_secs": 1}),
+            json!({"command": "true; sleep 2; echo broke >&2; exit 3", "yield_after_secs": 1}),
             ToolCallOptions::default(),
             Some(&call),
         )
