@@ -195,9 +195,8 @@ impl MemoryTool {
             };
             let outcome = if is_write_action(&args) {
                 let runtime = tokio::runtime::Handle::current();
-                match tokio::task::spawn_blocking(move || {
-                    runtime.block_on(dispatch.enter(call))
-                })
+                let write_dispatch = dispatch.clone();
+                match tokio::task::spawn_blocking(move || runtime.block_on(write_dispatch.enter(call)))
                 .await
                 {
                     Ok(result) => result,
