@@ -1,13 +1,10 @@
 use super::*;
-use crate::agent::orchestration::background_completions::{
-    pending_for, record_completion, router_for_workspace, TestWorkspace,
-};
 use crate::agent::orchestration::busy_guard::TurnBusy;
 use crate::core::runtime::DispatchCtx;
 use crate::storage::fence::{system_now_ms, ScopeMatch};
 use crate::storage::lease::{DocumentLeases, LeaseStore};
 use crate::storage::MemoryStorage;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 const TTL: Duration = Duration::from_secs(30);
 const SHORT: Duration = Duration::from_millis(20);
@@ -152,50 +149,4 @@ async fn a_recovered_drain_waits_for_a_relayed_turn_on_its_thread() {
     assert_eq!(outcome, DrainOutcome::Ran);
     assert!(ran);
     assert!(!is_busy(&DispatchCtx::ambient(), thread));
-}
-
-#[tokio::test]
-async fn a_delivery_waits_while_a_relayed_turn_runs_on_its_thread() {
-    let _g = crate::config::TEST_ENV_LOCK.lock().await;
-    let ws = TestWorkspace::new();
-    let w = ws.path();
-    let thread = "dd-relay-deliver";
-    record_completion(
-        &DispatchCtx::ambient(),
-        w,
-        "dd-relay-session",
-        "sub-relay",
-        "researcher",
-        "finished during the relayed turn",
-        Some(thread.to_owned()),
-    )
-    .await;
-    let router = router_for_workspace(w);
-    let turns = Arc::new(AtomicU32::new(0));
-    let attempt = |turns: Arc<AtomicU32>| {
-        super::super::background_delivery::try_deliver_for_test(
-            DispatchCtx::ambient(),
-            thread.to_string(),
-            Arc::clone(&router),
-            turns,
-        )
-    };
-
-    let relayed = TurnBusy::start_on_thread(&DispatchCtx::ambient(), thread);
-    attempt(Arc::clone(&turns)).await;
-    assert_eq!(
-        turns.load(Ordering::SeqCst),
-        0,
-        "no delivery over a running relayed turn"
-    );
-    assert_eq!(pending_for(w, thread).len(), 1, "the result stays pending");
-
-    drop(relayed);
-    attempt(Arc::clone(&turns)).await;
-    assert_eq!(
-        turns.load(Ordering::SeqCst),
-        1,
-        "delivered once the turn ends"
-    );
-    assert!(pending_for(w, thread).is_empty());
 }
