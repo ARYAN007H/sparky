@@ -35,6 +35,8 @@ mod classic_transcript_fixture;
 
 #[path = "support/storage_case.rs"]
 mod storage_case;
+#[path = "support/linked_modules.rs"]
+mod linked_modules;
 
 use storage_case::Case;
 
@@ -455,6 +457,7 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
     std::env::set_var("USERPROFILE", home_dir.path());
     std::env::set_var("OPENHUMAN_WORKSPACE", workspace);
     std::env::set_var("OPENHUMAN_MODULE_SOURCE", "linked");
+    linked_modules::install_if_requested();
     let fixture = desktop_workspace(workspace);
     make_workspace_private(workspace);
     let before = tree(workspace);
