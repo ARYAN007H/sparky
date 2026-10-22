@@ -300,9 +300,9 @@ pub(crate) async fn cancel_for_thread(
     let Some(core_context) = ctx.resolved() else {
         return Err("cannot resolve core context to cancel thread-owned driver jobs".into());
     };
-    let workspace_dir = core_context
-        .workspace_dir()
-        .map_err(|error| format!("cannot resolve workspace for thread-owned driver jobs: {error}"))?;
+    let workspace_dir = core_context.workspace_dir().map_err(|error| {
+        format!("cannot resolve workspace for thread-owned driver jobs: {error}")
+    })?;
     let scopes = crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
         ctx,
         &workspace_dir,
@@ -344,7 +344,9 @@ pub(crate) async fn cancel_for_thread(
                     cancelled += usize::from(!cancelled_job.status.is_terminal());
                 }
                 Err(error) => {
-                    failures.push(format!("driver thread deletion cancellation failed: {error}"));
+                    failures.push(format!(
+                        "driver thread deletion cancellation failed: {error}"
+                    ));
                 }
             }
             if let Err(error) = jobs.wait_owned(job.id.as_str(), &owner_key).await {
