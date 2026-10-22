@@ -103,6 +103,7 @@
     "ProfileSummary",
     "Provider",
     "Provisioned",
+    "ReasoningEffort",
     "RelayAccepted",
     "RelayMessage",
     "RemoveAgent",
