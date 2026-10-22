@@ -24,7 +24,7 @@ fn build_native_factory_model(
     std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>>,
     tinyinference_llm::model::ResolvedModelRoute,
 )> {
-    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let ctx = super::fixture_library_dispatch();
     let factory = OpenHumanModelFactory {
         ctx: &ctx,
         config,
@@ -62,7 +62,7 @@ fn create_chat_model_routes_plain_bearer_cloud_slug_to_crate_native() {
     config.cloud_providers.push(deepseek_entry("p_ds"));
     config.chat_provider = Some("deepseek:deepseek-reasoner".to_string());
     let (model, model_id) = create_chat_model_with_model_id_in(
-        &crate::core::runtime::DispatchCtx::ambient(),
+        &super::fixture_library_dispatch(),
         "chat",
         &config,
         0.7,
@@ -125,7 +125,7 @@ fn create_chat_model_routes_anthropic_auth_cloud_slug_to_crate_native() {
         .push(anthropic_entry("p_anth", "anthropic"));
     config.chat_provider = Some("anthropic:claude-sonnet-4-6".to_string());
     let (model, model_id) = create_chat_model_with_model_id_in(
-        &crate::core::runtime::DispatchCtx::ambient(),
+        &super::fixture_library_dispatch(),
         "chat",
         &config,
         0.7,
