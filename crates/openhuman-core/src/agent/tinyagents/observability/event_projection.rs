@@ -5,6 +5,7 @@
 use std::sync::atomic::Ordering;
 
 use tinyagents_harness::events::{AgentEvent, EventListener, EventRecord};
+use tinyagents_harness::cache::CacheLayoutEvent;
 
 use crate::progress::AgentProgress;
 use tinytools::humanize_tool_name;
