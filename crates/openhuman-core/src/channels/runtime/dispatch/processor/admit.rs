@@ -100,7 +100,7 @@ pub(crate) async fn admit_runtime_message(
 
     // A yes/no reply to an approval parked on this conversation decides it;
     // a fresh turn would cancel the parked tool call.
-    if channel_has_approval_surface(&msg.channel)
+    if channel_has_approval_surface(target_channel.as_deref())
         && try_route_approval_reply(&msg, &history_key).await
     {
         return None;

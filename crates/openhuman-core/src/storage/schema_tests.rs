@@ -33,5 +33,18 @@ fn module_items_are_the_owners_module_scoped_declarations() {
         .iter()
         .any(|spec| spec.name == "mcp.servers"));
     assert!(mcp.streams.iter().any(|name| name == "mcp.audit"));
+    assert!(!mcp
+        .collections
+        .iter()
+        .any(|spec| spec.name.starts_with("tsd.")));
+    let channels = module_items("channels");
+    assert!(channels
+        .collections
+        .iter()
+        .any(|spec| spec.name == tinychannels_bus::storage::MEDIA_METADATA));
+    assert!(channels
+        .blobs
+        .iter()
+        .any(|prefix| prefix == tinychannels_bus::storage::MEDIA_BLOB_PREFIX));
     assert!(module_items("no-such-owner").collections.is_empty());
 }

@@ -17,7 +17,8 @@
 
 use std::sync::OnceLock;
 
-use tinystoragedrivers::schema::{Item, Registry, Schema, ScopeClass};
+use tinystoragedrivers::schema::{Item, Owner, Registry, Schema, ScopeClass};
+use tinystoragedrivers::{CollectionSpec, IndexSpec};
 
 /// Every owner's schema that this build links.
 pub fn owner_schemas() -> Vec<Schema> {
@@ -45,8 +46,50 @@ pub fn owner_schemas() -> Vec<Schema> {
     schemas.push(tinyskills_drivers::storage_schema());
     #[cfg(feature = "modules")]
     {
-        schemas.push(tinymcp_bus::storage::storage_schema());
-        schemas.push(tinychannels_bus::storage::storage_schema());
+        // TinyMCP and TinyChannels v22 expose pure collection declarations;
+        // their migration plans now live in the modules. Compose those specs
+        // here only to provision storage and derive module grants.
+        schemas.push(
+            module_collection_schema(
+                tinymcp_bus::storage::OWNER,
+                tinymcp_bus::storage::SCHEMA_VERSION,
+                tinymcp_bus::storage::collection_specs()
+                    .into_iter()
+                    .filter(|spec| !spec.name.starts_with("tsd."))
+                    .map(|spec| {
+                        let mut converted = CollectionSpec::new(spec.name);
+                        for index in spec.indexes {
+                            let unique = index.unique;
+                            let index = IndexSpec::new(index.name, index.fields);
+                            converted =
+                                converted.index(if unique { index.unique() } else { index });
+                        }
+                        if let Some(ttl_field) = spec.ttl_field {
+                            converted = converted.ttl(ttl_field);
+                        }
+                        if let Some(search) = spec.search {
+                            converted = converted.searchable(search.fields);
+                        }
+                        converted
+                    })
+                    .collect(),
+            )
+            .stream(tinymcp_bus::storage::AUDIT_STREAM, ScopeClass::Module),
+        );
+        schemas.push(
+            module_collection_schema(
+                "channels",
+                tinychannels_bus::storage::schema::SCHEMA_VERSION,
+                tinychannels_bus::storage::collections()
+                    .into_iter()
+                    .map(|spec| CollectionSpec::new(spec.name))
+                    .collect(),
+            )
+            .blobs(
+                tinychannels_bus::storage::MEDIA_BLOB_PREFIX,
+                ScopeClass::Module,
+            ),
+        );
         schemas.push(tinyconnectors_bus::storage::storage_schema());
         schemas.push(tinybox_bus::storage::storage_schema());
         schemas.push(tinyjuice_bus::storage::storage_schema());
@@ -61,6 +104,22 @@ pub fn owner_schemas() -> Vec<Schema> {
         schemas.push(crate::inbound::results::storage_schema());
     }
     schemas
+}
+
+/// Compose a module's current collection specs without taking ownership of its
+/// migration plan. The module runs its own migrations through its storage port.
+fn module_collection_schema(
+    owner_name: &str,
+    version: u32,
+    collections: Vec<CollectionSpec>,
+) -> Schema {
+    let owner = Owner::new(owner_name)
+        .unwrap_or_else(|_| unreachable!("module owner names are contract constants"));
+    collections
+        .into_iter()
+        .fold(Schema::new(owner), |schema, spec| {
+            schema.collection_with(version, spec, ScopeClass::Module)
+        })
 }
 
 /// The registry composed from [`owner_schemas`].

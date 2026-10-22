@@ -24,6 +24,12 @@ impl Channel for RecordingChannel {
     async fn listen(&self, _tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
         Ok(())
     }
+    fn supports_chat_approvals(&self) -> bool {
+        matches!(self.name.as_str(), "telegram" | "discord" | "slack")
+    }
+    fn supports_remote_control(&self) -> bool {
+        matches!(self.name.as_str(), "telegram" | "discord")
+    }
 }
 
 fn recording(name: &str) -> Arc<RecordingChannel> {
@@ -39,6 +45,20 @@ fn approval_subscriber(channels: &[Arc<RecordingChannel>]) -> ChannelApprovalSur
         .map(|c| (c.name.clone(), Arc::clone(c) as Arc<dyn Channel>))
         .collect();
     ChannelApprovalSurfaceSubscriber::new(Arc::new(map))
+}
+
+#[cfg(feature = "e2e-test-support")]
+fn turn_state_subscriber(workspace_dir: PathBuf, names: &[&str]) -> ChannelTurnStateSubscriber {
+    let channels: HashMap<String, Arc<dyn Channel>> = names
+        .iter()
+        .map(|name| {
+            let channel = recording(name);
+            ((*name).to_owned(), channel as Arc<dyn Channel>)
+        })
+        .collect();
+    let mut subscriber = ChannelTurnStateSubscriber::new(workspace_dir);
+    subscriber.channels = Arc::new(channels);
+    subscriber
 }
 
 fn received(channel: &str, reply_target: &str, thread_ts: Option<&str>, ws: &Path) -> DomainEvent {
@@ -175,7 +195,7 @@ async fn turn_state_marks_busy_for_every_remote_control_channel() {
     let _storage = crate::channels::module_fixture::install_memory_storage();
     let dir = tempdir().unwrap();
     let ws = dir.path().to_path_buf();
-    let sub = ChannelTurnStateSubscriber::new(ws.clone());
+    let sub = turn_state_subscriber(ws.clone(), &["telegram", "discord"]);
     assert_eq!(sub.name(), "channels::turn_state");
     assert_eq!(sub.domains(), Some(&["channel"][..]));
     for channel in ["telegram", "discord"] {
@@ -199,7 +219,7 @@ async fn turn_state_ignores_non_remote_channels_and_stale_workspaces() {
     let _storage = crate::channels::module_fixture::install_memory_storage();
     let dir = tempdir().unwrap();
     let ws = dir.path().to_path_buf();
-    let sub = ChannelTurnStateSubscriber::new(ws.clone());
+    let sub = turn_state_subscriber(ws.clone(), &["telegram"]);
     let other = tempdir().unwrap().path().to_path_buf();
     sub.handle(&received("email", "a@b.c", None, &ws)).await;
     assert!(remote_status(&ws, "email", "a@b.c").await.is_none());

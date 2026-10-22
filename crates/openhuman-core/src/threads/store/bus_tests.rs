@@ -169,11 +169,11 @@ fn persisted_channel_thread_id_ignores_blank_thread_ts() {
 #[test]
 fn channel_thread_title_uses_thread_suffix_only_for_non_telegram_threads() {
     assert_eq!(
-        channel_thread_title("slack", "alice", "general", Some(" 123 ")),
+        channel_thread_title("slack", "alice", "general", Some(" 123 "), false),
         "slack · alice · general · thread 123"
     );
     assert_eq!(
-        channel_thread_title("telegram", "alice", "chat-1", Some("123")),
+        channel_thread_title("telegram", "alice", "chat-1", Some("123"), true),
         "telegram · alice · chat-1"
     );
 }
