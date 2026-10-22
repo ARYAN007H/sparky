@@ -234,6 +234,9 @@ fn write_token_file(path: &Path, token: &str) -> anyhow::Result<()> {
             .truncate(true)
             .mode(0o600)
             .open(path)?;
+        // `mode` applies only when the file is created; an existing file keeps
+        // its old mode, so tighten it before the new token is written.
+        file.set_permissions(std::os::unix::fs::PermissionsExt::from_mode(0o600))?;
         file.write_all(token.as_bytes())?;
     }
 
