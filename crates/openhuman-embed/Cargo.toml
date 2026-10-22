@@ -170,6 +170,11 @@ required-features = ["profiles"]
 name = "profile_cron_sweep"
 required-features = ["profiles"]
 
+# A scheduled reminder always delivers; only a conditional job may stay silent.
+[[test]]
+name = "cron_reminder_no_reply"
+required-features = ["profiles"]
+
 # Operator-admitted cron and time tools, the iteration cap, no backend credential.
 [[test]]
 name = "profile_operator_tools"
