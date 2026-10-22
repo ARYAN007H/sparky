@@ -42,39 +42,7 @@ impl SpawnSubagentTool {
             )));
         }
 
-        let registry =
-            match AgentDefinitionRegistry::for_core_context(run_context.dispatch_ctx().into_core())
-            {
-                Some(registry) => registry,
-                None => {
-                    return Ok(ToolResult::error(
-                        "spawn_subagent: AgentDefinitionRegistry has not been initialised",
-                    ));
-                }
-            };
-        let definition = match registry.get(&agent_id).cloned() {
-            Some(definition) => definition,
-            None => {
-                let available: Vec<&str> = registry.list().iter().map(|d| d.id.as_str()).collect();
-                return Ok(ToolResult::error(format!(
-                    "spawn_subagent: unknown agent_id '{agent_id}'. Available: {}",
-                    available.join(", ")
-                )));
-            }
-        };
-
-        if !parent.allowed_subagent_ids.contains(&definition.id) {
-            log::warn!(
-                "[spawn_subagent] blocked subagent outside allowlist parent={} requested={} allowed={:?}",
-                parent.agent_definition_id,
-                definition.id,
-                parent.allowed_subagent_ids
-            );
-            return Ok(ToolResult::error(format!(
-                "spawn_subagent: agent '{}' is not in parent agent '{}' subagents.allowlist",
-                definition.id, parent.agent_definition_id
-            )));
-        }
+        spawn_subagent_definition!(definition, run_context, agent_id, parent);
 
         let parent_session = parent.session_id.clone();
         let progress_sink = parent.on_progress.clone();
