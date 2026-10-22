@@ -40,5 +40,8 @@ fn an_older_config_without_the_new_keys_gets_the_on_defaults() {
 fn legacy_repl_save_setting_is_ignored() {
     let c: TokenjuiceConfig = toml::from_str("repl_save_enabled = true").unwrap();
     assert!(c.repl_handle_enabled);
-    assert_eq!(toml::to_string(&c).unwrap().contains("repl_save_enabled"), false);
+    assert_eq!(
+        toml::to_string(&c).unwrap().contains("repl_save_enabled"),
+        false
+    );
 }

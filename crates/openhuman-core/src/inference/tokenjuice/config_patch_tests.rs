@@ -29,7 +29,9 @@ fn legacy_repl_save_patch_field_is_ignored() {
         serde_json::from_str(r#"{ "repl_save_enabled": true }"#).unwrap();
     patch.apply(&mut cfg);
     assert!(cfg.repl_handle_enabled);
-    assert!(!serde_json::to_string(&cfg).unwrap().contains("repl_save_enabled"));
+    assert!(!serde_json::to_string(&cfg)
+        .unwrap()
+        .contains("repl_save_enabled"));
 }
 
 #[test]
