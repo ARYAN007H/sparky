@@ -8,9 +8,6 @@ use tinyagents_orchestration::subagent::{
     FinishedOutcome, ParentJobScope, SubAgentJobStatus,
 };
 
-use super::registry::admit_workspace;
-use super::task_ledger::scoped_task_store;
-
 /// Metadata captured when a sub-agent is cancelled, so the caller can surface
 /// the cancellation back in the parent chat (record a "cancelled" completion
 /// for idle-gated delivery).
@@ -132,9 +129,7 @@ pub(crate) async fn cancel_by_task_with_workspace_reason(
             }
         }
         if jobs.cancel_owned(job.id.as_str(), &owner).is_err() {
-            crate::agent::orchestration::completion_owners::clear_driver_cancel_reason(
-                ctx, task_id,
-            );
+            crate::agent::orchestration::completion_owners::clear_driver_cancel_reason(ctx, task_id);
             return Ok(None);
         }
     }
@@ -170,29 +165,33 @@ pub(crate) async fn cancel_by_session_in_workspace(
     parent_session: &str,
     workspace_dir: &Path,
 ) -> Option<CancelledSubagent> {
-    let owner_scope = crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+    let owners = crate::agent::orchestration::completion_owners::driver_tasks_for_parent(
         ctx,
         workspace_dir,
-        "",
-    )
-    .into_iter()
-    .map(|(_, owner)| owner)
-    .find(|owner| owner.parent_session == parent_session);
-    let owner_scope = owner_scope?;
-    let task_id = crate::agent::orchestration::subagent_sessions::open_for_context(
-        ctx,
-        workspace_dir.to_path_buf(),
         parent_session,
-        owner_scope.parent_thread_id.clone(),
-        None,
-    )
-    .ok()?
-    .list_for_parent(parent_session, owner_scope.parent_thread_id.as_deref())
-    .await
-    .ok()?
-    .into_iter()
-    .find(|session| session.subagent_session_id == subagent_session_id)?
-    .current_task_id?;
+    );
+    let mut task_id = None;
+    for (candidate, owner) in owners {
+        let sessions = crate::agent::orchestration::subagent_sessions::open_for_context(
+            ctx,
+            workspace_dir.to_path_buf(),
+            parent_session,
+            owner.parent_thread_id.clone(),
+            None,
+        )
+        .ok()?
+        .list_for_parent(parent_session, owner.parent_thread_id.as_deref())
+        .await
+        .ok()?;
+        if sessions.iter().any(|session| {
+            session.subagent_session_id == subagent_session_id
+                && session.current_task_id.as_deref() == Some(candidate.as_str())
+        }) {
+            task_id = Some(candidate);
+            break;
+        }
+    }
+    let task_id = task_id?;
     cancel_by_task_with_workspace_reason(ctx, &task_id, Some(workspace_dir), None)
         .await
         .ok()
@@ -223,7 +222,6 @@ pub(crate) fn stop_for_thread(
     ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
 ) -> Vec<String> {
-    let mut task_ids = Vec::new();
     if let Some(core_context) = ctx.resolved() {
         if let Ok(workspace_dir) = core_context.workspace_dir() {
             let jobs = crate::core::runtime::slot_for::<
@@ -278,14 +276,12 @@ pub(crate) fn stop_for_thread(
                     log::warn!("[running_subagents] driver thread stop failed: {error}");
                 }
             }
-            for task_id in task_ids {
-                if !task_ids.contains(&task_id) {
-                    task_ids.push(task_id);
-                }
-            }
+            task_ids.sort();
+            task_ids.dedup();
+            return task_ids;
         }
     }
-    task_ids
+    Vec::new()
 }
 
 /// Abort and drop **every** registered sub-agent. Called on a full thread purge

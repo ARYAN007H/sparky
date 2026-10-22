@@ -34,6 +34,7 @@ struct Owners {
     order: VecDeque<String>,
     driver_tasks: HashMap<String, DriverTaskOwner>,
     driver_task_order: VecDeque<String>,
+    driver_cancel_reasons: HashMap<String, String>,
 }
 
 #[derive(Clone)]
@@ -103,6 +104,35 @@ pub(crate) fn driver_task_owner(
     owners().driver_tasks.get(&driver_task_key(ctx, task_id)).cloned()
 }
 
+pub(crate) fn note_driver_cancel_reason(
+    ctx: &crate::core::runtime::DispatchCtx,
+    task_id: &str,
+    reason: &str,
+) {
+    owners().driver_cancel_reasons.insert(
+        driver_task_key(ctx, task_id),
+        reason.to_owned(),
+    );
+}
+
+pub(crate) fn take_driver_cancel_reason(
+    ctx: &crate::core::runtime::DispatchCtx,
+    task_id: &str,
+) -> Option<String> {
+    owners()
+        .driver_cancel_reasons
+        .remove(&driver_task_key(ctx, task_id))
+}
+
+pub(crate) fn clear_driver_cancel_reason(
+    ctx: &crate::core::runtime::DispatchCtx,
+    task_id: &str,
+) {
+    owners()
+        .driver_cancel_reasons
+        .remove(&driver_task_key(ctx, task_id));
+}
+
 /// Return registered task scopes for one exact workspace/thread pair.
 pub(crate) fn driver_tasks_for_thread(
     ctx: &crate::core::runtime::DispatchCtx,
@@ -117,6 +147,24 @@ pub(crate) fn driver_tasks_for_thread(
             (owner.profile == profile
                 && owner.workspace_dir == workspace_dir
                 && owner.parent_thread_id.as_deref() == Some(thread_id))
+                .then(|| (owner.task_id.clone(), owner.clone()))
+        })
+        .collect()
+}
+
+pub(crate) fn driver_tasks_for_parent(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+    parent_session: &str,
+) -> Vec<(String, DriverTaskOwner)> {
+    let profile = ctx.tenant().ok().and_then(|tenant| tenant.profile);
+    owners()
+        .driver_tasks
+        .iter()
+        .filter_map(|(_, owner)| {
+            (owner.profile == profile
+                && owner.workspace_dir == workspace_dir
+                && owner.parent_session == parent_session)
                 .then(|| (owner.task_id.clone(), owner.clone()))
         })
         .collect()
