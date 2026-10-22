@@ -284,6 +284,9 @@ async fn stopping_a_paused_driver_releases_its_active_owner() {
     let workspace = tempfile::tempdir().expect("workspace");
     let parent_session = "paused-stop-owner-parent";
     let thread_id = "paused-stop-owner-thread";
+    let ask_tool: Box<dyn tinytools::Tool> =
+        Box::new(tinyagents_harness_tools::AskClarificationTool::new());
+    let ask_spec = Arc::new(ask_tool.spec());
     let mut parent = parent_context(
         workspace.path(),
         Arc::new(PauseThenAnswerModel {
@@ -294,6 +297,13 @@ async fn stopping_a_paused_driver_releases_its_active_owner() {
     );
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(32);
     parent.on_progress = Some(progress_tx);
+    parent.all_tools = Arc::new(vec![ask_tool]);
+    parent.all_tool_specs = Arc::new(vec![ask_spec.clone()]);
+    parent.visible_tool_specs = Arc::new(vec![ask_spec]);
+    parent.visible_tool_names.insert("ask_user_clarification".into());
+    parent
+        .subagent_tool_ceiling_names
+        .insert("ask_user_clarification".into());
     let (live, _core) = super::continuation_tests::core_backed_live_parent(
         workspace.path(),
         parent,
