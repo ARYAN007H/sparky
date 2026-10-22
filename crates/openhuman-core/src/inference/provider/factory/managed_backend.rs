@@ -177,7 +177,7 @@ pub(crate) fn make_openhuman_backend_model_for_options(
     model: &str,
     thread_id: Option<&str>,
 ) -> anyhow::Result<ManagedChatModel> {
-    let overrides = crate::inference::registry::provider_overrides(None);
+    let overrides = crate::inference::registry::ambient_provider_overrides();
     let Some(entry) = overrides.chat_entry(PROVIDER_OPENHUMAN) else {
         return Err(managed_unavailable_error());
     };
