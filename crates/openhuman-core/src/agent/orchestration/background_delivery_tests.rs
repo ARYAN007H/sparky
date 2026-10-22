@@ -31,6 +31,46 @@ fn pending_ids(ws: &Path, thread: &str) -> Vec<String> {
         .collect()
 }
 
+#[tokio::test]
+async fn try_deliver_applies_the_requested_turn_end_delay() {
+    let _g = test_guard().await;
+    let ws = workspace();
+    let workspace_dir = ws.path().to_path_buf();
+    let thread_id = "thread-turn-end-delay";
+    record(&workspace_dir, "session-turn-end-delay", "sub-delay", "done", thread_id).await;
+    let requested_delay = Duration::from_millis(300);
+    let started = std::time::Instant::now();
+    let delivered_after = Arc::new(std::sync::Mutex::new(None));
+    let observed = Arc::clone(&delivered_after);
+
+    try_deliver(
+        cx(),
+        thread_id.to_owned(),
+        DrainFence::current(&cx()),
+        false,
+        requested_delay,
+        move |_ctx, _workspace, _thread, _notice| {
+            let observed = Arc::clone(&observed);
+            async move {
+                *observed.lock().expect("delivery timestamp") = Some(started.elapsed());
+                Ok(())
+            }
+        },
+    )
+    .await;
+
+    let delivered_after = delivered_after
+        .lock()
+        .expect("delivery timestamp")
+        .expect("try_deliver should invoke the turn callback");
+    assert!(delivered_after >= requested_delay);
+    assert!(
+        delivered_after < Duration::from_secs(2),
+        "requested {requested_delay:?} delay was replaced by the 3s debounce: {delivered_after:?}"
+    );
+    assert!(pending_ids(&workspace_dir, thread_id).is_empty());
+}
+
 fn mark_busy(session: &str) {
     busy()
         .lock()

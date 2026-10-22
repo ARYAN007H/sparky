@@ -28,11 +28,12 @@
 //! `chat_done`, so a reconnect cannot lose a completed delegated result.
 
 use crate::core::runtime::DispatchCtx;
+use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 #[cfg(test)]
-use std::{collections::HashSet, future::Future, sync::Mutex};
+use std::{collections::HashSet, sync::Mutex};
 
 use async_trait::async_trait;
 use serde_json::json;
@@ -160,7 +161,20 @@ fn schedule_delivery_inner(
                    // Scoped: the thread -> workspace table is keyed per profile, so the
                    // delayed task must run under the profile that scheduled it.
     ctx.clone().spawn(async move {
-        let outcome = try_deliver(ctx.clone(), thread_id.clone(), fence.clone(), wait_idle).await;
+        let outcome = try_deliver(
+            ctx.clone(),
+            thread_id.clone(),
+            fence.clone(),
+            wait_idle,
+            delay,
+            |ctx, workspace, thread_id, notice| async move {
+                run_system_turn_on_thread(&ctx, workspace, thread_id, notice)
+                    .await
+                    .map(|_| ())
+                    .map_err(|error| error.to_string())
+            },
+        )
+        .await;
         if outcome == DeliveryOutcome::ParentBusy {
             // Still running past the ceiling: leave the record pending and
             // wait again rather than overlap the user's turn.
@@ -263,12 +277,18 @@ fn claim_ready(
 
 /// Drain + deliver pending completions for a thread — if idle and not already
 /// delivering. Batches everything ready at this instant into one system turn.
-async fn try_deliver(
+async fn try_deliver<D, Fut>(
     busy_ctx: DispatchCtx,
     thread_id: String,
     fence: DrainFence,
     recovering: bool,
-) -> DeliveryOutcome {
+    initial_delay: Duration,
+    run_turn: D,
+) -> DeliveryOutcome
+where
+    D: Fn(DispatchCtx, PathBuf, String, String) -> Fut,
+    Fut: Future<Output = Result<(), String>>,
+{
     if !fence.admits() {
         log::info!(
             "[background_delivery] profile lease lost; not delivering thread_id={thread_id}"
@@ -308,18 +328,13 @@ async fn try_deliver(
     };
     let tenant_key = crate::core::runtime::tenant::profile_key_in(&owner, "");
     let scoped_thread = crate::core::runtime::tenant::profile_key_in(&owner, &thread_id);
+    let run_turn = &run_turn;
     let deliver = move |records: &[CompletionRecord]| {
         let notice = format_router.formatter().format_batch(records);
         let ctx = ctx.clone();
         let workspace_dir = turn_workspace.clone();
         let thread_id = turn_thread_id.clone();
-        async move {
-            let result = run_system_turn_on_thread(&ctx, workspace_dir, thread_id, notice)
-                .await
-                .map(|_| ())
-                .map_err(|error| error.to_string());
-            result
-        }
+        run_turn(ctx, workspace_dir, thread_id, notice)
     };
     let write_undelivered = move |records: &[CompletionRecord], error: &str| {
         let attempts = records
