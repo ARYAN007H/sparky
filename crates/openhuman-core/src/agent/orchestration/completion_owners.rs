@@ -25,6 +25,14 @@ use crate::core::runtime::CoreContext;
 /// Bound on noted ids; the oldest is evicted first.
 const OWNERS_CAP: usize = 4096;
 
+/// Live detached jobs are never evicted: losing their scope would make thread
+/// deletion unable to cancel and settle them safely.
+const ACTIVE_DRIVER_TASKS_CAP: usize = 4096;
+
+/// Terminal task owners are retained only to preserve late cancel-by-task
+/// reporting. Evicting these cannot leave a child running.
+const TERMINAL_DRIVER_TASKS_CAP: usize = 4096;
+
 /// Bound on the profiles one (session) id can name.
 const PROFILES_PER_ID: usize = 16;
 
@@ -33,7 +41,8 @@ struct Owners {
     by_id: HashMap<String, Vec<String>>,
     order: VecDeque<String>,
     driver_tasks: HashMap<String, DriverTaskOwner>,
-    driver_task_order: VecDeque<String>,
+    terminal_driver_tasks: HashMap<String, DriverTaskOwner>,
+    terminal_driver_task_order: VecDeque<String>,
     driver_cancel_reasons: HashMap<String, String>,
 }
 
@@ -73,7 +82,7 @@ pub(crate) fn note_driver_task(
     workspace: tinytools::WorkspaceDescriptor,
     parent_session: String,
     parent_thread_id: Option<String>,
-) {
+) -> Result<(), String> {
     let owner = DriverTaskOwner {
         task_id: task_id.to_owned(),
         profile: ctx.tenant().ok().and_then(|tenant| tenant.profile),
@@ -84,13 +93,42 @@ pub(crate) fn note_driver_task(
     };
     let key = driver_task_key(ctx, task_id);
     let mut st = owners();
-    if !st.driver_tasks.contains_key(&key) {
-        st.driver_task_order.push_back(key.clone());
+    remember_active_driver_task(&mut st, key, owner, ACTIVE_DRIVER_TASKS_CAP)
+}
+
+fn remember_active_driver_task(
+    st: &mut Owners,
+    key: String,
+    owner: DriverTaskOwner,
+    capacity: usize,
+) -> Result<(), String> {
+    if !st.driver_tasks.contains_key(&key) && st.driver_tasks.len() >= capacity {
+        return Err(format!("active sub-agent owner capacity ({capacity}) is full"));
     }
+    st.terminal_driver_tasks.remove(&key);
+    st.terminal_driver_task_order
+        .retain(|existing| existing != &key);
     st.driver_tasks.insert(key, owner);
-    while st.driver_task_order.len() > OWNERS_CAP {
-        if let Some(oldest) = st.driver_task_order.pop_front() {
-            st.driver_tasks.remove(&oldest);
+    Ok(())
+}
+
+/// Move a settled task out of the non-evictable live-owner set while retaining
+/// its scope for the bounded late cancel-by-task compatibility path.
+pub(crate) fn finish_driver_task(ctx: &crate::core::runtime::DispatchCtx, task_id: &str) {
+    let key = driver_task_key(ctx, task_id);
+    let mut st = owners();
+    terminalize_driver_task(&mut st, &key, TERMINAL_DRIVER_TASKS_CAP);
+}
+
+fn terminalize_driver_task(st: &mut Owners, key: &str, capacity: usize) {
+    let Some(owner) = st.driver_tasks.remove(key) else {
+        return;
+    };
+    st.terminal_driver_tasks.insert(key.to_owned(), owner);
+    st.terminal_driver_task_order.push_back(key.to_owned());
+    while st.terminal_driver_task_order.len() > capacity {
+        if let Some(oldest) = st.terminal_driver_task_order.pop_front() {
+            st.terminal_driver_tasks.remove(&oldest);
         }
     }
 }
@@ -101,9 +139,11 @@ pub(crate) fn driver_task_owner(
     ctx: &crate::core::runtime::DispatchCtx,
     task_id: &str,
 ) -> Option<DriverTaskOwner> {
-    owners()
-        .driver_tasks
-        .get(&driver_task_key(ctx, task_id))
+    let st = owners();
+    let key = driver_task_key(ctx, task_id);
+    st.driver_tasks
+        .get(&key)
+        .or_else(|| st.terminal_driver_tasks.get(&key))
         .cloned()
 }
 
@@ -149,6 +189,54 @@ pub(crate) fn driver_tasks_for_thread(
         })
         .map(|owner| (owner.task_id.clone(), owner.clone()))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn owner(task_id: &str) -> DriverTaskOwner {
+        let workspace_dir = PathBuf::from("/workspace");
+        DriverTaskOwner {
+            task_id: task_id.to_owned(),
+            profile: None,
+            workspace: tinytools::WorkspaceDescriptor::new(workspace_dir.clone()),
+            workspace_dir,
+            parent_session: "parent".into(),
+            parent_thread_id: Some("thread".into()),
+        }
+    }
+
+    #[test]
+    fn terminal_tasks_leave_the_non_evictable_live_owner_set() {
+        let mut st = Owners::default();
+        st.driver_tasks.insert("task".into(), owner("task"));
+
+        terminalize_driver_task(&mut st, "task", 2);
+
+        assert!(!st.driver_tasks.contains_key("task"));
+        assert!(st.terminal_driver_tasks.contains_key("task"));
+    }
+
+    #[test]
+    fn active_owner_capacity_refuses_new_tasks_without_evicting_live_scope() {
+        let mut st = Owners::default();
+        for index in 0..ACTIVE_DRIVER_TASKS_CAP {
+            let key = format!("task-{index}");
+            st.driver_tasks.insert(key.clone(), owner(&key));
+        }
+
+        let result = remember_active_driver_task(
+            &mut st,
+            "new-task".into(),
+            owner("new-task"),
+            ACTIVE_DRIVER_TASKS_CAP,
+        );
+
+        assert!(result.is_err());
+        assert!(st.driver_tasks.contains_key("task-0"));
+        assert!(!st.driver_tasks.contains_key("new-task"));
+    }
 }
 
 pub(crate) fn driver_tasks_for_parent(
