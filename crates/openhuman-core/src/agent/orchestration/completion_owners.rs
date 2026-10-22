@@ -103,7 +103,9 @@ fn remember_active_driver_task(
     capacity: usize,
 ) -> Result<(), String> {
     if !st.driver_tasks.contains_key(&key) && st.driver_tasks.len() >= capacity {
-        return Err(format!("active sub-agent owner capacity ({capacity}) is full"));
+        return Err(format!(
+            "active sub-agent owner capacity ({capacity}) is full"
+        ));
     }
     st.terminal_driver_tasks.remove(&key);
     st.terminal_driver_task_order

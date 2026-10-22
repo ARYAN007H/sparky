@@ -127,7 +127,14 @@ pub(super) fn make_completion(
         let background_store = background_store.clone();
         let background_subagent_session_id = background_subagent_session_id.clone();
         let background_parent_thread_id = background_parent_thread_id.clone();
+        let owner_dispatch = background_dispatch.clone();
+        let owner_task_id = background_task_id.clone();
         Box::pin(async move {
+            let keep_owner_active = matches!(
+                &result,
+                Ok(outcome)
+                    if matches!(&outcome.status, SubagentRunStatus::AwaitingUser { .. })
+            );
             let finish = async move {
                 let mut abort_report =
                     AbortReport::arm(progress_sink, &background_agent_id, &background_task_id);
@@ -469,6 +476,12 @@ pub(super) fn make_completion(
                     .await
                 }
                 None => finish.await,
+            }
+            if !keep_owner_active {
+                crate::agent::orchestration::completion_owners::finish_driver_task(
+                    &owner_dispatch,
+                    &owner_task_id,
+                );
             }
         })
     }

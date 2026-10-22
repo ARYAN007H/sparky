@@ -603,14 +603,32 @@ impl SpawnSubagentTool {
                 thread_id,
             );
         }
-        crate::agent::orchestration::completion_owners::note_driver_task(
+        if let Err(error) = crate::agent::orchestration::completion_owners::note_driver_task(
             &dispatch,
             &task_id,
             parent.workspace_dir.clone(),
             task_workspace.clone(),
             parent_session.clone(),
             parent_thread_id.clone(),
-        );
+        ) {
+            if let Err(store_error) = driver_store
+                .mark_failed(
+                    &durable_session.subagent_session_id,
+                    &task_id,
+                    error.clone(),
+                )
+                .await
+            {
+                log::warn!(
+                    "[subagent_reuse] mark_failed after owner admission refusal failed subagent_session_id={} task_id={} error={store_error}",
+                    durable_session.subagent_session_id,
+                    task_id
+                );
+            }
+            return Ok(ToolResult::error(format!(
+                "spawn_subagent: registration refused: {error}"
+            )));
+        }
 
         crate::agent::orchestration::subagent_events::publish_subagent_spawned(
             parent_session.clone(),

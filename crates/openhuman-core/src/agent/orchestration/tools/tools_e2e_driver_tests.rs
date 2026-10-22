@@ -632,7 +632,8 @@ async fn thread_delete_keeps_completions_when_driver_task_scope_cannot_be_resolv
         workspace_descriptor,
         parent_session.into(),
         Some(thread_id.into()),
-    );
+    )
+    .expect("record active owner for fail-closed regression");
 
     let result = crate::threads::ops::thread_delete(
         &dispatch,
