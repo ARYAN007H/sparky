@@ -428,7 +428,7 @@ tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
-tinystoragedrivers-testkit = { workspace = true }
+tinystoragedrivers-testkit = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-testkit" }
 # Root tests and examples reach into the core, embed and tinyhumans directly.
 # Dev-only, so none of them is an edge of the shipped binary. Same spelling as
 # the library crates' own manifests (`default-features = false`; the gates come
