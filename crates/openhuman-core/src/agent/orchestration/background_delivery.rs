@@ -29,14 +29,16 @@
 
 use crate::core::runtime::DispatchCtx;
 use std::path::{Path, PathBuf};
+#[cfg(test)]
+use std::sync::Mutex;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use async_trait::async_trait;
 use serde_json::json;
 use tinyagents_tasks::{
-    CompletionDelivery, CompletionDeliveryConfig, DeliveryOutcome, DeliveryTarget,
-    ThreadDeliveryLeases,
+    CompletionDelivery, CompletionDeliveryConfig, CompletionRecord, DeliveryOutcome,
+    DeliveryTarget, ThreadDeliveryLeases,
 };
 
 use crate::core::bus::BUS;
@@ -54,8 +56,6 @@ mod delivery_events;
 use crate::core::runtime::CoreContext;
 #[cfg(test)]
 pub(super) use delivery_events::Drain;
-#[cfg(test)]
-pub(super) use delivery_events::drain_schedule;
 pub(super) use delivery_events::{drain_schedule_in, owning_profiles};
 
 /// Coalesce completions landing within this window into one delivery turn.
@@ -253,7 +253,7 @@ async fn try_deliver(
             debounce: DEBOUNCE,
             recovery_delay: RECOVERY_DELAY,
             retry_backoff: Duration::from_secs(2),
-            busy_poll: RECOVERY_BUSY_POLL,
+            busy_poll: CompletionDeliveryConfig::default().busy_poll,
             max_busy_polls: CompletionDeliveryConfig::default().max_busy_polls,
             batch_size: usize::MAX,
         },

@@ -15,7 +15,7 @@ fn delivery_target(router: &tinyagents_tasks::CompletionRouter) -> DeliveryTarge
     }
 }
 
-fn immediate_delivery(router: &tinyagents_tasks::CompletionRouter) -> CompletionDelivery {
+fn immediate_delivery() -> CompletionDelivery {
     CompletionDelivery::new(
         CompletionDeliveryConfig {
             debounce: Duration::ZERO,
@@ -45,7 +45,7 @@ async fn upstream_delivery_claims_and_acknowledges_one_parent_batch() {
             .unwrap();
     }
 
-    let delivery = immediate_delivery(&router);
+    let delivery = immediate_delivery();
     let mut delivered = Vec::new();
     let outcome = delivery
         .deliver_once(
@@ -79,7 +79,7 @@ async fn upstream_delivery_reports_parent_busy_without_claiming_completions() {
         .await
         .unwrap();
 
-    let delivery = immediate_delivery(&router);
+    let delivery = immediate_delivery();
     let outcome = delivery
         .deliver_once(
             delivery_target(&router),
