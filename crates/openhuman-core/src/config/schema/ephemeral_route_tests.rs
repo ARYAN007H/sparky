@@ -267,8 +267,8 @@ fn a_changed_route_is_applied_and_logged_once() {
             .map(|entry| entry.endpoint.as_str()),
         Some("http://127.0.0.1:9999/openai")
     );
-    let info_lines: Vec<_> = logs
-        .text()
+    let text = logs.text();
+    let info_lines: Vec<_> = text
         .lines()
         .filter(|line| line.contains("INFO") && line.contains("[config][ephemeral-route]"))
         .collect();
