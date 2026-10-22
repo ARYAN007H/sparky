@@ -5465,6 +5465,7 @@ dependencies = [
  "tinyinference-providers",
  "tinyinference-voice",
  "tinyjuice-bus",
+ "tinyjuice-host",
  "tinymcp-bus",
  "tinymemes-bus",
  "tinymemory-api",
@@ -5476,7 +5477,7 @@ dependencies = [
  "tinyskills-drivers",
  "tinystoragedrivers",
  "tinystoragedrivers-bus",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-client",
  "tinytools 0.6.0",
  "tinytools-agent 0.6.0",
@@ -8770,7 +8771,7 @@ dependencies = [
  "tinybox-ssh",
  "tinybus",
  "tinybus-module",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-core",
  "tokio",
  "uuid",
@@ -8907,7 +8908,7 @@ dependencies = [
  "tinychannels",
  "tinychannels-bus",
  "tinystoragedrivers-bus",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-client",
  "tinystoragedrivers-core",
  "tokio",
@@ -9063,7 +9064,7 @@ dependencies = [
  "tinybus-module",
  "tinyconnectors-bus",
  "tinyconnectors-sync",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-core",
  "tokio",
  "tracing",
@@ -9142,7 +9143,7 @@ dependencies = [
  "tinybus",
  "tinybus-module",
  "tinyeventqueues-bus",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-core",
  "tokio",
 ]
@@ -9544,7 +9545,7 @@ dependencies = [
 
 [[package]]
 name = "tinyjuice"
-version = "0.10.8"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "dirs 7.0.0",
@@ -9567,12 +9568,12 @@ dependencies = [
 
 [[package]]
 name = "tinyjuice-bus"
-version = "0.10.8"
+version = "0.11.0"
 dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
- "tinystoragedrivers-core",
+ "tinystoragedrivers-types",
 ]
 
 [[package]]
@@ -9582,12 +9583,28 @@ dependencies = [
  "log",
  "tinyjuice",
  "tinyjuice-bus",
- "tinystoragedrivers-core",
+ "tinystoragedrivers-api",
+ "tinystoragedrivers-types",
+ "tokio",
+]
+
+[[package]]
+name = "tinyjuice-host"
+version = "0.11.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "log",
+ "serde_json",
+ "tinyjuice-bus",
+ "tinytools 0.6.0",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]
 name = "tinyjuice-module"
-version = "0.10.8"
+version = "0.11.1"
 dependencies = [
  "log",
  "serde_json",
@@ -9596,8 +9613,9 @@ dependencies = [
  "tinyjuice",
  "tinyjuice-bus",
  "tinyjuice-drivers",
- "tinystoragedrivers-busproxy",
- "tinystoragedrivers-core",
+ "tinystoragedrivers-api",
+ "tinystoragedrivers-busproxy 2.1.0",
+ "tinystoragedrivers-types",
  "tokio",
 ]
 
@@ -9636,7 +9654,7 @@ dependencies = [
  "tinybus",
  "tinybus-module",
  "tinymcp-bus",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-client",
  "tinystoragedrivers-core",
  "tinystoragedrivers-secrets",
@@ -9802,6 +9820,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinystoragedrivers-api"
+version = "2.1.0"
+source = "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=05eaada962decbab33bafa4763d2bd1a67f6b456#05eaada962decbab33bafa4763d2bd1a67f6b456"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures-core",
+ "serde",
+ "serde_json",
+ "tinystoragedrivers-types",
+ "zeroize",
+]
+
+[[package]]
 name = "tinystoragedrivers-bus"
 version = "1.0.0"
 dependencies = [
@@ -9822,6 +9854,24 @@ dependencies = [
  "tinystoragedrivers-client",
  "tinystoragedrivers-core",
  "tokio",
+]
+
+[[package]]
+name = "tinystoragedrivers-busproxy"
+version = "2.1.0"
+source = "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=05eaada962decbab33bafa4763d2bd1a67f6b456#05eaada962decbab33bafa4763d2bd1a67f6b456"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures-core",
+ "serde",
+ "serde_json",
+ "tinybus",
+ "tinystoragedrivers-api",
+ "tinystoragedrivers-bus",
+ "tinystoragedrivers-types",
+ "tokio",
+ "zeroize",
 ]
 
 [[package]]
@@ -9937,6 +9987,16 @@ dependencies = [
  "tinystoragedrivers-core",
  "tokio",
  "zstd 0.13.3",
+]
+
+[[package]]
+name = "tinystoragedrivers-types"
+version = "2.1.0"
+source = "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=05eaada962decbab33bafa4763d2bd1a67f6b456#05eaada962decbab33bafa4763d2bd1a67f6b456"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -10159,7 +10219,7 @@ dependencies = [
  "tinybus",
  "tinybus-module",
  "tinystoragedrivers-bus",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-client",
  "tinystoragedrivers-core",
  "tinywallet",
