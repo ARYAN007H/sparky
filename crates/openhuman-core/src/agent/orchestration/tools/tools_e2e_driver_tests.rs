@@ -627,8 +627,14 @@ async fn detached_registration_failure_finishes_the_announced_product_card() {
         ),
         "the announced product card must end in failure: {events:?}"
     );
-    let store = SubagentSessionStore::new(workspace.clone());
-    let rows = store.load().expect("session row is durable");
+    let rows = super::driver_sessions_for_parent(
+        &live.data.dispatch_ctx(),
+        &workspace,
+        "registration-failure-parent",
+        Some(thread_id),
+    )
+    .await
+    .expect("session row is durable");
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].status, DurableSubagentStatus::Failed);
     assert!(

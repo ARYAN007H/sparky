@@ -26,9 +26,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         return;
     }
 
-    use crate::agent::orchestration::subagent_sessions::{
-        DurableSubagentStatus, SubagentSessionStore,
-    };
+    use crate::agent::orchestration::subagent_sessions::DurableSubagentStatus;
     use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
@@ -147,9 +145,14 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
     let alice_jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(&alice_ctx);
-    let store = SubagentSessionStore::new(workspace.clone());
-    let row_before = CoreContext::sync_scope(Arc::clone(&alice), || store.load())
-        .expect("durable child row readable")
+    let row_before = super::driver_sessions_for_parent(
+        &alice_ctx,
+        &workspace,
+        "shared-profile-parent-session",
+        Some(thread_id),
+    )
+        .await
+        .expect("driver child row readable")
         .into_iter()
         .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
         .expect("durable row belongs to the live child");

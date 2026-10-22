@@ -124,13 +124,17 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
         "the initial child must reach and persist its clarification before resume"
     );
 
-    let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
-    let before_session =
-        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&_core), || sessions.load())
-            .expect("initial session persisted")
-            .into_iter()
-            .find(|session| session.current_task_id.as_deref() == Some(task_id.as_str()))
-            .expect("initial durable session points at the paused child");
+    let before_session = super::driver_sessions_for_parent(
+        &live.data.dispatch_ctx(),
+        workspace.path(),
+        "continue-paused-e2e",
+        Some("continue-paused-e2e-thread"),
+    )
+    .await
+    .expect("initial session persisted")
+    .into_iter()
+    .find(|session| session.current_task_id.as_deref() == Some(task_id.as_str()))
+    .expect("initial durable session points at the paused child");
     assert_eq!(before_session.status, DurableSubagentStatus::AwaitingUser);
     let original_lifecycle_key = before_session
         .lifecycle_key
