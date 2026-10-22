@@ -44,6 +44,14 @@ struct Owners {
     terminal_driver_tasks: HashMap<String, DriverTaskOwner>,
     terminal_driver_task_order: VecDeque<String>,
     driver_cancel_reasons: HashMap<String, String>,
+    deleting_threads: std::collections::HashSet<DriverThreadScope>,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct DriverThreadScope {
+    profile: Option<String>,
+    workspace_dir: PathBuf,
+    thread_id: String,
 }
 
 #[derive(Clone)]
@@ -112,6 +120,18 @@ fn remember_active_driver_task(
         .retain(|existing| existing != &key);
     st.driver_tasks.insert(key, owner);
     Ok(())
+}
+
+fn driver_thread_scope(
+    profile: Option<String>,
+    workspace_dir: PathBuf,
+    thread_id: String,
+) -> DriverThreadScope {
+    DriverThreadScope {
+        profile,
+        workspace_dir,
+        thread_id,
+    }
 }
 
 /// Move a settled task out of the non-evictable live-owner set while retaining

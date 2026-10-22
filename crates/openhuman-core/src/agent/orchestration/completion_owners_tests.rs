@@ -42,3 +42,37 @@ fn active_owner_capacity_refuses_new_tasks_without_evicting_live_scope() {
     assert!(st.driver_tasks.contains_key("task-0"));
     assert!(!st.driver_tasks.contains_key("new-task"));
 }
+
+#[test]
+fn deleting_thread_refuses_late_owner_registration_but_keeps_prior_owner() {
+    let mut st = Owners::default();
+    let existing = owner("existing");
+    let existing_key = "existing".to_owned();
+    remember_active_driver_task(
+        &mut st,
+        existing_key.clone(),
+        existing.clone(),
+        ACTIVE_DRIVER_TASKS_CAP,
+    )
+    .expect("register live child before deletion starts");
+    st.deleting_threads.insert(driver_thread_scope(
+        existing.profile.clone(),
+        existing.workspace_dir.clone(),
+        existing.parent_thread_id.clone().expect("thread owner"),
+    ));
+
+    let late = owner("late");
+    let result = remember_active_driver_task(
+        &mut st,
+        "late".into(),
+        late,
+        ACTIVE_DRIVER_TASKS_CAP,
+    );
+
+    assert!(result.is_err(), "a child cannot enter after deletion fences admission");
+    assert!(
+        st.driver_tasks.contains_key(&existing_key),
+        "deletion still sees owners admitted before its fence"
+    );
+    assert!(!st.driver_tasks.contains_key("late"));
+}
