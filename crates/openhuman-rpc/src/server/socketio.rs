@@ -222,6 +222,7 @@ struct ChatCancelPayload {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ThreadSubscribePayload {
     thread_id: String,
 }
