@@ -11,14 +11,21 @@ const THREAD: &str = "goal-thread";
 /// A session for `agent_id` bound to [`THREAD`], with its runtime session up.
 fn host_for(agent_id: &str) -> (crate::agent::OpenHumanSessionHost, tempfile::TempDir) {
     let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    crate::agent::session_host::test_support::install_model_fixture();
     let tmp = tempfile::TempDir::new().unwrap();
     let config = crate::config::Config {
         workspace_dir: tmp.path().join("workspace"),
         action_dir: tmp.path().join("workspace"),
         config_path: tmp.path().join("config.toml"),
+        default_model: Some("test/session-fixture".to_string()),
         ..crate::config::Config::default()
     };
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    // Building the orchestrator's model passes the backend-session gate; a
+    // standing API key in this session's own state dir satisfies it, and the
+    // model fixture above answers instead of a real provider.
+    crate::security::credentials::api_key::store_api_key(&config, "test-goal-key")
+        .expect("test api key");
     let definition = crate::agent_registry::agents::load_builtins()
         .unwrap()
         .into_iter()
