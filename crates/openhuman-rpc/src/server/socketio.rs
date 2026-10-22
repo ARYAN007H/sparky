@@ -78,8 +78,8 @@ fn socket_tenant_from_request_extensions(
     extensions: &axum::http::Extensions,
 ) -> Option<SocketTenant> {
     let dispatch = extensions.get::<crate::core_host::core::runtime::DispatchCtx>()?;
-    let scope = crate::core_host::agent::plan_review::gate::global()
-        .socket_scope_for_dispatch(dispatch)?;
+    let scope =
+        crate::core_host::agent::plan_review::gate::global().socket_scope_for_dispatch(dispatch)?;
     Some(SocketTenant(scope))
 }
 
@@ -305,7 +305,7 @@ pub fn attach_socketio() -> (socketioxide::layer::SocketIoLayer, SocketIo) {
                 let _ = socket.clone().disconnect();
                 return;
             };
-            socket.extensions.insert(SocketTenant(tenant));
+            socket.extensions.insert(tenant);
 
             log::info!("[socketio] client connected id={client_id} (authenticated)");
             // Join a room named after the client ID for targeted event delivery.

@@ -7,8 +7,8 @@ use super::{
 #[tokio::test]
 async fn socket_connect_reads_dispatch_context_from_request_extensions_after_spawn() {
     let dispatch = crate::core_host::core::runtime::DispatchCtx::process_default();
-    let expected = crate::core_host::agent::plan_review::gate::global()
-        .socket_scope_for_dispatch(&dispatch);
+    let expected =
+        crate::core_host::agent::plan_review::gate::global().socket_scope_for_dispatch(&dispatch);
     let mut extensions = axum::http::Extensions::new();
     extensions.insert(dispatch);
 
