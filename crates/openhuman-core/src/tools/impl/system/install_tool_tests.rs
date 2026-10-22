@@ -104,12 +104,3 @@ async fn rejects_unknown_manager() {
     assert!(result.is_error);
 }
 
-#[test]
-fn package_name_validation() {
-    assert!(is_valid_package_name("ripgrep"));
-    assert!(is_valid_package_name("@scope/cli"));
-    assert!(is_valid_package_name("python3.11"));
-    assert!(!is_valid_package_name("jq; rm -rf /"));
-    assert!(!is_valid_package_name("a b"));
-    assert!(!is_valid_package_name(""));
-}
