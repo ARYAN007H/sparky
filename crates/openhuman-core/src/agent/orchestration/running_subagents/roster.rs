@@ -103,11 +103,12 @@ pub(crate) fn active_subagents_context_block(
     workspace_dir: &std::path::Path,
 ) -> Option<String> {
     admit_workspace(ctx, workspace_dir).ok()?;
-    let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new_in_context(
-        ctx,
-        workspace_dir.to_path_buf(),
-    )
-    .ok()?;
+    let store =
+        crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new_in_context(
+            ctx,
+            workspace_dir.to_path_buf(),
+        )
+        .ok()?;
     let durable = crate::agent::orchestration::subagent_sessions::list_for_parent(
         &store,
         parent_session,

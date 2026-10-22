@@ -28,9 +28,7 @@ impl SubagentSessionStore {
 
     fn in_scope<T>(&self, f: impl FnOnce() -> T) -> T {
         match &self.context {
-            Some(context) => {
-                crate::core::runtime::CoreContext::sync_scope(Arc::clone(context), f)
-            }
+            Some(context) => crate::core::runtime::CoreContext::sync_scope(Arc::clone(context), f),
             None => f(),
         }
     }
