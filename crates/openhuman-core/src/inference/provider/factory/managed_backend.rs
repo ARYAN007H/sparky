@@ -67,7 +67,11 @@ pub(super) fn managed_chat_model_for(
         return Err(managed_unavailable_error());
     };
     let model = match entry.models.as_ref() {
-        Some(models) => (models.resolve_model)(role, &crate::inference::registry::ProviderContext::new(config, egress), model_override),
+        Some(models) => (models.resolve_model)(
+            role,
+            &crate::inference::registry::ProviderContext::new(config, egress),
+            model_override,
+        ),
         None => model_override
             .or(config.default_model.as_deref())
             .map(str::trim)

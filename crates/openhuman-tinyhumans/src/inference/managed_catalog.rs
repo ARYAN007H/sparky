@@ -31,24 +31,33 @@ const MODELS_PATH: &str = "/openai/v1/models";
 
 /// The registry entry for the managed catalog.
 pub(super) fn entry() -> CatalogEntry<ProviderContext> {
-    let list = Arc::new(|request: CatalogRequest<ProviderContext>| -> BoxFuture<Result<serde_json::Value, String>> {
-        Box::pin(async move {
-            let context = request.context;
-            let host = context.catalog.as_ref().expect("catalog host context");
-            let outcome = list_models(
-                &context.config,
-                CatalogHostRequest {
-                    provider_key: host.request.provider_key.clone(),
-                    client: host.request.client.clone(),
-                },
-            ).await?;
-            host.logs.lock().unwrap_or_else(std::sync::PoisonError::into_inner).extend(outcome.logs);
-            Ok(outcome.value)
-        })
-    });
+    let list = Arc::new(
+        |request: CatalogRequest<ProviderContext>| -> BoxFuture<Result<serde_json::Value, String>> {
+            Box::pin(async move {
+                let context = request.context;
+                let host = context.catalog.as_ref().expect("catalog host context");
+                let outcome = list_models(
+                    &context.config,
+                    CatalogHostRequest {
+                        provider_key: host.request.provider_key.clone(),
+                        client: host.request.client.clone(),
+                    },
+                )
+                .await?;
+                host.logs
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .extend(outcome.logs);
+                Ok(outcome.value)
+            })
+        },
+    );
     let limits: CatalogLimits<ProviderContext> =
         Arc::new(|model: &str, context: &ProviderContext| limits_request(model, &context.config));
-    CatalogEntry { list, limits: Some(limits) }
+    CatalogEntry {
+        list,
+        limits: Some(limits),
+    }
 }
 
 fn empty_catalog(reason: &str) -> Result<Outcome<serde_json::Value>, String> {

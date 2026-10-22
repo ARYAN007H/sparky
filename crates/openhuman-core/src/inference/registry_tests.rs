@@ -1,6 +1,4 @@
 use super::*;
-use tinyinference_llm::model::ChatModel;
-use tinyinference_llm::model::discover::DiscoveryRequest;
 use crate::inference::context_window::model_limits_request;
 use crate::inference::provider::factory::{
     create_chat_model_from_string, make_openhuman_backend_model_for_thread, PROVIDER_OPENHUMAN,
@@ -8,6 +6,8 @@ use crate::inference::provider::factory::{
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use tinyinference_llm::model::discover::DiscoveryRequest;
+use tinyinference_llm::model::ChatModel;
 use tinyinference_llm::model::{ModelRequest, ModelResponse};
 
 type SeenModelRequests = Arc<Mutex<Vec<(String, Option<String>, Option<String>)>>>;
@@ -52,7 +52,8 @@ fn fake_entry(seen: SeenModelRequests) -> ChatModelEntry<ProviderContext> {
                 Some(model) if !model.starts_with("hint:") => Some(model.to_string()),
                 Some(_) => None,
                 None => config
-                    .config.default_model
+                    .config
+                    .default_model
                     .clone()
                     .or_else(|| Some("host/fake-default".to_string())),
             }),
@@ -127,11 +128,14 @@ fn a_registered_embedding_factory_builds_the_managed_embedding_model() {
     let _guard = crate::inference::inference_test_guard();
     let calls = Arc::new(AtomicUsize::new(0));
     let counter = Arc::clone(&calls);
-    register_embedding(PROVIDER_OPENHUMAN, Arc::new(move |request| {
-        assert_eq!(request.dimensions, 8);
-        counter.fetch_add(1, Ordering::SeqCst);
-        Ok(Box::new(tinyinference_embeddings::NoopEmbeddingModel))
-    }));
+    register_embedding(
+        PROVIDER_OPENHUMAN,
+        Arc::new(move |request| {
+            assert_eq!(request.dimensions, 8);
+            counter.fetch_add(1, Ordering::SeqCst);
+            Ok(Box::new(tinyinference_embeddings::NoopEmbeddingModel))
+        }),
+    );
     let built = crate::inference::embedding_host::create_embedding_provider_with_credentials(
         "cloud",
         "any-model",
@@ -150,9 +154,7 @@ async fn a_registered_catalog_answers_the_model_listing_for_its_provider() {
         "fake-catalog",
         CatalogEntry {
             list: Arc::new(|_| {
-                Box::pin(async {
-                    Ok(serde_json::json!({ "models": [{ "id": "registered" }] }))
-                })
+                Box::pin(async { Ok(serde_json::json!({ "models": [{ "id": "registered" }] })) })
             }),
             limits: None,
         },
@@ -240,7 +242,14 @@ async fn a_registered_catalog_receives_the_entrys_provider_key() {
         PROVIDER_OPENHUMAN,
         CatalogEntry {
             list: Arc::new(move |request: CatalogRequest<ProviderContext>| {
-                *sink.lock().unwrap() = request.context.catalog.as_ref().unwrap().request.provider_key.clone();
+                *sink.lock().unwrap() = request
+                    .context
+                    .catalog
+                    .as_ref()
+                    .unwrap()
+                    .request
+                    .provider_key
+                    .clone();
                 Box::pin(async { Ok(serde_json::json!({ "models": [] })) })
             }),
             limits: None,

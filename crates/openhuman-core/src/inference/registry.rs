@@ -16,7 +16,6 @@
 
 use std::sync::Arc;
 
-
 use crate::config::Config;
 use crate::core::slots::{Extensions, HookSlot};
 use crate::security::approval::ApprovalChatContext;
@@ -61,7 +60,12 @@ pub struct CatalogHostRequest {
 
 impl ProviderContext {
     pub(crate) fn new(config: &Config, egress: &EgressLedger) -> Self {
-        Self { config: config.clone(), egress: egress.clone(), embedding: None, catalog: None }
+        Self {
+            config: config.clone(),
+            egress: egress.clone(),
+            embedding: None,
+            catalog: None,
+        }
     }
 
     pub(crate) fn for_embedding(
@@ -74,7 +78,12 @@ impl ProviderContext {
         Self {
             config: base,
             egress: EgressLedger::none(),
-            embedding: Some(EmbeddingCallContext { config: config.cloned(), chat, state_dir, secrets_encrypt }),
+            embedding: Some(EmbeddingCallContext {
+                config: config.cloned(),
+                chat,
+                state_dir,
+                secrets_encrypt,
+            }),
             catalog: None,
         }
     }
@@ -84,18 +93,23 @@ impl ProviderContext {
             config: config.clone(),
             egress: EgressLedger::none(),
             embedding: None,
-            catalog: Some(CatalogCallContext { request, logs: Arc::new(std::sync::Mutex::new(Vec::new())) }),
+            catalog: Some(CatalogCallContext {
+                request,
+                logs: Arc::new(std::sync::Mutex::new(Vec::new())),
+            }),
         }
     }
 }
 
 pub use tinyinference_llm::providers::overrides::{
     BoxFuture, CatalogEntry, CatalogLimits, CatalogRequest, ChatModelEntry, ChatModelFactory,
-    ChatModelRequest, EmbeddingFactory, EmbeddingRequest, ProviderModelMetadata,
-    ProviderOverrides, ReadinessProbe,
+    ChatModelRequest, EmbeddingFactory, EmbeddingRequest, ProviderModelMetadata, ProviderOverrides,
+    ReadinessProbe,
 };
 
-pub(crate) fn provider_overrides(extensions: Option<Extensions>) -> ProviderOverrides<ProviderContext> {
+pub(crate) fn provider_overrides(
+    extensions: Option<Extensions>,
+) -> ProviderOverrides<ProviderContext> {
     let chat_extensions = extensions.clone();
     let embedding_extensions = extensions.clone();
     ProviderOverrides::new(
@@ -180,7 +194,8 @@ pub fn classify_backend_error(
         .map(|classifier| classifier(provider, error))
 }
 
-static CHAT_MODELS: HookSlot<ChatModelEntry<ProviderContext>> = HookSlot::new("inference::chat_models");
+static CHAT_MODELS: HookSlot<ChatModelEntry<ProviderContext>> =
+    HookSlot::new("inference::chat_models");
 
 /// Registers the chat-model provider `provider_id` for the whole process.
 pub fn register_chat_model(provider_id: impl Into<String>, entry: ChatModelEntry<ProviderContext>) {
@@ -217,7 +232,9 @@ pub(crate) fn chat_model_for(
 }
 
 /// The registered provider's model hooks, if it has any.
-pub(crate) fn provider_model_hooks(provider_id: &str) -> Option<ProviderModelMetadata<ProviderContext>> {
+pub(crate) fn provider_model_hooks(
+    provider_id: &str,
+) -> Option<ProviderModelMetadata<ProviderContext>> {
     chat_model(provider_id)?.models
 }
 
@@ -325,7 +342,11 @@ pub fn resolve_provider_model(
     model_override: Option<&str>,
 ) -> Option<String> {
     let hooks = provider_model_hooks(provider_id)?;
-    (hooks.resolve_model)(role, &ProviderContext::new(config, &EgressLedger::none()), model_override)
+    (hooks.resolve_model)(
+        role,
+        &ProviderContext::new(config, &EgressLedger::none()),
+        model_override,
+    )
 }
 
 pub(crate) fn resolve_provider_model_for(
@@ -336,7 +357,11 @@ pub(crate) fn resolve_provider_model_for(
     model_override: Option<&str>,
 ) -> Option<String> {
     let hooks = chat_model_for(extensions, provider_id)?.models?;
-    (hooks.resolve_model)(role, &ProviderContext::new(config, &EgressLedger::none()), model_override)
+    (hooks.resolve_model)(
+        role,
+        &ProviderContext::new(config, &EgressLedger::none()),
+        model_override,
+    )
 }
 
 /// The provider's model-specific context window, if known.
@@ -411,15 +436,23 @@ pub(crate) fn normalize_config(config: &mut Config) -> bool {
 // Embeddings
 // ---------------------------------------------------------------------------
 
-static EMBEDDINGS: HookSlot<EmbeddingFactory<ProviderContext>> = HookSlot::new("inference::embeddings");
+static EMBEDDINGS: HookSlot<EmbeddingFactory<ProviderContext>> =
+    HookSlot::new("inference::embeddings");
 
 /// Registers the embedding provider `provider_id` for the whole process.
-pub fn register_embedding(provider_id: impl Into<String>, factory: EmbeddingFactory<ProviderContext>) {
+pub fn register_embedding(
+    provider_id: impl Into<String>,
+    factory: EmbeddingFactory<ProviderContext>,
+) {
     EMBEDDINGS.register(provider_id, factory);
 }
 
 /// Registers the embedding provider `provider_id` for the context built from `extensions`.
-pub fn register_embedding_in(extensions: &Extensions, provider_id: impl Into<String>, factory: EmbeddingFactory<ProviderContext>) {
+pub fn register_embedding_in(
+    extensions: &Extensions,
+    provider_id: impl Into<String>,
+    factory: EmbeddingFactory<ProviderContext>,
+) {
     EMBEDDINGS.register_in(extensions, provider_id, factory);
 }
 

@@ -506,7 +506,8 @@ pub async fn probe_inference_readiness(
         return Ok(());
     };
     let provider_context = crate::inference::registry::ProviderContext::new(
-        config, &crate::security::egress::EgressLedger::none(),
+        config,
+        &crate::security::egress::EgressLedger::none(),
     );
     let model_id = entry
         .models
@@ -525,7 +526,8 @@ pub async fn probe_inference_readiness(
         role: role.to_string(),
         model: model_id.clone(),
         context: provider_context,
-    }).await;
+    })
+    .await;
     log::debug!(
         "[flows][inference-probe] role={role} model={model_id} probe result: {}",
         if result.is_ok() { "ready" } else { "not ready" }

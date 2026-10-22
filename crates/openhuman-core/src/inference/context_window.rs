@@ -232,7 +232,8 @@ pub(crate) fn model_limits_request_for(
             .filter(|model| !model.is_empty())
             .unwrap_or(model);
         let context = crate::inference::registry::ProviderContext::new(
-            config, &crate::security::egress::EgressLedger::none(),
+            config,
+            &crate::security::egress::EgressLedger::none(),
         );
         return crate::inference::registry::catalog_for(
             extensions,
@@ -260,7 +261,8 @@ pub(crate) fn model_limits_request_for(
             route.model.trim()
         };
         let context = crate::inference::registry::ProviderContext::new(
-            config, &crate::security::egress::EgressLedger::none(),
+            config,
+            &crate::security::egress::EgressLedger::none(),
         );
         return crate::inference::registry::catalog_for(
             extensions,

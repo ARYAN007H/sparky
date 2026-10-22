@@ -1,7 +1,9 @@
 use super::*;
 
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
-use crate::inference::registry::{ChatModelEntry, ChatModelRequest, ProviderContext, ProviderModelMetadata};
+use crate::inference::registry::{
+    ChatModelEntry, ChatModelRequest, ProviderContext, ProviderModelMetadata,
+};
 use std::sync::Arc;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 
@@ -67,7 +69,8 @@ fn model_fixture_entry() -> ChatModelEntry<ProviderContext> {
                     .map(|hint_role| {
                         if hint_role == "chat" {
                             config
-                                .config.default_model
+                                .config
+                                .default_model
                                 .as_deref()
                                 .filter(|configured| !configured.starts_with("hint:"))
                                 .map(str::to_string)

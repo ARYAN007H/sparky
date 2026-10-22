@@ -101,7 +101,9 @@ fn managed_vision_capability_is_absent_without_provider_policy() {
 #[test]
 fn model_supports_vision_uses_the_scoped_provider_capability_hook() {
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{register_chat_model_in, ChatModelEntry, ProviderModelMetadata};
+    use crate::inference::registry::{
+        register_chat_model_in, ChatModelEntry, ProviderModelMetadata,
+    };
     use std::sync::Arc;
 
     let extensions = Extensions::new();

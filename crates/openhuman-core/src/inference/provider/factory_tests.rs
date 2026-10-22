@@ -74,7 +74,8 @@ fn install_test_managed_provider() -> Arc<std::sync::Mutex<Vec<bool>>> {
                     Some(model) if !model.starts_with("hint:") => Some(model.into()),
                     Some(_) => None,
                     None => config
-                        .config.default_model
+                        .config
+                        .default_model
                         .clone()
                         .or_else(|| Some("fixture/managed-default".into())),
                 }),

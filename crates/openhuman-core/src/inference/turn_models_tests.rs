@@ -31,7 +31,7 @@ use tinyagents_harness::host::PrebuiltModelResolver as TurnModelResolver;
 fn scoped_model_entry(
     name: &'static str,
     supports_vision: bool,
-) -> crate::inference::registry::ChatModelEntry::<crate::inference::registry::ProviderContext> {
+) -> crate::inference::registry::ChatModelEntry<crate::inference::registry::ProviderContext> {
     use crate::inference::registry::ProviderModelMetadata;
 
     crate::inference::registry::ChatModelEntry::<crate::inference::registry::ProviderContext> {
