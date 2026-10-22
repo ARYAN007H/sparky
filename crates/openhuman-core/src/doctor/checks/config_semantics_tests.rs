@@ -234,7 +234,7 @@ async fn malformed_storage_url_is_reported_without_echoing_it() {
 // This fixture relies on POSIX mode bits; Windows readonly attributes do not revoke write ACLs.
 #[cfg(unix)]
 #[tokio::test]
-async fn action_directory_without_write_access_is_an_error() {
+async fn action_directory_without_write_mode_bits_reports_effective_writability() {
     let dir = tempfile::tempdir().expect("temporary action directory");
     let mut config = Config::default();
     config.action_dir = dir.path().to_owned();
