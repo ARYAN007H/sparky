@@ -97,7 +97,7 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
             let mut rows = super::session_db::SessionDatabase::read(snapshot.db())
                 .context("[sessions] read the session database snapshot")?;
             sanitize_legacy_system_messages(&mut rows.messages);
-            let fingerprint = source_fingerprint(snapshot.db())?;
+            let fingerprint = source_fingerprint(&rows)?;
             let history_batch = SessionHistoryImport {
                 sessions: rows.sessions,
                 messages: rows.messages,
@@ -196,10 +196,9 @@ fn database_totals(counts: [ImportCounts; 11]) -> (usize, usize) {
     )
 }
 
-fn source_fingerprint(path: &Path) -> Result<String> {
+fn source_fingerprint<T: serde::Serialize>(rows: &T) -> Result<String> {
     use sha2::{Digest, Sha256};
-    let bytes =
-        std::fs::read(path).with_context(|| format!("read source snapshot {}", path.display()))?;
+    let bytes = serde_json::to_vec(rows).context("serialize decoded legacy session rows")?;
     Ok(format!("sha256:{}", hex::encode(Sha256::digest(bytes))))
 }
 
