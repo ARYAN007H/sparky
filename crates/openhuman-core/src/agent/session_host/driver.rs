@@ -491,7 +491,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             observed.hit_cap = outcome.hit_cap;
             observed.wrap_up_injected = outcome.wrap_up_injected;
             // Preserve the harness stop reason and the wind-down sidecar marker.
-            observed.stop = crate::agent::session_host::stop_summary::classify_stop_with_cause(
+            observed.stop = crate::agent::session_host::stop_policy::classify_stop_with_cause(
                 outcome.breaker_halt.as_deref(),
                 outcome.failure_cause.clone(),
                 observed.wind_down,

@@ -46,7 +46,7 @@ mod live_tools;
 mod resume_bound_session_tests;
 mod runtime;
 mod runtime_session;
-pub(crate) mod stop_summary;
+pub(crate) mod stop_policy;
 mod types;
 
 pub use codec::OpenHumanTranscriptCodec;

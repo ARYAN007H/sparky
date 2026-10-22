@@ -16,7 +16,7 @@ use tinytools_agent::dialect::ToolDialect;
 use tinyagents_harness::middleware::wrap_harness_instruction;
 
 use crate::agent::{
-    session_host::{product_copy, stop_summary},
+    session_host::{product_copy, stop_policy},
     tinyagents::{SupplementalTrace, TinyagentsTurnOutcome, TurnModelSource},
 };
 use crate::inference::provider::{BilledUsage, AGENT_TURN_MAX_OUTPUT_TOKENS};
@@ -241,7 +241,7 @@ fn classified_halt_close(outcome: &TinyagentsTurnOutcome) -> Option<GroundedClos
     }
     let records = product_copy::close_results(&outcome.tool_outcomes);
     Some(GroundedClose {
-        output: stop_summary::deterministic_final_summary(&records, Some(reason)),
+        output: stop_policy::deterministic_final_summary(&records, Some(reason)),
         usage: RepairUsage::default(),
     })
 }
@@ -414,7 +414,7 @@ pub(super) async fn close_if_needed(
                 !records.is_empty(),
             )
         } else {
-            stop_summary::deterministic_final_summary(&records, stop_reason)
+            stop_policy::deterministic_final_summary(&records, stop_reason)
         }
     };
 

@@ -271,7 +271,7 @@ fn the_final_summary_quotes_each_failure_message() {
 /// raw records. The detailed cases live in `stop_summary_tests.rs`.
 #[test]
 fn the_final_summary_of_a_halted_turn_gives_a_reason_and_names_the_tools() {
-    let out = super::super::stop_summary::deterministic_final_summary(
+    let out = super::super::stop_policy::deterministic_final_summary(
         &[result("install_item", false, "no direct download")],
         Some(STOP_NOTE),
     );
