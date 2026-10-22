@@ -13,7 +13,10 @@ use std::task::{Context, Poll, Waker};
 use tinybus::EventHandler;
 use tinychannels::routes::resolve_provider_alias;
 use tinychannels_bus::context::ChatMessage;
-use tinychannels_bus::{ChannelInboundEnvelope, ChannelRef, ConversationRef, SenderRef};
+use tinychannels_bus::{
+    ChannelInboundEnvelope, ChannelOutboundMessage, ChannelRef, ConversationRef, OutboundContentPart,
+    SenderRef,
+};
 use tinytools::{Tool, ToolResult};
 
 fn inbound(
@@ -57,7 +60,7 @@ impl Tool for DummyTool {
 
 #[derive(Default)]
 struct RecordingChannel {
-    sent: Mutex<Vec<SendMessage>>,
+    sent: Mutex<Vec<ChannelOutboundMessage>>,
 }
 
 #[async_trait]
@@ -66,14 +69,37 @@ impl Channel for RecordingChannel {
         "recording"
     }
 
-    async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
+    #[allow(deprecated, reason = "TinyChannels v22 still requires the legacy send trait method")]
+    async fn send(&self, _message: &tinychannels_bus::SendMessage) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    async fn send_typed(&self, message: &ChannelOutboundMessage) -> anyhow::Result<()> {
         self.sent.lock().unwrap().push(message.clone());
         Ok(())
     }
 
-    async fn listen(&self, _tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
+    #[allow(deprecated, reason = "TinyChannels v22 still requires the legacy listener trait method")]
+    async fn listen(
+        &self,
+        _tx: tokio::sync::mpsc::Sender<tinychannels_bus::ChannelMessage>,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
+}
+
+fn sent_text(message: &ChannelOutboundMessage) -> String {
+    message
+        .parts
+        .iter()
+        .filter_map(|part| match part {
+            OutboundContentPart::Content {
+                part: tinychannels_bus::channel::ContentPart::Text { text, .. },
+            } => Some(text.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
@@ -346,10 +372,9 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(sent[0]
-        .content
+    assert!(sent_text(&sent[0])
         .contains("Unknown provider `definitely-not-a-provider`"));
-    assert_eq!(sent[0].thread_ts.as_deref(), Some("thread-1"));
+    assert_eq!(sent[0].thread_id.as_deref(), Some("thread-1"));
 }
 
 #[tokio::test]
@@ -396,7 +421,7 @@ async fn handle_runtime_command_set_model_clears_sender_history_and_persists_rou
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(sent[0].content.contains("Model switched to `gpt-5-mini`"));
+    assert!(sent_text(&sent[0]).contains("Model switched to `gpt-5-mini`"));
 }
 
 #[tokio::test]
@@ -425,11 +450,11 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
     assert!(
-        sent[0].content.contains("**Status**"),
+        sent_text(&sent[0]).contains("**Status**"),
         "status command returned unexpected reply: {:?}",
-        sent[0].content
+        sent_text(&sent[0])
     );
-    assert!(sent[0].content.contains("Provider:"));
+    assert!(sent_text(&sent[0]).contains("Provider:"));
 }
 
 #[tokio::test]
@@ -474,12 +499,11 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(sent[0].content.contains("Remote control:"));
-    assert!(sent[0].content.contains("`/status`"));
-    assert!(sent[0].content.contains("`/sessions`"));
-    assert!(sent[0].content.contains("`/new`"));
-    assert!(sent[0]
-        .content
+    assert!(sent_text(&sent[0]).contains("Remote control:"));
+    assert!(sent_text(&sent[0]).contains("`/status`"));
+    assert!(sent_text(&sent[0]).contains("`/sessions`"));
+    assert!(sent_text(&sent[0]).contains("`/new`"));
+    assert!(sent_text(&sent[0])
         .contains("Model routing: `/model`, `/models`"));
 }
 
@@ -509,10 +533,9 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(sent[0]
-        .content
+    assert!(sent_text(&sent[0])
         .contains("No conversation threads yet. Send `/new` to create one."));
-    assert_eq!(sent[0].thread_ts.as_deref(), Some("42"));
+    assert_eq!(sent[0].thread_id.as_deref(), Some("42"));
 }
 
 #[tokio::test]
@@ -618,20 +641,19 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 3);
-    assert!(sent[0].content.contains("Started new session"));
-    assert!(sent[0]
-        .content
+    assert!(sent_text(&sent[0]).contains("Started new session"));
+    assert!(sent_text(&sent[0])
         .contains("In-memory channel history cleared for this chat."));
 
-    assert!(sent[1].content.contains("**Status**"));
-    assert!(sent[1].content.contains("Thread: `Telegram"));
-    assert!(sent[1].content.contains("Provider: `anthropic`"));
-    assert!(sent[1].content.contains("Model: `claude-3`"));
-    assert!(sent[1].content.contains("In-memory turns: 1"));
-    assert!(sent[1].content.contains("Turn: in progress"));
+    assert!(sent_text(&sent[1]).contains("**Status**"));
+    assert!(sent_text(&sent[1]).contains("Thread: `Telegram"));
+    assert!(sent_text(&sent[1]).contains("Provider: `anthropic`"));
+    assert!(sent_text(&sent[1]).contains("Model: `claude-3`"));
+    assert!(sent_text(&sent[1]).contains("In-memory turns: 1"));
+    assert!(sent_text(&sent[1]).contains("Turn: in progress"));
 
-    assert!(sent[2].content.contains("**Recent sessions**"));
-    assert!(sent[2].content.contains("→ `Telegram"));
+    assert!(sent_text(&sent[2]).contains("**Recent sessions**"));
+    assert!(sent_text(&sent[2]).contains("→ `Telegram"));
     assert!(sent
         .iter()
         .all(|message| message.thread_ts.as_deref() == Some("42")));
@@ -670,13 +692,12 @@ async fn handle_runtime_command_telegram_new_reports_unavailable_storage() {
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
     assert!(
-        sent[0].content.contains("Created thread"),
+        sent_text(&sent[0]).contains("Created thread"),
         "{}",
-        sent[0].content
+        sent_text(&sent[0])
     );
-    assert!(sent[0]
-        .content
+    assert!(sent_text(&sent[0])
         .contains("failed to persist the chat binding"));
-    assert!(sent[0].content.contains("host storage is unavailable"));
-    assert_eq!(sent[0].thread_ts.as_deref(), Some("42"));
+    assert!(sent_text(&sent[0]).contains("host storage is unavailable"));
+    assert_eq!(sent[0].thread_id.as_deref(), Some("42"));
 }
