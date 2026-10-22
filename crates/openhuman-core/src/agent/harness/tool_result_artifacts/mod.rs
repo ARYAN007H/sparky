@@ -35,6 +35,10 @@ use tinystoragedrivers::BlobStore;
 use crate::agent::harness::artifact_offload::{SanitizingRedactor, READ_TOOL};
 use tinyagents_harness_tools::fs::filesystem::FileReadTool;
 
+mod wiring;
+
+pub(crate) use wiring::build_artifact_store;
+
 /// Namespace of the artifact index in the run's store registry.
 pub(crate) const TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE: &str = "openhuman_tool_result_artifacts";
 
