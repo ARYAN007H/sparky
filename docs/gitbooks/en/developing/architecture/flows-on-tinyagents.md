@@ -67,13 +67,13 @@ flowchart LR
 4. outcome: a `RunOutcome { output, pending_approvals, cancelled }`; the host
    persists live steps through the `FlowRunObserver` and exports the durable
    graph observations to Langfuse
-   ([`tinyflows/langfuse_export.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/tinyflows/langfuse_export.rs)).
+   ([`tinyflows/langfuse_export.rs`](https://github.com/senamakel/openhuman/blob/epic/7964-channel-v2/crates/openhuman-core/src/flows/tinyflows/langfuse_export.rs)).
 
 Because the engine keys persisted state by a caller-supplied `thread_id`,
 durable human-in-the-loop resume is `engine::resume_with_checkpointer` over the same
 `tinyagents::graph::SqliteCheckpointer` the agent harness uses: opened once per
 host at `<workspace_dir>/flows/checkpoints.db`
-([`caps/ops.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/tinyflows/caps/ops.rs), `open_flow_checkpointer`).
+([`caps/ops.rs`](https://github.com/senamakel/openhuman/blob/epic/7964-channel-v2/crates/openhuman-core/src/flows/tinyflows/caps/ops.rs), `open_flow_checkpointer`).
 
 ## Run state: one JSON map, a merge reducer, and the `{json,text,raw}` envelope
 
@@ -144,7 +144,7 @@ code, persistence and sub-workflow lookup are each a capability trait that the h
 implements ([`vendor/tinyflows/crates/tinyflows/src/caps/mod.rs`](https://github.com/tinyhumansai/tinyflows/blob/main/crates/tinyflows/src/caps/mod.rs)).
 `openhuman::flows::tinyflows::caps` supplies one adapter per trait, assembled into a
 `Capabilities` bundle per run by `build_capabilities`
-([`caps/`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/tinyflows/caps/mod.rs)):
+([`caps/`](https://github.com/senamakel/openhuman/blob/epic/7964-channel-v2/crates/openhuman-core/src/flows/tinyflows/caps/mod.rs)):
 
 | tinyflows trait    | Node(s) it backs                | OpenHuman adapter                  | Wraps                                            |
 | ------------------ | ------------------------------- | ---------------------------------- | ------------------------------------------------ |
@@ -231,7 +231,7 @@ around the whole engine future
 `[autonomy]` tier through `SecurityPolicy::gate_decision` for that node's
 `CommandClass` (`http_request` → Network, `code` → Write, native `oh:` tools →
 their classified class) in `enforce_node_tier_gate`
-([`caps/`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/tinyflows/caps/mod.rs)):
+([`caps/`](https://github.com/senamakel/openhuman/blob/epic/7964-channel-v2/crates/openhuman-core/src/flows/tinyflows/caps/mod.rs)):
 
 - a `readonly` run is blocked at the network/code boundary and never dispatches;
 - a `supervised` run's `Prompt` decision is escalated by `gate_call_for_tier`
@@ -301,7 +301,7 @@ pattern the flow's own `agent` nodes use:
 | Executor          | (the engine)       | `flows_run` / `flows_resume`                                                                                              | the capability seam above                                                                                                                                                                                                                                                                    |
 
 Both agents live under
-[`crates/openhuman-core/src/flows/agents/`](https://github.com/tinyhumansai/openhuman/tree/main/crates/openhuman-core/src/flows/agents) as
+[`crates/openhuman-core/src/flows/agents/`](https://github.com/senamakel/openhuman/tree/epic/7964-channel-v2/crates/openhuman-core/src/flows/agents) as
 first-class registry agents (`agent.toml` + `prompt.md`), on the reasoning tier
 with narrow, safety-reviewed tool belts. The builder is tool-assisted
 end-to-end: it proposes graphs (validate-only), dry-runs them against mock
@@ -335,12 +335,12 @@ sequenceDiagram
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | [`vendor/tinyflows/crates/tinyflows/src/`](https://github.com/tinyhumansai/tinyflows/tree/main/crates/tinyflows/src)                                                               | The engine: `model/`, `validate.rs`, `compiler.rs`, `engine.rs`, `expr.rs`, `caps/`, `nodes/`. |
 | [`vendor/tinyflows/crates/tinyflows/src/caps/mod.rs`](https://github.com/tinyhumansai/tinyflows/blob/main/crates/tinyflows/src/caps/mod.rs)                                        | The capability traits + `Capabilities` bundle.                                                 |
-| [`crates/openhuman-core/src/flows/tinyflows/caps/`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/tinyflows/caps/mod.rs)                     | The host adapters, `build_capabilities`, `open_flow_checkpointer`, the two-layer gate helpers. |
+| [`crates/openhuman-core/src/flows/tinyflows/caps/`](https://github.com/senamakel/openhuman/blob/epic/7964-channel-v2/crates/openhuman-core/src/flows/tinyflows/caps/mod.rs)                     | The host adapters, `build_capabilities`, `open_flow_checkpointer`, the two-layer gate helpers. |
 | [`crates/openhuman-core/src/flows/ops.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/ops.rs)                                             | `flows_run` / `flows_resume` / `flows_build` / `flows_discover` and CRUD.                      |
 | [`crates/openhuman-core/src/flows/bus.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/bus.rs)                                             | `FlowTriggerSubscriber`: the host-side multi-trigger bridge.                                   |
 | [`crates/openhuman-core/src/flows/builder_tools.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/builder_tools.rs)                         | The Composio-bound builder reads; the authoring tools are `tinyflows_copilot::tools`, bound by `flows/builder_host.rs`. |
-| [`crates/openhuman-core/src/flows/agents/`](https://github.com/tinyhumansai/openhuman/tree/main/crates/openhuman-core/src/flows/agents)                                            | `workflow_builder` + `flow_discovery` agent definitions.                                       |
-| [`crates/openhuman-core/src/flows/tinyflows/langfuse_export.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/tinyflows/langfuse_export.rs) | Post-run export of the durable graph observations.                                             |
+| [`crates/openhuman-core/src/flows/agents/`](https://github.com/senamakel/openhuman/tree/epic/7964-channel-v2/crates/openhuman-core/src/flows/agents)                                            | `workflow_builder` + `flow_discovery` agent definitions.                                       |
+| [`crates/openhuman-core/src/flows/tinyflows/langfuse_export.rs`](https://github.com/senamakel/openhuman/blob/epic/7964-channel-v2/crates/openhuman-core/src/flows/tinyflows/langfuse_export.rs) | Post-run export of the durable graph observations.                                             |
 
 ## See also
 
