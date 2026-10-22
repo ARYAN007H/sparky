@@ -1,5 +1,5 @@
 use super::channel_has_approval_surface;
-use tinychannels_bus::{Channel, ChannelMessage, SendMessage};
+use tinychannels_bus::Channel;
 
 struct ConfiguredChannel {
     approvals: bool,
@@ -11,11 +11,22 @@ impl Channel for ConfiguredChannel {
         "configured"
     }
 
-    async fn send(&self, _message: &SendMessage) -> anyhow::Result<()> {
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v22 still requires the legacy send trait method"
+    )]
+    async fn send(&self, _message: &tinychannels_bus::SendMessage) -> anyhow::Result<()> {
         Ok(())
     }
 
-    async fn listen(&self, _tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v22 still requires the legacy listener trait method"
+    )]
+    async fn listen(
+        &self,
+        _tx: tokio::sync::mpsc::Sender<tinychannels_bus::ChannelMessage>,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
 
