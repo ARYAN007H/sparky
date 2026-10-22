@@ -131,6 +131,14 @@ export function isUnderVendoredTsd(manifest, root) {
 }
 
 const TSD_GIT = /^git\+https?:\/\/[^?#]*\/tinystoragedrivers(?:\.git)?\?tag=([^#&]+)/;
+const TSD_TYPES_REV =
+  /^git\+https?:\/\/github\.com\/tinyhumansai\/tinystoragedrivers(?:\.git)?\?rev=([0-9a-f]{40})#([0-9a-f]{7,40})$/;
+
+function isPinnedTsdTypesContract(pkg) {
+  if (pkg.name !== "tinystoragedrivers-types") return false;
+  const match = TSD_TYPES_REV.exec(pkg.source ?? "");
+  return Boolean(match && match[1].startsWith(match[2]));
+}
 
 // ---------------------------------------------------------------------------
 // Dependency-closure walk
@@ -255,6 +263,7 @@ export function checkVendoredOwner(metadata, root = REPO_ROOT) {
   for (const pkg of packages) {
     if (!isOwner(pkg.name)) continue;
     const manifest = norm(pkg.manifest_path);
+    if (isPinnedTsdTypesContract(pkg)) continue;
     if (!pkg.source && isUnderVendoredTsd(manifest, root)) {
       vendoredVersion ??= pkg.version ?? null;
       continue;

@@ -19,7 +19,32 @@ const pkg = (name, deps = [], source = null, manifest_path) => ({
       : `/repo/vendor/${name}/Cargo.toml`),
   dependencies: deps.map(d => ({ name: d, kind: null, optional: false })),
 });
-const checkMetadata = (m, root = '/repo') => checkMetadataAt(m, root);
+const checkMetadata = (input, root = '/repo') => {
+  const packages = [...input.packages];
+  for (const sourcePackage of [...packages]) {
+    for (const dependency of sourcePackage.dependencies ?? []) {
+      if (!packages.some((candidate) => candidate.name === dependency.name)) {
+        packages.push(pkg(dependency.name, [], dependency.source ?? null));
+      }
+    }
+  }
+  for (const packageInfo of packages) packageInfo.id ??= packageInfo.name;
+  return checkMetadataAt(
+    {
+      packages,
+      resolve: {
+        nodes: packages.map((packageInfo) => ({
+          id: packageInfo.id,
+          deps: (packageInfo.dependencies ?? []).map((dependency) => ({
+            pkg: dependency.name,
+            dep_kinds: [{ kind: dependency.kind }],
+          })),
+        })),
+      },
+    },
+    root,
+  );
+};
 const registry = 'registry+https://github.com/rust-lang/crates.io-index';
 
 test('a clean workspace passes', () => {
