@@ -481,9 +481,10 @@ class SocketService {
           profile_id: getCoreStateSnapshot().snapshot.auth.profileId ?? undefined,
         },
         () => {
-        clearTimeout(timer);
-        finish(true);
-      });
+          clearTimeout(timer);
+          finish(true);
+        }
+      );
     });
   }
 
