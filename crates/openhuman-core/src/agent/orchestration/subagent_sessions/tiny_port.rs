@@ -184,7 +184,7 @@ fn import_host_sessions(
                 .await
             {
                 Ok(_) => Ok(()),
-                Err(error) if error.kind() == crate::storage::StorageErrorKind::Conflict => Ok(()),
+                Err(error) if error.kind() == tinystoragedrivers::ErrorKind::Conflict => Ok(()),
                 Err(error) => Err(error),
             }
         })
