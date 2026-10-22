@@ -529,6 +529,30 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         background_completions::pending_for(&workspace, thread_id).is_empty(),
         "queued child completions are discarded after cancellation"
     );
+    background_completions::record_outcome(
+        &dispatch,
+        &workspace,
+        parent_session,
+        task_id.clone(),
+        "task_manager_agent",
+        "late terminal child completion",
+        Some(thread_id.into()),
+        BackgroundAgentOutcome::Completed,
+    )
+    .await;
+    crate::threads::ops::thread_delete(
+        &dispatch,
+        crate::threads::DeleteConversationThreadRequest {
+            thread_id: thread_id.into(),
+            deleted_at: "2026-01-01T00:02:00Z".into(),
+        },
+    )
+    .await
+    .expect("a retained terminal owner does not block deletion cleanup");
+    assert!(
+        background_completions::pending_for(&workspace, thread_id).is_empty(),
+        "terminal driver owners do not prevent queued completions from being discarded"
+    );
     release_on_cancel
         .await
         .expect("cancellation-aware child release task completes");
