@@ -1,7 +1,17 @@
 #[cfg(feature = "storage-sqlite")]
 use crate::storage::test_support::sqlite_backend;
 #[cfg(feature = "storage-sqlite")]
+use crate::{
+    core::runtime::{CoreContext, DispatchCtx, DomainSet, SaasConfig},
+    profiles::{ProfileHost, ProfileId, ProfileLayout},
+};
+#[cfg(feature = "storage-sqlite")]
 use std::sync::Arc;
+
+#[cfg(feature = "storage-sqlite")]
+fn profile(name: &str) -> ProfileId {
+    ProfileId::parse(name).unwrap()
+}
 
 #[cfg(feature = "storage-sqlite")]
 #[tokio::test]
