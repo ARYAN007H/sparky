@@ -224,11 +224,11 @@ impl SecurityPolicy {
                         .unwrap_or(forbidden_expanded);
                     if canonical.starts_with(&forbidden_canonical) {
                         log::trace!(
-                        "[security:policy] path blocked: symlink resolves to forbidden tree (requested={}, resolved={}, forbidden={})",
-                        path,
-                        canonical.display(),
-                        forbidden_canonical.display()
-                    );
+                            "[security:policy] path blocked: symlink resolves to forbidden tree (requested={}, resolved={}, forbidden={})",
+                            path,
+                            canonical.display(),
+                            forbidden_canonical.display()
+                        );
                         return false;
                     }
                 }
