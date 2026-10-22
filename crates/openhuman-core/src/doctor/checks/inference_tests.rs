@@ -392,13 +392,11 @@ async fn inspection_reports_refresh_required_without_refreshing_or_publishing_se
 #[tokio::test]
 async fn a_fully_configured_managed_default_constructs_cleanly() {
     use crate::config::schema::cloud_providers::{
-        register_hosted_cloud_provider_policy, AuthStyle, CloudProviderCreds,
+        register_hosted_cloud_provider_policy_in, AuthStyle, CloudProviderCreds,
     };
     use crate::config::test_env::EnvVarGuard;
     use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
-    use crate::inference::registry::{
-        register_chat_model, register_inspection_chat_model, InspectionChatModelFactory,
-    };
+    use crate::inference::registry::InspectionChatModelFactory;
     use tinyinference_llm::providers::overrides::ChatModelEntry;
 
     struct ManagedModel {
@@ -426,7 +424,9 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
         .without("OPENHUMAN_ACTION_DIR")
         .without("OPENAI_API_KEY")
         .without("OPENHUMAN_CORE_TOKEN");
-    register_hosted_cloud_provider_policy(
+    let extensions = crate::core::slots::Extensions::new();
+    register_hosted_cloud_provider_policy_in(
+        &extensions,
         Arc::new(|slug| slug == "openhuman"),
         Arc::new(|style| style == AuthStyle::OpenhumanJwt),
     );
@@ -445,8 +445,13 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
             credential: "doctor-test-session-token".to_owned(),
         })
     });
-    register_inspection_chat_model(PROVIDER_OPENHUMAN, inspection_factory);
-    register_chat_model(
+    crate::inference::registry::register_inspection_chat_model_in(
+        &extensions,
+        PROVIDER_OPENHUMAN,
+        inspection_factory,
+    );
+    crate::inference::registry::register_chat_model_in(
+        &extensions,
         PROVIDER_OPENHUMAN,
         ChatModelEntry {
             build: Arc::new(|request| {
@@ -480,7 +485,16 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
         default_model: Some("managed-test-model".to_owned()),
     }];
     let before = filesystem_snapshot(temp.path());
-    let findings = run_only(config, CONSTRUCT).await;
+    let core_context = crate::core::runtime::CoreContext::for_test_with_extensions(
+        crate::core::runtime::DomainSet::full(),
+        Some(temp.path().to_path_buf()),
+        extensions,
+    );
+    let findings = crate::core::runtime::CoreContext::scope(
+        core_context,
+        run_only(config, CONSTRUCT),
+    )
+    .await;
     assert_eq!(filesystem_snapshot(temp.path()), before);
 
     assert!(
