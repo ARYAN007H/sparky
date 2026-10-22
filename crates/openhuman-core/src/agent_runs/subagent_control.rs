@@ -209,9 +209,9 @@ async fn settle_paused_driver_cancel(
     parent_epoch: Option<u64>,
     reason: Option<&str>,
 ) -> Result<bool, String> {
-    let Some(lifecycle_key) = paused.lifecycle_key.as_ref() else {
+    if paused.lifecycle_key.is_none() {
         return Err("subagent_cancel: paused driver child has no lifecycle key".into());
-    };
+    }
     let store = subagent_sessions::open_for_context(
         ctx,
         paused.workspace_dir.clone(),

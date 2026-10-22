@@ -142,7 +142,7 @@ pub(crate) fn driver_tasks_for_thread(
     owners()
         .driver_tasks
         .iter()
-        .filter_map(|(key, owner)| {
+        .filter_map(|(_, owner)| {
             (owner.profile == profile
                 && owner.workspace_dir == workspace_dir
                 && owner.parent_thread_id.as_deref() == Some(thread_id))
