@@ -96,6 +96,27 @@ test('rejects direct calls through an alias of a grouped implementation prefix',
   ]);
 });
 
+test('resolves chained crate and implementation-prefix aliases', () => {
+  const source = [
+    'use tinychannels as tc;',
+    'use tc::providers as p;',
+    'p::email_channel::parse("message");',
+  ].join('\n');
+
+  assert.deepEqual(findOwnershipViolations(source, 'tests/email.rs'), [
+    {
+      line: 2,
+      path: 'tinychannels::providers::',
+      reason: 'TinyChannels provider behavior belongs in TinyChannels.',
+    },
+    {
+      line: 3,
+      path: 'tinychannels::providers::',
+      reason: 'TinyChannels provider behavior belongs in TinyChannels.',
+    },
+  ]);
+});
+
 test('expands nested grouped imports of TinyChannels provider internals', () => {
   const source = `
     use tinychannels::{providers::{email_channel::parse}};
