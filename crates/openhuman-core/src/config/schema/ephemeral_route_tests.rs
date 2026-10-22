@@ -2,6 +2,44 @@ use super::*;
 
 use crate::config::Config;
 
+#[derive(Clone, Default)]
+struct Capture(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl Capture {
+    fn text(&self) -> String {
+        String::from_utf8(self.0.lock().unwrap().clone()).unwrap()
+    }
+}
+
+impl std::io::Write for Capture {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Capture {
+    type Writer = Self;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        self.clone()
+    }
+}
+
+fn capture_logs() -> (Capture, tracing::subscriber::DefaultGuard) {
+    let capture = Capture::default();
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(capture.clone())
+        .with_ansi(false)
+        .with_max_level(tracing::Level::TRACE)
+        .finish();
+    (capture, tracing::subscriber::set_default(subscriber))
+}
+
 /// A config with a model resolved for the call, as `agent_chat` leaves it after
 /// applying `model_override`.
 fn config_with_model(model: &str) -> Config {
@@ -168,6 +206,49 @@ fn apply_twice_leaves_one_entry() {
         .collect();
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].endpoint, "http://127.0.0.1:9999/openai");
+}
+
+#[test]
+fn reapplying_the_same_route_is_a_no_op() {
+    let mut config = config_with_model("x/y");
+    apply(&mut config, route());
+    let before = config.clone();
+    let (logs, _guard) = capture_logs();
+
+    apply(&mut config, route());
+
+    assert_eq!(config, before);
+    assert!(!logs.text().contains("INFO"));
+}
+
+#[test]
+fn a_changed_route_is_applied_and_logged_once() {
+    let mut config = config_with_model("x/y");
+    apply(&mut config, route());
+    let (logs, _guard) = capture_logs();
+    let changed = EphemeralRoute {
+        endpoint: "http://127.0.0.1:9999/openai".into(),
+        api_key: "mdl-other".into(),
+        headers: Vec::new(),
+    };
+
+    apply(&mut config, changed.clone());
+
+    assert_eq!(config.ephemeral_route, Some(changed));
+    assert_eq!(
+        config
+            .cloud_providers
+            .iter()
+            .find(|entry| entry.slug == EPHEMERAL_ROUTE_SLUG)
+            .map(|entry| entry.endpoint.as_str()),
+        Some("http://127.0.0.1:9999/openai")
+    );
+    let info_lines: Vec<_> = logs
+        .text()
+        .lines()
+        .filter(|line| line.contains("INFO") && line.contains("[config][ephemeral-route]"))
+        .collect();
+    assert_eq!(info_lines.len(), 1, "expected one info log: {info_lines:?}");
 }
 
 #[test]
