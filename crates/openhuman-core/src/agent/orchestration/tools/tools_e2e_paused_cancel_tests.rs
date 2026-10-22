@@ -272,3 +272,88 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
     forget_workspace_for_test(workspace.path());
     assert!(!parent_cancellation.is_cancelled());
 }
+
+#[tokio::test]
+async fn stopping_a_paused_driver_releases_its_active_owner() {
+    use crate::agent::orchestration::tools::SpawnSubagentTool;
+    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobStatus;
+
+    let _lock = crate::config::TEST_ENV_LOCK.lock().await;
+    let _ = AgentDefinitionRegistry::init_global_builtins();
+    let workspace = tempfile::tempdir().expect("workspace");
+    let parent_session = "paused-stop-owner-parent";
+    let thread_id = "paused-stop-owner-thread";
+    let mut parent = parent_context(
+        workspace.path(),
+        Arc::new(PauseThenAnswerModel {
+            calls: std::sync::atomic::AtomicUsize::new(0),
+            seen: Mutex::new(Vec::new()),
+        }),
+        vec![],
+    );
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(32);
+    parent.on_progress = Some(progress_tx);
+    let (live, _core) = super::continuation_tests::core_backed_live_parent(
+        workspace.path(),
+        parent,
+        parent_session,
+        thread_id,
+    );
+    let jobs = (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&live.data.dispatch_ctx()))
+        .clone();
+    let result = SpawnSubagentTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "pause before stop",
+                "model": "test-model",
+                "blocking": true
+            }),
+            None,
+            live.data.child(),
+            crate::agent::subagent_host::detached_subagent_parent(&live, "paused-stop-child")
+                .expect("detached parent"),
+        )
+        .await
+        .expect("spawn paused child");
+    assert!(!result.is_error, "{}", result.output());
+    let task_id = result
+        .output()
+        .split("[async_subagent_ref]\n")
+        .nth(1)
+        .and_then(|value| value.split("\n[/async_subagent_ref]").next())
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .and_then(|value| value["task_id"].as_str().map(str::to_owned))
+        .expect("accepted task id");
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            if matches!(progress_rx.recv().await, Some(crate::progress::AgentProgress::SubagentAwaitingUser { task_id: ref id, .. }) if id == &task_id) {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("child reaches AwaitingInput");
+    let dispatch = live.data.dispatch_ctx();
+    assert_eq!(
+        crate::agent::orchestration::running_subagents::stop_for_thread(&dispatch, thread_id),
+        vec![task_id.clone()]
+    );
+    assert_eq!(
+        jobs.list()
+            .into_iter()
+            .find(|job| job.extensions.get("task_id").and_then(serde_json::Value::as_str) == Some(task_id.as_str()))
+            .map(|job| job.status),
+        Some(SubAgentJobStatus::Cancelled)
+    );
+    assert!(
+        crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+            &dispatch,
+            workspace.path(),
+            thread_id,
+        )
+        .is_empty(),
+        "a cancelled paused child must release its active owner"
+    );
+}
