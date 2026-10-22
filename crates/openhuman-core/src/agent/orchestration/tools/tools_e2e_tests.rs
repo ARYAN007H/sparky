@@ -294,7 +294,12 @@ async fn failed_async_child_is_reported_to_the_parent_without_a_success_result()
         vec![],
     );
     parent.on_progress = Some(progress_tx);
-    let live = super::live_parent_run_context("failed-async-child", parent);
+    let (live, _core) = continuation_tests::core_backed_live_parent(
+        workspace.path(),
+        parent,
+        "failed-async-child-session",
+        "failed-async-child-thread",
+    );
     let accepted = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
@@ -352,7 +357,12 @@ async fn unexecuted_tool_call_stub_is_projected_as_incomplete_not_success() {
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(32);
     let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
     parent.on_progress = Some(progress_tx);
-    let live = super::live_parent_run_context("stub-async-child", parent);
+    let (live, _core) = continuation_tests::core_backed_live_parent(
+        workspace.path(),
+        parent,
+        "stub-async-child-session",
+        "stub-async-child-thread",
+    );
     let accepted = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
