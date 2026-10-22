@@ -83,8 +83,9 @@ impl SpawnSubagentTool {
         let task_workspace = workspace_descriptor
             .clone()
             .unwrap_or_else(|| tinytools::WorkspaceDescriptor::new(parent.workspace_dir.clone()));
-        let detached_parent_with_workspace =
-            (*detached_parent).clone().with_workspace(task_workspace.clone());
+        let detached_parent_with_workspace = (*detached_parent)
+            .clone()
+            .with_workspace(task_workspace.clone());
         let resolved_model = definition.model.resolve(parent.model_name.as_str());
         let target_model = model_override.as_deref().unwrap_or(&resolved_model);
         if crate::attachments::should_forward_parent_images(&prompt)
