@@ -300,7 +300,9 @@ async fn stopping_a_paused_driver_releases_its_active_owner() {
     parent.all_tools = Arc::new(vec![ask_tool]);
     parent.all_tool_specs = Arc::new(vec![ask_spec.clone()]);
     parent.visible_tool_specs = Arc::new(vec![ask_spec]);
-    parent.visible_tool_names.insert("ask_user_clarification".into());
+    parent
+        .visible_tool_names
+        .insert("ask_user_clarification".into());
     parent
         .subagent_tool_ceiling_names
         .insert("ask_user_clarification".into());
