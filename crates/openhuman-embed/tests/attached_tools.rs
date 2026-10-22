@@ -319,7 +319,10 @@ fn attaching_before_first_turn_preserves_and_executes_native_tools() {
             let runtime = Runtime::builder()
                 .config(offline_config()).workspace(Workspace::Ephemeral)
                 .backend_url(backend.uri()).build().await
-                .unwrap_or_else(|error| panic!("runtime build failed: {error:?}"));
+                .unwrap_or_else(|error| {
+                    eprintln!("runtime build failed: {error:?}");
+                    panic!("runtime build failed")
+                });
             let agent = runtime.agent(AgentSpec::new("fresh-attached")
                 .provider(Provider::openai_compatible(format!("{}/v1",provider.uri()),"fixture").model("fixture"))
                 .definition(AgentDefinitionSpec::new().system_prompt("ORIGINAL_FRESH_HOST_PROMPT")
