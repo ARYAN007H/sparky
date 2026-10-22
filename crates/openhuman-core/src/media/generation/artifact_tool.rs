@@ -8,9 +8,10 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::Value;
 use tinyagents_harness_tools::media::{
     ArtifactFiling, FiledArtifact, GeneratedArtifact, MediaArtifactKind, MediaInnerFactory,
+    MediaProgressFn,
 };
 use tinytools::{
     PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolPolicy, ToolResult, ToolRunContext,

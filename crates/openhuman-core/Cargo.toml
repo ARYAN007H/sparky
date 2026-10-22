@@ -723,7 +723,7 @@ web3 = [
 # are light (serde + the already-shared reqwest), so this remains mostly a
 # surface gate. There are no controllers / stores / subscribers tagged `Media`
 # (agent tools only), and `openhuman::image` is currently unwired scaffold.
-media = ["tinyagents-harness/media"]
+media = ["tinyagents-harness/media", "tinyagents-harness-tools/media"]
 # Flows domains: the `flows::` automation surface (saved graphs — create/run/
 # schedule plus the workflow_builder / flow_discovery agents), and the
 # `rhai_workflows::` language-workflow tool. Production graphs remain JSON over
