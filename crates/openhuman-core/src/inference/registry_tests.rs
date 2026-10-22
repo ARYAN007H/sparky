@@ -302,15 +302,20 @@ fn inspection_model_factory_uses_the_callers_context_before_process_fallback() {
         Arc::new(move |request| {
             Ok(InspectionChatModelBuild {
                 model: Arc::new(FakeModel),
-                model_id: request.context.config.default_model.clone().unwrap(),
+                model_id: format!(
+                    "{endpoint}:{}",
+                    request.context.config.default_model.as_deref().unwrap()
+                ),
                 endpoint: format!("https://{endpoint}.example/v1"),
                 credential: format!("{endpoint}-credential"),
             })
         })
     };
     register_inspection_chat_model(PROVIDER_OPENHUMAN, factory("process"));
+    register_chat_model(PROVIDER_OPENHUMAN, fake_entry(Arc::default()));
     let a = Extensions::new();
     register_inspection_chat_model_in(&a, PROVIDER_OPENHUMAN, factory("context-a"));
+    register_chat_model_in(&a, PROVIDER_OPENHUMAN, fake_entry(Arc::default()));
     let context_a = crate::core::runtime::DispatchCtx::new(
         crate::core::runtime::CoreContext::for_test_with_host_kind_and_extensions(
             crate::core::types::HostKind::Library,
@@ -321,6 +326,7 @@ fn inspection_model_factory_uses_the_callers_context_before_process_fallback() {
     );
     let b = Extensions::new();
     register_inspection_chat_model_in(&b, PROVIDER_OPENHUMAN, factory("context-b"));
+    register_chat_model_in(&b, PROVIDER_OPENHUMAN, fake_entry(Arc::default()));
     let context_b = crate::core::runtime::DispatchCtx::new(
         crate::core::runtime::CoreContext::for_test_with_host_kind_and_extensions(
             crate::core::types::HostKind::Library,
@@ -350,8 +356,9 @@ fn inspection_model_factory_uses_the_callers_context_before_process_fallback() {
     )
     .expect("process inspection provider");
     unregister_inspection_chat_model(PROVIDER_OPENHUMAN);
+    unregister_chat_model(PROVIDER_OPENHUMAN);
 
-    assert_eq!(build_a.model_id, "context-a");
-    assert_eq!(build_b.model_id, "context-b");
-    assert_eq!(build_process.model_id, "process");
+    assert_eq!(build_a.model_id, "context-a:context-a");
+    assert_eq!(build_b.model_id, "context-b:context-b");
+    assert_eq!(build_process.model_id, "process:process");
 }

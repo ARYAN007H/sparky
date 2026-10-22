@@ -27,9 +27,7 @@ pub(crate) fn create_chat_model_with_identity_in_for_inspection(
     temperature: f64,
 ) -> anyhow::Result<PreparedInspectionChatModel> {
     let resolved_context = ctx.resolved();
-    let extensions = resolved_context
-        .as_deref()
-        .map(crate::core::runtime::CoreContext::extensions);
+    let extensions = None;
     let mut resolved = provider_for_role(role, config);
     if resolved.trim().is_empty() || resolved.trim() == "cloud" {
         resolved = resolve_primary_cloud_provider_string(config);
