@@ -187,8 +187,7 @@ pub mod agent {
     }
     pub mod session_store {
         pub use openhuman_core::storage::sessions::{
-            context_workspace_dir, install, installed, restore, ReboundSessionStores,
-            WorkspaceSessionStores,
+            context_workspace_dir, install, installed, restore, WorkspaceSessionStores,
         };
     }
 }

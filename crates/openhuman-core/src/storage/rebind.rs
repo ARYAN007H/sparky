@@ -7,7 +7,7 @@
 //! differs from the one the host installed:
 //!
 //! 1. opens the new backend;
-//! 2. points the session store (`ReboundSessionStores`) and the process's
+//! 2. points the session-store tenant routers and the process's
 //!    storage slot at it, together, so no store reads one workspace's
 //!    sessions beside another's documents;
 //! 3. runs the read-only legacy importers over the new workspace, since a

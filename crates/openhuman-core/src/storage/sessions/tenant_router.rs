@@ -22,11 +22,27 @@ use tinystoragedrivers::{Scope, StorageBackend, StorageError};
 #[derive(Default)]
 struct TenantStoreRegistry {
     providers: Arc<SessionStoreRegistry>,
-    backends: Mutex<Vec<Weak<RwLock<Arc<dyn StorageBackend>>>>>,
+    state: Mutex<TenantStoreRegistryState>,
+}
+
+#[derive(Default)]
+struct TenantStoreRegistryState {
+    backends: Vec<Weak<RwLock<Arc<dyn StorageBackend>>>>,
+    current_backend: Option<Arc<dyn StorageBackend>>,
 }
 
 impl TenantStoreRegistry {
     fn rebind(&self, backend: &Arc<dyn StorageBackend>) -> usize {
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        let routers = state
+            .backends
+            .iter()
+            .filter_map(Weak::upgrade)
+            .collect::<Vec<_>>();
+        let mut bindings = routers
+            .iter()
+            .map(|router| router.write().unwrap_or_else(PoisonError::into_inner))
+            .collect::<Vec<_>>();
         let rebound = match self.providers.rebind(Arc::clone(backend)) {
             Ok(rebound) => rebound,
             Err(error) => {
@@ -34,22 +50,21 @@ impl TenantStoreRegistry {
                 return 0;
             }
         };
-        let mut live = self.backends.lock().unwrap_or_else(PoisonError::into_inner);
-        live.retain(|weak| {
-            if let Some(current) = weak.upgrade() {
-                *current.write().unwrap_or_else(PoisonError::into_inner) = Arc::clone(backend);
-                true
-            } else {
-                false
-            }
-        });
+        for current in &mut bindings {
+            **current = Arc::clone(backend);
+        }
+        state.backends.retain(|weak| weak.strong_count() > 0);
+        state.current_backend = Some(Arc::clone(backend));
         rebound
     }
 
     fn register_backend(&self, backend: &Arc<RwLock<Arc<dyn StorageBackend>>>) {
-        let mut live = self.backends.lock().unwrap_or_else(PoisonError::into_inner);
-        live.retain(|weak| weak.strong_count() > 0);
-        live.push(Arc::downgrade(backend));
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(current) = &state.current_backend {
+            *backend.write().unwrap_or_else(PoisonError::into_inner) = Arc::clone(current);
+        }
+        state.backends.retain(|weak| weak.strong_count() > 0);
+        state.backends.push(Arc::downgrade(backend));
     }
 }
 
@@ -219,9 +234,8 @@ impl SessionStoreProvider for TenantSessionStores {
             backend,
             self.recover_on_open,
             admission,
-            Arc::clone(&self.registry),
+            Arc::new(TenantStoreRegistry::default()),
         );
-        self.registry.register_backend(&actor.backend);
         Ok(Some(Arc::new(actor)))
     }
 
