@@ -203,14 +203,33 @@ async fn settle_paused_driver_cancel(
     parent_epoch: Option<u64>,
     reason: Option<&str>,
 ) -> Result<bool, String> {
-    let store = subagent_sessions::SubagentSessionStore::new(paused.workspace_dir.clone());
-    let transitioned = subagent_sessions::mark_driver_pause_cancelled(&store, paused)
+    let Some(lifecycle_key) = paused.lifecycle_key.as_ref() else {
+        return Err("subagent_cancel: paused driver child has no lifecycle key".into());
+    };
+    let store = subagent_sessions::open_for_context(
+        ctx,
+        paused.workspace_dir.clone(),
+        paused.parent_session.clone(),
+        paused.parent_thread_id.clone(),
+        None,
+    )
+    .map_err(|error| format!("subagent_cancel: failed to open paused child store: {error}"))?;
+    let error = match reason.map(str::trim).filter(|reason| !reason.is_empty()) {
+        Some(reason) => format!("cancelled by user. Reason: {reason}"),
+        None => "cancelled by user".to_string(),
+    };
+    let transitioned = store
+        .mark_failed_if_current(
+            &paused.subagent_session_id,
+            &paused.task_id,
+            lifecycle_key,
+            &paused.parent_session,
+            paused.parent_thread_id.as_deref(),
+            error.clone(),
+        )
+        .await
         .map_err(|error| format!("subagent_cancel: failed to settle paused child: {error}"))?;
     if transitioned {
-        let error = match reason.map(str::trim).filter(|reason| !reason.is_empty()) {
-            Some(reason) => format!("cancelled by user. Reason: {reason}"),
-            None => "cancelled by user".to_string(),
-        };
         let parent_epoch = paused
             .parent_thread_id
             .as_ref()
