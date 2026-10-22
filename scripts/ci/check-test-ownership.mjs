@@ -126,14 +126,13 @@ export function findOwnershipViolations(source, filePath) {
   }
 
   for (const denied of DENIED_PATHS) {
+    if (allowed?.has(denied.path)) continue;
     const deniedSegments = denied.path.split('::').filter(Boolean);
     const reportedLines = new Set();
 
-    if (!allowed?.has(denied.path)) {
-      for (const importedPath of importedPaths) {
-        if (deniedSegments.every((segment, index) => importedPath[index]?.value === segment)) {
-          reportedLines.add(source.slice(0, importedPath[0].start).split('\n').length);
-        }
+    for (const importedPath of importedPaths) {
+      if (deniedSegments.every((segment, index) => importedPath[index]?.value === segment)) {
+        reportedLines.add(source.slice(0, importedPath[0].start).split('\n').length);
       }
     }
 

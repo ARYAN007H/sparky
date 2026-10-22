@@ -75,10 +75,10 @@ test('expands nested grouped imports of TinyChannels provider internals', () => 
   ]);
 });
 
-test('allowlisted imports do not permit direct calls into implementation internals', () => {
+test('allowlisted implementation paths do not permit direct calls outside their fixture', () => {
   const source = 'tinymemory_tools::lifecycle::window::Window::default();';
   assert.equal(
-    findOwnershipViolations(source, 'crates/openhuman-core/src/memory/lifecycle/adapter_tests.rs').length,
+    findOwnershipViolations(source, 'crates/openhuman-core/src/example_tests.rs').length,
     1,
   );
 });
