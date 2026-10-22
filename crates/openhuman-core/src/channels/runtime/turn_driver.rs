@@ -21,7 +21,7 @@
 //! early-exit tool: it pauses the turn and returns its question as the turn's
 //! text, which the channel relays as the reply.
 //!
-//! **Summarization.** [`run_channel_turn_via_graph`] resolves the model's
+//! **Summarization.** [`run_channel_turn`] resolves the model's
 //! effective context window before dispatch so the shared seam runs the
 //! context-window summarization step (`tinyagents::summarize`) ahead of the
 //! deterministic front-trim.
@@ -44,7 +44,7 @@ use tinytools::Tool;
 /// `on_progress` is `Some`, the run streams and mirrors progress onto
 /// `AgentProgress`; pass `None` for a fire-and-forget final-text turn.
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn run_channel_turn_via_graph(
+pub(crate) async fn run_channel_turn(
     source: TurnModelSource,
     history: &mut Vec<TranscriptMessage>,
     tools_registry: Arc<Vec<Box<dyn Tool>>>,
@@ -139,7 +139,7 @@ pub(crate) async fn run_channel_turn_via_graph(
         max_iterations,
         observed = on_progress.is_some(),
         context_window,
-        "[channel:graph] routing channel turn through tinyagents harness"
+        "[channel:turn] routing channel turn through tinyagents harness"
     );
     let turn_origin = origin.clone();
     let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new()

@@ -24,7 +24,7 @@ impl Tool for PingTool {
 }
 
 #[tokio::test]
-async fn channel_turn_runs_through_the_graph() {
+async fn channel_turn_runs_tools_and_returns_final_text() {
     let registry: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![Box::new(PingTool)]);
     let mut history = vec![TranscriptMessage::user("ping please")];
     let scripted: Arc<dyn ChatModel<()>> = Arc::new(ScriptedModel::new(vec![
@@ -50,7 +50,7 @@ async fn channel_turn_runs_through_the_graph() {
     let mut profile = ModelProfile::default();
     profile.tool_calling = true;
     profile.parallel_tool_calls = true;
-    let text = run_channel_turn_via_graph(
+    let text = run_channel_turn(
         TurnModelSource::from_model_with_profile(scripted, profile),
         &mut history,
         registry,
@@ -68,7 +68,7 @@ async fn channel_turn_runs_through_the_graph() {
         Default::default(),
     )
     .await
-    .expect("channel graph turn runs");
+    .expect("channel turn runs");
     assert_eq!(text.text, "channel done");
     assert!(history.iter().any(|m| m.content.contains("pong")));
 }
@@ -114,7 +114,7 @@ async fn channel_turn_pauses_on_ask_user_clarification() {
     let mut profile = ModelProfile::default();
     profile.tool_calling = true;
     profile.parallel_tool_calls = true;
-    let text = run_channel_turn_via_graph(
+    let text = run_channel_turn(
         TurnModelSource::from_model_with_profile(scripted, profile),
         &mut history,
         registry,
@@ -132,7 +132,7 @@ async fn channel_turn_pauses_on_ask_user_clarification() {
         Default::default(),
     )
     .await
-    .expect("channel graph turn runs");
+    .expect("channel turn runs");
 
     assert_eq!(
         text.text, "Which three sources?",

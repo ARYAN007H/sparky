@@ -151,7 +151,7 @@ In order:
 
 The bus path is shorter. `bus.rs` scopes the origin, sandbox mode and file
 state agent id, then calls
-`channels::runtime::turn_driver::run_channel_turn_via_graph`
+`channels::runtime::turn_driver::run_channel_turn`
 ([`../channels/runtime/turn_driver.rs`](../channels/runtime/turn_driver.rs)),
 which calls `TurnSpec::run`. There is no TinyAgents `Session`: the caller owns
 the history vector, and

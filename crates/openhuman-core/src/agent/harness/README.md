@@ -84,8 +84,8 @@ turn lifecycle are in `../session_host/`; `OpenHumanSubagentHost`,
 - `../session_host/` and `../subagent_host/` build turns from the
   definitions and prompt data this module supplies; parent context types are
   owned by `../subagent_host/`.
-- `agent/bus.rs` serves the `agent.run_turn` native request through the
-  driver in [`channels/runtime/turn_driver.rs`](../../channels/runtime/turn_driver.rs);
+- `agent/bus.rs` serves the `agent.run_turn` native request through
+  `run_channel_turn` in [`channels/runtime/turn_driver.rs`](../../channels/runtime/turn_driver.rs);
   channels reach it through that bus.
 - [`channels/runtime/dispatch/routing.rs`](../../channels/runtime/dispatch/routing.rs) consults
   `AgentDefinitionRegistry`/`ToolScope`.
