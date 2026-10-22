@@ -10,6 +10,8 @@ pub(super) const COMMAND_TIMEOUT_EXIT_CODE: i32 = 124;
 pub(super) const COMMAND_TIMEOUT_NOTE: &str = "[exit 124: the command's own `timeout` limit expired; the shell tool's timeout_secs did not fire]";
 
 /// The result when the tool's own `timeout_secs` deadline killed the command.
+/// It stays the first line of the result: TinyAgents' shell turn-budget note
+/// recognises a fired deadline by this prefix.
 pub(super) fn tool_timeout_message(secs: u64) -> String {
     format!(
         "Command timed out after {secs}s and was killed: the shell tool's timeout_secs limit fired."
@@ -38,7 +40,7 @@ pub(super) fn exec_result(
 ) -> ToolResult {
     match result {
         Ok(result) if result.timed_out => {
-            ToolResult::error(tool_timeout_message(effective.as_secs()))
+            ToolResult::error(timed_out_output(effective.as_secs(), &result))
         }
         Ok(result) if result.success() => {
             if result.stderr.is_empty() {
@@ -54,6 +56,42 @@ pub(super) fn exec_result(
         ),
         Err(e) => ToolResult::error(format!("Sandbox execution failed: {e}")),
     }
+}
+
+/// The timeout line, then what the command printed before it was killed.
+///
+/// A test or build that runs past its deadline has usually already printed
+/// what the model needs: its first failures, how far it got, the error that
+/// stalled it. Dropping that leaves only "timed out", and the model reruns
+/// blind. When nothing came back, the result says why output can be missing
+/// (a pipeline such as `| tail`, or a program that buffers its output, holds
+/// it until the command exits), so the model does not read it as a hang.
+fn timed_out_output(secs: u64, result: &crate::sandbox::SandboxExecResult) -> String {
+    let mut out = tool_timeout_message(secs);
+    let stdout = result.stdout.trim_end();
+    let stderr = result.stderr.trim_end();
+    if stdout.is_empty() && stderr.is_empty() {
+        out.push_str(
+            " No output reached the tool before the kill; a pipeline such as `| tail` \
+             or a program that buffers its output holds it until the command exits.",
+        );
+        return out;
+    }
+    tracing::debug!(
+        stdout_bytes = stdout.len(),
+        stderr_bytes = stderr.len(),
+        "[shell] timed out: returning the output printed before the kill"
+    );
+    out.push_str(" Output before the kill:");
+    if !stdout.is_empty() {
+        out.push_str("\n[stdout]\n");
+        out.push_str(stdout);
+    }
+    if !stderr.is_empty() {
+        out.push_str("\n[stderr]\n");
+        out.push_str(stderr);
+    }
+    out
 }
 
 /// Python's text-encoding defaults for a child, unless the parent sets its own.

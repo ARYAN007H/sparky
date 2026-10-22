@@ -295,14 +295,14 @@ async fn collect_process(
     tinybox::release_output(config, process)
         .await
         .map_err(|_| anyhow::anyhow!("TinyBox could not release command output"))?;
+    // What the command printed before it was stopped, both streams: a build
+    // or test killed at its deadline has usually written its progress and
+    // first errors by then. `timed_out` says why it stopped; the shell tool
+    // writes the timeout line.
     Ok(SandboxExecResult {
         exit_code: -1,
         stdout: String::from_utf8_lossy(&stdout).into_owned(),
-        stderr: if timed_out {
-            format!("Command timed out after {}s", timeout.as_secs())
-        } else {
-            String::from_utf8_lossy(&stderr).into_owned()
-        },
+        stderr: String::from_utf8_lossy(&stderr).into_owned(),
         timed_out,
     })
 }
