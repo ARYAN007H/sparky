@@ -85,6 +85,7 @@ fn legacy_jsonl_conversations_are_imported_and_the_files_stay_byte_identical() {
     assert_eq!(snapshot(&root), before, "legacy files must not change");
 }
 
+#[cfg(feature = "storage-sqlite")]
 #[test]
 fn legacy_tsd_v1_threads_and_messages_are_migrated_before_owner_reads() {
     let dir = tempfile::tempdir().unwrap();
@@ -94,26 +95,29 @@ fn legacy_tsd_v1_threads_and_messages_are_migrated_before_owner_reads() {
         crate::storage::test_support::install_for_test(&sqlite.url, Arc::clone(&backend));
     let scope = crate::storage::Scope::local();
     let scoped = backend.for_scope(&scope).unwrap();
-    let thread_id = "legacy-thread";
-    let incarnation = "6f9619ff-8b86-d011-b42d-00c04fc964ff";
+    let thread_id = "legacy-thread".to_owned();
+    let incarnation = "6f9619ff-8b86-d011-b42d-00c04fc964ff".to_owned();
     let digest = hex::encode(sha2::Sha256::digest(thread_id.as_bytes()));
     let stream = format!("conversation_messages_v1:{digest}:{incarnation}");
 
-    crate::storage::block_on(async {
+    let legacy_thread_id = thread_id.clone();
+    let legacy_incarnation = incarnation.clone();
+    let legacy_digest = digest.clone();
+    crate::storage::block_on(async move {
         let docs = scoped.documents();
         docs.ensure_collection(&CollectionSpec::new("conversation_threads_v1"))
             .await
-            .unwrap();
+            ?;
         docs.put_with(
             "conversation_threads_v1",
-            &digest,
+            &legacy_digest,
             serde_json::json!({
                 "schema": 1,
-                "incarnation": incarnation,
+                "incarnation": legacy_incarnation,
                 "deleted": false,
                 "visible_end": 1,
                 "thread": {
-                    "id": thread_id,
+                    "id": legacy_thread_id,
                     "title": "Historical thread",
                     "isActive": true,
                     "messageCount": 1,
@@ -126,7 +130,7 @@ fn legacy_tsd_v1_threads_and_messages_are_migrated_before_owner_reads() {
             WriteOptions::new().created_ms(1_700_000_000_000),
         )
         .await
-        .unwrap();
+        ?;
         scoped
             .streams()
             .append(
@@ -145,8 +149,10 @@ fn legacy_tsd_v1_threads_and_messages_are_migrated_before_owner_reads() {
                 }),
             )
             .await
-            .unwrap();
-    });
+            ?;
+        Ok::<(), crate::storage::StorageError>(())
+    })
+    .unwrap();
 
     let store = ConversationStore::new(
         crate::core::runtime::DispatchCtx::ambient(),
