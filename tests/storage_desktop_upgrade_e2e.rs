@@ -468,10 +468,11 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
 
     case.install();
     let backend = case.backend();
-    let config = Config {
+    let mut config = Config {
         workspace_dir: workspace.to_path_buf(),
         ..Config::default()
     };
+    config.modules.source = openhuman_core::config::schema::ModuleSourceMode::Linked;
 
     // First boot: every host importer runs and none is left without a source.
     let reports = import::run(
