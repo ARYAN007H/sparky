@@ -321,21 +321,16 @@ impl SpawnSubagentTool {
                 task_id.to_owned(),
                 follow_up_prompt.chars().count(),
             );
-            if let Some(progress) = progress_sink.as_ref() {
-                let _ = progress
-                    .send(AgentProgress::SubagentSpawned {
-                        agent_id: definition.id.clone(),
-                        task_id: task_id.to_owned(),
-                        mode: "async".to_string(),
-                        dedicated_thread: session.worker_thread_id.is_some(),
-                        prompt_chars: follow_up_prompt.chars().count(),
-                        prompt: follow_up_prompt.clone(),
-                        worker_thread_id: session.worker_thread_id.clone(),
-                        display_name: Some(definition.display_name().to_string()),
-                        parent_call_id: crate::tools::host_extensions::tool_call_id(tool_context),
-                    })
-                    .await;
-            }
+            completion::report_spawned_progress(
+                progress_sink.clone(),
+                definition.id.clone(),
+                task_id.to_owned(),
+                follow_up_prompt.clone(),
+                session.worker_thread_id.clone(),
+                definition.display_name().to_string(),
+                crate::tools::host_extensions::tool_call_id(tool_context),
+            )
+            .await;
 
             let completion = completion::make_completion(
                 dispatch.clone().into_core(),
@@ -625,21 +620,16 @@ impl SpawnSubagentTool {
             task_id.clone(),
             prompt.chars().count(),
         );
-        if let Some(ref tx) = progress_sink {
-            let _ = tx
-                .send(AgentProgress::SubagentSpawned {
-                    agent_id: definition.id.clone(),
-                    task_id: task_id.clone(),
-                    mode: "async".to_string(),
-                    dedicated_thread: worker_thread_id.is_some(),
-                    prompt_chars: prompt.chars().count(),
-                    prompt: prompt.clone(),
-                    worker_thread_id: worker_thread_id.clone(),
-                    display_name: Some(definition.display_name().to_string()),
-                    parent_call_id: crate::tools::host_extensions::tool_call_id(tool_context),
-                })
-                .await;
-        }
+        completion::report_spawned_progress(
+            progress_sink.clone(),
+            definition.id.clone(),
+            task_id.clone(),
+            prompt.clone(),
+            worker_thread_id.clone(),
+            definition.display_name().to_string(),
+            crate::tools::host_extensions::tool_call_id(tool_context),
+        )
+        .await;
 
         let background_workspace_dir = parent.workspace_dir.clone();
         let background_dispatch = dispatch.clone();

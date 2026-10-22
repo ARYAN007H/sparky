@@ -7,6 +7,32 @@ use crate::security::turn_origin::AgentTurnOrigin;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+pub(super) async fn report_spawned_progress(
+    progress_sink: Option<tokio::sync::mpsc::Sender<AgentProgress>>,
+    agent_id: String,
+    task_id: String,
+    prompt: String,
+    worker_thread_id: Option<String>,
+    display_name: String,
+    parent_call_id: Option<String>,
+) {
+    if let Some(progress) = progress_sink {
+        let _ = progress
+            .send(AgentProgress::SubagentSpawned {
+                agent_id,
+                task_id,
+                mode: "async".to_string(),
+                dedicated_thread: worker_thread_id.is_some(),
+                prompt_chars: prompt.chars().count(),
+                prompt,
+                worker_thread_id,
+                display_name: Some(display_name),
+                parent_call_id,
+            })
+            .await;
+    }
+}
+
 async fn mark_driver_finished(
     store: &Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore>,
     session_id: &str,
