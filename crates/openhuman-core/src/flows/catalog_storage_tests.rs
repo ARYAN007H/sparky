@@ -278,6 +278,7 @@ async fn catalog_module_uses_captured_profile_and_storage_preserves_cas_metadata
 }
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)] // Serializes access to the process-wide installed storage slot.
 async fn catalog_storage_resolves_the_current_backend_and_confines_graph_namespace_queries() {
     use tinyflows_bus::catalog::{
         CatalogCollectionSpec, CatalogDocumentPrecondition, CatalogFilter, CatalogQuery,

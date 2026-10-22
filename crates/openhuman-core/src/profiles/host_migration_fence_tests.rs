@@ -1,6 +1,7 @@
 use super::*;
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)] // Serializes access to the process-wide installed storage slot.
 async fn provisioning_with_a_new_root_replaces_a_dead_higher_epoch_fence() {
     const CHILD: &str = "OPENHUMAN_PROFILE_DEAD_HIGHER_FENCE_CHILD";
     if std::env::var_os(CHILD).is_none() {
@@ -71,6 +72,7 @@ async fn provisioning_with_a_new_root_replaces_a_dead_higher_epoch_fence() {
 }
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)] // Serializes access to the process-wide installed storage slot.
 async fn opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation() {
     const CHILD: &str = "OPENHUMAN_PROFILE_REOPEN_DROPPED_FENCE_CHILD";
     if std::env::var_os(CHILD).is_none() {

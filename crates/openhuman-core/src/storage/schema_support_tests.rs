@@ -75,7 +75,7 @@ fn owner_conversion_preserves_driver_times_and_absolute_expiry() {
         updated_ms: Some(200),
     };
     let converted = map_legacy_collection(vec![source], "legacy", |rows| {
-        Ok(rows
+        rows
             .into_iter()
             .map(|row| {
                 Ok(
@@ -83,7 +83,7 @@ fn owner_conversion_preserves_driver_times_and_absolute_expiry() {
                         .source_metadata(row.meta),
                 )
             })
-            .collect::<anyhow::Result<Vec<_>>>()?)
+            .collect::<anyhow::Result<Vec<_>>>()
     })
     .unwrap();
 

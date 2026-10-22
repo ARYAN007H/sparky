@@ -113,12 +113,12 @@ pub trait DocumentStoreExt: tinystoragedrivers_api::DocumentStoreExt {
 
 impl<T: tinystoragedrivers_api::DocumentStoreExt + ?Sized> DocumentStoreExt for T {}
 
+type StorageTask = Box<dyn FnOnce(&tokio::runtime::Runtime) + Send>;
+
 /// Dedicated runtime for synchronous domain surfaces that bridge to the
 /// asynchronous storage ports. Keeping it on its own thread also permits a
 /// synchronous facade to be called while the caller is on a current-thread
 /// Tokio runtime.
-type StorageTask = Box<dyn FnOnce(&tokio::runtime::Runtime) + Send>;
-
 struct Blocking {
     tasks: mpsc::Sender<StorageTask>,
 }
