@@ -10,7 +10,7 @@ use super::super::context::{
 };
 use super::super::runtime::process_channel_message;
 use super::super::{Channel, SendMessage};
-use super::common::SlowModel;
+use super::common::{channel_envelope, SlowModel};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -289,17 +289,13 @@ fn telegram_channel_history_key_ignores_thread_ts() {
             None
         );
 
-    let msg_with_thread = traits::ChannelMessage {
-        id: "tg_100_2".to_string(),
-        thread_ts: Some("42".to_string()),
-        ..base_msg.clone()
-    };
+    let mut msg_with_thread = base_msg.clone();
+    msg_with_thread.message_id = "tg_100_2".to_string();
+    msg_with_thread.conversation.thread_id = Some("42".to_string());
 
-    let msg_with_different_thread = traits::ChannelMessage {
-        id: "tg_100_3".to_string(),
-        thread_ts: Some("99".to_string()),
-        ..base_msg.clone()
-    };
+    let mut msg_with_different_thread = base_msg.clone();
+    msg_with_different_thread.message_id = "tg_100_3".to_string();
+    msg_with_different_thread.conversation.thread_id = Some("99".to_string());
 
     let key_base = conversation_history_key(&base_msg);
     let key_thread = conversation_history_key(&msg_with_thread);
@@ -449,11 +445,9 @@ fn non_telegram_channel_history_key_includes_thread_ts() {
             None
         );
 
-    let msg_in_thread = traits::ChannelMessage {
-        id: "slack_C01_2".to_string(),
-        thread_ts: Some("1234567890.000001".to_string()),
-        ..base_msg.clone()
-    };
+    let mut msg_in_thread = base_msg.clone();
+    msg_in_thread.message_id = "slack_C01_2".to_string();
+    msg_in_thread.conversation.thread_id = Some("1234567890.000001".to_string());
 
     let key_base = conversation_history_key(&base_msg);
     let key_thread = conversation_history_key(&msg_in_thread);

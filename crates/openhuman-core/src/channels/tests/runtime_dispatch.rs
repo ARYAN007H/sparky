@@ -4,7 +4,7 @@ use super::super::runtime::{
     process_channel_message, run_message_dispatch_loop, RuntimeChannelMessage,
 };
 use super::super::Channel;
-use super::common::{use_real_agent_handler, RecordingChannel, SlowModel};
+use super::common::{channel_envelope, use_real_agent_handler, RecordingChannel, SlowModel};
 use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::core::events::DomainEvent;
 use crate::inference::provider;
@@ -150,7 +150,7 @@ async fn message_dispatch_processes_messages_in_parallel() {
 
     let (parallel_channel, parallel_ctx) = build_runtime();
     let (tx, rx) = tokio::sync::mpsc::channel::<RuntimeChannelMessage>(4);
-    tx.send(RuntimeChannelMessage::from(channel_envelope(
+    tx.send(RuntimeChannelMessage::with_inbound_envelope(channel_envelope(
             "test-channel",
             "alice",
             "alice",
@@ -162,7 +162,7 @@ async fn message_dispatch_processes_messages_in_parallel() {
         )))
     .await
     .unwrap();
-    tx.send(RuntimeChannelMessage::from(channel_envelope(
+    tx.send(RuntimeChannelMessage::with_inbound_envelope(channel_envelope(
             "test-channel",
             "bob",
             "bob",

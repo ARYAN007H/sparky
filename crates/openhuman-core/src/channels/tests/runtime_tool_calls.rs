@@ -5,7 +5,7 @@ use super::super::context::{
 use super::super::runtime::process_channel_message;
 use super::super::Channel;
 use super::common::{
-    IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
+    channel_envelope, IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
     TelegramRecordingChannel, ToolCallingModel,
 };
 use crate::inference::provider;
