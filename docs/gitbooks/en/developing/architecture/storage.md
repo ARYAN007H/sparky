@@ -171,12 +171,12 @@ CI runs these targets, with the lib tests of the domains on the ports, in the co
 
 ## Schema, boot and migration
 
-Storage owners expose pure v2 `CollectionSpec` values. The host composes and validates them in `storage::schema::owner_collections`, then ensures those collections in its shared scopes and when an owner opens a scope. The generated [`docs/storage-schema.md`](../../../../storage-schema.md) lists the composed collection names, indexes, expiry fields and search fields; `scripts/ci/check-storage-schema.mjs` checks their names and millisecond timestamp fields. Record shapes, legacy conversion and migration rules remain with the owning domains.
+Storage crates expose pure v2 `CollectionSpec` values. The host validates and preserves those declarations by crate in `storage::schema::collection_owners`, then calls `ensure_collection` for each declaration in its shared scopes and when an owner opens a scope. The generated [`docs/storage-schema.md`](../../../../storage-schema.md) lists each crate's collection names, indexes, expiry fields and search fields; `scripts/ci/check-storage-schema.mjs` checks their names and millisecond timestamp fields. Record shapes, legacy conversion and migration rules remain with the owning domains.
 
 `storage::open` runs `storage::boot::prepare_and_migrate` on the raw backend before the lease fence wraps it:
 
-1. `owner_collections` merges compatible declarations and fails on conflicting specs before the backend is touched.
-2. The host ensures composed collections in its local and cluster scopes. Profile, agent and module scopes are prepared by their owners when opened; no driver-wide schema registry or scope enumeration is used.
+1. `collection_owners` validates each crate's declarations without combining owners.
+2. The host ensures every crate's collections in its local and cluster scopes. Profile, agent and module scopes are prepared by their owners when opened; no driver-wide schema registry or scope enumeration is used.
 3. Historical workspace and per-domain files are read by the separately gated `legacy-import` path. Its source formats and typed owner conversions are kept separate from normal backend opening.
 
 A module's storage grant is generated from its owner's declared collections (`modules::storage_grant_schemas`), so it cannot drift from what the module declares.

@@ -298,7 +298,7 @@ pub async fn open(url: &str) -> Result<Arc<dyn StorageBackend>, StorageError> {
     // Every opened backend checks the process's lease fences on write; with
     // no fence registered (every single-user host) that is a pass-through.
     let backend = tinystoragedrivers::open(&parsed).await?;
-    // Prepare the composed owner collections before installing lease fences.
+    // Prepare each linked crate's collection declarations before installing lease fences.
     // Legacy physical-source migration is handled separately by importers.
     boot::prepare_and_migrate(&backend).await?;
     Ok(fenced_backend::wrap(backend))
