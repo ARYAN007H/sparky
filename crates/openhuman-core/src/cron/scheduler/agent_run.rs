@@ -217,10 +217,9 @@ pub(super) async fn run_agent_job_for_run(
     }
 }
 
-/// The line a corrective turn adds when a job that must deliver answered
-/// `NO_REPLY`.
-pub(super) const NO_REPLY_CORRECTION: &str =
-    "NO_REPLY is not allowed for this task; write the message to send now.";
+/// The whole prompt of a corrective turn: a delivery request only, never the
+/// job prompt, so an action the first turn took is not asked for again.
+pub(super) const NO_REPLY_CORRECTION: &str = "Your last reply was NO_REPLY, which is not allowed for this task. Write the message to send to the user now. Do not call tools or repeat any action.";
 
 /// Run the scheduled turn. A job that must deliver and answers `NO_REPLY`
 /// (or nothing) gets one corrective turn; if that still yields no message the
@@ -241,8 +240,18 @@ async fn run_with_corrective_turn(
         run_id = %run_id,
         "[cron] run answered NO_REPLY but the job must deliver; running a corrective turn"
     );
-    let corrective = format!("{prompt}\n\n{NO_REPLY_CORRECTION}");
-    let response = Box::pin(run_cron_turn(agent, context, job, run_id, &corrective)).await?;
+    agent.set_next_turn_overrides(crate::agent::session_host::TurnOverrides {
+        suppress_tools: true,
+        ..Default::default()
+    });
+    let response = Box::pin(run_cron_turn(
+        agent,
+        context,
+        job,
+        run_id,
+        NO_REPLY_CORRECTION,
+    ))
+    .await?;
     if !needs_correction(&response) {
         return Ok(response);
     }

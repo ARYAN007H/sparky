@@ -145,6 +145,18 @@ mod corrective_turn {
             .collect()
     }
 
+    fn last_user_message(body: &str) -> String {
+        let body: serde_json::Value = serde_json::from_str(body).unwrap();
+        body["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .rev()
+            .find(|m| m["role"] == "user")
+            .map(|m| m["content"].as_str().unwrap_or_default().to_string())
+            .unwrap_or_default()
+    }
+
     async fn run(
         job: CronJob,
         first: &'static str,
@@ -180,7 +192,8 @@ mod corrective_turn {
             assert_eq!(outcome, (true, "Time to drink water!".to_string()));
             assert_eq!(chats.len(), 2, "{chats:#?}");
             assert!(!chats[0].contains(NO_REPLY_CORRECTION));
-            assert!(chats[1].contains(NO_REPLY_CORRECTION), "{}", chats[1]);
+            assert_eq!(last_user_message(&chats[1]), NO_REPLY_CORRECTION);
+            assert!(last_user_message(&chats[0]).contains("drink water"));
         });
     }
 
