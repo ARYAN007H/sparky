@@ -1,7 +1,17 @@
 use super::{
     channel_connection_update_payload, event_alias, origin_is_allowed_with_extra,
-    publish_companion_state_changed, subscribe_companion_state_changed,
+    publish_companion_state_changed, socket_replay_tenant, subscribe_companion_state_changed,
 };
+
+#[test]
+fn plan_review_replay_uses_the_joining_sockets_profile() {
+    let ambient = crate::core_host::core::runtime::Tenant {
+        profile: Some("ambient-profile".into()),
+        agent: None,
+    };
+    let actual = socket_replay_tenant(Some("socket-profile"), Ok(ambient)).unwrap();
+    assert_eq!(actual.profile.as_deref(), Some("socket-profile"));
+}
 
 #[test]
 fn companion_state_transport_delivers_payload_to_bridge() {

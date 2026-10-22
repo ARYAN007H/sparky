@@ -3,6 +3,21 @@ use crate::plan_review::PlanReviewResolution;
 use serde_json::json;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolRunContext};
 
+struct RunModeEventCollector(tokio::sync::mpsc::UnboundedSender<(String, String)>);
+
+#[async_trait::async_trait]
+impl tinybus::EventHandler<crate::core::events::DomainEvent> for RunModeEventCollector {
+    fn name(&self) -> &str {
+        "plan-exit-test"
+    }
+
+    async fn handle(&self, event: &crate::core::events::DomainEvent) {
+        if let crate::core::events::DomainEvent::ThreadRunModeChanged { thread_id, mode } = event {
+            let _ = self.0.send((thread_id.clone(), mode.clone()));
+        }
+    }
+}
+
 struct ThreadContext(&'static str);
 impl ToolRunContext for ThreadContext {
     fn thread_id(&self) -> Option<&str> {
@@ -108,10 +123,10 @@ async fn plan_exit_emits_marker() {
 #[tokio::test]
 async fn plan_exit_publishes_build_run_mode_change() {
     crate::core::bus::init().await.expect("bus init");
-    let _handle = crate::core::bus::BUS.subscribe(std::sync::Arc::new(
-        crate::web_chat::event_bus::AgentSurfaceSubscriber,
-    ));
-    let mut events = crate::web_chat::event_bus_channel::subscribe_web_channel_events();
+    let (tx, mut events) = tokio::sync::mpsc::unbounded_channel();
+    let _subscription = crate::core::bus::BUS
+        .subscribe(std::sync::Arc::new(RunModeEventCollector(tx)))
+        .expect("subscribe to core events");
     let thread_id = "plan-exit-publishes-run-mode";
     crate::threads::run_mode::set_mode(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -132,17 +147,17 @@ async fn plan_exit_publishes_build_run_mode_change() {
     let event = tokio::time::timeout(std::time::Duration::from_secs(1), async {
         loop {
             match events.recv().await {
-                Ok(event) if event.event == "run_mode_changed" && event.thread_id == thread_id => {
+                Some((event_thread_id, mode)) if event_thread_id == thread_id && mode == "build" => {
                     break event;
                 }
-                Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                Err(error) => panic!("run mode event stream ended: {error}"),
+                Some(_) => continue,
+                None => panic!("run mode event stream ended"),
             }
         }
     })
     .await
     .expect("plan_exit must publish run_mode_changed");
-    assert_eq!(event.args.unwrap()["mode"], "build");
+    assert_eq!(event, (thread_id.into(), "build".into()));
 }
 
 #[tokio::test]

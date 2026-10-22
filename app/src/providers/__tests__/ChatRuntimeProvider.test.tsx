@@ -901,6 +901,34 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
       });
     });
 
+    it('clears a parked plan review when its decision event arrives', () => {
+      const listeners = renderProvider();
+      act(() => {
+        listeners.onPlanReviewRequest?.({
+          thread_id: 't-plan-decided',
+          request_id: 'pr-decided',
+          message: 'Ship the release',
+          args: { steps: ['build'] },
+        });
+      });
+      expect(
+        store.getState().chatRuntime.pendingPlanReviewByThread['t-plan-decided']?.requestId
+      ).toBe('pr-decided');
+
+      act(() => {
+        listeners.onPlanReviewDecided?.({
+          thread_id: 't-plan-decided',
+          request_id: 'pr-decided',
+          decision: 'reject',
+          resolution: 'cancelled',
+        });
+      });
+
+      expect(
+        store.getState().chatRuntime.pendingPlanReviewByThread['t-plan-decided']
+      ).toBeUndefined();
+    });
+
     it('clears a parked plan review when the turn ends or errors', () => {
       const listeners = renderProvider();
       const park = () =>
