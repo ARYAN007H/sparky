@@ -613,63 +613,63 @@ fn tinychannels_registry_matches_scoped_runtime_release() {
 #[test]
 fn voice_capture_release_pins_summary_contract_and_every_platform_digest() {
     let record = find("tinyvoice").unwrap();
-    assert_eq!(record.version, "0.3.2");
+    assert_eq!(record.version, "0.3.4");
     assert_eq!(tinyvoice_bus::CONTRACT_VERSION, (1, 10));
     let expected = [
         (
             "macos-15-arm64",
-            "tinyvoice-module-0.3.2-macos-15-arm64.tar.gz",
-            "316cb2b9b9a1630f2c815744121e3bbc1d0df58364bb012dd6f11f78978ba947",
+            "tinyvoice-module-0.3.4-macos-15-arm64.tar.gz",
+            "fa2c380ce034e31f96f3faae4e7d7651e9f2df5614977cae7c5bf0339dd2a8ab",
         ),
         (
             "macos-15-x86_64",
-            "tinyvoice-module-0.3.2-macos-15-x86_64.tar.gz",
-            "51045754d67386db5b09a19714ec8b1f319ad9896bb3f936325d7935ce5dce0e",
+            "tinyvoice-module-0.3.4-macos-15-x86_64.tar.gz",
+            "29ec1e0097a6da61e2da5c6f6d2290ddb74217a72840fd8e22d51cacdd288f6f",
         ),
         (
             "macos-26-arm64",
-            "tinyvoice-module-0.3.2-macos-26-arm64.tar.gz",
-            "2a4ee8f87229422019adfd28f07ac26d5e2e78165550b04f0e563764a66a429e",
+            "tinyvoice-module-0.3.4-macos-26-arm64.tar.gz",
+            "c9c729ba646a5069b30e4b84cdeb53f3ec274406f10c10955411862eacc246f1",
         ),
         (
             "macos-26-x86_64",
-            "tinyvoice-module-0.3.2-macos-26-x86_64.tar.gz",
-            "4199913e36c12987a82606f98c93e2a85e086aaa17380469a9aa68b719c853d9",
+            "tinyvoice-module-0.3.4-macos-26-x86_64.tar.gz",
+            "5ad4ca051265063338510d891d894c347d76356828605f8c5f793986acddfdda",
         ),
         (
             "ubuntu-22.04-arm64",
-            "tinyvoice-module-0.3.2-ubuntu-22.04-arm64.tar.gz",
-            "533a3715f5efad9911e7768e8280bbe724c60785e0ff67939867ae21a20f690e",
+            "tinyvoice-module-0.3.4-ubuntu-22.04-arm64.tar.gz",
+            "bc31815f65fff0e44b47f0da8eac10a4a404fb516d0c093649ed4e1de005e925",
         ),
         (
             "ubuntu-22.04-x86_64",
-            "tinyvoice-module-0.3.2-ubuntu-22.04-x86_64.tar.gz",
-            "d173a63a6b20e0441d18d639906ec9c74f96178c50e274ebd32bf94abbf5260b",
+            "tinyvoice-module-0.3.4-ubuntu-22.04-x86_64.tar.gz",
+            "35e5529cd3e6ab3d6ca062bc110181526851ab13d59c34d8a3febd93d21262fa",
         ),
         (
             "ubuntu-24.04-arm64",
-            "tinyvoice-module-0.3.2-ubuntu-24.04-arm64.tar.gz",
-            "f2145cd4bf729b5b6ad563687b061557d502c786ba935a65433e4338adf75a7a",
+            "tinyvoice-module-0.3.4-ubuntu-24.04-arm64.tar.gz",
+            "1ed67f4f36538e5ad5052d796a5c2bc647b0edd2cf78366c8d9be521e4e516b7",
         ),
         (
             "ubuntu-24.04-x86_64",
-            "tinyvoice-module-0.3.2-ubuntu-24.04-x86_64.tar.gz",
-            "6ee278898d33f3b3ca7a9bf8a313dc4ab4e207eabf970608d37f56d825587519",
+            "tinyvoice-module-0.3.4-ubuntu-24.04-x86_64.tar.gz",
+            "ba5417d7442d3cc8c800f89f0e2e765c4f30c30bf8257a8030022bc2416ca175",
         ),
         (
             "windows-11-arm64",
-            "tinyvoice-module-0.3.2-windows-11-arm64.zip",
-            "b3cbff9b477495027839b0266201299b0db5cb585a9e41b3110cf46f16c35c99",
+            "tinyvoice-module-0.3.4-windows-11-arm64.zip",
+            "c9bb31d5bbaa0d614262a92ceaa793755bb651992f6b18c768062154b42dbebd",
         ),
         (
             "windows-2022-x86_64",
-            "tinyvoice-module-0.3.2-windows-2022-x86_64.zip",
-            "7b7a8a8e04a57adc306b2b840bff43ea6a27090e2b089b74cfcf451f18172456",
+            "tinyvoice-module-0.3.4-windows-2022-x86_64.zip",
+            "b0aff0e3c11fc825078fa62a4ead24cec41eb938ac6d45f6231e468e6bb1283a",
         ),
         (
             "windows-2025-x86_64",
-            "tinyvoice-module-0.3.2-windows-2025-x86_64.zip",
-            "04cf6b21ed7d73375181c6cf5a18fa52a50fb09049031f0926cd46c3bcf33431",
+            "tinyvoice-module-0.3.4-windows-2025-x86_64.zip",
+            "a4acbbd05d8965de326e9f37241c28fa14cef696062b013720c96adbd56eb4be",
         ),
     ];
     assert_eq!(record.assets.len(), expected.len());

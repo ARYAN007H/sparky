@@ -47,7 +47,12 @@ impl Tool for FakeTool {
 }
 
 /// A registry holding several real packed tools plus the two pack tools, bound.
-fn registry_with_all(names: &[&'static str]) -> Arc<Vec<Box<dyn Tool>>> {
+fn registry_with_all(
+    names: &[&'static str],
+) -> (
+    Arc<Vec<Box<dyn Tool>>>,
+    tinyagents_harness_tools::skills::PackRegistryHandle,
+) {
     let mut tools: Vec<Box<dyn Tool>> = names
         .iter()
         .map(|name| {
@@ -59,24 +64,30 @@ fn registry_with_all(names: &[&'static str]) -> Arc<Vec<Box<dyn Tool>>> {
             }) as Box<dyn Tool>
         })
         .collect();
-    append_pack_tools(&mut tools);
+    let handle = append_pack_tools(&mut tools);
     let tools = Arc::new(tools);
-    bind_pack_registry(&tools);
-    tools
+    bind_pack_registry(&handle, &tools);
+    (tools, handle)
 }
 
 /// A registry holding one real packed tool plus the two pack tools, bound.
-fn registry_with(name: &'static str, level: PermissionLevel) -> Arc<Vec<Box<dyn Tool>>> {
+fn registry_with(
+    name: &'static str,
+    level: PermissionLevel,
+) -> (
+    Arc<Vec<Box<dyn Tool>>>,
+    tinyagents_harness_tools::skills::PackRegistryHandle,
+) {
     let mut tools: Vec<Box<dyn Tool>> = vec![Box::new(FakeTool {
         name,
         level,
         external: false,
         timeout: ToolTimeout::Inherit,
     })];
-    append_pack_tools(&mut tools);
+    let handle = append_pack_tools(&mut tools);
     let tools = Arc::new(tools);
-    bind_pack_registry(&tools);
-    tools
+    bind_pack_registry(&handle, &tools);
+    (tools, handle)
 }
 
 fn find<'a>(tools: &'a [Box<dyn Tool>], name: &str) -> &'a dyn Tool {

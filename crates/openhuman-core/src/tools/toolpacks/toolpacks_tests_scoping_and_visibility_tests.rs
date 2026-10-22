@@ -2,13 +2,13 @@
 //! execution distinction the whole pack mechanism rests on.
 
 use super::*;
-use tinyagents_harness_tools::skills::USE_SKILL;
+use tinyagents_harness_tools::skills::{route_sentence, USE_SKILL};
 
 // ── the index must agree with the gate too ──────────────────────────────────
 
 /// A spec shaped like the one `UseSkillTool` publishes.
 fn use_skill_spec() -> tinytools::ToolSpec {
-    let tools = registry_with_all(&["run_workflow"]);
+    let (tools, _handle) = registry_with_all(&["build_workflow"]);
     let tool = find(&tools, USE_SKILL);
     tinytools::ToolSpec {
         name: tool.name().to_string(),
@@ -119,7 +119,7 @@ fn scoping_the_index_only_ever_shrinks_it() {
 fn a_withheld_packed_tool_is_hidden_but_not_denied() {
     use tinytools::{ToolPolicyAction, ToolPolicyEngine};
 
-    let tools = registry_with_all(&["goal_set", "run_workflow"]);
+    let (tools, _handle) = registry_with_all(&["goal_set", "build_workflow"]);
     // The real shape: the harness seeds `visible` with everything, then
     // `strip_packed_from_visible` removes the packed names for a non-owner.
     let mut visible: HashSet<String> = tools.iter().map(|t| t.name().to_string()).collect();
@@ -197,7 +197,7 @@ fn rebinding_a_pack_handle_repoints_it_at_the_new_registry() {
     let name = pack("web3").unwrap().tools[0];
 
     // The agent's first tool `Arc`, with the packed tool marked Dangerous.
-    let first = registry_with(name, PermissionLevel::Dangerous);
+    let (first, handle) = registry_with(name, PermissionLevel::Dangerous);
     let use_skill = find(&first, USE_SKILL);
     let args = json!({"skill": "web3", "tool": name});
     assert_eq!(
@@ -214,13 +214,11 @@ fn rebinding_a_pack_handle_repoints_it_at_the_new_registry() {
         external: false,
         timeout: ToolTimeout::Inherit,
     })];
-    append_pack_tools(&mut rebuilt);
+    let _rebuilt_handle = append_pack_tools(&mut rebuilt);
     let rebuilt = Arc::new(rebuilt);
 
     // Re-point the ORIGINAL handle at it, which is what a rebuild does.
-    crate::tools::host_extensions::pack_registry_handle(use_skill)
-        .expect("use_skill exposes a pack registry handle")
-        .bind(Arc::downgrade(&rebuilt));
+    handle.bind(Arc::downgrade(&rebuilt));
 
     assert_eq!(
         use_skill.permission_level_with_args(&args),
@@ -240,9 +238,7 @@ fn rebinding_a_pack_handle_repoints_it_at_the_new_registry() {
 /// not mention a tool that gate will refuse.
 #[test]
 fn a_non_owner_listing_omits_the_tools_the_gate_will_refuse() {
-    let tools = registry_with_all(&["run_workflow", "propose_workflow"]);
-    let handle = crate::tools::host_extensions::pack_registry_handle(find(&tools, USE_SKILL))
-        .expect("use_skill carries the pack handle");
+    let (_tools, handle) = registry_with_all(&["build_workflow", "propose_workflow"]);
 
     let rendered = tinyagents_harness_tools::skills::render_pack_filtered(
         &CATALOG,
@@ -254,7 +250,7 @@ fn a_non_owner_listing_omits_the_tools_the_gate_will_refuse() {
     .expect("the pack still has a callable tool");
 
     assert!(
-        rendered.contains("run_workflow"),
+        rendered.contains("build_workflow"),
         "a tool the session CAN call must still be listed: {rendered}"
     );
     assert!(
@@ -267,23 +263,21 @@ fn a_non_owner_listing_omits_the_tools_the_gate_will_refuse() {
 /// way out. A bare "no tools available" is the dead end the model retried into.
 #[test]
 fn a_listing_with_nothing_callable_names_the_route_out() {
-    let tools = registry_with_all(&["run_workflow", "propose_workflow"]);
-    let handle = crate::tools::host_extensions::pack_registry_handle(find(&tools, USE_SKILL))
-        .expect("use_skill carries the pack handle");
+    let (_tools, handle) = registry_with_all(&["build_workflow", "propose_workflow"]);
 
-    let route = "Call `spawn_subagent` with agent_id `workflow_builder`.";
+    let route = route_sentence(&["build_workflow".to_string()], &["workflow_builder"]);
     let err = tinyagents_harness_tools::skills::render_pack_filtered(
         &CATALOG,
         "workflows",
         &handle,
         &|_| false,
-        route,
+        &route,
     )
     .expect_err("nothing callable must not render a menu");
 
     assert!(
-        err.contains("spawn_subagent") && err.contains("workflow_builder"),
-        "the denial must name the single spawn route and specialist id: {err}"
+        err.contains("build_workflow"),
+        "the denial must name the delegate to call instead: {err}"
     );
 }
 
@@ -335,7 +329,7 @@ fn retired_specialist_aliases_are_not_packed() {
 /// schema, leaving unrelated packs available to direct calls.
 #[test]
 fn spawn_tool_schema_closes_only_reachable_specialist_packs() {
-    let raw = registry_with_all(&[
+    let (raw, _handle) = registry_with_all(&[
         "skill_registry_install",
         "media_generate_image",
         "propose_workflow",
