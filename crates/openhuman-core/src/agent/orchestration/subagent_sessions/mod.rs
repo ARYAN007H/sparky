@@ -4,6 +4,7 @@ mod store;
 pub use storage_schema::storage_schema;
 mod store_documents;
 mod tiny_port;
+mod tiny_port_epoch;
 mod types;
 
 pub use ops::{
@@ -15,9 +16,9 @@ pub use ops::{
 #[cfg(test)]
 pub(crate) use tiny_port::OpenHumanTinySubagentSessionStore;
 pub(crate) use tiny_port::{
-    host_projection, import_terminal_task_for_context, open_for_context, parent_epoch_for_context,
-    set_parent_epoch_for_context,
+    host_projection, import_terminal_task_for_context, open_for_context,
 };
+pub(crate) use tiny_port_epoch::{parent_epoch_for_context, set_parent_epoch_for_context};
 pub use types::{
     DurableSubagentStatus, SubagentSessionSelector, SubagentSessionStore, SubagentSessionUpsert,
 };
