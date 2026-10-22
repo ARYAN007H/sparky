@@ -64,7 +64,9 @@ fn inference_agent_chat_parses_its_route_fields() {
         "agent_id": "alpha",
         "inference_url": "https://example.test/v1",
         "api_key": "secret",
-        "inference_headers": [["x-test", "value"]]
+        "inference_headers": [["x-test", "value"]],
+        "inference_provider_options": {"reasoning": {"effort": "high"}},
+        "inference_reasoning_effort": "high"
     }))
     .expect("inference route params decode");
     assert_eq!(params.agent_id.as_deref(), Some("alpha"));
@@ -75,6 +77,14 @@ fn inference_agent_chat_parses_its_route_fields() {
     assert_eq!(
         params.inference_headers,
         vec![("x-test".into(), "value".into())]
+    );
+    assert_eq!(
+        params.inference_provider_options,
+        Some(serde_json::json!({"reasoning": {"effort": "high"}}))
+    );
+    assert_eq!(
+        params.inference_reasoning_effort.as_deref(),
+        Some("high")
     );
 }
 
@@ -96,4 +106,14 @@ fn inference_agent_chat_keeps_the_optional_agent_id_schema_and_typed_route_field
         invalid.is_err(),
         "the inference surface still validates route fields"
     );
+
+    for name in [
+        "inference_provider_options",
+        "inference_reasoning_effort",
+    ] {
+        assert!(
+            schema.inputs.iter().any(|field| field.name == name),
+            "the inference chat schema must preserve the {name} wire field"
+        );
+    }
 }
