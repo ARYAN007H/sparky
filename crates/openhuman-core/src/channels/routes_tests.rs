@@ -13,8 +13,26 @@ use std::task::{Context, Poll, Waker};
 use tinybus::EventHandler;
 use tinychannels::routes::resolve_provider_alias;
 use tinychannels_bus::context::ChatMessage;
-use tinychannels_bus::ChannelMessage;
+use tinychannels_bus::{ChannelInboundEnvelope, ChannelRef, ConversationRef, SenderRef};
 use tinytools::{Tool, ToolResult};
+
+fn inbound(
+    message_id: impl Into<String>,
+    sender_id: impl Into<String>,
+    conversation_id: impl Into<String>,
+    text: impl Into<String>,
+    channel_id: impl Into<String>,
+    thread_id: Option<String>,
+) -> ChannelInboundEnvelope {
+    ChannelInboundEnvelope {
+        message_id: message_id.into(),
+        sender: SenderRef { id: sender_id.into(), ..Default::default() },
+        conversation: ConversationRef { id: conversation_id.into(), thread_id, ..Default::default() },
+        channel: ChannelRef { id: channel_id.into(), ..Default::default() },
+        text: text.into(),
+        ..Default::default()
+    }
+}
 
 struct DummyTool;
 
@@ -100,16 +118,14 @@ async fn module_route_help_response(
 
     let request = ChannelControlRequest::Route {
         workspace_dir: workspace_dir.to_string_lossy().into_owned(),
-        message: Box::new(ChannelMessage {
-            id: "help-fixture".into(),
-            sender: "operator".into(),
-            reply_target: "chat".into(),
-            content: content.into(),
-            channel: "telegram".into(),
-            timestamp: 0,
-            thread_ts: None,
-            sender_name: None,
-        }),
+        message: Box::new(inbound(
+            "help-fixture".into(),
+            "operator".into(),
+            "chat".into(),
+            content.into(),
+            "telegram".into(),
+            None,
+        )),
         route: RemoteRoute {
             provider: "openai".into(),
             model: "gpt-5".into(),
@@ -226,16 +242,14 @@ async fn module_route_help_ignores_stale_model_cache_and_projects_providers() {
 
 #[test]
 fn model_command_messages_use_thread_aware_history_keys() {
-    let msg = ChannelMessage {
-        id: "1".into(),
-        sender: "alice".into(),
-        reply_target: "room".into(),
-        content: "/model gpt-5".into(),
-        channel: "discord".into(),
-        timestamp: 0,
-        thread_ts: Some("thread-1".into()),
-        sender_name: None,
-    };
+    let msg = inbound(
+            "1".into(),
+            "alice".into(),
+            "room".into(),
+            "/model gpt-5".into(),
+            "discord".into(),
+            Some("thread-1".into()),
+        );
     assert_eq!(
         super::super::context::conversation_history_key(&msg),
         "discord_alice_room_thread:thread-1"
@@ -312,16 +326,14 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
-    let msg = ChannelMessage {
-        id: "1".into(),
-        sender: "alice".into(),
-        reply_target: "room".into(),
-        content: "/models definitely-not-a-provider".into(),
-        channel: "telegram".into(),
-        timestamp: 0,
-        thread_ts: Some("thread-1".into()),
-        sender_name: None,
-    };
+    let msg = inbound(
+            "1".into(),
+            "alice".into(),
+            "room".into(),
+            "/models definitely-not-a-provider".into(),
+            "telegram".into(),
+            Some("thread-1".into()),
+        );
 
     let handled = handle_runtime_command_if_needed(
         &ctx,
@@ -350,16 +362,14 @@ async fn handle_runtime_command_set_model_clears_sender_history_and_persists_rou
         .insert(key.to_string(), vec![ChatMessage::user("old history")]);
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
-    let msg = ChannelMessage {
-        id: "1".into(),
-        sender: "alice".into(),
-        reply_target: "room".into(),
-        content: "/model gpt-5-mini".into(),
-        channel: "telegram".into(),
-        timestamp: 0,
-        thread_ts: None,
-        sender_name: None,
-    };
+    let msg = inbound(
+            "1".into(),
+            "alice".into(),
+            "room".into(),
+            "/model gpt-5-mini".into(),
+            "telegram".into(),
+            None,
+        );
 
     let handled = handle_runtime_command_if_needed(
         &ctx,
@@ -394,16 +404,14 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
-    let msg = ChannelMessage {
-        id: "1".into(),
-        sender: "alice".into(),
-        reply_target: "chat-remote".into(),
-        content: "/status".into(),
-        channel: "telegram".into(),
-        timestamp: 0,
-        thread_ts: Some("42".into()),
-        sender_name: None,
-    };
+    let msg = inbound(
+            "1".into(),
+            "alice".into(),
+            "chat-remote".into(),
+            "/status".into(),
+            "telegram".into(),
+            Some("42".into()),
+        );
 
     let handled = handle_runtime_command_if_needed(
         &ctx,
@@ -427,16 +435,14 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
 #[tokio::test]
 async fn handle_runtime_command_without_target_channel_still_consumes_command() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
-    let msg = ChannelMessage {
-        id: "1".into(),
-        sender: "alice".into(),
-        reply_target: "chat-remote".into(),
-        content: "/help".into(),
-        channel: "telegram".into(),
-        timestamp: 0,
-        thread_ts: None,
-        sender_name: None,
-    };
+    let msg = inbound(
+            "1".into(),
+            "alice".into(),
+            "chat-remote".into(),
+            "/help".into(),
+            "telegram".into(),
+            None,
+        );
 
     let handled =
         handle_runtime_command_if_needed(&ctx, &msg, None, &conversation_history_key(&msg)).await;
@@ -448,16 +454,14 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
-    let msg = ChannelMessage {
-        id: "1".into(),
-        sender: "alice".into(),
-        reply_target: "chat-remote".into(),
-        content: "/help".into(),
-        channel: "telegram".into(),
-        timestamp: 0,
-        thread_ts: Some("42".into()),
-        sender_name: None,
-    };
+    let msg = inbound(
+            "1".into(),
+            "alice".into(),
+            "chat-remote".into(),
+            "/help".into(),
+            "telegram".into(),
+            Some("42".into()),
+        );
 
     let handled = handle_runtime_command_if_needed(
         &ctx,
@@ -485,16 +489,14 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
     let ctx = runtime_context(tempdir.path().to_path_buf());
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
-    let msg = ChannelMessage {
-        id: "1".into(),
-        sender: "alice".into(),
-        reply_target: "chat-remote".into(),
-        content: "/sessions".into(),
-        channel: "telegram".into(),
-        timestamp: 0,
-        thread_ts: Some("42".into()),
-        sender_name: None,
-    };
+    let msg = inbound(
+            "1".into(),
+            "alice".into(),
+            "chat-remote".into(),
+            "/sessions".into(),
+            "telegram".into(),
+            Some("42".into()),
+        );
 
     let handled = handle_runtime_command_if_needed(
         &ctx,
@@ -527,16 +529,14 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         vec![ChatMessage::user("old history")],
     );
 
-    let new_msg = ChannelMessage {
-        id: "1".into(),
-        sender: "alice".into(),
-        reply_target: "chat-remote".into(),
-        content: "/new".into(),
-        channel: "telegram".into(),
-        timestamp: 0,
-        thread_ts: Some("42".into()),
-        sender_name: None,
-    };
+    let new_msg = inbound(
+            "1".into(),
+            "alice".into(),
+            "chat-remote".into(),
+            "/new".into(),
+            "telegram".into(),
+            Some("42".into()),
+        );
     assert!(
         handle_runtime_command_if_needed(
             &ctx,
@@ -580,16 +580,14 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         })
         .await;
 
-    let status_msg = ChannelMessage {
-        id: "3".into(),
-        sender: "alice".into(),
-        reply_target: "chat-remote".into(),
-        content: "/status".into(),
-        channel: "telegram".into(),
-        timestamp: 0,
-        thread_ts: Some("42".into()),
-        sender_name: None,
-    };
+    let status_msg = inbound(
+            "3".into(),
+            "alice".into(),
+            "chat-remote".into(),
+            "/status".into(),
+            "telegram".into(),
+            Some("42".into()),
+        );
     assert!(
         handle_runtime_command_if_needed(
             &ctx,
@@ -600,16 +598,14 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         .await
     );
 
-    let sessions_msg = ChannelMessage {
-        id: "4".into(),
-        sender: "alice".into(),
-        reply_target: "chat-remote".into(),
-        content: "/sessions".into(),
-        channel: "telegram".into(),
-        timestamp: 0,
-        thread_ts: Some("42".into()),
-        sender_name: None,
-    };
+    let sessions_msg = inbound(
+            "4".into(),
+            "alice".into(),
+            "chat-remote".into(),
+            "/sessions".into(),
+            "telegram".into(),
+            Some("42".into()),
+        );
     assert!(
         handle_runtime_command_if_needed(
             &ctx,
@@ -654,16 +650,14 @@ async fn handle_runtime_command_telegram_new_reports_unavailable_storage() {
         vec![ChatMessage::user("old history")],
     );
 
-    let msg = ChannelMessage {
-        id: "1".into(),
-        sender: "alice".into(),
-        reply_target: "chat-remote".into(),
-        content: "/new".into(),
-        channel: "telegram".into(),
-        timestamp: 0,
-        thread_ts: Some("42".into()),
-        sender_name: None,
-    };
+    let msg = inbound(
+            "1".into(),
+            "alice".into(),
+            "chat-remote".into(),
+            "/new".into(),
+            "telegram".into(),
+            Some("42".into()),
+        );
     assert!(
         handle_runtime_command_if_needed(
             &ctx,
