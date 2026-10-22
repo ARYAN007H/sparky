@@ -73,22 +73,8 @@ impl OpenHumanTurnPrelude {
             )
             .map_err(|error| anyhow::anyhow!(error.to_string()))?
         };
-        let flow_archetype_text = super::prompt::flow_archetype_text(self, cold).await?;
         let prefix = if cold {
-            let connected_identities_md =
-                crate::integrations::render_connected_identities_async(&self.dispatch_ctx()).await;
-            let tiered = self
-                .build_system_prompt_tiered_with_flow_archetype_and_connected_identities(
-                    flow_archetype_text.as_deref(),
-                    &connected_identities_md,
-                )?;
-            Some(tinyagents_runtime::PrefixSnapshot::new(
-                tiered
-                    .system_messages()
-                    .into_iter()
-                    .map(Message::system)
-                    .collect(),
-            ))
+            Some(self.cold_prompt_prefix().await?)
         } else {
             None
         };
@@ -96,6 +82,29 @@ impl OpenHumanTurnPrelude {
             prefix,
             tools: Some(tools),
         })
+    }
+
+    /// The prompt a new session starts with, rendered now: one system
+    /// message per cache tier, with the definition's flow archetype when it
+    /// has one. A resumed thread that refreshes its prompt
+    /// (`prompt_refresh.rs`) renders it here too, so an unchanged prompt
+    /// compares equal to the one its transcript recorded.
+    pub(super) async fn cold_prompt_prefix(&self) -> Result<tinyagents_runtime::PrefixSnapshot> {
+        let flow_archetype_text = super::prompt::flow_archetype_text(self, true).await?;
+        let connected_identities_md =
+            crate::integrations::render_connected_identities_async(&self.dispatch_ctx()).await;
+        let tiered = self
+            .build_system_prompt_tiered_with_flow_archetype_and_connected_identities(
+                flow_archetype_text.as_deref(),
+                &connected_identities_md,
+            )?;
+        Ok(tinyagents_runtime::PrefixSnapshot::new(
+            tiered
+                .system_messages()
+                .into_iter()
+                .map(Message::system)
+                .collect(),
+        ))
     }
 
     pub(super) fn build_system_prompt_tiered(&self) -> Result<crate::agent::prompts::TieredPrompt> {

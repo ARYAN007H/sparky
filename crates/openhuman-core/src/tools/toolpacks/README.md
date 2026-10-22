@@ -36,9 +36,10 @@ constructed and executable but unadvertised: the agent sees one small tool,
   produced by the tinyagents policy middleware, which is the only layer that
   holds the session (see below).
 - `tinyagents_harness_tools::skills::PackRegistryHandle` is the late-bound, non-owning (`Weak`) view the
-  proxy dispatches through. It can hold the durable tool `Arc` and, for hosts
-  that provide synthesized tools, a second `Arc`. Each must be rebound after
-  replacement, or packed tools degrade to "skill unavailable" / "no tool in skill". The handle rides
+  proxy dispatches through. It holds the durable tool `Arc` and can hold a
+  second synthesized-tools `Arc` when the host provides synthesized tools.
+  Rebind both after replacement, or packed tools degrade to "skill unavailable"
+  / "no tool in skill". The handle rides
   on `Tool::host_extension` and is read back by
   `tools::host_extensions::pack_registry_handle`. The proxy itself
   (`UseSkillTool`, `PackCatalog`, `ToolPack`, the listing/scoping renderers) lives in

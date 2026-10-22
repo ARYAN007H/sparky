@@ -78,9 +78,9 @@ fn non_owner_middleware_at(allowed: PermissionLevel) -> ToolPolicyMiddleware {
         Box::new(RoutingFakeTool("spawn_subagent")),
         Box::new(RoutingFakeTool("propose_workflow")),
     ];
-    append_pack_tools(&mut tools);
+    let pack_handle = append_pack_tools(&mut tools);
     let tools = Arc::new(tools);
-    bind_pack_registry(&tools);
+    bind_pack_registry(&pack_handle, &tools);
 
     let session = ToolPolicySession {
         profile: TaskProfile {
@@ -262,9 +262,9 @@ async fn a_use_skill_denial_names_a_delegate_this_session_can_call() {
 async fn a_session_without_the_delegate_is_not_told_to_call_it() {
     let mut tools: Vec<Box<dyn tinytools::Tool>> =
         vec![Box::new(RoutingFakeTool("propose_workflow"))];
-    append_pack_tools(&mut tools);
+    let pack_handle = append_pack_tools(&mut tools);
     let tools = Arc::new(tools);
-    bind_pack_registry(&tools);
+    bind_pack_registry(&pack_handle, &tools);
 
     let session = ToolPolicySession {
         profile: TaskProfile {
@@ -324,9 +324,9 @@ async fn use_skill_reaches_a_withheld_packed_tool() {
     use tinytools::ToolPolicyEngine;
 
     let mut tools: Vec<Box<dyn tinytools::Tool>> = vec![Box::new(RoutingFakeTool("goal_set"))];
-    append_pack_tools(&mut tools);
+    let pack_handle = append_pack_tools(&mut tools);
     let tools = Arc::new(tools);
-    bind_pack_registry(&tools);
+    bind_pack_registry(&pack_handle, &tools);
 
     // The real harness shape: seed `visible` with everything, then withhold the
     // packed names for a non-owner.
@@ -375,9 +375,9 @@ async fn a_prompt_hidden_delegate_is_not_offered_as_a_direct_route() {
         Box::new(RoutingFakeTool("propose_workflow")),
         Box::new(RoutingFakeTool("spawn_subagent")),
     ];
-    append_pack_tools(&mut tools);
+    let pack_handle = append_pack_tools(&mut tools);
     let tools = Arc::new(tools);
-    bind_pack_registry(&tools);
+    bind_pack_registry(&pack_handle, &tools);
 
     // The spawn tool is withheld from this session, so even though its schema
     // can reach the workflow owners it is not a callable route.
