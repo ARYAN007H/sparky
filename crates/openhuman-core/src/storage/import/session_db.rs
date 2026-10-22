@@ -18,8 +18,8 @@ use tinyagents_session::{SessionMessage, SessionRecord, SessionToolCall};
 use crate::storage::rusqlite::{self, types::ValueRef};
 
 /// Typed rows from the historical session database, in deterministic source
-/// order. The owner import operation performs the destination preflight and
-/// checked batch write.
+/// order. The host passes these rows to TinyAgents' typed, idempotent import
+/// ports after reading the consistent snapshot.
 #[derive(Debug, Default)]
 pub(crate) struct SessionDatabase {
     pub sessions: Vec<SessionRecord>,

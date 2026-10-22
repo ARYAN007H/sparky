@@ -188,7 +188,7 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
     })
 }
 
-/// The native importer reports source rows per stored family. FTS rows are a
+/// The destination ports report source rows per stored family. FTS rows are a
 /// derived index and do not represent additional legacy records.
 fn database_totals(counts: [ImportCounts; 11]) -> (usize, usize) {
     counts.into_iter().fold(

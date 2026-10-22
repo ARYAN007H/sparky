@@ -9,8 +9,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tinyagents_harness::ids::ExecutionStatus;
-use tinyagents_harness::observability::{DriverStatusStore, HarnessStatusStore};
+use tinyagents_harness::observability::{is_active, DriverStatusStore, HarnessStatusStore};
 use tinyagents_harness::store::DriverAppendStore;
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, StorageBackend};
 
@@ -292,12 +291,7 @@ async fn maintain_run_journals(
             .get_status(run_id)
             .await
             .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
-        if backfill
-            && !matches!(
-                status.as_ref().map(|status| status.status),
-                Some(ExecutionStatus::Running | ExecutionStatus::Pending)
-            )
-        {
+        if backfill && !status.as_ref().is_some_and(is_active) {
             let already_sealed = streams
                 .info(&name)
                 .await?
