@@ -97,9 +97,7 @@ fn flow_export_targets_the_v4_otlp_proxy_route() {
     )
     .expect("client");
     assert_eq!(
-        build_flow_exporter(client, "flow-1")
-            .client()
-            .otlp_endpoint(),
+        client.otlp_endpoint(),
         "https://staging-api.tinyhumans.ai/telemetry/langfuse/otel/v1/traces"
     );
 }
@@ -320,8 +318,8 @@ async fn export_skips_api_key_credentials() {
     );
 }
 
-/// The bus carries serialized TinyAgents graph observations. Pin the exact
-/// round-trip the PollRun adapter uses so graph span coordinates survive.
+/// The bus carries TinyFlows observations. Pin the round-trip used by the
+/// PollRun adapter so run coordinates survive without a serde retype bridge.
 #[test]
 fn bus_graph_observation_round_trip_preserves_export_fields() {
     let thread_id = "flow:flow-1:uuid-1";
