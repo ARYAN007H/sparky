@@ -9,8 +9,8 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tinyagents_harness::observability::{DriverStatusStore, HarnessStatusStore};
 use tinyagents_harness::events::ExecutionStatus;
+use tinyagents_harness::observability::{DriverStatusStore, HarnessStatusStore};
 use tinyagents_harness::store::DriverAppendStore;
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, StorageBackend};
 
@@ -285,16 +285,35 @@ async fn maintain_run_journals(
 ) -> Result<JournalMaintenanceReport, crate::storage::StorageError> {
     let mut report = JournalMaintenanceReport::default();
     for name in streams.streams(DriverAppendStore::JOURNAL_PREFIX).await? {
-        let Some(run_id) = name.strip_prefix(DriverAppendStore::JOURNAL_PREFIX) else { continue };
-        let status = statuses.get_status(run_id).await
+        let Some(run_id) = name.strip_prefix(DriverAppendStore::JOURNAL_PREFIX) else {
+            continue;
+        };
+        let status = statuses
+            .get_status(run_id)
+            .await
             .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
-        if backfill && !matches!(status.as_ref().map(|status| status.status), Some(ExecutionStatus::Running | ExecutionStatus::Pending)) {
-            if streams.seal(&name).await?.sealed_ms.is_some() { report.backfilled += 1; }
+        if backfill
+            && !matches!(
+                status.as_ref().map(|status| status.status),
+                Some(ExecutionStatus::Running | ExecutionStatus::Pending)
+            )
+        {
+            if streams.seal(&name).await?.sealed_ms.is_some() {
+                report.backfilled += 1;
+            }
         }
-        if retention_ms == 0 { continue; }
-        let Some(info) = streams.info(&name).await? else { continue };
-        let Some(sealed_ms) = info.sealed_ms else { continue };
-        if i128::from(now_ms) - i128::from(sealed_ms) < i128::from(retention_ms) { continue; }
+        if retention_ms == 0 {
+            continue;
+        }
+        let Some(info) = streams.info(&name).await? else {
+            continue;
+        };
+        let Some(sealed_ms) = info.sealed_ms else {
+            continue;
+        };
+        if i128::from(now_ms) - i128::from(sealed_ms) < i128::from(retention_ms) {
+            continue;
+        }
         if streams.delete_sealed_stream(&name, sealed_ms).await? {
             report.deleted += 1;
         } else {
@@ -303,7 +322,6 @@ async fn maintain_run_journals(
     }
     Ok(report)
 }
-
 
 /// Scopes this process can safely maintain, plus the profile handles that
 /// keep their lease fences alive for the duration of a pass.
