@@ -8,8 +8,8 @@ use tinyflows_bus::runs::FlowRunTrigger;
 /// Builds a minimal observation stream for one node under run/thread ids
 /// shaped like a real `flows_run` (`thread_id = flow:{id}:{uuid}`).
 ///
-/// Built from the serialized TinyAgents graph-event contract consumed by the
-/// host's PollRun adapter; no TinyFlows engine types cross this boundary.
+/// Built from TinyFlows graph observations consumed by the host's PollRun
+/// adapter; these engine types are mapped into TinyAgents' generic span export.
 fn sample_observations(thread_id: &str) -> Vec<GraphObservation> {
     let node = NodeId::new("fetch");
     let mk = |offset: u64, step: usize, ts_ms: u64, event: GraphEvent| GraphObservation {
