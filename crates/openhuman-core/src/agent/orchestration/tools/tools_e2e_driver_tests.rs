@@ -619,11 +619,9 @@ async fn thread_delete_keeps_completions_when_driver_task_scope_cannot_be_resolv
     )
     .await;
 
-    assert!(
-        result
-            .expect_err("an indexed task without its driver job must fail closed")
-            .contains("no matching driver job")
-    );
+    assert!(result
+        .expect_err("an indexed task without its driver job must fail closed")
+        .contains("no matching driver job"));
     assert_eq!(
         background_completions::pending_for(&workspace, thread_id).len(),
         1,
