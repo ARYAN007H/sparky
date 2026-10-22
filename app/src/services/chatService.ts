@@ -427,6 +427,14 @@ export interface ChatPlanReviewRequestEvent {
   expires_at?: string;
 }
 
+/** A parked plan-review gate resolved or was cancelled by the core. */
+export interface ChatPlanReviewDecidedEvent {
+  thread_id: string;
+  request_id: string;
+  decision: string;
+  resolution?: 'expired' | 'cancelled' | string;
+}
+
 /**
  * One item of a thread's live todo list, as the core writes it via the
  * `todo` tool. Bridged from `DomainEvent::ThreadTodosChanged` by the web
@@ -891,6 +899,7 @@ export interface ChatEventListeners {
   onApprovalRequest?: (event: ChatApprovalRequestEvent) => void;
   onApprovalDecided?: (event: ChatApprovalDecidedEvent) => void;
   onPlanReviewRequest?: (event: ChatPlanReviewRequestEvent) => void;
+  onPlanReviewDecided?: (event: ChatPlanReviewDecidedEvent) => void;
   onThreadTodosChanged?: (event: ChatThreadTodosChangedEvent) => void;
   onThreadGoalUpdated?: (event: ChatThreadGoalUpdatedEvent) => void;
   onThreadGoalCleared?: (event: ChatThreadGoalClearedEvent) => void;
@@ -945,6 +954,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
     approvalRequest: 'approval_request',
     approvalDecided: 'approval_decided',
     planReviewRequest: 'plan_review_request',
+    planReviewDecided: 'plan_review_decided',
     threadTodosChanged: 'thread_todos_changed',
     threadGoalUpdated: 'thread_goal_updated',
     threadGoalCleared: 'thread_goal_cleared',
@@ -1344,6 +1354,22 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
     };
     socket.on(EVENTS.planReviewRequest, cb);
     handlers.push([EVENTS.planReviewRequest, cb]);
+  }
+
+  if (listeners.onPlanReviewDecided) {
+    const cb = (payload: unknown) => {
+      const e = payload as ChatPlanReviewDecidedEvent;
+      chatLog(
+        '%s thread_id=%s request_id=%s resolution=%s',
+        EVENTS.planReviewDecided,
+        e.thread_id,
+        e.request_id,
+        e.resolution
+      );
+      listeners.onPlanReviewDecided?.(e);
+    };
+    socket.on(EVENTS.planReviewDecided, cb);
+    handlers.push([EVENTS.planReviewDecided, cb]);
   }
 
   if (listeners.onThreadTodosChanged) {
