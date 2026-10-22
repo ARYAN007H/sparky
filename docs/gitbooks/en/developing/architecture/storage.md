@@ -17,11 +17,12 @@ A backend is a `StorageBackend`. It hands out a `ScopedStorage` for each `Scope`
 
 | Port            | Holds                                                                                                                                                      | Used for                                                                                                                    |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `DocumentStore` | Versioned JSON documents in named collections, with filters, paging, unique indexes, compare-and-swap (`Precondition`), atomic `claim` and optional expiry | Approvals, devices, notifications, task sources, cron jobs and runs, the flow catalog, graph checkpoints, encrypted secrets |
+| `DocumentStore` | Versioned JSON documents in named collections, with filters, paging, unique indexes, compare-and-swap (`Precondition`), atomic `claim` and optional expiry | Approvals, devices, notifications, task sources, cron jobs and runs, the flow catalog, graph checkpoints                    |
 | `StreamStore`   | Append-only logs with dense offsets                                                                                                                        | Transcripts, journals                                                                                                       |
-| `BlobStore`     | Opaque bytes by key                                                                                                                                        | Attachments, artifacts                                                                                                      |
-| `SearchIndex`   | Full-text membership                                                                                                                                       | Where the driver supports it                                                                                                |
-| `SecretStore`   | Encrypted values (`enc2:` envelope)                                                                                                                        | Keyring user secrets and the credential stores                                                                              |
+| `KvStore`       | JSON values addressed by key                                                                                                                               | Small owner-managed values and indexes                                                                                      |
+| `BlobStore`     | Opaque bytes and trees by key                                                                                                                              | Attachments, artifacts and other large objects                                                                              |
+| `QueueStore`    | Leased, acknowledged queue deliveries                                                                                                                      | Durable work queues                                                                                                         |
+| `SecretStore`   | Scoped secret values, with optional conditional writes                                                                                                    | Secrets when the selected backend has a configured secret engine and key provider                                          |
 
 The core's stores are mostly synchronous, so `storage::block_on` runs a storage future on one shared runtime thread. It never uses `block_in_place`, which panics on a current-thread runtime. `storage::documents::Repo` is the base the domain stores build on. It declares a domain's collections once per process and runs each call.
 
@@ -144,7 +145,7 @@ The tinyflows stores are imported the same way with TinyFlows' own reader (`tiny
 
 TinyFlows has no storage backend of its own any more, so these stores are on the ports whatever the URL says, and the legacy files are never modified or written again.
 
-Sessions are imported through TinyAgents' `legacy` reader, which owns those formats (`storage::import::sessions`): `session_db/sessions.db` (copied with `VACUUM INTO` first, because the reader refuses a database with a WAL sidecar) fills the run ledger of the default agent, each `session_raw` transcript lands in the scope of the agent its stem names (matched against the known agent definitions, else the default agent), and the turn-state JSON goes to the default agent. The marker is `sessions`; a run that skipped records leaves no marker and is retried.
+The host owns the legacy session sources and their lifecycle (`storage::import::sessions`). It snapshots `session_db/sessions.db` with `VACUUM INTO`, decodes its rows and the `session_raw` JSONL transcripts, resolves transcript agents from their stems, and maps the old rows into TinyAgents' typed import ports. The default agent receives the legacy database's run history and turn-state JSON; each transcript is written to the resolved agent's scope, falling back to the default agent when its identity is unknown. TinyAgents owns destination writes and its owner-local in-storage migrations, but does not open these source files. The marker is `sessions`; a run that skipped records leaves no marker and is retried.
 
 Secrets with a backend installed are encrypted documents in the current storage scope: the acting agent's scope on a desktop or CLI host, and the profile's scope under SaaS, where every agent in one profile shares the profile's credentials and data key. Each scope's data key is derived with HKDF-SHA256 from the keyring master key (`OPENHUMAN_KEYRING_MASTER_KEY` or `_FILE`, else the OS keychain), and with no master key they fail closed. The config encryption key stays on the process keyring because `config.toml` is loaded before any agent acts.
 
@@ -165,7 +166,7 @@ CI runs these targets, with the lib tests of the domains on the ports, in the co
 ## Where to read next
 
 - `crates/openhuman-core/src/storage/README.md` for the entry points and the consumers.
-- The `tinystoragedrivers` specs: `docs/specs/storage-ports.md` and `docs/plans/storage-rollout.md` in the tinystoragedrivers repository (tag `v0.11.0`).
+- The `tinystoragedrivers` specs: `docs/specs/storage-ports.md` and `docs/plans/storage-rollout.md` in the tinystoragedrivers repository (tag `v2.1.0`).
 - [Security](security.md) for the keyring and credential stores.
 
 ## Schema, boot and migration
