@@ -25,9 +25,7 @@ use tinyinference_llm::providers::openai::codex::{
     openai_codex_client_version, openai_codex_user_agent, OPENAI_CODEX_ACCOUNT_HEADER,
     OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
 };
-use tinyinference_llm::providers::registry::{
-    resolve_slug_model, ProviderBuildOptions, ProviderRegistry,
-};
+use tinyinference_llm::providers::registry::resolve_slug_model;
 use tinyinference_providers::route::split_model_and_temperature;
 
 type CloudSlugInspectionChatModelResult = Option<
@@ -529,6 +527,14 @@ fn try_create_cloud_slug_chat_model_from_string_with_native_tools_and_access(
         })
         .map(|route| route.headers.clone())
         .unwrap_or_default();
+    let default_provider_options = config
+        .ephemeral_route
+        .as_ref()
+        .filter(|route| {
+            slug == crate::config::schema::ephemeral_route::EPHEMERAL_ROUTE_SLUG
+                && route.endpoint == entry.endpoint
+        })
+        .and_then(|route| route.provider_options.clone());
     let mut extra_query_params: Vec<(String, String)> = Vec::new();
     let mut user_agent: Option<String> = None;
     let mut codex_route: Option<&tinyinference_llm::providers::openai::codex::OpenAiCodexRouting> =
@@ -635,49 +641,40 @@ fn try_create_cloud_slug_chat_model_from_string_with_native_tools_and_access(
         crate::security::egress::EgressDescriptor::inference(&slug, &effective_model, true),
     );
 
-    let ca_bundle = config
+    let http = match config
         .cloud_provider_ca_certs
         .get(&slug)
         .filter(|pem| !pem.is_empty())
-        .map(String::as_str);
-    let service_key = if anthropic_native {
-        "provider.anthropic"
-    } else {
-        "provider.compatible"
+    {
+        Some(pem) => {
+            let service_key = if anthropic_native {
+                "provider.anthropic"
+            } else {
+                "provider.compatible"
+            };
+            match crate::util::tls::client_with_ca_bundle(pem, service_key) {
+                Ok(http) => Some(http),
+                Err(error) => return Some(Err(anyhow::anyhow!(error))),
+            }
+        }
+        None => None,
     };
-    let http_builder = ca_bundle.map(|_| {
-        std::sync::Arc::new(move || {
-            crate::config::apply_runtime_proxy_to_builder(
-                crate::util::tls::tls_client_builder(),
-                service_key,
-            )
-        }) as tinyinference_llm::providers::registry::ProviderHttpClientBuilder<'_>
+    let auth_style = cloud_spec::registry_auth_style(entry.auth_style)
+        .expect("managed JWT entries returned above");
+    let chat = cloud_spec::build_cloud_model(cloud_spec::CloudBuild {
+        spec: cloud_spec::cloud_provider_spec(entry, &effective_model),
+        auth_style,
+        key: key.as_str(),
+        temperature_override,
+        temperature_unsupported_models: config.temperature_unsupported_models.as_slice(),
+        native_tool_calling,
+        default_provider_options,
+        extra_headers: extra_headers.as_slice(),
+        extra_query_params: extra_query_params.as_slice(),
+        user_agent: user_agent.as_deref(),
+        codex: codex_route,
+        http,
     });
-    let spec = cloud_spec::cloud_provider_spec(entry, &effective_model);
-    log::debug!(
-        "[providers][cloud-spec] build slug={} kind={} auth={:?}",
-        spec.provider,
-        spec.kind.as_str(),
-        entry.auth_style
-    );
-    let chat = ProviderRegistry::new(cloud_spec::CloudCredentialResolver(&key))
-        .build_with(
-            &spec,
-            ProviderBuildOptions {
-                auth_style: Some(entry.auth_style.into()),
-                temperature_override,
-                temperature_unsupported_models: config.temperature_unsupported_models.as_slice(),
-                native_tool_calling: Some(native_tool_calling),
-                extra_headers: extra_headers.as_slice(),
-                extra_query_params: extra_query_params.as_slice(),
-                user_agent: user_agent.as_deref(),
-                codex: codex_route,
-                http_builder,
-                ca_bundle,
-                ..ProviderBuildOptions::default()
-            },
-        )
-        .map_err(|error| anyhow::anyhow!("[chat-factory] {error}"));
     if let Some(identity) = inspection_identity {
         let credential = if entry.auth_style == AuthStyle::None {
             String::new()
