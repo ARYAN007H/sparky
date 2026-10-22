@@ -73,3 +73,4 @@ pub use types::{
 };
 
 pub(crate) use ops::resolve_subagent_source;
+pub(crate) use ops::{append_reuse_follow_up, create_worker_thread};

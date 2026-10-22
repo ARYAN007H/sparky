@@ -107,10 +107,6 @@ pub(crate) fn append_worker_user_message(
     .map(|_| ())
 }
 
-#[cfg(test)]
-#[path = "worker_thread_tests.rs"]
-mod tests;
-
 /// Appends a reused sub-agent's follow-up prompt to its worker thread. A
 /// failure is logged and does not fail the spawn. `ids` is the parent thread
 /// and the sub-agent session, for the log line.

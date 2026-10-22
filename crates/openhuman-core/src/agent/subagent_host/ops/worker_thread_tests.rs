@@ -1,4 +1,5 @@
 use super::*;
+use crate::threads::store as conversations;
 
 #[test]
 fn creates_child_thread_linked_to_parent_and_seeds_prompt() {

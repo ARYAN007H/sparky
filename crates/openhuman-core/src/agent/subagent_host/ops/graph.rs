@@ -54,7 +54,7 @@ pub(super) use dispatch::AggregatedUsage;
 #[cfg(test)]
 use crate::progress::AgentProgress;
 #[cfg(test)]
-use crate::threads::worker_mirror::{mirror_worker_thread, mirror_worker_thread_from_history};
+use super::{mirror_worker_thread, mirror_worker_thread_from_history};
 #[cfg(test)]
 use std::collections::HashSet;
 #[cfg(test)]
