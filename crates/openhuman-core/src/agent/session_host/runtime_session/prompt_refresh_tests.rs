@@ -64,6 +64,26 @@ fn host(
     )
 }
 
+/// As [`host`], with an inline prompt composed with the standard agent
+/// sections, none of which depend on a connected integrations snapshot.
+fn inline_host(
+    locator: &Arc<dyn TranscriptLocator>,
+    model: &Arc<ScriptedModel>,
+    root: &std::path::Path,
+    prompt: &str,
+) -> crate::agent::OpenHumanSessionHost {
+    host_with(
+        locator,
+        model,
+        root,
+        SystemPromptBuilder::for_subagent(prompt.to_string(), false, false),
+        |definition| {
+            definition.system_prompt = PromptSource::Inline(prompt.to_string());
+            definition.extensions.refresh_prompt_on_resume = true;
+        },
+    )
+}
+
 /// A model that answers each turn with the next of `replies`. The native
 /// dialect resolves from the model's profile; a profile-less scripted model
 /// would be treated as text-only, like no production model is.
@@ -194,6 +214,33 @@ async fn resumed_thread_takes_up_the_current_prompt_only_when_opted_in() {
     assert_eq!(sent_prompt(&model), ["You are release two."]);
     assert!(!last_user_text(&model).contains(PROMPT_UPDATE_NOTE));
     assert_eq!(locator.session_chain(&session).len(), 2);
+}
+
+#[tokio::test]
+async fn resume_refreshes_the_prompt_without_an_integrations_backend() {
+    let root = tempfile::tempdir().expect("tempdir");
+    let locator = memory_locator();
+    let model = model(vec!["first reply", "second reply"]);
+
+    let mut first = inline_host(&locator, &model, root.path(), "You are release one.");
+    assert_eq!(first.turn("first message").await.unwrap(), "first reply");
+    drop(first);
+
+    // This host has no hydrated integrations snapshot or backend connection.
+    // Inline prompts do not render connected integrations, so that absence
+    // must not keep the resumed thread on its recorded prompt.
+    let mut resumed = inline_host(&locator, &model, root.path(), "You are release two.");
+    assert_eq!(resumed.turn("second message").await.unwrap(), "second reply");
+    assert!(
+        sent_prompt(&model)
+            .iter()
+            .any(|message| message.contains("You are release two.")),
+        "the second request should carry the changed inline prompt: {:?}",
+        sent_prompt(&model)
+    );
+    assert!(!sent_prompt(&model)
+        .iter()
+        .any(|message| message.contains("You are release one.")));
 }
 
 /// The prelude a turn of `host` is prepared by.
