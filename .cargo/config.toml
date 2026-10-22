@@ -1,5 +1,4 @@
 # Repo-level Cargo configuration.
-
 #
 # ────────────────────────────────────────────────────────────────────────────
 # Faster linking (OPT-IN)
