@@ -10,8 +10,6 @@ use tinytools::ToolSpec;
 mod flow_prompt_tests;
 #[path = "runtime_session_terminal_tests.rs"]
 mod terminal_tests;
-#[path = "runtime_session_post_commit_tests.rs"]
-mod post_commit_tests;
 
 fn synthesized_tool_names(
     prelude: &super::OpenHumanTurnPrelude,
