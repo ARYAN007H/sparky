@@ -33,12 +33,10 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 #[cfg(test)]
-use std::{collections::HashSet, sync::Mutex};
+use std::sync::Mutex;
 
 use async_trait::async_trait;
 use serde_json::json;
-#[cfg(test)]
-use tinyagents_tasks::CompletionRouter;
 use tinyagents_tasks::{
     CompletionDelivery, CompletionDeliveryConfig, CompletionRecord, DeliveryOutcome,
     DeliveryTarget, ThreadDeliveryLeases,
@@ -49,10 +47,6 @@ use crate::core::events::DomainEvent;
 use tinybus::EventHandler;
 use tinybus::SubscriptionHandle;
 
-#[cfg(test)]
-mod slot;
-#[cfg(test)]
-use slot::DeliverySlot;
 
 use super::background_completions;
 use super::busy_guard::is_busy;
@@ -77,13 +71,6 @@ const DEBOUNCE: Duration = Duration::from_secs(3);
 /// delivery turn, so providers and the session store are up first.
 const RECOVERY_DELAY: Duration = Duration::from_secs(15);
 
-/// Threads whose delivery turn is in flight — prevents two concurrent turns.
-/// Keyed by the tenant profile derived from the thread id, for the same reason.
-#[cfg(test)]
-fn delivering() -> &'static Mutex<HashSet<String>> {
-    static D: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-    D.get_or_init(|| Mutex::new(HashSet::new()))
-}
 
 /// Ask for a delivery attempt on `thread_id` soon (after a Stop cleared a stale
 /// busy mark, or anything else that may have left a drain without its trigger).
