@@ -24,7 +24,7 @@ use axum::extract::State;
 use axum::http::{header::AUTHORIZATION, HeaderMap, StatusCode, Uri};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
@@ -3786,7 +3786,7 @@ async fn json_rpc_plan_review_decide_wakes_a_parked_review() {
 
     let (api_addr, api_join) = serve_on_ephemeral(mock_upstream_router()).await;
     write_min_config(openhuman_home.as_path(), &format!("http://{api_addr}"));
-    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(true)).await;
     let rpc_base = format!("http://{rpc_addr}");
 
     let dispatch = openhuman_core::core::runtime::DispatchCtx::ambient();
@@ -3794,6 +3794,76 @@ async fn json_rpc_plan_review_decide_wakes_a_parked_review() {
     let thread_id = format!("plan-review-rpc-{}", uuid::Uuid::new_v4());
     let scope = openhuman_core::plan_review::host::socket_scope_for_dispatch(&dispatch)
         .expect("trusted socket scope");
+
+    // Join before the review is parked so this connection proves the live
+    // event path, not only the replay path used by reconnecting clients.
+    let socket_url = format!("ws://{rpc_addr}/socket.io/?EIO=4&transport=websocket");
+    let (mut live_socket, _) = tokio_tungstenite::connect_async(&socket_url)
+        .await
+        .expect("connect live Socket.IO client");
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let frame = live_socket
+                .next()
+                .await
+                .expect("engine handshake frame")
+                .expect("read engine handshake frame")
+                .into_text()
+                .expect("engine handshake text");
+            if frame.starts_with('0') {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("Engine.IO handshake arrives");
+    live_socket
+        .send(tokio_tungstenite::tungstenite::Message::Text(
+            format!("40{{\"token\":\"{TEST_RPC_TOKEN}\"}}").into(),
+        ))
+        .await
+        .expect("authenticate live Socket.IO client");
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let frame = live_socket
+                .next()
+                .await
+                .expect("Socket.IO connect frame")
+                .expect("read Socket.IO connect frame")
+                .into_text()
+                .expect("Socket.IO connect text");
+            if frame.starts_with("40{") {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("authenticated Socket.IO connection is accepted");
+    live_socket
+        .send(tokio_tungstenite::tungstenite::Message::Text(
+            format!("421[\"thread:subscribe\",{{\"thread_id\":\"{thread_id}\"}}]").into(),
+        ))
+        .await
+        .expect("subscribe live Socket.IO client to the thread");
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let frame = live_socket
+                .next()
+                .await
+                .expect("thread subscription acknowledgement")
+                .expect("read thread subscription acknowledgement")
+                .into_text()
+                .expect("thread subscription text");
+            if frame.starts_with("431[") {
+                let ack: Value = serde_json::from_str(&frame[3..]).expect("subscription ack JSON");
+                assert_eq!(ack[0]["joined"], true);
+                break;
+            }
+        }
+    })
+    .await
+    .expect("thread subscription is acknowledged");
+
     let store = openhuman_core::plan_review::host::global();
     let request_thread = thread_id.clone();
     let parked = tokio::spawn(async move {
@@ -3826,6 +3896,95 @@ async fn json_rpc_plan_review_decide_wakes_a_parked_review() {
     assert_eq!(replay.thread_id, thread_id);
     assert_eq!(replay.summary, "Resolve through the live RPC controller");
     assert_eq!(replay.tool_call_id.as_deref(), Some("call-rpc-e2e"));
+
+    let live_event = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let frame = live_socket
+                .next()
+                .await
+                .expect("live plan review event")
+                .expect("read live plan review event")
+                .into_text()
+                .expect("live plan review event text");
+            if let Some(payload) = frame.strip_prefix("42[\"plan_review_request\",") {
+                let payload = payload.strip_suffix(']').expect("event packet closes");
+                break serde_json::from_str::<Value>(payload).expect("live event JSON");
+            }
+        }
+    })
+    .await
+    .expect("parked review is emitted to its subscribed socket");
+    assert_eq!(live_event["request_id"], replay.request_id);
+    assert_eq!(live_event["thread_id"], thread_id);
+
+    // A reconnecting client joins after the review is already parked and must
+    // receive the same request as a room-join replay.
+    let (mut replay_socket, _) = tokio_tungstenite::connect_async(&socket_url)
+        .await
+        .expect("connect replay Socket.IO client");
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let frame = replay_socket
+                .next()
+                .await
+                .expect("replay engine handshake frame")
+                .expect("read replay engine handshake frame")
+                .into_text()
+                .expect("replay engine handshake text");
+            if frame.starts_with('0') {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("replay Engine.IO handshake arrives");
+    replay_socket
+        .send(tokio_tungstenite::tungstenite::Message::Text(
+            format!("40{{\"token\":\"{TEST_RPC_TOKEN}\"}}").into(),
+        ))
+        .await
+        .expect("authenticate replay Socket.IO client");
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let frame = replay_socket
+                .next()
+                .await
+                .expect("replay Socket.IO connect frame")
+                .expect("read replay Socket.IO connect frame")
+                .into_text()
+                .expect("replay Socket.IO connect text");
+            if frame.starts_with("40{") {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("replay Socket.IO connection is accepted");
+    replay_socket
+        .send(tokio_tungstenite::tungstenite::Message::Text(
+            format!("421[\"thread:subscribe\",{{\"thread_id\":\"{thread_id}\"}}]").into(),
+        ))
+        .await
+        .expect("subscribe replay Socket.IO client to the thread");
+    let replay_event = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let frame = replay_socket
+                .next()
+                .await
+                .expect("replayed plan review event")
+                .expect("read replayed plan review event")
+                .into_text()
+                .expect("replayed plan review event text");
+            if let Some(payload) = frame.strip_prefix("42[\"plan_review_request\",") {
+                let payload = payload.strip_suffix(']').expect("event packet closes");
+                break serde_json::from_str::<Value>(payload).expect("replayed event JSON");
+            }
+        }
+    })
+    .await
+    .expect("joining the thread replays its parked review");
+    assert_eq!(replay_event["request_id"], replay.request_id);
+    assert_eq!(replay_event["thread_id"], thread_id);
 
     let decided = post_json_rpc(
         &rpc_base,
