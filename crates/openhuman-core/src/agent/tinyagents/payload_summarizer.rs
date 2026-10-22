@@ -147,11 +147,18 @@ impl HarnessPayloadSummarizer<OpenHumanRunContext> for SubagentPayloadSummarizer
                 let provider_model = if child_context.data.model_budget.is_some()
                     || child_context.data.dispatch_admission.is_some()
                 {
-                    super::budget::ModelBudget::control(
+                    let monetary_budget = child_context.data.model_budget.as_ref().map(|budget| {
+                        tinyagents_harness::cost::ModelBudget::new(
+                            budget.ledger.clone(),
+                            budget.call,
+                        )
+                    });
+                    Arc::new(tinyagents_harness::cost::ControlledChatModel::new(
                         provider_model,
-                        child_context.data.model_budget.as_ref(),
-                        child_context.data.dispatch_admission.clone(),
-                    )
+                        tinyagents_harness::cost::DispatchModelOptions::new()
+                            .monetary_budget(monetary_budget)
+                            .admission(child_context.data.dispatch_admission.clone()),
+                    ))
                 } else {
                     provider_model
                 };

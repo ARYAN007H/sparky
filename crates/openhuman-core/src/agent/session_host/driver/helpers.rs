@@ -1,29 +1,5 @@
 use super::*;
 
-pub(super) fn system_prefix_len(history: &[Message]) -> usize {
-    history
-        .iter()
-        .take_while(|message| matches!(message, Message::System(_)))
-        .count()
-}
-
-/// Drop `tool` messages that open the history right after the system prefix.
-/// Their assistant turn is gone (an old unpaired trim, #6721), and the provider
-/// rejects every request that carries them, so the thread can never recover
-/// without this. Later system rows (e.g. a steering nudge) are kept.
-pub(super) fn repair_orphaned_tool_head(history: &mut Vec<Message>) {
-    let prefix_len = system_prefix_len(history);
-    let orphans =
-        tinyagents_harness::summarization::advance_past_orphan_tools(&history[prefix_len..], 0);
-    if orphans > 0 {
-        tracing::warn!(
-            orphans,
-            "[session_host::driver] repaired orphaned tool head: dropped {orphans} leading tool message(s)"
-        );
-        history.drain(prefix_len..prefix_len + orphans);
-    }
-}
-
 pub(super) fn driver_error(error: impl std::fmt::Display) -> DriverFailure {
     driver_failure(error)
 }
@@ -115,13 +91,9 @@ pub(super) fn driver_error_with_snapshot(
         // The model's streamed narration was stopped before it could repeat
         // indefinitely. Preserve the completed tools as a useful, bounded
         // partial rather than showing only the failed model's process text.
-        let results = crate::agent::session_host::turn_checkpoint::results_from_tool_outcomes(
-            &guard.tool_outcomes,
-        );
-        let evidence = crate::agent::session_host::turn_checkpoint::render_tool_results(
-            &results,
-            crate::agent::session_host::turn_checkpoint::CHECKPOINT_TOTAL_CHARS,
-        );
+        let results = crate::agent::session_host::product_copy::close_results(&guard.tool_outcomes);
+        let evidence =
+            crate::agent::session_host::product_copy::render_close_results(&results, 4_000);
         format!(
             "I stopped a repetitive model response before it could finish. Here are the completed tool results I can report:\n{evidence}"
         )

@@ -327,35 +327,11 @@ pub struct OpenHumanSessionHost {
     /// Injected transcript locator, or `None` to resolve the session store for
     /// this agent key.
     ///
-    /// The single injection point for the whole transcript seam: it resolves
-    /// both resume reads (`latest_for_agent`, `root_for_thread`) and binds this
-    /// session's write handle (`open_stem`). `None` is the production default
-    /// and is resolved *lazily* by
-    /// [`OpenHumanSessionHost::session_locator`][Self::session_locator] into the
-    /// session store's transcripts for the **current** `workspace_dir` — never
-    /// captured at build time, because callers (tests especially) reassign
-    /// `workspace_dir` after `build()` and a frozen locator would silently keep
-    /// reading the old directory.
+    /// Optional transcript locator used by focused session-host tests and
+    /// embedders that supply their own durable transcript store. Production
+    /// thread-bound sessions use `SessionIdentityResolver` admission instead.
     pub(super) session_history_locator:
         Option<std::sync::Arc<dyn tinyagents_session::transcript::TranscriptLocator>>,
-    /// First-call memo for [`OpenHumanSessionHost::session_locator`][Self::session_locator]'s
-    /// lazily-resolved store locator (the `session_history_locator` `None` branch).
-    ///
-    /// tinyagents' `SessionBuilder` only accepts a later transcript-target
-    /// change when it is the *same* locator object (`Arc::ptr_eq`), not merely
-    /// an equivalent one — see `tinyagents_session::transcript`'s
-    /// `TranscriptTarget::same_binding`. `session_locator` is called from more
-    /// than one place while building a session's runtime turn machinery (the
-    /// `before_resume` resume target and the eager construction-time bind), and
-    /// without this memo each call minted a fresh `Arc` over the same
-    /// destination, so the second bind was rejected with "cannot change a
-    /// transcript target after it is bound or committed" even though both
-    /// calls agreed on the file. `OnceLock` keeps the resolution lazy — still
-    /// read from `workspace_dir` at first use, not frozen at struct-build time
-    /// — while guaranteeing every later caller in this host's lifetime gets
-    /// back the identical `Arc`.
-    pub(super) session_history_locator_memo:
-        std::sync::OnceLock<std::sync::Arc<dyn tinyagents_session::transcript::TranscriptLocator>>,
     /// Unique transcript key for this session, formatted as
     /// `"{unix_ts}_{agent_id}"`. Generated once at agent-build time so
     /// every transcript write in this session uses the same filename

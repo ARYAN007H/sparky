@@ -83,7 +83,7 @@ impl OpenHumanSessionHost {
         context.workspace = self.workspace_descriptor.clone();
         // Sub-agents of this turn write their transcripts to this session's
         // store, under the key it resolved for its own.
-        context.transcripts = Some(self.session_locator());
+        context.transcripts = Some(self.subagent_transcript_locator());
         // The web backstop's deadline (`host_env.turn_deadline`), when this
         // turn runs under one, is already on the context: the harness winds
         // down before it instead of being dropped by it.
@@ -116,7 +116,10 @@ impl OpenHumanSessionHost {
             }),
             thread_id: self.thread_id.clone(),
             stream: self.on_progress.is_some(),
-            session: self.session.clone(),
+            session: self
+                .session_history_locator
+                .as_ref()
+                .and(self.session.clone()),
             resume: self.turn_resume_mode(),
             cancellation: cancellation.clone(),
             run_context: context.into_tinyagents(root_config),
