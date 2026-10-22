@@ -741,6 +741,10 @@ impl SpawnSubagentTool {
                 registration_agent_id.clone(),
                 message.clone(),
             );
+            crate::agent::orchestration::completion_owners::finish_driver_task(
+                &dispatch,
+                &registration_task_id,
+            );
             if let Some(progress) = registration_progress {
                 let _ = progress
                     .send(AgentProgress::SubagentFailed {
@@ -750,10 +754,6 @@ impl SpawnSubagentTool {
                     })
                     .await;
             }
-            crate::agent::orchestration::completion_owners::finish_driver_task(
-                &dispatch,
-                &registration_task_id,
-            );
             return Ok(ToolResult::error(format!(
                 "spawn_subagent: failed to register detached sub-agent: {error}"
             )));
