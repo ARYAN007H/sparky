@@ -7,6 +7,8 @@
 //! answered, and the reasoning it spent). The document is untrusted data, so a
 //! host-only agent may take it past the prompt guard; no other agent may.
 
+#![allow(dead_code)] // Each test target includes the shared scenarios but runs one case.
+
 use crate::common;
 
 use std::sync::atomic::{AtomicUsize, Ordering};

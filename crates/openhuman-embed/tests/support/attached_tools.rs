@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Each test target includes the shared scenarios but runs one case.
+
 use crate::common;
 use common::{chat_completion, chat_requests, offline_config, runtime, stub_backend};
 use openhuman_embed::session_store::SessionRef;

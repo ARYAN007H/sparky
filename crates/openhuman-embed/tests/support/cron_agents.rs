@@ -6,6 +6,8 @@
 //! decides the run's recorded result. And a runtime that asks for background
 //! services runs the scheduler, then stops it when it is dropped.
 
+#![allow(dead_code)] // Each test target includes the shared scenarios but runs one case.
+
 use crate::common;
 
 use std::sync::{Arc, Mutex};

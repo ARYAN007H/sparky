@@ -4,6 +4,8 @@
 //! to that catalog: no shell, writes, network, memory, skills, MCP or delegation.
 //! Assertions inspect provider requests and attempted filesystem effects.
 
+#![allow(dead_code)] // Each test target includes the shared scenarios but runs one case.
+
 use crate::common;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
