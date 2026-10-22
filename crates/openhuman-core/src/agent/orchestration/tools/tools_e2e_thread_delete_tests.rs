@@ -548,8 +548,9 @@ async fn purging_threads_cancels_driver_children_and_discards_completions() {
         .into_iter()
         .find(|job| job.status == SubAgentJobStatus::Running && job.agent == "task_manager_agent")
         .expect("spawned child is live in the TinyAgents job registry");
-    let owner = crate::agent::orchestration::completion_owners::driver_task_owner(&dispatch, &task_id)
-        .expect("spawn registers the exact task owner");
+    let owner =
+        crate::agent::orchestration::completion_owners::driver_task_owner(&dispatch, &task_id)
+            .expect("spawn registers the exact task owner");
     assert_eq!(owner.workspace_dir, workspace);
     assert_eq!(owner.parent_thread_id.as_deref(), Some(thread_id));
     background_completions::record_outcome(
