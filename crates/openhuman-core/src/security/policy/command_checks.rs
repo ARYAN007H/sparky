@@ -5,6 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use super::CommandAnalysis;
+#[cfg(test)]
 use super::command_analysis::classify_host_command;
 
 #[cfg(test)]
