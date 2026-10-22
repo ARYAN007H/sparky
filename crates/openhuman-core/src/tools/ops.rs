@@ -158,7 +158,10 @@ pub fn all_tools_with_runtime_and_pack_handle(
         // value ready to paste into a tool argument.
         Box::new(ResolveTimeTool::new()),
         Box::new(DetectToolsTool::new()),
-        Box::new(InstallToolTool::new(security.clone())),
+        Box::new(InstallToolTool::with_audit(
+            security.clone(),
+            Arc::clone(&audit),
+        )),
     ]);
     tools.extend(crate::cron::tools::tools(config.clone(), security));
     #[cfg(feature = "flows")]
