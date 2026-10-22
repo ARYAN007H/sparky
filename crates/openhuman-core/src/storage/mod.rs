@@ -192,18 +192,47 @@ pub async fn open(url: &str) -> Result<Arc<dyn StorageBackend>, StorageError> {
     Ok(fenced_backend::wrap(backend))
 }
 
-/// Runs `connect` to completion and returns what it built.
+/// The process's storage runtime: two worker threads that live as long as the
+/// process. A driver connected here keeps its background tasks (MongoDB's
+/// connection pool and monitors) here, off the host runtime, so callers parked
+/// on [`block_on`] cannot starve them.
+fn storage_runtime() -> Result<&'static tokio::runtime::Runtime, StorageError> {
+    static RUNTIME: OnceLock<Result<tokio::runtime::Runtime, String>> = OnceLock::new();
+    RUNTIME
+        .get_or_init(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
+                .thread_name("openhuman-storage")
+                .enable_all()
+                .build()
+                .map_err(|error| format!("cannot build the storage runtime: {error}"))
+        })
+        .as_ref()
+        .map_err(|error| StorageError::backend(error.clone()))
+}
+
+/// Runs `connect` on the storage runtime and returns what it built.
 ///
 /// # Errors
 ///
-/// When `connect` panics or cannot be run.
+/// When the storage runtime cannot start or `connect` panics.
 pub(crate) async fn connect_on_storage_runtime<F, Fut, T>(connect: F) -> Result<T, StorageError>
 where
     F: FnOnce() -> Fut + Send + 'static,
     Fut: Future<Output = T> + Send + 'static,
     T: Send + 'static,
 {
-    Ok(connect().await)
+    let runtime = storage_runtime()?;
+    tracing::debug!(
+        target: "openhuman::storage",
+        "[storage] connecting on the storage runtime"
+    );
+    runtime
+        .spawn(async move { connect().await })
+        .await
+        .map_err(|error| {
+            StorageError::backend(format!("connecting on the storage runtime failed: {error}"))
+        })
 }
 
 /// Makes `backend` the process's storage backend; returns the previous one.
@@ -297,7 +326,10 @@ pub fn current_scoped() -> Result<Option<ScopedStorage>, StorageError> {
 ///
 /// For domain stores whose API is synchronous (most of the core's), so they
 /// can call the async storage ports without `block_in_place` — which would
-/// panic on a current-thread runtime.
+/// panic on a current-thread runtime. The backend [`open`] returns runs on the
+/// storage runtime, so `future` depends only on that thread and the storage
+/// runtime, never on the caller's: however many callers are parked here, the
+/// host runtime cannot be left without the threads the backend needs.
 ///
 /// # Errors
 ///
