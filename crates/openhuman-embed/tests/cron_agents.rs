@@ -103,8 +103,9 @@ fn a_scheduled_job_runs_a_runtime_agent_with_its_host_tool_as_cron() {
         tokio::spawn(async {
             let backend = stub_backend().await;
             let provider = provider_calling_ping().await;
+            let config = offline_config();
             let runtime = Runtime::builder()
-                .config(offline_config())
+                .config(config.clone())
                 .workspace(Workspace::Ephemeral)
                 .backend_url(backend.uri())
                 .build()
@@ -151,7 +152,9 @@ fn a_scheduled_job_runs_a_runtime_agent_with_its_host_tool_as_cron() {
             assert!(again.single_flight);
             assert_eq!(cron.list().unwrap().len(), 1);
             let changed = cron
-                .upsert(JobSpec::agent("teeny-hourly", "teeny", "check in", HOURLY))
+                .upsert(
+                    JobSpec::agent("teeny-hourly", "teeny", "check in", HOURLY),
+                )
                 .expect("job updated");
             assert_eq!(changed.id, first.id, "same job, updated in place");
             assert_eq!(
@@ -163,6 +166,17 @@ fn a_scheduled_job_runs_a_runtime_agent_with_its_host_tool_as_cron() {
             );
             assert_eq!(changed.retries, None);
             assert!(!changed.single_flight);
+            runtime
+                .core_runtime()
+                .invoke(
+                    "openhuman.cron_update",
+                    serde_json::json!({
+                        "job_id": changed.id,
+                        "patch": {"model": "cron-override"}
+                    }),
+                )
+                .await
+                .unwrap_or_else(|error| panic!("job model override was not stored: {error}"));
 
             // The run goes through the cron scheduler's agent path.
             let run = cron.run_now("teeny-hourly").await.expect("job runs");
