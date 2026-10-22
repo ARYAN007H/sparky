@@ -218,8 +218,8 @@ pub struct WebChannelEvent {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub queue_item: Option<QueueItemPayload>,
     /// Session goal snapshot, carried on goal-lifecycle events. Left as a
-    /// raw `Value` because the goal shape is owned by `tinyagents-graph`,
-    /// not this crate.
+    /// raw `Value` so the wire event remains independent of the harness
+    /// tool's internal goal type.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub goal: Option<serde_json::Value>,
     /// Session todo-list snapshot, carried on todo-lifecycle events. Raw
