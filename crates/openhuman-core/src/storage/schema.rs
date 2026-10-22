@@ -55,7 +55,11 @@ fn declared_collections() -> Vec<CollectionSpec> {
                 .into_iter()
                 .map(CollectionSpec::new),
         );
-        collections.extend(tinyconnectors_bus::storage::collections());
+        collections.extend(
+            tinyconnectors_bus::storage::collections()
+                .into_iter()
+                .map(|collection| CollectionSpec::new(collection.name)),
+        );
         collections.extend(
             tinybox_bus::storage::collections()
                 .into_iter()
@@ -98,7 +102,12 @@ pub fn module_collections(owner: &str) -> Vec<CollectionSpec> {
             );
         }
         "connectors" => {
-            return module_owned_collections(tinyconnectors_bus::storage::collections());
+            return module_owned_collections(
+                tinyconnectors_bus::storage::collections()
+                    .into_iter()
+                    .map(|collection| CollectionSpec::new(collection.name))
+                    .collect(),
+            );
         }
         "box" => {
             return module_owned_collections(
