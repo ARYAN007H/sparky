@@ -507,7 +507,7 @@ fn replay_transcript(
             return Ok(());
         }
         let mut next = logical.clone();
-        next.extend(group.iter().map(|message| stored_transcript_row(message)));
+        next.extend(group.iter().map(stored_transcript_row));
         let usage = group
             .iter()
             .rev()
