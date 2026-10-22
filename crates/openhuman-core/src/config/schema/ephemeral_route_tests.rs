@@ -212,12 +212,36 @@ fn apply_twice_leaves_one_entry() {
 fn reapplying_the_same_route_is_a_no_op() {
     let mut config = config_with_model("x/y");
     apply(&mut config, route());
-    let before = config.clone();
+    let mut intervening = config
+        .cloud_providers
+        .iter()
+        .find(|entry| entry.slug == EPHEMERAL_ROUTE_SLUG)
+        .unwrap()
+        .clone();
+    intervening.id = "another-provider".into();
+    intervening.slug = "another-provider".into();
+    config.cloud_providers.push(intervening);
+    let providers_before = config.cloud_providers.clone();
+    let roles_before = (
+        config.chat_provider.clone(),
+        config.reasoning_provider.clone(),
+        config.agentic_provider.clone(),
+        config.coding_provider.clone(),
+    );
     let (logs, _guard) = capture_logs();
 
     apply(&mut config, route());
 
-    assert_eq!(config, before);
+    assert_eq!(config.cloud_providers, providers_before);
+    assert_eq!(
+        (
+            config.chat_provider,
+            config.reasoning_provider,
+            config.agentic_provider,
+            config.coding_provider,
+        ),
+        roles_before
+    );
     assert!(!logs.text().contains("INFO"));
 }
 
