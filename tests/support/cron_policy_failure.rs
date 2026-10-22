@@ -6,8 +6,8 @@ use openhuman_core::cron::{CronJobPatch, JobPolicy};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use tinystoragedrivers::{
-    Capabilities, CollectionSpec, Filter, Page, Precondition, Query, ReadCheck, Sort, StorageError,
-    Version, Versioned, WriteOp, WriteResult,
+    Capabilities, CollectionSpec, Filter, Page, Precondition, Query, ReadCheck, Scope as TsdScope,
+    Sort, StorageError, Version, Versioned, WriteOp, WriteResult,
 };
 use tinystoragedrivers_api::{DocumentStore, Storage, StorageBackend};
 use tinytools::Tool;
@@ -60,13 +60,10 @@ struct Backend {
 }
 
 impl StorageBackend for Backend {
-    fn driver(&self) -> &'static str {
-        self.inner.driver()
-    }
     fn capabilities(&self) -> Capabilities {
         self.inner.capabilities()
     }
-    fn for_scope(&self, scope: &Scope) -> StoreResult<Storage> {
+    fn for_scope(&self, scope: &TsdScope) -> StoreResult<Storage> {
         let inner = self.inner.for_scope(scope)?;
         Ok(Storage::new(
             Arc::new(Documents {
