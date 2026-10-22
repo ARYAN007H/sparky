@@ -105,6 +105,9 @@ pub(super) struct TurnMiddlewareInputs {
     /// Called when the turn starts summarizing earlier conversation, so the
     /// client can show it. `None` for a turn nobody watches.
     pub(super) compaction_notice: Option<super::context_wiring::CompactionNotice>,
+    /// The session store the goal and `todo` tools write, whether or not this
+    /// turn has the `todo` tool; the run-state block reads it.
+    pub(super) state_store: Option<Arc<dyn tinyagents_harness::store::Store>>,
 }
 
 /// The handles the run loop reads after the drive returns.
@@ -157,6 +160,7 @@ pub(super) fn install_turn_middleware(
         tool_outcome_sink,
         todo_store,
         compaction_notice,
+        state_store,
     } = inputs;
     let super::host::HarnessHostPolicy {
         stop_hooks,
@@ -517,6 +521,10 @@ pub(super) fn install_turn_middleware(
             "[todo_sequence] not installed for this turn"
         ),
     }
+    // The goal, the plan and the turn's tool-call facts on every model call,
+    // request-only. On these turns the goal is not prepended to the user's
+    // message (see `state_block`).
+    super::state_block::install(harness, state_store, is_subagent, agent_id);
 
     // Direct web lookup is bounded. Once enough search/fetch results have
     // returned, the web tools leave the request so the run works with what it
