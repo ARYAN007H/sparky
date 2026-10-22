@@ -120,16 +120,16 @@ async fn inbound_thread_ts_is_forwarded_to_channel_send() {
 
     process_channel_message(
         ctx,
-        traits::ChannelMessage {
-            id: "tg_100_99".to_string(),
-            sender: "alice".to_string(),
-            reply_target: "100".to_string(),
-            content: "ping".to_string(),
-            channel: "test-channel".to_string(),
-            timestamp: 1,
-            thread_ts: Some("99".to_string()),
-            sender_name: None,
-        },
+        channel_envelope(
+            "test-channel",
+            "alice",
+            "100",
+            "ping",
+            "tg_100_99",
+            1,
+            Some("99"),
+            None
+        ),
     )
     .await;
 
@@ -158,16 +158,16 @@ async fn no_thread_ts_on_inbound_message_results_in_none_on_send() {
 
     process_channel_message(
         ctx,
-        traits::ChannelMessage {
-            id: "tg_100_55".to_string(),
-            sender: "alice".to_string(),
-            reply_target: "100".to_string(),
-            content: "hello".to_string(),
-            channel: "test-channel".to_string(),
-            timestamp: 1,
-            thread_ts: None,
-            sender_name: None,
-        },
+        channel_envelope(
+            "test-channel",
+            "alice",
+            "100",
+            "hello",
+            "tg_100_55",
+            1,
+            None,
+            None
+        ),
     )
     .await;
 
@@ -196,16 +196,16 @@ async fn reaction_marker_in_llm_response_is_passed_to_channel_send() {
 
     process_channel_message(
         ctx,
-        traits::ChannelMessage {
-            id: "tg_100_42".to_string(),
-            sender: "alice".to_string(),
-            reply_target: "100".to_string(),
-            content: "great job".to_string(),
-            channel: "test-channel".to_string(),
-            timestamp: 1,
-            thread_ts: Some("42".to_string()), // message_id the reaction targets
-            sender_name: None,
-        },
+        channel_envelope(
+            "test-channel",
+            "alice",
+            "100",
+            "great job",
+            "tg_100_42",
+            1,
+            Some("42"),
+            None
+        ),
     )
     .await;
 
@@ -248,16 +248,16 @@ async fn typing_indicator_starts_and_stops_once_per_message() {
 
     process_channel_message(
         ctx,
-        traits::ChannelMessage {
-            id: "typing-test".to_string(),
-            sender: "alice".to_string(),
-            reply_target: "chat-123".to_string(),
-            content: "hello".to_string(),
-            channel: "test-channel".to_string(),
-            timestamp: 1,
-            thread_ts: None,
-            sender_name: None,
-        },
+        channel_envelope(
+            "test-channel",
+            "alice",
+            "chat-123",
+            "hello",
+            "typing-test",
+            1,
+            None,
+            None
+        ),
     )
     .await;
 
@@ -278,16 +278,16 @@ async fn typing_indicator_starts_and_stops_once_per_message() {
 /// sender must share one history key regardless of their thread_ts value.
 #[test]
 fn telegram_channel_history_key_ignores_thread_ts() {
-    let base_msg = traits::ChannelMessage {
-        id: "tg_100_1".to_string(),
-        sender: "alice".to_string(),
-        reply_target: "100".to_string(),
-        content: "hello".to_string(),
-        channel: "telegram".to_string(),
-        timestamp: 1,
-        thread_ts: None,
-        sender_name: None,
-    };
+    let base_msg = channel_envelope(
+            "telegram",
+            "alice",
+            "100",
+            "hello",
+            "tg_100_1",
+            1,
+            None,
+            None
+        );
 
     let msg_with_thread = traits::ChannelMessage {
         id: "tg_100_2".to_string(),
@@ -372,16 +372,16 @@ async fn telegram_threaded_inbound_emits_ack_reaction_then_reply() {
 
     process_channel_message(
         ctx,
-        traits::ChannelMessage {
-            id: "tg_200_77".to_string(),
-            sender: "alice".to_string(),
-            reply_target: "200".to_string(),
-            content: "ping".to_string(),
-            channel: "telegram".to_string(),
-            timestamp: 1,
-            thread_ts: Some("77".to_string()),
-            sender_name: None,
-        },
+        channel_envelope(
+            "telegram",
+            "alice",
+            "200",
+            "ping",
+            "tg_200_77",
+            1,
+            Some("77"),
+            None
+        ),
     )
     .await;
 
@@ -438,16 +438,16 @@ async fn telegram_threaded_inbound_emits_ack_reaction_then_reply() {
 /// so each thread maintains independent conversation context.
 #[test]
 fn non_telegram_channel_history_key_includes_thread_ts() {
-    let base_msg = traits::ChannelMessage {
-        id: "slack_C01_1".to_string(),
-        sender: "alice".to_string(),
-        reply_target: "C01".to_string(),
-        content: "hello".to_string(),
-        channel: "slack".to_string(),
-        timestamp: 1,
-        thread_ts: None,
-        sender_name: None,
-    };
+    let base_msg = channel_envelope(
+            "slack",
+            "alice",
+            "C01",
+            "hello",
+            "slack_C01_1",
+            1,
+            None,
+            None
+        );
 
     let msg_in_thread = traits::ChannelMessage {
         id: "slack_C01_2".to_string(),

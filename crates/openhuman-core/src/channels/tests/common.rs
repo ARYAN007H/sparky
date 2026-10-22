@@ -9,6 +9,38 @@ use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelRespo
 use tinyinference_llm::tool::ToolCall;
 use tinytools::{Tool, ToolResult};
 
+pub(super) fn channel_envelope(
+    channel: &str,
+    sender: &str,
+    reply_target: &str,
+    content: &str,
+    id: &str,
+    timestamp: u64,
+    thread_id: Option<&str>,
+    sender_name: Option<&str>,
+) -> traits::ChannelInboundEnvelope {
+    traits::ChannelInboundEnvelope {
+        channel: traits::ChannelRef {
+            id: channel.to_string(),
+            ..Default::default()
+        },
+        message_id: id.to_string(),
+        timestamp_unix_ms: Some(timestamp),
+        conversation: traits::ConversationRef {
+            id: reply_target.to_string(),
+            thread_id: thread_id.map(str::to_string),
+            ..Default::default()
+        },
+        sender: traits::SenderRef {
+            id: sender.to_string(),
+            name: sender_name.map(str::to_string),
+            ..Default::default()
+        },
+        text: content.to_string(),
+        ..Default::default()
+    }
+}
+
 fn message_role(message: &Message) -> &'static str {
     match message {
         Message::System(_) => "system",

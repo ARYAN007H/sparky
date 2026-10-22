@@ -149,16 +149,16 @@ async fn discord_inbound_dispatches_through_full_pipeline() {
 
     process_channel_message(
         ctx,
-        traits::ChannelMessage {
-            id: "discord_msg_1".to_string(),
-            sender: "user-123".to_string(),
-            reply_target: "channel-456".to_string(),
-            content: "what's up?".to_string(),
-            channel: "discord".to_string(),
-            timestamp: 1,
-            thread_ts: None,
-            sender_name: None,
-        },
+        channel_envelope(
+            "discord",
+            "user-123",
+            "channel-456",
+            "what's up?",
+            "discord_msg_1",
+            1,
+            None,
+            None
+        ),
     )
     .await;
 
@@ -200,16 +200,16 @@ async fn discord_threaded_message_does_not_emit_reaction_ack() {
 
     process_channel_message(
         ctx,
-        traits::ChannelMessage {
-            id: "discord_msg_2".to_string(),
-            sender: "user-123".to_string(),
-            reply_target: "channel-456".to_string(),
-            content: "in-thread message".to_string(),
-            channel: "discord".to_string(),
-            timestamp: 1,
-            thread_ts: Some("thread-42".to_string()),
-            sender_name: None,
-        },
+        channel_envelope(
+            "discord",
+            "user-123",
+            "channel-456",
+            "in-thread message",
+            "discord_msg_2",
+            1,
+            Some("thread-42"),
+            None
+        ),
     )
     .await;
 
@@ -249,16 +249,16 @@ async fn discord_thread_ts_splits_conversation_history_end_to_end() {
     let provider: Arc<dyn ChatModel<()>> = provider_impl.clone();
     let ctx = make_discord_ctx(channel, provider);
 
-    let first = traits::ChannelMessage {
-        id: "discord_msg_a".to_string(),
-        sender: "user-123".to_string(),
-        reply_target: "channel-456".to_string(),
-        content: "first thread message".to_string(),
-        channel: "discord".to_string(),
-        timestamp: 1,
-        thread_ts: Some("thread-A".to_string()),
-        sender_name: None,
-    };
+    let first = channel_envelope(
+            "discord",
+            "user-123",
+            "channel-456",
+            "first thread message",
+            "discord_msg_a",
+            1,
+            Some("thread-A"),
+            None
+        );
 
     let second = traits::ChannelMessage {
         id: "discord_msg_b".to_string(),
