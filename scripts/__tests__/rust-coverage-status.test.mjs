@@ -393,7 +393,7 @@ for (const platform of ["Linux", "Darwin", "MINGW64_NT-10.0", "Windows_NT"]) {
       [
         `if target_expected_in_coverage composio_list_tools_stack_overflow_regression '${platform}'; then exit 11; fi`,
         `if target_expected_in_coverage windows_sandbox_env_e2e '${platform}'; then ${windows ? ":" : "exit 12"}; else ${windows ? "exit 13" : ":"}; fi`,
-        `target_expected_in_coverage json_rpc_e2e '${platform}'`,
+        `target_expected_in_coverage json_rpc_threads_e2e '${platform}'`,
         `target_expected_in_coverage future_empty_suite '${platform}'`,
       ].join("\n"),
     );
@@ -468,6 +468,7 @@ test("nextest product suites are one build and one run over the union of their f
   // suites keep their own resolutions.
   assert.doesNotMatch(source, /-p openhuman-cli --tests/);
   assert.doesNotMatch(source, /-E "\$\{FILTER_(CORE|EMBED|TINYHUMANS|CLI_TESTS)\}"/);
+
   assert.match(source, /suite "openhuman-rpc" llvm_cov_package .*-p openhuman-rpc --all-targets/);
   assert.match(source, /suite "openhuman-tui" llvm_cov_package .*-p openhuman-tui --all-targets/);
   assert.match(source, /suite "openhuman-embed \(default\)" llvm_cov_package .*-p openhuman-embed --all-targets/);
