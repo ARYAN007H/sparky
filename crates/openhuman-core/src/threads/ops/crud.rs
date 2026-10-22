@@ -505,34 +505,56 @@ async fn thread_delete_inner(
     // completion in the gap between the two calls, then discard anything already
     // queued for delivery. Both target a thread that's being deleted, so there's
     // nowhere left to deliver to — abort + cleanup is the whole behavior.
-    let cancelled_legacy = match crate::agent::orchestration::running_subagents::cancel_for_thread(
-        &ctx,
-        &request.thread_id,
-    )
-    .await
-    {
-        Ok(cancelled) => cancelled,
-        Err(error) => {
+    let (cancelled_legacy, cancelled_driver) = if ctx.resolved().is_none() {
+        if !crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+            &ctx,
+            &dir,
+            &request.thread_id,
+        )
+        .is_empty()
+        {
             crate::agent::orchestration::background_completions::delete_parent_for_thread(
                 &ctx,
                 &dir,
                 &request.thread_id,
-            )
-            .map_err(|close_error| format!("{error}; {close_error}"))?;
-            return Err(error);
+            )?;
+            return Err("cannot resolve core context to settle thread-owned driver jobs".into());
         }
+        (0, 0)
+    } else {
+        let cancelled_legacy =
+            match crate::agent::orchestration::running_subagents::cancel_for_thread(
+                &ctx,
+                &request.thread_id,
+            )
+            .await
+            {
+                Ok(cancelled) => cancelled,
+                Err(error) => {
+                    crate::agent::orchestration::background_completions::delete_parent_for_thread(
+                        &ctx,
+                        &dir,
+                        &request.thread_id,
+                    )
+                    .map_err(|close_error| format!("{error}; {close_error}"))?;
+                    return Err(error);
+                }
+            };
+        let jobs = crate::core::runtime::slot_for::<
+            tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        >(&ctx);
+        let cancelled_driver =
+            crate::agent::orchestration::subagent_sessions::cancel_driver_jobs_for_thread(
+                &crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
+                    dir.clone(),
+                ),
+                &dir,
+                &jobs,
+                &request.thread_id,
+            )
+            .len();
+        (cancelled_legacy, cancelled_driver)
     };
-    let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
-    >(&ctx);
-    let cancelled_driver =
-        crate::agent::orchestration::subagent_sessions::cancel_driver_jobs_for_thread(
-            &crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(dir.clone()),
-            &dir,
-            &jobs,
-            &request.thread_id,
-        )
-        .len();
     let cancelled = cancelled_legacy + cancelled_driver;
     let discarded = crate::agent::orchestration::background_completions::delete_parent_for_thread(
         &ctx,
