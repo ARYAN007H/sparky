@@ -1,6 +1,70 @@
 use super::*;
 
 #[tokio::test]
+async fn driver_store_imports_legacy_rows_without_losing_host_epoch() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let scratch = tempfile::tempdir().expect("isolated session-store fixture");
+    let workspace = scratch.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("create workspace");
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.clone();
+    let context = CoreContext::for_test(DomainSet::full(), None).derive_with(
+        ContextOverlay::new(config, DomainSet::kernel(), ToolGroups::none())
+            .profile("session-owner")
+            .session_agent("session-owner"),
+    );
+    let dispatch = DispatchCtx::new(context);
+    let legacy = SubagentSessionStore::new_in_context(&dispatch, workspace.clone()).unwrap();
+    let row: DurableSubagentSession = serde_json::from_value(serde_json::json!({
+        "subagentSessionId": "legacy-session",
+        "parentSession": "owner",
+        "parentThreadId": "thread",
+        "workerThreadId": null,
+        "agentId": "researcher",
+        "displayName": null,
+        "model": null,
+        "sandboxMode": "workspace",
+        "actionRoot": null,
+        "taskKey": "analysis",
+        "taskTitle": "Analyze",
+        "currentTaskId": "legacy-task",
+        "status": "idle",
+        "reusable": true,
+        "latestHistory": null,
+        "latestError": null,
+        "createdAt": "2026-01-01T00:00:00Z",
+        "updatedAt": "2026-01-01T00:00:00Z",
+        "lastUsedAt": "2026-01-01T00:00:00Z",
+        "parentEpoch": 7
+    }))
+    .unwrap();
+    legacy.save(&[row]).unwrap();
+
+    let driver = open_for_context(
+        &dispatch,
+        workspace,
+        "owner",
+        Some("thread".into()),
+        None,
+    )
+    .expect("open explicitly scoped driver store");
+    let imported = driver
+        .get("legacy-task")
+        .await
+        .expect("read imported task alias")
+        .expect("legacy row is visible to the driver store");
+    assert_eq!(imported.subagent_session_id, "legacy-session");
+    assert_eq!(imported.current_task_id.as_deref(), Some("legacy-task"));
+    assert_eq!(imported.status, TinyStatus::Idle);
+
+    let retained = legacy.load().unwrap();
+    assert_eq!(retained[0].parent_epoch, Some(7));
+}
+
+#[tokio::test]
 async fn driver_session_store_uses_the_explicit_profile_scope() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
