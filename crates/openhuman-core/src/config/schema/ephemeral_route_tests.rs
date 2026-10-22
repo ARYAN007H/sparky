@@ -54,6 +54,7 @@ fn route() -> EphemeralRoute {
         endpoint: "http://127.0.0.1:41234/openai".to_string(),
         api_key: "mdl-token".to_string(),
         headers: Vec::new(),
+        ..EphemeralRoute::default()
     }
 }
 
@@ -67,6 +68,7 @@ fn from_params_needs_both_halves() {
             endpoint: "http://x/openai".into(),
             api_key: "k".into(),
             headers: Vec::new(),
+            ..EphemeralRoute::default()
         })
     );
     // An endpoint with no credential and a credential with no endpoint are both
@@ -96,6 +98,7 @@ fn from_params_treats_blank_as_absent_and_trims() {
             endpoint: "http://x/openai".into(),
             api_key: "k".into(),
             headers: Vec::new(),
+            ..EphemeralRoute::default()
         })
     );
 }
@@ -123,6 +126,42 @@ fn apply_registers_the_entry_and_pins_the_turn_roles() {
     );
     assert_eq!(config.agentic_provider.as_deref(), Some(expected.as_str()));
     assert_eq!(config.coding_provider.as_deref(), Some(expected.as_str()));
+}
+
+#[test]
+fn apply_carries_provider_options_and_model_reasoning_effort() {
+    let mut config = config_with_model("provider/model");
+    let mut route = route();
+    route.provider_options = Some(serde_json::json!({"provider": {"sort": "latency"}}));
+    route.reasoning_effort = Some("high".into());
+
+    apply(&mut config, route);
+
+    assert_eq!(
+        config
+            .ephemeral_route
+            .as_ref()
+            .and_then(|route| route.provider_options.clone()),
+        Some(serde_json::json!({"provider": {"sort": "latency"}}))
+    );
+    assert_eq!(
+        config
+            .runtime
+            .reasoning_effort_by_model
+            .get("provider/model"),
+        Some(&"high".to_string())
+    );
+}
+
+#[test]
+fn an_ephemeral_route_without_options_keeps_the_provider_default() {
+    let mut config = config_with_model("provider/model");
+    apply(&mut config, route());
+
+    assert_eq!(
+        config.ephemeral_route.as_ref().unwrap().provider_options,
+        None
+    );
 }
 
 #[test]
@@ -197,6 +236,7 @@ fn apply_twice_leaves_one_entry() {
             endpoint: "http://127.0.0.1:9999/openai".into(),
             api_key: "mdl-other".into(),
             headers: Vec::new(),
+            ..EphemeralRoute::default()
         },
     );
     let entries: Vec<_> = config
@@ -274,6 +314,7 @@ fn a_changed_route_is_applied_and_logged_once() {
         endpoint: "http://127.0.0.1:9999/openai".into(),
         api_key: "mdl-other".into(),
         headers: Vec::new(),
+        ..EphemeralRoute::default()
     };
 
     apply(&mut config, changed.clone());
@@ -313,6 +354,7 @@ fn debug_never_discloses_route_bearer_or_header_values() {
         endpoint: "https://fixture.example/v1".into(),
         api_key: "u2-unique-route-secret".into(),
         headers: vec![("x-private".into(), "u2-unique-header-secret".into())],
+        ..EphemeralRoute::default()
     };
     let debug = format!("{route:?}");
     assert!(!debug.contains("u2-unique-route-secret"));
