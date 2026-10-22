@@ -312,6 +312,174 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
 }
 
 #[tokio::test]
+async fn deleting_parent_thread_cancels_driver_child_before_discarding_completions() {
+    use crate::agent::orchestration::background_completions::{
+        self, BackgroundAgentOutcome,
+    };
+    use crate::agent::tinyagents::host::OpenHumanRunContext;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::threads::store::{CreateConversationThread, blocking};
+    use crate::tools::toolpacks::ToolGroups;
+    use tinyagents_harness::context::RunContext;
+    use tinyagents_harness_tools::subagents::{SubAgentJobRegistry, SubAgentJobStatus};
+
+    struct GatedModel {
+        started: tokio::sync::mpsc::Sender<()>,
+        release: Arc<tokio::sync::Notify>,
+    }
+
+    #[async_trait]
+    impl ChatModel<()> for GatedModel {
+        fn profile(&self) -> Option<&ModelProfile> {
+            static PROFILE: std::sync::OnceLock<ModelProfile> = std::sync::OnceLock::new();
+            Some(PROFILE.get_or_init(|| {
+                let mut profile = ModelProfile::default();
+                profile.tool_calling = true;
+                profile.parallel_tool_calls = true;
+                profile
+            }))
+        }
+
+        async fn invoke(
+            &self,
+            _state: &(),
+            _request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            let _ = self.started.send(()).await;
+            self.release.notified().await;
+            Ok(ModelResponse::assistant("child released after delete"))
+        }
+    }
+
+    let scratch = tempfile::tempdir().expect("isolated thread-delete fixture");
+    let workspace = scratch.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("create workspace");
+    let thread_id = "delete-live-driver-parent-thread";
+    let parent_session = "delete-live-driver-parent-session";
+    let (started_tx, mut started_rx) = tokio::sync::mpsc::channel(1);
+    let release = Arc::new(tokio::sync::Notify::new());
+    let provider = Arc::new(GatedModel {
+        started: started_tx,
+        release: release.clone(),
+    });
+    let mut parent = parent_context(&workspace, provider, vec![]);
+    parent.workspace_dir = workspace.clone();
+    parent.session_id = parent_session.into();
+
+    let definitions = Arc::new(AgentDefinitionRegistry::builtins_only());
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.clone();
+    config.components.juice = false;
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).definitions(definitions),
+    );
+    let mut host_context = OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_parent(parent);
+    host_context.thread_id = Some(thread_id.into());
+    let live = RunContext::<OpenHumanRunContext>::new(
+        tinyagents_harness::context::RunConfig::new("delete-live-driver-parent")
+            .with_thread(thread_id),
+        host_context,
+    );
+    let dispatch = live.data.dispatch_ctx();
+    blocking::ensure_thread(
+        dispatch.clone(),
+        workspace.clone(),
+        CreateConversationThread {
+            id: thread_id.into(),
+            title: "Delete live driver parent".into(),
+            created_at: "2026-01-01T00:00:00Z".into(),
+            parent_thread_id: None,
+            labels: None,
+            personality_id: None,
+            working_dir: None,
+        },
+    )
+    .await
+    .expect("persist parent thread before spawning child");
+
+    let completion_store: Arc<dyn tinyagents_tasks::CompletionStore> =
+        Arc::new(tinyagents_tasks::InMemoryCompletionStore::new());
+    background_completions::install_store_for_test(&workspace, completion_store);
+    let detached_data = live.data.detached_child();
+    let detached = live
+        .child(
+            tinyagents_harness::context::RunConfig::new("delete-live-driver-child"),
+            detached_data.clone(),
+        )
+        .expect("detached child context")
+        .with_cancellation(detached_data.cancellation.clone());
+    let spawned = crate::agent::orchestration::tools::SpawnSubagentTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "wait for the parent thread to be deleted",
+                "model": "test-model"
+            }),
+            None,
+            live.data.child(),
+            detached,
+        )
+        .await
+        .expect("spawn tool execution");
+    assert!(!spawned.is_error, "{}", spawned.output());
+    tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
+        .await
+        .expect("child reaches its gated provider call")
+        .expect("provider start notification");
+
+    let jobs = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&dispatch);
+    let job = jobs
+        .list()
+        .into_iter()
+        .find(|job| {
+            job.status == SubAgentJobStatus::Running
+                && job.agent == "task_manager_agent"
+                && job.extensions.get("task_id").and_then(serde_json::Value::as_str).is_some()
+        })
+        .expect("spawned child is live in the TinyAgents job registry");
+    let task_id = job.extensions["task_id"].as_str().unwrap().to_owned();
+    background_completions::record_outcome(
+        &dispatch,
+        &workspace,
+        parent_session,
+        task_id,
+        "task_manager_agent",
+        "queued child result",
+        Some(thread_id.into()),
+        BackgroundAgentOutcome::Completed,
+    )
+    .await;
+    assert_eq!(
+        background_completions::pending_for(&workspace, thread_id).len(),
+        1,
+        "the deletion starts with a queued child completion"
+    );
+
+    crate::threads::thread_delete(
+        &dispatch,
+        crate::threads::DeleteConversationThreadRequest {
+            thread_id: thread_id.into(),
+            deleted_at: "2026-01-01T00:01:00Z".into(),
+        },
+    )
+    .await
+    .expect("delete parent thread");
+
+    assert_eq!(
+        jobs.get(job.id.as_str()).map(|job| job.status),
+        Some(SubAgentJobStatus::Cancelled),
+        "deleting a parent thread cancels its live TinyAgents child"
+    );
+    assert!(
+        background_completions::pending_for(&workspace, thread_id).is_empty(),
+        "queued child completions are discarded after cancellation"
+    );
+    release.notify_waiters();
+}
+
+#[tokio::test]
 async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
     use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
