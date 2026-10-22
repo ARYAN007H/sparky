@@ -229,13 +229,13 @@ impl SpawnSubagentTool {
                 ));
             };
             let checkpoint_dir = parent.workspace_dir.join(".openhuman/subagent_checkpoints");
-            let original_key = match subagent_sessions::resolve_lifecycle_key(
-                &store,
+            let original_key = match subagent_sessions::resolve_driver_lifecycle_key(
+                driver_store.as_ref(),
                 &session.subagent_session_id,
-                &parent_session,
-                parent_thread_id.as_deref(),
                 &checkpoint_dir,
-            ) {
+            )
+            .await
+            {
                 Ok(key) => key,
                 Err(error) => {
                     return Ok(ToolResult::error(format!(
