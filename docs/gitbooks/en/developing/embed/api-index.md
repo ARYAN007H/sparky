@@ -218,7 +218,7 @@ The compiled capability report describes this build:
     "storage-file": false,
     "storage-mongodb": false,
     "storage-s3": false,
-    "storage-sqlite": true,
+    "storage-sqlite": false,
     "tinymemes": true,
     "voice": false,
     "web3": false

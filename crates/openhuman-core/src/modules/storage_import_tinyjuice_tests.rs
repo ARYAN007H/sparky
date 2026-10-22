@@ -1,15 +1,14 @@
 use super::*;
+use crate::storage::{Scope, Storage};
 use std::time::Duration;
-use tinystoragedrivers::{MemoryStorage, Scope, StorageBackend};
+use tinystoragedrivers_testkit::memory_storage;
 
 const FRESH: &str = "00112233445566778899aabbccddeeff";
 const OLD: &str = "ffeeddccbbaa99887766554433221100";
 const UPPER: &str = "ABCDEF0123456789ABCDEF0123456789";
 
-fn scoped() -> ScopedStorage {
-    MemoryStorage::new()
-        .for_scope(&Scope::new("module:tinyjuice@local").unwrap())
-        .unwrap()
+fn scoped() -> Storage {
+    memory_storage(&Scope::new("module:tinyjuice@local").unwrap())
 }
 
 fn set_age(path: &Path, age: Duration) {
@@ -36,7 +35,7 @@ fn legacy_root() -> tempfile::TempDir {
     dir
 }
 
-async fn read(scoped: &ScopedStorage, token: &str) -> Option<String> {
+async fn read(scoped: &Storage, token: &str) -> Option<String> {
     scoped
         .blobs()
         .get(&ccr_key(token))

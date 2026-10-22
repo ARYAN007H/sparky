@@ -193,6 +193,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
                 (ChannelControlRequest::Route {
                     workspace_dir: ctx.workspace_dir.to_string_lossy().into_owned(),
                     message: Box::new(msg.clone()),
+                    capabilities: None,
                     route: tinychannels_bus::module_remote::RemoteRoute {
                         provider: current.provider,
                         model: current.model,

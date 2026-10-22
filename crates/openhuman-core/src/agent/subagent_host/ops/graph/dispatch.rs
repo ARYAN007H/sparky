@@ -103,7 +103,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     // the child carrier cannot disagree.
     let thread_id = inherited_thread_id(run_context.thread_id.clone(), thread_id);
     // Where this child's transcript is written: its turn tree's store.
-    let transcripts = super::transcript::subagent_transcripts(&run_context, &workspace_dir);
+    let transcripts = super::transcript::subagent_transcripts(&run_context, &workspace_dir)?;
     tracing::info!(
         model,
         max_iterations,

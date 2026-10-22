@@ -24,7 +24,9 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, Context, Result};
-use tinystoragedrivers::{Capability, ScopedStorage};
+use tinystoragedrivers_types::Capability;
+
+use crate::storage::Storage;
 
 use super::storage_grant_schemas::tinyjuice::MODULE_ID;
 use super::storage_import_support as support;
@@ -66,7 +68,26 @@ pub(crate) async fn import_legacy(
     let Some(scoped) = support::module_scope(ctx, MODULE_ID)? else {
         return Ok(Outcome::NoBackend);
     };
-    import_into(ctx, &scoped, root, ttl, SystemTime::now()).await
+    if !root.is_dir() {
+        return Ok(Outcome::NoSource);
+    }
+    let blobs = scoped.blobs();
+    if ttl.is_some() && !blobs.capabilities().contains(Capability::BlobTtl) {
+        return Ok(Outcome::Unsupported);
+    }
+    let marker = support::marker_id("ccr", root);
+    let root = root.to_owned();
+    let ctx_for_read = ctx.clone();
+    let result =
+        support::with_module_claim(ctx, MODULE_ID, MARKER_COLLECTION, &marker, move |scoped| {
+            crate::storage::block_on_anyhow(async move {
+                import_into(&ctx_for_read, &scoped, &root, ttl, SystemTime::now()).await
+            })
+        })?;
+    let Some(outcome) = result else {
+        return Ok(Outcome::NoBackend);
+    };
+    Ok(outcome)
 }
 
 /// One readable original: its token, text and age.
@@ -78,7 +99,7 @@ struct LegacyOriginal {
 
 async fn import_into(
     ctx: &DispatchCtx,
-    scoped: &ScopedStorage,
+    scoped: &Storage,
     root: &Path,
     ttl: Option<Duration>,
     now: SystemTime,

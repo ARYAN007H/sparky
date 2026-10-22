@@ -29,13 +29,6 @@
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/config/migrations/phase_out_profile_md.rs",
-    "line": 175,
-    "text": "match fs::write(&md_path, cleaned.as_bytes()) {",
-    "occurrence": 1
-  },
-  {
-    "rule": "json-write",
     "path": "crates/openhuman-core/src/config/ops/ui.rs",
     "line": 301,
     "text": "std::fs::write(&flag_path, \"\")",

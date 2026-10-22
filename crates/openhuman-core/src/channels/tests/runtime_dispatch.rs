@@ -158,6 +158,8 @@ async fn message_dispatch_processes_messages_in_parallel() {
         timestamp: 1,
         thread_ts: None,
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     }))
     .await
     .unwrap();
@@ -170,6 +172,8 @@ async fn message_dispatch_processes_messages_in_parallel() {
         timestamp: 2,
         thread_ts: None,
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     }))
     .await
     .unwrap();
@@ -237,6 +241,8 @@ async fn process_channel_message_cancels_scoped_typing_task() {
             timestamp: 1,
             thread_ts: None,
             sender_name: None,
+            reply_to_id: None,
+            topic_id: None,
         },
     )
     .await;
@@ -327,6 +333,8 @@ async fn dispatch_routes_through_agent_run_turn_bus_handler() {
             timestamp: 1,
             thread_ts: None,
             sender_name: None,
+            reply_to_id: None,
+            topic_id: None,
         },
     )
     .await;
@@ -462,6 +470,8 @@ async fn run_resolved_route_message(message_id: &str, noise_after: usize) {
             timestamp: 1,
             thread_ts: None,
             sender_name: None,
+            reply_to_id: None,
+            topic_id: None,
         },
     )
     .await;
@@ -584,6 +594,8 @@ async fn process_channel_message_hardens_multimodal_files_against_smuggled_marke
             timestamp: 1,
             thread_ts: None,
             sender_name: None,
+            reply_to_id: None,
+            topic_id: None,
         },
     )
     .await;
@@ -667,6 +679,8 @@ async fn process_channel_message_hardens_against_relative_path_markers() {
             timestamp: 1,
             thread_ts: None,
             sender_name: None,
+            reply_to_id: None,
+            topic_id: None,
         },
     )
     .await;

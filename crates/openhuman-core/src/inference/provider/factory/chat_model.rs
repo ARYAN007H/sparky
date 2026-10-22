@@ -211,9 +211,14 @@ impl OpenHumanModelFactory<'_> {
                 .parent()
                 .map(std::path::Path::to_path_buf)
                 .unwrap_or_else(|| self.config.workspace_dir.clone());
+            let documents = crate::storage::current_scoped()?
+                .ok_or_else(|| anyhow::anyhow!("storage is unavailable for Claude provider state"))?
+                .documents()
+                .clone();
             let context = tinyagents_harness::host::model_factory::SubprocessProviderContext {
                 workspace_dir: workspace,
                 action_dir: self.config.action_dir.clone(),
+                documents,
                 claude_agent_sdk: (&self.config.claude_agent_sdk).into(),
                 mcp_provider: Some(Arc::new(OpenHumanMcpEndpoint)),
             };

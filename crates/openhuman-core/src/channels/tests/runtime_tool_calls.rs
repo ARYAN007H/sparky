@@ -61,6 +61,8 @@ async fn process_channel_message_executes_native_tool_calls() {
             timestamp: 2,
             thread_ts: None,
             sender_name: None,
+            reply_to_id: None,
+            topic_id: None,
         },
     )
     .await;
@@ -144,6 +146,8 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         timestamp: 1,
         thread_ts: None,
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     };
     let route_key = conversation_history_key(&cmd_msg);
     process_channel_message(runtime_ctx.clone(), cmd_msg).await;
@@ -199,6 +203,8 @@ async fn process_channel_message_uses_route_override_provider_and_model() {
         timestamp: 2,
         thread_ts: None,
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     };
     let route_key = conversation_history_key(&routed_msg);
     let mut route_overrides = HashMap::new();
@@ -300,6 +306,8 @@ async fn process_channel_message_respects_configured_max_tool_iterations_above_d
             timestamp: 1,
             thread_ts: None,
             sender_name: None,
+            reply_to_id: None,
+            topic_id: None,
         },
     )
     .await;
@@ -360,6 +368,8 @@ async fn process_channel_message_reports_configured_max_tool_iterations_limit() 
             timestamp: 2,
             thread_ts: None,
             sender_name: None,
+            reply_to_id: None,
+            topic_id: None,
         },
     )
     .await;

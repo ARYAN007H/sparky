@@ -34,7 +34,7 @@ pub(super) struct ModuleChannelRuntime {
 struct ModuleChannel {
     name: String,
     object: ModuleObjectClient,
-    interaction: tinychannels_bus::ChannelInteractionInfo,
+    interaction: tinychannels_bus::ChannelInteractionInfoV2,
     relay: Option<tinychannels_bus::module_relay::RelayReservation>,
     relay_fronted: bool,
 }
@@ -302,7 +302,11 @@ impl Channel for ModuleChannel {
     }
 
     fn proactive_target(&self) -> Option<String> {
-        self.interaction.proactive_target.clone()
+        self.interaction
+            .capabilities
+            .account
+            .proactive_target
+            .clone()
     }
 
     async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
@@ -378,15 +382,7 @@ impl Channel for ModuleChannel {
     }
 
     fn capabilities(&self) -> tinychannels_bus::ChannelCapabilities {
-        self.interaction.capabilities
-    }
-
-    fn supports_reactions(&self) -> bool {
-        self.interaction.supports_reactions
-    }
-
-    fn supports_draft_updates(&self) -> bool {
-        self.interaction.supports_draft_updates
+        self.interaction.capabilities.clone()
     }
 
     async fn send_draft(&self, message: &SendMessage) -> anyhow::Result<Option<String>> {

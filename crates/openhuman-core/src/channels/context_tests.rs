@@ -65,6 +65,8 @@ fn channel_message(channel: &str) -> traits::ChannelMessage {
         thread_ts: Some("thread-1".into()),
         timestamp: 0,
         sender_name: None,
+        reply_to_id: None,
+        topic_id: None,
     }
 }
 

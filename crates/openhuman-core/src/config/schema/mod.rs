@@ -67,7 +67,9 @@ mod identity_cost;
 mod inbound_debounce;
 pub(crate) mod load;
 pub(crate) use load::config_from_toml_str;
-pub(crate) use load::source::storage_schema::storage_schema as config_storage_schema;
+pub(crate) use load::source::storage_schema::collection_specs as config_storage_collections;
+#[cfg(feature = "legacy-import")]
+pub(crate) use load::source::storage_schema::upgrade_records as upgrade_config_records;
 pub use load::{
     action_dir_env_override, active_user_marker_path, active_workspace_dir,
     active_workspace_dir_cached, active_workspace_snapshot, clear_active_user, default_action_dir,

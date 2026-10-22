@@ -6,6 +6,20 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const CONTRACT_REGISTRY = 'registry+https://github.com/rust-lang/crates.io-index';
+const CONTRACT_GIT_SOURCES = new Map([
+  ['tinystoragedrivers-types', 'https://github.com/tinyhumansai/tinystoragedrivers'],
+]);
+
+function contractSourceAllowed(name, source) {
+  if (source === CONTRACT_REGISTRY) return true;
+  const repository = CONTRACT_GIT_SOURCES.get(name);
+  if (!repository || typeof source !== 'string') return false;
+  const prefix = `git+${repository}?rev=`;
+  if (!source.startsWith(prefix)) return false;
+  const [revision, resolved] = source.slice(prefix.length).split('#');
+  return /^[0-9a-f]{40}$/.test(revision) &&
+    typeof resolved === 'string' && resolved.length >= 8 && revision.startsWith(resolved);
+}
 
 export const CONTRACT_CLOSURE = new Set([
   'serde', 'serde_core', 'serde_derive', 'serde_json', 'itoa', 'memchr', 'zmij',
@@ -14,6 +28,8 @@ export const CONTRACT_CLOSURE = new Set([
   'proc-macro2', 'quote', 'syn', 'unicode-ident',
   // Base64 encoding of serialized binary contract fields; no transport/crypto.
   'base64',
+  // TSD v2's data-only storage contract vocabulary (Scope, specs, errors).
+  'tinystoragedrivers-types',
 ]);
 
 export function isImplementation(name, policy) {
@@ -81,7 +97,7 @@ export function auditGraph(metadata, roots, policy, contract = null) {
       if (path.length > 1) {
         const sourceMismatch = !contract && policy.contractManifests?.[name] &&
           packages.get(id).manifest_path !== policy.contractManifests[name];
-        const forbidden = contract ? !CONTRACT_CLOSURE.has(name) || packages.get(id).source !== CONTRACT_REGISTRY :
+        const forbidden = contract ? !CONTRACT_CLOSURE.has(name) || !contractSourceAllowed(name, packages.get(id).source) :
           isImplementation(name, policy) || sourceMismatch;
         if (forbidden) {
           const scope = contract ?? 'hosts';
