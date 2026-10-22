@@ -31,24 +31,15 @@ pub(crate) async fn admit_runtime_message(
     use tinychannels_bus::module_inbound::{ChannelInboundSource, PrepareChannelInboundRequest};
     let RuntimeChannelMessage {
         message,
-        inbound_envelope,
         authenticated_relay,
         prepared_inbound,
     } = runtime_msg;
     let prepared = match prepared_inbound {
         Some(prepared) => prepared,
         None => {
-            let source = if message.channel.is_empty() {
-                let envelope = inbound_envelope?;
-                ChannelInboundSource::Envelope {
-                    envelope,
-                    timestamp: 0,
-                }
-            } else {
-                ChannelInboundSource::Legacy {
-                    message,
-                    envelope: inbound_envelope,
-                }
+            let source = ChannelInboundSource::Envelope {
+                envelope: message,
+                timestamp: 0,
             };
             match crate::modules::channel_controller::prepare_inbound(
                 &crate::channels::context::module_client(&ctx).await,
@@ -68,30 +59,30 @@ pub(crate) async fn admit_runtime_message(
             }
         }
     };
-    let msg = prepared.message;
+    let msg = prepared.envelope;
     let history_key = prepared.history_key;
-    let mut envelope = prepared.envelope;
-    envelope.access.delivered_via_upstream_relay = authenticated_relay;
+    let mut msg = msg;
+    msg.access.delivered_via_upstream_relay = authenticated_relay;
 
     println!(
         "  💬 [{}] from {}: {}",
-        msg.channel,
-        msg.sender,
-        truncate_with_ellipsis(&msg.content, 80)
+        msg.channel.id,
+        msg.sender.id,
+        truncate_with_ellipsis(&msg.text, 80)
     );
 
     BUS.publish(DomainEvent::ChannelMessageReceived {
-        channel: msg.channel.clone(),
-        message_id: msg.id.clone(),
-        sender: msg.sender.clone(),
-        reply_target: msg.reply_target.clone(),
-        content: msg.content.clone(),
-        thread_ts: msg.thread_ts.clone(),
-        inbound_envelope: Some(envelope),
+        channel: msg.channel.id.clone(),
+        message_id: msg.message_id.clone(),
+        sender: msg.sender.id.clone(),
+        reply_target: msg.conversation.id.clone(),
+        content: msg.text.clone(),
+        thread_ts: msg.conversation.thread_id.clone(),
+        inbound_envelope: Some(msg.clone()),
         workspace_dir: ctx.workspace_dir.as_ref().clone(),
     });
 
-    let target_channel = ctx.channels_by_name.get(&msg.channel).cloned();
+    let target_channel = ctx.channels_by_name.get(&msg.channel.id).cloned();
     if handle_runtime_command_if_needed(ctx.as_ref(), &msg, target_channel.as_ref(), &history_key)
         .await
     {
