@@ -1,12 +1,64 @@
 use super::*;
 use crate::agent::orchestration::background_completions::CompletionTarget;
-use crate::agent::orchestration::subagent_sessions::SubagentSessionStore;
 use crate::agent::subagent_host::{SubagentRunOutcome, SubagentRunStatus};
 use crate::core::runtime::{CoreContext, DispatchCtx};
 use crate::progress::AgentProgress;
 use crate::security::turn_origin::AgentTurnOrigin;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+async fn mark_driver_finished(
+    store: &Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore>,
+    session_id: &str,
+    task_id: &str,
+    status: &SubagentRunStatus,
+    history: &[tinyagents_session::transcript::TranscriptMessage],
+) -> Result<(), String> {
+    let status = match subagent_sessions::DurableSubagentStatus::from_run_status(status) {
+        subagent_sessions::DurableSubagentStatus::Running => {
+            tinyagents_orchestration::subagent::DurableSubagentStatus::Running
+        }
+        subagent_sessions::DurableSubagentStatus::Idle => {
+            tinyagents_orchestration::subagent::DurableSubagentStatus::Idle
+        }
+        subagent_sessions::DurableSubagentStatus::AwaitingUser => {
+            tinyagents_orchestration::subagent::DurableSubagentStatus::AwaitingUser
+        }
+        subagent_sessions::DurableSubagentStatus::Failed => {
+            tinyagents_orchestration::subagent::DurableSubagentStatus::Failed
+        }
+        subagent_sessions::DurableSubagentStatus::Closed => {
+            tinyagents_orchestration::subagent::DurableSubagentStatus::Closed
+        }
+    };
+    let history = tinyagents_runtime::transcript::transcript_to_messages(history);
+    if store
+        .mark_finished(session_id, task_id, status, history)
+        .await
+        .map_err(|error| error.to_string())?
+    {
+        Ok(())
+    } else {
+        Err("driver session no longer belongs to this task".into())
+    }
+}
+
+async fn mark_driver_failed(
+    store: &Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore>,
+    session_id: &str,
+    task_id: &str,
+    error: String,
+) -> Result<(), String> {
+    if store
+        .mark_failed(session_id, task_id, error)
+        .await
+        .map_err(|error| error.to_string())?
+    {
+        Ok(())
+    } else {
+        Err("driver session no longer belongs to this task".into())
+    }
+}
 
 pub(super) fn make_completion(
     completion_core: Option<Arc<CoreContext>>,
@@ -20,7 +72,7 @@ pub(super) fn make_completion(
     background_parent_session: String,
     completion_target: CompletionTarget,
     completion_worker_thread_id: Option<String>,
-    background_store: SubagentSessionStore,
+    background_store: Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore>,
     background_subagent_session_id: String,
     background_parent_thread_id: Option<String>,
 ) -> impl Fn(
@@ -69,13 +121,15 @@ pub(super) fn make_completion(
                         };
                         match status.clone() {
                             SubagentRunStatus::Completed => {
-                                if let Err(err) = subagent_sessions::mark_finished(
+                                if let Err(err) = mark_driver_finished(
                                     &background_store,
                                     &background_subagent_session_id,
                                     &outcome.task_id,
                                     &status,
                                     outcome.final_history.clone(),
-                                ) {
+                                )
+                                .await
+                                {
                                     log::warn!(
                                         "[subagent_reuse] mark_completed failed subagent_session_id={} task_id={} agent_id={} error={}",
                                         background_subagent_session_id,
@@ -136,13 +190,15 @@ pub(super) fn make_completion(
                                 // cap). Mark the session finished and deliver the PARTIAL
                                 // progress back to the parent, framed so it is not
                                 // mistaken for a completed result (#4096).
-                                if let Err(err) = subagent_sessions::mark_finished(
+                                if let Err(err) = mark_driver_finished(
                                     &background_store,
                                     &background_subagent_session_id,
                                     &outcome.task_id,
                                     &status,
                                     outcome.final_history.clone(),
-                                ) {
+                                )
+                                .await
+                                {
                                     log::warn!(
                                         "[subagent_reuse] mark_incomplete failed subagent_session_id={} task_id={} agent_id={} error={}",
                                         background_subagent_session_id,
@@ -201,16 +257,16 @@ pub(super) fn make_completion(
                                 }
                             }
                             SubagentRunStatus::Cancelled => {
-                                let reason = match background_store.load() {
-                                    Ok(rows) => rows
-                                        .into_iter()
-                                        .find(|row| {
-                                            row.subagent_session_id
-                                                == background_subagent_session_id
-                                                && row.current_task_id.as_deref()
-                                                    == Some(outcome.task_id.as_str())
+                                let reason = match background_store
+                                    .get(&background_subagent_session_id)
+                                    .await
+                                {
+                                    Ok(session) => session
+                                        .filter(|session| {
+                                            session.current_task_id.as_deref()
+                                                == Some(outcome.task_id.as_str())
                                         })
-                                        .and_then(|row| row.latest_error),
+                                        .and_then(|session| session.latest_error),
                                     Err(error) => {
                                         log::warn!(
                                             "[subagent_reuse] cancellation reason lookup failed subagent_session_id={} task_id={} error={error}",
@@ -230,13 +286,15 @@ pub(super) fn make_completion(
                                     }
                                     None => "async sub-agent was cancelled".to_string(),
                                 };
-                                if let Err(err) = subagent_sessions::mark_finished(
+                                if let Err(err) = mark_driver_finished(
                                     &background_store,
                                     &background_subagent_session_id,
                                     &outcome.task_id,
                                     &outcome.status,
                                     outcome.final_history.clone(),
-                                ) {
+                                )
+                                .await
+                                {
                                     log::warn!(
                                         "[subagent_reuse] mark_cancelled failed subagent_session_id={} task_id={} agent_id={} error={}",
                                         background_subagent_session_id,
@@ -269,13 +327,15 @@ pub(super) fn make_completion(
                                 ref checkpoint,
                                 ..
                             } => {
-                                if let Err(err) = subagent_sessions::mark_finished(
+                                if let Err(err) = mark_driver_finished(
                                     &background_store,
                                     &background_subagent_session_id,
                                     &outcome.task_id,
                                     &outcome.status,
                                     outcome.final_history.clone(),
-                                ) {
+                                )
+                                .await
+                                {
                                     log::warn!(
                                         "[subagent_reuse] mark_awaiting_user failed subagent_session_id={} task_id={} agent_id={} error={}",
                                         background_subagent_session_id,
@@ -324,12 +384,14 @@ pub(super) fn make_completion(
                             "spawn_subagent",
                             &error,
                         );
-                        if let Err(store_err) = subagent_sessions::mark_failed(
+                        if let Err(store_err) = mark_driver_failed(
                             &background_store,
                             &background_subagent_session_id,
                             &background_task_id,
                             error.clone(),
-                        ) {
+                        )
+                        .await
+                        {
                             log::warn!(
                                 "[subagent_reuse] mark_failed failed subagent_session_id={} task_id={} agent_id={} error={}",
                                 background_subagent_session_id,
