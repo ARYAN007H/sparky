@@ -105,7 +105,6 @@ uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 async-trait = "0.1"
-tinystoragedrivers-testkit = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-testkit" }
 tinymemory-api = { path = "../../vendor/tinymemory/crates/tinymemory-api", features = ["conformance"] }
 dirs = "6"
 zeroize = "1"
