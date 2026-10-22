@@ -53,6 +53,8 @@ use super::delivery_drain::{DrainFence, RECOVERY_BUSY_POLL};
 #[path = "delivery_events.rs"]
 mod delivery_events;
 use crate::core::runtime::CoreContext;
+#[cfg(test)]
+pub(super) use delivery_events::Drain;
 pub(super) use delivery_events::{drain_schedule_in, owning_profiles};
 
 /// Coalesce completions landing within this window into one delivery turn.
