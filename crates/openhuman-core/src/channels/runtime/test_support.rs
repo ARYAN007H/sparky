@@ -1,9 +1,7 @@
 //! Debug-build harnesses for raw integration coverage of the channel runtime.
 
 pub use super::dispatch::test_support::build_channel_context_block_for_test;
-use super::dispatch::{
-    process_channel_message, process_channel_runtime_message, RuntimeChannelMessage,
-};
+use super::dispatch::{process_channel_runtime_message, RuntimeChannelMessage};
 pub use super::startup::test_support::resolve_yuanbao_app_secret_for_test;
 use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, AGENT_RUN_TURN_METHOD};
 use crate::channels::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
@@ -22,7 +20,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tinychannels_bus::context::ChatMessage;
-use tinychannels_bus::{ChannelInboundEnvelope, ChannelOutboundMessage, ChannelRef, ConversationRef, SenderRef};
+use tinychannels_bus::{
+    ChannelInboundEnvelope, ChannelOutboundMessage, ChannelRef, ConversationRef, SenderRef,
+};
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
 
@@ -215,10 +215,7 @@ impl Channel for HarnessChannel {
         deprecated,
         reason = "TinyChannels v0.1.39 exposes drafts only through its v21 test-double method"
     )]
-    async fn send_draft(
-        &self,
-        message: &tinychannels_bus::SendMessage,
-    ) -> Result<Option<String>> {
+    async fn send_draft(&self, message: &tinychannels_bus::SendMessage) -> Result<Option<String>> {
         self.state.sends.lock().await.push(ObservedSend {
             kind: "draft",
             recipient: message.recipient.clone(),
@@ -478,29 +475,31 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
 
     let expected_event_channel = options.channel_name.clone();
 
-    let message = options.inbound_envelope.unwrap_or_else(|| ChannelInboundEnvelope {
-        channel: ChannelRef {
-            id: options.channel_name,
-            account_id: None,
-        },
-        message_id: "m1".to_string(),
-        conversation: ConversationRef {
-            id: "reply".to_string(),
-            thread_id: options.thread_ts,
+    let message = options
+        .inbound_envelope
+        .unwrap_or_else(|| ChannelInboundEnvelope {
+            channel: ChannelRef {
+                id: options.channel_name,
+                account_id: None,
+            },
+            message_id: "m1".to_string(),
+            conversation: ConversationRef {
+                id: "reply".to_string(),
+                thread_id: options.thread_ts,
+                ..Default::default()
+            },
+            sender: SenderRef {
+                id: "alice".to_string(),
+                ..Default::default()
+            },
+            timestamp_unix_ms: Some(1),
+            text: options.content.clone(),
+            parts: vec![tinychannels_bus::channel::ContentPart::Text {
+                text: options.content,
+                markdown_dialect: None,
+            }],
             ..Default::default()
-        },
-        sender: SenderRef {
-            id: "alice".to_string(),
-            ..Default::default()
-        },
-        timestamp_unix_ms: Some(1),
-        text: options.content.clone(),
-        parts: vec![tinychannels_bus::channel::ContentPart::Text {
-            text: options.content,
-            markdown_dialect: None,
-        }],
-        ..Default::default()
-    });
+        });
     process_channel_runtime_message(
         Arc::clone(&ctx),
         RuntimeChannelMessage::with_inbound_envelope(message),
