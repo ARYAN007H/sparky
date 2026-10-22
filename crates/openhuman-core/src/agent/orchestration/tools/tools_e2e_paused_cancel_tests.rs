@@ -6,7 +6,7 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         forget_workspace_for_test, pending_for_ctx,
     };
     use crate::agent::orchestration::subagent_sessions::{
-        DurableSubagentStatus, SubagentSessionStore,
+        DurableSubagentStatus,
     };
     use crate::agent::orchestration::tools::SpawnSubagentTool;
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
@@ -120,7 +120,6 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         }),
         "the asynchronous pause notice is queued independently"
     );
-    let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
     let parent_session = live
         .data
         .parent
@@ -128,9 +127,14 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         .expect("live parent execution context")
         .session_id
         .clone();
-    let before_row = sessions
-        .load()
-        .expect("paused durable session list")
+    let before_row = super::driver_sessions_for_parent(
+        &live.data.dispatch_ctx(),
+        workspace.path(),
+        &parent_session,
+        Some("paused-cancel-rpc-thread"),
+    )
+        .await
+        .expect("paused driver session list")
         .into_iter()
         .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
         .expect("actual paused durable session remains available");
