@@ -79,7 +79,10 @@ fn document_records_cannot_address_other_shared_or_graph_keys() {
         assert!(allowed_collection(collection).is_ok(), "{collection}");
     }
     for (collection, id) in [
-        ("tsd.migrations", "graph/graph.checkpoints/checkpoints_flows_v2"),
+        (
+            "tsd.migrations",
+            "graph/graph.checkpoints/checkpoints_flows_v2",
+        ),
         ("graph.checkpoints", "graph/thread/checkpoint"),
         ("graph.checkpoints", "delegation/thread/checkpoint"),
     ] {
