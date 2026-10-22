@@ -294,10 +294,36 @@ pub(crate) async fn cancel_by_session_in_workspace(
 /// keep running (and later try to deliver) against a thread that no longer
 /// exists. Returns the number of sub-agents cancelled.
 pub(crate) fn cancel_for_thread(ctx: &crate::core::runtime::DispatchCtx, thread_id: &str) -> usize {
-    let _ = (ctx, thread_id);
-    // The production job-registry thread selector is added by the cancellation
-    // owner leaf; the legacy detached-task registry was always empty in hosts.
-    0
+    let Some(core_context) = ctx.resolved() else {
+        return 0;
+    };
+    let Ok(workspace_dir) = core_context.workspace_dir() else {
+        return 0;
+    };
+    let scopes = crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+        ctx,
+        &workspace_dir,
+        thread_id,
+    );
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    >(ctx);
+    let mut cancelled = 0;
+    let mut scopes_seen = Vec::new();
+    for (_, owner) in scopes {
+        let scope = ParentJobScope::new(owner.workspace, thread_id);
+        if scopes_seen.contains(&scope) {
+            continue;
+        }
+        scopes_seen.push(scope.clone());
+        match jobs.cancel_for_thread(&scope) {
+            Ok(count) => cancelled += count,
+            Err(error) => log::warn!(
+                "[running_subagents] driver thread deletion cancellation failed: {error}"
+            ),
+        }
+    }
+    cancelled
 }
 
 /// Abort every running detached sub-agent spawned from chat thread

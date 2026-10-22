@@ -313,12 +313,10 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
 
 #[tokio::test]
 async fn deleting_parent_thread_cancels_driver_child_before_discarding_completions() {
-    use crate::agent::orchestration::background_completions::{
-        self, BackgroundAgentOutcome,
-    };
+    use crate::agent::orchestration::background_completions::{self, BackgroundAgentOutcome};
     use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
-    use crate::threads::store::{CreateConversationThread, blocking};
+    use crate::threads::store::{blocking, CreateConversationThread};
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness::context::RunContext;
     use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
@@ -445,9 +443,7 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
     let job = jobs
         .list()
         .into_iter()
-        .find(|job| {
-            job.status == SubAgentJobStatus::Running && job.agent == "task_manager_agent"
-        })
+        .find(|job| job.status == SubAgentJobStatus::Running && job.agent == "task_manager_agent")
         .expect("spawned child is live in the TinyAgents job registry");
     background_completions::record_outcome(
         &dispatch,
