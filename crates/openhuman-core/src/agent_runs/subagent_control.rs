@@ -132,15 +132,21 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     // A paused job has already returned from that hook, so this
                     // handler settles and reports that one terminal transition.
                     if let Some(paused) = meta.driver_pause.as_ref() {
-                        settle_paused_driver_cancel(
+                        let transitioned = settle_paused_driver_cancel(
                             &ctx,
                             paused,
                             meta.parent_epoch,
                             reason.as_deref(),
                         )
                         .await?;
+                        if !transitioned {
+                            (false, Some("unknown"))
+                        } else {
+                            (true, None)
+                        }
+                    } else {
+                        (true, None)
                     }
-                    (true, None)
                 } else {
                     let summary = match reason.as_deref().map(str::trim).filter(|r| !r.is_empty()) {
                         Some(r) => format!(
@@ -219,14 +225,7 @@ async fn settle_paused_driver_cancel(
         None => "cancelled by user".to_string(),
     };
     let transitioned = store
-        .mark_failed_if_current(
-            &paused.subagent_session_id,
-            &paused.task_id,
-            lifecycle_key,
-            &paused.parent_session,
-            paused.parent_thread_id.as_deref(),
-            error.clone(),
-        )
+        .mark_failed(&paused.subagent_session_id, &paused.task_id, error.clone())
         .await
         .map_err(|error| format!("subagent_cancel: failed to settle paused child: {error}"))?;
     if transitioned {
