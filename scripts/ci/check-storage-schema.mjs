@@ -88,6 +88,9 @@ export function dumpSchema(root = REPO_ROOT, { run: spawn = spawnSync, env = pro
 /** @returns {string[]} one message per violation */
 export function lint(dump) {
   const problems = [];
+  if (!Array.isArray(dump.owners)) {
+    return ['schema dump must group collections under an owners array'];
+  }
   const crates = new Set();
   const names = new Set();
   for (const owner of dump.owners ?? []) {

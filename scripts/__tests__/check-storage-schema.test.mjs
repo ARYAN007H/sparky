@@ -23,6 +23,12 @@ test('a well-formed per-crate schema is clean', () => {
   assert.deepEqual(lint(dump), []);
 });
 
+test('a flattened schema dump is rejected instead of passing as empty', () => {
+  assert.deepEqual(lint({ collections: [collection('cron.jobs')] }), [
+    'schema dump must group collections under an owners array',
+  ]);
+});
+
 test('collection names must be <owner>.<entity> in snake_case', () => {
   const problems = lint({
     owners: [{ crate: 'openhuman', collections: [
