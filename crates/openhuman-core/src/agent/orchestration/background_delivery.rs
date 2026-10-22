@@ -239,29 +239,6 @@ pub(crate) fn recover_on_open(ctx: &DispatchCtx, workspace_dir: &Path, fence: Dr
     scheduled
 }
 
-/// Claim everything ready for a thread **right now** (sync, testable): `None`
-/// (queue untouched) when the thread is busy or nothing is pending. A claimed
-/// batch stays leased until the caller settles it with `mark_delivered` /
-/// `mark_failed` / `release`.
-#[cfg(test)]
-fn claim_ready(
-    ctx: &DispatchCtx,
-    router: &CompletionRouter,
-    thread_id: &str,
-) -> Option<Vec<CompletionRecord>> {
-    if is_busy(ctx, thread_id) {
-        return None;
-    }
-    match router.claim_pending(thread_id, usize::MAX) {
-        Ok(batch) if !batch.is_empty() => Some(batch),
-        Ok(_) => None,
-        Err(error) => {
-            log::error!("[background_delivery] claim failed thread_id={thread_id} error={error}");
-            None
-        }
-    }
-}
-
 /// Drain + deliver pending completions for a thread — if idle and not already
 /// delivering. Batches everything ready at this instant into one system turn.
 async fn try_deliver<D, Fut>(
