@@ -309,7 +309,6 @@ fn install_request_handle_mode_follows_every_switch_it_needs() {
     ] {
         let mut config = crate::config::Config::default();
         flip(&mut config);
-        config.tokenjuice.repl_save_enabled = true;
         let request = install_request(&config);
         assert!(!request.options.repl_handle);
         assert!(!request.ccr_durable);
