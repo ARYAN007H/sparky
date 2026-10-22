@@ -2,7 +2,7 @@ use super::*;
 use crate::security::AutonomyLevel;
 
 #[test]
-fn name_and_permission() {
+fn update_check_name_and_permission() {
     let tool = UpdateCheckTool::new();
     assert_eq!(tool.name(), "update_check");
     assert_eq!(tool.permission_level(), PermissionLevel::ReadOnly);
@@ -55,7 +55,7 @@ fn read_only() -> Arc<SecurityPolicy> {
 }
 
 #[test]
-fn name_and_permission() {
+fn update_apply_name_and_permission() {
     let tool = UpdateApplyTool::new(supervised());
     assert_eq!(tool.name(), "update_apply");
     assert_eq!(tool.permission_level(), PermissionLevel::Dangerous);
