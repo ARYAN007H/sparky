@@ -1,3 +1,4 @@
+use super::worker_thread::append_worker_user_message;
 use super::*;
 use crate::threads::store as conversations;
 

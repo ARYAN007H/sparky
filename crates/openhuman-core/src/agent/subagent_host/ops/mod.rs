@@ -32,9 +32,7 @@ mod worker_mirror;
 mod worker_thread;
 
 pub(crate) use worker_mirror::{mirror_worker_thread, mirror_worker_thread_from_history};
-pub(crate) use worker_thread::{
-    append_reuse_follow_up, append_worker_user_message, create_worker_thread,
-};
+pub(crate) use worker_thread::{append_reuse_follow_up, create_worker_thread};
 
 #[cfg(test)]
 #[path = "worker_thread_tests.rs"]
