@@ -15,53 +15,30 @@ use tinyjuice_bus::types::{AgentTokenjuiceCompression, CompressorKind};
 use tinyjuice_bus::wire::{QueryRequest, QueryResponse};
 use tinytools::{Tool, ToolRunContext, ToolSpec};
 
-/// The host-specific query seam for TinyJuice's shared REPL tools.
-#[async_trait]
-trait QuerySource: Send + Sync {
-    async fn query(
-        &self,
-        ctx: &DispatchCtx,
-        request: QueryRequest,
-    ) -> Result<QueryResponse, String>;
-}
-
 struct ModuleSource(Option<Arc<crate::config::Config>>);
 
 #[async_trait]
-impl QuerySource for ModuleSource {
-    async fn query(
-        &self,
-        ctx: &DispatchCtx,
-        request: QueryRequest,
-    ) -> Result<QueryResponse, String> {
-        match &self.0 {
-            Some(config) => query_for_config(config, request).await,
-            None => query(ctx, request).await,
-        }
-    }
-}
-
-struct QueryBridge(Arc<dyn QuerySource>);
-
-#[async_trait]
-impl tinyjuice_host::repl_tools::QuerySource for QueryBridge {
+impl tinyjuice_host::repl_tools::QuerySource for ModuleSource {
     async fn query(
         &self,
         context: Option<&dyn ToolRunContext>,
         request: QueryRequest,
     ) -> Result<QueryResponse, String> {
         let ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
-        self.0.query(&ctx, request).await
+        match &self.0 {
+            Some(config) => query_for_config(config, request).await,
+            None => query(&ctx, request).await,
+        }
     }
 }
 
 fn host_repl_tools(
-    source: Arc<dyn QuerySource>,
+    source: Arc<dyn tinyjuice_host::repl_tools::QuerySource>,
     limits: ReplLimits,
     artifacts_dir: Option<PathBuf>,
 ) -> Vec<Box<dyn Tool>> {
     tinyjuice_host::repl_tools::repl_tools(
-        Arc::new(QueryBridge(source)),
+        source,
         limits,
         artifacts_dir,
         tinytools_std::filesystem::FileReadTool::MAX_FILE_SIZE_BYTES,
@@ -70,7 +47,10 @@ fn host_repl_tools(
 }
 
 #[cfg(test)]
-fn repl_tools_with(source: Arc<dyn QuerySource>, limits: ReplLimits) -> Vec<Box<dyn Tool>> {
+fn repl_tools_with(
+    source: Arc<dyn tinyjuice_host::repl_tools::QuerySource>,
+    limits: ReplLimits,
+) -> Vec<Box<dyn Tool>> {
     host_repl_tools(source, limits, None)
 }
 
@@ -119,9 +99,7 @@ pub(crate) fn repl_tools_for_recorded(
         .collect();
     tinyjuice_host::repl_tools::repl_tools_with_declarations(
         declarations,
-        Arc::new(QueryBridge(Arc::new(ModuleSource(
-            config.cloned().map(Arc::new),
-        )))),
+        Arc::new(ModuleSource(config.cloned().map(Arc::new))),
         ReplLimits::default(),
         Some(crate::security::policy::tool_result_artifacts_dir(
             workspace_dir,
