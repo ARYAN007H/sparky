@@ -109,7 +109,7 @@ fn tinyjuice_reaches_only_its_blob_prefix() {
         &grant,
         Object::Blobs,
         "Get",
-        json!({"key": "juice/ccr/abc"})
+        json!({"key": "tinyjuice_ccr/abc"})
     ));
     assert!(!allowed(
         &grant,
