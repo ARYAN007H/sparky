@@ -50,12 +50,17 @@ fn declared_collections() -> Vec<CollectionSpec> {
     #[cfg(feature = "modules")]
     {
         collections.extend(tinymcp_bus::storage::collection_specs());
-        collections.extend(tinychannels_bus::storage::collections());
+        collections.extend(
+            tinychannels_bus::storage::collections()
+                .into_iter()
+                .map(CollectionSpec::new),
+        );
         collections.extend(tinyconnectors_bus::storage::collections());
-        collections.extend([
-            CollectionSpec::new("box.boxes"),
-            CollectionSpec::new("box.jail_index"),
-        ]);
+        collections.extend(
+            tinybox_bus::storage::collections()
+                .into_iter()
+                .map(CollectionSpec::new),
+        );
         collections.extend(tinyjuice_bus::storage::collections());
     }
     #[cfg(feature = "web3")]
@@ -65,7 +70,11 @@ fn declared_collections() -> Vec<CollectionSpec> {
             .map(|collection| CollectionSpec::new(collection.name)),
     );
     #[cfg(feature = "tinymemes")]
-    collections.extend(tinymemes_bus::storage::collections());
+    collections.extend(
+        tinymemes_bus::storage::collections()
+            .into_iter()
+            .map(CollectionSpec::new),
+    );
     #[cfg(feature = "inbound-queues")]
     {
         collections.extend(tinyeventqueues_bus::storage::collection_specs());
@@ -80,15 +89,24 @@ pub fn module_collections(owner: &str) -> Vec<CollectionSpec> {
     #[cfg(feature = "modules")]
     match owner {
         "mcp" => return module_owned_collections(tinymcp_bus::storage::collection_specs()),
-        "channels" => return module_owned_collections(tinychannels_bus::storage::collections()),
+        "channels" => {
+            return module_owned_collections(
+                tinychannels_bus::storage::collections()
+                    .into_iter()
+                    .map(CollectionSpec::new)
+                    .collect(),
+            );
+        }
         "connectors" => {
             return module_owned_collections(tinyconnectors_bus::storage::collections());
         }
         "box" => {
-            return module_owned_collections(vec![
-                CollectionSpec::new("box.boxes"),
-                CollectionSpec::new("box.jail_index"),
-            ]);
+            return module_owned_collections(
+                tinybox_bus::storage::collections()
+                    .into_iter()
+                    .map(CollectionSpec::new)
+                    .collect(),
+            );
         }
         "juice" => return module_owned_collections(tinyjuice_bus::storage::collections()),
         _ => {}
@@ -104,7 +122,12 @@ pub fn module_collections(owner: &str) -> Vec<CollectionSpec> {
     }
     #[cfg(feature = "tinymemes")]
     if owner == "memes" {
-        return module_owned_collections(tinymemes_bus::storage::collections());
+        return module_owned_collections(
+            tinymemes_bus::storage::collections()
+                .into_iter()
+                .map(CollectionSpec::new)
+                .collect(),
+        );
     }
     #[cfg(feature = "inbound-queues")]
     if owner == "teq" {
