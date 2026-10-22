@@ -174,7 +174,7 @@ fn import_host_sessions(
                     "subagent_sessions",
                 ))
                 .await?;
-            write_docs
+            match write_docs
                 .put(
                     "subagent_sessions",
                     &session.subagent_session_id,
@@ -182,7 +182,11 @@ fn import_host_sessions(
                     crate::storage::Precondition::Absent,
                 )
                 .await
-                .map(|_| ())
+            {
+                Ok(_) => Ok(()),
+                Err(error) if error.kind() == crate::storage::StorageErrorKind::Conflict => Ok(()),
+                Err(error) => Err(error),
+            }
         })
         .map_err(|error| SubagentError::Persistence(format!("import host sessions: {error}")))?;
     }
