@@ -61,6 +61,41 @@ test('rejects direct calls into TinyChannels provider internals', () => {
   ]);
 });
 
+test('rejects direct calls through a crate alias', () => {
+  const source = [
+    'use tinychannels as tc;',
+    'tc::providers::email_channel::parse("message");',
+  ].join('\n');
+
+  assert.deepEqual(findOwnershipViolations(source, 'tests/email.rs'), [
+    {
+      line: 2,
+      path: 'tinychannels::providers::',
+      reason: 'TinyChannels provider behavior belongs in TinyChannels.',
+    },
+  ]);
+});
+
+test('rejects direct calls through an alias of a grouped implementation prefix', () => {
+  const source = [
+    'use tinychannels::{providers as p};',
+    'p::email_channel::parse("message");',
+  ].join('\n');
+
+  assert.deepEqual(findOwnershipViolations(source, 'tests/email.rs'), [
+    {
+      line: 1,
+      path: 'tinychannels::providers::',
+      reason: 'TinyChannels provider behavior belongs in TinyChannels.',
+    },
+    {
+      line: 2,
+      path: 'tinychannels::providers::',
+      reason: 'TinyChannels provider behavior belongs in TinyChannels.',
+    },
+  ]);
+});
+
 test('expands nested grouped imports of TinyChannels provider internals', () => {
   const source = `
     use tinychannels::{providers::{email_channel::parse}};
