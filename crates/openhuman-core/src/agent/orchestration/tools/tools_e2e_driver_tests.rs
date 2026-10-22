@@ -198,18 +198,18 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
 
     release_first.notify_one();
     release_second.notify_one();
-    let session_port =
-        crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
-            workspace.clone(),
-            "force-fresh-parent-session",
-            Some("force-fresh-parent-thread".into()),
-        );
+    let session_port = crate::agent::orchestration::subagent_sessions::open_for_context(
+        &crate::core::runtime::DispatchCtx::new(Arc::clone(&core)),
+        workspace.clone(),
+        "force-fresh-parent-session",
+        Some("force-fresh-parent-thread".into()),
+        Some((*jobs).clone()),
+    )
+    .expect("open explicitly scoped force-fresh session store");
     let wait = SubAgentJobsTool::new((*jobs).clone())
         .with_fixed_action(tinyagents_harness_tools::subagents::SubAgentJobAction::Await)
         .with_identifier_fields("task_id", "subagent_session_id")
-        .with_sessions(Arc::new(session_port), |_| {
-            "force-fresh-parent-session".to_owned()
-        })
+        .with_sessions(session_port, |_| "force-fresh-parent-session".to_owned())
         .with_owner_scope(Arc::new({
             let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
                 &workspace,
