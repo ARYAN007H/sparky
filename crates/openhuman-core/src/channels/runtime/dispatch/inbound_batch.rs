@@ -3,7 +3,7 @@
 
 use super::processor::AdmittedInbound;
 use crate::inbound_debounce::DebounceItem;
-use tinychannels_bus::channel::ContentPart;
+use tinychannels_bus::channel::{ContentPart, ConversationRef};
 
 const MEDIA_MARKERS: [&str; 5] = ["[IMAGE:", "[FILE:", "[VIDEO:", "[DOCUMENT:", "[Attachment:"];
 

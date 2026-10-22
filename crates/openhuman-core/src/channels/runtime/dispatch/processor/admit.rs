@@ -8,7 +8,7 @@ use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
-use tinychannels_bus as traits;
+use tinychannels_bus::ChannelInboundEnvelope;
 
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 use super::RuntimeChannelMessage;
@@ -17,7 +17,7 @@ use super::RuntimeChannelMessage;
 /// command and not an approval reply.
 #[derive(Debug, Clone)]
 pub(crate) struct AdmittedInbound {
-    pub(crate) msg: traits::ChannelMessage,
+    pub(crate) msg: ChannelInboundEnvelope,
     pub(crate) history_key: String,
 }
 

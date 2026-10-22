@@ -110,8 +110,8 @@ pub(crate) async fn run_message_dispatch_loop(
             match merge_channel_batch(batch) {
                 Some(admitted) => {
                     tracing::debug!(
-                        channel = %admitted.msg.channel,
-                        message_id = %admitted.msg.id,
+                        channel = %admitted.msg.channel.id,
+                        message_id = %admitted.msg.message_id,
                         batch_len,
                         in_flight = turns.len() + 1,
                         held,
