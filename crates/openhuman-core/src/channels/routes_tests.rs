@@ -19,29 +19,29 @@ use tinychannels_bus::{
 use tinytools::{Tool, ToolResult};
 
 fn inbound(
-    message_id: impl Into<String>,
-    sender_id: impl Into<String>,
-    conversation_id: impl Into<String>,
-    text: impl Into<String>,
-    channel_id: impl Into<String>,
+    message_id: String,
+    sender_id: String,
+    conversation_id: String,
+    text: String,
+    channel_id: String,
     thread_id: Option<String>,
 ) -> ChannelInboundEnvelope {
     ChannelInboundEnvelope {
-        message_id: message_id.into(),
+        message_id,
         sender: SenderRef {
-            id: sender_id.into(),
+            id: sender_id,
             ..Default::default()
         },
         conversation: ConversationRef {
-            id: conversation_id.into(),
+            id: conversation_id,
             thread_id,
             ..Default::default()
         },
         channel: ChannelRef {
-            id: channel_id.into(),
+            id: channel_id,
             ..Default::default()
         },
-        text: text.into(),
+        text,
         ..Default::default()
     }
 }
