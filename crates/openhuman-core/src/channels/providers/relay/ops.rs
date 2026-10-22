@@ -263,6 +263,7 @@ pub(crate) async fn run_relay_turn(
                 envelope: None,
             },
             namespace: "main".into(),
+            preparation_mode: Default::default(),
             session_policy: Default::default(),
         },
     )

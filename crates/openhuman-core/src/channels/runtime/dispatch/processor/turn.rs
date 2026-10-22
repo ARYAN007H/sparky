@@ -22,11 +22,41 @@ use super::super::host_agent::{self, HostRoute};
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 use super::RuntimeChannelMessage;
 
+fn channel_inbound_preparation_request(
+    source: tinychannels_bus::module_inbound::ChannelInboundSource,
+    preparation_mode: tinychannels_bus::module_inbound::ChannelInboundPreparationMode,
+) -> tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
+    tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
+        source,
+        namespace: "main".into(),
+        session_policy: Default::default(),
+        preparation_mode,
+    }
+}
+
+fn inbound_console_preview(
+    envelope: &tinychannels_bus::ChannelInboundEnvelope,
+    text: &str,
+) -> String {
+    let contains_audio = envelope.parts.iter().any(|part| {
+        matches!(
+            part,
+            tinychannels_bus::ContentPart::VoiceNote { .. }
+                | tinychannels_bus::ContentPart::Audio { .. }
+        )
+    });
+    if contains_audio {
+        "[voice message]".to_owned()
+    } else {
+        truncate_with_ellipsis(text, 80)
+    }
+}
+
 pub(crate) async fn process_channel_runtime_message(
     ctx: Arc<ChannelRuntimeContext>,
     runtime_msg: RuntimeChannelMessage,
 ) {
-    use tinychannels_bus::module_inbound::{ChannelInboundSource, PrepareChannelInboundRequest};
+    use tinychannels_bus::module_inbound::ChannelInboundSource;
     let RuntimeChannelMessage {
         message,
         inbound_envelope,
@@ -36,6 +66,10 @@ pub(crate) async fn process_channel_runtime_message(
         legacy_history,
         progressive_target,
     } = runtime_msg;
+    let typed_envelope_input = message.channel.is_empty()
+        && inbound_envelope
+            .as_ref()
+            .is_some_and(super::native_media::requires_typed_preparation);
     let prepared = match prepared_inbound {
         Some(prepared) => prepared,
         None => {
@@ -55,11 +89,14 @@ pub(crate) async fn process_channel_runtime_message(
             };
             match crate::modules::channel_controller::prepare_inbound(
                 &crate::channels::context::module_client(&ctx).await,
-                PrepareChannelInboundRequest {
+                channel_inbound_preparation_request(
                     source,
-                    namespace: "main".into(),
-                    session_policy: Default::default(),
-                },
+                    if typed_envelope_input {
+                        tinychannels_bus::module_inbound::ChannelInboundPreparationMode::Typed
+                    } else {
+                        tinychannels_bus::module_inbound::ChannelInboundPreparationMode::LegacyText
+                    },
+                ),
             )
             .await
             {
@@ -75,13 +112,27 @@ pub(crate) async fn process_channel_runtime_message(
     let history_key = prepared.history_key;
     let canonical_session_key = prepared.session_key.clone();
     let mut envelope = prepared.envelope;
+    tracing::debug!(
+        provider_matches_account = envelope
+            .channel
+            .account_id
+            .as_deref()
+            .is_some_and(|account| tinychannels_bus::provider_id(account) == envelope.channel.id),
+        account_present = envelope
+            .channel
+            .account_id
+            .as_deref()
+            .is_some_and(|account| !account.trim().is_empty()),
+        conversation_present = !envelope.conversation.id.trim().is_empty(),
+        message_present = !envelope.message_id.trim().is_empty(),
+        "prepared inbound scope for native channel turn"
+    );
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
     let remote_reset_scope = tinychannels_bus::module_remote::RemoteSessionScope {
         channel: envelope.channel.clone(),
         conversation: envelope.conversation.clone(),
         session_key: canonical_session_key.clone(),
     };
-    crate::channels::host::voice::record_inbound_envelope(&envelope);
     let native_target = if let Some(target) = progressive_target {
         Some(target)
     } else {
@@ -107,7 +158,7 @@ pub(crate) async fn process_channel_runtime_message(
         "  💬 [{}] from {}: {}",
         msg.channel,
         msg.sender,
-        truncate_with_ellipsis(&msg.content, 80)
+        inbound_console_preview(&envelope, &msg.content)
     );
 
     BUS.publish(DomainEvent::ChannelMessageReceived {
@@ -354,6 +405,39 @@ pub(crate) async fn process_channel_runtime_message(
         }
         None => None,
     };
+    let native_preparation = if typed_envelope_input {
+        if let Some(host) = selected_host.as_ref() {
+            let host_dispatch = crate::core::runtime::DispatchCtx::new(Arc::clone(&host.context));
+            match super::native_media::resolve_typed_message(
+                &ctx,
+                &host_dispatch,
+                &host.config,
+                &envelope,
+                &canonical_session_key,
+                &channel_context,
+            )
+            .await
+            {
+                Ok(input) => Some(Ok(input)),
+                Err(error) => Some(Err(error)),
+            }
+        } else {
+            Some(Err("native media has no selected host agent".to_owned()))
+        }
+    } else {
+        None
+    };
+    let (native_message_input, native_staged_parts, native_staged_lease, native_preparation_error) =
+        match native_preparation {
+            Some(Ok(Some(prepared))) => (
+                Some(prepared.message),
+                prepared.staged_parts,
+                Some(prepared.staged_lease),
+                None,
+            ),
+            Some(Ok(None)) | None => (None, Vec::new(), None, None),
+            Some(Err(error)) => (None, Vec::new(), None, Some(error)),
+        };
     let channel_session = selected_host.as_ref().and_then(|host| {
         let account_id = envelope
             .channel
@@ -388,6 +472,7 @@ pub(crate) async fn process_channel_runtime_message(
     let execution = match selected_host {
         Some(host) => {
             let request_id = format!("{}:{}:{}", msg.channel, msg.id, uuid::Uuid::new_v4());
+            crate::channels::host::voice::record_inbound_envelope(&envelope, &tenant, &request_id);
             let trusted = Arc::new(crate::agent::turn_host::TrustedAgentTurn {
                 host_agent: host,
                 channel: msg.channel.clone(),
@@ -405,6 +490,11 @@ pub(crate) async fn process_channel_runtime_message(
                 session_key.clone(),
                 request_id,
                 enriched_message.clone(),
+                native_message_input,
+                native_staged_parts,
+                native_staged_lease,
+                Some(envelope.message_id.clone()),
+                native_preparation_error,
                 trusted,
             )
             .await
@@ -618,3 +708,7 @@ pub(crate) async fn process_channel_runtime_message(
         workspace_dir: ctx.workspace_dir.as_ref().clone(),
     });
 }
+
+#[cfg(test)]
+#[path = "turn_tests.rs"]
+mod tests;

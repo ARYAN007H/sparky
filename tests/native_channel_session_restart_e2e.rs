@@ -16,11 +16,13 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use axum::body::Bytes;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use base64::Engine as _;
 use serde_json::{json, Value};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
@@ -33,13 +35,31 @@ const OTHER_CHAT_TEXT: &str = "remember a separate chat history";
 const AFTER_RESET_TEXT: &str = "this starts a fresh session after new";
 const RESET_AFTER_RESTART_TEXT: &str = "continue the reset conversation after restart";
 const OTHER_AFTER_RESTART_TEXT: &str = "continue the separate chat after restart";
+const NATIVE_FILE_BYTES: &[u8] = b"native file bytes for typed admission";
+
+fn native_image_png() -> &'static [u8] {
+    static PNG: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    PNG.get_or_init(|| {
+        base64::engine::general_purpose::STANDARD
+            .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==")
+            .expect("valid 1x1 PNG fixture")
+    })
+}
 
 #[derive(Default)]
 struct MockState {
     updates: Mutex<VecDeque<Value>>,
     update_offsets: Mutex<Vec<i64>>,
+    served_update_ids: Mutex<Vec<i64>>,
+    file_requests: Mutex<Vec<String>>,
+    file_downloads: Mutex<Vec<String>>,
     completions: Mutex<Vec<Value>>,
     sent_messages: Mutex<Vec<Value>>,
+    transcription_uploads: Mutex<Vec<Vec<u8>>>,
+    voice_file_requests: Mutex<Vec<String>>,
+    voice_download_requests: Mutex<usize>,
+    speech_requests: Mutex<Vec<String>>,
+    sent_voice_uploads: Mutex<Vec<Vec<u8>>>,
 }
 
 struct MockServers {
@@ -54,6 +74,8 @@ async fn start_mock_servers() -> MockServers {
     let state = Arc::new(MockState::default());
     let telegram_app = Router::new()
         .route("/botsession-restart-token/getUpdates", post(get_updates))
+        .route("/botsession-restart-token/getFile", post(get_file))
+        .route("/file/botsession-restart-token/{*path}", get(download_file))
         .route("/botsession-restart-token/sendMessage", post(send_message))
         .route(
             "/botsession-restart-token/editMessageText",
@@ -62,12 +84,19 @@ async fn start_mock_servers() -> MockServers {
         .route("/botsession-restart-token/sendChatAction", post(ok))
         .route("/botsession-restart-token/deleteWebhook", post(ok))
         .route("/botsession-restart-token/getMe", get(get_me))
+        .route(
+            "/file/botsession-restart-token/voice/input.oga",
+            get(download_voice_file),
+        )
+        .route("/botsession-restart-token/sendVoice", post(send_voice))
         .with_state(Arc::clone(&state));
     let inference_app = Router::new()
         .route("/v1/chat/completions", post(chat_completion))
         .route("/v1/models", get(models))
         .route("/auth/me", get(auth_me))
         .route("/settings", get(auth_me))
+        .route("/openai/v1/audio/transcriptions", post(transcribe_voice))
+        .route("/openai/v1/audio/speech", post(synthesize_voice))
         .with_state(Arc::clone(&state));
     let (telegram, telegram_task) = serve(telegram_app).await;
     let (inference, inference_task) = serve(inference_app).await;
@@ -111,7 +140,17 @@ async fn get_updates(State(state): State<Arc<MockState>>, Json(body): Json<Value
             .and_then(Value::as_i64)
             .is_some_and(|id| id >= offset)
     });
-    Json(json!({ "ok": true, "result": updates.iter().cloned().collect::<Vec<_>>() }))
+    let result = updates.iter().cloned().collect::<Vec<_>>();
+    state
+        .served_update_ids
+        .lock()
+        .expect("served Telegram updates")
+        .extend(
+            result
+                .iter()
+                .filter_map(|update| update.get("update_id").and_then(Value::as_i64)),
+        );
+    Json(json!({ "ok": true, "result": result }))
 }
 
 async fn send_message(State(state): State<Arc<MockState>>, Json(body): Json<Value>) -> Json<Value> {
@@ -128,12 +167,68 @@ async fn send_message(State(state): State<Arc<MockState>>, Json(body): Json<Valu
     Json(json!({ "ok": true, "result": { "message_id": id, "chat": { "id": 42 } } }))
 }
 
+async fn get_file(State(state): State<Arc<MockState>>, Json(body): Json<Value>) -> Json<Value> {
+    let file_id = body
+        .get("file_id")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if file_id == "fixture-voice-file" {
+        state
+            .voice_file_requests
+            .lock()
+            .expect("voice file requests")
+            .push(file_id.to_owned());
+        return Json(json!({
+            "ok": true,
+            "result": { "file_path": "voice/input.oga", "file_size": 2575 }
+        }));
+    }
+    state
+        .file_requests
+        .lock()
+        .expect("Telegram getFile requests")
+        .push(file_id.to_owned());
+    let (path, bytes) = match file_id {
+        "typed-image-file" => ("photos/native.png", native_image_png()),
+        "typed-document-file" => ("documents/native.txt", NATIVE_FILE_BYTES),
+        _ => return Json(json!({ "ok": false, "description": "unknown mock file" })),
+    };
+    Json(json!({ "ok": true, "result": { "file_path": path, "file_size": bytes.len() } }))
+}
+
+async fn download_file(
+    State(state): State<Arc<MockState>>,
+    path: axum::extract::Path<String>,
+) -> Response {
+    state
+        .file_downloads
+        .lock()
+        .expect("Telegram file downloads")
+        .push(path.0.clone());
+    let (content_type, bytes) = match path.0.as_str() {
+        "photos/native.png" => ("image/png", native_image_png()),
+        "documents/native.txt" => ("text/plain", NATIVE_FILE_BYTES),
+        _ => return StatusCode::NOT_FOUND.into_response(),
+    };
+    (
+        [(axum::http::header::CONTENT_TYPE, content_type)],
+        bytes.to_vec(),
+    )
+        .into_response()
+}
+
 async fn ok() -> Json<Value> {
     Json(json!({ "ok": true, "result": true }))
 }
 
 async fn models() -> Json<Value> {
-    Json(json!({ "data": [{ "id": "session-model", "object": "model" }] }))
+    Json(json!({
+        "data": [{
+            "id": "gpt-4o",
+            "object": "model",
+            "input_modalities": ["text", "image", "pdf"]
+        }]
+    }))
 }
 
 async fn auth_me() -> Json<Value> {
@@ -142,6 +237,53 @@ async fn auth_me() -> Json<Value> {
 
 async fn get_me() -> Json<Value> {
     Json(json!({ "ok": true, "result": { "id": 9, "is_bot": true, "username": "test_bot" } }))
+}
+
+async fn download_voice_file(State(state): State<Arc<MockState>>) -> impl IntoResponse {
+    *state
+        .voice_download_requests
+        .lock()
+        .expect("voice download requests") += 1;
+    (
+        [(axum::http::header::CONTENT_TYPE, "audio/ogg")],
+        include_bytes!("../vendor/tinychannels/src/providers/telegram/fixtures/sine-ogg-opus.ogg")
+            .as_slice(),
+    )
+}
+
+async fn send_voice(State(state): State<Arc<MockState>>, body: Bytes) -> Json<Value> {
+    state
+        .sent_voice_uploads
+        .lock()
+        .expect("voice uploads")
+        .push(body.to_vec());
+    Json(json!({ "ok": true, "result": { "message_id": 700, "chat": { "id": 42 } } }))
+}
+
+async fn transcribe_voice(State(state): State<Arc<MockState>>, body: Bytes) -> Json<Value> {
+    state
+        .transcription_uploads
+        .lock()
+        .expect("STT uploads")
+        .push(body.to_vec());
+    Json(json!({ "text": "the dictated voice request" }))
+}
+
+async fn synthesize_voice(
+    State(state): State<Arc<MockState>>,
+    Json(body): Json<Value>,
+) -> Json<Value> {
+    state.speech_requests.lock().expect("TTS requests").push(
+        body.get("text")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
+    );
+    let audio = base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        include_bytes!("../vendor/tinyvoice/crates/tinyvoice/tests/fixtures/voice-envelope.wav"),
+    );
+    Json(json!({ "audio_base64": audio, "audio_mime": "audio/wav" }))
 }
 
 async fn chat_completion(State(state): State<Arc<MockState>>, Json(body): Json<Value>) -> Response {
@@ -195,6 +337,19 @@ fn message_update_for(update_id: i64, message_id: i64, chat_id: i64, text: &str)
     })
 }
 
+fn voice_update(update_id: i64, message_id: i64) -> Value {
+    json!({
+        "update_id": update_id,
+        "message": {
+            "message_id": message_id,
+            "date": 1_800_000_000,
+            "from": { "id": 42, "is_bot": false, "first_name": "Ada" },
+            "chat": { "id": 42, "type": "private", "first_name": "Ada" },
+            "voice": { "file_id": "fixture-voice-file", "file_unique_id": "fixture-voice", "duration": 1, "mime_type": "audio/ogg" }
+        }
+    })
+}
+
 fn push_update(state: &MockState, update_id: i64, message_id: i64, text: &str) {
     state
         .updates
@@ -211,13 +366,56 @@ fn push_update_for(state: &MockState, update_id: i64, message_id: i64, chat_id: 
         .push_back(message_update_for(update_id, message_id, chat_id, text));
 }
 
+fn media_update(
+    update_id: i64,
+    message_id: i64,
+    image: bool,
+    document: bool,
+    text: Option<&str>,
+) -> Value {
+    assert!(
+        !(image && document),
+        "a Telegram message has one media object"
+    );
+    let mut message = json!({
+        "message_id": message_id,
+        "date": 1_800_000_000,
+        "from": { "id": 42, "is_bot": false, "first_name": "Ada" },
+        "chat": { "id": 42, "type": "private", "first_name": "Ada" }
+    });
+    if image {
+        message["photo"] = json!([{
+            "file_id": "typed-image-file",
+            "file_unique_id": "typed-image-unique",
+            "file_size": native_image_png().len()
+        }]);
+    }
+    if document {
+        message["document"] = json!({
+            "file_id": "typed-document-file",
+            "file_unique_id": "typed-document-unique",
+            "file_name": "native.txt",
+            "mime_type": "text/plain",
+            "file_size": NATIVE_FILE_BYTES.len()
+        });
+    }
+    if let Some(text) = text {
+        if image || document {
+            message["caption"] = json!(text);
+        } else {
+            message["text"] = json!(text);
+        }
+    }
+    json!({ "update_id": update_id, "message": message })
+}
+
 fn write_config(home: &Path, workspace: &Path, inference: &str) {
     let openhuman_dir = home.join(".openhuman");
     std::fs::create_dir_all(&openhuman_dir).expect("create OpenHuman config dir");
     std::fs::create_dir_all(workspace).expect("create workspace");
     let config = format!(
-        r#"default_model = "mock:session-model"
-chat_provider = "mock:session-model"
+        r#"default_model = "openai:gpt-4o"
+chat_provider = "openai:gpt-4o"
 api_url = "{inference}"
 default_temperature = 0.0
 
@@ -238,13 +436,16 @@ bot_token = "{BOT_TOKEN}"
 allowed_users = ["42", "43"]
 mention_only = false
 
+[channel_voice]
+reply_mode = "mirror"
+
 [[cloud_providers]]
 id = "p_session_restart"
-slug = "mock"
+slug = "openai"
 label = "Session restart mock"
 endpoint = "{inference}/v1"
 auth_style = "none"
-default_model = "session-model"
+default_model = "gpt-4o"
 "#
     );
     std::fs::write(openhuman_dir.join("config.toml"), &config).expect("write config");
@@ -296,6 +497,7 @@ fn start_core(
     inference: &str,
     module_source_dir: &Path,
     log_path: &Path,
+    voice_enabled: bool,
 ) -> (CoreProcess, String) {
     let port = std::net::TcpListener::bind("127.0.0.1:0")
         .expect("reserve core port")
@@ -315,7 +517,7 @@ fn start_core(
             "RUST_LOG",
             "tinychannels=debug,tinychannels::remote=debug,tinychannels_module=debug,tinychannels_module::service=debug,tinystoragedrivers=debug,openhuman::storage_host=info,openhuman_core::channels=debug",
         )
-        .env("OPENHUMAN_MODEL", "mock:session-model")
+        .env("OPENHUMAN_MODEL", "openai:gpt-4o")
         .env("OPENHUMAN_BACKEND_API_KEY", MOCK_API_KEY)
         .env("BACKEND_URL", inference)
         .env("OPENHUMAN_API_URL", inference)
@@ -348,6 +550,7 @@ fn start_core(
             ]
             .map(|name| (format!("OPENHUMAN_COMPONENT_{name}"), "0")),
         )
+        .env("OPENHUMAN_COMPONENT_VOICE", if voice_enabled { "1" } else { "0" })
         .stdout(Stdio::from(stdout))
         .stderr(Stdio::from(stderr))
         .spawn()
@@ -373,18 +576,25 @@ async fn wait_until(label: &str, mut condition: impl FnMut() -> bool) {
 async fn wait_for_new_session_reply(state: &MockState) {
     let deadline = Instant::now() + Duration::from_secs(45);
     loop {
-        let sent = state.sent_messages.lock().expect("Telegram sent messages");
-        if sent.iter().any(|body| {
-            body["text"]
-                .as_str()
-                .is_some_and(|text| text.contains("Started new session"))
-        }) {
+        let (has_reply, sent_snapshot) = {
+            let sent = state.sent_messages.lock().expect("Telegram sent messages");
+            (
+                sent.iter().any(|body| {
+                    body["text"]
+                        .as_str()
+                        .is_some_and(|text| text.contains("Started new session"))
+                }),
+                sent.clone(),
+            )
+        };
+        if has_reply {
             return;
         }
         if Instant::now() >= deadline {
-            panic!("timed out waiting for Telegram /new reply; outbound bodies: {sent:#?}");
+            panic!(
+                "timed out waiting for Telegram /new reply; outbound bodies: {sent_snapshot:#?}"
+            );
         }
-        drop(sent);
         sleep(Duration::from_millis(50)).await;
     }
 }
@@ -426,8 +636,23 @@ async fn wait_for_completion(state: &MockState, count: usize) {
                 .lock()
                 .expect("Telegram sent messages")
                 .clone();
+            let served_update_ids = state
+                .served_update_ids
+                .lock()
+                .expect("served Telegram updates")
+                .clone();
+            let file_requests = state
+                .file_requests
+                .lock()
+                .expect("Telegram getFile requests")
+                .clone();
+            let file_downloads = state
+                .file_downloads
+                .lock()
+                .expect("Telegram file downloads")
+                .clone();
             panic!(
-                "timed out waiting for model request {count}; observed {model_requests} model requests, Telegram offsets {offsets:?}, and outbound bodies {sent_messages:#?}"
+                "timed out waiting for model request {count}; observed {model_requests} model requests, Telegram offsets {offsets:?}, served updates {served_update_ids:?}, getFile requests {file_requests:?}, file downloads {file_downloads:?}, and outbound bodies {sent_messages:#?}"
             );
         }
         sleep(Duration::from_millis(50)).await;
@@ -447,10 +672,216 @@ async fn wait_for_completion(state: &MockState, count: usize) {
             break;
         }
         if Instant::now() >= deadline {
-            panic!("timed out waiting for final Telegram reply {count}; captured outbound bodies: {sent_messages:#?}");
+            panic!(
+                "timed out waiting for final Telegram reply {count}; captured outbound bodies: {sent_messages:#?}"
+            );
         }
         sleep(Duration::from_millis(50)).await;
     }
+}
+
+fn assert_model_received_typed_image(request: &Value) {
+    use base64::Engine as _;
+    let content = last_user_content(request).expect("image user content is present");
+    let image = find_block_type(content, "image_url").unwrap_or_else(|| {
+        fn collect_shape(value: &Value, types: &mut Vec<String>, fields: &mut Vec<String>) {
+            match value {
+                Value::Array(items) => {
+                    for item in items {
+                        collect_shape(item, types, fields);
+                    }
+                }
+                Value::Object(object) => {
+                    if let Some(kind) = object.get("type").and_then(Value::as_str) {
+                        types.push(kind.to_owned());
+                    }
+                    for (name, item) in object {
+                        fields.push(name.clone());
+                        collect_shape(item, types, fields);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let messages = request["messages"].as_array().expect("request messages");
+        let shapes = messages
+            .iter()
+            .enumerate()
+            .map(|(index, message)| {
+                let content = &message["content"];
+                let mut types = Vec::new();
+                let mut fields = Vec::new();
+                collect_shape(content, &mut types, &mut fields);
+                fields.sort();
+                fields.dedup();
+                let serialized = serde_json::to_string(content).unwrap_or_default();
+                format!(
+                    "message={index} role={} content_kind={} block_types={types:?} fields={fields:?} staged_ref={} image_data_url={}",
+                    message["role"].as_str().unwrap_or("unknown"),
+                    match content {
+                        Value::Array(_) => "array",
+                        Value::Object(_) => "object",
+                        Value::String(_) => "string",
+                        _ => "other",
+                    },
+                    serialized.contains("openhuman-staged://"),
+                    serialized.contains("data:image/")
+                )
+            })
+            .collect::<Vec<_>>();
+        panic!("image is missing from typed model content; safe request shape: {shapes:?}");
+    });
+    let url = image["image_url"]["url"]
+        .as_str()
+        .expect("typed image carries a data URL");
+    let (header, data) = url
+        .split_once(',')
+        .expect("typed image data URL has a payload");
+    assert_eq!(header, "data:image/png;base64");
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(data)
+        .expect("image data URL payload is base64");
+    assert!(decoded.starts_with(b"\x89PNG\r\n\x1a\n"));
+    assert!(decoded.ends_with(b"IEND\xaeB`\x82"));
+}
+
+fn assert_model_received_file_content(request: &Value) {
+    let content = last_user_content(request).expect("file user content is present");
+    if let Some(document) = ["input_file", "document", "file"]
+        .into_iter()
+        .find_map(|kind| find_block_type(content, kind))
+    {
+        let encoded = serde_json::to_string(document).expect("serialize typed document");
+        assert!(encoded.contains("text/plain"), "typed file MIME: {encoded}");
+        let base64 = base64::engine::general_purpose::STANDARD.encode(NATIVE_FILE_BYTES);
+        assert!(
+            encoded.contains(&base64)
+                || encoded.contains(std::str::from_utf8(NATIVE_FILE_BYTES).unwrap()),
+            "typed document carries the downloaded file bytes: {encoded}"
+        );
+    } else {
+        if !content_has_text_block(content, std::str::from_utf8(NATIVE_FILE_BYTES).unwrap()) {
+            let serialized = serde_json::to_string(content).unwrap_or_default();
+            panic!(
+                "unsupported Document input must reach the model as extracted literal text; safe content shape: kind={} block_types={:?} staged_ref={} file_bytes_text={} file_bytes_base64={} caption={}",
+                match content {
+                    Value::Array(_) => "array",
+                    Value::Object(_) => "object",
+                    Value::String(_) => "string",
+                    _ => "other",
+                },
+                content_block_types(content),
+                serialized.contains("openhuman-staged://"),
+                serialized.contains(std::str::from_utf8(NATIVE_FILE_BYTES).unwrap()),
+                serialized.contains(&base64::engine::general_purpose::STANDARD.encode(NATIVE_FILE_BYTES)),
+                serialized.contains("file caption before media")
+            );
+        }
+    }
+    let text_blocks = collect_text_blocks(content);
+    let encoded = base64::engine::general_purpose::STANDARD.encode(NATIVE_FILE_BYTES);
+    assert!(text_blocks.iter().all(|text| !text.contains(&encoded)));
+}
+
+fn assert_request_retains_native_file(request: &Value) {
+    let content = &request["messages"];
+    if let Some(document) = ["input_file", "document", "file"]
+        .into_iter()
+        .find_map(|kind| find_block_type(content, kind))
+    {
+        let encoded = serde_json::to_string(document).expect("serialize historical document");
+        assert!(encoded.contains("text/plain"));
+        let base64 = base64::engine::general_purpose::STANDARD.encode(NATIVE_FILE_BYTES);
+        assert!(
+            encoded.contains(&base64)
+                || encoded.contains(std::str::from_utf8(NATIVE_FILE_BYTES).unwrap()),
+            "historical typed document retains its bytes"
+        );
+    } else {
+        assert!(
+            content_has_text_block(content, std::str::from_utf8(NATIVE_FILE_BYTES).unwrap()),
+            "historical file is available as extracted literal text"
+        );
+    }
+}
+
+fn find_block_type<'a>(value: &'a Value, expected: &str) -> Option<&'a Value> {
+    match value {
+        Value::Array(items) => items
+            .iter()
+            .find_map(|item| find_block_type(item, expected)),
+        Value::Object(fields) => {
+            if fields.get("type").and_then(Value::as_str) == Some(expected) {
+                return Some(value);
+            }
+            fields
+                .values()
+                .find_map(|item| find_block_type(item, expected))
+        }
+        _ => None,
+    }
+}
+
+fn content_block_types(value: &Value) -> Vec<String> {
+    match value {
+        Value::Array(items) => items.iter().flat_map(content_block_types).collect(),
+        Value::Object(fields) => {
+            let mut kinds = fields
+                .get("type")
+                .and_then(Value::as_str)
+                .map(|kind| vec![kind.to_owned()])
+                .unwrap_or_default();
+            kinds.extend(fields.values().flat_map(content_block_types));
+            kinds
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn content_has_text_block(value: &Value, expected: &str) -> bool {
+    match value {
+        Value::String(text) => text.contains(expected),
+        Value::Array(items) => items
+            .iter()
+            .any(|item| content_has_text_block(item, expected)),
+        Value::Object(fields) => {
+            (fields.get("type").and_then(Value::as_str) == Some("text")
+                && fields
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .is_some_and(|text| text.contains(expected)))
+                || fields
+                    .values()
+                    .any(|item| content_has_text_block(item, expected))
+        }
+        _ => false,
+    }
+}
+
+fn collect_text_blocks(value: &Value) -> Vec<&str> {
+    match value {
+        Value::String(text) => vec![text],
+        Value::Array(items) => items.iter().flat_map(collect_text_blocks).collect(),
+        Value::Object(fields) => {
+            let mut text = Vec::new();
+            if fields.get("type").and_then(Value::as_str) == Some("text") {
+                if let Some(value) = fields.get("text").and_then(Value::as_str) {
+                    text.push(value);
+                }
+            }
+            text.extend(fields.values().flat_map(collect_text_blocks));
+            text
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn last_user_content(request: &Value) -> Option<&Value> {
+    request["messages"]
+        .as_array()?
+        .iter()
+        .rev()
+        .find_map(|message| (message["role"] == "user").then(|| &message["content"]))
 }
 
 fn model_saw_user_text(request: &Value, text: &str) -> bool {
@@ -508,6 +939,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         &mocks.inference,
         &module_source_dir,
         &logs.join("first.log"),
+        false,
     );
     wait_healthy(&first_rpc, &mut first, &logs.join("first.log")).await;
     let first_pid = first.child.id();
@@ -597,6 +1029,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         &mocks.inference,
         &module_source_dir,
         &logs.join("second.log"),
+        false,
     );
     assert_ne!(
         first_pid,
@@ -646,4 +1079,354 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
     assert!(!model_saw_user_text(other_chat_request, AFTER_RESET_TEXT));
     wait_for_completion(&mocks.state, 5).await;
     second.stop();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() {
+    let tmp = tempfile::tempdir().expect("temporary core home");
+    let home = std::fs::canonicalize(tmp.path()).expect("canonicalize temporary home");
+    let workspace = home.join("workspace");
+    let logs = home.join("logs");
+    std::fs::create_dir_all(&logs).expect("create logs");
+    let module_source_dir = std::env::var_os("OPENHUMAN_TEST_MODULE_SOURCE_DIR")
+        .map(std::path::PathBuf::from)
+        .expect("build TinyChannels and set OPENHUMAN_TEST_MODULE_SOURCE_DIR");
+    assert!(module_source_dir
+        .join("tinychannels/modules.toml")
+        .is_file());
+
+    let mocks = start_mock_servers().await;
+    write_config(&home, &workspace, &mocks.inference);
+    let (mut core, core_rpc) = start_core(
+        &home,
+        &workspace,
+        &mocks.telegram,
+        &mocks.inference,
+        &module_source_dir,
+        &logs.join("typed-media.log"),
+        false,
+    );
+    wait_healthy(&core_rpc, &mut core, &logs.join("typed-media.log")).await;
+
+    push_media_update(&mocks.state, media_update(200, 20, true, false, None));
+    wait_for_media_fetch(&mocks.state, 200, "typed-image-file", "photos/native.png").await;
+    wait_for_completion(&mocks.state, 1).await;
+    push_media_update(&mocks.state, media_update(201, 21, false, true, None));
+    wait_for_media_fetch(
+        &mocks.state,
+        201,
+        "typed-document-file",
+        "documents/native.txt",
+    )
+    .await;
+    wait_for_completion(&mocks.state, 2).await;
+    push_media_update(
+        &mocks.state,
+        media_update(202, 22, true, false, Some("image caption before media")),
+    );
+    wait_for_media_fetch(&mocks.state, 202, "typed-image-file", "photos/native.png").await;
+    wait_for_completion(&mocks.state, 3).await;
+    push_media_update(
+        &mocks.state,
+        media_update(203, 23, false, true, Some("file caption before media")),
+    );
+    wait_for_media_fetch(
+        &mocks.state,
+        203,
+        "typed-document-file",
+        "documents/native.txt",
+    )
+    .await;
+    wait_for_completion(&mocks.state, 4).await;
+
+    let requests = mocks
+        .state
+        .completions
+        .lock()
+        .expect("model requests")
+        .clone();
+    assert_eq!(
+        requests.len(),
+        4,
+        "each media update reaches the model once"
+    );
+    assert_model_received_typed_image(&requests[0]);
+    assert_model_received_file_content(&requests[1]);
+    let image_mixed = serde_json::to_string(
+        last_user_content(&requests[2]).expect("mixed image user message is present"),
+    )
+    .expect("serialize mixed image user content");
+    let image_caption = image_mixed
+        .find("image caption before media")
+        .expect("image caption text is present");
+    let image = image_mixed
+        .find("image_url")
+        .expect("mixed image is still a typed image block");
+    assert!(image_caption < image, "image part order: {image_mixed}");
+
+    assert_model_received_file_content(&requests[3]);
+    let file_content = last_user_content(&requests[3]).expect("mixed file user message is present");
+    let file_mixed = serde_json::to_string(file_content).expect("serialize mixed file content");
+    let file_caption = file_mixed
+        .find("file caption before media")
+        .expect("file caption text is present");
+    let typed_file = ["input_file", "document", "file"]
+        .into_iter()
+        .find_map(|kind| find_block_type(file_content, kind))
+        .and_then(|document| serde_json::to_string(document).ok())
+        .and_then(|document| file_mixed.find(&document));
+    let file_position = typed_file.or_else(|| {
+        file_mixed.find(std::str::from_utf8(NATIVE_FILE_BYTES).expect("fixture is UTF-8"))
+    });
+    let file_position = file_position.expect("file reaches model as a document or extracted text");
+    assert!(
+        file_caption < file_position,
+        "file part order: {file_mixed}"
+    );
+    for request in &requests {
+        let serialized = serde_json::to_string(request).unwrap();
+        assert!(!serialized.contains("typed-image-file"));
+        assert!(!serialized.contains("typed-document-file"));
+        assert!(!serialized.contains("photos/native.png"));
+        assert!(!serialized.contains("documents/native.txt"));
+    }
+    let first_pid = core.child.id();
+    core.stop();
+
+    // A new process must resolve committed native media from the same scoped
+    // claims while preparing the next text-only turn.
+    push_update(
+        &mocks.state,
+        204,
+        24,
+        "continue the conversation after native media restart",
+    );
+    let (mut restarted, restarted_rpc) = start_core(
+        &home,
+        &workspace,
+        &mocks.telegram,
+        &mocks.inference,
+        &module_source_dir,
+        &logs.join("typed-media-restarted.log"),
+        false,
+    );
+    assert_ne!(
+        first_pid,
+        restarted.child.id(),
+        "media resume uses a new process"
+    );
+    wait_healthy(
+        &restarted_rpc,
+        &mut restarted,
+        &logs.join("typed-media-restarted.log"),
+    )
+    .await;
+    wait_for_completion(&mocks.state, 5).await;
+    let resumed = mocks
+        .state
+        .completions
+        .lock()
+        .expect("model requests")
+        .get(4)
+        .cloned()
+        .expect("post-restart text reached the model");
+    assert!(model_saw_user_text(
+        &resumed,
+        "continue the conversation after native media restart"
+    ));
+    assert!(find_block_type(&resumed["messages"], "image_url").is_some());
+    assert_request_retains_native_file(&resumed);
+    restarted.stop();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[cfg(feature = "voice")]
+async fn telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_modules() {
+    let tmp = tempfile::tempdir().expect("temporary core home");
+    let home = std::fs::canonicalize(tmp.path()).expect("canonicalize temporary home");
+    let workspace = home.join("workspace");
+    let logs = home.join("logs");
+    std::fs::create_dir_all(&logs).expect("create logs");
+    let module_source_dir = std::env::var_os("OPENHUMAN_TEST_MODULE_SOURCE_DIR")
+        .map(std::path::PathBuf::from)
+        .expect("build TinyChannels and TinyVoice and set OPENHUMAN_TEST_MODULE_SOURCE_DIR");
+    for module in ["tinychannels", "tinyvoice"] {
+        assert!(
+            module_source_dir
+                .join(module)
+                .join("modules.toml")
+                .is_file(),
+            "compiled {module} descriptor missing from {}",
+            module_source_dir.display()
+        );
+    }
+
+    let mocks = start_mock_servers().await;
+    write_config(&home, &workspace, &mocks.inference);
+    let (mut core, rpc) = start_core(
+        &home,
+        &workspace,
+        &mocks.telegram,
+        &mocks.inference,
+        &module_source_dir,
+        &logs.join("voice.log"),
+        true,
+    );
+    wait_healthy(&rpc, &mut core, &logs.join("voice.log")).await;
+    mocks
+        .state
+        .updates
+        .lock()
+        .expect("Telegram updates")
+        .push_back(voice_update(200, 20));
+
+    wait_until("voice note reaches inference", || {
+        !mocks
+            .state
+            .completions
+            .lock()
+            .expect("model requests")
+            .is_empty()
+    })
+    .await;
+
+    let requests = mocks
+        .state
+        .completions
+        .lock()
+        .expect("model requests")
+        .clone();
+    assert_eq!(
+        requests.len(),
+        1,
+        "one inbound voice update produces one agent turn"
+    );
+    assert!(
+        model_saw_user_text(&requests[0], "the dictated voice request"),
+        "the model receives the transcript produced by the scoped cloud STT callback; file requests={:?}, downloads={}, transcription uploads={}",
+        mocks
+            .state
+            .voice_file_requests
+            .lock()
+            .expect("voice file requests"),
+        mocks
+            .state
+            .voice_download_requests
+            .lock()
+            .expect("voice download requests"),
+        mocks
+            .state
+            .transcription_uploads
+            .lock()
+            .expect("STT uploads")
+            .len()
+    );
+    assert_eq!(
+        mocks
+            .state
+            .transcription_uploads
+            .lock()
+            .expect("STT uploads")
+            .len(),
+        1,
+        "Telegram voice media is downloaded and transcribed once"
+    );
+    assert!(
+        mocks
+            .state
+            .transcription_uploads
+            .lock()
+            .expect("STT uploads")[0]
+            .windows(4)
+            .any(|window| window == b"OggS"),
+        "the cloud STT mock receives the downloaded audio multipart payload"
+    );
+    assert_eq!(
+        mocks
+            .state
+            .voice_file_requests
+            .lock()
+            .expect("voice file requests")
+            .as_slice(),
+        &["fixture-voice-file"],
+        "the real Telegram voice file ID is resolved before scoped transcription"
+    );
+    wait_until("mirror reply reaches Telegram sendVoice", || {
+        !mocks
+            .state
+            .sent_voice_uploads
+            .lock()
+            .expect("voice uploads")
+            .is_empty()
+    })
+    .await;
+    assert_eq!(
+        mocks
+            .state
+            .speech_requests
+            .lock()
+            .expect("TTS requests")
+            .as_slice(),
+        &["mock reply 1"]
+    );
+    assert!(
+        mocks
+            .state
+            .sent_voice_uploads
+            .lock()
+            .expect("voice uploads")[0]
+            .windows(4)
+            .any(|window| window == b"OggS"),
+        "TinyVoice converts the WAV TTS response to Ogg before Telegram sendVoice"
+    );
+    let voice_log = std::fs::read_to_string(logs.join("voice.log"))
+        .expect("read captured core log after voice delivery");
+    assert!(
+        voice_log.contains("[voice message]"),
+        "captured core log should retain the content-free voice preview"
+    );
+    assert!(
+        !voice_log.contains("the dictated voice request"),
+        "voice transcripts must not be written to the core log"
+    );
+    core.stop();
+}
+
+fn push_media_update(state: &MockState, update: Value) {
+    state
+        .updates
+        .lock()
+        .expect("Telegram updates")
+        .push_back(update);
+}
+
+async fn wait_for_media_fetch(state: &MockState, update_id: i64, file_id: &str, file_path: &str) {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        let served = state
+            .served_update_ids
+            .lock()
+            .expect("served Telegram updates")
+            .contains(&update_id);
+        let metadata = state
+            .file_requests
+            .lock()
+            .expect("Telegram getFile requests")
+            .iter()
+            .any(|request| request == file_id);
+        let downloaded = state
+            .file_downloads
+            .lock()
+            .expect("Telegram file downloads")
+            .iter()
+            .any(|download| download == file_path);
+        assert!(
+            Instant::now() < deadline,
+            "media update {update_id} did not reach file fetch: served={served}, getFile={metadata}, downloaded={downloaded}"
+        );
+        if served && metadata && downloaded {
+            return;
+        }
+        sleep(Duration::from_millis(25)).await;
+    }
 }

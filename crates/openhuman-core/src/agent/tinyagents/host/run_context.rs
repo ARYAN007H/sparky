@@ -29,48 +29,9 @@ use tinyagents_harness::store::InMemoryStore as ToolResultArtifactIndexStore;
 use tinyagents_harness::turn_outcome::{ToolCallOutcome, ToolOutcomeSink};
 use tinyinference_llm::model::ResolvedModelRoute;
 
-/// Allocate a durable-unique root [`RunConfig`](tinyagents_harness::context::RunConfig).
-///
-/// A root config id is a cross-turn lifecycle identity, not a display label:
-/// callers must retain the returned config/id for every boundary belonging to
-/// that one root turn. Child configs are derived with [`RunContext::child`],
-/// never by reusing a root literal such as `"agent_turn"`.
-pub(crate) fn fresh_root_run_config(kind: &str) -> tinyagents_harness::context::RunConfig {
-    tinyagents_harness::context::RunConfig::new(format!("{kind}-{}", uuid::Uuid::new_v4()))
-}
-
-/// Builds an owned direct child for the neutral subagent lifecycle.
-///
-/// The durable key is derived from `parent` *before* a child exists, preserving
-/// the parent's root id, immediate run id, and thread. `child_config.run_id`
-/// must be a durable-unique child execution id; this helper cannot prove global
-/// uniqueness for a caller-supplied value. The resulting TinyAgents and
-/// OpenHuman cancellation carriers are the same shared token, so either the
-/// lifecycle executor or host child observes cancellation across the tree.
-pub(crate) fn direct_subagent_child(
-    parent: &tinyagents_harness::context::RunContext<OpenHumanRunContext>,
-    task_id: impl Into<String>,
-    child_config: tinyagents_harness::context::RunConfig,
-) -> tinyagents_harness::Result<(
-    tinyagents_orchestration::subagent::SubagentTaskKey,
-    tinyagents_harness::context::RunContext<OpenHumanRunContext>,
-)> {
-    let task_id = task_id.into();
-    let task_key =
-        tinyagents_orchestration::subagent::SubagentTaskKey::from_context(parent, task_id, None);
-    let child_data = parent
-        .data
-        .child()
-        .with_cancellation(parent.cancellation.clone());
-    let mut child = parent.child(child_config, child_data)?;
-    // TinyAgents gives the child a linked `child_token()` of the parent's, so a
-    // parent cancel cascades down but cancelling the child (policy timeout,
-    // steering) leaves the parent running. Point the host carrier at that same
-    // child token; otherwise it keeps the parent's token and the host tools
-    // observe (and could trigger) the wrong scope.
-    child.data.cancellation = child.cancellation.clone();
-    Ok((task_key, child))
-}
+#[path = "run_context_subagents.rs"]
+mod subagents;
+pub(crate) use subagents::{direct_subagent_child, fresh_root_run_config};
 
 /// One delegated run's token and cost totals, retained for the parent-turn
 /// usage breakdown.
@@ -321,6 +282,12 @@ pub struct OpenHumanRunContext {
     pub(crate) tool_result_artifact_index: Option<Arc<ToolResultArtifactIndexStore>>,
     /// Current-turn attachment placeholders forwarded to vision delegates.
     pub attachment_placeholders: Arc<Vec<String>>,
+    /// Opaque native media refs issued for this exact root channel turn.
+    pub(crate) native_staged_parts: Vec<tinychannels_bus::ContentPart>,
+    /// Final-owner cleanup state for root native refs; children never inherit it.
+    pub(crate) native_staged_lease: Option<crate::threads::attachments::NativeStagedLease>,
+    /// Provider message identity for durable post-commit claims.
+    pub(crate) native_message_id: Option<String>,
     /// Dispatch guard shared by synchronous delegates in this run.
     pub dispatch: Option<Arc<TurnDispatchState>>,
     /// Optional task recency restriction for integration tools.
@@ -457,6 +424,9 @@ impl OpenHumanRunContext {
             file_state_agent_id: None,
             tool_result_artifact_index: None,
             attachment_placeholders: Arc::new(Vec::new()),
+            native_staged_parts: Vec::new(),
+            native_staged_lease: None,
+            native_message_id: None,
             dispatch: None,
             task_recency_window: None,
             command_environment: None,
@@ -596,6 +566,9 @@ impl OpenHumanRunContext {
         self.command_environment = env.command_environment.clone().or(self.command_environment);
         self.memory_identity = env.memory_identity.clone().or(self.memory_identity);
         self.core = env.core.clone().or(self.core);
+        self.native_staged_parts = env.native_staged_parts.clone();
+        self.native_staged_lease = env.native_staged_lease.clone();
+        self.native_message_id = env.native_message_id.clone();
         self.stop_hooks
             .extend(env.hooks.stop_hooks().iter().cloned());
         self.tool_hooks
@@ -622,6 +595,9 @@ impl OpenHumanRunContext {
         child.subagent_usage = Arc::new(Mutex::new(Vec::new()));
         child.resolved_route = Arc::new(Mutex::new(None));
         child.memory_turn = None;
+        child.native_staged_parts.clear();
+        child.native_staged_lease = None;
+        child.native_message_id = None;
         child.response_shape = None;
         child
     }

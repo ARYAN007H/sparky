@@ -83,6 +83,7 @@ impl EventHandler<DomainEvent> for ChannelApprovalSurfaceSubscriber {
                     &self.client().await,
                     tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
                         namespace: "main".into(),
+                        preparation_mode: Default::default(),
                         session_policy: Default::default(),
                         source: tinychannels_bus::module_inbound::ChannelInboundSource::Legacy {
                             message: ChannelMessage {

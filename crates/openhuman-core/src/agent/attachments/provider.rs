@@ -221,7 +221,8 @@ impl AttachmentModel {
                 .count();
             let (max_images, _) = self.config.multimodal.effective_limits();
             let (max_files, _, _) = self.config.multimodal_files.effective_limits();
-            if images > max_images
+            if (self.config.multimodal.max_images == 0 && images > 0)
+                || images > max_images
                 || files > max_files
                 || self.config.multimodal_files.max_files == 0 && images + files > 0
             {
@@ -250,15 +251,6 @@ impl AttachmentModel {
                 }
             }
         }
-        if scope.external_channel
-            && request.messages.iter().any(|message| {
-                matches!(message, Message::User(user) if user.content.iter().any(is_media_block))
-            })
-        {
-            return Err(tinyinference_llm::Error::Model(
-                "attachment resolution is disabled for external channel input".into(),
-            ));
-        }
         for (message_index, message) in request.messages.iter_mut().enumerate() {
             let Message::User(user) = message else {
                 continue;
@@ -275,7 +267,10 @@ impl AttachmentModel {
                     )));
                     continue;
                 }
-                let resolved = match self.resolve_block(&block, &scope).await {
+                let resolved = match self
+                    .resolve_block(&block, &scope, Some(message_index) != latest_user_message)
+                    .await
+                {
                     Ok(resolved) => resolved,
                     Err(error)
                         if Some(message_index) != latest_user_message

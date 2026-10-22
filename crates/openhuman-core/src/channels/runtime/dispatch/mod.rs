@@ -14,6 +14,9 @@ mod helpers;
 pub(crate) mod host_agent;
 mod native_runner;
 mod processor;
+
+#[cfg(test)]
+pub(crate) use processor::drop_media_read_lease_for_test;
 mod routing;
 
 pub(crate) use processor::progressive::{

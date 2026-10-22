@@ -86,6 +86,7 @@ impl WebIngress {
                 &crate::agent::attachments::AttachmentAccessScope {
                     external_channel: false,
                     workspace: Some(workspace),
+                    ..Default::default()
                 },
             )
             .await

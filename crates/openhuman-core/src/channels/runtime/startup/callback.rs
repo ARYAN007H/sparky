@@ -18,6 +18,8 @@ use tokio::sync::mpsc;
 
 const MAX_CALLBACK_BYTES: usize = 128 * 1024;
 const MAX_TRANSCRIPTION_BYTES: usize = 12 * 1024 * 1024;
+const MAX_VOICE_MEDIA_BYTES: usize = 12 * 1024 * 1024;
+const MAX_VOICE_MEDIA_DECODED_BYTES: usize = 8 * 1024 * 1024;
 const MAX_CONTROLLER_BYTES: usize = 1024 * 1024;
 
 type ProgressiveChannelRegistry =
@@ -141,9 +143,22 @@ impl ChannelHostCallbacks {
             let envelope: tinychannels_bus::ChannelInboundEnvelope =
                 serde_json::from_value(message)
                     .map_err(|_| Error::failed("invalid inbound envelope"))?;
-            if channel.trim().is_empty()
-                || envelope.channel.id != tinychannels_bus::provider_id(&channel)
-                || envelope.channel.account_id.as_deref() != Some(channel.as_str())
+            let channel_present = !channel.trim().is_empty();
+            let provider_matches = envelope.channel.id == tinychannels_bus::provider_id(&channel);
+            let account_matches = envelope.channel.account_id.as_deref() == Some(channel.as_str());
+            let conversation_present = !envelope.conversation.id.trim().is_empty();
+            let message_present = !envelope.message_id.trim().is_empty();
+            tracing::debug!(
+                channel_present,
+                provider_matches,
+                account_matches,
+                conversation_present,
+                message_present,
+                "typed inbound envelope scope validation"
+            );
+            if !channel_present
+                || !provider_matches
+                || !account_matches
                 || envelope.message_id.trim().is_empty()
                 || envelope.conversation.id.trim().is_empty()
             {
@@ -241,12 +256,109 @@ impl ChannelHostCallbacks {
             .map_err(|_| Error::failed("channel speech synthesis failed"))
     }
 
+    async fn store_voice_media(
+        &self,
+        request: tinychannels_bus::HostStoreVoiceMediaRequest,
+    ) -> Result<tinychannels_bus::HostStoreVoiceMediaResult> {
+        let serialized_len = serde_json::to_vec(&request).map_or(usize::MAX, |bytes| bytes.len());
+        tracing::debug!(
+            direction = ?request.direction,
+            base64_len = request.audio_base64.len(),
+            serialized_within_limit = serialized_len <= MAX_VOICE_MEDIA_BYTES,
+            "scoped channel voice media callback entered"
+        );
+        if serialized_len > MAX_VOICE_MEDIA_BYTES {
+            tracing::debug!(
+                reason = "serialized_size",
+                "scoped channel voice media rejected"
+            );
+            return Err(Error::failed("voice media callback exceeds its limit"));
+        }
+        let decoded = base64::Engine::decode(
+            &base64::engine::general_purpose::STANDARD,
+            &request.audio_base64,
+        )
+        .map_err(|_| {
+            tracing::debug!(
+                reason = "invalid_base64",
+                "scoped channel voice media rejected"
+            );
+            Error::failed("voice media payload is invalid")
+        })?;
+        if decoded.is_empty() || decoded.len() > MAX_VOICE_MEDIA_DECODED_BYTES {
+            tracing::debug!(
+                reason = "decoded_size",
+                "scoped channel voice media rejected"
+            );
+            return Err(Error::failed("voice media exceeds its size limit"));
+        }
+        let scope = &request.scope;
+        let context = self.context()?;
+        let Some(channel) = context.channels_by_name.get(&scope.configured_instance) else {
+            tracing::debug!(
+                reason = "configured_instance_not_registered",
+                provider_adapter_registered =
+                    context.channels_by_name.contains_key(&scope.channel.id),
+                provider_matches_instance =
+                    scope.channel.id == tinychannels_bus::provider_id(&scope.configured_instance),
+                account_matches_instance =
+                    scope.channel.account_id.as_deref() == Some(scope.configured_instance.as_str()),
+                "scoped channel voice media rejected"
+            );
+            return Err(Error::failed("voice media account is not configured"));
+        };
+        if scope.configured_instance.trim().is_empty()
+            || scope.channel.id != tinychannels_bus::provider_id(&scope.configured_instance)
+            || scope.channel.account_id.as_deref() != Some(scope.configured_instance.as_str())
+            || tinychannels_bus::provider_id(channel.name()) != scope.channel.id
+            || scope.conversation.id.trim().is_empty()
+            || scope.turn_id.trim().is_empty()
+        {
+            tracing::debug!(
+                reason = "scope_mismatch",
+                provider_matches_instance =
+                    scope.channel.id == tinychannels_bus::provider_id(&scope.configured_instance),
+                account_matches_instance =
+                    scope.channel.account_id.as_deref() == Some(scope.configured_instance.as_str()),
+                adapter_matches_provider =
+                    tinychannels_bus::provider_id(channel.name()) == scope.channel.id,
+                conversation_present = !scope.conversation.id.trim().is_empty(),
+                turn_present = !scope.turn_id.trim().is_empty(),
+                "scoped channel voice media rejected"
+            );
+            return Err(Error::failed(
+                "voice media scope does not match configured account",
+            ));
+        }
+        let media = request
+            .media_reference
+            .filter(|media| {
+                media
+                    .opaque_id
+                    .as_deref()
+                    .is_some_and(|id| id.starts_with("tinychannels_media_v1_"))
+            })
+            .ok_or_else(|| {
+                tracing::debug!(
+                    reason = "opaque_reference",
+                    "scoped channel voice media rejected"
+                );
+                Error::failed("voice media has no durable scoped reference")
+            })?;
+        tracing::debug!("scoped channel voice media accepted");
+        Ok(tinychannels_bus::HostStoreVoiceMediaResult {
+            media,
+            // A local durable reference does not grant public-link access.
+            accessible_url: None,
+        })
+    }
+
     async fn get_voice_reply_policy(
         &self,
         request: HostVoiceReplyPolicyRequest,
     ) -> Result<HostVoiceReplyPolicy> {
         Self::validate_callback_size(&request)?;
-        Ok(self.voice().reply_policy(&request.scope))
+        Ok(self.voice().reply_policy(&request.scope, &self.tenant))
     }
 
     async fn publish_event(&self, publication: HostEventPublication) -> Result<()> {
