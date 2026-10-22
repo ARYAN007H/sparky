@@ -698,6 +698,10 @@ async fn thread_delete_keeps_completions_when_driver_task_scope_cannot_be_resolv
         background_completions::pending_for(&workspace, thread_id).is_empty(),
         "terminal durable session permits queued completion cleanup after registry pruning"
     );
+    crate::agent::orchestration::completion_owners::finish_driver_task(
+        &dispatch,
+        "stale-driver-task",
+    );
 }
 
 #[tokio::test]
