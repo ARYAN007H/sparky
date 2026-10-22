@@ -106,6 +106,46 @@ async fn plan_exit_emits_marker() {
 }
 
 #[tokio::test]
+async fn plan_exit_publishes_build_run_mode_change() {
+    crate::core::bus::init().await.expect("bus init");
+    let _handle = crate::core::bus::BUS.subscribe(std::sync::Arc::new(
+        crate::web_chat::event_bus::AgentSurfaceSubscriber,
+    ));
+    let mut events = crate::web_chat::event_bus_channel::subscribe_web_channel_events();
+    let thread_id = "plan-exit-publishes-run-mode";
+    crate::threads::run_mode::set_mode(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        thread_id,
+        tinyagents_harness::middleware::RunMode::Plan,
+    );
+    let tool = PlanExitTool::new();
+    let result = tool
+        .execute_with_context(
+            json!({ "plan": "1. Do the thing" }),
+            ToolCallOptions::default(),
+            Some(&ThreadContext(thread_id)),
+        )
+        .await
+        .unwrap();
+    assert!(!result.is_error);
+
+    let event = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        loop {
+            match events.recv().await {
+                Ok(event) if event.event == "run_mode_changed" && event.thread_id == thread_id => {
+                    break event;
+                }
+                Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(error) => panic!("run mode event stream ended: {error}"),
+            }
+        }
+    })
+    .await
+    .expect("plan_exit must publish run_mode_changed");
+    assert_eq!(event.args.unwrap()["mode"], "build");
+}
+
+#[tokio::test]
 async fn plan_exit_rejects_empty() {
     let tool = PlanExitTool::new();
     let result = tool.execute(json!({ "plan": "   " })).await.unwrap();
