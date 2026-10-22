@@ -198,8 +198,9 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
 
     release_first.notify_one();
     release_second.notify_one();
+    let session_dispatch = live.data.dispatch_ctx();
     let session_port = crate::agent::orchestration::subagent_sessions::open_for_context(
-        &crate::core::runtime::DispatchCtx::new(Arc::clone(&core)),
+        &session_dispatch,
         workspace.clone(),
         "force-fresh-parent-session",
         Some("force-fresh-parent-thread".into()),
