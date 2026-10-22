@@ -6,8 +6,9 @@ implementation; [`collapsed.rs`](./collapsed.rs) wraps them into a single action
 `CronTool`. The cron tool types are re-exported from `crate::cron::tools`; `tools/ops.rs`
 assembles the registered tool set.
 
-Every tool first checks `config.cron.enabled` and returns an error result
-when cron is disabled.
+The cron-domain tools first check `config.cron.enabled` and return an error
+result when cron is disabled. The separate `schedule` tool exposes its own
+one-shot and recurring schedule actions.
 
 ## Registration state
 
