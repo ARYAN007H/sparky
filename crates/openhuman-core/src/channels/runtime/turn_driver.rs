@@ -1,20 +1,16 @@
-//! The **channel/CLI turn graph** (issue #4249).
+//! Driver for channel and CLI turns (issue #4249).
 //!
-//! Per the per-folder `graph.rs` convention, this is the harness's top-level
-//! (channel/CLI) graph definition, its available tools, and its summarization
-//! step — all thin over the shared tinyagents seam
-//! ([`TurnSpec::run`]).
+//! This adapts channel/CLI inputs to the shared tinyagents turn seam
+//! ([`TurnSpec::run`]) and supplies the turn's tools, context-window
+//! summarization, and host context.
 //!
-//! **Graph.** A single agent-loop turn driven by the tinyagents harness (the
-//! canonical channel/CLI path; the legacy `run_tool_call_loop` is removed),
-//! covering the loop's control-flow seams (iteration cap, circuit breakers, stop
-//! hooks). When the caller supplies an `on_progress` sender the harness event
-//! stream is mirrored onto `AgentProgress` (live tool timeline, streaming text
-//! deltas, cost/token footer) via the same
-//! `OpenhumanEventBridge`
-//! the chat route uses.
+//! **Turn execution.** The shared seam runs one agent turn with the channel/CLI
+//! iteration cap, circuit-breaker, and stop-hook settings. When the caller
+//! supplies an `on_progress` sender, seam events are mirrored onto
+//! `AgentProgress` (live tool timeline, streaming text deltas, cost/token
+//! footer) via the same `OpenhumanEventBridge` the chat route uses.
 //!
-//! **Available tools.** Reuses the bus handler's `Arc`-shared tool sets
+//! **Tools.** Reuses the bus handler's `Arc`-shared tool sets
 //! (`tools_registry: Arc<Vec<Box<dyn Tool>>>` + per-turn `extra_tools`),
 //! advertised via the canonical shared-tool adapter
 //! and filtered by `visible_tool_names`. `ask_user_clarification` is the
@@ -39,10 +35,10 @@ use crate::progress::AgentProgress;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinytools::Tool;
 
-/// Drive a channel/CLI turn on the graph engine. Returns the explicit turn
-/// outcome, including the concrete route selected by the model runtime. When
-/// `on_progress` is `Some`, the run streams and mirrors progress onto
-/// `AgentProgress`; pass `None` for a fire-and-forget final-text turn.
+/// Run a channel/CLI turn through the shared tinyagents turn seam. Returns the
+/// explicit outcome, including the concrete route selected by the model
+/// runtime. When `on_progress` is `Some`, progress is mirrored onto
+/// `AgentProgress`; pass `None` for a final-text turn without progress events.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_channel_turn(
     source: TurnModelSource,
@@ -85,7 +81,7 @@ pub(crate) async fn run_channel_turn(
     // channel/CLI turns too — long-running channel threads otherwise grew
     // unbounded until the cap error — then build the turn's crate `ChatModel` set.
     // The `Provider` is confined to the seam `TurnModelSource` (issue #4249,
-    // Phase 3 / Motion A): the harness graph names crate model types only, and
+    // Phase 3 / Motion A): the turn seam names crate model types only, and
     // reads native-tool / vision capability + telemetry id off the built bundle.
     let context_window = source.effective_context_window(model).await;
     let turn_models = source.build(model, temperature, context_window, None)?;

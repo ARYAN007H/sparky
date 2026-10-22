@@ -276,7 +276,7 @@ Turn execution:
 | --- | --- |
 | `session_host/` | `OpenHumanSessionHost`: builder, runtime session, driver, hooks, transcript codec, resume and recorded tools ([README](session_host/README.md)) |
 | `tinyagents/` | Adapter seam onto the TinyAgents harness: turn runner, model source, middleware stack, `host/` capability adapters, event bridge, journal, replay RPC ([README](tinyagents/README.md)) |
-| `harness/` | Agent definitions and loader, parent/fork context types, sandbox and spawn-depth context, oversized tool-result artifacts, the channel/CLI turn graph ([README](harness/README.md)) |
+| `harness/` | Agent definitions and loader, parent/fork context types, sandbox and spawn-depth context, oversized tool-result artifacts ([README](harness/README.md)) |
 | `bus.rs` | The `agent.run_turn` native request handler (`AgentTurnRequest` to `AgentTurnResponse`) |
 | `progress.rs` | `AgentProgress`, the event enum every turn streams to its observer |
 | [`progress_sink.rs`](./progress_sink.rs) | The `ProgressSink` channel type an in-process embedder hands a turn (carried on `AgentChatEnv`) |
