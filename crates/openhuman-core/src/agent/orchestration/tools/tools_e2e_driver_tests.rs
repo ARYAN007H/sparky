@@ -380,10 +380,10 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
     host_context.thread_id = Some(thread_id.into());
     let live = RunContext::<OpenHumanRunContext>::new(
         tinyagents_harness::context::RunConfig::new("delete-live-driver-parent")
-            .with_thread(thread_id)
-            .with_workspace(workspace_descriptor),
+            .with_thread(thread_id),
         host_context,
-    );
+    )
+    .with_workspace(workspace_descriptor);
     let dispatch = live.data.dispatch_ctx();
     blocking::ensure_thread(
         dispatch.clone(),
