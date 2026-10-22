@@ -85,16 +85,10 @@ fn declared_collections() -> Vec<CollectionOwner> {
     ));
 
     #[cfg(feature = "inbound-queues")]
-    {
-        owners.push(owner(
-            "tinyeventqueues-bus",
-            tinyeventqueues_bus::storage::collection_specs(),
-        ));
-        owners.push(owner(
-            "openhuman-core-inbound",
-            crate::inbound::results::collection_specs(),
-        ));
-    }
+    owners.push(owner(
+        "tinyeventqueues-bus",
+        tinyeventqueues_bus::storage::collection_specs(),
+    ));
 
     owners
 }
@@ -113,6 +107,8 @@ fn host_collections() -> Vec<CollectionSpec> {
     collections.extend(crate::agent::orchestration::subagent_sessions::collection_specs());
     collections.extend(super::agents::collection_specs());
     collections.extend(super::journal_maintenance::collection_specs());
+    #[cfg(feature = "inbound-queues")]
+    collections.extend(crate::inbound::results::collection_specs());
     collections
 }
 

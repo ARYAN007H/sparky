@@ -96,31 +96,31 @@ export function lint(dump) {
     }
     crates.add(owner.crate);
     for (const collection of owner.collections ?? []) {
-    const { name, indexes = [], ttl_field: ttlField, search } = collection;
-    if (!COLLECTION.test(name) && !LEGACY_COLLECTIONS.has(name)) {
-      problems.push(`collection "${name}" must be <owner>.<entity> with a snake_case entity`);
-    }
-    const key = `${owner.crate}\0${name}`;
-    if (names.has(key)) problems.push(`${owner.crate}: collection "${name}" is declared more than once`);
-    names.add(key);
-    const indexNames = new Set();
-    for (const index of indexes) {
-      if (!index.name || indexNames.has(index.name)) {
-        problems.push(`${name}: index name "${index.name}" is empty or duplicated`);
+      const { name, indexes = [], ttl_field: ttlField, search } = collection;
+      if (!COLLECTION.test(name) && !LEGACY_COLLECTIONS.has(name)) {
+        problems.push(`${owner.crate}: collection "${name}" must be <owner>.<entity> with a snake_case entity`);
       }
-      indexNames.add(index.name);
-      for (const field of index.fields ?? []) {
-        if (TIME_SUFFIX.test(field)) {
-          problems.push(`${name}: indexed field "${field}" holds a time and must be named *_ms`);
+      const key = `${owner.crate}\0${name}`;
+      if (names.has(key)) problems.push(`${owner.crate}: collection "${name}" is declared more than once`);
+      names.add(key);
+      const indexNames = new Set();
+      for (const index of indexes) {
+        if (!index.name || indexNames.has(index.name)) {
+          problems.push(`${owner.crate}: ${name}: index name "${index.name}" is empty or duplicated`);
+        }
+        indexNames.add(index.name);
+        for (const field of index.fields ?? []) {
+          if (TIME_SUFFIX.test(field)) {
+            problems.push(`${owner.crate}: ${name}: indexed field "${field}" holds a time and must be named *_ms`);
+          }
         }
       }
-    }
-    if (ttlField && TIME_SUFFIX.test(ttlField)) {
-      problems.push(`${name}: expiry field "${ttlField}" holds a time and must be named *_ms`);
-    }
-    for (const field of search?.fields ?? []) {
-      if (!field) problems.push(`${name}: search fields must not be empty`);
-    }
+      if (ttlField && TIME_SUFFIX.test(ttlField)) {
+        problems.push(`${owner.crate}: ${name}: expiry field "${ttlField}" holds a time and must be named *_ms`);
+      }
+      for (const field of search?.fields ?? []) {
+        if (!field) problems.push(`${owner.crate}: ${name}: search fields must not be empty`);
+      }
     }
   }
   return problems;
@@ -195,8 +195,8 @@ function main(argv) {
     console.error(`${docPath} is out of date. Run \`pnpm docs:generate\` and commit the result.`);
     return 1;
   }
-  const owners = new Set((dump.collections ?? []).map(collection => collection.name.split('.', 1)[0]));
-  console.log(`storage schema ok: ${owners.size} owners, ${(dump.collections ?? []).length} collections`);
+  const collectionCount = (dump.owners ?? []).reduce((total, owner) => total + (owner.collections ?? []).length, 0);
+  console.log(`storage schema ok: ${(dump.owners ?? []).length} crates, ${collectionCount} collections`);
   return 0;
 }
 
