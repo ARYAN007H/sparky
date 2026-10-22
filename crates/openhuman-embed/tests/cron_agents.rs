@@ -185,6 +185,7 @@ fn a_scheduled_job_runs_a_runtime_agent_with_its_host_tool_as_cron() {
             let first_request = String::from_utf8_lossy(&requests[0].body).to_string();
             assert!(first_request.contains("TEENY_CRON_PROMPT"));
             let first_body: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
+            eprintln!("cron provider request body: {first_body}");
             assert_eq!(
                 first_body["provider"],
                 serde_json::json!({"sort": "latency"})
