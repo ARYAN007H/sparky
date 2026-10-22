@@ -19,6 +19,8 @@ use tinyagents_session::port::{
 use tinyagents_session::{RebindableSessionStores, SessionStoreRegistry};
 use tinystoragedrivers::{Scope, StorageBackend, StorageError};
 
+type TenantProviders = Mutex<HashMap<Scope, Arc<RebindableSessionStores>>>;
+
 #[derive(Default)]
 struct TenantStoreRegistry {
     providers: Arc<SessionStoreRegistry>,
@@ -28,7 +30,7 @@ struct TenantStoreRegistry {
 #[derive(Default)]
 struct TenantStoreRegistryState {
     backends: Vec<Weak<RwLock<Arc<dyn StorageBackend>>>>,
-    tenants: Vec<Weak<Mutex<HashMap<Scope, Arc<RebindableSessionStores>>>>>,
+    tenants: Vec<Weak<TenantProviders>>,
     current_backend: Option<Arc<dyn StorageBackend>>,
 }
 
@@ -109,7 +111,7 @@ impl TenantStoreRegistry {
     fn register_backend(
         &self,
         backend: &Arc<RwLock<Arc<dyn StorageBackend>>>,
-        tenants: &Arc<Mutex<HashMap<Scope, Arc<RebindableSessionStores>>>>,
+        tenants: &Arc<TenantProviders>,
     ) {
         let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(current) = &state.current_backend {
@@ -135,7 +137,7 @@ pub struct TenantSessionStores {
     backend: Arc<RwLock<Arc<dyn StorageBackend>>>,
     recover_on_open: bool,
     admission: SchemaAdmission,
-    tenants: Arc<Mutex<HashMap<Scope, Arc<RebindableSessionStores>>>>,
+    tenants: Arc<TenantProviders>,
     registry: Arc<TenantStoreRegistry>,
     /// Names this router in [`SessionStoreProvider::destination_key`].
     id: uuid::Uuid,
