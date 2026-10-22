@@ -293,7 +293,10 @@ pub(crate) async fn cancel_by_session_in_workspace(
 /// `thread_id`. Called when that thread is deleted so detached children don't
 /// keep running (and later try to deliver) against a thread that no longer
 /// exists. Returns the number of sub-agents cancelled.
-pub(crate) fn cancel_for_thread(ctx: &crate::core::runtime::DispatchCtx, thread_id: &str) -> usize {
+pub(crate) async fn cancel_for_thread(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+) -> usize {
     let Some(core_context) = ctx.resolved() else {
         return 0;
     };
@@ -305,29 +308,53 @@ pub(crate) fn cancel_for_thread(ctx: &crate::core::runtime::DispatchCtx, thread_
         &workspace_dir,
         thread_id,
     );
-    eprintln!(
-        "thread-delete scope workspace={workspace_dir:?} thread={thread_id} owners={}",
-        scopes.len()
-    );
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(ctx);
     let mut cancelled = 0;
-    let mut scopes_seen = Vec::new();
-    for (_, owner) in scopes {
-        let scope = ParentJobScope::new(owner.workspace, thread_id);
-        if scopes_seen.contains(&scope) {
+    for (task_id, owner) in scopes {
+        let Some(parent_thread_id) = owner.parent_thread_id.as_deref() else {
             continue;
-        }
-        scopes_seen.push(scope.clone());
-        match jobs.cancel_for_thread(&scope) {
+        };
+        let owner_key = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+            &owner.workspace_dir,
+            &owner.parent_session,
+            Some(parent_thread_id),
+        );
+        let scope = ParentJobScope::new(owner.workspace, parent_thread_id);
+        let matching_jobs = match jobs.list_for_parent_scope(&owner_key, &scope) {
+            Ok(jobs) => jobs
+                .into_iter()
+                .filter(|job| {
+                    job.extensions
+                        .get("task_id")
+                        .and_then(serde_json::Value::as_str)
+                        == Some(task_id.as_str())
+                })
+                .collect::<Vec<_>>(),
+            Err(error) => {
+                log::warn!("[running_subagents] failed to list thread-owned driver jobs: {error}");
+                continue;
+            }
+        };
+        match jobs.cancel_owned(
+            matching_jobs
+                .first()
+                .map(|job| job.id.as_str())
+                .unwrap_or(task_id.as_str()),
+            &owner_key,
+        ) {
             Ok(count) => {
-                eprintln!("thread-delete cancel scope={scope:?} count={count}");
                 cancelled += count;
             }
             Err(error) => log::warn!(
                 "[running_subagents] driver thread deletion cancellation failed: {error}"
             ),
+        }
+        for job in matching_jobs {
+            if let Err(error) = jobs.wait_owned(job.id.as_str(), &owner_key).await {
+                log::warn!("[running_subagents] failed waiting for deleted-thread child to settle: {error}");
+            }
         }
     }
     cancelled
