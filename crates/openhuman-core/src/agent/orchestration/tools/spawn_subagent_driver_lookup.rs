@@ -20,10 +20,9 @@ async fn find_reusable_driver_session(
         )
         .await
         .map_err(|error| error.to_string())?;
-    let Some(selected) = tinyagents_orchestration::subagent::find_reusable_session(
-        sessions,
-        &driver_selector,
-    ) else {
+    let Some(selected) =
+        tinyagents_orchestration::subagent::find_reusable_session(sessions, &driver_selector)
+    else {
         return Ok(None);
     };
     let parent_epoch = subagent_sessions::parent_epoch_for_context(

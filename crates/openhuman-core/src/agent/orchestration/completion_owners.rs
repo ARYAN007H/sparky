@@ -101,7 +101,10 @@ pub(crate) fn driver_task_owner(
     ctx: &crate::core::runtime::DispatchCtx,
     task_id: &str,
 ) -> Option<DriverTaskOwner> {
-    owners().driver_tasks.get(&driver_task_key(ctx, task_id)).cloned()
+    owners()
+        .driver_tasks
+        .get(&driver_task_key(ctx, task_id))
+        .cloned()
 }
 
 pub(crate) fn note_driver_cancel_reason(
@@ -109,10 +112,9 @@ pub(crate) fn note_driver_cancel_reason(
     task_id: &str,
     reason: &str,
 ) {
-    owners().driver_cancel_reasons.insert(
-        driver_task_key(ctx, task_id),
-        reason.to_owned(),
-    );
+    owners()
+        .driver_cancel_reasons
+        .insert(driver_task_key(ctx, task_id), reason.to_owned());
 }
 
 pub(crate) fn take_driver_cancel_reason(
@@ -124,10 +126,7 @@ pub(crate) fn take_driver_cancel_reason(
         .remove(&driver_task_key(ctx, task_id))
 }
 
-pub(crate) fn clear_driver_cancel_reason(
-    ctx: &crate::core::runtime::DispatchCtx,
-    task_id: &str,
-) {
+pub(crate) fn clear_driver_cancel_reason(ctx: &crate::core::runtime::DispatchCtx, task_id: &str) {
     owners()
         .driver_cancel_reasons
         .remove(&driver_task_key(ctx, task_id));
@@ -147,7 +146,7 @@ pub(crate) fn driver_tasks_for_thread(
             (owner.profile == profile
                 && owner.workspace_dir == workspace_dir
                 && owner.parent_thread_id.as_deref() == Some(thread_id))
-                .then(|| (owner.task_id.clone(), owner.clone()))
+            .then(|| (owner.task_id.clone(), owner.clone()))
         })
         .collect()
 }
