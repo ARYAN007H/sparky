@@ -2,8 +2,8 @@ mod core;
 pub mod ops;
 pub mod scheduler;
 mod schemas;
-mod types;
 mod tools;
+mod types;
 
 pub use self::core::*;
 pub use self::tools::{UpdateApplyTool, UpdateCheckTool};
