@@ -17,9 +17,14 @@ module owns provider-specific startup, supervision, transport, and interaction
 behavior; OpenHuman owns routing, approvals, agent execution, and the session
 cancellation lifetime.
 
-The normal provider type and provider re-exports are available only to tests
-that retain legacy compatibility fixtures. Production code uses the portable
-TinyChannels bus contracts from `tinychannels-bus` and the module client.
+Production code uses the portable TinyChannels bus contracts from
+`tinychannels-bus` and the compiled module client. Provider algorithms,
+transports, and concrete adapters stay in TinyChannels; OpenHuman does not
+link the provider implementation library or expose a host-side provider trait.
+The module prepares inbound identity and typed content before the host applies
+its account authorization and session policy. Host callbacks handle only
+capabilities the module cannot own, such as scoped media access, voice, and
+event publication.
 
 ## Hosted and relay paths
 
@@ -45,12 +50,12 @@ or shell-based substitute.
 
 ## Layout
 
-| Path | Purpose |
-| --- | --- |
-| [`mod.rs`](./mod.rs) | Feature gates and the public channel contract exports. Concrete provider exports are test-only. |
-| [`traits.rs`](./traits.rs) | Portable message and send contracts re-exported from `tinychannels-bus`. |
-| [`controllers/`](./controllers/) | OpenHuman `channels.*` operations and host-side backend transport adaptation. |
-| [`host/`](./host/) | Typed module callbacks, event subscribers, and remote-control host operations. |
-| [`runtime/`](./runtime/README.md) | Module lease startup, account lifetime, and the OpenHuman dispatch pipeline. |
-| [`bus/`](./bus/) | Hosted-channel inbound and durable progressive delivery integration. |
-| [`providers/relay/`](./providers/relay/README.md) | Gateway relay RPC surface and host-side relay orchestration. |
+| Path                                                                                                         | Purpose                                                                        |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| [`mod.rs`](./mod.rs)                                                                                         | Feature gates, TinyBus module setup, and host-facing channel contracts.        |
+| [`tinychannels-bus channel contracts`](../../../../vendor/tinychannels/crates/tinychannels-bus/src/channel/) | Portable message and typed send contracts.                                     |
+| [`controllers/`](./controllers/)                                                                             | OpenHuman `channels.*` operations and host-side backend transport adaptation.  |
+| [`host/`](./host/)                                                                                           | Typed module callbacks, event subscribers, and remote-control host operations. |
+| [`runtime/`](./runtime/README.md)                                                                            | Module lease startup, account lifetime, and the OpenHuman dispatch pipeline.   |
+| [`bus/`](./bus/)                                                                                             | Hosted-channel inbound and durable progressive delivery integration.           |
+| [`providers/relay/`](./providers/relay/README.md)                                                            | Gateway relay RPC surface and host-side relay orchestration.                   |
