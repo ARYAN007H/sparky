@@ -97,7 +97,8 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
             let mut rows = super::session_db::SessionDatabase::read(snapshot.db())
                 .context("[sessions] read the session database snapshot")?;
             sanitize_legacy_system_messages(&mut rows.messages);
-            let fingerprint = source_fingerprint((&rows.agent_runs, &rows.events, &rows.telemetry))?;
+            let fingerprint =
+                source_fingerprint((&rows.agent_runs, &rows.events, &rows.telemetry))?;
             let history_batch = SessionHistoryImport {
                 sessions: rows.sessions,
                 messages: rows.messages,
