@@ -16,7 +16,9 @@
 //! the async workers.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Arc, Condvar, Mutex, OnceLock, Weak};
 
 use super::ConversationPurgeStats;
 use tinyagents_session::threads::{
@@ -29,6 +31,107 @@ use crate::core::runtime::DispatchCtx;
 use crate::storage::documents::Repo;
 use crate::storage::{self, Scope, StorageError};
 use tinystoragedrivers::ErrorKind;
+
+#[derive(Default)]
+struct ThreadAdmissionState {
+    active_creates: usize,
+    purging: bool,
+}
+
+struct WorkspaceThreadAdmission {
+    state: Mutex<ThreadAdmissionState>,
+    changed: Condvar,
+}
+
+static THREAD_ADMISSIONS: OnceLock<Mutex<HashMap<PathBuf, Weak<WorkspaceThreadAdmission>>>> =
+    OnceLock::new();
+
+fn thread_admission(workspace_dir: &Path) -> Arc<WorkspaceThreadAdmission> {
+    let admissions = THREAD_ADMISSIONS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut admissions = admissions.lock().unwrap_or_else(|error| error.into_inner());
+    if let Some(admission) = admissions.get(workspace_dir).and_then(Weak::upgrade) {
+        return admission;
+    }
+    admissions.retain(|_, admission| admission.strong_count() > 0);
+    let admission = Arc::new(WorkspaceThreadAdmission {
+        state: Mutex::new(ThreadAdmissionState::default()),
+        changed: Condvar::new(),
+    });
+    admissions.insert(workspace_dir.to_path_buf(), Arc::downgrade(&admission));
+    admission
+}
+
+struct ThreadCreateGuard(Arc<WorkspaceThreadAdmission>);
+
+impl Drop for ThreadCreateGuard {
+    fn drop(&mut self) {
+        let mut state = self
+            .0
+            .state
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        state.active_creates -= 1;
+        if state.active_creates == 0 {
+            self.0.changed.notify_all();
+        }
+    }
+}
+
+impl WorkspaceThreadAdmission {
+    fn admit_create(self: &Arc<Self>) -> Result<ThreadCreateGuard, String> {
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        if state.purging {
+            return Err("thread creation refused while workspace purge is active".into());
+        }
+        state.active_creates += 1;
+        Ok(ThreadCreateGuard(Arc::clone(self)))
+    }
+}
+
+/// A workspace-wide barrier that prevents new thread rows while a full purge
+/// snapshots, cancels and removes the current rows.
+pub(crate) struct ThreadPurgeGuard(Arc<WorkspaceThreadAdmission>);
+
+impl Drop for ThreadPurgeGuard {
+    fn drop(&mut self) {
+        let mut state = self
+            .0
+            .state
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        state.purging = false;
+        self.0.changed.notify_all();
+    }
+}
+
+/// Closes workspace thread admission and waits for in-flight creates to settle.
+///
+/// # Errors
+///
+/// This currently has no recoverable error path; the result type keeps the
+/// purge caller's setup failures uniform with other storage admission errors.
+pub(crate) fn begin_thread_purge(workspace_dir: &Path) -> Result<ThreadPurgeGuard, String> {
+    let admission = thread_admission(workspace_dir);
+    let mut state = admission
+        .state
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    while state.purging {
+        state = admission
+            .changed
+            .wait(state)
+            .unwrap_or_else(|error| error.into_inner());
+    }
+    state.purging = true;
+    while state.active_creates > 0 {
+        state = admission
+            .changed
+            .wait(state)
+            .unwrap_or_else(|error| error.into_inner());
+    }
+    drop(state);
+    Ok(ThreadPurgeGuard(admission))
+}
 
 const DOMAIN: &str = "threads::store";
 const LOG_PREFIX: &str = "[conversations]";
@@ -191,6 +294,7 @@ impl ConversationStore {
         &self,
         request: CreateConversationThread,
     ) -> Result<ConversationThread, String> {
+        let _admission = thread_admission(&self.workspace_dir).admit_create()?;
         self.run("ensure_thread", NONE, |s| async move {
             s.ensure_thread(request).await
         })
