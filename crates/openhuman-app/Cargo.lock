@@ -6740,11 +6740,10 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.1.40"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
- "tinystoragedrivers-types",
 ]
 
 [[package]]
@@ -6800,7 +6799,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
- "tinystoragedrivers-types",
  "tokio",
 ]
 
@@ -7079,7 +7077,6 @@ version = "0.4.1"
 dependencies = [
  "serde",
  "serde_json",
- "tinystoragedrivers-types",
 ]
 
 [[package]]
