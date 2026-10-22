@@ -362,6 +362,8 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         release: release.clone(),
     });
     let mut parent = parent_context(&workspace, provider, vec![]);
+    let workspace_descriptor = tinytools::WorkspaceDescriptor::new(workspace.clone());
+    parent.workspace_descriptor = Some(workspace_descriptor.clone());
     parent.workspace_dir = workspace.clone();
     parent.session_id = parent_session.into();
 
@@ -378,7 +380,8 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
     host_context.thread_id = Some(thread_id.into());
     let live = RunContext::<OpenHumanRunContext>::new(
         tinyagents_harness::context::RunConfig::new("delete-live-driver-parent")
-            .with_thread(thread_id),
+            .with_thread(thread_id)
+            .with_workspace(workspace_descriptor),
         host_context,
     );
     let dispatch = live.data.dispatch_ctx();
@@ -445,18 +448,14 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         .into_iter()
         .find(|job| job.status == SubAgentJobStatus::Running && job.agent == "task_manager_agent")
         .expect("spawned child is live in the TinyAgents job registry");
-    let owner = crate::agent::orchestration::completion_owners::driver_task_owner(
-        &dispatch,
-        &task_id,
-    )
-    .expect("spawn registers the exact task owner");
+    let owner =
+        crate::agent::orchestration::completion_owners::driver_task_owner(&dispatch, &task_id)
+            .expect("spawn registers the exact task owner");
     assert_eq!(owner.workspace_dir, workspace);
     assert_eq!(owner.parent_thread_id.as_deref(), Some(thread_id));
     assert_eq!(
         crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
-            &dispatch,
-            &workspace,
-            thread_id,
+            &dispatch, &workspace, thread_id,
         )
         .len(),
         1,
