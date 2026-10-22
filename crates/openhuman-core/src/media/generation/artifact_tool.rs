@@ -27,6 +27,9 @@ use crate::artifacts::ArtifactKind;
 pub struct MediaArtifactTool<T: Tool> {
     inner: tinyagents_harness_tools::media::MediaArtifactTool<ReferenceRefreshTool<T>>,
     policy: Arc<RwLock<MediaArtifactPolicy>>,
+    workspace_dir: PathBuf,
+    files_dir: crate::artifacts::FileRoots,
+    allowed_references: Option<super::tools::MediaReferenceAllowlist>,
 }
 
 #[derive(Clone)]
@@ -46,10 +49,12 @@ impl<T: Tool> MediaArtifactTool<T> {
         workspace_dir: impl Into<PathBuf>,
         files_dir: impl Into<crate::artifacts::FileRoots>,
     ) -> Self {
+        let workspace_dir = workspace_dir.into();
+        let files_dir = files_dir.into();
         let policy = Arc::new(RwLock::new(MediaArtifactPolicy {
             kind,
-            workspace_dir: workspace_dir.into(),
-            files_dir: files_dir.into(),
+            workspace_dir: workspace_dir.clone(),
+            files_dir: files_dir.clone(),
             blobs: None,
             allowed_references: None,
         }));
@@ -65,13 +70,19 @@ impl<T: Tool> MediaArtifactTool<T> {
             filing,
         )
         .with_tool_call_id(Arc::new(crate::tools::host_extensions::tool_call_id));
-        Self { inner, policy }
+        Self {
+            inner,
+            policy,
+            workspace_dir,
+            files_dir,
+            allowed_references: None,
+        }
     }
 
     /// Reads generated outputs addressed by blob key from the media tool's
     /// backing store.
     #[must_use]
-    pub fn with_blobs(mut self, blobs: Arc<dyn tinystoragedrivers::BlobStore>) -> Self {
+    pub fn with_blobs(self, blobs: Arc<dyn tinystoragedrivers::BlobStore>) -> Self {
         self.policy
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -89,7 +100,27 @@ impl<T: Tool> MediaArtifactTool<T> {
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .allowed_references = Some(allowed_references);
+        self.allowed_references = Some(allowed_references);
         self
+    }
+
+    async fn refresh_allowed_references(&self) -> Result<(), String> {
+        let policy = self
+            .policy
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        refresh_allowed_references(&policy).await
+    }
+
+    async fn complete_and_discard_blob(
+        &self,
+        production: &Production,
+        source: &Path,
+    ) -> Result<u64, String> {
+        OpenHumanArtifactFiling(Arc::clone(&self.policy))
+            .complete_and_discard_blob(production, source)
+            .await
     }
 
     /// Builds the inner generator for one call around its provider progress
@@ -351,60 +382,66 @@ impl<T: Tool> ReferenceRefreshTool<T> {
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
-        let Some(allowed) = &policy.allowed_references else {
-            return Ok(());
-        };
+        refresh_allowed_references(&policy).await
+    }
+}
 
-        let previously_allowed = allowed
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        let artifacts = match crate::artifacts::store::list_artifacts(
+async fn refresh_allowed_references(policy: &MediaArtifactPolicy) -> Result<(), String> {
+    let Some(allowed) = &policy.allowed_references else {
+        return Ok(());
+    };
+
+    let previously_allowed = allowed
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    let artifacts = match crate::artifacts::store::list_artifacts(
+        &policy.workspace_dir,
+        0,
+        usize::MAX,
+        None,
+    )
+    .await
+    {
+        Ok((artifacts, _)) => artifacts,
+        Err(error) => {
+            tracing::warn!(
+                target = "media_generation",
+                %error,
+                "[media_generation] could not refresh reusable artifact paths"
+            );
+            return Err(
+                "could not validate previously generated media references; retry the media call"
+                    .to_owned(),
+            );
+        }
+    };
+
+    let mut recovered = std::collections::HashSet::new();
+    for artifact in artifacts.iter().filter(|artifact| {
+        matches!(&artifact.kind, ArtifactKind::Image | ArtifactKind::Video)
+            && matches!(&artifact.status, crate::artifacts::ArtifactStatus::Ready)
+    }) {
+        let Ok(path) = crate::artifacts::resolve_ready_file_meta(
             &policy.workspace_dir,
-            0,
-            usize::MAX,
-            None,
+            &policy.files_dir,
+            artifact,
         )
         .await
-        {
-            Ok((artifacts, _)) => artifacts,
-            Err(error) => {
-                tracing::warn!(
-                    target = "media_generation",
-                    %error,
-                    "[media_generation] could not refresh reusable artifact paths"
-                );
-                return Err("could not validate previously generated media references; retry the media call"
-                    .to_owned());
-            }
+        else {
+            continue;
         };
-
-        let mut recovered = std::collections::HashSet::new();
-        for artifact in artifacts.iter().filter(|artifact| {
-            matches!(&artifact.kind, ArtifactKind::Image | ArtifactKind::Video)
-                && matches!(&artifact.status, crate::artifacts::ArtifactStatus::Ready)
-        }) {
-            let Ok(path) = crate::artifacts::resolve_ready_file_meta(
-                &policy.workspace_dir,
-                &policy.files_dir,
-                artifact,
-            )
-            .await
-            else {
-                continue;
-            };
-            if let Ok(path) = tokio::fs::canonicalize(path).await {
-                recovered.insert(path);
-            }
+        if let Ok(path) = tokio::fs::canonicalize(path).await {
+            recovered.insert(path);
         }
-
-        let mut allowed = allowed
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        allowed.retain(|path| !previously_allowed.contains(path) || recovered.contains(path));
-        allowed.extend(recovered);
-        Ok(())
     }
+
+    let mut allowed = allowed
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    allowed.retain(|path| !previously_allowed.contains(path) || recovered.contains(path));
+    allowed.extend(recovered);
+    Ok(())
 }
 
 #[async_trait]
