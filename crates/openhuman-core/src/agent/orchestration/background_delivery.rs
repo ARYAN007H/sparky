@@ -303,7 +303,7 @@ where
     let router = background_completions::router_for_workspace_ctx(&busy_ctx, &workspace_dir);
     let delivery = CompletionDelivery::new(
         CompletionDeliveryConfig {
-            debounce: DEBOUNCE,
+            debounce: initial_delay,
             recovery_delay: RECOVERY_DELAY,
             retry_backoff: Duration::from_secs(2),
             busy_poll: RECOVERY_BUSY_POLL,
@@ -377,9 +377,8 @@ where
             .await
     } else {
         delivery
-            .deliver_once_with_initial_delay(
+            .deliver_once_with_error(
                 target,
-                initial_delay,
                 || is_busy(&busy_ctx, &thread_id),
                 fence.clone(),
                 deliver,
