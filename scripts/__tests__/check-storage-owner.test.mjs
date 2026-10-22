@@ -19,7 +19,7 @@ const pkg = (name, deps = [], source = null, manifest_path) => ({
       : `/repo/vendor/${name}/Cargo.toml`),
   dependencies: deps.map(d => ({ name: d, kind: null, optional: false })),
 });
-const checkMetadata = (m, root = '/repo') => checkMetadataAt(m, ALLOWLIST, root);
+const checkMetadata = (m, root = '/repo') => checkMetadataAt(m, root);
 const registry = 'registry+https://github.com/rust-lang/crates.io-index';
 
 test('a clean workspace passes', () => {
