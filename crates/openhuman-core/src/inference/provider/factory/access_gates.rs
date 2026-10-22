@@ -62,10 +62,54 @@ pub(super) fn local_only_violation(
         // Deferred: re-resolves to a concrete string on the recursive call.
         return None;
     }
-    if tinyinference_local::profile::is_local_provider_string(p) {
+    if tinyinference_local::profile::is_local_provider_string(p) && !is_ollama_cloud_model(p) {
         return None;
     }
     Some(external_provider_label(p))
+}
+
+/// An Ollama `*-cloud` tag: the local daemon proxies it to ollama.com, so
+/// the prompt leaves the machine although the route is named local.
+pub(super) fn is_ollama_cloud_model(provider: &str) -> bool {
+    let Some((prefix, model)) = provider.trim().split_once(':') else {
+        return false;
+    };
+    let tag = model
+        .rsplit_once('@')
+        .map_or(model, |(tag, _temperature)| tag);
+    prefix.eq_ignore_ascii_case("ollama") && tag.to_ascii_lowercase().ends_with("-cloud")
+}
+
+/// Whether `endpoint` stays on this machine. Only loopback counts: a LAN
+/// address is another machine.
+pub(super) fn is_loopback_endpoint(endpoint: &str) -> bool {
+    match url::Url::parse(endpoint.trim())
+        .ok()
+        .and_then(|url| url.host().map(|h| h.to_owned()))
+    {
+        Some(url::Host::Domain(host)) => {
+            let host = host.to_ascii_lowercase();
+            host == "localhost" || host.ends_with(".localhost")
+        }
+        // A client dialling the unspecified address reaches this machine.
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback() || ip.is_unspecified(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback() || ip.is_unspecified(),
+        None => false,
+    }
+}
+
+/// Privacy Mode `LocalOnly` for a resolved local-runtime endpoint: refuse
+/// one that is not loopback (the prompt and the `local_ai` key would go there).
+pub(super) fn enforce_local_only_endpoint(role: &str, endpoint: &str) -> anyhow::Result<()> {
+    let mode = crate::security::live_policy::current_privacy_mode();
+    if mode != crate::config::PrivacyMode::LocalOnly || is_loopback_endpoint(endpoint) {
+        return Ok(());
+    }
+    log::warn!("[privacy][chat-factory] LocalOnly BLOCK: role={role} local runtime endpoint is not loopback");
+    anyhow::bail!(
+        "Local-only privacy mode is active: this local model's endpoint is on another machine. \
+         Point it at this computer (localhost) or change privacy mode in Settings."
+    )
 }
 
 /// Enforce Privacy Mode `LocalOnly` at the inference chokepoint: refuse to build
