@@ -140,6 +140,14 @@ pub(super) fn effective_agent_config(
     effective_agent_config
 }
 
+pub(super) fn log_agent_definition_name(agent_id: &str) {
+    // Keep the definition stamp visible at the point the session is built.
+    log::debug!(
+        "[agent::builder] stamping agent_definition_name={} onto session agent",
+        agent_id
+    );
+}
+
 pub(super) fn payload_summarizer(
     host_only: bool,
     agent_id: &str,

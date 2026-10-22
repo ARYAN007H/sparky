@@ -378,44 +378,8 @@ impl OpenHumanSessionHost {
         let (effective_temperature, effective_omit_memory_context, effective_tokenjuice_compression) =
             helpers::effective_settings(target_def, config);
 
-        // Stamp the resolved agent definition id onto the OpenHumanSessionHost via the
-        // builder. Without this call, `agent_definition_name` falls
-        // back to the legacy `"main"` default (see `SessionHostBuilder::build`)
-        // for every non-orchestrator caller. In the current codebase
-        // that is benign for the orchestrator (which is already aliased
-        // as `"main"` everywhere downstream) but causes two concrete
-        // bugs for the welcome agent, which is the only other id that
-        // reaches this function in practice:
-        //
-        //   1. Its session transcripts are misfiled on disk under
-        //      `sessions/DDMMYYYY/main_*.md` instead of `welcome_*.md`.
-        //   2. The `agent:` line inside each transcript's metadata
-        //      header stamps `agent: main` instead of `agent: welcome`.
-        //
-        // Workflows_agent and every other typed sub-agent are unaffected
-        // because they never build via `from_config_for_agent` — they
-        // are spawned through `subagent_host` which constructs its
-        // prompt and history directly.
-        //
-        // See the docstring on `SessionHostBuilder::agent_definition_name`
-        // for the full list of surfaces and the latent prompt-section
-        // foot-gun this call also closes.
-        log::debug!(
-            "[agent::builder] stamping agent_definition_name={} onto session agent",
-            agent_id
-        );
+        helpers::log_agent_definition_name(agent_id);
 
-        // ── Orchestrator-only: wire the payload summarizer ──────────
-        //
-        // Issue #574 — when a tool returns a huge payload (Composio
-        // dump, long file read, web scrape), it should be compressed
-        // by TinyJuice's summary stage before entering the orchestrator's
-        // history. TinyJuice owns the prompt and the thresholds (installed
-        // from [`ContextConfig`]); the host supplies only the model call,
-        // through a `SubagentPayloadSummarizer` built from the `summarizer`
-        // agent definition. Every other agent id gets
-        // `None` and their tool results stay untouched (the summarizer
-        // itself MUST be `None` to avoid recursive self-summarization).
         let payload_summarizer = helpers::payload_summarizer(host_only, agent_id, config);
 
         // Crate-native turn models (Phase 3 P3-B): the production main-turn agent
