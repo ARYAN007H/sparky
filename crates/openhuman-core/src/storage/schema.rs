@@ -59,7 +59,11 @@ fn declared_collections() -> Vec<CollectionSpec> {
         collections.extend(tinyjuice_bus::storage::collections());
     }
     #[cfg(feature = "web3")]
-    collections.extend(tinywallet_bus::storage::collections());
+    collections.extend(
+        tinywallet_bus::storage::collections()
+            .into_iter()
+            .map(|collection| CollectionSpec::new(collection.name)),
+    );
     #[cfg(feature = "tinymemes")]
     collections.extend(tinymemes_bus::storage::collections());
     #[cfg(feature = "inbound-queues")]
@@ -91,7 +95,12 @@ pub fn module_collections(owner: &str) -> Vec<CollectionSpec> {
     }
     #[cfg(feature = "web3")]
     if owner == "wallet" {
-        return module_owned_collections(tinywallet_bus::storage::collections());
+        return module_owned_collections(
+            tinywallet_bus::storage::collections()
+                .into_iter()
+                .map(|collection| CollectionSpec::new(collection.name))
+                .collect(),
+        );
     }
     #[cfg(feature = "tinymemes")]
     if owner == "memes" {
