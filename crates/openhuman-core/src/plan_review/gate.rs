@@ -211,14 +211,16 @@ impl PlanReviewGate {
         self.parked_review_for_thread(&socket_tenant.0, thread_id)
     }
 
-    /// Capture this socket's replay scope from the active server context.
-    /// SaaS requests with no scoped tenant fail closed; local hosts keep their
-    /// current profile/default context for the lifetime of the socket.
-    pub fn socket_scope_for_current_context(&self) -> Option<SocketReviewScope> {
-        socket_scope_from_context(
-            crate::core::runtime::DispatchCtx::ambient().tenant(),
-            crate::core::runtime::is_saas(),
-        )
+    /// Capture this socket's replay scope from the request's server-bound
+    /// dispatch context. Socket transports may run connection handlers in a
+    /// new task, so the request context must be passed explicitly rather than
+    /// read from ambient task-local state. SaaS requests without a scoped
+    /// tenant fail closed; local hosts retain their active profile/default.
+    pub fn socket_scope_for_dispatch(
+        &self,
+        dispatch: &crate::core::runtime::DispatchCtx,
+    ) -> Option<SocketReviewScope> {
+        socket_scope_from_context(dispatch.tenant(), crate::core::runtime::is_saas())
     }
 
     /// Resolve a parked review by `request_id`. Returns `true` when a waiter was
