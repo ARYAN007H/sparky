@@ -48,22 +48,22 @@ fn without_session(config: &Config) {
 
 #[test]
 fn a_managed_401_on_an_attached_session_reads_as_signed_out() {
-    assert!(managed_401_means_signed_out(Some(401), true));
-    assert!(!managed_401_means_signed_out(None, true));
+    assert!(managed_401_means_signed_out(401, true));
+    assert!(!managed_401_means_signed_out(200, true));
 }
 
 /// A 401 on a request that never carried the session token describes the
 /// request (a misconfigured URL), not the session, so the error surfaces.
 #[test]
 fn a_401_without_an_attached_session_still_surfaces() {
-    assert!(!managed_401_means_signed_out(Some(401), false));
+    assert!(!managed_401_means_signed_out(401, false));
 }
 
 #[test]
 fn other_statuses_still_surface_the_error() {
     for status in [400, 403, 404, 429, 500, 503] {
         assert!(
-            !managed_401_means_signed_out(Some(status), true),
+            !managed_401_means_signed_out(status, true),
             "managed {status}"
         );
     }
@@ -145,7 +145,7 @@ async fn managed_catalog_treats_http_401_as_signed_out_only_for_an_attached_sess
 
     let result = list_models(
         &config,
-        CatalogRequest {
+        CatalogHostRequest {
             provider_key: String::new(),
             client: reqwest::Client::new(),
         },
@@ -170,7 +170,7 @@ async fn managed_catalog_keeps_provider_key_401_as_a_provider_error() {
 
     let error = list_models(
         &config,
-        CatalogRequest {
+        CatalogHostRequest {
             provider_key: "fixture-provider-key".into(),
             client: reqwest::Client::new(),
         },
@@ -195,7 +195,7 @@ async fn managed_catalog_does_not_infer_http_status_from_error_payload_text() {
 
     let error = list_models(
         &config,
-        CatalogRequest {
+        CatalogHostRequest {
             provider_key: String::new(),
             client: reqwest::Client::new(),
         },
@@ -206,3 +206,7 @@ async fn managed_catalog_does_not_infer_http_status_from_error_payload_text() {
     assert!(error.contains("provider returned error payload"), "{error}");
     assert!(error.contains("401 session expired"), "{error}");
 }
+
+#[cfg(test)]
+#[path = "managed_catalog_inspection_tests.rs"]
+mod inspection_tests;

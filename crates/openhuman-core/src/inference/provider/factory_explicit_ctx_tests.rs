@@ -1,16 +1,19 @@
 use super::*;
+use tinyinference_llm::providers::overrides::{
+    CatalogEntry, ChatModelEntry, ProviderModelMetadata,
+};
 
 #[tokio::test]
 async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{ChatModelEntry, ProviderModelHooks};
+    use crate::inference::registry::ProviderContext;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use tinyinference_llm::message::Message;
     use tinyinference_llm::model::ModelRequest;
 
-    fn entry(name: &'static str, probed: Arc<AtomicBool>) -> ChatModelEntry {
+    fn entry(name: &'static str, probed: Arc<AtomicBool>) -> ChatModelEntry<ProviderContext> {
         ChatModelEntry {
             build: Arc::new(move |_| {
                 Ok((
@@ -20,15 +23,15 @@ async fn managed_factory_and_probe_use_the_explicit_provider_entry() {
                     name.to_string(),
                 ))
             }),
-            probe: Some(Arc::new(move |_, model, _| {
+            probe: Some(Arc::new(move |request| {
                 let actual = probed.clone();
                 Box::pin(async move {
-                    assert_eq!(model, name);
+                    assert_eq!(request.model, name);
                     actual.store(true, Ordering::SeqCst);
                     Ok(())
                 })
             })),
-            models: Some(ProviderModelHooks {
+            models: Some(ProviderModelMetadata {
                 default_model: Arc::new(move || Some(name.to_string())),
                 role_for_model: Arc::new(|_| None),
                 is_alias: Arc::new(|_| false),
@@ -133,14 +136,12 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
     };
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{
-        register_catalog_in, CatalogEntry, ChatModelEntry, ProviderModelHooks,
-    };
+    use crate::inference::registry::{register_catalog_in, ProviderContext};
     use std::sync::Arc;
     use tinyinference_llm::message::Message;
     use tinyinference_llm::model::ModelRequest;
 
-    fn entry(name: &'static str) -> ChatModelEntry {
+    fn entry(name: &'static str) -> ChatModelEntry<ProviderContext> {
         ChatModelEntry {
             build: Arc::new(move |_| {
                 Ok((
@@ -151,7 +152,7 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
                 ))
             }),
             probe: None,
-            models: Some(ProviderModelHooks {
+            models: Some(ProviderModelMetadata {
                 default_model: Arc::new(move || Some(name.to_string())),
                 role_for_model: Arc::new(|_| None),
                 is_alias: Arc::new(|_| false),
@@ -165,9 +166,9 @@ async fn hosted_cloud_slug_uses_explicit_auth_policy_and_model_entry() {
         }
     }
 
-    fn catalog(name: &'static str) -> CatalogEntry {
+    fn catalog(name: &'static str) -> CatalogEntry<ProviderContext> {
         CatalogEntry {
-            list: Arc::new(|_, _| {
+            list: Arc::new(|_| {
                 Box::pin(async { Err("model listing is not used by this test".to_string()) })
             }),
             limits: Some(Arc::new(move |model, _| {

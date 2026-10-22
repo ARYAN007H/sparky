@@ -14,12 +14,11 @@
 //! The tables know nothing about what a provider talks to. With nothing
 //! registered every consult point behaves exactly as before.
 
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
+use std::collections::hash_map::RandomState;
+use std::hash::{BuildHasher, Hash, Hasher};
+use std::sync::{Arc, OnceLock};
 
 use tinyinference_embeddings::EmbeddingModel;
-use tinyinference_llm::model::discover::DiscoveryRequest;
 use tinyinference_llm::model::ChatModel;
 
 use crate::config::Config;
@@ -28,91 +27,109 @@ use crate::core::Outcome;
 use crate::security::approval::ApprovalChatContext;
 use crate::security::egress::EgressLedger;
 
-/// A boxed `Send` future.
-pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
-
 // ---------------------------------------------------------------------------
 // Chat models
 // ---------------------------------------------------------------------------
 
-/// What a registered chat-model factory is asked to build.
-pub struct ChatModelRequest<'a> {
-    /// The workload role the route was resolved for (`chat`, `reasoning`, ...).
-    pub role: &'a str,
-    /// The configuration in force.
-    pub config: &'a Config,
-    /// The concrete model id the core resolved for this construction (a role
-    /// alias such as `hint:coding` has already been translated to the
-    /// configured default).
-    pub model_override: Option<&'a str>,
-    /// The model the turn runs on when the request itself names none.
-    pub default_model: Option<&'a str>,
-    /// Whether the model should use native tool calling.
-    pub native_tool_calling: bool,
-    /// The conversation thread this model serves, when it is a turn model.
-    pub thread_id: Option<&'a str>,
-    /// Where the construction discloses its external transfer.
-    pub egress: &'a EgressLedger,
+/// Host state supplied to a native TinyInference provider callback.
+#[derive(Clone)]
+pub struct ProviderContext {
+    /// Configuration selected by the host for this provider call.
+    pub config: Config,
+    /// Egress ledger selected by the host for this provider call.
+    pub egress: EgressLedger,
+    /// Credential and disclosure data for an embedding factory call.
+    pub embedding: Option<EmbeddingCallContext>,
+    /// Request data and log sink for a catalog listing call.
+    pub catalog: Option<CatalogCallContext>,
 }
 
-/// Builds a chat model and reports the model id it resolved to.
-pub type ChatModelFactory = Arc<
-    dyn for<'a> Fn(&ChatModelRequest<'a>) -> anyhow::Result<(Arc<dyn ChatModel<()>>, String)>
-        + Send
-        + Sync,
->;
-
-/// Asks a provider whether it can serve `role` right now: `(role, model,
-/// config)`, where `model` is the concrete model id the core resolved.
-pub type ReadinessProbe =
-    Arc<dyn Fn(String, String, Config) -> BoxFuture<Result<(), String>> + Send + Sync>;
-
-/// Resolves a provider-owned model id to its workload role.
-pub type ModelRoleResolver = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
-
-/// Resolves a workload role and optional model pin to a concrete model id.
-pub type ModelResolver = Arc<dyn Fn(&str, &Config, Option<&str>) -> Option<String> + Send + Sync>;
-
-/// Looks up a provider-owned static context window for a model id.
-pub type ModelContextWindow = Arc<dyn Fn(&str) -> Option<u64> + Send + Sync>;
-
-/// A registered chat-model provider.
 #[derive(Clone)]
-pub struct ChatModelEntry {
-    /// Builds the model.
-    pub build: ChatModelFactory,
-    /// Optional readiness probe (the flows inference probe).
-    pub probe: Option<ReadinessProbe>,
-    /// Optional model vocabulary and defaults owned by this provider. The
-    /// core calls these hooks without interpreting provider-specific ids.
-    pub models: Option<ProviderModelHooks>,
+pub struct EmbeddingCallContext {
+    pub config: Option<Config>,
+    pub chat: Option<ApprovalChatContext>,
+    pub state_dir: std::path::PathBuf,
+    pub secrets_encrypt: bool,
 }
 
-/// Provider-owned model behavior consulted by generic inference callers.
 #[derive(Clone)]
-pub struct ProviderModelHooks {
-    /// The provider's default model, absent when it has no default.
-    pub default_model: Arc<dyn Fn() -> Option<String> + Send + Sync>,
-    /// Resolves a role alias or legacy model id to its workload role.
-    pub role_for_model: ModelRoleResolver,
-    /// Whether a model is a provider-specific alias rather than a concrete id.
-    pub is_alias: Arc<dyn Fn(&str) -> bool + Send + Sync>,
-    /// Whether a model is a concrete id suitable for pass-through.
-    pub is_raw_model: Arc<dyn Fn(&str) -> bool + Send + Sync>,
-    /// Whether a model accepts image input according to provider metadata.
-    pub supports_vision: Arc<dyn Fn(&str) -> bool + Send + Sync>,
-    /// Resolves the provider's default/alias policy for a managed construction.
-    pub resolve_model: ModelResolver,
-    /// The default model's static context window, if the provider knows it.
-    pub context_window: ModelContextWindow,
-    /// Provider default pricing as (model id, input USD/1M, output USD/1M).
-    pub default_pricing: Arc<dyn Fn() -> Option<(String, f64, f64)> + Send + Sync>,
-    /// Applies a provider-specific request hint without exposing its wire key.
-    pub without_reasoning: Arc<
-        dyn Fn(tinyinference_llm::model::ModelRequest) -> tinyinference_llm::model::ModelRequest
-            + Send
-            + Sync,
-    >,
+pub struct CatalogCallContext {
+    pub request: CatalogHostRequest,
+    pub logs: Arc<std::sync::Mutex<Vec<String>>>,
+}
+
+#[derive(Clone)]
+pub struct CatalogHostRequest {
+    pub provider_key: String,
+    pub client: reqwest::Client,
+}
+
+impl ProviderContext {
+    pub(crate) fn new(config: &Config, egress: &EgressLedger) -> Self {
+        Self {
+            config: config.clone(),
+            egress: egress.clone(),
+            embedding: None,
+            catalog: None,
+        }
+    }
+
+    pub(crate) fn for_embedding(
+        config: Option<&Config>,
+        chat: Option<ApprovalChatContext>,
+        state_dir: std::path::PathBuf,
+        secrets_encrypt: bool,
+    ) -> Self {
+        let base = config.cloned().unwrap_or_default();
+        Self {
+            config: base,
+            egress: EgressLedger::none(),
+            embedding: Some(EmbeddingCallContext {
+                config: config.cloned(),
+                chat,
+                state_dir,
+                secrets_encrypt,
+            }),
+            catalog: None,
+        }
+    }
+
+    pub(crate) fn for_catalog(config: &Config, request: CatalogHostRequest) -> Self {
+        Self {
+            config: config.clone(),
+            egress: EgressLedger::none(),
+            embedding: None,
+            catalog: Some(CatalogCallContext {
+                request,
+                logs: Arc::new(std::sync::Mutex::new(Vec::new())),
+            }),
+        }
+    }
+}
+
+use tinyinference_llm::providers::overrides::{
+    BoxFuture, CatalogEntry, ChatModelEntry, ChatModelRequest, EmbeddingFactory, EmbeddingRequest,
+    ProviderModelMetadata, ProviderOverrides,
+};
+
+pub(crate) fn provider_overrides(
+    extensions: Option<Extensions>,
+) -> ProviderOverrides<ProviderContext> {
+    let chat_extensions = extensions.clone();
+    let embedding_extensions = extensions.clone();
+    ProviderOverrides::new(
+        move |provider_id| CHAT_MODELS.get_for(chat_extensions.as_ref(), provider_id),
+        move |provider_id| EMBEDDINGS.get_for(embedding_extensions.as_ref(), provider_id),
+        move |provider_id| CATALOGS.get_for(extensions.as_ref(), provider_id),
+    )
+}
+
+pub(crate) fn ambient_provider_overrides() -> ProviderOverrides<ProviderContext> {
+    ProviderOverrides::new(
+        |provider_id| CHAT_MODELS.get(provider_id),
+        |provider_id| EMBEDDINGS.get(provider_id),
+        |provider_id| CATALOGS.get(provider_id),
+    )
 }
 
 /// A provider-neutral semantic category for a backend error.
@@ -182,10 +199,79 @@ pub fn classify_backend_error(
         .map(|classifier| classifier(provider, error))
 }
 
-static CHAT_MODELS: HookSlot<ChatModelEntry> = HookSlot::new("inference::chat_models");
+static CHAT_MODELS: HookSlot<ChatModelEntry<ProviderContext>> =
+    HookSlot::new("inference::chat_models");
+
+/// A managed chat-model factory that is safe for inspection calls through
+/// invoke/stream: it must use a frozen, read-only credential snapshot and
+/// must not refresh or publish credential state.
+pub type InspectionChatModelFactory = PreparedInspectionChatModelFactory;
+
+/// An inspection-safe model and the resolved wire identity it invokes.
+/// `credential` is retained only long enough for the core to build a
+/// report-local deduplication key; it must never be logged or reported.
+pub struct InspectionChatModelBuild {
+    /// Frozen chat model that invokes the resolved route.
+    pub model: Arc<dyn ChatModel<()>>,
+    /// Safe provider model identifier selected for the route.
+    pub model_id: String,
+    /// Effective request endpoint used by the model.
+    pub endpoint: String,
+    /// Exact frozen bearer/key used by the model. Never expose in findings.
+    pub credential: String,
+}
+
+/// Inspection-safe provider callback. Unlike the runtime callback this must
+/// return the same frozen route identity used by the model invocation.
+pub type PreparedInspectionChatModelFactory = Arc<
+    dyn for<'a> Fn(
+            &ChatModelRequest<'a, ProviderContext>,
+        ) -> anyhow::Result<InspectionChatModelBuild>
+        + Send
+        + Sync,
+>;
+
+static INSPECTION_CHAT_MODELS: HookSlot<InspectionChatModelFactory> =
+    HookSlot::new("inference::inspection_chat_models");
+
+/// Registers an inspection-safe managed model factory process-wide.
+pub fn register_inspection_chat_model(
+    provider_id: impl Into<String>,
+    factory: PreparedInspectionChatModelFactory,
+) {
+    INSPECTION_CHAT_MODELS.register(provider_id, factory);
+}
+
+/// Registers an inspection-safe managed model factory for the context built
+/// from `extensions`.
+pub fn register_inspection_chat_model_in(
+    extensions: &Extensions,
+    provider_id: impl Into<String>,
+    factory: PreparedInspectionChatModelFactory,
+) {
+    INSPECTION_CHAT_MODELS.register_in(extensions, provider_id, factory);
+}
+
+/// Removes the process-wide inspection-safe managed model factory.
+pub fn unregister_inspection_chat_model(provider_id: &str) -> bool {
+    INSPECTION_CHAT_MODELS.unregister(provider_id)
+}
+
+pub(crate) fn inspection_chat_model(
+    provider_id: &str,
+) -> Option<PreparedInspectionChatModelFactory> {
+    INSPECTION_CHAT_MODELS.get(provider_id)
+}
+
+pub(crate) fn inspection_chat_model_for(
+    extensions: Option<&Extensions>,
+    provider_id: &str,
+) -> Option<PreparedInspectionChatModelFactory> {
+    INSPECTION_CHAT_MODELS.get_for(extensions, provider_id)
+}
 
 /// Registers the chat-model provider `provider_id` for the whole process.
-pub fn register_chat_model(provider_id: impl Into<String>, entry: ChatModelEntry) {
+pub fn register_chat_model(provider_id: impl Into<String>, entry: ChatModelEntry<ProviderContext>) {
     CHAT_MODELS.register(provider_id, entry);
 }
 
@@ -194,7 +280,7 @@ pub fn register_chat_model(provider_id: impl Into<String>, entry: ChatModelEntry
 pub fn register_chat_model_in(
     extensions: &Extensions,
     provider_id: impl Into<String>,
-    entry: ChatModelEntry,
+    entry: ChatModelEntry<ProviderContext>,
 ) {
     CHAT_MODELS.register_in(extensions, provider_id, entry);
 }
@@ -205,8 +291,8 @@ pub fn unregister_chat_model(provider_id: &str) -> bool {
 }
 
 /// The registered chat-model provider, if any.
-pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry> {
-    CHAT_MODELS.get(provider_id)
+pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry<ProviderContext>> {
+    ambient_provider_overrides().chat_entry(provider_id)
 }
 
 /// The chat-model provider selected by an explicit context, falling back only
@@ -214,12 +300,14 @@ pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry> {
 pub(crate) fn chat_model_for(
     extensions: Option<&Extensions>,
     provider_id: &str,
-) -> Option<ChatModelEntry> {
-    CHAT_MODELS.get_for(extensions, provider_id)
+) -> Option<ChatModelEntry<ProviderContext>> {
+    provider_overrides(extensions.cloned()).chat_entry(provider_id)
 }
 
 /// The registered provider's model hooks, if it has any.
-pub(crate) fn provider_model_hooks(provider_id: &str) -> Option<ProviderModelHooks> {
+pub(crate) fn provider_model_hooks(
+    provider_id: &str,
+) -> Option<ProviderModelMetadata<ProviderContext>> {
     chat_model(provider_id)?.models
 }
 
@@ -306,7 +394,11 @@ pub fn resolve_provider_model(
     model_override: Option<&str>,
 ) -> Option<String> {
     let hooks = provider_model_hooks(provider_id)?;
-    (hooks.resolve_model)(role, config, model_override)
+    (hooks.resolve_model)(
+        role,
+        &ProviderContext::new(config, &EgressLedger::none()),
+        model_override,
+    )
 }
 
 pub(crate) fn resolve_provider_model_for(
@@ -317,7 +409,11 @@ pub(crate) fn resolve_provider_model_for(
     model_override: Option<&str>,
 ) -> Option<String> {
     let hooks = chat_model_for(extensions, provider_id)?.models?;
-    (hooks.resolve_model)(role, config, model_override)
+    (hooks.resolve_model)(
+        role,
+        &ProviderContext::new(config, &EgressLedger::none()),
+        model_override,
+    )
 }
 
 /// The provider's model-specific context window, if known.
@@ -381,60 +477,64 @@ pub(crate) fn normalize_config(config: &mut Config) -> bool {
 // Embeddings
 // ---------------------------------------------------------------------------
 
-/// What a registered embedding factory is asked to build.
-pub struct EmbeddingRequest<'a> {
-    /// The configuration in force, when the caller has one (the credential-only
-    /// constructors do not).
-    pub config: Option<&'a Config>,
-    /// The embedding model id.
-    pub model: &'a str,
-    /// The vector dimensionality.
-    pub dimensions: usize,
-    /// The chat turn the call is made in, so disclosures reach that chat.
-    pub chat: Option<ApprovalChatContext>,
-    /// The directory the caller's credentials live in (the config's credential
-    /// scope, or the process default when the caller has no config).
-    pub state_dir: std::path::PathBuf,
-    /// Whether that credential store is encrypted at rest.
-    pub secrets_encrypt: bool,
-}
+static EMBEDDINGS: HookSlot<EmbeddingFactory<ProviderContext>> =
+    HookSlot::new("inference::embeddings");
 
-/// Builds an embedding model.
-pub type EmbeddingFactory = Arc<
-    dyn for<'a> Fn(
-            &EmbeddingRequest<'a>,
+/// A managed embedding factory safe for doctor inspection: it uses a frozen
+/// credential snapshot and never refreshes or publishes credential state.
+pub type InspectionEmbeddingFactory = EmbeddingFactory<ProviderContext>;
+
+static INSPECTION_EMBEDDINGS: HookSlot<InspectionEmbeddingFactory> =
+    HookSlot::new("inference::inspection-embeddings");
+
+/// Registers a managed embedding factory for read-only credential inspection.
+pub fn register_inspection_embedding<F>(provider_id: impl Into<String>, factory: F)
+where
+    F: for<'a> Fn(
+            &EmbeddingRequest<'a, ProviderContext>,
         ) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
         + Send
-        + Sync,
->;
+        + Sync
+        + 'static,
+{
+    INSPECTION_EMBEDDINGS.register(provider_id, Arc::new(factory));
+}
 
-static EMBEDDINGS: HookSlot<EmbeddingFactory> = HookSlot::new("inference::embeddings");
+/// Registers an inspection-safe embedding factory for one core context.
+pub fn register_inspection_embedding_in<F>(
+    extensions: &Extensions,
+    provider_id: impl Into<String>,
+    factory: F,
+) where
+    F: for<'a> Fn(
+            &EmbeddingRequest<'a, ProviderContext>,
+        ) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
+        + Send
+        + Sync
+        + 'static,
+{
+    INSPECTION_EMBEDDINGS.register_in(extensions, provider_id, Arc::new(factory));
+}
+
+pub(crate) fn inspection_embedding(provider_id: &str) -> Option<InspectionEmbeddingFactory> {
+    INSPECTION_EMBEDDINGS.get(provider_id)
+}
 
 /// Registers the embedding provider `provider_id` for the whole process.
-pub fn register_embedding<F>(provider_id: impl Into<String>, factory: F)
-where
-    F: for<'a> Fn(
-            &EmbeddingRequest<'a>,
-        ) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
-        + Send
-        + Sync
-        + 'static,
-{
-    EMBEDDINGS.register(provider_id, Arc::new(factory));
+pub fn register_embedding(
+    provider_id: impl Into<String>,
+    factory: EmbeddingFactory<ProviderContext>,
+) {
+    EMBEDDINGS.register(provider_id, factory);
 }
 
-/// Registers the embedding provider `provider_id` for the context built from
-/// `extensions`.
-pub fn register_embedding_in<F>(extensions: &Extensions, provider_id: impl Into<String>, factory: F)
-where
-    F: for<'a> Fn(
-            &EmbeddingRequest<'a>,
-        ) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
-        + Send
-        + Sync
-        + 'static,
-{
-    EMBEDDINGS.register_in(extensions, provider_id, Arc::new(factory));
+/// Registers the embedding provider `provider_id` for the context built from `extensions`.
+pub fn register_embedding_in(
+    extensions: &Extensions,
+    provider_id: impl Into<String>,
+    factory: EmbeddingFactory<ProviderContext>,
+) {
+    EMBEDDINGS.register_in(extensions, provider_id, factory);
 }
 
 /// Removes the process-wide embedding provider `provider_id`.
@@ -443,53 +543,18 @@ pub fn unregister_embedding(provider_id: &str) -> bool {
 }
 
 /// The registered embedding factory, if any.
-pub(crate) fn embedding(provider_id: &str) -> Option<EmbeddingFactory> {
-    EMBEDDINGS.get(provider_id)
+pub(crate) fn embedding(provider_id: &str) -> Option<EmbeddingFactory<ProviderContext>> {
+    ambient_provider_overrides().embedding_factory(provider_id)
 }
 
 // ---------------------------------------------------------------------------
 // Model catalogs
 // ---------------------------------------------------------------------------
 
-/// What the core resolved for the `cloud_providers` entry a listing serves,
-/// handed to the catalog so it honours the same per-entry settings every
-/// other provider listing does.
-#[derive(Clone)]
-pub struct CatalogRequest {
-    /// The key stored for the entry's slug (empty when none): the credential
-    /// a catalog falls back to when there is no live session.
-    pub provider_key: String,
-    /// The HTTP client for the entry: the entry's CA bundle when it has one,
-    /// else the runtime proxy client, under the `providers.list_models`
-    /// service key.
-    pub client: reqwest::Client,
-}
-
-/// Lists a provider's models: the same envelope `list_configured_models`
-/// returns (`{ "models": [...] }`).
-pub type CatalogListing = Arc<
-    dyn Fn(Config, CatalogRequest) -> BoxFuture<Result<Outcome<serde_json::Value>, String>>
-        + Send
-        + Sync,
->;
-
-/// Where to ask for one model's limits: `(model, config)`; `None` when the
-/// provider has no listing for it.
-pub type CatalogLimits = Arc<dyn Fn(&str, &Config) -> Option<DiscoveryRequest> + Send + Sync>;
-
-/// A registered model catalog.
-#[derive(Clone)]
-pub struct CatalogEntry {
-    /// The `list_configured_models` listing.
-    pub list: CatalogListing,
-    /// The limits-discovery request, when the provider has one.
-    pub limits: Option<CatalogLimits>,
-}
-
-static CATALOGS: HookSlot<CatalogEntry> = HookSlot::new("inference::catalogs");
+static CATALOGS: HookSlot<CatalogEntry<ProviderContext>> = HookSlot::new("inference::catalogs");
 
 /// Registers the model catalog for `provider_id` for the whole process.
-pub fn register_catalog(provider_id: impl Into<String>, entry: CatalogEntry) {
+pub fn register_catalog(provider_id: impl Into<String>, entry: CatalogEntry<ProviderContext>) {
     CATALOGS.register(provider_id, entry);
 }
 
@@ -498,7 +563,7 @@ pub fn register_catalog(provider_id: impl Into<String>, entry: CatalogEntry) {
 pub fn register_catalog_in(
     extensions: &Extensions,
     provider_id: impl Into<String>,
-    entry: CatalogEntry,
+    entry: CatalogEntry<ProviderContext>,
 ) {
     CATALOGS.register_in(extensions, provider_id, entry);
 }
@@ -509,15 +574,138 @@ pub fn unregister_catalog(provider_id: &str) -> bool {
 }
 
 /// The registered catalog, if any.
-pub(crate) fn catalog(provider_id: &str) -> Option<CatalogEntry> {
-    CATALOGS.get(provider_id)
+pub(crate) fn catalog(provider_id: &str) -> Option<CatalogEntry<ProviderContext>> {
+    ambient_provider_overrides().catalog_entry(provider_id)
 }
 
 pub(crate) fn catalog_for(
     extensions: Option<&Extensions>,
     provider_id: &str,
-) -> Option<CatalogEntry> {
-    CATALOGS.get_for(extensions, provider_id)
+) -> Option<CatalogEntry<ProviderContext>> {
+    provider_overrides(extensions.cloned()).catalog_entry(provider_id)
+}
+
+/// Safe outcomes from an inspection-only catalog request. Error response
+/// bodies stay at the adapter boundary so Findings can never echo them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InspectionCatalogError {
+    /// The selected credential was rejected or lacks catalog access.
+    AuthOrAccess,
+    /// The provider does not expose a model-listing route.
+    NoCatalog,
+    /// The selected profile, endpoint, or read-only credential could not be
+    /// inspected safely.
+    Unavailable,
+    /// The catalog request failed for another bounded, safe-to-summarize
+    /// reason.
+    Failure,
+}
+
+/// A catalog result is prepared before the doctor consults its cache. The
+/// opaque identity captures the exact frozen credential and endpoint; the
+/// lazy future captures those same values and is dropped on a cache hit.
+///
+/// Fields are intentionally private and this type does not implement
+/// `Debug`, `Serialize`, or `Display`, so credential identities cannot leak
+/// through reports or logs.
+pub struct PreparedInspectionCatalog {
+    identity: InspectionCatalogIdentity,
+    fetch: BoxFuture<Result<Outcome<serde_json::Value>, InspectionCatalogError>>,
+}
+
+/// Host request state used to prepare a cache-safe catalog inspection.
+///
+/// Unlike a normal provider catalog request, inspection resolves credentials
+/// read-only and freezes them before the doctor checks its cache.
+#[derive(Clone)]
+pub struct InspectionCatalogRequest {
+    /// Provider-scoped key selected by the host, if any.
+    pub provider_key: String,
+    /// HTTP client configured by the host for this listing.
+    pub client: reqwest::Client,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct InspectionCatalogIdentity(u64);
+
+impl PreparedInspectionCatalog {
+    /// Creates a prepared request using a stable, process-keyed identity over
+    /// the provider, effective listing URL, and credential snapshot. The
+    /// fetch future must use the same credential snapshot passed here.
+    pub fn new(
+        provider_id: &str,
+        effective_listing_url: &str,
+        credential: Option<&str>,
+        fetch: BoxFuture<Result<Outcome<serde_json::Value>, InspectionCatalogError>>,
+    ) -> Self {
+        let normalized_url = reqwest::Url::parse(effective_listing_url)
+            .map(|url| url.to_string())
+            .unwrap_or_else(|_| effective_listing_url.to_owned());
+        let credential = credential
+            .map(str::trim)
+            .filter(|credential| !credential.is_empty());
+        static IDENTITY_HASHER: OnceLock<RandomState> = OnceLock::new();
+        let mut hasher = IDENTITY_HASHER.get_or_init(RandomState::new).build_hasher();
+        provider_id.hash(&mut hasher);
+        normalized_url.hash(&mut hasher);
+        credential.hash(&mut hasher);
+        Self {
+            identity: InspectionCatalogIdentity(hasher.finish()),
+            fetch,
+        }
+    }
+
+    pub(crate) fn identity(&self) -> InspectionCatalogIdentity {
+        self.identity
+    }
+
+    /// Runs the prepared request. Callers consult their cache before invoking
+    /// this method; dropping the value leaves the network future unpolled.
+    pub fn fetch(self) -> BoxFuture<Result<Outcome<serde_json::Value>, InspectionCatalogError>> {
+        self.fetch
+    }
+}
+
+/// An inspection-safe catalog preparer. It must read credentials without
+/// refreshing, publishing expiry, or modifying profile state, then freeze the
+/// credential into the returned request before the core checks its cache.
+pub type InspectionCatalogListing = Arc<
+    dyn Fn(
+            Config,
+            InspectionCatalogRequest,
+        ) -> BoxFuture<Result<PreparedInspectionCatalog, InspectionCatalogError>>
+        + Send
+        + Sync,
+>;
+
+static INSPECTION_CATALOGS: HookSlot<InspectionCatalogListing> =
+    HookSlot::new("inference::inspection_catalogs");
+
+/// Registers an inspection-safe catalog preparer for the whole process.
+pub fn register_inspection_catalog(
+    provider_id: impl Into<String>,
+    listing: InspectionCatalogListing,
+) {
+    INSPECTION_CATALOGS.register(provider_id, listing);
+}
+
+/// Registers an inspection-safe catalog preparer for a context built from
+/// `extensions`.
+pub fn register_inspection_catalog_in(
+    extensions: &Extensions,
+    provider_id: impl Into<String>,
+    listing: InspectionCatalogListing,
+) {
+    INSPECTION_CATALOGS.register_in(extensions, provider_id, listing);
+}
+
+/// Removes a process-wide inspection-safe catalog preparer.
+pub fn unregister_inspection_catalog(provider_id: &str) -> bool {
+    INSPECTION_CATALOGS.unregister(provider_id)
+}
+
+pub(crate) fn inspection_catalog(provider_id: &str) -> Option<InspectionCatalogListing> {
+    INSPECTION_CATALOGS.get(provider_id)
 }
 
 #[cfg(test)]

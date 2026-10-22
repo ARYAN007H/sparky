@@ -7,6 +7,41 @@ use axum::{routing::post, Json, Router};
 use chrono::{Duration, Utc};
 use tempfile::tempdir;
 
+#[tokio::test]
+async fn inference_list_models_uses_the_dispatch_context_config() {
+    use crate::core::runtime::{context::CoreContext, DispatchCtx, DomainSet};
+    use crate::inference::provider::model_listing_test_support::{
+        configure_generic_workspace, spawn_static_models_server,
+    };
+
+    let models_a = r#"{"data":[{"id":"tenant-a-model","owned_by":"fixture"}]}"#;
+    let models_b = r#"{"data":[{"id":"tenant-b-model","owned_by":"fixture"}]}"#;
+    let endpoint_a = spawn_static_models_server(axum::http::StatusCode::OK, models_a).await;
+    let endpoint_b = spawn_static_models_server(axum::http::StatusCode::OK, models_b).await;
+    let workspace_a = tempdir().expect("tenant A workspace");
+    let workspace_b = tempdir().expect("tenant B workspace");
+    let config_a = configure_generic_workspace(&workspace_a, endpoint_a).await;
+    let config_b = configure_generic_workspace(&workspace_b, endpoint_b).await;
+    let ctx_a = DispatchCtx::new(CoreContext::for_test_with_config(
+        DomainSet::full(),
+        config_a,
+    ));
+    let ctx_b = DispatchCtx::new(CoreContext::for_test_with_config(
+        DomainSet::full(),
+        config_b,
+    ));
+
+    let result_a = inference_list_models(&ctx_a, "p_generic_test")
+        .await
+        .expect("tenant A catalog request succeeds");
+    let result_b = inference_list_models(&ctx_b, "p_generic_test")
+        .await
+        .expect("tenant B catalog request succeeds");
+
+    assert_eq!(result_a.value["models"][0]["id"], "tenant-a-model");
+    assert_eq!(result_b.value["models"][0]["id"], "tenant-b-model");
+}
+
 fn disabled_config() -> (Config, tempfile::TempDir) {
     let tmp = tempdir().expect("tempdir");
     let mut config = Config {

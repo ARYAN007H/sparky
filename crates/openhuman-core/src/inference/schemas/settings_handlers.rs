@@ -192,12 +192,12 @@ pub(super) fn handle_inference_update_local_settings(
 }
 
 pub(super) fn handle_inference_list_models(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let request = deserialize_params::<InferenceListModelsParams>(params)?;
-        to_json(crate::inference::ops::inference_list_models(&request.provider_id).await?)
+        to_json(crate::inference::ops::inference_list_models(&ctx, &request.provider_id).await?)
     })
 }
 

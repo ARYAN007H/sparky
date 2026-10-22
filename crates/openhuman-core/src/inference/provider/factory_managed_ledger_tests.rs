@@ -35,7 +35,7 @@ async fn managed_construction_ledger_collapses_repeat_disclosures() {
     let provider_id = crate::inference::provider::factory::PROVIDER_OPENHUMAN;
     crate::inference::registry::register_chat_model(
         provider_id,
-        crate::inference::registry::ChatModelEntry {
+        tinyinference_llm::providers::overrides::ChatModelEntry {
             build: Arc::new(|request| {
                 let model = request
                     .model_override
@@ -44,23 +44,25 @@ async fn managed_construction_ledger_collapses_repeat_disclosures() {
                 Ok((Arc::new(LedgerTestModel), model))
             }),
             probe: None,
-            models: Some(crate::inference::registry::ProviderModelHooks {
-                default_model: Arc::new(|| Some("fixture-model".to_string())),
-                role_for_model: Arc::new(|_| None),
-                is_alias: Arc::new(|_| false),
-                is_raw_model: Arc::new(|model| !model.starts_with("hint:")),
-                supports_vision: Arc::new(|_| false),
-                resolve_model: Arc::new(|_, config, model| {
-                    model
-                        .map(str::trim)
-                        .filter(|model| !model.is_empty() && !model.starts_with("hint:"))
-                        .map(str::to_string)
-                        .or_else(|| config.default_model.clone())
-                }),
-                context_window: Arc::new(|_| None),
-                default_pricing: Arc::new(|| None),
-                without_reasoning: Arc::new(|request| request),
-            }),
+            models: Some(
+                tinyinference_llm::providers::overrides::ProviderModelMetadata {
+                    default_model: Arc::new(|| Some("fixture-model".to_string())),
+                    role_for_model: Arc::new(|_| None),
+                    is_alias: Arc::new(|_| false),
+                    is_raw_model: Arc::new(|model| !model.starts_with("hint:")),
+                    supports_vision: Arc::new(|_| false),
+                    resolve_model: Arc::new(|_, config, model| {
+                        model
+                            .map(str::trim)
+                            .filter(|model| !model.is_empty() && !model.starts_with("hint:"))
+                            .map(str::to_string)
+                            .or_else(|| config.config.default_model.clone())
+                    }),
+                    context_window: Arc::new(|_| None),
+                    default_pricing: Arc::new(|| None),
+                    without_reasoning: Arc::new(|request| request),
+                },
+            ),
         },
     );
     let build = |ledger: &EgressLedger| {

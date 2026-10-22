@@ -266,7 +266,7 @@ async fn injected_turn_profile_is_authoritative_and_skips_unselected_routes() {
     crate::inference::registry::register_chat_model_in(
         &extensions,
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-        crate::inference::registry::ChatModelEntry {
+        tinyinference_llm::providers::overrides::ChatModelEntry {
             build: Arc::new(move |_| {
                 count.fetch_add(1, Ordering::SeqCst);
                 Ok((Arc::new(NamedModel("unselected")), "unselected".into()))

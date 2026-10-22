@@ -1,4 +1,5 @@
 use super::*;
+use tinyinference_llm::providers::overrides::{ChatModelEntry, ProviderModelMetadata};
 #[test]
 fn generic_model_window_patterns_retain_conservative_estimates() {
     assert_eq!(context_window_for_model("gemma-3n-e2b"), Some(8_192));
@@ -101,7 +102,7 @@ fn managed_vision_capability_is_absent_without_provider_policy() {
 #[test]
 fn model_supports_vision_uses_the_scoped_provider_capability_hook() {
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{register_chat_model_in, ChatModelEntry, ProviderModelHooks};
+    use crate::inference::registry::register_chat_model_in;
     use std::sync::Arc;
 
     let extensions = Extensions::new();
@@ -109,9 +110,9 @@ fn model_supports_vision_uses_the_scoped_provider_capability_hook() {
         &extensions,
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         ChatModelEntry {
-            build: Arc::new(|_| Err(anyhow::anyhow!("test factory"))),
+            build: Arc::new(|_| panic!("metadata-only provider entry")),
             probe: None,
-            models: Some(ProviderModelHooks {
+            models: Some(ProviderModelMetadata {
                 default_model: Arc::new(|| None),
                 role_for_model: Arc::new(|_| None),
                 is_alias: Arc::new(|_| false),

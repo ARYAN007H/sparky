@@ -5,6 +5,7 @@
 
 use super::super::factory::resolve_codex_routing;
 use super::local_runtime::synthesize_local_runtime_entry;
+use std::sync::Arc;
 use tinyinference_llm::catalog::{
     append_query_param, endpoint_hosts_models_listing, is_openrouter_provider, list_models,
     merge_openai_codex_model_hints, validate_openrouter_key, ModelInfo,
@@ -48,7 +49,7 @@ pub(super) fn resolve_local_runtime_key(
 fn catalog_request(
     config: &crate::config::Config,
     entry: Option<&crate::config::schema::cloud_providers::CloudProviderCreds>,
-) -> Result<crate::inference::registry::CatalogRequest, String> {
+) -> Result<crate::inference::registry::CatalogHostRequest, String> {
     let service_key = "providers.list_models";
     let slug = entry.map(|e| e.slug.trim()).unwrap_or_default();
     let provider_key = match entry {
@@ -70,10 +71,34 @@ fn catalog_request(
         }
         None => crate::config::build_runtime_proxy_client_with_timeouts(service_key, 30, 10),
     };
-    Ok(crate::inference::registry::CatalogRequest {
+    Ok(crate::inference::registry::CatalogHostRequest {
         provider_key,
         client,
     })
+}
+
+async fn run_registered_catalog(
+    provider_id: &str,
+    config: &crate::config::Config,
+    request: crate::inference::registry::CatalogHostRequest,
+    catalog: tinyinference_llm::providers::overrides::CatalogEntry<
+        crate::inference::registry::ProviderContext,
+    >,
+) -> Result<crate::core::Outcome<serde_json::Value>, String> {
+    let context = crate::inference::registry::ProviderContext::for_catalog(config, request);
+    let call = context.catalog.as_ref().expect("catalog context");
+    let logs = Arc::clone(&call.logs);
+    let listing =
+        (catalog.list)(tinyinference_llm::providers::overrides::CatalogRequest { context }).await?;
+    let logs = std::mem::take(
+        &mut *logs
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+    );
+    log::debug!(
+        "[providers][list_models] provider_id={provider_id} served by native provider catalog"
+    );
+    Ok(crate::core::Outcome::new(listing, logs))
 }
 
 /// The empty listing the managed provider answers with when no hosted catalog
@@ -86,16 +111,6 @@ fn no_managed_catalog() -> crate::core::Outcome<serde_json::Value> {
         serde_json::json!({ "models": Vec::<ModelInfo>::new() }),
         vec!["no hosted backend; managed catalog is empty".to_string()],
     )
-}
-
-pub async fn list_configured_models(
-    provider_id: &str,
-) -> Result<crate::core::Outcome<serde_json::Value>, String> {
-    let config = crate::config::Config::load_or_init()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    list_configured_models_from_config(provider_id, &config).await
 }
 
 pub async fn list_configured_models_from_config(
@@ -120,7 +135,7 @@ pub async fn list_configured_models_from_config(
             .iter()
             .find(|e| e.id == provider_id || e.slug == provider_id);
         let request = catalog_request(config, entry)?;
-        return (catalog.list)(config.clone(), request).await;
+        return run_registered_catalog(&provider_id, config, request, catalog).await;
     }
     if provider_id == crate::inference::provider::factory::PROVIDER_OPENHUMAN {
         return Ok(no_managed_catalog());
@@ -146,7 +161,13 @@ pub async fn list_configured_models_from_config(
         ) {
             Some(catalog) => {
                 let request = catalog_request(config, Some(&entry))?;
-                (catalog.list)(config.clone(), request).await
+                run_registered_catalog(
+                    crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+                    config,
+                    request,
+                    catalog,
+                )
+                .await
             }
             None => Ok(no_managed_catalog()),
         };
@@ -171,7 +192,7 @@ pub async fn list_configured_models_from_config(
         ));
     }
 
-    let crate::inference::registry::CatalogRequest {
+    let crate::inference::registry::CatalogHostRequest {
         provider_key: api_key,
         client,
     } = catalog_request(config, Some(&entry))?;

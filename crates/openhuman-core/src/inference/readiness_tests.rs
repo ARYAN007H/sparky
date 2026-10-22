@@ -1,11 +1,12 @@
 use super::*;
 use tempfile::TempDir;
+use tinyinference_llm::providers::overrides::{ChatModelEntry, ProviderModelMetadata};
 
 #[tokio::test]
 async fn cached_probe_serves_definitive_negative_results() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{register_chat_model_in, ChatModelEntry, ProviderModelHooks};
+    use crate::inference::registry::register_chat_model_in;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
@@ -38,11 +39,11 @@ async fn cached_probe_serves_definitive_negative_results() {
                     "fixture-model".to_string(),
                 ))
             }),
-            probe: Some(Arc::new(move |_, _, _| {
+            probe: Some(Arc::new(move |_| {
                 counter.fetch_add(1, Ordering::SeqCst);
                 Box::pin(async { Err("API key not configured for provider".to_string()) })
             })),
-            models: Some(ProviderModelHooks {
+            models: Some(ProviderModelMetadata {
                 default_model: Arc::new(|| Some("fixture-model".to_string())),
                 role_for_model: Arc::new(|_| None),
                 is_alias: Arc::new(|_| false),

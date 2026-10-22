@@ -1,3 +1,4 @@
+use super::super::cloud_slug::try_create_cloud_slug_chat_model_from_string;
 use super::*;
 use crate::security::egress::EgressLedger;
 
@@ -45,6 +46,15 @@ fn fixture_library_dispatch() -> crate::core::runtime::DispatchCtx {
             None,
         ),
     )
+}
+
+fn with_fixture_library_context<R>(f: impl FnOnce() -> R) -> R {
+    let context = crate::core::runtime::CoreContext::for_test_with_host_kind(
+        crate::core::types::HostKind::Library,
+        crate::core::runtime::DomainSet::full(),
+        None,
+    );
+    crate::core::runtime::CoreContext::sync_scope(context, f)
 }
 
 #[test]
@@ -723,3 +733,6 @@ fn openhuman_jwt_slug_without_model_preserves_managed_role_tier() {
 
 #[path = "factory_crate_native_cloud_tests.rs"]
 mod cloud_tests;
+
+#[path = "factory_crate_native_defaults_tests.rs"]
+mod default_temperature_tests;

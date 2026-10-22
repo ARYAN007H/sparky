@@ -31,13 +31,17 @@ use tinyagents_harness::host::PrebuiltModelResolver as TurnModelResolver;
 fn scoped_model_entry(
     name: &'static str,
     supports_vision: bool,
-) -> crate::inference::registry::ChatModelEntry {
-    use crate::inference::registry::ProviderModelHooks;
+) -> tinyinference_llm::providers::overrides::ChatModelEntry<
+    crate::inference::registry::ProviderContext,
+> {
+    use tinyinference_llm::providers::overrides::ProviderModelMetadata;
 
-    crate::inference::registry::ChatModelEntry {
+    tinyinference_llm::providers::overrides::ChatModelEntry::<
+        crate::inference::registry::ProviderContext,
+    > {
         build: Arc::new(move |_| Ok((Arc::new(NamedModel(name)), name.to_string()))),
         probe: None,
-        models: Some(ProviderModelHooks {
+        models: Some(ProviderModelMetadata {
             default_model: Arc::new(move || Some(name.to_string())),
             role_for_model: Arc::new(move |model| {
                 if model == "fixture-role" {
@@ -192,7 +196,9 @@ async fn role_pins_apply_when_the_primary_uses_config_routing() {
     crate::inference::registry::register_chat_model_in(
         &extensions,
         crate::inference::provider::factory::PROVIDER_OPENHUMAN,
-        crate::inference::registry::ChatModelEntry {
+        tinyinference_llm::providers::overrides::ChatModelEntry::<
+            crate::inference::registry::ProviderContext,
+        > {
             build: Arc::new(|_| {
                 Ok((
                     Arc::new(NamedModel("managed fixture")),
@@ -200,28 +206,30 @@ async fn role_pins_apply_when_the_primary_uses_config_routing() {
                 ))
             }),
             probe: None,
-            models: Some(crate::inference::registry::ProviderModelHooks {
-                default_model: Arc::new(|| Some("fixture/managed-default".into())),
-                role_for_model: Arc::new(|model| {
-                    model
-                        .strip_prefix("hint:")
-                        .filter(|role| matches!(*role, "chat" | "coding" | "summarization"))
-                        .map(str::to_string)
-                }),
-                is_alias: Arc::new(|model| model.starts_with("hint:")),
-                is_raw_model: Arc::new(|model| !model.starts_with("hint:")),
-                supports_vision: Arc::new(|_| false),
-                resolve_model: Arc::new(|_, config, model| {
-                    model
-                        .filter(|model| !model.starts_with("hint:"))
-                        .map(str::to_string)
-                        .or_else(|| config.default_model.clone())
-                        .or_else(|| Some("fixture/managed-default".into()))
-                }),
-                context_window: Arc::new(|_| None),
-                default_pricing: Arc::new(|| None),
-                without_reasoning: Arc::new(|request| request),
-            }),
+            models: Some(
+                tinyinference_llm::providers::overrides::ProviderModelMetadata {
+                    default_model: Arc::new(|| Some("fixture/managed-default".into())),
+                    role_for_model: Arc::new(|model| {
+                        model
+                            .strip_prefix("hint:")
+                            .filter(|role| matches!(*role, "chat" | "coding" | "summarization"))
+                            .map(str::to_string)
+                    }),
+                    is_alias: Arc::new(|model| model.starts_with("hint:")),
+                    is_raw_model: Arc::new(|model| !model.starts_with("hint:")),
+                    supports_vision: Arc::new(|_| false),
+                    resolve_model: Arc::new(|_, config, model| {
+                        model
+                            .filter(|model| !model.starts_with("hint:"))
+                            .map(str::to_string)
+                            .or_else(|| config.config.default_model.clone())
+                            .or_else(|| Some("fixture/managed-default".into()))
+                    }),
+                    context_window: Arc::new(|_| None),
+                    default_pricing: Arc::new(|| None),
+                    without_reasoning: Arc::new(|request| request),
+                },
+            ),
         },
     );
     let mut overrides = HostOverrides::default();

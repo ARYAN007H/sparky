@@ -118,15 +118,15 @@ test("core RPC client bounds a stalled request and propagates its timeout", asyn
     hangingFetch,
     5,
   );
-  // AbortSignal.timeout uses an unref'd timer. Keep the test process alive so
-  // the simulated stalled fetch can observe that timer without real network I/O.
-  const keepAlive = setInterval(() => {}, 1_000);
+  // AbortSignal.timeout uses an unreferenced timer; keep the test process alive
+  // until that timeout fires even when no other handles are open.
+  const keepAlive = setTimeout(() => {}, 50);
   try {
     await assert.rejects(rpc("openhuman.auth_get_state"), {
       name: "TimeoutError",
     });
   } finally {
-    clearInterval(keepAlive);
+    clearTimeout(keepAlive);
   }
   assert.equal(signal.aborted, true);
 });

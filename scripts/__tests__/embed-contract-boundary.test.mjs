@@ -14,6 +14,8 @@ import { spawnSync } from "node:child_process";
 function check(files) {
   const root = mkdtempSync(resolve(tmpdir(), "embed-contract-boundary-"));
   try {
+    mkdirSync(resolve(root, "crates"), { recursive: true });
+    mkdirSync(resolve(root, "vendor/tinyagents/crates"), { recursive: true });
     mkdirSync(resolve(root, "scripts/ci"), { recursive: true });
     mkdirSync(resolve(root, "scripts/lib"), { recursive: true });
     const bridge =
@@ -211,4 +213,133 @@ test("Embed preserves the exact native dispatch-budget and observer contracts", 
     assert.equal(rejected.status, 1, rejected.output);
     assert.match(rejected.output, /openhuman-upstream-reexport/);
   }
+});
+
+test("Embed exposes exact native provider override contracts in inference_registry", () => {
+  const overrides =
+    "pub mod inference_registry {\n" +
+    " pub use tinyinference_llm::providers::overrides::{\n" +
+    "  BoxFuture, CatalogEntry, CatalogLimits, CatalogListing, CatalogRequest,\n" +
+    "  ChatModelEntry, ChatModelFactory, ChatModelRequest, EmbeddingFactory,\n" +
+    "  EmbeddingRequest, ProviderModelMetadata, ProviderOverrides, ReadinessProbe,\n" +
+    " };\n" +
+    "}\n";
+  const allowed = check({
+    "crates/openhuman-embed/src/host_internals.rs": overrides,
+  });
+  assert.equal(allowed.status, 0, allowed.output);
+
+  for (const files of [
+    {
+      "crates/openhuman-embed/src/host_internals.rs": overrides.replace(
+        "ProviderOverrides, ReadinessProbe,",
+        "ProviderOverrides, ReadinessProbe, UnreviewedType,",
+      ),
+    },
+    {
+      "crates/openhuman-embed/src/host_internals.rs": overrides.replace(
+        "inference_registry",
+        "provider_registry",
+      ),
+    },
+    {
+      "crates/openhuman-core/src/inference/registry.rs": overrides,
+    },
+  ]) {
+    const rejected = check(files);
+    assert.equal(rejected.status, 1, rejected.output);
+    assert.match(rejected.output, /openhuman-upstream-reexport/);
+  }
+});
+
+test("the TinyAgents-owned AgentProgress type is allowed only at its native paths", () => {
+  const progressOwner =
+    "vendor/tinyagents/crates/tinyagents-harness/src/progress.rs";
+  const harness = "vendor/tinyagents/crates/tinyagents-harness/src/";
+  const native = {
+    [`${harness}lib.rs`]: "pub use progress::AgentProgress;\n",
+    [progressOwner]: "pub enum AgentProgress { Started }\n",
+    [`${harness}turn_runner/types.rs`]:
+      "use crate::progress::AgentProgress;\nstruct Event(AgentProgress);\n",
+    [`${harness}turn_runner/mod_tests.rs`]:
+      "fn progress(event: crate::progress::AgentProgress) { let _ = event; }\n",
+  };
+  const allowed = check(native);
+  assert.equal(allowed.status, 0, allowed.output);
+
+  for (const files of [
+    {
+      "vendor/tinyagents/crates/tinyagents-session/src/progress.rs":
+        "pub enum AgentProgress { Started }\n",
+    },
+    {
+      "vendor/tinyagents/crates/tinyagents-harness/src/agent_progress.rs":
+        "pub enum AgentProgress { Started }\n",
+    },
+    {
+      [progressOwner]:
+        "pub enum AgentProgress { Started }\nuse openhuman_core::AgentProgress;\n",
+    },
+    {
+      [`${harness}turn_runner/types.rs`]:
+        "use crate::progress::AgentProgress;\nuse openhuman_core::AgentProgress;\n",
+    },
+    {
+      [`${harness}turn_runner/types.rs`]:
+        "/* use crate::progress::AgentProgress; */\nstruct Event(AgentProgress);\n",
+    },
+    {
+      "vendor/tinyagents/crates/tinyagents-session/src/lib.rs":
+        "pub enum AgentProgress { Started }\n",
+    },
+  ]) {
+    const rejected = check(files);
+    assert.equal(rejected.status, 1, rejected.output);
+    assert.match(rejected.output, /tinyagents-openhuman-domain-name/);
+  }
+});
+
+test("provider override contract does not escape its closed facade module", () => {
+  const overrides =
+    "pub mod inference_registry {\n" +
+    "}\n" +
+    "pub mod other_registry {\n" +
+    " pub use tinyinference_llm::providers::overrides::{\n" +
+    "  BoxFuture, CatalogEntry, CatalogLimits, CatalogListing, CatalogRequest,\n" +
+    "  ChatModelEntry, ChatModelFactory, ChatModelRequest, EmbeddingFactory,\n" +
+    "  EmbeddingRequest, ProviderModelMetadata, ProviderOverrides, ReadinessProbe,\n" +
+    " };\n" +
+    "}\n";
+  const misplaced = check({
+    "crates/openhuman-embed/src/host_internals.rs": overrides,
+  });
+  assert.equal(misplaced.status, 1, misplaced.output);
+  assert.match(misplaced.output, /openhuman-upstream-reexport/);
+
+  const freeExport = check({
+    "crates/openhuman-embed/src/host_internals.rs":
+      "pub mod inference_registry {\n}\n" +
+      "pub use tinyinference_llm::providers::overrides::{\n" +
+      " BoxFuture, CatalogEntry, CatalogLimits, CatalogListing, CatalogRequest,\n" +
+      " ChatModelEntry, ChatModelFactory, ChatModelRequest, EmbeddingFactory,\n" +
+      " EmbeddingRequest, ProviderModelMetadata, ProviderOverrides, ReadinessProbe,\n" +
+      "};\n",
+  });
+  assert.equal(freeExport.status, 1, freeExport.output);
+  assert.match(freeExport.output, /openhuman-upstream-reexport/);
+
+  const nestedExport = check({
+    "crates/openhuman-embed/src/host_internals.rs":
+      "pub mod inference_registry {\n" +
+      " pub mod nested {\n" +
+      "  pub use tinyinference_llm::providers::overrides::{\n" +
+      "   BoxFuture, CatalogEntry, CatalogLimits, CatalogListing, CatalogRequest,\n" +
+      "   ChatModelEntry, ChatModelFactory, ChatModelRequest, EmbeddingFactory,\n" +
+      "   EmbeddingRequest, ProviderModelMetadata, ProviderOverrides, ReadinessProbe,\n" +
+      "  };\n" +
+      " }\n" +
+      "}\n",
+  });
+  assert.equal(nestedExport.status, 1, nestedExport.output);
+  assert.match(nestedExport.output, /openhuman-upstream-reexport/);
 });

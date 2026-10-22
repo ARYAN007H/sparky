@@ -64,9 +64,21 @@ pub async fn inference_update_local_settings(
     result
 }
 
-pub async fn inference_list_models(provider_id: &str) -> Result<Outcome<Value>, String> {
+pub async fn inference_list_models(
+    ctx: &DispatchCtx,
+    provider_id: &str,
+) -> Result<Outcome<Value>, String> {
     debug!(provider_id, "{LOG_PREFIX} list_models:start");
-    let result = providers::models::catalog_listing::list_configured_models(provider_id).await;
+    let result = match ctx.load_config().await {
+        Ok(config) => {
+            providers::models::catalog_listing::list_configured_models_from_config(
+                provider_id,
+                &config,
+            )
+            .await
+        }
+        Err(error) => Err(error),
+    };
     match &result {
         Ok(_) => debug!("{LOG_PREFIX} list_models:ok"),
         Err(err) => {

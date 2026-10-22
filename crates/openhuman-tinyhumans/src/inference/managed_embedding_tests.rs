@@ -24,13 +24,23 @@ fn state_dir_of(config: &Config) -> std::path::PathBuf {
 /// Builds the embedder the way the core's managed factory does: through the
 /// registered embedding provider, with the config's credential scope.
 fn build_through_registry(config: &Config, model: &str, dimensions: usize) -> CloudEmbeddingModel {
+    let context = openhuman_embed::__host::inference_registry::ProviderContext {
+        config: config.clone(),
+        egress: openhuman_embed::__host::egress::EgressLedger::none(),
+        embedding: Some(
+            openhuman_embed::__host::inference_registry::EmbeddingCallContext {
+                config: Some(config.clone()),
+                chat: None,
+                state_dir: state_dir_of(config),
+                secrets_encrypt: config.secrets.encrypt,
+            },
+        ),
+        catalog: None,
+    };
     from_request(&EmbeddingRequest {
-        config: Some(config),
         model,
         dimensions,
-        chat: None,
-        state_dir: state_dir_of(config),
-        secrets_encrypt: config.secrets.encrypt,
+        context: &context,
     })
 }
 
@@ -77,6 +87,7 @@ async fn api_key_alone_authenticates_cloud_embeddings() {
         "m",
         2,
         None,
+        None,
     );
 
     let vectors = provider
@@ -109,6 +120,7 @@ async fn api_key_is_refused_over_plaintext_non_loopback() {
         false,
         "m",
         2,
+        None,
         None,
     );
     let err = provider.embed(&["hello".to_string()]).await.unwrap_err();
@@ -162,6 +174,7 @@ fn unreachable_embedder_with_chat(
         model,
         DEFAULT_CLOUD_DIMENSIONS,
         chat,
+        None,
     )
 }
 
@@ -493,6 +506,7 @@ async fn offline_local_session_is_refused_before_embedding_request() {
         "m",
         2,
         None,
+        None,
     );
 
     let err = provider
@@ -562,6 +576,7 @@ async fn expired_session_publishes_session_expired_before_embedding_request() {
         false,
         "m",
         2,
+        None,
         None,
     );
 

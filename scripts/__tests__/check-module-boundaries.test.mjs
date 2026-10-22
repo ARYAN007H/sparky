@@ -288,6 +288,7 @@ test('a package-scoped normal tree still rejects an activated implementation wri
 
 test('host boundary audit ignores writer features unified only by unrelated workspace dev fixtures', () => {
   const root = resolve(new URL('../..', import.meta.url).pathname);
+  mkdirSync(join(root, 'target'), { recursive: true });
   const harnessRoot = mkdtempSync(join(root, 'target', 'module-boundaries-host-isolation-'));
   try {
     mkdirSync(join(harnessRoot, 'scripts', 'ci'), { recursive: true });

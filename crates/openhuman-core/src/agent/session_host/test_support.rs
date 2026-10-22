@@ -1,7 +1,10 @@
 use super::*;
+use tinyinference_llm::providers::overrides::{
+    ChatModelEntry, ChatModelRequest, ProviderModelMetadata,
+};
 
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
-use crate::inference::registry::{ChatModelEntry, ChatModelRequest, ProviderModelHooks};
+use crate::inference::registry::ProviderContext;
 use std::sync::Arc;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 
@@ -25,18 +28,18 @@ pub(crate) fn with_fixture_model_name(builder: SessionHostBuilder) -> SessionHos
 /// Installs an explicit generic model fixture for tests that construct a
 /// session through the managed-provider factory. HookSlot test registrations
 /// are thread-local, so each test opts in on the thread that builds its host.
-fn model_fixture_entry() -> ChatModelEntry {
+fn model_fixture_entry() -> ChatModelEntry<ProviderContext> {
     ChatModelEntry {
-        build: Arc::new(|request: &ChatModelRequest<'_>| {
+        build: Arc::new(|request: &ChatModelRequest<'_, ProviderContext>| {
             let model = request
                 .model_override
                 .or(request.default_model)
-                .or(request.config.default_model.as_deref())
+                .or(request.context.config.default_model.as_deref())
                 .unwrap_or("test/session-fixture");
             Ok((Arc::new(SessionFixtureModel), model.to_string()))
         }),
         probe: None,
-        models: Some(ProviderModelHooks {
+        models: Some(ProviderModelMetadata {
             default_model: Arc::new(|| Some("test/session-fixture".into())),
             role_for_model: Arc::new(|model| {
                 if model == "fixture-reasoning" {
@@ -67,6 +70,7 @@ fn model_fixture_entry() -> ChatModelEntry {
                     .map(|hint_role| {
                         if hint_role == "chat" {
                             config
+                                .config
                                 .default_model
                                 .as_deref()
                                 .filter(|configured| !configured.starts_with("hint:"))
@@ -77,7 +81,7 @@ fn model_fixture_entry() -> ChatModelEntry {
                         }
                     }),
                 None if role == "agentic" => Some("test/session-fixture".into()),
-                None => match config.default_model.as_deref() {
+                None => match config.config.default_model.as_deref() {
                     Some("fixture-reasoning") => Some("test/selected-reasoning".into()),
                     Some(model) => Some(model.to_string()),
                     None => Some("test/session-fixture".into()),

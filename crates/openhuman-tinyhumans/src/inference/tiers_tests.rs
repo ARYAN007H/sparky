@@ -2,7 +2,10 @@ use super::*;
 
 fn normalize_with_hosted_registration(config: &mut Config) -> bool {
     let _registry = crate::registry_test_lock();
-    crate::register::register_all(&crate::install::InstallOptions::default());
+    crate::register::register_all(
+        &crate::install::InstallOptions::default(),
+        crate::register::DoctorRegistration::Process,
+    );
     super::normalize_config(config)
 }
 
@@ -179,7 +182,10 @@ fn hosted_normalizer_leaves_custom_and_explicit_primary_choices_alone() {
 #[test]
 fn hosted_cost_defaults_include_the_registered_managed_model_price() {
     let _registry = crate::registry_test_lock();
-    crate::register::register_all(&crate::install::InstallOptions::default());
+    crate::register::register_all(
+        &crate::install::InstallOptions::default(),
+        crate::register::DoctorRegistration::Process,
+    );
 
     let prices = openhuman_embed::__host::config::Config::default()
         .cost

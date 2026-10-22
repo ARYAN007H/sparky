@@ -1,12 +1,19 @@
 use super::*;
 use crate::inference::context_window::model_limits_request;
 use crate::inference::provider::factory::{
-    create_chat_model_from_string, make_openhuman_backend_model_for_thread, PROVIDER_OPENHUMAN,
+    create_chat_model_from_string, create_chat_model_with_identity_in_for_inspection,
+    make_openhuman_backend_model_for_thread_in, PROVIDER_OPENHUMAN,
 };
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use tinyinference_llm::model::discover::DiscoveryRequest;
+use tinyinference_llm::model::ChatModel;
 use tinyinference_llm::model::{ModelRequest, ModelResponse};
+use tinyinference_llm::providers::overrides::CatalogRequest;
+use tinyinference_llm::providers::overrides::{
+    CatalogEntry, ChatModelEntry, ProviderModelMetadata,
+};
 
 type SeenModelRequests = Arc<Mutex<Vec<(String, Option<String>, Option<String>)>>>;
 
@@ -23,7 +30,7 @@ impl ChatModel<()> for FakeModel {
     }
 }
 
-fn fake_entry(seen: SeenModelRequests) -> ChatModelEntry {
+fn fake_entry(seen: SeenModelRequests) -> ChatModelEntry<ProviderContext> {
     ChatModelEntry {
         build: Arc::new(move |request| {
             seen.lock().unwrap().push((
@@ -37,7 +44,7 @@ fn fake_entry(seen: SeenModelRequests) -> ChatModelEntry {
             ))
         }),
         probe: None,
-        models: Some(ProviderModelHooks {
+        models: Some(ProviderModelMetadata {
             default_model: Arc::new(|| Some("host/fake-default".to_string())),
             role_for_model: Arc::new(|model| {
                 (model == "hint:reasoning").then(|| "reasoning".to_string())
@@ -50,6 +57,7 @@ fn fake_entry(seen: SeenModelRequests) -> ChatModelEntry {
                 Some(model) if !model.starts_with("hint:") => Some(model.to_string()),
                 Some(_) => None,
                 None => config
+                    .config
                     .default_model
                     .clone()
                     .or_else(|| Some("host/fake-default".to_string())),
@@ -76,7 +84,8 @@ async fn a_registered_chat_model_serves_the_managed_provider_for_a_thread() {
     let seen = Arc::default();
     register_chat_model(PROVIDER_OPENHUMAN, fake_entry(Arc::clone(&seen)));
 
-    let built = make_openhuman_backend_model_for_thread(
+    let built = make_openhuman_backend_model_for_thread_in(
+        None,
         "chat",
         &Config::default(),
         Some("hint:reasoning"),
@@ -125,11 +134,14 @@ fn a_registered_embedding_factory_builds_the_managed_embedding_model() {
     let _guard = crate::inference::inference_test_guard();
     let calls = Arc::new(AtomicUsize::new(0));
     let counter = Arc::clone(&calls);
-    register_embedding(PROVIDER_OPENHUMAN, move |request| {
-        assert_eq!(request.dimensions, 8);
-        counter.fetch_add(1, Ordering::SeqCst);
-        Ok(Box::new(tinyinference_embeddings::NoopEmbeddingModel))
-    });
+    register_embedding(
+        PROVIDER_OPENHUMAN,
+        Arc::new(move |request| {
+            assert_eq!(request.dimensions, 8);
+            counter.fetch_add(1, Ordering::SeqCst);
+            Ok(Box::new(tinyinference_embeddings::NoopEmbeddingModel))
+        }),
+    );
     let built = crate::inference::embedding_host::create_embedding_provider_with_credentials(
         "cloud",
         "any-model",
@@ -147,13 +159,8 @@ async fn a_registered_catalog_answers_the_model_listing_for_its_provider() {
     register_catalog(
         "fake-catalog",
         CatalogEntry {
-            list: Arc::new(|_, _| {
-                Box::pin(async {
-                    Ok(Outcome::new(
-                        serde_json::json!({ "models": [{ "id": "registered" }] }),
-                        vec![],
-                    ))
-                })
+            list: Arc::new(|_| {
+                Box::pin(async { Ok(serde_json::json!({ "models": [{ "id": "registered" }] })) })
             }),
             limits: None,
         },
@@ -185,7 +192,7 @@ fn a_registered_catalog_supplies_the_managed_limits_request() {
     register_catalog(
         PROVIDER_OPENHUMAN,
         CatalogEntry {
-            list: Arc::new(|_, _| Box::pin(async { Err("unused".to_string()) })),
+            list: Arc::new(|_| Box::pin(async { Err("unused".to_string()) })),
             limits: Some(Arc::new(|model, _| {
                 Some(DiscoveryRequest::new("https://catalog.example/v1", model))
             })),
@@ -203,7 +210,8 @@ fn a_registered_catalog_supplies_the_managed_limits_request() {
 fn selecting_the_managed_provider_with_nothing_registered_is_backend_unavailable() {
     let _guard = crate::inference::inference_test_guard();
     let _exclusive = crate::inference::provider::factory::test_provider_override::exclusive();
-    let error = make_openhuman_backend_model_for_thread(
+    let error = make_openhuman_backend_model_for_thread_in(
+        None,
         "chat",
         &Config::default(),
         Some("any-model"),
@@ -240,9 +248,16 @@ async fn a_registered_catalog_receives_the_entrys_provider_key() {
     register_catalog(
         PROVIDER_OPENHUMAN,
         CatalogEntry {
-            list: Arc::new(move |_, request| {
-                *sink.lock().unwrap() = request.provider_key.clone();
-                Box::pin(async { Ok(Outcome::new(serde_json::json!({ "models": [] }), vec![])) })
+            list: Arc::new(move |request: CatalogRequest<ProviderContext>| {
+                *sink.lock().unwrap() = request
+                    .context
+                    .catalog
+                    .as_ref()
+                    .unwrap()
+                    .request
+                    .provider_key
+                    .clone();
+                Box::pin(async { Ok(serde_json::json!({ "models": [] })) })
             }),
             limits: None,
         },
@@ -271,4 +286,79 @@ async fn a_registered_catalog_receives_the_entrys_provider_key() {
     unregister_catalog(PROVIDER_OPENHUMAN);
     listing.unwrap();
     assert_eq!(seen.lock().unwrap().as_str(), "entry-key");
+}
+
+#[test]
+fn inspection_model_factory_uses_the_callers_context_before_process_fallback() {
+    use crate::core::slots::Extensions;
+    use crate::inference::registry::{
+        register_inspection_chat_model, register_inspection_chat_model_in,
+        unregister_inspection_chat_model, InspectionChatModelBuild,
+        PreparedInspectionChatModelFactory,
+    };
+
+    let _guard = crate::inference::inference_test_guard();
+    let factory = |endpoint: &'static str| -> PreparedInspectionChatModelFactory {
+        Arc::new(move |request| {
+            Ok(InspectionChatModelBuild {
+                model: Arc::new(FakeModel),
+                model_id: format!(
+                    "{endpoint}:{}",
+                    request.context.config.default_model.as_deref().unwrap()
+                ),
+                endpoint: format!("https://{endpoint}.example/v1"),
+                credential: format!("{endpoint}-credential"),
+            })
+        })
+    };
+    register_inspection_chat_model(PROVIDER_OPENHUMAN, factory("process"));
+    register_chat_model(PROVIDER_OPENHUMAN, fake_entry(Arc::default()));
+    let a = Extensions::new();
+    register_inspection_chat_model_in(&a, PROVIDER_OPENHUMAN, factory("context-a"));
+    register_chat_model_in(&a, PROVIDER_OPENHUMAN, fake_entry(Arc::default()));
+    let context_a = crate::core::runtime::DispatchCtx::new(
+        crate::core::runtime::CoreContext::for_test_with_host_kind_and_extensions(
+            crate::core::types::HostKind::Library,
+            crate::core::runtime::DomainSet::full(),
+            None,
+            a,
+        ),
+    );
+    let b = Extensions::new();
+    register_inspection_chat_model_in(&b, PROVIDER_OPENHUMAN, factory("context-b"));
+    register_chat_model_in(&b, PROVIDER_OPENHUMAN, fake_entry(Arc::default()));
+    let context_b = crate::core::runtime::DispatchCtx::new(
+        crate::core::runtime::CoreContext::for_test_with_host_kind_and_extensions(
+            crate::core::types::HostKind::Library,
+            crate::core::runtime::DomainSet::full(),
+            None,
+            b,
+        ),
+    );
+
+    let mut config_a = Config::default();
+    config_a.default_model = Some("context-a".into());
+    let mut config_b = Config::default();
+    config_b.default_model = Some("context-b".into());
+    let mut config_process = Config::default();
+    config_process.default_model = Some("process".into());
+    let build_a =
+        create_chat_model_with_identity_in_for_inspection(&context_a, "chat", &config_a, 0.0)
+            .expect("context A inspection provider");
+    let build_b =
+        create_chat_model_with_identity_in_for_inspection(&context_b, "chat", &config_b, 0.0)
+            .expect("context B inspection provider");
+    let build_process = create_chat_model_with_identity_in_for_inspection(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "chat",
+        &config_process,
+        0.0,
+    )
+    .expect("process inspection provider");
+    unregister_inspection_chat_model(PROVIDER_OPENHUMAN);
+    unregister_chat_model(PROVIDER_OPENHUMAN);
+
+    assert_eq!(build_a.model_id, "context-a:context-a");
+    assert_eq!(build_b.model_id, "context-b:context-b");
+    assert_eq!(build_process.model_id, "process:process");
 }
