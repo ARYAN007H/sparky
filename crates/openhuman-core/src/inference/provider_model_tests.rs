@@ -1,4 +1,5 @@
 use super::*;
+use tinyinference_llm::providers::overrides::{ChatModelEntry, ProviderModelMetadata};
 
 #[test]
 fn absent_provider_keeps_default_absent_and_concrete_model_ids_verbatim() {
@@ -33,9 +34,7 @@ fn abstract_hint_markers_do_not_become_raw_model_ids() {
 #[test]
 fn registered_model_defaults_and_aliases_are_context_scoped() {
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{
-        register_chat_model_in, ChatModelEntry, ProviderModelMetadata,
-    };
+    use crate::inference::registry::register_chat_model_in;
     use std::sync::Arc;
 
     let extensions = Extensions::new();
@@ -225,8 +224,7 @@ fn registered_model_defaults_and_aliases_are_context_scoped() {
 fn native_provider_metadata_resolves_by_context_and_preserves_request_fields() {
     use crate::core::slots::Extensions;
     use crate::inference::registry::{
-        register_chat_model, register_chat_model_in, unregister_chat_model, ChatModelEntry,
-        ProviderContext, ProviderModelMetadata,
+        register_chat_model, register_chat_model_in, unregister_chat_model, ProviderContext,
     };
     use serde_json::json;
     use std::sync::Arc;
@@ -400,7 +398,7 @@ fn native_provider_metadata_resolves_by_context_and_preserves_request_fields() {
 fn managed_options_builder_uses_the_ambient_native_provider_entry() {
     use crate::core::slots::Extensions;
     use crate::inference::registry::{
-        register_chat_model_in, unregister_chat_model, ChatModelEntry, ProviderContext,
+        register_chat_model_in, unregister_chat_model, ProviderContext,
     };
     use std::sync::Arc;
 
@@ -449,9 +447,7 @@ fn managed_options_builder_uses_the_ambient_native_provider_entry() {
 #[test]
 fn managed_builder_uses_the_entry_selected_before_metadata_resolution() {
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{
-        register_chat_model_in, ChatModelEntry, ProviderContext, ProviderModelMetadata,
-    };
+    use crate::inference::registry::{register_chat_model_in, ProviderContext};
     use std::sync::Arc;
 
     let _guard = crate::inference::inference_test_guard();

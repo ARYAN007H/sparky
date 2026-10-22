@@ -1,14 +1,19 @@
 use super::*;
 use crate::inference::context_window::model_limits_request;
 use crate::inference::provider::factory::{
-    PROVIDER_OPENHUMAN, create_chat_model_from_string, make_openhuman_backend_model_for_thread,
+    create_chat_model_from_string, create_chat_model_with_identity_in_for_inspection,
+    make_openhuman_backend_model_for_thread_in, PROVIDER_OPENHUMAN,
 };
 use async_trait::async_trait;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tinyinference_llm::model::ChatModel;
+use std::sync::Mutex;
 use tinyinference_llm::model::discover::DiscoveryRequest;
+use tinyinference_llm::model::ChatModel;
 use tinyinference_llm::model::{ModelRequest, ModelResponse};
+use tinyinference_llm::providers::overrides::CatalogRequest;
+use tinyinference_llm::providers::overrides::{
+    CatalogEntry, ChatModelEntry, ProviderModelMetadata,
+};
 
 type SeenModelRequests = Arc<Mutex<Vec<(String, Option<String>, Option<String>)>>>;
 
@@ -79,7 +84,8 @@ async fn a_registered_chat_model_serves_the_managed_provider_for_a_thread() {
     let seen = Arc::default();
     register_chat_model(PROVIDER_OPENHUMAN, fake_entry(Arc::clone(&seen)));
 
-    let built = make_openhuman_backend_model_for_thread(
+    let built = make_openhuman_backend_model_for_thread_in(
+        None,
         "chat",
         &Config::default(),
         Some("hint:reasoning"),
@@ -204,7 +210,8 @@ fn a_registered_catalog_supplies_the_managed_limits_request() {
 fn selecting_the_managed_provider_with_nothing_registered_is_backend_unavailable() {
     let _guard = crate::inference::inference_test_guard();
     let _exclusive = crate::inference::provider::factory::test_provider_override::exclusive();
-    let error = make_openhuman_backend_model_for_thread(
+    let error = make_openhuman_backend_model_for_thread_in(
+        None,
         "chat",
         &Config::default(),
         Some("any-model"),
@@ -231,7 +238,7 @@ fn selecting_the_managed_provider_with_nothing_registered_is_backend_unavailable
 #[tokio::test]
 async fn a_registered_catalog_receives_the_entrys_provider_key() {
     use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
-    use crate::config::schema::{EPHEMERAL_ROUTE_SLUG, EphemeralRoute};
+    use crate::config::schema::{EphemeralRoute, EPHEMERAL_ROUTE_SLUG};
     let seen = Arc::new(Mutex::new(String::new()));
     crate::config::schema::cloud_providers::register_hosted_cloud_provider_policy(
         Arc::new(|slug| slug == EPHEMERAL_ROUTE_SLUG),
@@ -285,17 +292,17 @@ async fn a_registered_catalog_receives_the_entrys_provider_key() {
 fn inspection_model_factory_uses_the_callers_context_before_process_fallback() {
     use crate::core::slots::Extensions;
     use crate::inference::registry::{
-        InspectionChatModelBuild, PreparedInspectionChatModelFactory,
         register_inspection_chat_model, register_inspection_chat_model_in,
-        unregister_inspection_chat_model,
+        unregister_inspection_chat_model, InspectionChatModelBuild,
+        PreparedInspectionChatModelFactory,
     };
 
     let _guard = crate::inference::inference_test_guard();
     let factory = |endpoint: &'static str| -> PreparedInspectionChatModelFactory {
-        Arc::new(move |_| {
+        Arc::new(move |request| {
             Ok(InspectionChatModelBuild {
                 model: Arc::new(FakeModel),
-                model_id: endpoint.to_owned(),
+                model_id: request.context.config.default_model.clone().unwrap(),
                 endpoint: format!("https://{endpoint}.example/v1"),
                 credential: format!("{endpoint}-credential"),
             })
@@ -304,22 +311,47 @@ fn inspection_model_factory_uses_the_callers_context_before_process_fallback() {
     register_inspection_chat_model(PROVIDER_OPENHUMAN, factory("process"));
     let a = Extensions::new();
     register_inspection_chat_model_in(&a, PROVIDER_OPENHUMAN, factory("context-a"));
+    let context_a = crate::core::runtime::DispatchCtx::new(
+        crate::core::runtime::CoreContext::for_test_with_host_kind_and_extensions(
+            crate::core::types::HostKind::Library,
+            crate::core::runtime::DomainSet::full(),
+            None,
+            a,
+        ),
+    );
     let b = Extensions::new();
     register_inspection_chat_model_in(&b, PROVIDER_OPENHUMAN, factory("context-b"));
+    let context_b = crate::core::runtime::DispatchCtx::new(
+        crate::core::runtime::CoreContext::for_test_with_host_kind_and_extensions(
+            crate::core::types::HostKind::Library,
+            crate::core::runtime::DomainSet::full(),
+            None,
+            b,
+        ),
+    );
 
-    let config = Config::default();
-    let build_a = crate::inference::provider::factory::managed_backend::
-        managed_chat_model_build_for_inspection(Some(&a), "chat", &config, None)
-        .expect("context A inspection provider");
-    let build_b = crate::inference::provider::factory::managed_backend::
-        managed_chat_model_build_for_inspection(Some(&b), "chat", &config, None)
-        .expect("context B inspection provider");
-    let build_process = crate::inference::provider::factory::managed_backend::
-        managed_chat_model_build_for_inspection(None, "chat", &config, None)
-        .expect("process inspection provider");
+    let mut config_a = Config::default();
+    config_a.default_model = Some("context-a".into());
+    let mut config_b = Config::default();
+    config_b.default_model = Some("context-b".into());
+    let mut config_process = Config::default();
+    config_process.default_model = Some("process".into());
+    let build_a =
+        create_chat_model_with_identity_in_for_inspection(&context_a, "chat", &config_a, 0.0)
+            .expect("context A inspection provider");
+    let build_b =
+        create_chat_model_with_identity_in_for_inspection(&context_b, "chat", &config_b, 0.0)
+            .expect("context B inspection provider");
+    let build_process = create_chat_model_with_identity_in_for_inspection(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "chat",
+        &config_process,
+        0.0,
+    )
+    .expect("process inspection provider");
     unregister_inspection_chat_model(PROVIDER_OPENHUMAN);
 
-    assert_eq!(build_a.endpoint, "https://context-a.example/v1");
-    assert_eq!(build_b.endpoint, "https://context-b.example/v1");
-    assert_eq!(build_process.endpoint, "https://process.example/v1");
+    assert_eq!(build_a.model_id, "context-a");
+    assert_eq!(build_b.model_id, "context-b");
+    assert_eq!(build_process.model_id, "process");
 }

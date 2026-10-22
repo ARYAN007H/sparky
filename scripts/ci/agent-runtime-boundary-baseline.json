@@ -525,34 +525,6 @@
     "occurrence": 1
   },
   {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_calls.rs",
-    "line": 12,
-    "text": "use super::managed_reasoning::{apply_reasoning_hint, with_thread_id};",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_calls.rs",
-    "line": 123,
-    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_calls.rs",
-    "line": 153,
-    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
-    "occurrence": 2
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-tinyhumans/src/inference/managed_model.rs",
-    "line": 99,
-    "text": "pub fn with_thread_id(mut self, thread_id: Option<impl AsRef<str>>) -> Self {",
-    "occurrence": 1
-  },
-  {
     "rule": "openhuman-upstream-reexport",
     "path": "crates/openhuman-core/src/agent/tinyagents/budget.rs",
     "line": 10,

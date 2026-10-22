@@ -7,10 +7,11 @@ use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use super::*;
 use crate::inference::provider::factory::test_provider_override;
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
-use crate::inference::registry::{
-    ChatModelEntry, ChatModelRequest, ProviderContext, ProviderModelMetadata,
-};
+use crate::inference::registry::ProviderContext;
 use crate::web_chat::subscribe_web_channel_events;
+use tinyinference_llm::providers::overrides::{
+    ChatModelEntry, ChatModelRequest, ProviderModelMetadata,
+};
 
 // ── parse_suggestions / strip_markdown_fence: pure unit tests ──────────────
 

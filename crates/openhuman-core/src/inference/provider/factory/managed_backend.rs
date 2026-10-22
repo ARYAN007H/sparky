@@ -7,6 +7,7 @@
 //! `BACKEND_UNAVAILABLE:` sentinel.
 
 use super::*;
+use tinyinference_llm::providers::overrides::ChatModelRequest;
 
 type ManagedChatModel = (
     std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>>,
@@ -87,7 +88,7 @@ pub(super) fn managed_chat_model_for(
         crate::security::egress::EgressDescriptor::inference("openhuman", &model, true),
     );
     let context = crate::inference::registry::ProviderContext::new(config, egress);
-    let request = crate::inference::registry::ChatModelRequest {
+    let request = tinyinference_llm::providers::overrides::ChatModelRequest {
         role,
         model_override: Some(&model),
         default_model,
@@ -122,16 +123,30 @@ pub(super) fn managed_chat_model_build_for_inspection(
     else {
         return Err(managed_unavailable_error());
     };
-    let model = resolve_managed_model(role, config, model_override);
-    (factory)(&crate::inference::registry::ChatModelRequest {
+    let overrides = crate::inference::registry::provider_overrides(extensions.cloned());
+    let Some(entry) = overrides.chat_entry(PROVIDER_OPENHUMAN) else {
+        return Err(managed_unavailable_error());
+    };
+    let context = crate::inference::registry::ProviderContext::new(config, &EgressLedger::none());
+    let model = match entry.models.as_ref() {
+        Some(models) => (models.resolve_model)(role, &context, model_override),
+        None => model_override
+            .or(config.default_model.as_deref())
+            .map(str::trim)
+            .filter(|model| !model.is_empty() && !model.starts_with("hint:"))
+            .map(str::to_string),
+    }
+    .ok_or_else(managed_unavailable_error)?;
+    let context = crate::inference::registry::ProviderContext::new(config, &EgressLedger::none());
+    let request = tinyinference_llm::providers::overrides::ChatModelRequest {
         role,
-        config,
         model_override: Some(&model),
         default_model: None,
         native_tool_calling: true,
         thread_id: None,
-        egress: &EgressLedger::none(),
-    })
+        context: &context,
+    };
+    (factory)(&request)
 }
 
 /// Construct a managed turn model with the explicit OpenHuman thread attached.
@@ -224,7 +239,7 @@ pub(crate) fn make_openhuman_backend_model_for_options(
     config.secrets.encrypt = options.secrets_encrypt;
     let egress = EgressLedger::none();
     let context = crate::inference::registry::ProviderContext::new(&config, &egress);
-    let request = crate::inference::registry::ChatModelRequest {
+    let request = tinyinference_llm::providers::overrides::ChatModelRequest {
         role: "delegate",
         model_override: Some(model),
         default_model: Some(model),

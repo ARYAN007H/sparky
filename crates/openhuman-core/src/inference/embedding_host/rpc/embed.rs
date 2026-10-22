@@ -3,13 +3,12 @@
 use crate::config::Config;
 use crate::core::Outcome;
 
-use super::{LOG_PREFIX, resolve_api_key};
+use super::{resolve_api_key, LOG_PREFIX};
 use crate::inference::embedding_host::factory::{
     create_embedding_provider_for_inspection, create_embedding_provider_with_config,
     credential_resolver, managed_factory, settings,
 };
-use tinyinference_embeddings::probe::probe_custom_embeddings;
-use tinyinference_embeddings::verify::{ConnectionTestError, test_embedding_connection_detailed};
+use tinyinference_embeddings::verify::{test_embedding_connection_detailed, ConnectionTestError};
 use tinyinference_providers::route::split_custom_provider;
 
 /// Generates embeddings for the given input texts using the currently

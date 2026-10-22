@@ -43,8 +43,8 @@ impl ChatModel<()> for ManagedRouteFixtureModel {
 
 fn install_test_managed_provider() -> Arc<std::sync::Mutex<Vec<bool>>> {
     use crate::config::schema::cloud_providers::AuthStyle;
-    use crate::inference::registry::{ChatModelEntry, ProviderModelMetadata};
     use std::sync::Mutex;
+    use tinyinference_llm::providers::overrides::{ChatModelEntry, ProviderModelMetadata};
 
     let native_modes = Arc::new(Mutex::new(Vec::new()));
     let seen = Arc::clone(&native_modes);
@@ -174,7 +174,7 @@ fn inspection_requires_credentials_for_explicit_authenticated_cloud_routes() {
     let mut config = config_with_providers_in_tempdir(&tmp, vec![provider.clone()]);
     config.chat_provider = Some("factory-missing-key-test:gpt-4o".to_string());
 
-    let inspection = super::chat_model::create_chat_model_with_model_id_in_for_inspection(
+    let inspection = super::inspection::create_chat_model_with_model_id_in_for_inspection(
         &crate::core::runtime::DispatchCtx::ambient(),
         "chat",
         &config,
@@ -199,7 +199,7 @@ fn inspection_requires_credentials_for_explicit_authenticated_cloud_routes() {
     provider.auth_style = AuthStyle::Anthropic;
     config.cloud_providers = vec![provider.clone()];
     assert!(
-        super::chat_model::create_chat_model_with_model_id_in_for_inspection(
+        super::inspection::create_chat_model_with_model_id_in_for_inspection(
             &crate::core::runtime::DispatchCtx::ambient(),
             "chat",
             &config,
@@ -212,7 +212,7 @@ fn inspection_requires_credentials_for_explicit_authenticated_cloud_routes() {
     provider.auth_style = AuthStyle::None;
     config.cloud_providers = vec![provider];
     assert!(
-        super::chat_model::create_chat_model_with_model_id_in_for_inspection(
+        super::inspection::create_chat_model_with_model_id_in_for_inspection(
             &crate::core::runtime::DispatchCtx::ambient(),
             "chat",
             &config,
@@ -418,7 +418,7 @@ async fn inspection_construction_does_not_refresh_unselected_expired_codex_oauth
     provider.endpoint = "https://api.openai.example.test/v1".into();
     config.cloud_providers = vec![provider];
     config.chat_provider = Some("openai:gpt-4o".into());
-    let inspected = super::chat_model::create_chat_model_with_model_id_in_for_inspection(
+    let inspected = super::inspection::create_chat_model_with_model_id_in_for_inspection(
         &crate::core::runtime::DispatchCtx::ambient(),
         "chat",
         &config,

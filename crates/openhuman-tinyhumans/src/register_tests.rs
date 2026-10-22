@@ -12,7 +12,7 @@ fn register_all_is_idempotent() {
 #[tokio::test]
 async fn boot_registration_supplies_hosted_model_default_and_normalizer_before_context_exists() {
     let _registry = crate::registry_test_lock_async().await;
-    register_all(&InstallOptions::default());
+    register_all(&InstallOptions::default(), DoctorRegistration::Process);
 
     let config = openhuman_embed::__host::config::Config::default();
     assert_eq!(

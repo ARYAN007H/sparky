@@ -22,8 +22,8 @@ use tinyinference_embeddings::EmbeddingModel;
 use tinyinference_llm::model::ChatModel;
 
 use crate::config::Config;
-use crate::core::Outcome;
 use crate::core::slots::{Extensions, HookSlot};
+use crate::core::Outcome;
 use crate::security::approval::ApprovalChatContext;
 use crate::security::egress::EgressLedger;
 
@@ -108,9 +108,8 @@ impl ProviderContext {
 }
 
 use tinyinference_llm::providers::overrides::{
-    BoxFuture, CatalogEntry, CatalogLimits, CatalogRequest, ChatModelEntry, ChatModelFactory,
-    ChatModelRequest, EmbeddingFactory, EmbeddingRequest, ProviderModelMetadata, ProviderOverrides,
-    ReadinessProbe,
+    BoxFuture, CatalogEntry, ChatModelEntry, ChatModelRequest, EmbeddingFactory, EmbeddingRequest,
+    ProviderModelMetadata, ProviderOverrides,
 };
 
 pub(crate) fn provider_overrides(
@@ -225,7 +224,11 @@ pub struct InspectionChatModelBuild {
 /// Inspection-safe provider callback. Unlike the runtime callback this must
 /// return the same frozen route identity used by the model invocation.
 pub type PreparedInspectionChatModelFactory = Arc<
-    dyn for<'a> Fn(&ChatModelRequest<'a>) -> anyhow::Result<InspectionChatModelBuild> + Send + Sync,
+    dyn for<'a> Fn(
+            &ChatModelRequest<'a, ProviderContext>,
+        ) -> anyhow::Result<InspectionChatModelBuild>
+        + Send
+        + Sync,
 >;
 
 static INSPECTION_CHAT_MODELS: HookSlot<InspectionChatModelFactory> =
@@ -479,7 +482,7 @@ static EMBEDDINGS: HookSlot<EmbeddingFactory<ProviderContext>> =
 
 /// A managed embedding factory safe for doctor inspection: it uses a frozen
 /// credential snapshot and never refreshes or publishes credential state.
-pub type InspectionEmbeddingFactory = EmbeddingFactory;
+pub type InspectionEmbeddingFactory = EmbeddingFactory<ProviderContext>;
 
 static INSPECTION_EMBEDDINGS: HookSlot<InspectionEmbeddingFactory> =
     HookSlot::new("inference::inspection-embeddings");
@@ -488,7 +491,7 @@ static INSPECTION_EMBEDDINGS: HookSlot<InspectionEmbeddingFactory> =
 pub fn register_inspection_embedding<F>(provider_id: impl Into<String>, factory: F)
 where
     F: for<'a> Fn(
-            &EmbeddingRequest<'a>,
+            &EmbeddingRequest<'a, ProviderContext>,
         ) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
         + Send
         + Sync
@@ -504,7 +507,7 @@ pub fn register_inspection_embedding_in<F>(
     factory: F,
 ) where
     F: for<'a> Fn(
-            &EmbeddingRequest<'a>,
+            &EmbeddingRequest<'a, ProviderContext>,
         ) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
         + Send
         + Sync

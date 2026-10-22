@@ -1,6 +1,8 @@
 //! Read-only provider preparation for doctor inspections.
 
 use super::*;
+use crate::config::resolve_primary_cloud_provider_string;
+use crate::core::runtime::DispatchCtx;
 
 /// Build a chat model for static inspection, sharing the runtime constructor
 /// while resolving stored credentials through the read-only profile snapshot.
@@ -34,10 +36,7 @@ pub(crate) fn create_chat_model_with_identity_in_for_inspection(
     }
     if resolves_to_managed_backend(role, config) {
         let build = managed_backend::managed_chat_model_build_for_inspection(
-            extensions.as_ref(),
-            role,
-            config,
-            None,
+            extensions, role, config, None,
         )?;
         return Ok(prepared_inspection_model(
             build.model,
@@ -84,11 +83,9 @@ pub(crate) fn create_chat_model_with_identity_in_for_inspection(
             InspectionOutputBudgetCapability::Bounded,
         ));
     }
-    if let Some(result) = try_create_cloud_slug_chat_model_for_inspection_with_identity(
-        role,
-        config,
-        extensions.as_ref(),
-    ) {
+    if let Some(result) =
+        try_create_cloud_slug_chat_model_for_inspection_with_identity(role, config, extensions)
+    {
         let (model, model_id, endpoint, credential, output_budget) = result?;
         return Ok(prepared_inspection_model(
             model,
@@ -104,7 +101,7 @@ pub(crate) fn create_chat_model_with_identity_in_for_inspection(
         &provider_for_role(role, config),
         config,
         &EgressLedger::none(),
-        extensions.as_ref(),
+        extensions,
         CredentialAccess::Inspection,
     ))
 }

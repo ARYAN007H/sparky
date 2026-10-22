@@ -1,9 +1,10 @@
 use super::*;
+use tinyinference_llm::providers::overrides::{
+    ChatModelEntry, ChatModelRequest, ProviderModelMetadata,
+};
 
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
-use crate::inference::registry::{
-    ChatModelEntry, ChatModelRequest, ProviderContext, ProviderModelMetadata,
-};
+use crate::inference::registry::ProviderContext;
 use std::sync::Arc;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 

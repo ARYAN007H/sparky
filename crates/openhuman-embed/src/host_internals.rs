@@ -400,8 +400,8 @@ pub mod inference_registry {
         unregister_embedding, unregister_inspection_catalog, unregister_inspection_chat_model,
         BackendErrorClassification, BackendErrorClassifier, BackendErrorKind, CatalogCallContext,
         CatalogHostRequest, ConfigNormalizer, EmbeddingCallContext, InspectionCatalogError,
-        InspectionCatalogListing, InspectionCatalogRequest, InspectionChatModelBuild, InspectionChatModelFactory,
-        InspectionEmbeddingFactory, PreparedInspectionCatalog,
+        InspectionCatalogListing, InspectionCatalogRequest, InspectionChatModelBuild,
+        InspectionChatModelFactory, InspectionEmbeddingFactory, PreparedInspectionCatalog,
         PreparedInspectionChatModelFactory, ProviderContext,
     };
     pub use tinyinference_llm::providers::overrides::{

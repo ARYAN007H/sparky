@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::config::ops::legacy_inference_slug;
+use crate::security::credentials::AuthService;
 
 type ReadOnlyProfileCredential = (
     String,

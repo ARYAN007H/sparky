@@ -122,7 +122,7 @@ fn build_chat_model_for_inspection(
     })
 }
 
-fn readiness_probe() -> ReadinessProbe {
+fn readiness_probe() -> ReadinessProbe<ProviderContext> {
     Arc::new(
         |request: tinyinference_llm::providers::overrides::ReadinessRequest<ProviderContext>| -> tinyinference_llm::providers::overrides::BoxFuture<Result<(), String>> {
             Box::pin(async move {
@@ -153,7 +153,10 @@ fn readiness_probe() -> ReadinessProbe {
 
 /// Registers this area's hooks with the core. Idempotent.
 pub(crate) fn register(_options: &InstallOptions) {
-    let build: ChatModelFactory<ProviderContext> = Arc::new(build_chat_model);
+    let build: ChatModelFactory<ProviderContext> = Arc::new(|request| {
+        build_chat_model(request)
+            .map_err(|error| tinyinference_llm::Error::Model(error.to_string()))
+    });
     register_chat_model(
         PROVIDER_OPENHUMAN,
         ChatModelEntry {
@@ -189,10 +192,7 @@ pub(crate) fn register(_options: &InstallOptions) {
             .map(|model| Box::new(model) as Box<dyn tinyinference_embeddings::EmbeddingModel>)
     });
     register_catalog(PROVIDER_OPENHUMAN, managed_catalog::entry());
-    register_inspection_catalog(
-        PROVIDER_OPENHUMAN,
-        managed_catalog::inspection_entry(),
-    );
+    register_inspection_catalog(PROVIDER_OPENHUMAN, managed_catalog::inspection_entry());
     register_config_normalizer(PROVIDER_OPENHUMAN, Arc::new(tiers::normalize_config));
     register_backend_error_classifier(Arc::new(backend_error_code::classify));
     log::debug!(

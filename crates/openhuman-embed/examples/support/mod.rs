@@ -245,7 +245,7 @@ impl PointedInference {
             // rides as the bearer.
             let token = openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential(&request.context.config)
                 .map(|credential| credential.secret().to_string())
-                .map_err(anyhow::Error::msg)?;
+                .map_err(tinyinference_llm::Error::Model)?;
             let wire =
                 OpenAiModel::compatible_provider("EmbedTest", token, base_url.clone(), &model)
                     .with_native_tool_calling(request.native_tool_calling);

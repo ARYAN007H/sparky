@@ -22,13 +22,13 @@ mod managed_backend;
 mod routing;
 mod subprocess_providers;
 
-pub(crate) use chat_model::{OpenHumanModelFactory, resolves_to_managed_backend};
 pub use chat_model::{
     create_chat_model_from_string, create_chat_model_from_string_with_model_id,
     create_chat_model_in, create_chat_model_with_model_id_in, probe_inference_readiness,
 };
+pub(crate) use chat_model::{resolves_to_managed_backend, OpenHumanModelFactory};
 pub(crate) use cloud_slug::resolve_cloud_slug_for;
-pub(crate) use cloud_spec::{CloudCredentialResolver, cloud_provider_spec};
+pub(crate) use cloud_spec::{cloud_provider_spec, CloudCredentialResolver};
 pub use credentials::{auth_key_for_slug, lookup_key_for_slug};
 pub(crate) use credentials::{
     openai_bearer_is_oauth, redact_endpoint_origin, resolve_codex_routing,
@@ -39,12 +39,14 @@ pub(crate) use inspection::{
 };
 pub(crate) use local_runtime::create_local_chat_model_from_string;
 pub(crate) use routing::fallback_diagnostics_for_role;
-pub(crate) use routing::{ConfigRouteSource, workload_router};
 pub use routing::{provider_for_role, role_bypasses_managed_credits};
+pub(crate) use routing::{workload_router, ConfigRouteSource};
 
 // Factory-internal helpers shared across the implementation modules.
 use access_gates::{emit_inference_egress, enforce_local_only_inference};
-use chat_model::{unresolved_chat_model_error, with_default_temperature};
+use chat_model::{
+    unresolved_chat_model_error, unresolved_chat_model_error_for_access, with_default_temperature,
+};
 #[cfg(test)]
 use cloud_slug::try_create_cloud_slug_chat_model;
 use cloud_slug::{
@@ -53,16 +55,16 @@ use cloud_slug::{
 };
 use credentials::CredentialAccess;
 use local_runtime::{
-    OptionalChatModelResult, try_create_local_runtime_chat_model_for_inspection,
-    try_create_local_runtime_chat_model_from_string,
+    try_create_local_runtime_chat_model_for_inspection,
+    try_create_local_runtime_chat_model_from_string, OptionalChatModelResult,
 };
 use managed_backend::managed_chat_model_for;
 pub(crate) use managed_backend::{
     make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread_in,
 };
 use subprocess_providers::{
-    OpenHumanMcpEndpoint, try_create_claude_agent_sdk_chat_model_for_inspection,
-    try_create_claude_code_chat_model_for_inspection,
+    try_create_claude_agent_sdk_chat_model_for_inspection,
+    try_create_claude_code_chat_model_for_inspection, OpenHumanMcpEndpoint,
 };
 use tinyinference_providers::route::split_model_and_temperature;
 
@@ -85,15 +87,15 @@ pub mod test_provider_override;
 #[path = "factory_tests.rs"]
 mod factory_tests;
 
-use crate::config::Config;
 use crate::config::schema::cloud_providers::AuthStyle;
+use crate::config::Config;
 use crate::inference::provider::openai_codex::resolve_openai_codex_routing_for_inspection;
 use crate::security::egress::EgressLedger;
 use std::sync::Arc;
 use tinyinference_llm::model::ChatModel;
 use tinyinference_llm::providers::openai::codex::{
-    OPENAI_CODEX_ACCOUNT_HEADER, OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
-    openai_codex_client_version, openai_codex_user_agent,
+    openai_codex_client_version, openai_codex_user_agent, OPENAI_CODEX_ACCOUNT_HEADER,
+    OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
 };
 
 /// Opaque per-report identity for an inspection completion. It contains the

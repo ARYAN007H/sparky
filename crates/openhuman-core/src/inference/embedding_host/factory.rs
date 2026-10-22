@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use crate::config::Config;
 use tinyinference_embeddings::factory::{
-    CredentialResolver, EmbeddingFactorySettings, ManagedModelFactory,
-    create_configured_embedding_model, create_default_embedding_model,
+    create_configured_embedding_model, create_default_embedding_model, CredentialResolver,
+    EmbeddingFactorySettings, ManagedModelFactory,
 };
 use tinyinference_embeddings::{EmbeddingModel, UnavailableEmbeddingModel};
 use tinyinference_providers::route::custom_provider_string;
@@ -69,7 +69,14 @@ fn inspection_managed_factory(config: &Config) -> ManagedModelFactory {
         let Some(registered) = crate::inference::registry::inspection_embedding(PROVIDER_OPENHUMAN)
         else {
             log::debug!("[embeddings::factory] no inspection-safe managed embedder registered");
-            return Ok(Box::new(UnavailableEmbeddingModel::new(model, dimensions)));
+            return Ok(Box::new(UnavailableEmbeddingModel::new(
+                model,
+                dimensions,
+                format!(
+                    "{} managed embeddings need an inspection-safe hosted provider; none is registered",
+                    crate::core::observability::BACKEND_UNAVAILABLE_PREFIX
+                ),
+            )));
         };
         let (state_dir, secrets_encrypt) = credential_scope(Some(&config));
         let context =

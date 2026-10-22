@@ -38,10 +38,7 @@ pub(super) fn entry() -> CatalogEntry<ProviderContext> {
         |request: CatalogRequest<ProviderContext>| -> BoxFuture<Result<serde_json::Value, String>> {
             Box::pin(async move {
                 let context = request.context;
-                let host = context
-                    .catalog
-                    .as_ref()
-                    .expect("catalog host context");
+                let host = context.catalog.as_ref().expect("catalog host context");
                 let outcome = list_models(
                     &context.config,
                     CatalogHostRequest {

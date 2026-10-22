@@ -10,7 +10,7 @@ use crate::inference::provider::factory::access_gates::verify_session_active;
 use crate::inference::provider::fallback_diagnostics;
 use tinyinference_llm::providers::anthropic::endpoint_is_anthropic_messages;
 use tinyinference_llm::providers::registry::{
-    ProviderBuildOptions, ProviderRegistry, resolve_slug_model,
+    resolve_slug_model, ProviderBuildOptions, ProviderRegistry,
 };
 
 type CloudSlugInspectionChatModelResult = Option<

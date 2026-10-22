@@ -1,13 +1,12 @@
 use super::*;
 use tempfile::TempDir;
+use tinyinference_llm::providers::overrides::{ChatModelEntry, ProviderModelMetadata};
 
 #[tokio::test]
 async fn cached_probe_serves_definitive_negative_results() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
-    use crate::inference::registry::{
-        register_chat_model_in, ChatModelEntry, ProviderModelMetadata,
-    };
+    use crate::inference::registry::register_chat_model_in;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 

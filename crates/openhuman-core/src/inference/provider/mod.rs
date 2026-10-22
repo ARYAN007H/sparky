@@ -9,6 +9,7 @@ pub mod factory;
 pub(crate) mod fallback_diagnostics;
 pub mod http_error;
 pub mod models;
+pub(crate) mod openai_codex;
 
 pub use factory::{
     create_chat_model_from_string, create_chat_model_from_string_with_model_id,

@@ -72,7 +72,8 @@ pub async fn inference_list_models(
     let result = match ctx.load_config().await {
         Ok(config) => {
             providers::models::catalog_listing::list_configured_models_from_config(
-                provider_id, &config,
+                provider_id,
+                &config,
             )
             .await
         }
