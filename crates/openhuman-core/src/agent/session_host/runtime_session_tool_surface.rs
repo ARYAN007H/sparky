@@ -273,7 +273,7 @@ impl OpenHumanTurnPrelude {
             &surface.agent_definition_name,
             &all_tools,
         );
-        let visible = super::super::builder::dedup_visible_tool_specs(
+        let visible = tinyagents_runtime::dedup_visible_tool_specs(
             super::super::builder::visible_tool_specs_for_policy(
                 &specs,
                 &surface.visible_tool_names,

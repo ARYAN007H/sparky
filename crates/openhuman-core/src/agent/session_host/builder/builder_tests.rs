@@ -1,6 +1,7 @@
 //! Tests for the builder module — dedup_visible_tool_specs and related logic.
 
-use super::{dedup_visible_tool_specs, visible_tool_specs_for_policy};
+use super::visible_tool_specs_for_policy;
+use tinyagents_runtime::dedup_visible_tool_specs;
 use serde_json::json;
 use tinytools::ToolSpec;
 

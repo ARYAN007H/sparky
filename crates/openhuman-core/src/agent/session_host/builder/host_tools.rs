@@ -93,7 +93,7 @@ impl HostTurnTools {
     /// specifically, and a host that cannot override a tool it collides with
     /// has no way to correct one.
     ///
-    /// First and not last because [`dedup_visible_tool_specs`] keeps the first
+    /// First and not last because TinyAgents' `dedup_visible_tool_specs` keeps the first
     /// occurrence. Appending would advertise the config-derived spec while the
     /// host believed it had replaced it -- the model told about one tool and a
     /// different one answering, which is the version of this bug that is
@@ -102,7 +102,8 @@ impl HostTurnTools {
     /// Returns `None` for an empty belt, which is also a host that supplied no
     /// gate: there is nothing to admit.
     ///
-    /// [`dedup_visible_tool_specs`]: super::dedup_visible_tool_specs
+    /// Tool schema deduplication is owned by
+    /// `tinyagents_runtime::dedup_visible_tool_specs`.
     pub(super) fn merge_into(
         self,
         agent_id: &str,

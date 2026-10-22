@@ -57,7 +57,6 @@ pub use types::{OpenHumanSessionHost, SessionHostBuilder, TurnOverrides};
 // Re-export the duplicate-tool-spec guard for sibling harness modules
 // (`session::runtime`, `subagent_host`) so all provider call sites
 // share one tested implementation.
-pub(crate) use builder::dedup_visible_tool_specs;
 
 #[cfg(test)]
 mod orphaned_head_resume_tests;
