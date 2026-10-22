@@ -502,34 +502,7 @@ impl OpenHumanSessionHost {
                     Ok(())
                 })
             },
-            {
-                let state = self.runtime_state.clone();
-                let post_turn_hooks = self.post_turn_hooks.clone();
-                let session_id = self.event_session_id.clone();
-                let agent_id = self.agent_definition_id.clone();
-                let channel = self.event_channel.clone();
-                move |receipt| {
-                    let state = state.clone();
-                    let post_turn_hooks = post_turn_hooks.clone();
-                    let session_id = session_id.clone();
-                    let agent_id = agent_id.clone();
-                    let channel = channel.clone();
-                    Box::pin(async move {
-                        post_commit::finalize_committed_turn(
-                            &state,
-                            &post_turn_hooks,
-                            post_commit::TurnIdentity {
-                                session_id,
-                                agent_id,
-                                channel,
-                            },
-                            receipt,
-                        )
-                        .await;
-                        Ok(())
-                    })
-                }
-            },
+            |_| Box::pin(async { Ok(()) }),
             {
                 let state = self.runtime_state.clone();
                 move |terminal| {
@@ -549,6 +522,15 @@ impl OpenHumanSessionHost {
         let mut builder = SessionBuilder::new(driver)
             .codec(Arc::new(OpenHumanTranscriptCodec))
             .hooks(hooks)
+            .post_commit_sink(Arc::new(post_commit::OpenHumanPostCommitSink {
+                state: self.runtime_state.clone(),
+                hooks: self.post_turn_hooks.clone(),
+                identity: post_commit::TurnIdentityOwned {
+                    session_id: self.event_session_id.clone(),
+                    agent_id: self.agent_definition_id.clone(),
+                    channel: self.event_channel.clone(),
+                },
+            }))
             .retain_recorded_tools(!self.host_only && !self.host_env.fresh_tool_snapshot);
         let meta = self.runtime_transcript_meta();
         builder = if let Some(locator) = injected_locator {

@@ -26,6 +26,43 @@ use std::time::{Duration, Instant};
 
 use tinyinference_llm::message::Message;
 
+pub(super) struct OpenHumanPostCommitSink {
+    pub(super) state: std::sync::Arc<std::sync::Mutex<super::OpenHumanSessionState>>,
+    pub(super) hooks: std::sync::Arc<Vec<std::sync::Arc<dyn tinyagents_harness::host::LearningSink>>>,
+    pub(super) identity: TurnIdentityOwned,
+}
+
+pub(super) struct TurnIdentityOwned {
+    pub(super) session_id: String,
+    pub(super) agent_id: String,
+    pub(super) channel: String,
+}
+
+#[async_trait::async_trait]
+impl tinyagents_runtime::PostCommitSink<crate::agent::tinyagents::host::OpenHumanRunContext>
+    for OpenHumanPostCommitSink
+{
+    async fn after_commit(
+        &self,
+        observation: &tinyagents_runtime::PostCommitObservation<
+            crate::agent::tinyagents::host::OpenHumanRunContext,
+        >,
+    ) -> Result<(), tinyagents_runtime::RuntimeError> {
+        finalize_committed_turn(
+            &self.state,
+            &self.hooks,
+            TurnIdentity {
+                session_id: self.identity.session_id.clone(),
+                agent_id: self.identity.agent_id.clone(),
+                channel: self.identity.channel.clone(),
+            },
+            observation.receipt.clone(),
+        )
+        .await;
+        Ok(())
+    }
+}
+
 pub(super) fn take_terminal_sidecar(
     state: &std::sync::Arc<std::sync::Mutex<super::OpenHumanSessionState>>,
     terminal: tinyagents_runtime::SessionTerminal,
