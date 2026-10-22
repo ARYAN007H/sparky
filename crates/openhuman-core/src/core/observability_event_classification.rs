@@ -1,3 +1,4 @@
+#[cfg(feature = "crash-reporting")]
 pub fn is_transient_provider_http_failure(event: &sentry::protocol::Event<'_>) -> bool {
     let tags = &event.tags;
     if tags.get("domain").map(String::as_str) != Some("llm_provider") {
@@ -285,4 +286,3 @@ fn is_transient_domain_failure(event: &sentry::protocol::Event<'_>, domain: &str
 
 /// Transient backend API failures (gateway hiccups, scheduled downtime).
 /// Match by event tags written by report_error at the authed_json call site.
-#[cfg(feature = "crash-reporting")]

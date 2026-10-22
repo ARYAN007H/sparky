@@ -1,3 +1,15 @@
+
+/// Capture an error to Sentry with structured tags.
+///
+/// `domain` and `operation` are required and become tags `domain:<…>` and
+/// `operation:<…>`. `extra` is an optional list of extra tag pairs. The error
+/// itself is rendered via `Display` and emitted as a `tracing::error!` event,
+/// which the Sentry tracing layer turns into a Sentry event under the active
+/// scope.
+///
+/// Use stable, low-cardinality values for tag keys/values so Sentry can group
+/// and aggregate. High-cardinality data (full IDs, payloads) belongs in the
+/// error message body, not in tags.
 pub fn report_error<E: Display + ?Sized>(
     err: &E,
     domain: &str,
@@ -686,4 +698,3 @@ pub fn report_warning_message(message: &str, domain: &str, operation: &str, extr
 ///   for its own reasons doesn't get silently dropped
 /// - tag `failure == "non_2xx"` (the marker set by `ops::api_error`)
 /// - tag `status` parses to one of [`TRANSIENT_PROVIDER_HTTP_STATUSES`]
-#[cfg(feature = "crash-reporting")]

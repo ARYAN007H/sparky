@@ -1,3 +1,58 @@
+
+/// Detect transport-level connection failures that fire before any HTTP status
+/// is observed — DNS resolution failures, TCP connect refused/reset, TLS
+/// handshake failures, or ISP/firewall blocks. The canonical shape is
+/// reqwest's `"error sending request for url (…)"`, which surfaces from any
+/// HTTP call site (provider chat, embeddings, backend RPC) when the request
+/// can't reach the server at all.
+///
+/// These are user-environment problems — VPN drop, captive portal, ISP-level
+/// block (OPENHUMAN-TAURI-32: user in RU couldn't reach the managed backend),
+/// firewall — that no amount of retry / fallback on our side can resolve.
+/// Sentry has no signal to act on (no status, no trace, no payload), so each
+/// occurrence is pure noise. Classify them as expected so the report site
+/// logs a breadcrumb rather than spawning an error event.
+///
+/// Loopback `127.0.0.1:<port>` `Connection refused` shapes are routed
+/// through [`is_loopback_unavailable`] *before* this matcher so the
+/// boot-window race against the embedded core keeps its own bucket — see
+/// the precedence comment in [`expected_error_kind`].
+///
+/// Three additional substrings cover wire-shape variants observed in
+/// Wave 4 that the original `"dns error"` / status-code matchers miss:
+///
+/// - `"failed to lookup address"` / `"nodename nor servname"` —
+///   `getaddrinfo()` failure renderings on macOS / BSD libc and POSIX
+///   resolvers (`OPENHUMAN-TAURI-44` ~50 events,
+///   `[socket] Connection failed: WebSocket connect: IO error: failed to
+///   lookup address information: nodename nor servname provided, or not
+///   known`).
+/// - `"http error: 200 ok"` — tungstenite's `WsError::Http(200)` render
+///   when a corporate proxy / captive portal intercepts the WebSocket
+///   handshake and returns a plain HTML 200 page (`OPENHUMAN-TAURI-4P`
+///   ~66 events). Tungstenite-only — reqwest renders HTTP 200 as
+///   `"HTTP status server error (200)"`, so this can't collide with the
+///   regular HTTP call path.
+/// - `"unexpected eof during handshake"` — `native-tls`'s render when the
+///   peer (or an intercepting firewall / antivirus / corporate TLS proxy)
+///   closes the TCP connection mid-TLS-handshake, surfacing as
+///   `"TLS error: native-tls error: unexpected EOF during handshake"`
+///   wrapped by `socket::ws_loop::run_connection` into
+///   `"WebSocket connect: …"` (`TAURI-RUST-4ZD`, first seen on
+///   `openhuman@0.56.0`, Windows). The existing `"tls handshake"` anchor
+///   misses it because the words aren't contiguous (`"tls error"` …
+///   `"during handshake"`). Same user-environment shape as the other
+///   handshake-stage entries — the socket supervisor already retries with
+///   exponential backoff and Sentry has no actionable signal.
+/// - `"http version must be 1.1 or higher"` — tungstenite's
+///   `ProtocolError::WrongHttpVersion` render. Fires when a server (or
+///   intermediary proxy / HTTP/2-only edge) responds to the WebSocket
+///   upgrade with HTTP/2+, which the WS spec forbids — the handshake
+///   requires HTTP/1.1 (`CORE-RUST-DP`, ~2 events / 24h, first seen on
+///   `openhuman@0.56.0`). Same shape as the existing handshake-stage
+///   entries: a user-environment / infra misconfiguration that the
+///   client cannot fix; Sentry has no actionable signal beyond what the
+///   socket supervisor's exponential backoff already provides.
 fn is_network_unreachable_message(lower: &str) -> bool {
     lower.contains("error sending request for url")
         || lower.contains("dns error")
@@ -539,15 +594,3 @@ fn is_filesystem_user_path_invalid_message(lower: &str) -> bool {
 fn is_empty_provider_response_message(lower: &str) -> bool {
     lower.contains("model returned an empty response")
 }
-
-/// Capture an error to Sentry with structured tags.
-///
-/// `domain` and `operation` are required and become tags `domain:<…>` and
-/// `operation:<…>`. `extra` is an optional list of extra tag pairs. The error
-/// itself is rendered via `Display` and emitted as a `tracing::error!` event,
-/// which the Sentry tracing layer turns into a Sentry event under the active
-/// scope.
-///
-/// Use stable, low-cardinality values for tag keys/values so Sentry can group
-/// and aggregate. High-cardinality data (full IDs, payloads) belongs in the
-/// error message body, not in tags.

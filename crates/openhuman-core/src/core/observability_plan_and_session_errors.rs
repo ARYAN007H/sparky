@@ -1,3 +1,9 @@
+
+/// Whether `msg` is the hosted backend refusing a feature the account's plan
+/// does not include (#8081): a `[…_PLAN_REQUIRED]` code in the head
+/// TinyMemory gives a hosted failure, `[CODE] memory API {route} …`. Matched
+/// as that delimited code, so a description that merely mentions the code
+/// is not a plan refusal. User state, never an expired session.
 pub fn is_plan_required_message(msg: &str) -> bool {
     // The code runs from the nearest `[` before the head and is all
     // `A-Z0-9_`, as TinyMemory cleans it.
@@ -189,13 +195,3 @@ pub fn is_api_key_unset_message(text: &str) -> bool {
         || lower.contains("no api key is configured")
         || lower.contains("no api key supplied")
 }
-
-/// Does this error text describe a **local** LLM provider (loopback host, e.g.
-/// LM Studio / Ollama / llama.cpp on `127.0.0.1:<port>` or `localhost:<port>`)
-/// refusing the connection because its server isn't running?
-///
-/// Single-source wrapper over [`is_loopback_unavailable`] so callers outside
-/// this module (the cron scheduler's retry-halt guard) key off the exact same
-/// matcher the [`expected_error_kind`] classifier uses — the phrasing cannot
-/// drift between the source demotion and the cron suppression. Lowercases the
-/// input to match the classifier's internal contract (TAURI-RUST-12K).

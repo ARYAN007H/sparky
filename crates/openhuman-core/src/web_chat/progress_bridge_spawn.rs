@@ -22,7 +22,7 @@ pub(crate) fn spawn_progress_bridge(
 
     let (drained_tx, drained_rx) = tokio::sync::watch::channel(false);
     let timing_snapshot: std::sync::Arc<
-        std::sync::Mutex<Option<super::turn_timing::TurnTimingSnapshot>>,
+        std::sync::Mutex<Option<crate::web_chat::turn_timing::TurnTimingSnapshot>>,
     > = std::sync::Arc::new(std::sync::Mutex::new(None));
     let timing_snapshot_for_task = timing_snapshot.clone();
     dispatch_ctx.clone().spawn(async move {
@@ -44,8 +44,8 @@ pub(crate) fn spawn_progress_bridge(
         // separately via `deliver_response` and is never part of this buffer
         // (it belongs to the terminal round, which ends with no tool call).
         let mut pending_narration = String::new();
-        let mut timing = super::turn_timing::TurnTiming::start();
-        let mut turn_cost_throttle = super::turn_timing::TurnCostThrottle::new();
+        let mut timing = crate::web_chat::turn_timing::TurnTiming::start();
+        let mut turn_cost_throttle = crate::web_chat::turn_timing::TurnCostThrottle::new();
         let mut events_seen: u64 = 0;
         // Per-request monotonic ordering key stamped on every emitted
         // web-channel event (see `publish_seq_stamped`). Unique per emission so

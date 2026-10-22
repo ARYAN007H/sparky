@@ -1,3 +1,4 @@
+
 pub fn expected_error_kind(message: &str) -> Option<ExpectedErrorKind> {
     let lower = message.to_ascii_lowercase();
     // Explicit host ownership/reportability metadata precedes text heuristics.
@@ -524,9 +525,3 @@ pub(crate) fn is_embedding_endpoint_absent(lower: &str) -> bool {
 fn is_embedding_model_rejected(lower: &str) -> bool {
     tinyinference_embeddings::probe::is_embedding_model_rejected(lower)
 }
-
-/// Whether `msg` is the hosted backend refusing a feature the account's plan
-/// does not include (#8081): a `[…_PLAN_REQUIRED]` code in the head
-/// TinyMemory gives a hosted failure, `[CODE] memory API {route} …`. Matched
-/// as that delimited code, so a description that merely mentions the code
-/// is not a plan refusal. User state, never an expired session.
