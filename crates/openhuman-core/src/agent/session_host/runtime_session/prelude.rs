@@ -93,11 +93,10 @@ impl OpenHumanTurnPrelude {
         let flow_archetype_text = super::prompt::flow_archetype_text(self, true).await?;
         let connected_identities_md =
             crate::integrations::render_connected_identities_async(&self.dispatch_ctx()).await;
-        let tiered = self
-            .build_system_prompt_tiered_with_flow_archetype_and_connected_identities(
-                flow_archetype_text.as_deref(),
-                &connected_identities_md,
-            )?;
+        let tiered = self.build_system_prompt_tiered_with_flow_archetype_and_connected_identities(
+            flow_archetype_text.as_deref(),
+            &connected_identities_md,
+        )?;
         Ok(tinyagents_runtime::PrefixSnapshot::new(
             tiered
                 .system_messages()

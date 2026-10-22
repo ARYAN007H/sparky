@@ -209,18 +209,18 @@ impl OpenHumanSessionHost {
         let (mut tools, pack_registry_handle) =
             tool_registry::make_tool_registry(host_only, || {
                 tools::ops::all_tools_with_runtime_and_pack_handle(
-                Arc::clone(&tool_config),
-                &security,
-                runtime,
-                audit,
-                &tool_config.browser,
-                &tool_config.http_request,
-                &tool_config.action_dir,
-                &tool_config,
-                workspace_descriptor
-                    .as_ref()
-                    .map(|descriptor| descriptor.root.as_path()),
-            )
+                    Arc::clone(&tool_config),
+                    &security,
+                    runtime,
+                    audit,
+                    &tool_config.browser,
+                    &tool_config.http_request,
+                    &tool_config.action_dir,
+                    &tool_config,
+                    workspace_descriptor
+                        .as_ref()
+                        .map(|descriptor| descriptor.root.as_path()),
+                )
             });
 
         // Filter tools by the user preference loaded above.

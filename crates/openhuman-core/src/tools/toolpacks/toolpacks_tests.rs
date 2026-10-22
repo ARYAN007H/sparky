@@ -49,7 +49,10 @@ impl Tool for FakeTool {
 /// A registry holding several real packed tools plus the two pack tools, bound.
 fn registry_with_all(
     names: &[&'static str],
-) -> (Arc<Vec<Box<dyn Tool>>>, tinyagents_harness_tools::skills::PackRegistryHandle) {
+) -> (
+    Arc<Vec<Box<dyn Tool>>>,
+    tinyagents_harness_tools::skills::PackRegistryHandle,
+) {
     let mut tools: Vec<Box<dyn Tool>> = names
         .iter()
         .map(|name| {
@@ -71,7 +74,10 @@ fn registry_with_all(
 fn registry_with(
     name: &'static str,
     level: PermissionLevel,
-) -> (Arc<Vec<Box<dyn Tool>>>, tinyagents_harness_tools::skills::PackRegistryHandle) {
+) -> (
+    Arc<Vec<Box<dyn Tool>>>,
+    tinyagents_harness_tools::skills::PackRegistryHandle,
+) {
     let mut tools: Vec<Box<dyn Tool>> = vec![Box::new(FakeTool {
         name,
         level,

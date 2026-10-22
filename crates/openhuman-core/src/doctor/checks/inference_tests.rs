@@ -578,10 +578,7 @@ async fn invalid_role_and_route_temperatures_report_their_config_paths() {
         .filter_map(|result| result.config_path.as_deref())
         .collect::<Vec<_>>();
 
-    for expected in [
-        "chat_provider",
-        "model_routes[0].model",
-    ] {
+    for expected in ["chat_provider", "model_routes[0].model"] {
         assert!(
             paths.contains(&expected),
             "missing {expected} temperature finding: {findings:#?}"
