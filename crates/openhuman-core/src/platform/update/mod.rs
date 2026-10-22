@@ -6,6 +6,7 @@ mod tools;
 mod types;
 
 pub use self::core::*;
+pub(crate) use self::tools::registered_tools;
 pub use self::tools::{UpdateApplyTool, UpdateCheckTool};
 pub use ops as rpc;
 pub use schemas::{

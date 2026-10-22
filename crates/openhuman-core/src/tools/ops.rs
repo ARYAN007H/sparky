@@ -172,9 +172,7 @@ pub fn all_tools_with_runtime_and_pack_handle(
         )),
         Box::new(ProxyConfigTool::new(config.clone(), security.clone())),
     ]);
-    tools.extend(crate::platform::update::tools::registered_tools(
-        security.clone(),
-    ));
+    tools.extend(crate::platform::update::registered_tools(security.clone()));
     tools.append(&mut vec![
         Box::new(GitOperationsTool::new(
             security.clone(),
