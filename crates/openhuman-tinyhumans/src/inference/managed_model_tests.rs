@@ -266,82 +266,116 @@ fn managed_endpoint_diagnostic_is_origin_only_or_a_constant_fallback() {
     assert_eq!(endpoint_origin_for_log("not a url"), "<invalid endpoint>");
 }
 
-async fn unauthorized_chat_response() -> axum::response::Response {
+/// Serves `status` for every chat request, with `marker` in the error body.
+async fn serve_chat_status(
+    status: axum::http::StatusCode,
+    marker: &'static str,
+) -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
     use axum::response::IntoResponse;
-    (
-        axum::http::StatusCode::UNAUTHORIZED,
-        axum::Json(serde_json::json!({
-            "error": { "message": "HOST_AUTH_CALLBACK_MARKER" }
-        })),
-    )
-        .into_response()
-}
-
-#[tokio::test]
-async fn owner_typed_managed_auth_callback_publishes_session_expiry() {
-    use openhuman_embed::__host::core::events::DomainEvent;
-
-    openhuman_embed::__host::core::bus::init()
-        .await
-        .expect("initialize event bus");
-    let mut events = openhuman_embed::__host::core::bus::BUS
-        .get()
-        .expect("event bus initialized")
-        .receiver();
-    let tmp = tempfile::TempDir::new().expect("temporary credentials");
-    openhuman_embed::__host::security::credentials::api_key::store_api_key_in(
-        tmp.path(),
-        false,
-        "test-managed-key",
-    )
-    .expect("store test API key");
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind fixture server");
     let addr = listener.local_addr().expect("fixture address");
     let app = axum::Router::new().route(
         "/openai/v1/chat/completions",
-        axum::routing::post(unauthorized_chat_response),
+        axum::routing::post(move || async move {
+            (
+                status,
+                axum::Json(serde_json::json!({ "error": { "message": marker } })),
+            )
+                .into_response()
+        }),
     );
     let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-    let options = ManagedOptions {
-        openhuman_dir: Some(tmp.path().to_path_buf()),
-        secrets_encrypt: false,
-        ..ManagedOptions::default()
-    };
-    let model = build_chat_model(
-        Some(&format!("http://{addr}")),
-        &options,
-        "reasoning-v1",
-        true,
-        None,
-        true,
-    )
-    .expect("build owner model");
+    (addr, server)
+}
 
-    assert!(model
-        .invoke(&(), ModelRequest::new(vec![Message::user("ping")]))
+/// Only a 401 on the session credential expires the session: a 403 is a
+/// refusal and an API-key 401 is a rejected key.
+#[tokio::test]
+async fn managed_auth_failure_expires_the_session_only_on_a_session_401() {
+    use axum::http::StatusCode;
+    use openhuman_embed::__host::core::events::DomainEvent;
+
+    openhuman_embed::__host::core::bus::init()
         .await
-        .is_err());
-    server.abort();
-
-    let mut source = None;
-    loop {
-        match events.try_recv() {
-            Ok(DomainEvent::SessionExpired {
-                source: value,
-                reason,
-            }) if reason.contains("HOST_AUTH_CALLBACK_MARKER") => {
-                source = Some(value);
-                break;
-            }
-            Ok(_) | Err(tinybus::TryRecvError::Lagged(_)) => continue,
-            Err(_) => break,
+        .expect("initialize event bus");
+    let cases: [(&str, bool, StatusCode, &'static str, Option<&str>); 4] = [
+        (
+            "session 401",
+            false,
+            StatusCode::UNAUTHORIZED,
+            "HOST_AUTH_SESSION_401",
+            Some("openhuman_backend_model.invoke(401)"),
+        ),
+        (
+            "session 403",
+            false,
+            StatusCode::FORBIDDEN,
+            "HOST_AUTH_SESSION_403",
+            None,
+        ),
+        (
+            "api-key 401",
+            true,
+            StatusCode::UNAUTHORIZED,
+            "HOST_AUTH_API_KEY_401",
+            None,
+        ),
+        (
+            "api-key 403",
+            true,
+            StatusCode::FORBIDDEN,
+            "HOST_AUTH_API_KEY_403",
+            None,
+        ),
+    ];
+    for (name, api_key, status, marker, expected) in cases {
+        let mut events = openhuman_embed::__host::core::bus::BUS
+            .get()
+            .expect("event bus initialized")
+            .receiver();
+        let tmp = tempfile::TempDir::new().expect("temporary credentials");
+        seed_app_session(tmp.path(), Some("2999-01-01T00:00:00Z"));
+        if api_key {
+            openhuman_embed::__host::security::credentials::api_key::store_api_key_in(
+                tmp.path(),
+                false,
+                "test-managed-key",
+            )
+            .expect("store test API key");
         }
+        let (addr, server) = serve_chat_status(status, marker).await;
+        let model = build_chat_model(
+            Some(&format!("http://{addr}")),
+            &managed_options_at(tmp.path()),
+            "reasoning-v1",
+            true,
+            None,
+            true,
+        )
+        .expect("build owner model");
+
+        assert!(model
+            .invoke(&(), ModelRequest::new(vec![Message::user("ping")]))
+            .await
+            .is_err());
+        server.abort();
+
+        let mut source = None;
+        loop {
+            match events.try_recv() {
+                Ok(DomainEvent::SessionExpired {
+                    source: value,
+                    reason,
+                }) if reason.contains(marker) => {
+                    source = Some(value);
+                    break;
+                }
+                Ok(_) | Err(tinybus::TryRecvError::Lagged(_)) => continue,
+                Err(_) => break,
+            }
+        }
+        assert_eq!(source.as_deref(), expected, "{name}");
     }
-    assert_eq!(
-        source.as_deref(),
-        Some("openhuman_backend_model.invoke(401)"),
-        "the owner's explicit managed-auth callback must preserve invoke attribution"
-    );
 }

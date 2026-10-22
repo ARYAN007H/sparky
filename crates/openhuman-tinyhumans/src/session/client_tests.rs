@@ -36,6 +36,24 @@ fn base_url_is_normalised_and_validated() {
 }
 
 #[test]
+fn fetch_me_error_from_sdk_rejects_only_a_401() {
+    let status = |status| tinyhumans_sdk::Error::Status {
+        status,
+        body: Value::Null,
+    };
+    assert!(matches!(
+        FetchMeError::from_sdk(status(401)),
+        FetchMeError::Rejected(_)
+    ));
+    for code in [400, 402, 403, 404, 429, 500, 503] {
+        assert!(
+            FetchMeError::from_sdk(status(code)).is_availability_failure(),
+            "{code} must keep the session"
+        );
+    }
+}
+
+#[test]
 fn fetch_me_error_classification() {
     assert!(FetchMeError::Transient("503".into()).is_availability_failure());
     assert!(FetchMeError::Transport("timeout".into()).is_availability_failure());

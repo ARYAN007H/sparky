@@ -113,6 +113,23 @@ async fn backend_401_publishes_session_expired_through_reporter() {
 }
 
 #[tokio::test]
+async fn backend_403_does_not_publish_session_expired() {
+    install_fixture_backend_classifier();
+    crate::core::bus::init().await.expect("bus init");
+    let mut rx = crate::core::bus::BUS.get().expect("bus").receiver();
+    let marker = "REPORTER_MARKER_FORBIDDEN a paid plan is required";
+    let _ = api_error(FIXTURE_BACKEND, response(StatusCode::FORBIDDEN, marker)).await;
+    let seen = drain_until(&mut rx, |e| match e {
+        DomainEvent::SessionExpired { reason, .. } if reason.contains(marker) => Some(()),
+        _ => None,
+    });
+    assert!(
+        seen.is_none(),
+        "a backend 403 is a refusal, not an expired session"
+    );
+}
+
+#[tokio::test]
 async fn byo_401_publishes_api_key_rejected_not_session_expired() {
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().expect("bus").receiver();
@@ -166,16 +183,17 @@ async fn backend_provider_does_not_get_byo_key_rejection() {
 /// Sentry). Getting this wrong in either direction is a regression:
 /// over-matching silences real misconfig; under-matching is TAURI-RUST-N.
 #[test]
-fn is_backend_auth_failure_only_matches_openhuman_backend_401_403() {
+fn is_backend_auth_failure_only_matches_openhuman_backend_401() {
     use reqwest::StatusCode;
     install_fixture_backend_classifier();
     let backend = FIXTURE_BACKEND;
 
     assert!(is_backend_auth_failure(backend, StatusCode::UNAUTHORIZED));
-    assert!(is_backend_auth_failure(backend, StatusCode::FORBIDDEN));
 
-    // Non-auth backend statuses stay reportable (real server bugs / transient).
+    // A 403 is a refusal (plan, tier, WAF) and the rest are server faults or
+    // transient: none of them expires the session.
     for s in [
+        StatusCode::FORBIDDEN,
         StatusCode::INTERNAL_SERVER_ERROR,
         StatusCode::TOO_MANY_REQUESTS,
         StatusCode::BAD_REQUEST,

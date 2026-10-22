@@ -133,14 +133,28 @@ fn maybe_publish_local_session_expiry(operation: &str) {
 }
 
 /// Publish expiry only from TinyInference's explicit managed-endpoint
-/// provenance. The provider label is a wire diagnostic and is not an auth
-/// ownership signal.
-pub(super) fn publish_managed_auth_failure(error: &ProviderError, context: TinyHumansAuthFailure) {
+/// provenance, and only for a 401 on the session credential. A 403 is a
+/// refusal (plan, tier, WAF) and an API-key 401 is a rejected key; neither
+/// signs the user out. The provider label is a wire diagnostic and is not an
+/// auth ownership signal.
+pub(super) fn publish_managed_auth_failure(
+    error: &ProviderError,
+    context: TinyHumansAuthFailure,
+    api_key: bool,
+) {
     let status = match context.kind() {
         TinyHumansAuthFailureKind::Unauthorized => 401,
         TinyHumansAuthFailureKind::Forbidden => 403,
         TinyHumansAuthFailureKind::Other => return,
     };
+    if !openhuman_embed::__host::core::session_expiry::backend_status_means_session_expired(
+        status, api_key,
+    ) {
+        log::warn!(
+            "[providers][openhuman-backend] managed {status} (api_key={api_key}) is a refusal — keeping the session"
+        );
+        return;
+    }
     let operation = match context.operation() {
         TinyHumansOperation::Invoke => "invoke",
         TinyHumansOperation::Stream => "stream",

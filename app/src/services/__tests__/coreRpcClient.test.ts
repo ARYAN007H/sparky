@@ -782,6 +782,11 @@ describe('coreRpcClient', () => {
 describe('classifyRpcError', () => {
   test.each([
     ['GET /teams failed (401 Unauthorized): {"success":false}', undefined, 'auth_expired'],
+    [
+      'GET /teams failed (500 Internal Server Error): {"status":401,"error":"Unauthorized"}',
+      undefined,
+      'provider_auth',
+    ],
     ['Session expired. Please log in again.', undefined, 'auth_expired'],
     ['some prefix Session expired suffix', undefined, 'auth_expired'],
     [

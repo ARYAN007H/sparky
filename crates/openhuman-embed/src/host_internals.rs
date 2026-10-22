@@ -91,7 +91,9 @@ pub mod core {
         pub use openhuman_core::core::server_launcher::{install_server_launcher, ServeRequest};
     }
     pub mod session_expiry {
-        pub use openhuman_core::core::session_expiry::is_session_expired_error;
+        pub use openhuman_core::core::session_expiry::{
+            backend_status_means_session_expired, is_session_expired_error,
+        };
     }
     pub mod shutdown {
         pub use openhuman_core::core::shutdown::{register, signal};
