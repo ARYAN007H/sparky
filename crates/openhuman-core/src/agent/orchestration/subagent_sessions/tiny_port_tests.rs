@@ -33,7 +33,7 @@ async fn driver_store_imports_legacy_rows_without_losing_host_epoch() {
         "currentTaskId": "legacy-task",
         "status": "idle",
         "reusable": true,
-        "latestHistory": null,
+        "latestHistory": [{"role": "user", "content": "legacy history"}],
         "latestError": null,
         "createdAt": "2026-01-01T00:00:00Z",
         "updatedAt": "2026-01-01T00:00:00Z",
@@ -53,6 +53,9 @@ async fn driver_store_imports_legacy_rows_without_losing_host_epoch() {
     assert_eq!(imported.subagent_session_id, "legacy-session");
     assert_eq!(imported.current_task_id.as_deref(), Some("legacy-task"));
     assert_eq!(imported.status, TinyStatus::Idle);
+    assert!(serde_json::to_string(&imported.latest_history)
+        .unwrap()
+        .contains("legacy history"));
 
     let retained = legacy.load().unwrap();
     assert_eq!(retained[0].parent_epoch, Some(7));
