@@ -122,7 +122,7 @@ step.
 | [`ops.rs`](./ops.rs) | Registry assembly (`default_tools*`, `all_tools*`), all config and feature gating, and `tool_group`. |
 | Deferred Composio action expansion | [`integrations/composio/orchestrator_actions.rs`](../integrations/composio/orchestrator_actions.rs). |
 | [`user_filter.rs`](./user_filter.rs) | `filter_tools_by_user_preference` and the UI toggle to tool-name map. |
-| [`host_extensions.rs`](./host_extensions.rs) | Readers over `tinytools`' erased host-extension slots: `pack_registry_handle`, `delegation_target`, `tool_call_id`. |
+| [`host_extensions.rs`](./host_extensions.rs) | Readers over `tinytools`' erased host-extension slots: `pack_registry_handle`, `tool_call_id`. |
 | [`schemas.rs`](./schemas.rs), [`schemas/`](./schemas/) | The `tools.*` controllers: `registry.rs` (schemas and dispatch), `composio.rs`, `web_search.rs`. |
 | [`impl/`](impl/README.md) | Built-in tool families: `filesystem/` (the `FsGate` adapter only; the tools are `tinytools_std::filesystem`), `browser/`, `system/`, `network/`, `meta/`, and the `documents`-gated `document/` and `presentation/`. |
 | [`toolpacks/`](toolpacks/README.md) | On-demand tool disclosure (`use_skill`, pack catalog, guides) and `ToolGroups` / `GroupMode`. |

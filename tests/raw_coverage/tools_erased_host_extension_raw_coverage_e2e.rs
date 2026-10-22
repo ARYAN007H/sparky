@@ -21,8 +21,8 @@ use std::sync::Arc;
 use serde_json::json;
 
 use openhuman_core::tools::host_extensions::pack_registry_handle;
-use openhuman_core::tools::toolpacks::registry::{CATALOG, PACKS};
-use tinyagents_harness_tools::skills::{PackRegistryHandle, UseSkillTool};
+use openhuman_core::tools::toolpacks::registry::PACKS;
+use openhuman_core::tools::toolpacks::{append_pack_tools, bind_pack_registry};
 use tinytools::Tool;
 
 /// A production pack tool's registry handle survives the round trip through
@@ -53,10 +53,14 @@ use tinytools::Tool;
 /// An empty registry is deliberate: the second message proves the binding was
 /// observed without needing to construct a real packed tool.
 #[tokio::test]
-async fn a_pack_tools_registry_handle_reads_back_as_the_same_handle() {
-    let tool = UseSkillTool::new(PackRegistryHandle::default(), CATALOG);
+async fn the_public_pack_builder_returns_the_handle_its_tool_uses() {
+    let mut tools: Vec<Box<dyn Tool>> = Vec::new();
+    let returned = append_pack_tools(&mut tools);
+    let registry = Arc::new(tools);
+    bind_pack_registry(&returned, &registry);
+    let tool = registry.iter().find(|tool| tool.name() == "use_skill").expect("pack tool registered");
 
-    let recovered = pack_registry_handle(&tool).expect(
+    let recovered = pack_registry_handle(tool).expect(
         "a pack tool must yield its PackRegistryHandle through the erased \
          host extension; None here is the silent-downcast failure that makes \
          toolpacks::ops skip the registry",
@@ -64,7 +68,6 @@ async fn a_pack_tools_registry_handle_reads_back_as_the_same_handle() {
 
     // Kept alive for the whole test: the handle stores a `Weak`, so dropping
     // this would make the binding unobservable and the assertion vacuous.
-    let registry: Arc<Vec<Box<dyn Tool>>> = Arc::new(Vec::new());
     recovered.bind(Arc::downgrade(&registry));
 
     let skill = PACKS
