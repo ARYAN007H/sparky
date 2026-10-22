@@ -11,57 +11,6 @@ use tinyjuice_bus::names::methods;
 use tinyjuice_bus::types::{AgentTokenjuiceCompression, CompressorKind};
 
 pub use repl_tools::{is_repl_tool, repl_tools, repl_tools_for};
-/// Compatibility constructor for the tool registry; execution and its
-/// declaration are owned by TinyJuice's host crate.
-pub struct TokenjuiceRetrieveTool(tinyjuice_host::retrieve_tool::RetrieveToolOutputTool);
-
-impl TokenjuiceRetrieveTool {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl Default for TokenjuiceRetrieveTool {
-    fn default() -> Self {
-        Self(tinyjuice_host::retrieve_tool::RetrieveToolOutputTool::new(
-            std::sync::Arc::new(|token, range| {
-                Box::pin(async move { retrieve(token, range).await })
-            }),
-        ))
-    }
-}
-
-#[async_trait::async_trait]
-impl tinytools::Tool for TokenjuiceRetrieveTool {
-    fn name(&self) -> &str {
-        tinytools::Tool::name(&self.0)
-    }
-
-    fn description(&self) -> &str {
-        tinytools::Tool::description(&self.0)
-    }
-
-    fn parameters_schema(&self) -> serde_json::Value {
-        tinytools::Tool::parameters_schema(&self.0)
-    }
-
-    fn permission_level(&self) -> tinytools::PermissionLevel {
-        tinytools::Tool::permission_level(&self.0)
-    }
-
-    fn is_concurrency_safe(&self, args: &serde_json::Value) -> bool {
-        tinytools::Tool::is_concurrency_safe(&self.0, args)
-    }
-
-    fn external_effect(&self) -> bool {
-        tinytools::Tool::external_effect(&self.0)
-    }
-
-    async fn execute(&self, args: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
-        tinytools::Tool::execute(&self.0, args).await
-    }
-}
-
 use tinyjuice_bus::wire::InstallRequest;
 
 use tinyjuice_bus::tools::REPL_TOOLS;
@@ -69,7 +18,6 @@ pub use tinyjuice_host::recovery::{
     is_recovery_tool, summary_failed_notice, CompactedToolOutput, RECOVERY_TOOL_NAMES,
     RECOVERY_TOOL_VISIBLE,
 };
-pub const LEGACY_RETRIEVE_TOOL_NAME: &str = RECOVERY_TOOL_NAMES[3];
 
 /// Whether the `[components] juice` switch is on. Off means turns truncate
 /// tool output only: no compaction, no summary, no `juice_*` / recovery tools,
