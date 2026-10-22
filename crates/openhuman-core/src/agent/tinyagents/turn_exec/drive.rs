@@ -2,10 +2,10 @@ use super::*;
 
 #[path = "drive/controls.rs"]
 mod controls;
-#[path = "drive/stores.rs"]
-mod stores;
 #[path = "drive/setup.rs"]
 mod setup;
+#[path = "drive/stores.rs"]
+mod stores;
 
 pub(super) async fn drive_turn(
     spec: TurnSpec<'_>,
@@ -189,26 +189,9 @@ pub(super) async fn drive_turn(
     };
 
     let streaming = on_progress.is_some();
-    let turn_completed_sink = setup::turn_completed_sink(
-        &on_progress,
-        is_subagent,
-        defer_turn_completed_to_caller,
-    );
-    //
-    // Mint the durable run id *before* the sink and seed the sink stream prefix
-    // with it (`with_stream_id`), so every persisted observation's `event_id` is
-    // the restart-stable `{run_id}-evt-{offset}` a late-attach replay
-    // reconstructs the timeline from (05.1). The same id keys the journal + status.
+    let turn_completed_sink =
+        setup::turn_completed_sink(&on_progress, is_subagent, defer_turn_completed_to_caller);
     let sink = setup::event_sink(&journal_run_id, native_subagent.as_ref());
-    // Attach the event bridge for EVERY turn — including an unobserved
-    // (`on_progress = None`) background/cron turn (#4467, item 3). The bridge's
-    // `record_usage` feeds the global cost tracker on each `UsageRecorded` event
-    // *during* the run, so a run that burns N model calls and then fails still
-    // contributes that spend to the wallet/cost surfaces — the post-run
-    // `record_unobserved_turn_usage` fallback only runs on the success path
-    // and never sees a failed run's usage. With `on_progress = None` the bridge
-    // still records cost but its progress `send`s are inert no-ops, so there is
-    // no spurious streaming; every turn has an event sink.
     let bridge = setup::event_bridge(
         &sink,
         on_progress,

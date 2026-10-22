@@ -8,7 +8,10 @@ pub(super) fn run_config(
     max_iterations: usize,
     max_output_tokens: Option<u32>,
     model: &str,
-) -> (tinyagents_harness::context::RunConfig, tinyagents_harness::ids::RunId) {
+) -> (
+    tinyagents_harness::context::RunConfig,
+    tinyagents_harness::ids::RunId,
+) {
     let mut config = native_subagent
         .map(|native| native.config.clone())
         .unwrap_or_else(|| {
@@ -53,6 +56,8 @@ pub(super) fn event_bridge(
     bridge_tool_sets: Vec<Arc<Vec<Box<dyn tinytools::Tool>>>>,
     run_context: &OpenHumanRunContext,
 ) -> Arc<OpenhumanEventBridge> {
+    // Attach for observed and background turns alike: this bridge records
+    // usage even when progress streaming is disabled.
     let bridge = OpenhumanEventBridge::with_scope(
         on_progress,
         model,
@@ -74,4 +79,38 @@ pub(super) fn event_bridge(
     );
     sink.subscribe(bridge.clone());
     bridge
+}
+
+pub(super) fn turn_completed_sink(
+    on_progress: &Option<tokio::sync::mpsc::Sender<crate::progress::AgentProgress>>,
+    is_subagent: bool,
+    defer_to_caller: bool,
+) -> Option<tokio::sync::mpsc::Sender<crate::progress::AgentProgress>> {
+    // Only the caller emits a top-level completion; session callers may defer
+    // that event until post-run wrap-up is finished.
+    (!is_subagent && !defer_to_caller)
+        .then(|| on_progress.clone())
+        .flatten()
+}
+
+pub(super) fn event_sink(
+    journal_run_id: &tinyagents_harness::ids::RunId,
+    native_subagent: Option<&NativeSubagentRunContext>,
+) -> EventSink {
+    // The stream prefix makes replayed event ids stable across process restart.
+    let sink = EventSink::with_stream_id(journal_run_id.as_str());
+    if let Some(native) = native_subagent {
+        *native
+            .child_events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(sink.clone());
+        native
+            .parent_events
+            .emit(tinyagents_harness::events::AgentEvent::SubAgentRunStarted {
+                name: native.name.clone(),
+                depth: native.depth,
+                run_id: journal_run_id.clone(),
+            });
+    }
+    sink
 }
