@@ -386,37 +386,33 @@ fn decode_display_message(
             message.content = cleaned;
         }
     }
-    let turn_usage = value
-        .get("usage")
-        .cloned()
-        .and_then(|usage| serde_json::from_value(usage).ok())
-        .map(|usage| tinyagents_session::transcript::TurnUsage {
-            provider: value
-                .get("provider")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-                .to_owned(),
-            model: value
-                .get("model")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-                .to_owned(),
-            usage,
-            ts: value
-                .get("ts")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-                .to_owned(),
-            reasoning_content: value
-                .get("reasoning_content")
-                .and_then(serde_json::Value::as_str)
-                .map(str::to_owned),
-            tool_calls: Vec::new(),
-            iteration: value
-                .get("iteration")
-                .and_then(serde_json::Value::as_u64)
-                .unwrap_or_default() as u32,
-        });
+    let turn_usage = match (
+        value.get("provider").and_then(serde_json::Value::as_str),
+        value.get("model").and_then(serde_json::Value::as_str),
+        value.get("usage"),
+        value.get("ts").and_then(serde_json::Value::as_str),
+    ) {
+        (Some(provider), Some(model), Some(usage), Some(ts)) if message.role == "assistant" => {
+            serde_json::from_value(usage.clone()).ok().map(|usage| {
+                tinyagents_session::transcript::TurnUsage {
+                    provider: provider.to_owned(),
+                    model: model.to_owned(),
+                    usage,
+                    ts: ts.to_owned(),
+                    reasoning_content: value
+                        .get("reasoning_content")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned),
+                    tool_calls: message.tool_calls.clone(),
+                    iteration: value
+                        .get("iteration")
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or_default() as u32,
+                }
+            })
+        }
+        _ => None,
+    };
     message.turn_usage = turn_usage.clone();
     message.preserve_request_id = true;
     let failed = value
@@ -427,7 +423,7 @@ fn decode_display_message(
         .get("failure_detail")
         .and_then(serde_json::Value::as_str)
         .map(str::to_owned);
-    if failed || failure_detail.is_some() {
+    if failed {
         message.tool_failure = Some(tinyagents_session::transcript::ToolFailure {
             failed,
             detail: failure_detail.clone(),
@@ -436,7 +432,12 @@ fn decode_display_message(
     let reasoning_content = value
         .get("reasoning_content")
         .and_then(serde_json::Value::as_str)
-        .map(str::to_owned);
+        .map(str::to_owned)
+        .or_else(|| {
+            turn_usage
+                .as_ref()
+                .and_then(|usage| usage.reasoning_content.clone())
+        });
     Ok(DisplayMessage {
         interrupted: value
             .get("interrupted")

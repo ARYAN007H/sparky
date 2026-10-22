@@ -59,7 +59,8 @@ fn host_jsonl_reader_preserves_meta_usage_typed_rows_and_tool_state() {
             "{\"_meta\":{\"agent\":\"Orchestrator\",\"agent_id\":\"orchestrator\",\"dispatcher\":\"native\",\"created\":\"2026-01-01T00:00:00Z\",\"updated\":\"2026-01-02T00:00:00Z\",\"turn_count\":2,\"input_tokens\":7,\"output_tokens\":3,\"cached_input_tokens\":1,\"charged_amount_usd\":0.25,\"thread_id\":\"thread\"}}\n",
             "{\"kind\":\"tools\",\"tools\":[{\"name\":\"lookup\"}]}\n",
             "{\"role\":\"assistant\",\"content\":\"answer\",\"provider\":\"local\",\"model\":\"m1\",\"usage\":{\"input\":7,\"output\":3,\"cached_input\":1,\"cost_usd\":0.25},\"ts\":\"2026-01-02T00:00:00Z\",\"request_id\":\"r1\",\"iteration\":2}\n",
-            "{\"role\":\"tool\",\"content\":\"{\\\"tool_call_id\\\":\\\"call-1\\\",\\\"content\\\":\\\"old envelope\\\"}\"}\n"
+            "{\"role\":\"tool\",\"content\":\"{\\\"tool_call_id\\\":\\\"call-1\\\",\\\"content\\\":\\\"old envelope\\\"}\"}\n",
+            "{\"role\":\"assistant\",\"content\":\"incomplete usage\",\"usage\":{\"input\":7,\"output\":3,\"cached_input\":1,\"cost_usd\":0.25}}\n"
         ),
     )
     .unwrap();
@@ -77,6 +78,10 @@ fn host_jsonl_reader_preserves_meta_usage_typed_rows_and_tool_state() {
         panic!("expected typed row");
     };
     assert_eq!(row.message.tool_call_id.as_deref(), Some("call-1"));
+    let DisplayRecord::Message(incomplete) = &records[2] else {
+        panic!("expected the assistant row with incomplete usage metadata");
+    };
+    assert!(incomplete.turn_usage.is_none());
 }
 
 #[test]
@@ -123,8 +128,13 @@ fn transcript_replay_keeps_background_provenance_for_messages_and_compaction() {
 
     let (meta, tools, records) = super::decode_transcript(&path).unwrap();
     let backend = backend();
-    let stores = session_provider(&backend).try_for_agent("orchestrator").unwrap();
-    let history = stores.transcripts.open_stem("thread.orchestrator", meta.clone()).unwrap();
+    let stores = session_provider(&backend)
+        .try_for_agent("orchestrator")
+        .unwrap();
+    let history = stores
+        .transcripts
+        .open_stem("thread.orchestrator", meta.clone())
+        .unwrap();
     super::replay_transcript(history.as_ref(), &meta, tools.as_ref(), records).unwrap();
 
     let display = history.read_display().unwrap().unwrap();
