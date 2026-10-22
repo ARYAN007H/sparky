@@ -45,6 +45,7 @@ vi.mock('../../lib/mcp', () => ({ SocketIOMCPTransportImpl: MockMCPTransport }))
 // getCoreRpcUrl mock — each test sets what it needs.
 const getCoreRpcUrlMock = vi.fn<() => Promise<string>>();
 const clearCoreRpcTokenCacheMock = vi.fn();
+const getCoreRpcTokenMock = vi.fn(async (): Promise<string | null> => 'mock-core-bearer');
 vi.mock('../coreRpcClient', () => ({
   getCoreRpcUrl: getCoreRpcUrlMock,
   clearCoreRpcUrlCache: vi.fn(),
@@ -52,7 +53,7 @@ vi.mock('../coreRpcClient', () => ({
   // socketService now reads the per-process bearer for the Socket.IO
   // handshake `auth.token` payload; tests only care that the resolve
   // chain proceeds, not what the bearer value is.
-  getCoreRpcToken: vi.fn(async () => 'mock-core-bearer'),
+  getCoreRpcToken: getCoreRpcTokenMock,
   resolveCoreSocketEndpoint: vi.fn(async (baseUrl: string) => ({ baseUrl, path: '/socket.io/' })),
 }));
 
@@ -107,6 +108,8 @@ describe('socketService — socket event handler dispatches (lines 212, 230, 237
     });
     setBackendMock.mockClear();
     getCoreRpcUrlMock.mockReset();
+    getCoreRpcTokenMock.mockReset();
+    getCoreRpcTokenMock.mockResolvedValue('mock-core-bearer');
   });
 
   afterEach(() => {
@@ -222,5 +225,43 @@ describe('socketService — socket event handler dispatches (lines 212, 230, 237
     );
     expect(disconnectedCall).toBeDefined();
     expect((disconnectedCall![0] as { error: string }).error).toBe('connection refused');
+  });
+
+  // The core refuses a stale bearer by disconnecting the namespace, which
+  // socket.io never retries by itself.
+  async function connectAndHandshake() {
+    const { handlers, mockSocket } = buildMockSocket();
+    let auth: ((cb: (data: object) => void) => void) | undefined;
+    vi.doMock('socket.io-client', () => ({
+      io: vi.fn((_url: string, opts: { auth: typeof auth }) => {
+        auth = opts.auth;
+        return mockSocket;
+      }),
+    }));
+    getCoreRpcUrlMock.mockResolvedValue('http://127.0.0.1:7788/rpc');
+    const { socketService } = await import('../socketService');
+    socketService.connect('jwt-test-server-disconnect');
+    await pollUntil(() => expect(handlers['disconnect']).toBeDefined());
+    const sent = await new Promise<object>(resolve => auth!(resolve));
+    expect(sent).toMatchObject({ token: 'mock-core-bearer' });
+    // Forget the initial connect so only a reconnect is counted.
+    const connect = (mockSocket as { connect: ReturnType<typeof vi.fn> }).connect;
+    connect.mockClear();
+    return { handlers, connect };
+  }
+
+  it('reconnects with the refreshed bearer after the core rejects the handshake', async () => {
+    const { handlers, connect } = await connectAndHandshake();
+    getCoreRpcTokenMock.mockResolvedValue('restarted-core-bearer');
+    handlers['disconnect']!('io server disconnect');
+    await pollUntil(() => expect(connect).toHaveBeenCalledTimes(1));
+    expect(clearCoreRpcTokenCacheMock).toHaveBeenCalled();
+  });
+
+  it('does not loop when the core rejects the same bearer again', async () => {
+    const { handlers, connect } = await connectAndHandshake();
+    handlers['disconnect']!('io server disconnect');
+    await new Promise(r => setTimeout(r, 50));
+    expect(connect).not.toHaveBeenCalled();
   });
 });

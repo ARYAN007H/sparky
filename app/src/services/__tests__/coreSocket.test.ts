@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { connectCoreSocket, createCoreSocket } from '../coreSocket';
+import { connectCoreSocket, createCoreSocket, lastHandshakeToken } from '../coreSocket';
 
 const hoisted = vi.hoisted(() => ({
   ioMock: vi.fn(() => ({ on: vi.fn(), id: 'mock-sid' })),
@@ -72,6 +72,17 @@ describe('createCoreSocket', () => {
     expect((await handshake(call[1].auth)).token).toBe('launch-1-bearer');
     getCoreRpcTokenMock.mockResolvedValue('launch-2-bearer');
     expect((await handshake(call[1].auth)).token).toBe('launch-2-bearer');
+  });
+
+  it('falls back to its own bearer when resolveToken declines (another core is active)', async () => {
+    const socket = createCoreSocket('http://127.0.0.1:7788', {
+      coreToken: 'core-a-bearer',
+      resolveToken: async () => null,
+    });
+    getCoreRpcTokenMock.mockResolvedValue('core-b-bearer');
+    const call = ioMock.mock.calls[0] as unknown as [string, { auth: unknown }];
+    expect((await handshake(call[1].auth)).token).toBe('core-a-bearer');
+    expect(lastHandshakeToken(socket as never)).toBe('core-a-bearer');
   });
 
   it('honours overrides without dropping the auth payload', async () => {
