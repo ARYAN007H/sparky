@@ -172,8 +172,8 @@ fn upstream_rebind_keeps_tenant_routing_and_moves_only_future_leases() {
 #[test]
 fn failed_rebind_rolls_back_tenant_providers_already_moved() {
     let registry = Arc::new(TenantStoreRegistry::default());
-    let first: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
-    let second: Arc<dyn StorageBackend> = Arc::new(RejectBobTenantStorage::new());
+    let first: Arc<dyn StorageBackend> = Arc::new(MarkerStorage::new("original", false));
+    let second: Arc<dyn StorageBackend> = Arc::new(MarkerStorage::new("candidate", true));
     let router = TenantSessionStores::with_registry(
         Arc::clone(&first),
         false,
@@ -192,46 +192,66 @@ fn failed_rebind_rolls_back_tenant_providers_already_moved() {
 
     let alice_before = router.for_agent(&alice_key);
     let bob_before = router.for_agent(&bob_key);
-    let alice_destination = alice_before.transcripts.destination_key();
-    let bob_destination = bob_before.transcripts.destination_key();
+    assert!(alice_before
+        .transcripts
+        .destination_key()
+        .is_some_and(|key| key.starts_with("original://")));
+    assert!(bob_before
+        .transcripts
+        .destination_key()
+        .is_some_and(|key| key.starts_with("original://")));
 
     assert_eq!(registry.rebind(&second), 0);
     assert!(Arc::ptr_eq(&*router.backend.read().unwrap(), &first));
 
-    assert_eq!(
-        router.for_agent(&alice_key).transcripts.destination_key(),
-        alice_destination,
+    assert!(
+        router
+            .for_agent(&alice_key)
+            .transcripts
+            .destination_key()
+            .is_some_and(|key| key.starts_with("original://")),
         "the earlier provider must return to its original backend when a later tenant fails"
     );
-    assert_eq!(
-        router.for_agent(&bob_key).transcripts.destination_key(),
-        bob_destination,
+    assert!(
+        router
+            .for_agent(&bob_key)
+            .transcripts
+            .destination_key()
+            .is_some_and(|key| key.starts_with("original://")),
         "the failing provider remains on its original backend"
     );
 }
 
 #[derive(Debug)]
-struct RejectBobTenantStorage(MemoryStorage);
+struct MarkerStorage {
+    inner: MemoryStorage,
+    driver: &'static str,
+    reject_bob: bool,
+}
 
-impl RejectBobTenantStorage {
-    fn new() -> Self {
-        Self(MemoryStorage::new())
+impl MarkerStorage {
+    fn new(driver: &'static str, reject_bob: bool) -> Self {
+        Self {
+            inner: MemoryStorage::new(),
+            driver,
+            reject_bob,
+        }
     }
 }
 
-impl StorageBackend for RejectBobTenantStorage {
+impl StorageBackend for MarkerStorage {
     fn driver(&self) -> &'static str {
-        self.0.driver()
+        self.driver
     }
 
     fn capabilities(&self) -> Capabilities {
-        self.0.capabilities()
+        self.inner.capabilities()
     }
 
     fn for_scope(&self, scope: &Scope) -> Result<ScopedStorage, StorageError> {
-        if scope.as_str().starts_with("u:bob/") {
+        if self.reject_bob && scope.as_str().starts_with("u:bob/") {
             return Err(StorageError::invalid_input("injected Bob tenant failure"));
         }
-        self.0.for_scope(scope)
+        self.inner.for_scope(scope)
     }
 }
