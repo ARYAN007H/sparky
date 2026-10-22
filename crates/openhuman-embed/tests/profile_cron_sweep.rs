@@ -64,7 +64,9 @@ async fn scenario() {
         .await;
     PointedInference::install(&inference.uri());
     // The shared backend every sweeper would contend on.
-    openhuman_core::storage::install(Arc::new(openhuman_core::storage::MemoryStorage::new()));
+    openhuman_core::storage::install(Arc::new(
+        tinystoragedrivers_testkit::MemoryBackend::new(),
+    ));
 
     let root = tempfile::tempdir().unwrap();
     let recorder = Arc::new(Recorder::default());
