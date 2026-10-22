@@ -3,8 +3,10 @@ pub mod ops;
 pub mod scheduler;
 mod schemas;
 mod types;
+mod tools;
 
 pub use self::core::*;
+pub use self::tools::{UpdateApplyTool, UpdateCheckTool};
 pub use ops as rpc;
 pub use schemas::{
     all_controller_schemas as all_update_controller_schemas,

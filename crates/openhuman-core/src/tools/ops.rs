@@ -3,6 +3,7 @@ use super::implementations::network::{McpListServersTool, McpListToolsTool};
 use super::*;
 use crate::config::Config;
 use crate::modules::tinybox::host_runtime::{NativeRuntime, RuntimeAdapter};
+use crate::platform::update::{UpdateApplyTool, UpdateCheckTool};
 use crate::security::{AuditLogger, SecurityPolicy};
 use std::sync::Arc;
 use tinyagents_harness_tools::{CurrentTimeTool, ResolveTimeTool};

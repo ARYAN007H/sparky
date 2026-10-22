@@ -11,8 +11,6 @@ mod shell;
 mod shell_description;
 mod shell_saas;
 mod shell_support;
-mod update_apply;
-mod update_check;
 
 use crate::security::SecurityPolicy;
 use crate::tools::implementations::filesystem::gate::security_scoped_to_root;
@@ -23,8 +21,6 @@ pub use proxy_config::ProxyConfigTool;
 pub use retrieve_tool_output::{retrieve_tool_output_tool, RetrieveToolOutputTool};
 pub use schedule::ScheduleTool;
 pub use shell::ShellTool;
-pub use update_apply::UpdateApplyTool;
-pub use update_check::UpdateCheckTool;
 
 /// Clone and scope `security` to the run's workspace descriptor, if any.
 pub(in crate::tools::implementations) fn security_for_tool_context(
