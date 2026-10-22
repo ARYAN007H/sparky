@@ -848,8 +848,9 @@ impl ShellPorts {
     fn permit(&self, context: Option<&dyn ToolRunContext>) -> Result<ExecPermit, ExecDenied> {
         let action_dir = self.host.effective_action_dir_for_context(context);
         let environment = command_environment_for_tool(context)
-            .unwrap_or_default()
+            .as_deref()
             .into_iter()
+            .flat_map(|environment| environment.iter())
             .map(|(name, value)| (name.into(), value.into()))
             .collect();
         Ok(ExecPermit {
@@ -865,7 +866,7 @@ impl ShellPorts {
 impl ExecBackend for ShellPorts {
     fn shell_flavor(&self) -> ShellFlavor {
         match self.host.runtime.shell_flavor() {
-            crate::modules::tinybox::contract::ShellFlavor::Cmd => ShellFlavor::Cmd,
+            crate::modules::tinybox::host_runtime::ShellFlavor::Cmd => ShellFlavor::Cmd,
             _ => ShellFlavor::Posix,
         }
     }
