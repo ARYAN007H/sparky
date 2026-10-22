@@ -83,8 +83,6 @@ tinystoragedrivers-mongodb = { path = "vendor/tinystoragedrivers/crates/tinystor
 tinystoragedrivers-s3 = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-s3" }
 tinystoragedrivers-secrets = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-secrets" }
 tinystoragedrivers-sqlite = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-sqlite" }
-tinystoragedrivers-api = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-api" }
-tinystoragedrivers-types = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-types" }
 
 [patch."https://github.com/tinyhumansai/tinyinference"]
 # tinymemes depends on the Jev client by git; resolve it to the vendored copy.
