@@ -241,7 +241,7 @@ fn the_controller_declares_nowhere_for_a_seed_to_travel() {
     // `context` or `transcript` could carry history just as well, and a
     // heuristic that guesses at names would pass it silently. Anything new
     // fails here until someone decides whether a seed could ride it.
-    const KNOWN: [&str; 9] = [
+    const KNOWN: [&str; 11] = [
         "message",
         "model_override",
         "temperature",
@@ -249,6 +249,8 @@ fn the_controller_declares_nowhere_for_a_seed_to_travel() {
         "cwd",
         "inference_url",
         "inference_headers",
+        "inference_provider_options",
+        "inference_reasoning_effort",
         "api_key",
         "agent_id",
     ];
