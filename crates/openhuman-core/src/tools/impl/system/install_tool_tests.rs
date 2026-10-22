@@ -3,7 +3,7 @@ use crate::security::approval::ApprovalChatContext;
 use crate::security::AutonomyLevel;
 use serde_json::json;
 use std::collections::BTreeMap;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::sync::Mutex;
 use tinyagents_harness_tools::exec::{
     ExecBackendOutcome, ExecOutput, ExecProgress, ExecRequest, ShellFlavor,
@@ -181,13 +181,13 @@ fn install_environment_filters_host_variables_without_dropping_package_manager_p
         (OsString::from("AWS_ACCESS_KEY_ID"), OsString::from("secret")),
     ]);
 
-    assert_eq!(filtered.get("PATH"), Some(&OsString::from("/tools/bin")));
-    assert_eq!(filtered.get("HOME"), Some(&OsString::from("/home/operator")));
+    assert_eq!(filtered.get(OsStr::new("PATH")), Some(&OsString::from("/tools/bin")));
+    assert_eq!(filtered.get(OsStr::new("HOME")), Some(&OsString::from("/home/operator")));
     assert_eq!(
-        filtered.get("CARGO_HOME"),
+        filtered.get(OsStr::new("CARGO_HOME")),
         Some(&OsString::from("/home/operator/.cargo"))
     );
-    assert_eq!(filtered.get("SystemRoot"), Some(&OsString::from("C:\\Windows")));
-    assert!(!filtered.contains_key("GH_TOKEN"));
-    assert!(!filtered.contains_key("AWS_ACCESS_KEY_ID"));
+    assert_eq!(filtered.get(OsStr::new("SystemRoot")), Some(&OsString::from("C:\\Windows")));
+    assert!(!filtered.contains_key(OsStr::new("GH_TOKEN")));
+    assert!(!filtered.contains_key(OsStr::new("AWS_ACCESS_KEY_ID")));
 }
