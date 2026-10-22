@@ -94,7 +94,7 @@ pub(crate) fn rebind_with(
     let backend = super::block_on_anyhow(async move { Ok(super::open(&url).await?) })
         .with_context(|| format!("open the storage backend {redacted_to}"))?;
 
-    let session_stores = install(&next, Arc::clone(&backend)).unwrap_or(0);
+    let session_stores = install(&next, Arc::clone(&backend))?;
     tracing::debug!(
         target: "openhuman::storage",
         session_stores,
