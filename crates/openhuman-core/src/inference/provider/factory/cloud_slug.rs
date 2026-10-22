@@ -1,13 +1,24 @@
 //! `<slug>:<model>` BYOK cloud providers: shared slug resolution (model fallback,
 //! abstract-tier remapping, credentials, codex routing) and the crate-native builders.
 
-use super::*;
+use super::{
+    access_gates::{enforce_local_only_inference, emit_inference_egress},
+    credentials::CredentialAccess,
+    openai_bearer_is_oauth, provider_for_role, resolve_codex_routing,
+    InspectionOutputBudgetCapability, OptionalChatModelResult, PROVIDER_OPENHUMAN,
+    CLAUDE_AGENT_SDK_PREFIX, CLAUDE_AGENT_SDK_PROVIDER,
+};
 use crate::config::ops::resolve_primary_cloud_provider_string;
+use crate::config::schema::cloud_providers::AuthStyle;
+use crate::config::Config;
 #[cfg(not(test))]
 use crate::inference::provider::factory::access_gates::verify_backend_session_active;
 #[cfg(not(test))]
 use crate::inference::provider::factory::access_gates::verify_session_active;
 use crate::inference::provider::fallback_diagnostics;
+use crate::security::egress::EgressLedger;
+use std::sync::Arc;
+use tinyinference_llm::model::ChatModel;
 use tinyinference_llm::providers::anthropic::endpoint_is_anthropic_messages;
 use tinyinference_llm::providers::registry::{
     resolve_slug_model, ProviderBuildOptions, ProviderRegistry,

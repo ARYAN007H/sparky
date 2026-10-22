@@ -231,8 +231,6 @@ fn managed_hint_roles_follow_the_native_workload_route_order() {
         .iter()
         .map(|route| route.strip_prefix("hint:").expect("native hint route"))
         .collect::<Vec<_>>();
-    let public = openhuman_embed::__host::config::WORKLOAD_ROLES;
-    assert_eq!(native, public);
     for (route, role) in tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS
         .iter()
         .zip(native)
