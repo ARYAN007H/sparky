@@ -339,8 +339,45 @@ pub(crate) async fn cancel_for_thread(
             }
         };
         if matching_jobs.is_empty() {
+            let terminal_session = match crate::agent::orchestration::subagent_sessions::open_for_context(
+                ctx,
+                owner.workspace_dir.clone(),
+                owner.parent_session.clone(),
+                owner.parent_thread_id.clone(),
+                Some((*jobs).clone()),
+            ) {
+                Ok(sessions) => match sessions
+                    .list_for_parent(&owner.parent_session, Some(parent_thread_id))
+                    .await
+                {
+                    Ok(sessions) => sessions.into_iter().find(|session| {
+                        session.current_task_id.as_deref() == Some(task_id.as_str())
+                            && matches!(
+                                session.status,
+                                tinyagents_orchestration::subagent::DurableSubagentStatus::Idle
+                                    | tinyagents_orchestration::subagent::DurableSubagentStatus::Failed
+                                    | tinyagents_orchestration::subagent::DurableSubagentStatus::Closed
+                            )
+                    }),
+                    Err(error) => {
+                        failures.push(format!(
+                            "failed to read durable session for indexed task {task_id}: {error}"
+                        ));
+                        continue;
+                    }
+                },
+                Err(error) => {
+                    failures.push(format!(
+                        "failed to open durable session scope for indexed task {task_id}: {error}"
+                    ));
+                    continue;
+                }
+            };
+            if terminal_session.is_some() {
+                continue;
+            }
             failures.push(format!(
-                "owner index task {task_id} has no matching driver job in its parent scope"
+                "owner index task {task_id} has no live driver job or terminal durable session in its parent scope"
             ));
             continue;
         }

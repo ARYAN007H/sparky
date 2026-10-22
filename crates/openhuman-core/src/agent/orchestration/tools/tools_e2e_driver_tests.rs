@@ -651,6 +651,54 @@ async fn thread_delete_keeps_completions_when_driver_task_scope_cannot_be_resolv
         1,
         "thread deletion retains queued completions when a selected child cannot be settled"
     );
+
+    let terminal_legacy_row = serde_json::from_value(
+        serde_json::json!({
+            "subagentSessionId": "pruned-terminal-session",
+            "parentSession": parent_session,
+            "parentThreadId": thread_id,
+            "workerThreadId": null,
+            "agentId": "task_manager_agent",
+            "displayName": null,
+            "model": null,
+            "sandboxMode": "workspace",
+            "actionRoot": null,
+            "taskKey": "pruned-terminal-task",
+            "taskTitle": "Completed before registry pruning",
+            "currentTaskId": "stale-driver-task",
+            "status": "idle",
+            "reusable": true,
+            "latestHistory": [],
+            "latestError": null,
+            "createdAt": "2026-01-01T00:00:00Z",
+            "updatedAt": "2026-01-01T00:00:00Z",
+            "lastUsedAt": "2026-01-01T00:00:00Z",
+            "parentEpoch": null,
+            "lifecycleKey": null
+        }),
+    )
+    .expect("deserialize terminal legacy session");
+    crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new_in_context(
+        &dispatch,
+        workspace.clone(),
+    )
+    .expect("open explicit legacy session scope")
+    .save(&[terminal_legacy_row])
+    .expect("save terminal legacy session for import");
+
+    crate::threads::ops::thread_delete(
+        &dispatch,
+        crate::threads::DeleteConversationThreadRequest {
+            thread_id: thread_id.into(),
+            deleted_at: "2026-01-01T00:02:00Z".into(),
+        },
+    )
+    .await
+    .expect("terminal durable session proves the missing registry snapshot is settled");
+    assert!(
+        background_completions::pending_for(&workspace, thread_id).is_empty(),
+        "terminal durable session permits queued completion cleanup after registry pruning"
+    );
 }
 
 #[tokio::test]
