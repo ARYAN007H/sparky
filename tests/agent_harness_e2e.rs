@@ -806,6 +806,12 @@ async fn boot_stack_with_options(
     let home_is_override = home_override.is_some();
     let tmp = tempdir().expect("tempdir");
     let home = home_override.unwrap_or_else(|| tmp.path().to_path_buf());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&home, std::fs::Permissions::from_mode(0o700))
+            .expect("make test HOME private");
+    }
     let openhuman_home = home.join(".openhuman");
     let action_dir = home.join("OpenHuman/projects");
     std::fs::create_dir_all(&action_dir).expect("create action directory");
