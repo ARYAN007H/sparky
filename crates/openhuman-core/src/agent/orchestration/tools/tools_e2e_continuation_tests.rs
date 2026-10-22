@@ -476,6 +476,33 @@ async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
         .current_task_id
         .clone()
         .expect("first task id");
+    let cached_owner = crate::agent::orchestration::completion_owners::driver_task_owner(
+        &live.data.dispatch_ctx(),
+        &first_task_id,
+    )
+    .expect("task owner scope is retained for the roster");
+    assert_eq!(cached_owner.workspace, workspace_descriptor);
+    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        workspace.path(),
+        "idle-reuse-e2e",
+        Some("idle-reuse-e2e-thread"),
+    );
+    let scoped_jobs =
+        crate::core::runtime::slot_for::<SubAgentJobRegistry>(&live.data.dispatch_ctx())
+            .list_for_parent_scope(
+                &owner,
+                &tinyagents_orchestration::subagent::ParentJobScope::new(
+                    workspace_descriptor.clone(),
+                    "idle-reuse-e2e-thread",
+                ),
+            )
+            .expect("custom workspace/thread job scope");
+    assert!(scoped_jobs.iter().any(|job| {
+        job.extensions
+            .get("task_id")
+            .and_then(serde_json::Value::as_str)
+            == Some(first_task_id.as_str())
+    }));
     let first_job =
         crate::core::runtime::slot_for::<SubAgentJobRegistry>(&live.data.dispatch_ctx())
             .list()
