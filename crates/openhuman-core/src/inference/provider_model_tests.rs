@@ -284,6 +284,8 @@ fn native_provider_metadata_resolves_by_context_and_preserves_request_fields() {
     };
 
     verify(None, "process", 101);
+    let empty_extensions = Extensions::new();
+    verify(Some(&empty_extensions), "process", 101);
     verify(Some(&a_extensions), "context-a", 202);
     verify(Some(&b_extensions), "context-b", 303);
 
@@ -298,4 +300,43 @@ fn native_provider_metadata_resolves_by_context_and_preserves_request_fields() {
         assert_eq!(crate::inference::registry::provider_model_context_window_for(None, provider, "process/raw"), Some(101), "explicit process-only lookup must ignore ambient registration");
     });
     unregister_chat_model(provider);
+}
+
+
+#[test]
+fn managed_options_builder_uses_the_ambient_native_provider_entry() {
+    use crate::core::slots::Extensions;
+    use crate::inference::registry::{register_chat_model_in, unregister_chat_model, ChatModelEntry, ProviderContext};
+    use std::sync::Arc;
+
+    let _guard = crate::inference::inference_test_guard();
+    let _exclusive = crate::inference::provider::factory::test_provider_override::exclusive();
+    let provider = crate::inference::provider::factory::PROVIDER_OPENHUMAN;
+    unregister_chat_model(provider);
+    let extensions = Extensions::new();
+    register_chat_model_in(
+        &extensions,
+        provider,
+        ChatModelEntry::<ProviderContext> {
+            build: Arc::new(|request| {
+                Ok((
+                    Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec!["ambient"])),
+                    request.model_override.unwrap_or("ambient/model").to_string(),
+                ))
+            }),
+            probe: None,
+            models: None,
+        },
+    );
+    let context = crate::core::runtime::CoreContext::for_test_with_extensions(
+        crate::core::runtime::DomainSet::full(), None, extensions,
+    );
+    let built = crate::core::runtime::CoreContext::sync_scope(context, || {
+        crate::inference::provider::factory::make_openhuman_backend_model_for_options(
+            &crate::tools::delegate::ProviderRuntimeOptions::default(),
+            "ambient/pinned",
+            None,
+        )
+    });
+    assert_eq!(built.expect("ambient registration must be visible").1, "ambient/pinned");
 }
