@@ -23,6 +23,8 @@ use tinytools_agent::dialect::{
 mod tool_registry;
 #[path = "factory_workflows.rs"]
 mod workflows;
+#[path = "factory/build_session.rs"]
+mod build_session;
 
 impl OpenHumanSessionHost {
     /// Returns whether `agent_id` resolves to a runnable definition for this
