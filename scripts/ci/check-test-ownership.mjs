@@ -133,7 +133,8 @@ export function findOwnershipViolations(source, filePath) {
     const reportedLines = new Set();
 
     for (const importedPath of importedPaths) {
-      if (deniedSegments.every((segment, index) => importedPath[index]?.value === segment)) {
+      const resolvedPath = resolveAliasSegments(importedPath.map((segment) => segment.value), aliases);
+      if (deniedSegments.every((segment, index) => resolvedPath[index] === segment)) {
         reportedLines.add(source.slice(0, importedPath[0].start).split('\n').length);
       }
     }
@@ -163,7 +164,18 @@ function readPathSegments(tokens, start, aliases) {
     segments.push(tokens[index + 2].value);
     index += 2;
   }
-  return segments;
+  return resolveAliasSegments(segments, aliases);
+}
+
+function resolveAliasSegments(segments, aliases) {
+  const resolved = [...segments];
+  const seen = new Set();
+  while (aliases.has(resolved[0]) && !seen.has(resolved[0])) {
+    const alias = resolved[0];
+    seen.add(alias);
+    resolved.splice(0, 1, ...aliases.get(alias));
+  }
+  return resolved;
 }
 
 function tokenizeUseTrees(source) {
