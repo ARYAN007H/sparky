@@ -52,7 +52,7 @@ pub(crate) async fn cancel_by_task_with_workspace_reason(
     let Some(owner_scope) =
         crate::agent::orchestration::completion_owners::driver_task_owner(ctx, task_id)
     else {
-        return Ok(None);
+        return terminal_legacy_session(ctx, &workspace_dir, task_id);
     };
     let Some(parent_thread_id) = owner_scope.parent_thread_id.as_deref() else {
         return Ok(None);
@@ -179,6 +179,79 @@ pub(crate) async fn cancel_by_task_with_workspace_reason(
         already_finished: selected.already_finished,
         driver_pause,
         driver_managed: true,
+    }))
+}
+
+/// Preserve late-cancel reporting for durable terminal sessions that predate
+/// the in-memory TinyAgents owner index. This is a read-only compatibility
+/// lookup; live cancellation always requires the owner-scoped driver registry.
+fn terminal_legacy_session(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &Path,
+    task_id: &str,
+) -> Result<Option<CancelledSubagent>, String> {
+    use crate::agent::orchestration::subagent_sessions::{
+        DurableSubagentStatus, SubagentSessionStore,
+    };
+
+    let store = if ctx.resolved().is_some() {
+        SubagentSessionStore::new_in_context(ctx, workspace_dir.to_path_buf())?
+    } else {
+        SubagentSessionStore::new(workspace_dir.to_path_buf())
+    };
+    let Some(session) = store
+        .load()?
+        .into_iter()
+        .find(|session| session.current_task_id.as_deref() == Some(task_id))
+    else {
+        return Ok(None);
+    };
+    let already_finished = match session.status {
+        DurableSubagentStatus::Failed if session.lifecycle_key.is_none() => {
+            Some(FinishedOutcome::Failed)
+        }
+        DurableSubagentStatus::Idle => {
+            let Some(key) = session.lifecycle_key.as_ref() else {
+                return Ok(None);
+            };
+            let Some(outcome) = crate::agent::subagent_host::load_terminal_outcome(
+                workspace_dir,
+                key,
+            )?
+            else {
+                return Ok(None);
+            };
+            match outcome.status {
+                tinyagents_orchestration::subagent::SubagentOutcomeKind::Completed => {
+                    Some(FinishedOutcome::Completed)
+                }
+                tinyagents_orchestration::subagent::SubagentOutcomeKind::Incomplete(_) => {
+                    Some(FinishedOutcome::Failed)
+                }
+                tinyagents_orchestration::subagent::SubagentOutcomeKind::Cancelled
+                | tinyagents_orchestration::subagent::SubagentOutcomeKind::AwaitingInput(_) => {
+                    None
+                }
+            }
+        }
+        DurableSubagentStatus::Running
+        | DurableSubagentStatus::AwaitingUser
+        | DurableSubagentStatus::Failed
+        | DurableSubagentStatus::Closed => None,
+    };
+    let Some(already_finished) = already_finished else {
+        return Ok(None);
+    };
+    Ok(Some(CancelledSubagent {
+        agent_id: session.agent_id,
+        parent_session: session.parent_session,
+        subagent_session_id: Some(session.subagent_session_id),
+        workspace_dir: workspace_dir.to_path_buf(),
+        parent_thread_id: session.parent_thread_id,
+        parent_epoch: session.parent_epoch,
+        already_finished: Some(already_finished),
+        driver_pause: None,
+        driver_managed: false,
     }))
 }
 
