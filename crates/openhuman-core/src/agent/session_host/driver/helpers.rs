@@ -116,7 +116,8 @@ pub(super) fn driver_error_with_snapshot(
         // indefinitely. Preserve the completed tools as a useful, bounded
         // partial rather than showing only the failed model's process text.
         let results = crate::agent::session_host::product_copy::close_results(&guard.tool_outcomes);
-        let evidence = crate::agent::session_host::product_copy::render_close_results(&results, 4_000);
+        let evidence =
+            crate::agent::session_host::product_copy::render_close_results(&results, 4_000);
         format!(
             "I stopped a repetitive model response before it could finish. Here are the completed tool results I can report:\n{evidence}"
         )

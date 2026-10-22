@@ -11,6 +11,13 @@ use super::super::types::OpenHumanSessionHost;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 
 impl OpenHumanSessionHost {
+    pub(super) fn injected_transcript_stem(&self) -> String {
+        match &self.session_parent_prefix {
+            Some(prefix) => format!("{prefix}__{}", self.session_key),
+            None => self.session_key.clone(),
+        }
+    }
+
     pub(super) fn runtime_session_key(&self) -> String {
         self.thread_id
             .clone()

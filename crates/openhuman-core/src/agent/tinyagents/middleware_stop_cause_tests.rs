@@ -5,8 +5,8 @@
 
 use super::*;
 use crate::agent::session_host::stop_summary::{render_stop_summary, StopReasonKind};
-use tinyagents_harness::close::CloseToolResult as CheckpointToolResult;
 use crate::agent::tinyagents::middleware::repeated_failure::RepeatedToolFailureMiddleware;
+use tinyagents_harness::close::CloseToolResult as CheckpointToolResult;
 use tinyagents_harness::middleware::is_repeat_call_exempt;
 use tinyagents_harness::middleware::library::{
     RepeatProgressMiddleware, DEFAULT_CLEARED_PLACEHOLDER, REPEAT_GUARD_BLOCKED,

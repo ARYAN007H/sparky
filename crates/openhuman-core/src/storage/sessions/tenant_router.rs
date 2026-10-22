@@ -13,7 +13,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use tinyagents_harness::store::SchemaAdmission;
-use tinyagents_session::port::{AgentStores, SessionStoreLease, SessionStoreLeaseError, SessionStoreProvider};
+use tinyagents_session::port::{
+    AgentStores, SessionStoreLease, SessionStoreLeaseError, SessionStoreProvider,
+};
 use tinyagents_session::DriverSessionStores;
 use tinystoragedrivers::{Blocking, Scope, StorageBackend, StorageError};
 
@@ -130,10 +132,7 @@ impl SessionStoreProvider for TenantSessionStores {
         provider.try_for_agent(&agent)
     }
 
-    fn lease_for_agent(
-        &self,
-        agent_id: &str,
-    ) -> Result<SessionStoreLease, SessionStoreLeaseError> {
+    fn lease_for_agent(&self, agent_id: &str) -> Result<SessionStoreLease, SessionStoreLeaseError> {
         let (provider, agent) = self.route(agent_id);
         provider.lease_for_agent(&agent)
     }

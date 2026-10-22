@@ -1,4 +1,4 @@
-use super::{OPENHUMAN_CLOSE_COPY, close_results, render_close_results};
+use super::{close_results, render_close_results, OPENHUMAN_CLOSE_COPY};
 
 type CheckpointToolResult = tinyagents_harness::close::CloseToolResult;
 const CHECKPOINT_TOTAL_CHARS: usize = 4_000;
@@ -245,13 +245,11 @@ const STOP_NOTE: &str = "Stopping: the `install_item` call was retried 3 times w
 /// request was not done.
 #[test]
 fn the_final_summary_quotes_each_failure_message() {
-    let out = build_deterministic_final_summary(
-        &[result(
-            "install_item",
-            false,
-            "no direct download. View it at https://example.test/demo",
-        )],
-    );
+    let out = build_deterministic_final_summary(&[result(
+        "install_item",
+        false,
+        "no direct download. View it at https://example.test/demo",
+    )]);
     assert!(
         out.contains("`install_item` — failed"),
         "status missing: {out}"

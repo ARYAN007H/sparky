@@ -116,7 +116,10 @@ impl OpenHumanSessionHost {
             }),
             thread_id: self.thread_id.clone(),
             stream: self.on_progress.is_some(),
-            session: self.session.clone(),
+            session: self
+                .session_history_locator
+                .as_ref()
+                .and(self.session.clone()),
             resume: self.turn_resume_mode(),
             cancellation: cancellation.clone(),
             run_context: context.into_tinyagents(root_config),
