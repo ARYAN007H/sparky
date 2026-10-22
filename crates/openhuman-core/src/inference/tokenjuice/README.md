@@ -58,12 +58,14 @@ behavior. There is no linked implementation fallback.
   Builds without `modules` return an unavailable error.
 - Controllers are registered from `crate::inference::tokenjuice::all_tokenjuice_registered_controllers()`,
   called by [`core/all.rs`](../../core/all.rs).
-- `tools/ops.rs` registers `crate::inference::tokenjuice::TokenjuiceRetrieveTool::new()`
-  in the agent tool catalog (it is not re-exported through [`tools/mod.rs`](../../tools/mod.rs)) and
+- `tools/ops.rs` constructs TinyJuice's
+  `tinyjuice_host::retrieve_tool::RetrieveToolOutputTool` with the host's
+  module-CCR lookup callback in the agent tool catalog (it is not re-exported
+  through [`tools/mod.rs`](../../tools/mod.rs)) and
   treats every `RECOVERY_TOOL_NAMES` entry as a recovery tool. The registered
   tool name is `tinyjuice_bus::tools::RETRIEVE` (`"juice_retrieve"`);
-  `"tokenjuice_retrieve"` and `LEGACY_RETRIEVE_TOOL_NAME`
-  (`"retrieve_tool_output"`) are recognized aliases only. Only
+  `"tokenjuice_retrieve"` and `"retrieve_tool_output"` are recognized aliases
+  only. Only
   `RECOVERY_TOOL_VISIBLE` (the live tool) is force-added to a curated
   `ToolScope::Named` belt (`session_host/builder/mod.rs::ensure_recovery_tool_visible`);
   the aliases stay registered for transcript replay but off the wire. It is

@@ -4,7 +4,12 @@ use tinytools::Tool;
 
 #[test]
 fn host_tools_keep_the_published_recovery_names_and_schemas() {
-    let retrieve = TokenjuiceRetrieveTool::new();
+    // Pin the actual tool the registry constructs before removing the local
+    // forwarding wrapper; this protects the model-facing contract byte for
+    // byte across the ownership move to tinyjuice-host.
+    let retrieve = tinyjuice_host::retrieve_tool::RetrieveToolOutputTool::new(
+        std::sync::Arc::new(|_, _| Box::pin(async { Ok(None) })),
+    );
     assert_eq!(retrieve.name(), "juice_retrieve");
     assert_eq!(
         retrieve.permission_level(),
@@ -104,7 +109,8 @@ fn host_tools_keep_the_published_recovery_names_and_schemas() {
 #[test]
 fn recovery_tool_aliases_remain_stable() {
     assert!(is_recovery_tool(tinyjuice_bus::tools::RETRIEVE));
-    assert!(is_recovery_tool(LEGACY_RETRIEVE_TOOL_NAME));
+    assert!(is_recovery_tool(tinyjuice_bus::tools::LEGACY_RETRIEVE));
+    assert!(is_recovery_tool("retrieve_tool_output"));
     assert!(!is_recovery_tool("shell"));
 }
 
