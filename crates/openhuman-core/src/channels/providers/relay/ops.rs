@@ -251,12 +251,11 @@ pub(crate) async fn run_relay_turn(
         request_id = %request_id,
         "[channels::relay] dispatching relayed turn"
     );
-    let mut runtime_message = RuntimeChannelMessage {
+    let runtime_message = RuntimeChannelMessage {
         message,
         authenticated_relay: false,
         prepared_inbound: Some(prepared),
     };
-    runtime_message.prepared_inbound = Some(prepared);
     let turn = process_channel_runtime_message(ctx, runtime_message);
     if let Some(context) = dispatch_ctx.core() {
         crate::core::runtime::CoreContext::scope(
