@@ -24,6 +24,9 @@ fn ctx(
 fn typing(channel: &str) -> ChannelBackendRequest {
     ChannelBackendRequest::ProgressiveTransport(Box::new(ProgressiveTransportRequest::Typing {
         channel: channel.to_string(),
+        turn_id: None,
+        channel_ref: None,
+        conversation: None,
     }))
 }
 
