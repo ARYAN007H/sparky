@@ -51,10 +51,7 @@ impl tinytools::Tool for TokenjuiceRetrieveTool {
         tinytools::Tool::external_effect(&self.0)
     }
 
-    async fn execute(
-        &self,
-        args: serde_json::Value,
-    ) -> anyhow::Result<tinytools::ToolResult> {
+    async fn execute(&self, args: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
         tinytools::Tool::execute(&self.0, args).await
     }
 }

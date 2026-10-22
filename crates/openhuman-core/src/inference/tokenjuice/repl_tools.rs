@@ -91,7 +91,11 @@ pub(crate) fn repl_tools_with_artifacts(
 
 /// The current TinyJuice REPL declarations for ordinary turns.
 pub fn repl_tools() -> Vec<Box<dyn Tool>> {
-    host_tools(Arc::new(ModuleSource { config: None }), ReplLimits::default(), None)
+    host_tools(
+        Arc::new(ModuleSource { config: None }),
+        ReplLimits::default(),
+        None,
+    )
 }
 
 /// Offer the REPL only while enabled handle storage can produce queryable handles.
@@ -147,4 +151,3 @@ pub(crate) fn repl_tools_for_recorded(
 #[cfg(test)]
 #[path = "repl_tools_tests.rs"]
 mod tests;
-

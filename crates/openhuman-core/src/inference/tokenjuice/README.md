@@ -19,9 +19,9 @@ OpenHuman-owned files:
 | [`mod.rs`](./mod.rs) | TinyBus calls (through `tinyjuice_bus::names::methods` constants), config installation, pass-through fallback, and savings wiring. |
 | [`schemas.rs`](./schemas.rs) | JSON-RPC controller schemas and handlers. |
 | [`config_patch.rs`](./config_patch.rs) | Partial update shape for the `[tokenjuice]` config block. |
-| [`generate.rs`](./generate.rs) | Turn-bound, single-use summary callbacks. The host registers the model call, sends its opaque ticket through the existing contract, and withdraws the callback when the ticket drops. |
-| [`repl_tools.rs`](./repl_tools.rs) | The three REPL tools (`juice_find`, `juice_extract`, `juice_summarize`) over a stored result. Declarations come from `tinyjuice-bus`; operations execute over `Query` inside the module CCR store. Registered by [`tools/ops.rs`](../../tools/ops.rs) only while `repl_handle_active(config)`. |
-| [`tools.rs`](./tools.rs) | OpenHuman agent tool implementation for the retrieve tool (`tinyjuice_bus::tools::RETRIEVE` (`"juice_retrieve"`); `"tokenjuice_retrieve"` is a recognized recovery-tool alias, not the tool's registered name, see `RECOVERY_TOOL_NAMES`). |
+| `tinyjuice-host::generate` | Shared turn-bound, single-use summary callback tickets; OpenHuman still registers the callback bound to its active model turn. |
+| [`repl_tools.rs`](./repl_tools.rs) | OpenHuman's query-source adapter, which binds TinyJuice's shared REPL tools to the active `DispatchCtx` and module configuration. Tool declarations, artifact path checks and execution are owned by `tinyjuice-host`. |
+| `tinyjuice-host::retrieve_tool` | Shared retrieval tool implementation and declaration; OpenHuman supplies the callback that reads from the module CCR store. |
 | Plain text | Compressed with TinyJuice's deterministic TextCrusher. |
 | [`savings.rs`](./savings.rs) | Thin adapter: attribution model and `agent::cost` price per input token; the module (`RecordSavings`, `SavingsStats`, `ResetSavings`) does the aggregate math and persists the `juice.savings` document in its storage (a legacy `state/tokenjuice_savings.json` is imported once). |
 

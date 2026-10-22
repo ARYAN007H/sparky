@@ -6,7 +6,10 @@ use tinytools::Tool;
 fn host_tools_keep_the_published_recovery_names_and_schemas() {
     let retrieve = TokenjuiceRetrieveTool::new();
     assert_eq!(retrieve.name(), "juice_retrieve");
-    assert_eq!(retrieve.permission_level(), tinytools::PermissionLevel::ReadOnly);
+    assert_eq!(
+        retrieve.permission_level(),
+        tinytools::PermissionLevel::ReadOnly
+    );
     assert!(!retrieve.external_effect());
     assert_eq!(
         serde_json::to_vec(&retrieve.parameters_schema()).unwrap(),
