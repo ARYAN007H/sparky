@@ -487,9 +487,8 @@ impl SpawnSubagentTool {
                 ));
             }
         }
-        // Capture the admitted parent generation before creating a worker
-        // thread, writing a durable running session, or publishing spawn
-        // events. A denied lifecycle admission must leave no phantom child.
+        // Capture the admitted parent generation before worker/session creation.
+        // Denied lifecycle admission must leave no phantom child or spawn event.
         let completion_target =
             match crate::agent::orchestration::background_completions::CompletionTarget::new(
                 dispatch.clone(),
