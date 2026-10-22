@@ -59,11 +59,9 @@ async fn driver_store_imports_legacy_rows_without_losing_host_epoch() {
     assert_eq!(imported.subagent_session_id, "legacy-session");
     assert_eq!(imported.current_task_id.as_deref(), Some("legacy-task"));
     assert_eq!(imported.status, TinyStatus::Idle);
-    assert!(
-        serde_json::to_string(&imported.latest_history)
-            .unwrap()
-            .contains("legacy history")
-    );
+    assert!(serde_json::to_string(&imported.latest_history)
+        .unwrap()
+        .contains("legacy history"));
 
     let retained = legacy.load().unwrap();
     assert_eq!(retained[0].parent_epoch, Some(7));
@@ -208,18 +206,16 @@ async fn old_rows_without_checkpoint_identity_remain_readable_without_fabricated
     assert_eq!(sessions[0].subagent_session_id, "legacy-session");
     assert_eq!(sessions[0].current_task_id.as_deref(), Some("legacy-task"));
     assert!(sessions[0].lifecycle_key.is_none());
-    assert!(
-        port.list_for_parent("foreign-owner", Some("thread"))
-            .await
-            .unwrap()
-            .is_empty()
-    );
-    assert!(
-        port.list_for_parent("owner", Some("other-thread"))
-            .await
-            .unwrap()
-            .is_empty()
-    );
+    assert!(port
+        .list_for_parent("foreign-owner", Some("thread"))
+        .await
+        .unwrap()
+        .is_empty());
+    assert!(port
+        .list_for_parent("owner", Some("other-thread"))
+        .await
+        .unwrap()
+        .is_empty());
     assert_eq!(port.list_for_parent("owner", None).await.unwrap().len(), 1);
     assert!(port.get("legacy-session").await.unwrap().is_some());
     let other_thread = OpenHumanTinySubagentSessionStore::new(
@@ -266,12 +262,11 @@ async fn unthreaded_port_lists_only_unthreaded_rows() {
     let sessions = port.list_for_parent("owner", None).await.unwrap();
     assert_eq!(sessions.len(), 1);
     assert_eq!(sessions[0].subagent_session_id, "unthreaded-session");
-    assert!(
-        port.list_for_parent("owner", Some("thread-a"))
-            .await
-            .unwrap()
-            .is_empty()
-    );
+    assert!(port
+        .list_for_parent("owner", Some("thread-a"))
+        .await
+        .unwrap()
+        .is_empty());
 }
 
 #[tokio::test]
@@ -376,41 +371,37 @@ async fn upsert_rejects_a_selector_or_lifecycle_key_outside_bound_scope() {
             }
         };
 
-    assert!(
-        port.upsert_running(upsert(
+    assert!(port
+        .upsert_running(upsert(
             "foreign",
             Some("thread-a"),
             key(Some("thread-a"), "task-1")
         ))
         .await
-        .is_err()
-    );
-    assert!(
-        port.upsert_running(upsert(
+        .is_err());
+    assert!(port
+        .upsert_running(upsert(
             "owner",
             Some("thread-b"),
             key(Some("thread-b"), "task-1")
         ))
         .await
-        .is_err()
-    );
-    assert!(
-        port.upsert_running(upsert(
+        .is_err());
+    assert!(port
+        .upsert_running(upsert(
             "owner",
             Some("thread-a"),
             key(Some("thread-b"), "task-1")
         ))
         .await
-        .is_err()
-    );
-    assert!(
-        port.upsert_running(upsert(
+        .is_err());
+    assert!(port
+        .upsert_running(upsert(
             "owner",
             Some("thread-a"),
             key(Some("thread-a"), "other-task")
         ))
         .await
-        .is_err()
-    );
+        .is_err());
     assert!(store.load().unwrap().is_empty());
 }

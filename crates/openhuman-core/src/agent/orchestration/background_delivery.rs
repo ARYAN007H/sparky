@@ -138,8 +138,8 @@ fn schedule_delivery_inner(
         .push((thread_id.clone(), delay));
     #[cfg(not(test))]
     let _ = delay; // The owner applies debounce/recovery timing inside its delivery API.
-    // Scoped: the thread -> workspace table is keyed per profile, so the
-    // delayed task must run under the profile that scheduled it.
+                   // Scoped: the thread -> workspace table is keyed per profile, so the
+                   // delayed task must run under the profile that scheduled it.
     ctx.clone().spawn(async move {
         let outcome = try_deliver(ctx.clone(), thread_id.clone(), fence.clone(), wait_idle).await;
         if outcome == DeliveryOutcome::ParentBusy {

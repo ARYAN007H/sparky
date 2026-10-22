@@ -232,11 +232,10 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
     .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
     .expect("cancelled durable session remains available");
     assert_eq!(row.status, DurableSubagentStatus::Failed);
-    assert!(
-        row.latest_error
-            .as_deref()
-            .is_some_and(|error| error.contains("user requested stop"))
-    );
+    assert!(row
+        .latest_error
+        .as_deref()
+        .is_some_and(|error| error.contains("user requested stop")));
     let deliveries = pending_for_ctx(
         &live.data.dispatch_ctx(),
         workspace.path(),

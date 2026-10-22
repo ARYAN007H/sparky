@@ -26,8 +26,8 @@ mod checkpoint;
 #[path = "lifecycle_outcome.rs"]
 mod outcome;
 use checkpoint::absolute_checkpoint_dir;
-use driver_adapter::HostInvocation;
 pub(super) use driver_adapter::outcome_to_host;
+use driver_adapter::HostInvocation;
 
 #[path = "lifecycle/driver_result.rs"]
 mod driver_result;
@@ -103,13 +103,13 @@ pub(crate) async fn spawn_async_via_driver_tool(
     input: String,
     options: SubagentRunOptions,
     completion: impl Fn(
-        String,
-        Result<SubagentRunOutcome, String>,
-        bool,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-    + Send
-    + Sync
-    + 'static,
+            String,
+            Result<SubagentRunOutcome, String>,
+            bool,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + Sync
+        + 'static,
 ) -> Result<String, SubagentRunError> {
     spawn_async_via_driver_tool_using_jobs(
         parent, definition, input, options, None, None, completion,
@@ -127,13 +127,13 @@ pub(crate) async fn resume_async_via_driver_tool(
     input: String,
     options: SubagentRunOptions,
     completion: impl Fn(
-        String,
-        Result<SubagentRunOutcome, String>,
-        bool,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-    + Send
-    + Sync
-    + 'static,
+            String,
+            Result<SubagentRunOutcome, String>,
+            bool,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + Sync
+        + 'static,
 ) -> Result<String, SubagentRunError> {
     spawn_async_via_driver_tool_using_jobs(
         parent,
@@ -155,13 +155,13 @@ pub(crate) async fn spawn_async_via_driver_tool_with_jobs(
     options: SubagentRunOptions,
     jobs: tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     completion: impl Fn(
-        String,
-        Result<SubagentRunOutcome, String>,
-        bool,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-    + Send
-    + Sync
-    + 'static,
+            String,
+            Result<SubagentRunOutcome, String>,
+            bool,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + Sync
+        + 'static,
 ) -> Result<String, SubagentRunError> {
     spawn_async_via_driver_tool_using_jobs(
         parent,
@@ -183,13 +183,13 @@ async fn spawn_async_via_driver_tool_using_jobs(
     jobs: Option<tinyagents_harness_tools::subagents::SubAgentJobRegistry>,
     continuation: Option<(SubagentTaskKey, SubagentResume)>,
     completion: impl Fn(
-        String,
-        Result<SubagentRunOutcome, String>,
-        bool,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-    + Send
-    + Sync
-    + 'static,
+            String,
+            Result<SubagentRunOutcome, String>,
+            bool,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + Sync
+        + 'static,
 ) -> Result<String, SubagentRunError> {
     let task_id = continuation
         .as_ref()

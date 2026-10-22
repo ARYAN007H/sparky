@@ -10,11 +10,9 @@ fn parameters_schema_hides_legacy_mode_flags_and_keeps_required_agent_id() {
             "legacy `{legacy}` is not advertised"
         );
     }
-    assert!(
-        schema["required"].as_array().is_some_and(|required| {
-            required.iter().any(|key| key.as_str() == Some("agent_id"))
-        })
-    );
+    assert!(schema["required"]
+        .as_array()
+        .is_some_and(|required| { required.iter().any(|key| key.as_str() == Some("agent_id")) }));
 }
 
 #[test]
@@ -24,13 +22,11 @@ fn parameters_schema_advertises_optional_model_override() {
     let props = schema.get("properties").expect("schema has properties");
     let model = props.get("model").expect("model override advertised");
     assert_eq!(model.get("type").and_then(|v| v.as_str()), Some("string"));
-    assert!(
-        schema
-            .get("required")
-            .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().all(|s| s.as_str() != Some("model")))
-            .unwrap_or(true)
-    );
+    assert!(schema
+        .get("required")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().all(|s| s.as_str() != Some("model")))
+        .unwrap_or(true));
 }
 
 #[tokio::test]

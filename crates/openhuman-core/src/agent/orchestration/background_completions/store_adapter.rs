@@ -2,8 +2,8 @@
 
 use super::*;
 use tinyagents_tasks::{
-    CompletionRouterPool, CompletionStoreFallback, CompletionStoreReplaceOutcome,
-    DEFAULT_MAX_ATTEMPTS, InMemoryCompletionStore, open_driver_completion_store_or_memory,
+    open_driver_completion_store_or_memory, CompletionRouterPool, CompletionStoreFallback,
+    CompletionStoreReplaceOutcome, InMemoryCompletionStore, DEFAULT_MAX_ATTEMPTS,
 };
 
 pub(in crate::agent::orchestration) fn router_scope_for(
@@ -96,8 +96,8 @@ pub(in crate::agent::orchestration) fn router_pool() -> &'static CompletionRoute
 }
 
 #[cfg(test)]
-pub(in crate::agent::orchestration) fn test_store_overrides()
--> &'static Mutex<HashMap<RouterScope, Arc<dyn CompletionStore>>> {
+pub(in crate::agent::orchestration) fn test_store_overrides(
+) -> &'static Mutex<HashMap<RouterScope, Arc<dyn CompletionStore>>> {
     static STORES: OnceLock<Mutex<HashMap<RouterScope, Arc<dyn CompletionStore>>>> =
         OnceLock::new();
     STORES.get_or_init(|| Mutex::new(HashMap::new()))

@@ -35,12 +35,10 @@ fn session(id: &str) -> DurableSubagentSession {
 
 #[test]
 fn a_missing_list_loads_empty() {
-    assert!(
-        docs_in(&MemoryStorage::new(), "local")
-            .load()
-            .unwrap()
-            .is_empty()
-    );
+    assert!(docs_in(&MemoryStorage::new(), "local")
+        .load()
+        .unwrap()
+        .is_empty());
 }
 
 #[test]
@@ -84,11 +82,10 @@ fn the_store_uses_the_workspace_default_with_no_backend_installed() {
     store.save(&[session("a")]).unwrap();
     assert_eq!(store.load().unwrap().len(), 1);
     // No JSON file store: the records are in the workspace's own database.
-    assert!(
-        !dir.path()
-            .join(".openhuman/subagent_sessions.json")
-            .exists()
-    );
+    assert!(!dir
+        .path()
+        .join(".openhuman/subagent_sessions.json")
+        .exists());
     assert!(dir.path().join("storage").exists());
 }
 
@@ -121,11 +118,10 @@ fn the_store_dispatches_to_documents_when_a_backend_is_pinned() {
         assert_eq!(store.load().unwrap().len(), 1);
     });
     assert_eq!(docs.load().unwrap().len(), 1);
-    assert!(
-        !dir.path()
-            .join(".openhuman/subagent_sessions.json")
-            .exists()
-    );
+    assert!(!dir
+        .path()
+        .join(".openhuman/subagent_sessions.json")
+        .exists());
 }
 
 #[test]

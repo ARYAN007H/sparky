@@ -7,8 +7,8 @@ mod roster;
 mod task_ledger;
 
 pub(crate) use cancel::{
-    CancelledSubagent, cancel_all, cancel_by_session_in_workspace,
-    cancel_by_task_with_workspace_reason, cancel_for_thread, stop_for_thread,
+    cancel_all, cancel_by_session_in_workspace, cancel_by_task_with_workspace_reason,
+    cancel_for_thread, stop_for_thread, CancelledSubagent,
 };
 pub(crate) use registry::admit_spawn;
 pub(crate) use roster::active_subagents_context_block;
