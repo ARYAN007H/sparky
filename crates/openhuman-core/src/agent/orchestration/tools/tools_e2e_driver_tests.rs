@@ -462,6 +462,23 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         1,
         "owner index selects the job in its exact profile/workspace/thread scope"
     );
+    let scoped_jobs = jobs
+        .list_for_parent_scope(
+            &crate::agent::tinyagents::tool_registration::subagent_owner_key(
+                &owner.workspace_dir,
+                &owner.parent_session,
+                owner.parent_thread_id.as_deref(),
+            ),
+            &tinyagents_orchestration::subagent::ParentJobScope::new(
+                owner.workspace.clone(),
+                thread_id,
+            ),
+        )
+        .expect("list exact parent scope");
+    assert!(
+        scoped_jobs.iter().any(|scoped| scoped.id == job.id),
+        "the driver's own scope query sees the job selected by the owner index"
+    );
     background_completions::record_outcome(
         &dispatch,
         &workspace,
