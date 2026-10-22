@@ -507,7 +507,7 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         history_key_ignores_thread: expected_event_channel == "telegram",
         thread_id: history_key.clone(),
         client_id: expected_event_channel.clone(),
-        session_key: history_key,
+        session_key: history_key.clone(),
     };
     process_channel_runtime_message(
         Arc::clone(&ctx),

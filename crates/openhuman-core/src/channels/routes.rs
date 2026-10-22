@@ -211,8 +211,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
                         model: current.model,
                     },
                     history_len,
-                    providers: self
-                        .context
+                    providers: ctx
                         .config
                         .as_deref()
                         .map(provider_descriptors)
