@@ -750,6 +750,10 @@ impl SpawnSubagentTool {
                     })
                     .await;
             }
+            crate::agent::orchestration::completion_owners::finish_driver_task(
+                &dispatch,
+                &registration_task_id,
+            );
             return Ok(ToolResult::error(format!(
                 "spawn_subagent: failed to register detached sub-agent: {error}"
             )));
