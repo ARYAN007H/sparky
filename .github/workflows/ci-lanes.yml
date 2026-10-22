@@ -59,11 +59,6 @@ jobs:
     # Sequential diagnostic validation plus cache save already took 118 min
     # before seven coverage suites could execute; reserve a complete-run budget.
     timeout-minutes: 180
-    env:
-      # One line per compile (outcome, crate, time, why not stored): ranks the
-      # misses and the not-cacheable compiles. Copied to ci-out/tinymold.log by
-      # "Record cache statistics" below and uploaded with the lane logs.
-      TINYMOLD_LOG: ${{ runner.temp }}/tinymold.log
     steps:
       - name: Checkout PR merge commit
         uses: tinyhumansai/.github/actions/checkout@35fa65b76c80d48779592b111837e55d9d0860d4
@@ -80,6 +75,10 @@ jobs:
 
       - name: Verify private runner contract
         run: bash scripts/ci/self-hosted/verify-runner.sh
+
+      - name: Set Tinymold diagnostic log path
+        # RUNNER_TEMP is available to steps, but not to the job-level env block.
+        run: echo "TINYMOLD_LOG=$RUNNER_TEMP/tinymold.log" >> "$GITHUB_ENV"
 
       - name: Setup Tinymold
         id: tinymold

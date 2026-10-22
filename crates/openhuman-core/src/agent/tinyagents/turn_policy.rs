@@ -168,12 +168,13 @@ pub(crate) fn run_policy_for_provider_with_backoff(
 /// Scale the model-call retry schedule down to `initial` milliseconds
 /// (`OPENHUMAN_MODEL_RETRY_BACKOFF_MS`). The attempt count and the doubling
 /// shape are kept; only the waits shrink, so suites that drive a failing
-/// upstream do not sit through the 3/6/12/24 s production schedule. Unset,
-/// empty, `0` or unparsable leaves the production schedule untouched.
+/// upstream do not sit through the 3/6/12/24 s production schedule. Values
+/// above the production initial wait, as well as unset, empty, `0` or
+/// unparsable values, leave the production schedule untouched.
 pub(crate) fn apply_retry_backoff_override(policy: &mut RunPolicy, raw: Option<&str>) {
     let Some(ms) = raw
         .and_then(|v| v.trim().parse::<u64>().ok())
-        .filter(|ms| *ms > 0)
+        .filter(|ms| *ms > 0 && *ms <= policy.retry.initial_backoff_ms)
     else {
         return;
     };
