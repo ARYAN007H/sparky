@@ -1,7 +1,8 @@
 use super::*;
 use serde_json::Value;
-use tinyagents_graph::stream::GraphEvent;
-use tinyagents_harness::ids::{EventId, GraphId, NodeId, RunId, ThreadId};
+use tinyflows::engine::GraphObservation;
+use tinyflows::graph::ids::{EventId, GraphId, NodeId, RunId, ThreadId};
+use tinyflows::graph::stream::GraphEvent;
 use tinyflows_bus::runs::FlowRunTrigger;
 
 /// Builds a minimal observation stream for one node under run/thread ids
@@ -129,11 +130,7 @@ fn otlp_flow_trace_puts_flow_attributes_on_every_span() {
         "completed",
         FlowRunTrigger::Rpc,
     );
-    let requests = flow_otlp_requests(
-        &build_flow_exporter(client, "flow-1"),
-        trace,
-        &sample_observations(thread_id),
-    )
+    let requests = flow_otlp_requests(&SpanExporter::new(client), trace, "flow-1", &sample_observations(thread_id))
     .expect("otlp requests");
     let resource = &requests[0]["resourceSpans"][0];
     assert_eq!(
@@ -209,7 +206,7 @@ fn batch_carries_flow_trace_and_langgraph_keys_on_node_spans() {
         },
     )
     .expect("client");
-    let exporter = build_flow_exporter(client, "flow-1");
+    let exporter = SpanExporter::new(client);
     let trace = build_flow_trace_config(
         "Daily digest",
         "flow-1",
@@ -218,7 +215,7 @@ fn batch_carries_flow_trace_and_langgraph_keys_on_node_spans() {
         FlowRunTrigger::Rpc,
     );
     let payload = exporter
-        .build_ingestion_batch(trace, &observations)
+        .build_ingestion_batch(trace, &flow_spans("flow-1", &observations))
         .expect("batch");
     let batch = payload["batch"].as_array().expect("batch array");
 
