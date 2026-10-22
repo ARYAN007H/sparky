@@ -206,6 +206,14 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
         Some((*jobs).clone()),
     )
     .expect("open explicitly scoped force-fresh session store");
+    assert!(
+        session_port
+            .get(&old_task_id)
+            .await
+            .expect("look up task id in the owner-scoped session store")
+            .is_some(),
+        "the upstream store adapter resolves the public task-id alias"
+    );
     let wait = SubAgentJobsTool::new((*jobs).clone())
         .with_fixed_action(tinyagents_harness_tools::subagents::SubAgentJobAction::Await)
         .with_identifier_fields("task_id", "subagent_session_id")
