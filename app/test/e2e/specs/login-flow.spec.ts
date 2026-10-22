@@ -186,7 +186,7 @@ describe('Login flow — complete with mock data (Linux)', () => {
   // The host session owner handles the backend credential. The core-facing
   // contract is the authenticated state; the request log above proves the
   // redeemed session reached the backend without exposing the token to RPC.
-  it.skip('the core reports authenticated state after login', async () => {
+  it('the core reports authenticated state after login', async () => {
     const state = await callOpenhumanRpc<AuthStateResponse>('openhuman.auth_get_state', {});
     expectRpcOk('auth_get_state', state);
     const authState = authStateValue(state);

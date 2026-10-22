@@ -445,7 +445,7 @@ describe('Auth & Access Control', () => {
     expect(onWelcome).toBe(true);
   });
 
-  it.skip('revoked session auto-logs out the user', async function () {
+  it('revoked session auto-logs out the user', async function () {
     this.timeout(120_000);
     // Login fresh
     clearRequestLog();
@@ -523,5 +523,36 @@ describe('Auth & Access Control', () => {
     const stillOnHome = await waitForHomePage(5_000);
     expect(stillOnHome).toBeNull();
     console.log('[AuthAccess] Revoked session auto-logout verified');
+  });
+
+  // The counterpart of the revoked case: only a 401 expires the session, so a
+  // 403 from `/auth/me` (a plan, WAF or proxy refusal) must leave the user
+  // signed in.
+  it('a forbidden /auth/me keeps the user signed in', async function () {
+    this.timeout(120_000);
+    clearRequestLog();
+    resetMockBehavior();
+    setMockBehavior('composioConnections', '[]');
+    await performFullLogin('e2e-forbidden-session-token');
+
+    setMockBehavior('session', 'forbidden');
+    await triggerAuthDeepLink('e2e-forbidden-check-token');
+
+    // 1. The injection landed: `/auth/me` was asked after the 403 was armed.
+    await browser.waitUntil(
+      async () => getRequestLog().some(r => r.method === 'GET' && r.url.includes('/auth/me')),
+      { timeout: 12_000, interval: 500, timeoutMsg: 'no /auth/me request after the 403 was armed' }
+    );
+
+    // 2. The core keeps the credential and the shell stays on Home. The wait
+    //    matches the revoked case's 20 s window, in which the background
+    //    `/auth/me` refresh of the existing session clears it on a 401 — so a
+    //    403 that still signed out would be caught here.
+    await browser.pause(20_000);
+    const state = await callOpenhumanRpc<AuthStateResponse>('openhuman.auth_get_state', {});
+    expectRpcOk('auth_get_state', state);
+    expect(authStateValue(state).isAuthenticated).toBe(true);
+    expect(await waitForHomePage(5_000)).not.toBeNull();
+    resetMockBehavior();
   });
 });
