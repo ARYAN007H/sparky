@@ -32,8 +32,6 @@ use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
-#[cfg(test)]
-use std::sync::Mutex;
 
 use async_trait::async_trait;
 use serde_json::json;
@@ -136,15 +134,8 @@ fn schedule_delivery_inner(
     wait_idle: bool,
     fence: DrainFence,
 ) {
-    #[cfg(test)]
-    scheduled_for_test()
-        .lock()
-        .expect("scheduled")
-        .push((thread_id.clone(), delay));
-    #[cfg(not(test))]
-    let _ = delay; // The owner applies debounce/recovery timing inside its delivery API.
-                   // Scoped: the thread -> workspace table is keyed per profile, so the
-                   // delayed task must run under the profile that scheduled it.
+    // Scoped: the thread -> workspace table is keyed per profile, so the delayed
+    // task must run under the profile that scheduled it.
     ctx.clone().spawn(async move {
         let outcome = try_deliver(
             ctx.clone(),
@@ -170,14 +161,6 @@ fn schedule_delivery_inner(
             schedule_delivery_inner(ctx, thread_id, RECOVERY_BUSY_POLL, true, fence);
         }
     });
-}
-
-/// Every drain the handler scheduled, so a test can assert the event ->
-/// schedule wiring without running a delivery turn.
-#[cfg(test)]
-fn scheduled_for_test() -> &'static Mutex<Vec<(String, Duration)>> {
-    static SCHEDULED: OnceLock<Mutex<Vec<(String, Duration)>>> = OnceLock::new();
-    SCHEDULED.get_or_init(|| Mutex::new(Vec::new()))
 }
 
 /// Boot recovery: redeliver completions a previous process finished but never
