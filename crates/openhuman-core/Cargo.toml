@@ -565,9 +565,8 @@ storage-mongodb = ["tinystoragedrivers/mongodb"]
 # `s3://` blob URLs and composite storage. In neither the contributor set nor
 # the product: an object-store client is only for a deployment that wants one.
 storage-s3 = ["tinystoragedrivers/s3"]
-# Always on (the dependency enables `file`); kept so existing feature lists
-# and the forwarding chain keep resolving.
 storage-file = ["tinystoragedrivers/file"]
+storage-rabbitmq = ["tinystoragedrivers/rabbitmq"]
 # Process keyring `secrets.enc` backend, separate from the storage driver.
 secret-file = ["tinystoragedrivers-secrets/file"]
 # THE CONTRIBUTOR SET — not the product set.
