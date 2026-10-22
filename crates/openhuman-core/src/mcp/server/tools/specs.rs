@@ -1,5 +1,5 @@
-use tinyagents_harness_tools::static_schema;
 use serde_json::{json, Value};
+use tinyagents_harness_tools::static_schema;
 use tinymcp_bus::ServerToolSpec;
 
 use super::types::{

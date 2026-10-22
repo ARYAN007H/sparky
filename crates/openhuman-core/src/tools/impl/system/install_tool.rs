@@ -20,15 +20,11 @@ impl InstallToolTool {
     }
 
     pub fn with_audit(security: Arc<SecurityPolicy>, audit: Arc<AuditLogger>) -> Self {
-        let gate = Arc::new(InstallGate {
-            security,
-            audit,
-        });
-        let backend: Arc<dyn ExecBackend> = Arc::new(
-            tinyagents_harness_tools::exec::NativeExecBackend::new(
+        let gate = Arc::new(InstallGate { security, audit });
+        let backend: Arc<dyn ExecBackend> =
+            Arc::new(tinyagents_harness_tools::exec::NativeExecBackend::new(
                 tinyagents_harness_tools::exec::ShellFlavor::Posix,
-            ),
-        );
+            ));
         Self {
             inner: InstallTool::new(gate, backend),
         }
@@ -79,7 +75,9 @@ impl Tool for InstallToolTool {
         options: ToolCallOptions,
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        self.inner.execute_with_context(args, options, context).await
+        self.inner
+            .execute_with_context(args, options, context)
+            .await
     }
 }
 

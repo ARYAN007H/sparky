@@ -603,7 +603,10 @@ pub fn registered_tools(
         tools.push(Box::new(PerCallTool::new(
             per_call_context,
             move |context| {
-                tiny_artifacts::CreateArtifactTool::new(service(context.chat.as_ref()), author.clone())
+                tiny_artifacts::CreateArtifactTool::new(
+                    service(context.chat.as_ref()),
+                    author.clone(),
+                )
             },
         )));
     }
@@ -615,7 +618,10 @@ pub fn registered_tools(
         tools.push(Box::new(PerCallTool::new(
             per_call_context,
             move |context| {
-                tiny_artifacts::UpdateArtifactTool::new(service(context.chat.as_ref()), author.clone())
+                tiny_artifacts::UpdateArtifactTool::new(
+                    service(context.chat.as_ref()),
+                    author.clone(),
+                )
             },
         )));
     }

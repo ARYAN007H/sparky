@@ -125,7 +125,8 @@ async fn execute_tool_outlives_the_bus_default_timeout() {
 fn the_execute_tool_deadline_stays_under_the_harness_tool_deadline() {
     assert!(EXECUTE_TOOL_TIMEOUT > tinybus::connection::DEFAULT_TIMEOUT);
     assert!(
-        EXECUTE_TOOL_TIMEOUT.as_secs() < tinyagents_harness_tools::exec::timeout::DEFAULT_TIMEOUT_SECS,
+        EXECUTE_TOOL_TIMEOUT.as_secs()
+            < tinyagents_harness_tools::exec::timeout::DEFAULT_TIMEOUT_SECS,
         "the harness would kill the call before the module could answer"
     );
 }

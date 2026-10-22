@@ -104,4 +104,3 @@ async fn rejects_unknown_manager() {
         .unwrap();
     assert!(result.is_error);
 }
-

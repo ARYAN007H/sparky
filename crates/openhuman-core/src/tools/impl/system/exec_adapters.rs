@@ -5,8 +5,8 @@ use std::{path::PathBuf, sync::Arc};
 use async_trait::async_trait;
 use serde_json::Value;
 use tinyagents_harness_tools::exec::{
-    ExecAuditEvent, ExecAuditOutcome, ExecAuthorizationRequest, ExecBackendCapability,
-    ExecDenied, ExecGate, ExecOperation, ExecPermit, ExecRefusalKind, NativeExecCapability,
+    ExecAuditEvent, ExecAuditOutcome, ExecAuthorizationRequest, ExecBackendCapability, ExecDenied,
+    ExecGate, ExecOperation, ExecPermit, ExecRefusalKind, NativeExecCapability,
 };
 use tinytools::ToolRunContext;
 
@@ -39,7 +39,9 @@ impl ExecGate for InstallGate {
         context: Option<&dyn ToolRunContext>,
     ) -> Result<ExecPermit, ExecDenied> {
         let ExecOperation::Install { .. } = &request.operation else {
-            return Err(ExecDenied("install gate received a non-install operation".into()));
+            return Err(ExecDenied(
+                "install gate received a non-install operation".into(),
+            ));
         };
         if crate::core::runtime::is_saas() {
             return Err(ExecDenied(

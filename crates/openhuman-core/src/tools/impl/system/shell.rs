@@ -10,17 +10,17 @@ use crate::core::runtime::DispatchCtx;
 use crate::modules::tinybox::host_runtime::RuntimeAdapter;
 use crate::security::{AuditLogger, CommandExecutionLog, SecurityPolicy};
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use tinytools::ToolRunContext;
-use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult, ToolTimeout};
 use tinyagents_harness_tools::exec::{
     ExecAuditEvent, ExecAuditOutcome, ExecAuthorizationRequest, ExecBackend, ExecBackendCapability,
     ExecBackendOutcome, ExecDenied, ExecGate, ExecOperation, ExecOutput, ExecPermit,
     ExecRefusalKind, ExecRequest, ExecTool, ShellFlavor,
 };
+use tinytools::ToolRunContext;
+use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult, ToolTimeout};
 
 /// Maximum output size in bytes (1MB).
 const MAX_OUTPUT_BYTES: usize = 1_048_576;
@@ -140,7 +140,9 @@ impl ShellHost {
 
 impl ShellHost {
     fn external_effect_with_args(&self, args: &Value) -> bool {
-        args.get("command").and_then(Value::as_str).is_some_and(|command| !command.is_empty())
+        args.get("command")
+            .and_then(Value::as_str)
+            .is_some_and(|command| !command.is_empty())
     }
 
     async fn prepare_authorization(&self, args: &Value) -> anyhow::Result<Option<Value>> {
@@ -411,7 +413,9 @@ impl ShellHost {
         // the functional variables are passed as approved overrides.
         if tinyagents_harness_tools::exec::timeout::CommandEnvironment::is_active() {
             for name in crate::sandbox::ops::SANDBOX_ENV_PASSTHROUGH {
-                if let Some(value) = tinyagents_harness_tools::exec::timeout::CommandEnvironment::var_os(name) {
+                if let Some(value) =
+                    tinyagents_harness_tools::exec::timeout::CommandEnvironment::var_os(name)
+                {
                     let Ok(value) = value.into_string() else {
                         return (
                             false,
@@ -616,12 +620,10 @@ impl ExecGate for ShellPorts {
         request: &ExecAuthorizationRequest,
         context: Option<&dyn ToolRunContext>,
     ) -> Result<ExecPermit, ExecDenied> {
-        let ExecOperation::Shell {
-            command,
-            category,
-        } = &request.operation
-        else {
-            return Err(ExecDenied("shell gate received a non-shell operation".into()));
+        let ExecOperation::Shell { command, category } = &request.operation else {
+            return Err(ExecDenied(
+                "shell gate received a non-shell operation".into(),
+            ));
         };
 
         // Check policy here before issuing a permit. The execution path repeats
@@ -665,10 +667,9 @@ impl ExecGate for ShellPorts {
 
     fn record(&self, event: ExecAuditEvent) {
         let (command, risk_level) = match &event.operation {
-            ExecOperation::Shell { command, category } => (
-                command.as_str(),
-                category.as_deref().unwrap_or("unknown"),
-            ),
+            ExecOperation::Shell { command, category } => {
+                (command.as_str(), category.as_deref().unwrap_or("unknown"))
+            }
             ExecOperation::Install { .. } => ("<invalid shell operation>", "unknown"),
         };
         let success = matches!(
@@ -829,12 +830,26 @@ impl ShellTool {
 
 #[async_trait]
 impl Tool for ShellTool {
-    fn name(&self) -> &str { self.inner.name() }
-    fn description(&self) -> &str { self.inner.description() }
-    fn parameters_schema(&self) -> Value { self.inner.parameters_schema() }
-    fn max_result_size_chars(&self) -> Option<usize> { self.inner.max_result_size_chars() }
-    fn timeout_policy(&self, args: &Value) -> ToolTimeout { self.inner.timeout_policy(args) }
-    fn permission_level(&self) -> PermissionLevel { self.inner.permission_level() }
+    fn name(&self) -> &str {
+        // Preserve OpenHuman's established model-facing tool contract while
+        // delegating its schema and call behavior to TinyAgents ExecTool.
+        "shell"
+    }
+    fn description(&self) -> &str {
+        self.inner.description()
+    }
+    fn parameters_schema(&self) -> Value {
+        self.inner.parameters_schema()
+    }
+    fn max_result_size_chars(&self) -> Option<usize> {
+        self.inner.max_result_size_chars()
+    }
+    fn timeout_policy(&self, args: &Value) -> ToolTimeout {
+        self.inner.timeout_policy(args)
+    }
+    fn permission_level(&self) -> PermissionLevel {
+        self.inner.permission_level()
+    }
     fn external_effect_with_args(&self, args: &Value) -> bool {
         self.inner.external_effect_with_args(args)
     }
@@ -851,7 +866,9 @@ impl Tool for ShellTool {
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let _ = &self.host;
-        self.inner.execute_with_context(args, options, context).await
+        self.inner
+            .execute_with_context(args, options, context)
+            .await
     }
 }
 

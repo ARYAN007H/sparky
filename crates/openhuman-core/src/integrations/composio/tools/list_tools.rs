@@ -1,8 +1,8 @@
 //! The `composio_list_tools` agent tool.
 
-use tinyagents_harness_tools::static_schema;
 use std::collections::HashSet;
 use std::sync::Arc;
+use tinyagents_harness_tools::static_schema;
 
 use async_trait::async_trait;
 use serde_json::Value;

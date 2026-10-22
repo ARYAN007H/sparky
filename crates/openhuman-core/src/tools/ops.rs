@@ -5,14 +5,14 @@ use crate::config::Config;
 use crate::modules::tinybox::host_runtime::{NativeRuntime, RuntimeAdapter};
 use crate::security::{AuditLogger, SecurityPolicy};
 use std::sync::Arc;
-use tinyagents_harness_tools::{CurrentTimeTool, ResolveTimeTool};
-use tinytools::Tool;
 use tinyagents_harness_tools::exec::detect_tools::DetectToolsTool;
 use tinyagents_harness_tools::fs::filesystem::{
     ApplyPatchTool, CsvExportTool, EditFileTool, FileReadTool, FileWriteTool, GitOperationsTool,
     GlobTool, GrepTool, ImageInfoTool, ListFilesTool, ReadDiffTool, RunLinterTool, RunTestsTool,
 };
 use tinyagents_harness_tools::net::network::PushoverTool;
+use tinyagents_harness_tools::{CurrentTimeTool, ResolveTimeTool};
+use tinytools::Tool;
 
 /// Create the default tool registry
 pub fn default_tools(security: Arc<SecurityPolicy>) -> Vec<Box<dyn Tool>> {

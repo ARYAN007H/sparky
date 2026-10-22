@@ -462,7 +462,8 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext> for Too
                 reads.insert(call.id.clone(), read);
             }
         }
-        if tinyagents_harness_tools::fs::filesystem::is_read_only_call(&call.name, &call.arguments) {
+        if tinyagents_harness_tools::fs::filesystem::is_read_only_call(&call.name, &call.arguments)
+        {
             tracing::debug!(
                 tool = %call.name,
                 call_id = %call.id,

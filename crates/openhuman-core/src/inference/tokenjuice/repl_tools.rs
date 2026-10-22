@@ -22,7 +22,8 @@ pub fn is_repl_tool(name: &str) -> bool {
 /// Largest persisted tool-result artifact read through the handle slot: the
 /// same limit `file_read` applies, which is also the most the artifact store
 /// ever writes.
-const MAX_ARTIFACT_BYTES: u64 = tinyagents_harness_tools::fs::filesystem::FileReadTool::MAX_FILE_SIZE_BYTES;
+const MAX_ARTIFACT_BYTES: u64 =
+    tinyagents_harness_tools::fs::filesystem::FileReadTool::MAX_FILE_SIZE_BYTES;
 
 /// The relative pointer form older stores handed out (`artifacts/tool-results/…`).
 const RELATIVE_ARTIFACT_PREFIX: &str = "artifacts/tool-results/";

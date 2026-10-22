@@ -3,8 +3,8 @@
 //! Each family, its tool structs, and its registration gates are catalogued in
 //! `tools/impl/README.md`.
 
-mod install_tool;
 mod exec_adapters;
+mod install_tool;
 mod proxy_config;
 mod retrieve_tool_output;
 mod schedule;
