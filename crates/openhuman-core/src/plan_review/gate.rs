@@ -68,6 +68,11 @@ pub struct PlanReviewGate {
     parked: Mutex<HashMap<(Tenant, String), ParkedReview>>,
 }
 
+/// A tenant captured from trusted server context for a live socket. Its
+/// private field prevents transport payloads from manufacturing replay scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SocketReviewScope(Tenant);
+
 impl PlanReviewGate {
     fn new(ttl: Duration) -> Self {
         Self {
@@ -195,21 +200,27 @@ impl PlanReviewGate {
         self.parked.lock().get(&(scope, request_id)).cloned()
     }
 
-    /// The parked review a socket subscribed under its own profile should
-    /// replay. SaaS sockets carry that profile in their authenticated client
-    /// state; a missing id fails closed. Single-host sockets retain the host's
-    /// ambient tenant and ignore the optional profile hint.
+    /// The parked review a socket connected under its server-bound tenant
+    /// should replay. The caller must capture this tenant from trusted server
+    /// context when the socket connects; client event payloads are not identity.
     pub fn parked_review_for_socket(
         &self,
-        socket_profile_id: Option<&str>,
+        socket_tenant: &SocketReviewScope,
         thread_id: &str,
     ) -> Option<ParkedReview> {
-        let tenant = socket_tenant(
-            socket_profile_id,
-            crate::core::runtime::DispatchCtx::ambient().tenant(),
-            crate::core::runtime::is_saas(),
-        )?;
-        self.parked_review_for_thread(&tenant, thread_id)
+        self.parked_review_for_thread(&socket_tenant.0, thread_id)
+    }
+
+    /// Capture this socket's replay scope from the request's server-bound
+    /// dispatch context. Socket transports may run connection handlers in a
+    /// new task, so the request context must be passed explicitly rather than
+    /// read from ambient task-local state. SaaS requests without a scoped
+    /// tenant fail closed; local hosts retain their active profile/default.
+    pub fn socket_scope_for_dispatch(
+        &self,
+        dispatch: &crate::core::runtime::DispatchCtx,
+    ) -> Option<SocketReviewScope> {
+        socket_scope_from_context(dispatch.tenant(), crate::core::runtime::is_saas())
     }
 
     /// Resolve a parked review by `request_id`. Returns `true` when a waiter was
@@ -257,19 +268,14 @@ impl PlanReviewGate {
     }
 }
 
-fn socket_tenant(
-    profile_id: Option<&str>,
-    ambient: Result<Tenant, crate::core::runtime::tenant::NoTenant>,
+fn socket_scope_from_context(
+    tenant: Result<Tenant, crate::core::runtime::tenant::NoTenant>,
     saas: bool,
-) -> Option<Tenant> {
-    if saas {
-        let profile = profile_id.filter(|profile| !profile.trim().is_empty())?;
-        Some(Tenant {
-            profile: Some(profile.to_owned()),
-            agent: None,
-        })
-    } else {
-        ambient.ok()
+) -> Option<SocketReviewScope> {
+    match tenant {
+        Ok(tenant) => Some(SocketReviewScope(tenant)),
+        Err(_) if saas => None,
+        Err(_) => Some(SocketReviewScope(Tenant::default())),
     }
 }
 
