@@ -1,9 +1,14 @@
 //! Test-only stand-in for the module's native shell: unit tests do not load a
 //! native TinyBox artifact, so unjailed runs execute here. The module's own
 //! behaviour (shell selection, environment, scratch) is covered by its crate and
-//! by the released-artifact test; this fixture only has to run a command.
+//! by the released-artifact test; this fixture only has to run a command, and
+//! like the module it keeps what a command printed before its deadline stopped
+//! it.
 
 use std::process::Stdio;
+use std::time::Duration;
+
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 use super::{NativeShellRun, SandboxExecResult};
 
@@ -60,27 +65,68 @@ pub(crate) async fn run(run: NativeShellRun) -> anyhow::Result<SandboxExecResult
         .stderr(Stdio::piped())
         .kill_on_drop(true);
     tinytools_std::timeout::own_process_group(command.as_std_mut());
-    match tinytools_std::timeout::output_or_kill(&mut command, run.timeout).await {
-        Ok(Ok(output)) => {
-            // The module streams output into the caller's meter as it reads it;
-            // the fixture folds the finished output in the same way.
-            if let Some(meter) = &run.meter {
-                meter.record(&output.stdout);
-                meter.record(&output.stderr);
+    let mut child = command
+        .spawn()
+        .map_err(|error| anyhow::anyhow!("Failed to execute command: {error}"))?;
+    let pid = child.id();
+    // Read both streams as the command runs, like the module does, so a
+    // command stopped at its deadline keeps what it printed before.
+    let (mut stdout_pipe, mut stderr_pipe) = (child.stdout.take(), child.stderr.take());
+    let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
+    let finished = tokio::time::timeout(run.timeout, async {
+        let (status, (), ()) = tokio::join!(
+            child.wait(),
+            drain(&mut stdout_pipe, &mut stdout),
+            drain(&mut stderr_pipe, &mut stderr),
+        );
+        status
+    })
+    .await;
+    let (exit_code, timed_out) = match finished {
+        Ok(status) => (status?.code().unwrap_or(-1), false),
+        Err(_) => {
+            // Stop the command and everything it started, then give the
+            // readers a moment to drain what is left in the pipes.
+            if let Some(pid) = pid {
+                tinytools_std::timeout::kill_process_group(pid);
             }
-            Ok(SandboxExecResult {
-                exit_code: output.status.code().unwrap_or(-1),
-                stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-                timed_out: false,
+            let _ = child.start_kill();
+            let _ = tokio::time::timeout(Duration::from_secs(2), async {
+                tokio::join!(
+                    drain(&mut stdout_pipe, &mut stdout),
+                    drain(&mut stderr_pipe, &mut stderr),
+                )
             })
+            .await;
+            (-1, true)
         }
-        Ok(Err(error)) => anyhow::bail!("Failed to execute command: {error}"),
-        Err(_) => Ok(SandboxExecResult {
-            exit_code: -1,
-            stdout: String::new(),
-            stderr: format!("Command timed out after {}s", run.timeout.as_secs()),
-            timed_out: true,
-        }),
+    };
+    // The module streams output into the caller's meter as it reads it; the
+    // fixture folds the collected output in the same way.
+    if let Some(meter) = &run.meter {
+        meter.record(&stdout);
+        meter.record(&stderr);
+    }
+    Ok(SandboxExecResult {
+        exit_code,
+        stdout: String::from_utf8_lossy(&stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&stderr).into_owned(),
+        timed_out,
+    })
+}
+
+/// Appends what `pipe` delivers to `into` until it closes. Reads are
+/// cancel-safe, so a drain cut short by the deadline keeps every chunk it read,
+/// and a later call picks up where it stopped.
+async fn drain(pipe: &mut Option<impl AsyncRead + Unpin>, into: &mut Vec<u8>) {
+    let Some(pipe) = pipe else {
+        return;
+    };
+    let mut chunk = [0u8; 8192];
+    while let Ok(read) = pipe.read(&mut chunk).await {
+        if read == 0 {
+            break;
+        }
+        into.extend_from_slice(&chunk[..read]);
     }
 }
