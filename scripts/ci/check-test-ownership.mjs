@@ -117,11 +117,13 @@ export function findOwnershipViolations(source, filePath) {
   const tokens = tokenizeUseTrees(source);
   const importedPaths = [];
   const useTreeRanges = [];
+  const aliases = new Map();
 
   for (let index = 0; index < tokens.length; index += 1) {
     if (tokens[index].value !== 'use') continue;
-    const [paths, end] = readUseTree(tokens, index + 1);
+    const [paths, end, useAliases] = readUseTree(tokens, index + 1);
     importedPaths.push(...paths);
+    for (const [alias, pathSegments] of useAliases) aliases.set(alias, pathSegments);
     useTreeRanges.push([index + 1, end]);
   }
 
@@ -138,19 +140,10 @@ export function findOwnershipViolations(source, filePath) {
 
     for (let index = 0; index < tokens.length; index += 1) {
       if (useTreeRanges.some(([start, end]) => index >= start && index < end)) continue;
-      if (tokens[index].value !== deniedSegments[0]) continue;
-
-      let cursor = index;
-      let matches = true;
-      for (let segmentIndex = 1; segmentIndex < deniedSegments.length; segmentIndex += 1) {
-        if (tokens[cursor + 1]?.value !== '::' || tokens[cursor + 2]?.value !== deniedSegments[segmentIndex]) {
-          matches = false;
-          break;
-        }
-        cursor += 2;
+      const pathSegments = readPathSegments(tokens, index, aliases);
+      if (deniedSegments.every((segment, segmentIndex) => pathSegments[segmentIndex] === segment)) {
+        reportedLines.add(source.slice(0, tokens[index].start).split('\n').length);
       }
-
-      if (matches) reportedLines.add(source.slice(0, tokens[index].start).split('\n').length);
     }
 
     for (const line of reportedLines) {
@@ -159,6 +152,18 @@ export function findOwnershipViolations(source, filePath) {
   }
 
   return violations.sort((left, right) => left.line - right.line || left.path.localeCompare(right.path));
+}
+
+function readPathSegments(tokens, start, aliases) {
+  const first = tokens[start]?.value;
+  if (!first || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(first)) return [];
+  const segments = [...(aliases.get(first) ?? [first])];
+  let index = start;
+  while (tokens[index + 1]?.value === '::' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(tokens[index + 2]?.value ?? '')) {
+    segments.push(tokens[index + 2].value);
+    index += 2;
+  }
+  return segments;
 }
 
 function tokenizeUseTrees(source) {
@@ -173,6 +178,7 @@ function tokenizeUseTrees(source) {
 /** Expand Rust use-tree groups into full paths, retaining source positions. */
 function readUseTree(tokens, start, prefix = []) {
   const paths = [];
+  const aliases = new Map();
   const segments = [];
   let index = start;
 
@@ -188,20 +194,27 @@ function readUseTree(tokens, start, prefix = []) {
 
   const fullPath = [...prefix, ...segments];
   if (tokens[index]?.value !== '{') {
-    if (fullPath.length > 0) paths.push(fullPath);
-    return [paths, index];
+    if (fullPath.length > 0) {
+      paths.push(fullPath);
+      if (tokens[index]?.value === 'as' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(tokens[index + 1]?.value ?? '')) {
+        aliases.set(tokens[index + 1].value, fullPath.map((segment) => segment.value));
+        index += 2;
+      }
+    }
+    return [paths, index, aliases];
   }
 
   index += 1;
   while (index < tokens.length && tokens[index].value !== '}') {
-    const [nestedPaths, nextIndex] = readUseTree(tokens, index, fullPath);
+    const [nestedPaths, nextIndex, nestedAliases] = readUseTree(tokens, index, fullPath);
     paths.push(...nestedPaths);
+    for (const [alias, pathSegments] of nestedAliases) aliases.set(alias, pathSegments);
     index = nextIndex;
     if (tokens[index]?.value === ',') index += 1;
     else if (tokens[index]?.value !== '}') break;
   }
   if (tokens[index]?.value === '}') index += 1;
-  return [paths, index];
+  return [paths, index, aliases];
 }
 
 function listRustFiles(directory, predicate, files = []) {
