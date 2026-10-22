@@ -375,6 +375,9 @@ impl OpenHumanSessionHost {
             &tools, &delegation_tools, &dispatcher_choice, supports_native, agent_id,
         );
 
+        let (effective_temperature, effective_omit_memory_context, effective_tokenjuice_compression) =
+            helpers::effective_settings(target_def, config);
+
         // Stamp the resolved agent definition id onto the OpenHumanSessionHost via the
         // builder. Without this call, `agent_definition_name` falls
         // back to the legacy `"main"` default (see `SessionHostBuilder::build`)

@@ -117,7 +117,7 @@ pub(super) fn payload_summarizer(
     agent_id: &str,
     config: &Config,
 ) -> Option<std::sync::Arc<crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer>> {
-    if !host_only && super::summarizes_tool_output(agent_id, config) {
+    if !host_only && super::super::summarizes_tool_output(agent_id, config) {
     match crate::agent_registry::host_definition::AgentDefinitionRegistry::current() {
         Some(reg) => match reg.get("summarizer") {
             Some(summarizer_def) => {
