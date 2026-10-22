@@ -246,13 +246,23 @@ async fn action_directory_without_write_access_is_an_error() {
     let findings = run_check(config, "workspace/action-dir").await;
     std::fs::set_permissions(dir.path(), original_permissions).unwrap();
 
+    // Root can still create files in a directory whose POSIX write bits are
+    // clear, so the expected result follows the effective user running the
+    // test rather than the mode bits alone.
+    let expected_severity = if unsafe { libc::geteuid() } == 0 {
+        FindingSeverity::Pass
+    } else {
+        FindingSeverity::Error
+    };
     assert_eq!(
-        finding(&findings, FindingSeverity::Error)
-            .config_path
-            .as_deref(),
+        findings[0].severity,
+        expected_severity,
+        "action-directory probe should reflect effective write access"
+    );
+    assert_eq!(
+        findings[0].config_path.as_deref(),
         Some("action_dir")
     );
-    #[cfg(unix)]
     assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
 }
 
