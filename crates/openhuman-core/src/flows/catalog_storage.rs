@@ -355,7 +355,9 @@ fn allowed_record(collection: &str, id: &str) -> Result<(), StorageError> {
             "record is outside the workflow catalog owner's keys",
         ));
     }
-    if SHARED_COLLECTIONS.contains(&collection) && !id.starts_with(FLOW_KEY_PREFIX)
+    if SHARED_COLLECTIONS.contains(&collection)
+        && collection != "tsd.migrations"
+        && !id.starts_with(FLOW_KEY_PREFIX)
     {
         return Err(StorageError::invalid_input(
             "record is outside the workflow catalog owner's keys",
