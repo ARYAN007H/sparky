@@ -52,7 +52,7 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use openhuman_core::config::Config;
-use openhuman_core::core::all::{all_registered_controllers, RegisteredController};
+use openhuman_core::core::all::{all_registered_controllers, ControllerEntry};
 use openhuman_core::inference::host_runtime::all_local_inference_registered_controllers;
 use serde_json::{json, Value};
 use tempfile::{tempdir, TempDir};
@@ -86,18 +86,18 @@ fn pin_offline_ollama() -> (EnvVarGuard, EnvVarGuard) {
 }
 
 fn controller<'a>(
-    controllers: &'a [RegisteredController],
+    controllers: &'a [ControllerEntry],
     function: &str,
-) -> &'a RegisteredController {
+) -> &'a ControllerEntry {
     controllers
         .iter()
         .find(|controller| controller.schema.function == function)
         .unwrap_or_else(|| panic!("controller {function} registered"))
 }
 
-async fn call(controller: &RegisteredController, params: Value) -> Result<Value, String> {
+async fn call(controller: &ControllerEntry, params: Value) -> Result<Value, String> {
     let params = params.as_object().cloned().unwrap_or_default();
-    (controller.handler)(DispatchCtx::process_default(), params).await
+    controller.invoke(DispatchCtx::process_default(), params).await
 }
 
 /// A config rooted in `tmp/.openhuman`, matching what `OPENHUMAN_WORKSPACE`
