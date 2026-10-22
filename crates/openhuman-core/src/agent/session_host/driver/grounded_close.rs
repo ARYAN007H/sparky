@@ -16,11 +16,7 @@ use tinytools_agent::dialect::ToolDialect;
 use tinyagents_harness::middleware::wrap_harness_instruction;
 
 use crate::agent::{
-    session_host::turn_checkpoint::{
-        self, build_deterministic_checkpoint, build_deterministic_final_summary,
-        close_verification_prompt, final_answer_instruction, harness_instruction_needles,
-        render_tool_results, results_from_tool_outcomes,
-    },
+    session_host::{product_copy, stop_summary},
     tinyagents::{SupplementalTrace, TinyagentsTurnOutcome, TurnModelSource},
 };
 use crate::inference::provider::{BilledUsage, AGENT_TURN_MAX_OUTPUT_TOKENS};
@@ -348,7 +344,7 @@ fn close_instruction(
     if needs_cap_close {
         return format!(
             "{}\n\n<tool_records>\n{}\n</tool_records>",
-            wrap_harness_instruction(turn_checkpoint::MAX_ITER_CHECKPOINT_INSTRUCTION),
+            wrap_harness_instruction(product_copy::OPENHUMAN_CLOSE_COPY.max_iteration_instruction),
             if rendered.is_empty() {
                 "(no tool calls completed)"
             } else {
@@ -363,7 +359,12 @@ fn close_instruction(
             "[session-runtime] closing a turn whose last reply ran out of output tokens"
         );
     }
-    final_answer_instruction(outcome.breaker_halt.as_deref(), outcome.truncated, rendered)
+    tinyagents_harness::close::final_answer_instruction(
+        &product_copy::OPENHUMAN_CLOSE_COPY,
+        outcome.breaker_halt.as_deref(),
+        outcome.truncated,
+        rendered,
+    )
 }
 
 /// Return `None` when the loop's terminal text is already usable.
@@ -389,8 +390,8 @@ pub(super) async fn close_if_needed(
     if let Some(close) = classified_halt_close(outcome) {
         return Some(close);
     }
-    let records = results_from_tool_outcomes(&outcome.tool_outcomes);
-    let rendered = render_tool_results(&records, turn_checkpoint::GROUNDING_TOTAL_CHARS);
+    let records = product_copy::close_results(&outcome.tool_outcomes);
+    let rendered = product_copy::render_close_results(&records, 16_000);
     let instruction = close_instruction(outcome, needs_cap_close, &rendered);
     let history: Vec<tinyinference_llm::message::Message> = base_history
         .iter()
@@ -398,13 +399,32 @@ pub(super) async fn close_if_needed(
         .map(|message| crate::agent::tinyagents::chat_message_to_message(&message))
         .collect();
     let stop_reason = outcome.breaker_halt.as_deref();
-    let harness_needles = harness_instruction_needles(stop_reason);
+    let harness_needles = tinyagents_harness::close::instruction_needles(
+        &product_copy::OPENHUMAN_CLOSE_COPY,
+        stop_reason,
+    );
     let harness_phrases: Vec<&str> = harness_needles.iter().map(String::as_str).collect();
     let fallback = || {
         if needs_cap_close {
-            build_deterministic_checkpoint(&records, outcome.model_calls)
+            let checkpoint_results = product_copy::render_close_results(&records, 4_000);
+            tinyagents_harness::close::checkpoint_with_copy(
+                &product_copy::OPENHUMAN_CLOSE_COPY,
+                outcome.model_calls,
+                &checkpoint_results,
+                !records.is_empty(),
+            )
         } else {
-            build_deterministic_final_summary(&records, stop_reason)
+            match stop_reason {
+                Some(reason) => stop_summary::render_stop_summary(&records, reason),
+                None => {
+                    let summary = product_copy::render_close_results(&records, 4_000);
+                    tinyagents_harness::close::final_summary_with_copy(
+                        &product_copy::OPENHUMAN_CLOSE_COPY,
+                        &summary,
+                        !records.is_empty(),
+                    )
+                }
+            }
         }
     };
 
@@ -427,21 +447,17 @@ pub(super) async fn close_if_needed(
         on_call_completed: Some(&mut on_call_completed),
     };
     let verification_prompt = |candidate: &str| -> String {
-        close_verification_prompt(user_message, &rendered, candidate)
+        tinyagents_harness::close::verification_prompt(
+            &product_copy::OPENHUMAN_CLOSE_COPY,
+            user_message,
+            &rendered,
+            candidate,
+            4_000,
+        )
     };
     let repair_instruction = |violation: tinyagents_harness::close::CloseViolation| -> String {
-        let violation = match violation {
-            tinyagents_harness::close::CloseViolation::NoReply => {
-                crate::agent::session_host::turn_checkpoint::CloseViolation::NoReply
-            }
-            tinyagents_harness::close::CloseViolation::QuotedInstruction => {
-                crate::agent::session_host::turn_checkpoint::CloseViolation::QuotedHarnessText
-            }
-            tinyagents_harness::close::CloseViolation::Unverified => {
-                crate::agent::session_host::turn_checkpoint::CloseViolation::Unverified
-            }
-        };
-        crate::agent::session_host::turn_checkpoint::close_repair_instruction(
+        tinyagents_harness::close::repair_with_copy(
+            &product_copy::OPENHUMAN_CLOSE_COPY,
             &instruction,
             violation,
         )
