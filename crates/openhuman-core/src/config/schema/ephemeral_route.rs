@@ -109,7 +109,8 @@ impl EphemeralRoute {
 /// already set. Any explicit pin on those roles is replaced, because the route
 /// *is* the caller's statement about where this turn runs and
 /// [`provider_for_role`](crate::inference::provider::factory::provider_for_role)
-/// consults the pins first.
+/// consults the pins first. Reapplying an unchanged route with matching role
+/// pins is a no-op; other same-route calls repair the pins and log at debug.
 ///
 /// A blank `default_model` leaves the roles alone and registers nothing: the
 /// slug grammar has no model to carry, and pinning a role to `"<slug>:"` would
@@ -129,6 +130,26 @@ pub fn apply(config: &mut crate::config::Config, route: EphemeralRoute) {
         return;
     };
 
+    let provider_string = format!("{EPHEMERAL_ROUTE_SLUG}:{model}");
+    let route_is_unchanged = config.ephemeral_route.as_ref() == Some(&route);
+    let roles_match = [
+        config.chat_provider.as_deref(),
+        config.reasoning_provider.as_deref(),
+        config.agentic_provider.as_deref(),
+        config.coding_provider.as_deref(),
+    ]
+    .into_iter()
+    .all(|provider| provider == Some(provider_string.as_str()));
+
+    if route_is_unchanged && roles_match {
+        tracing::debug!(
+            "[config][ephemeral-route] route already applied to {} model={}",
+            crate::inference::provider::factory::redact_endpoint(&route.endpoint),
+            model
+        );
+        return;
+    }
+
     // Replace rather than append: a second call on the same `Config` copy is not
     // expected, but two entries sharing a slug would make which one resolves an
     // ordering accident.
@@ -147,17 +168,24 @@ pub fn apply(config: &mut crate::config::Config, route: EphemeralRoute) {
         default_model: Some(model.clone()),
     });
 
-    let provider_string = format!("{EPHEMERAL_ROUTE_SLUG}:{model}");
     config.chat_provider = Some(provider_string.clone());
     config.reasoning_provider = Some(provider_string.clone());
     config.agentic_provider = Some(provider_string.clone());
     config.coding_provider = Some(provider_string);
 
-    log::info!(
-        "[config][ephemeral-route] this call routed to {} model={}",
-        crate::inference::provider::factory::redact_endpoint(&route.endpoint),
-        model
-    );
+    if route_is_unchanged {
+        tracing::debug!(
+            "[config][ephemeral-route] this call routed to {} model={}",
+            crate::inference::provider::factory::redact_endpoint(&route.endpoint),
+            model
+        );
+    } else {
+        tracing::info!(
+            "[config][ephemeral-route] this call routed to {} model={}",
+            crate::inference::provider::factory::redact_endpoint(&route.endpoint),
+            model
+        );
+    }
 
     config.ephemeral_route = Some(route);
 }
