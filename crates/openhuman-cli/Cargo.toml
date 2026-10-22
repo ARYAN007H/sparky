@@ -470,6 +470,7 @@ default = [
     "tinymemes",
     "inbound-queues",
     "storage-sqlite",
+    "storage-file",
     "secret-file",
     "legacy-import",
 ]

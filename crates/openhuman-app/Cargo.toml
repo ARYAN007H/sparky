@@ -96,6 +96,7 @@ openhuman-rpc = { path = "../openhuman-rpc", default-features = false, features 
     "tinymemes",
     "inbound-queues",
     "storage-sqlite",
+    "storage-file",
     "secret-file",
     "legacy-import",
 ] }
@@ -286,6 +287,9 @@ gateways = []
 # turns this on automatically for release; do not put it in `default` or
 # every `pnpm dev:app` will silently load the production bundle. DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+storage-mongodb = ["openhuman-rpc/storage-mongodb"]
+storage-s3 = ["openhuman-rpc/storage-s3"]
+storage-rabbitmq = ["openhuman-rpc/storage-rabbitmq"]
 # Forwarded down the chain (rpc -> tinyhumans -> embed -> core) to expose
 # `openhuman.test_reset`. Off by default; the E2E build flips it on via
 # `cargo tauri build --features e2e-test-support`. See app/scripts/e2e-build.sh.
