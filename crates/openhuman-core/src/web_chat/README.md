@@ -11,8 +11,8 @@ alone can supply:
 
 | Owner | Owns | OpenHuman's host seam |
 | --- | --- | --- |
-| TinyAgents harness | The generic turn runner and run-queue mechanics used by web chat | `agent/queued_turn.rs` supplies the product payload; `runner.rs` and `turn_host.rs` adapt web-chat policy and ports. |
-| TinyChannels module | The projection of canonical output events onto typed web events, with per-turn `seq` | `surface.rs` calls the compiled module through `tinychannels-bus`; the host keeps routing and process-wide event publication. |
+| TinyAgents harness | Generic turn admission and run-queue mechanics, exposed to the host through `tinyagents_harness::turn_runner` | [`QueuedPayload`](../agent/queued_turn.rs) carries product metadata; [`runner.rs`](./runner.rs) and [`turn_host.rs`](./turn_host.rs) adapt web-chat policy and ports. |
+| TinyChannels module | Projection of canonical output events onto typed web events, with per-turn `seq` | [`surface.rs`](./surface.rs) calls the compiled module through `tinychannels-bus`; the host keeps routing and process-wide event publication. |
 
 Hosted channel domain events are dispatched through this module's `start_chat`
 via `channels/bus/subscriber.rs`; those turns share the web-chat runner. Relay
