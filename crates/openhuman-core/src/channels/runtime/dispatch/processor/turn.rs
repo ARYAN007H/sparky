@@ -7,7 +7,7 @@ use crate::channels::context::{
     compact_sender_history, is_context_window_overflow_error, ChannelRuntimeContext,
 };
 use crate::channels::routes::{get_or_create_turn_model_source, get_route_selection};
-use crate::channels::{ChannelSendExt, SendMessage};
+use crate::channels::outbound::text_message;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::progress::AgentProgress;
@@ -15,8 +15,8 @@ use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tinyagents_session::transcript::TranscriptMessage;
-use tinychannels_bus as traits;
 use tinychannels_bus::context::ChatMessage;
+use tinychannels_bus::ChannelInboundEnvelope;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 
@@ -32,9 +32,17 @@ use super::RuntimeChannelMessage;
 
 pub(crate) async fn process_channel_message(
     ctx: Arc<ChannelRuntimeContext>,
-    msg: traits::ChannelMessage,
+    msg: ChannelInboundEnvelope,
 ) {
-    process_channel_runtime_message(ctx, RuntimeChannelMessage::from(msg)).await;
+    process_channel_runtime_message(
+        ctx,
+        RuntimeChannelMessage {
+            message: msg,
+            authenticated_relay: false,
+            prepared_inbound: None,
+        },
+    )
+    .await;
 }
 
 pub(crate) async fn process_channel_runtime_message(
@@ -117,13 +125,14 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
                 );
                 let react_content = format!("[REACTION:{ack_emoji}]");
                 let channel_for_react = Arc::clone(channel);
-                let react_msg = SendMessage::new(react_content, &msg.conversation.id)
-                    .in_thread(msg.conversation.thread_id.clone());
+                let react_msg = text_message(
+                    &msg.channel.id,
+                    &msg.conversation.id,
+                    react_content,
+                    msg.conversation.thread_id.clone(),
+                );
                 _acknowledgment_task = Some(AbortOnDropHandle::new(tokio::spawn(async move {
-                    if let Err(e) = channel_for_react
-                        .send_with_outbound_intent(&react_msg)
-                        .await
-                    {
+                    if let Err(e) = channel_for_react.send_typed(&react_msg).await {
                         tracing::debug!("[dispatch] Acknowledgment reaction failed: {e}");
                     }
                 })));
@@ -141,7 +150,7 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
                     "channels",
                     "provider_init",
                     &[
-                        ("channel", msg.channel.as_str()),
+                        ("channel", msg.channel.id.as_str()),
                         ("provider", route.provider.as_str()),
                     ],
                 );
@@ -152,10 +161,12 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
                 );
                 if let Some(channel) = target_channel.as_ref() {
                     let _ = channel
-                        .send_with_outbound_intent(
-                            &SendMessage::new(message, &msg.conversation.id)
-                                .in_thread(msg.conversation.thread_id.clone()),
-                        )
+                        .send_typed(&text_message(
+                            &msg.channel.id,
+                            &msg.conversation.id,
+                            message,
+                            msg.conversation.thread_id.clone(),
+                        ))
                         .await;
                 }
                 return;
