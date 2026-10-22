@@ -1,4 +1,5 @@
 use super::*;
+use tinytools::ToolTimeout;
 
 #[tokio::test]
 async fn configured_shell_fails_closed_when_tinybox_analysis_is_disabled() {

@@ -19,9 +19,9 @@ use super::gate::RoutedGate;
 use crate::config::HttpRequestConfig;
 use crate::security::approval::ApprovalChatContext;
 use crate::security::SecurityPolicy;
-use crate::tools::per_call::{context as per_call_context, PerCallTool};
 #[cfg(feature = "web3")]
 use crate::tools::per_call::PerCallContext;
+use crate::tools::per_call::{context as per_call_context, PerCallTool};
 use {tinyjuice_bus::tools::summary_focus_property, tinyjuice_bus::tools::SUMMARY_FOCUS_ARG};
 
 /// The fallbacks for a `0` limit, from the `[http_request]` schema defaults, so
