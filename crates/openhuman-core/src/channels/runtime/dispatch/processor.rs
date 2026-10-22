@@ -212,9 +212,9 @@ fn buffer_admitted(
     seq: u64,
     inbound: AdmittedInbound,
 ) {
-    let settings = debounce.settings_for(&inbound.msg.channel);
-    let channel = inbound.msg.channel.clone();
-    let reply_target = inbound.msg.reply_target.clone();
+    let settings = debounce.settings_for(&inbound.msg.channel.id);
+    let channel = inbound.msg.channel.id.clone();
+    let reply_target = inbound.msg.conversation.id.clone();
     let key = inbound.history_key.clone();
     let push = debouncer.push(
         key,
