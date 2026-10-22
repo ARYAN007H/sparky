@@ -99,7 +99,8 @@ fn encrypt_optional_secret(
     field_name: &str,
 ) -> Result<()> {
     if let Some(raw) = value.clone() {
-        if !crate::security::secret_storage::SecretStore::is_encrypted(&raw) {
+        // An empty value means "no key"; sealing it would make it look set.
+        if !raw.is_empty() && !crate::security::secret_storage::SecretStore::is_encrypted(&raw) {
             *value = Some(
                 store
                     .encrypt(&raw)

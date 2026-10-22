@@ -92,6 +92,35 @@ fn an_empty_hosting_key_stays_empty() {
     config.config_path = dir.path().join("config.toml");
     config.secrets.encrypt = true;
 
+    config.integrations.tinyfish.api_key = Some(String::new());
+
     encrypt_config_secrets(&mut config).unwrap();
     assert_eq!(config.hosting.api_key, "");
+    assert_eq!(config.integrations.tinyfish.api_key.as_deref(), Some(""));
+}
+
+/// A snapshot reload, which Composio tools run on every call, opens sealed
+/// secrets just as the first load does.
+#[tokio::test]
+async fn a_snapshot_reload_opens_sealed_secrets() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.config_path = dir.path().join("config.toml");
+    config.secrets.encrypt = true;
+    config.composio.api_key = Some("composio-sentinel".into());
+    encrypt_config_secrets(&mut config).unwrap();
+    std::fs::write(
+        &config.config_path,
+        toml::to_string_pretty(&config).unwrap(),
+    )
+    .unwrap();
+
+    let reloaded =
+        Config::load_from_config_path(&config.config_path, &dir.path().join("workspace"))
+            .await
+            .unwrap();
+    assert_eq!(
+        reloaded.composio.api_key.as_deref(),
+        Some("composio-sentinel")
+    );
 }
