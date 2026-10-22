@@ -377,8 +377,9 @@ where
             .await
     } else {
         delivery
-            .deliver_once_with_error(
+            .deliver_once_with_initial_delay(
                 target,
+                initial_delay,
                 || is_busy(&busy_ctx, &thread_id),
                 fence.clone(),
                 deliver,
