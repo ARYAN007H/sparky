@@ -7,12 +7,10 @@
 
 use std::sync::Mutex;
 
-use async_trait::async_trait;
 use serde_json::json;
 
 use crate::web_chat::{publish_web_channel_event, publish_web_channel_event_in, WebChannelEvent};
-use tinychannels_bus::{ChannelMessage, SendMessage};
-use tinychannels_runtime::Channel;
+use tinychannels_bus::SendMessage;
 
 /// The event name a relayed reply is published under.
 pub const CHANNEL_OUTBOUND_EVENT: &str = "channel_outbound";
@@ -54,6 +52,26 @@ impl RelayChannel {
     /// The texts sent so far, oldest first.
     pub fn sent(&self) -> Vec<String> {
         self.sent.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.channel
+    }
+
+    pub(crate) async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
+        tracing::debug!(
+            channel = %self.channel,
+            thread_id = %self.thread_id,
+            request_id = %self.request_id,
+            chars = message.content.chars().count(),
+            "[channels::relay] publishing channel_outbound"
+        );
+        self.sent
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(message.content.clone());
+        publish_web_channel_event(self.outbound_event(message));
+        Ok(())
     }
 
     /// The event that carries `message` to the gateway. The routing stamps
@@ -123,35 +141,6 @@ impl RelayChannel {
                 })),
             },
         );
-    }
-}
-
-#[async_trait]
-impl Channel for RelayChannel {
-    fn name(&self) -> &str {
-        &self.channel
-    }
-
-    async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
-        tracing::debug!(
-            channel = %self.channel,
-            thread_id = %self.thread_id,
-            request_id = %self.request_id,
-            chars = message.content.chars().count(),
-            "[channels::relay] publishing channel_outbound"
-        );
-        self.sent
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .push(message.content.clone());
-        publish_web_channel_event(self.outbound_event(message));
-        Ok(())
-    }
-
-    async fn listen(&self, _tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
-        anyhow::bail!(
-            "a relayed channel has no listener: its messages arrive through channel_relay_inbound"
-        )
     }
 }
 

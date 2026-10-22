@@ -1,31 +1,6 @@
 use super::*;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use tinychannels_bus::ChannelMessage;
-use tokio::sync::mpsc;
-
-/// Minimal mock channel that tracks send() calls.
-struct MockChannel {
-    name: String,
-    send_count: Arc<AtomicUsize>,
-    fail: bool,
-}
-
-#[async_trait]
-impl Channel for MockChannel {
-    fn name(&self) -> &str {
-        &self.name
-    }
-    async fn send(&self, _message: &SendMessage) -> anyhow::Result<()> {
-        self.send_count.fetch_add(1, Ordering::SeqCst);
-        if self.fail {
-            anyhow::bail!("mock send failure");
-        }
-        Ok(())
-    }
-    async fn listen(&self, _tx: mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
-        Ok(())
-    }
-}
+use crate::channels::runtime::{ChannelHandle, TestChannel};
+use std::sync::atomic::Ordering;
 
 fn delivery_event(channel: &str) -> DomainEvent {
     DomainEvent::CronDeliveryRequested {
@@ -36,22 +11,24 @@ fn delivery_event(channel: &str) -> DomainEvent {
     }
 }
 
-fn make_subscriber(channels: Vec<Arc<dyn Channel>>) -> CronDeliverySubscriber {
-    let map: HashMap<String, Arc<dyn Channel>> = channels
+fn test_channel(name: &str, fail: bool) -> (Arc<ChannelHandle>, Arc<TestChannel>) {
+    let mut state = TestChannel::new(name);
+    state.send_error = fail.then(|| "mock send failure".to_owned());
+    let state = Arc::new(state);
+    (Arc::new(ChannelHandle::Test(Arc::clone(&state))), state)
+}
+
+fn make_subscriber(channels: Vec<Arc<ChannelHandle>>) -> CronDeliverySubscriber {
+    let map: HashMap<String, Arc<ChannelHandle>> = channels
         .into_iter()
-        .map(|c| (c.name().to_string(), c))
+        .map(|channel| (channel.name().to_string(), channel))
         .collect();
     CronDeliverySubscriber::new(Arc::new(map))
 }
 
 #[tokio::test]
 async fn ignores_non_delivery_events() {
-    let send_count = Arc::new(AtomicUsize::new(0));
-    let ch: Arc<dyn Channel> = Arc::new(MockChannel {
-        name: "telegram".into(),
-        send_count: Arc::clone(&send_count),
-        fail: false,
-    });
+    let (ch, state) = test_channel("telegram", false);
     let sub = make_subscriber(vec![ch]);
 
     sub.handle(&DomainEvent::CronJobTriggered {
@@ -61,22 +38,17 @@ async fn ignores_non_delivery_events() {
     })
     .await;
 
-    assert_eq!(send_count.load(Ordering::SeqCst), 0);
+    assert_eq!(state.send_count.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
 async fn dispatches_to_matching_channel() {
-    let send_count = Arc::new(AtomicUsize::new(0));
-    let ch: Arc<dyn Channel> = Arc::new(MockChannel {
-        name: "telegram".into(),
-        send_count: Arc::clone(&send_count),
-        fail: false,
-    });
+    let (ch, state) = test_channel("telegram", false);
     let sub = make_subscriber(vec![ch]);
 
     sub.handle(&delivery_event("Telegram")).await;
 
-    assert_eq!(send_count.load(Ordering::SeqCst), 1);
+    assert_eq!(state.send_count.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test]
@@ -88,15 +60,10 @@ async fn missing_channel_does_not_panic() {
 
 #[tokio::test]
 async fn send_failure_does_not_panic() {
-    let send_count = Arc::new(AtomicUsize::new(0));
-    let ch: Arc<dyn Channel> = Arc::new(MockChannel {
-        name: "slack".into(),
-        send_count: Arc::clone(&send_count),
-        fail: true,
-    });
+    let (ch, state) = test_channel("slack", true);
     let sub = make_subscriber(vec![ch]);
 
     // Should log a warning but not panic.
     sub.handle(&delivery_event("slack")).await;
-    assert_eq!(send_count.load(Ordering::SeqCst), 1);
+    assert_eq!(state.send_count.load(Ordering::SeqCst), 1);
 }

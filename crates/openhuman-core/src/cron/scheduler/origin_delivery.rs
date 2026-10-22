@@ -11,16 +11,16 @@
 //! - Channel origin: the reply is sent to the origin's reply target, then
 //!   appended to its durable agent transcript so the next turn sees it.
 
+#[cfg(feature = "channels")]
 use super::delivery::strip_openhuman_link_markup;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
+#[cfg(feature = "channels")]
+use crate::cron::channel_bridge;
 use crate::web_chat::{publish_web_channel_event, WebChannelEvent};
 use anyhow::{anyhow, Result};
 use std::path::Path;
-use {
-    crate::cron::channel_bridge, tinyflows_bus::schedule::types::CronJob,
-    tinyflows_bus::schedule::types::DeliveryStatus, tinyflows_bus::schedule::types::JobOrigin,
-};
+use tinyflows_bus::schedule::types::{CronJob, DeliveryStatus, JobOrigin};
 
 /// What a scheduled run replies when it has nothing worth sending.
 pub(crate) const NO_REPLY: &str = "NO_REPLY";
@@ -237,43 +237,53 @@ pub(crate) async fn deliver_to_origin(
             channel_session,
             ..
         } => {
-            let identity = channel_session
-                .as_deref()
-                .ok_or_else(|| anyhow!("channel origin has no durable session identity"))?;
-            let (session_key, agent_id, _tenant) =
-                super::origin_context::validated_channel_session(ctx, config, channel, identity)
+            #[cfg(not(feature = "channels"))]
+            {
+                let _ = (channel, reply_target, channel_session);
+                return Err(anyhow!("channel delivery requires the channels feature"));
+            }
+            #[cfg(feature = "channels")]
+            {
+                let identity = channel_session
+                    .as_deref()
+                    .ok_or_else(|| anyhow!("channel origin has no durable session identity"))?;
+                let (session_key, agent_id, _tenant) =
+                    super::origin_context::validated_channel_session(
+                        ctx, config, channel, identity,
+                    )
                     .map_err(|error| anyhow!("invalid channel origin: {error}"))?;
-            let text = strip_openhuman_link_markup(text);
-            channel_bridge::send_to_channel(
-                channel,
-                identity,
-                reply_target,
-                &text,
-                &origin_request_id(&job.id, run_id),
-            )
-            .await
-            .map_err(|e| anyhow!(e))?;
-            let transcripts = origin_channel_transcripts(ctx, config, identity, &agent_id)?;
-            append_to_origin_transcript(
-                transcripts.as_ref(),
-                &TranscriptAppend {
-                    session_key: &session_key,
-                    agent_id: &agent_id,
-                    text: &text,
-                    idempotency_key: &origin_request_id(&job.id, run_id),
-                    job_id: &job.id,
-                    run_id,
-                },
-            )
-            .await
-            .map_err(|error| anyhow!("could not persist channel origin reply: {error}"))?;
-            tracing::debug!(
-                job_id = %job.id,
-                run_id = %run_id,
-                channel = %channel,
-                "[cron] origin delivery sent to channel"
-            );
-            Ok(DeliveryStatus::Delivered)
+                let text = strip_openhuman_link_markup(text);
+                channel_bridge::send_to_channel(
+                    channel,
+                    identity,
+                    reply_target,
+                    &text,
+                    &origin_request_id(&job.id, run_id),
+                )
+                .await
+                .map_err(|e| anyhow!(e))?;
+                let transcripts = origin_channel_transcripts(ctx, config, identity, &agent_id)?;
+                append_to_origin_transcript(
+                    transcripts.as_ref(),
+                    &TranscriptAppend {
+                        session_key: &session_key,
+                        agent_id: &agent_id,
+                        text: &text,
+                        idempotency_key: &origin_request_id(&job.id, run_id),
+                        job_id: &job.id,
+                        run_id,
+                    },
+                )
+                .await
+                .map_err(|error| anyhow!("could not persist channel origin reply: {error}"))?;
+                tracing::debug!(
+                    job_id = %job.id,
+                    run_id = %run_id,
+                    channel = %channel,
+                    "[cron] origin delivery sent to channel"
+                );
+                Ok(DeliveryStatus::Delivered)
+            }
         }
     }
 }

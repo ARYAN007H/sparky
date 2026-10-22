@@ -1,255 +1,14 @@
 //! OpenHuman callback implementations used by the TinyChannels module.
 //!
 //! Production callbacks translate typed module requests into OpenHuman-owned
-//! voice, persistence, allowlist, and event operations. The legacy portable
-//! provider-trait adapters below exist only for unit-test compatibility.
-
-use std::sync::Arc;
-
-#[cfg(test)]
-use crate::core::runtime::DispatchCtx;
-
-#[cfg(test)]
-use async_trait::async_trait;
-#[cfg(test)]
-use parking_lot::Mutex;
-#[cfg(test)]
-use tinychannels::host::{
-    AllowlistStore, ApprovalDecision, ApprovalGate, ConversationMessage, ConversationStore,
-    EventSink, LifecycleRegistry, ShutdownHook, SpeechRequest, SpeechResult, SpeechSynthesizer,
-    Transcriber, TranscriptionRequest, TranscriptionResult,
-};
+//! voice, persistence, allowlist, and event operations.
 
 use crate::config::Config;
 
 const LOG_PREFIX: &str = "[channels_host]";
 
 // ---------------------------------------------------------------------------
-// LifecycleRegistry → core::shutdown
-// ---------------------------------------------------------------------------
-
-/// Bridges [`LifecycleRegistry`] onto the process-global async shutdown hook
-/// registry. Providers register teardown that runs once on shutdown.
-#[cfg(test)]
-pub struct CoreShutdownRegistry;
-
-#[cfg(test)]
-impl LifecycleRegistry for CoreShutdownRegistry {
-    fn register_shutdown(&self, name: &str, hook: ShutdownHook) {
-        let name = name.to_string();
-        // `core::shutdown::register` takes a re-callable `Fn`, but our hook is a
-        // one-shot `FnOnce`; guard it behind a take-once slot so a (theoretical)
-        // second invocation is a no-op.
-        let slot = Arc::new(Mutex::new(Some(hook)));
-        crate::core::shutdown::register(move || {
-            let slot = Arc::clone(&slot);
-            let name = name.clone();
-            async move {
-                let taken = slot.lock().take();
-                if let Some(hook) = taken {
-                    tracing::debug!("{LOG_PREFIX} running shutdown hook: {name}");
-                    hook().await;
-                }
-            }
-        });
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Transcriber → voice STT factory
-// ---------------------------------------------------------------------------
-
-/// Speech-to-text backed by the OpenHuman voice provider factory.
-pub struct VoiceTranscriber {
-    pub config: Arc<Config>,
-}
-
-impl VoiceTranscriber {
-    pub(crate) async fn transcribe_host(
-        &self,
-        request: tinychannels_bus::HostTranscriptionRequest,
-    ) -> anyhow::Result<tinychannels_bus::HostTranscriptionResult> {
-        super::voice::ChannelVoiceHost {
-            config: Arc::clone(&self.config),
-        }
-        .transcribe_host(request)
-        .await
-    }
-}
-
-#[cfg(test)]
-#[async_trait]
-impl Transcriber for VoiceTranscriber {
-    fn name(&self) -> &str {
-        "openhuman-voice"
-    }
-
-    async fn transcribe(
-        &self,
-        request: TranscriptionRequest,
-    ) -> anyhow::Result<TranscriptionResult> {
-        self.transcribe_host(tinychannels_bus::HostTranscriptionRequest {
-            audio_base64: request.audio_base64,
-            mime_type: request.mime_type,
-            file_name: request.file_name,
-            language: request.language,
-        })
-        .await
-        .map(|result| TranscriptionResult {
-            text: result.text,
-            language: result.language,
-            duration_secs: result.duration_secs,
-        })
-    }
-}
-
-// ---------------------------------------------------------------------------
-// SpeechSynthesizer → voice reply_speech
-// ---------------------------------------------------------------------------
-
-/// Text-to-speech backed by the hosted reply-speech synthesizer.
-#[cfg(test)]
-pub struct VoiceSynthesizer {
-    pub config: Arc<Config>,
-}
-
-#[cfg(test)]
-#[async_trait]
-impl SpeechSynthesizer for VoiceSynthesizer {
-    async fn synthesize(&self, request: SpeechRequest) -> anyhow::Result<SpeechResult> {
-        tracing::debug!(
-            "{LOG_PREFIX} synthesize chars={} voice={:?}",
-            request.text.len(),
-            request.voice
-        );
-        let opts = crate::voice::reply_speech::ReplySpeechOptions {
-            voice_id: request.voice,
-            model_id: None,
-            output_format: request.format,
-            voice_settings: None,
-        };
-        let outcome =
-            crate::voice::reply_speech::synthesize_reply(&self.config, &request.text, &opts)
-                .await
-                .map_err(|e| anyhow::anyhow!(e))?;
-        let value = outcome.value;
-        let visemes = serde_json::to_value(&value.visemes).ok();
-        Ok(SpeechResult {
-            audio_base64: value.audio_base64,
-            mime_type: value.audio_mime,
-            duration_ms: None,
-            visemes,
-        })
-    }
-}
-
-// ---------------------------------------------------------------------------
-// ApprovalGate → approval reply parsing
-// ---------------------------------------------------------------------------
-
-/// Parses inbound approval replies via the OpenHuman approval gate. Raising
-/// interactive approvals stays host-internal (the tool gate), so only
-/// [`ApprovalGate::parse_reply`] is implemented.
-#[cfg(test)]
-pub struct CoreApprovalGate;
-
-#[cfg(test)]
-impl ApprovalGate for CoreApprovalGate {
-    fn parse_reply(&self, message: &str) -> Option<ApprovalDecision> {
-        crate::security::approval::parse_approval_reply(message).map(|decision| {
-            use crate::security::approval::ApprovalDecision as Core;
-            match decision {
-                Core::ApproveOnce => ApprovalDecision::Approve,
-                Core::ApproveAlwaysForTool => {
-                    ApprovalDecision::Choice("approve_always_for_tool".to_string())
-                }
-                // `parse_approval_reply` never actually produces this variant
-                // (it only maps a free-text yes/no chat reply to
-                // ApproveOnce/Deny) — the "approve always for this workflow"
-                // decision is only ever picked from the dedicated
-                // `flow-gate-approval` notification action, not typed as a
-                // chat reply. Mapped here purely for match exhaustiveness.
-                Core::ApproveAlwaysForFlow => {
-                    ApprovalDecision::Choice("approve_always_for_flow".to_string())
-                }
-                Core::Deny => ApprovalDecision::Deny,
-            }
-        })
-    }
-}
-
-// ---------------------------------------------------------------------------
-// ConversationStore → memory_conversations
-// ---------------------------------------------------------------------------
-
-/// Durable conversation history backed by the OpenHuman conversation store.
-#[cfg(test)]
-pub struct ConversationHistoryStore {
-    pub workspace_dir: std::path::PathBuf,
-}
-
-#[cfg(test)]
-#[async_trait]
-impl ConversationStore for ConversationHistoryStore {
-    async fn history(
-        &self,
-        session_key: &str,
-        limit: usize,
-    ) -> anyhow::Result<Vec<ConversationMessage>> {
-        let ctx = DispatchCtx::host_default();
-        let messages =
-            crate::threads::store::get_messages(&ctx, self.workspace_dir.clone(), session_key)
-                .map_err(|e| anyhow::anyhow!(e))?;
-        let start = messages.len().saturating_sub(limit);
-        Ok(messages[start..]
-            .iter()
-            .map(|m| ConversationMessage {
-                role: m.message_type.clone(),
-                content: m.content.clone(),
-                timestamp: None,
-            })
-            .collect())
-    }
-
-    async fn append(&self, session_key: &str, message: ConversationMessage) -> anyhow::Result<()> {
-        let ctx = DispatchCtx::host_default();
-        let now = chrono::Utc::now().to_rfc3339();
-        // `append_message` requires the thread to exist; create-or-noop first.
-        crate::threads::store::ensure_thread(
-            &ctx,
-            self.workspace_dir.clone(),
-            crate::threads::store::CreateConversationThread {
-                id: session_key.to_string(),
-                title: session_key.to_string(),
-                created_at: now.clone(),
-                parent_thread_id: None,
-                labels: None,
-                personality_id: None,
-                working_dir: None,
-            },
-        )
-        .map_err(|e| anyhow::anyhow!(e))?;
-        let stored = crate::threads::store::ConversationMessage {
-            id: uuid::Uuid::new_v4().to_string(),
-            content: message.content,
-            message_type: message.role.clone(),
-            extra_metadata: serde_json::Value::Null,
-            sender: message.role,
-            created_at: now,
-        };
-        crate::threads::store::append_message(
-            &ctx,
-            self.workspace_dir.clone(),
-            session_key,
-            stored,
-        )
-        .map_err(|e| anyhow::anyhow!(e))?;
-        Ok(())
-    }
-}
-
-// ---------------------------------------------------------------------------
-// AllowlistStore → config.toml channel allowlist
+// Host allowlist persistence → config.toml channel allowlist
 // ---------------------------------------------------------------------------
 
 /// Persists newly-authorized identities into the on-disk channel allowlist,
@@ -302,26 +61,19 @@ impl ConfigAllowlistStore {
     }
 }
 
-#[cfg(test)]
-#[async_trait]
-impl AllowlistStore for ConfigAllowlistStore {
-    async fn persist_allowed_identity(&self, channel: &str, identity: &str) -> anyhow::Result<()> {
-        ConfigAllowlistStore::persist_allowed_identity(self, channel, identity).await
-    }
-}
-
 // ---------------------------------------------------------------------------
-// EventSink → routes provider events to the right OpenHuman bus
+// Host callback → routes provider events to the right OpenHuman bus
 // ---------------------------------------------------------------------------
 
 /// Routes provider events by `domain`:
 /// - `"web"`     → the web channel's `WebChannelEvent` broadcast bus (payload
 ///   must deserialize into a `WebChannelEvent`; presentation builds that shape).
-/// - `"channel"` → the global `DomainEvent` bus for legacy provider callbacks.
+/// - `"channel"` → ignored legacy reaction callbacks. Reactions with durable
+///   message identity use the typed `channel_event` callback above instead.
 ///   Typed `channel_event` payloads use `publish_host_in` so trusted scope can
 ///   resolve and persist their exact OpenHuman message target first.
 ///
-/// One capability, two backends — providers don't know which bus they hit.
+/// One host callback, two backends — the module does not know which bus it hits.
 pub struct OpenHumanEventSink;
 
 impl OpenHumanEventSink {
@@ -404,14 +156,6 @@ pub(super) fn channel_event_target_message_id(
     }
 }
 
-fn json_str(payload: &serde_json::Value, key: &str) -> String {
-    payload
-        .get(key)
-        .and_then(|v| v.as_str())
-        .unwrap_or_default()
-        .to_string()
-}
-
 async fn publish_event(domain: &str, kind: &str, payload: serde_json::Value) -> anyhow::Result<()> {
     match domain {
         "web" => {
@@ -424,45 +168,11 @@ async fn publish_event(domain: &str, kind: &str, payload: serde_json::Value) -> 
             crate::web_chat::publish_web_channel_event(event);
         }
         "channel" => {
-            use crate::core::bus::BUS;
-            use crate::core::events::DomainEvent;
-            let event = match kind {
-                "reaction_received" => DomainEvent::ChannelReactionReceived {
-                    channel: json_str(&payload, "channel"),
-                    sender: json_str(&payload, "sender"),
-                    target_message_id: json_str(&payload, "target_message_id"),
-                    emoji: json_str(&payload, "emoji"),
-                },
-                "reaction_sent" => DomainEvent::ChannelReactionSent {
-                    channel: json_str(&payload, "channel"),
-                    target_message_id: json_str(&payload, "target_message_id"),
-                    emoji: json_str(&payload, "emoji"),
-                    success: payload
-                        .get("success")
-                        .and_then(|v| v.as_bool())
-                        .unwrap_or(false),
-                },
-                other => {
-                    tracing::warn!("{LOG_PREFIX} unmapped channel event kind: {other}");
-                    return Ok(());
-                }
-            };
-            BUS.publish(event);
+            tracing::debug!(
+                "{LOG_PREFIX} ignored legacy channel event kind without a typed target: {kind}"
+            );
         }
         other => tracing::warn!("{LOG_PREFIX} unmapped event domain: {other}"),
     }
     Ok(())
-}
-
-#[cfg(test)]
-#[async_trait]
-impl EventSink for OpenHumanEventSink {
-    async fn publish(
-        &self,
-        domain: &str,
-        kind: &str,
-        payload: serde_json::Value,
-    ) -> anyhow::Result<()> {
-        self.publish_host(domain, kind, payload).await
-    }
 }

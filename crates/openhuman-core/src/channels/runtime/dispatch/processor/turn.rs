@@ -5,7 +5,7 @@ use crate::channels::context::{is_context_window_overflow_error, ChannelRuntimeC
 #[cfg(test)]
 use crate::channels::routes::get_or_create_turn_model_source;
 use crate::channels::routes::{get_route_selection, handle_runtime_command_with_reset};
-use crate::channels::{ChannelSendExt, SendMessage};
+use crate::channels::SendMessage;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::util::truncate_with_ellipsis;
@@ -490,6 +490,7 @@ pub(crate) async fn process_channel_runtime_message(
                 session_key.clone(),
                 request_id,
                 enriched_message.clone(),
+                ctx.message_timeout_secs,
                 native_message_input,
                 native_staged_parts,
                 native_staged_lease,
@@ -509,18 +510,27 @@ pub(crate) async fn process_channel_runtime_message(
         }
         #[cfg(test)]
         None => {
-            let result = super::bus_turn::dispatch_test_turn(
-                ctx.as_ref(),
-                &msg,
-                &route,
-                &enriched_message,
-                active_turn_model_source,
-                None,
-                turn_origin,
-                approval,
+            let timeout_secs = ctx
+                .message_timeout_secs
+                .max(tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS);
+            let result = match tokio::time::timeout(
+                std::time::Duration::from_secs(timeout_secs),
+                super::bus_turn::dispatch_test_turn(
+                    ctx.as_ref(),
+                    &msg,
+                    &route,
+                    &enriched_message,
+                    active_turn_model_source,
+                    None,
+                    turn_origin,
+                    approval,
+                ),
             )
             .await
-            .map_err(|error| error.to_string());
+            {
+                Ok(result) => result.map_err(|error| error.to_string()),
+                Err(_) => Err(crate::web_chat::turn_timeout_error_message(timeout_secs)),
+            };
             super::super::native_runner::NativeTurnExecution {
                 result,
                 delivery_succeeded: None,
@@ -565,22 +575,23 @@ pub(crate) async fn process_channel_runtime_message(
             );
             let delivered = if native_target.is_some() {
                 native_delivery_succeeded
+            } else if let Some(channel) = target_channel.as_ref() {
+                match channel
+                    .send_with_outbound_intent(
+                        &SendMessage::new(&response_text, &msg.reply_target)
+                            .in_thread(msg.thread_ts.clone()),
+                    )
+                    .await
+                {
+                    Ok(()) => true,
+                    Err(e) => {
+                        eprintln!("  ❌ Failed to reply on {}: {e}", channel.name());
+                        false
+                    }
+                }
             } else {
                 false
             };
-            if native_target.is_none() {
-                if let Some(channel) = target_channel.as_ref() {
-                    if let Err(e) = channel
-                        .send_with_outbound_intent(
-                            &SendMessage::new(&response_text, &msg.reply_target)
-                                .in_thread(msg.thread_ts.clone()),
-                        )
-                        .await
-                    {
-                        eprintln!("  ❌ Failed to reply on {}: {e}", channel.name());
-                    }
-                }
-            }
             (delivered, response_text, resolved_provider, resolved_model)
         }
         Err(e) => {

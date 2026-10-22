@@ -5,22 +5,22 @@
 //! of directly constructing channel instances. The [`CronDeliverySubscriber`]
 //! picks up those events and dispatches to the appropriate channel, keeping
 //! channel construction out of the scheduler.
+use crate::channels::runtime::ChannelHandle;
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tinybus::EventHandler;
 use tinychannels_bus::SendMessage;
-use tinychannels_runtime::Channel;
 
 /// Subscribes to `CronDeliveryRequested` events and dispatches
 /// the output to the named channel.
-pub struct CronDeliverySubscriber {
-    channels_by_name: Arc<HashMap<String, Arc<dyn Channel>>>,
+pub(crate) struct CronDeliverySubscriber {
+    channels_by_name: Arc<HashMap<String, Arc<ChannelHandle>>>,
 }
 
 impl CronDeliverySubscriber {
-    pub fn new(channels_by_name: Arc<HashMap<String, Arc<dyn Channel>>>) -> Self {
+    pub(crate) fn new(channels_by_name: Arc<HashMap<String, Arc<ChannelHandle>>>) -> Self {
         Self { channels_by_name }
     }
 }

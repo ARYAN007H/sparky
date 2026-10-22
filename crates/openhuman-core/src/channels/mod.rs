@@ -11,7 +11,6 @@ pub mod contract_schema;
 pub(crate) mod credentials;
 
 pub use tinychannels_bus::SendMessage;
-pub use tinychannels_runtime::{Channel, ChannelSendExt};
 
 #[cfg(feature = "channels")]
 pub mod bus;
@@ -45,7 +44,7 @@ pub(crate) use system_prompt::ChannelSystemPrompt;
 mod tests;
 
 #[cfg(all(feature = "channels", any(test, debug_assertions)))]
-pub use runtime::test_support;
+pub mod test_support;
 
 #[cfg(feature = "channels")]
 // Channel system-prompt assembly lives in
@@ -64,7 +63,3 @@ pub(crate) use runtime::{session, start_channels_with_session};
 #[cfg(all(test, feature = "channels", feature = "modules"))]
 #[path = "module_fixture_tests.rs"]
 pub(crate) mod module_fixture;
-
-#[cfg(test)]
-#[path = "contract_reexport_tests.rs"]
-mod contract_reexport_tests;

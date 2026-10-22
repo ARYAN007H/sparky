@@ -72,11 +72,7 @@ fn channel_message(channel: &str) -> traits::ChannelMessage {
 
 #[test]
 fn timeout_and_history_keys_respect_channel_rules() {
-    assert_eq!(
-        effective_channel_message_timeout_secs(10),
-        MIN_CHANNEL_MESSAGE_TIMEOUT_SECS
-    );
-    assert_eq!(effective_channel_message_timeout_secs(120), 120);
+    const { assert!(CHANNEL_MESSAGE_TIMEOUT_SECS >= MIN_CHANNEL_MESSAGE_TIMEOUT_SECS) };
 
     let telegram = channel_message("telegram");
     let discord = channel_message("discord");

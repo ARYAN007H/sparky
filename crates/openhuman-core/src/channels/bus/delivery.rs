@@ -5,8 +5,6 @@ use crate::security::credentials::session_support::{
     get_session_token, is_local_session_token, BackendCredential,
 };
 use serde_json::json;
-#[cfg(test)]
-use serde_json::Value;
 use tinybus::module::ModuleCallError;
 use tinychannels_bus::module_progressive::{
     ChannelOutputEvent, ProgressiveCommand, ProgressiveEvent, ProgressiveResult,
@@ -399,13 +397,6 @@ impl ModuleProgressiveReply {
         }
         self.runtime.close().await
     }
-}
-
-// Compatibility fixtures exercise the owning library only in test builds.
-#[cfg(test)]
-pub(super) fn channel_message_body_with_idempotency(channel: &str, body: Value) -> Value {
-    let intent = tinychannels::outbound_intent_from_legacy_message(channel, body);
-    tinychannels::legacy_message_value_from_outbound_intent(&intent)
 }
 
 #[cfg(test)]

@@ -85,6 +85,7 @@ impl HostAgent {
     /// account/conversation); TinyAgents adds the agent id through
     /// `set_thread_id` when it binds the SessionRef.
     #[allow(clippy::too_many_arguments)]
+    #[cfg(feature = "channels")]
     pub(crate) async fn run_external_channel_turn(
         self,
         session_key: &str,

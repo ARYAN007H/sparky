@@ -5,26 +5,6 @@ use std::path::Path;
 use std::sync::Arc;
 use tinyagents_session::transcript::{SessionRef, TranscriptMessage, TranscriptMeta};
 
-struct ConfiguredChannel;
-
-#[async_trait::async_trait]
-impl crate::channels::Channel for ConfiguredChannel {
-    fn name(&self) -> &str {
-        "telegram:bot-a"
-    }
-
-    async fn send(&self, _message: &crate::channels::SendMessage) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    async fn listen(
-        &self,
-        _tx: tokio::sync::mpsc::Sender<tinychannels_bus::ChannelMessage>,
-    ) -> anyhow::Result<()> {
-        Ok(())
-    }
-}
-
 fn transcript_meta(thread_id: &str, agent_id: &str) -> TranscriptMeta {
     TranscriptMeta {
         agent_name: agent_id.into(),
@@ -137,7 +117,9 @@ fn tenant_runtime(
     runtime.core = Some(Arc::downgrade(&core));
     runtime.channels_by_name = Arc::new(HashMap::from([(
         "telegram:bot-a".into(),
-        Arc::new(ConfiguredChannel) as Arc<dyn crate::channels::Channel>,
+        Arc::new(crate::channels::runtime::ChannelHandle::Test(Arc::new(
+            crate::channels::runtime::TestChannel::new("telegram:bot-a"),
+        ))),
     )]));
     (core, runtime)
 }
@@ -239,18 +221,20 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
 
     let mut forged = scope.clone();
     forged.conversation.id = "other-room".into();
-    assert!(crate::channels::host::remote_control::dispatch_callback(
-        &alice_dispatch,
-        &alice_runtime,
-        &alice_tenant,
-        &cancellation,
-        Some(&reset),
-        RemoteHostRequest::ClearHistory {
-            session_scope: forged,
-        },
-    )
-    .await
-    .is_err());
+    assert!(
+        crate::channels::host::remote_control::dispatch_callback(
+            &alice_dispatch,
+            &alice_runtime,
+            &alice_tenant,
+            &cancellation,
+            Some(&reset),
+            RemoteHostRequest::ClearHistory {
+                session_scope: forged,
+            },
+        )
+        .await
+        .is_err()
+    );
     assert_eq!(
         session_messages(&alice_core, workspace, &alice_store_agent, &alice_session).len(),
         2

@@ -139,6 +139,19 @@ pub(crate) fn native_target(
     envelope: &tinychannels_bus::channel::ChannelInboundEnvelope,
 ) -> anyhow::Result<Option<NativeProgressiveTarget>> {
     #[cfg(test)]
+    if ctx
+        .channels_by_name
+        .get(&envelope.channel.id)
+        .is_some_and(|handle| {
+            matches!(
+                handle.as_ref(),
+                crate::channels::runtime::ChannelHandle::Test(_)
+            )
+        })
+    {
+        return Ok(None);
+    }
+    #[cfg(test)]
     if ctx.config.is_none() && ctx.module_objects.is_empty() {
         return Ok(None);
     }

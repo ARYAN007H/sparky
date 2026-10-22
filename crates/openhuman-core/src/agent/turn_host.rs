@@ -34,25 +34,30 @@ pub(crate) struct TrustedAgentTurn {
     pub(crate) approval: ApprovalTurnContext,
     pub(crate) relay_thread: Option<String>,
     pub(crate) imported_history: Vec<tinyagents_session::transcript::TranscriptMessage>,
+    #[cfg(feature = "channels")]
     pub(crate) legacy_history: Option<crate::channels::providers::relay::LegacyHistoryImport>,
     /// Captured configured compiled-module target for native turns. The
     /// progressive handle itself is opened at runner checkout per admitted
     /// request, so queued follow-ups never reuse a finished handle.
+    #[cfg(feature = "channels")]
     pub(crate) native_target:
         Option<Arc<crate::channels::runtime::dispatch::NativeProgressiveTarget>>,
 }
 
 impl std::fmt::Debug for TrustedAgentTurn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TrustedAgentTurn")
+        let mut debug = f.debug_struct("TrustedAgentTurn");
+        debug
             .field("agent_id", &self.host_agent.definition.id)
             .field("channel", &self.channel)
             .field("session_scoped", &!self.session_key.is_empty())
             .field("relay_thread", &self.relay_thread)
-            .field("imported_history_rows", &self.imported_history.len())
-            .field("has_legacy_history", &self.legacy_history.is_some())
-            .field("native_target", &self.native_target.is_some())
-            .finish_non_exhaustive()
+            .field("imported_history_rows", &self.imported_history.len());
+        #[cfg(feature = "channels")]
+        debug.field("has_legacy_history", &self.legacy_history.is_some());
+        #[cfg(feature = "channels")]
+        debug.field("native_target", &self.native_target.is_some());
+        debug.finish_non_exhaustive()
     }
 }
 

@@ -236,7 +236,7 @@ pub(crate) fn runtime_context(
     dispatch: &DispatchCtx,
     config: &Config,
     parts: ChannelTurnParts,
-    channels_by_name: Arc<HashMap<String, Arc<dyn crate::channels::Channel>>>,
+    channels_by_name: Arc<HashMap<String, Arc<crate::channels::runtime::ChannelHandle>>>,
     module_objects: Arc<HashMap<String, tinybus::module::ModuleObjectClient>>,
     message_timeout_secs: u64,
 ) -> ChannelRuntimeContext {

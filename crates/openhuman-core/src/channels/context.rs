@@ -10,15 +10,36 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tinytools::Tool;
 
-pub(crate) use tinychannels_runtime::context::{
-    ChannelRouteSelection, CHANNEL_MESSAGE_TIMEOUT_SECS, CHANNEL_TYPING_REFRESH_INTERVAL_SECS,
-    DEFAULT_CHANNEL_INITIAL_BACKOFF_SECS, DEFAULT_CHANNEL_MAX_BACKOFF_SECS, MAX_CHANNEL_HISTORY,
+pub(crate) use tinychannels_bus::context::ChannelRouteSelection;
+#[cfg(test)]
+pub(crate) use tinychannels_bus::{CHANNEL_MESSAGE_TIMEOUT_SECS, MIN_CHANNEL_MESSAGE_TIMEOUT_SECS};
+pub(crate) use tinychannels_bus::{
+    CHANNEL_TYPING_REFRESH_INTERVAL_SECS, DEFAULT_CHANNEL_INITIAL_BACKOFF_SECS,
+    DEFAULT_CHANNEL_MAX_BACKOFF_SECS, MAX_CHANNEL_HISTORY,
 };
 
+// Compatibility projection for tests that exercise route-state consumers with
+// legacy message fixtures. Runtime turns consume TinyChannels' prepared
+// `history_key` directly; provider identity derivation stays in TinyChannels.
 #[cfg(test)]
-pub(crate) use tinychannels::context::{
-    effective_channel_message_timeout_secs, MIN_CHANNEL_MESSAGE_TIMEOUT_SECS,
-};
+pub(crate) fn conversation_history_key(msg: &tinychannels_bus::ChannelMessage) -> String {
+    let mut key = [
+        msg.channel.as_str(),
+        msg.sender.as_str(),
+        msg.reply_target.as_str(),
+    ]
+    .iter()
+    .map(|part| part.replace('%', "%25").replace('_', "%5F"))
+    .collect::<Vec<_>>()
+    .join("_");
+    if !crate::channels::capabilities::capabilities_for(&msg.channel).history_key_ignores_thread {
+        if let Some(thread) = msg.thread_ts.as_deref() {
+            key.push_str("_thread:");
+            key.push_str(&thread.replace('%', "%25").replace('_', "%5F"));
+        }
+    }
+    key
+}
 
 pub(crate) type TurnModelSourceCacheMap = Arc<Mutex<HashMap<String, TurnModelSource>>>;
 pub(crate) type RouteSelectionMap = Arc<Mutex<HashMap<String, ChannelRouteSelection>>>;
@@ -28,7 +49,7 @@ pub(crate) struct ChannelRuntimeContext {
     /// Explicit durable conversation for a hosted relay; ordinary channels
     /// use their existing per-sender history and have no relay thread.
     pub(crate) relay_thread: Option<String>,
-    pub(crate) channels_by_name: Arc<HashMap<String, Arc<dyn super::Channel>>>,
+    pub(crate) channels_by_name: Arc<HashMap<String, Arc<super::runtime::ChannelHandle>>>,
     /// Compiled TinyChannels objects for configured providers. Host channel
     /// runners use these objects for module-owned progressive output.
     pub(crate) module_objects: Arc<HashMap<String, tinybus::module::ModuleObjectClient>>,
@@ -77,11 +98,6 @@ pub(crate) async fn module_client(ctx: &ChannelRuntimeContext) -> tinybus::modul
         return super::module_fixture::client().await;
     }
     crate::modules::client(ctx.config.as_deref().cloned().unwrap_or_default())
-}
-
-#[cfg(test)]
-pub(crate) fn conversation_history_key(msg: &tinychannels_bus::ChannelMessage) -> String {
-    tinychannels::context::conversation_history_key(msg)
 }
 
 pub(crate) async fn is_context_window_overflow_error(

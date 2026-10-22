@@ -1,6 +1,7 @@
 //! Host-owned approval routing and turn events over the channel module.
 use crate::channels::capabilities::capabilities_for;
-use crate::channels::{Channel, ChannelSendExt, SendMessage};
+use crate::channels::runtime::ChannelHandle;
+use crate::channels::SendMessage;
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -11,15 +12,15 @@ use tinybus::EventHandler;
 use tinychannels_bus::{approvals::ReplyContext, ChannelMessage};
 
 /// Captures the account configuration and reply addresses used by approvals.
-pub struct ChannelApprovalSurfaceSubscriber {
-    channels: Arc<HashMap<String, Arc<dyn Channel>>>,
+pub(crate) struct ChannelApprovalSurfaceSubscriber {
+    channels: Arc<HashMap<String, Arc<ChannelHandle>>>,
     replies: Mutex<HashMap<String, ReplyContext>>,
     config: Option<Arc<crate::config::Config>>,
     cancellation: tokio_util::sync::CancellationToken,
 }
 impl ChannelApprovalSurfaceSubscriber {
-    pub fn with_config(
-        channels: Arc<HashMap<String, Arc<dyn Channel>>>,
+    pub(crate) fn with_config(
+        channels: Arc<HashMap<String, Arc<ChannelHandle>>>,
         config: Arc<crate::config::Config>,
     ) -> Self {
         Self {
@@ -30,7 +31,7 @@ impl ChannelApprovalSurfaceSubscriber {
         }
     }
     #[cfg(test)]
-    pub fn new(channels: Arc<HashMap<String, Arc<dyn Channel>>>) -> Self {
+    pub(crate) fn new(channels: Arc<HashMap<String, Arc<ChannelHandle>>>) -> Self {
         Self {
             channels,
             replies: Mutex::new(HashMap::new()),
@@ -196,10 +197,21 @@ impl ChannelTurnStateSubscriber {
         }
     }
     async fn mark(&self, channel: &str, reply_target: &str, event_ws: &PathBuf, busy: bool) {
+        #[cfg(test)]
+        eprintln!(
+            "turn-state mark begin busy={busy} channel={channel:?} target={reply_target:?} cancelled={} remote={} event_ws={:?} subscriber_ws={:?} config={}",
+            self.cancellation.is_cancelled(),
+            capabilities_for(channel).remote_control,
+            event_ws,
+            self.workspace_dir,
+            self.config.is_some(),
+        );
         if self.cancellation.is_cancelled()
             || !capabilities_for(channel).remote_control
             || *event_ws != self.workspace_dir
         {
+            #[cfg(test)]
+            eprintln!("turn-state mark skipped");
             return;
         }
         #[cfg(test)]
@@ -222,6 +234,8 @@ impl ChannelTurnStateSubscriber {
                 },),
             )
             .await;
+        #[cfg(test)]
+        eprintln!("turn-state mark result: {result:?}");
         if result.is_err() {
             tracing::debug!("channel turn status unavailable");
         }

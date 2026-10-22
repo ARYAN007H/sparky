@@ -23,9 +23,11 @@ pub(crate) use processor::progressive::{
     delivery_succeeded, hosted_relay_target, NativeProgressiveTarget,
 };
 
+#[cfg(test)]
+pub(crate) use processor::process_channel_message;
 pub(crate) use processor::{
-    process_channel_message, process_channel_runtime_message, reset_durable_channel_session,
-    run_message_dispatch_loop, RuntimeChannelMessage,
+    process_channel_runtime_message, reset_durable_channel_session, run_message_dispatch_loop,
+    RuntimeChannelMessage,
 };
 
 // `channel_has_approval_surface` stays pub(crate) on processor; re-export so
@@ -36,7 +38,7 @@ use processor::channel_has_approval_surface;
 // Re-export internal helpers accessed by test_support (cfg(any(test,
 // debug_assertions))) and the inline #[cfg(test)] modules via `super::*`.
 #[cfg(any(test, debug_assertions))]
-use helpers::build_channel_context_block;
+pub(crate) use helpers::build_channel_context_block;
 #[cfg(test)]
 use helpers::select_acknowledgment_reaction;
 

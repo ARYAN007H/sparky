@@ -1,7 +1,8 @@
 //! Per-sender routing and runtime command handling.
 
 use super::context::{ChannelRouteSelection, ChannelRuntimeContext};
-use super::{Channel, ChannelSendExt, SendMessage};
+use super::runtime::ChannelHandle;
+use super::SendMessage;
 use crate::inference::provider;
 use std::sync::Arc;
 use tinychannels_bus as traits;
@@ -150,7 +151,7 @@ impl RouteCallbacks {
 pub(crate) async fn handle_runtime_command_with_reset<F, Fut>(
     ctx: &ChannelRuntimeContext,
     msg: &traits::ChannelMessage,
-    target_channel: Option<&Arc<dyn Channel>>,
+    target_channel: Option<&Arc<ChannelHandle>>,
     sender_key: &str,
     reset_scope: Option<tinychannels_bus::module_remote::RemoteSessionScope>,
     durable_session_key: Option<String>,
@@ -167,9 +168,29 @@ where
         return false;
     }
     let current = get_route_selection(ctx, sender_key);
+    // Telegram's legacy `thread_ts` is the inbound provider message id used
+    // for reply targeting; forum topic routing is already encoded in
+    // `reply_target` and must not be reused as a reply-to id.
+    let reply_thread = msg.thread_ts.clone();
+    let reply_recipient = reset_scope
+        .as_ref()
+        .map(|scope| scope.conversation.id.clone())
+        .unwrap_or_else(|| msg.reply_target.clone());
+    let reply_topic = reset_scope
+        .as_ref()
+        .and_then(|scope| scope.conversation.topic_id.clone())
+        .or_else(|| msg.topic_id.clone());
+    let reply_message = |content: &str| {
+        let mut message = SendMessage::new(content, reply_recipient.clone());
+        message.thread_ts = reply_thread.clone();
+        message.topic_id = reply_topic.clone();
+        message.reply_to_id = msg.reply_to_id.clone();
+        message
+    };
     let history_len =
         durable_channel_history_len(ctx, &current, &msg.channel, durable_session_key.as_deref())
             .await;
+    let configured_channel = configured_control_channel(ctx, reset_scope.as_ref());
     let client = super::context::module_client(ctx).await;
     let operation = async {
         let lease = crate::modules::channel_runtime::ChannelRuntimeLease::open(
@@ -203,21 +224,8 @@ where
                         model: current.model,
                     },
                     history_len,
-                    session_scope: reset_scope.clone().map(Box::new),
-                    configured_channel: reset_scope.as_ref().and_then(|scope| {
-                        let account = scope.channel.account_id.as_deref()?;
-                        let channel = ctx.channels_by_name.get(account)?;
-                        (channel.name() == account
-                            && tinychannels_bus::provider_id(channel.name()) == scope.channel.id)
-                            .then(|| {
-                                Box::new(
-                                    tinychannels_bus::module_control::ConfiguredControlChannel {
-                                        name: channel.name().to_owned(),
-                                        capabilities: channel.capabilities(),
-                                    },
-                                )
-                            })
-                    }),
+                    session_scope: reset_scope.map(Box::new),
+                    configured_channel,
                     providers: provider_descriptors(),
                 },),
             )
@@ -242,26 +250,23 @@ where
             if let Some(channel) = target_channel {
                 let reply = crate::channels::failure_copy::generic_failure(ctx.config.as_deref());
                 let _ = channel
-                    .send_with_outbound_intent(
-                        &SendMessage::new(&reply, &msg.reply_target)
-                            .in_thread(msg.thread_ts.clone()),
-                    )
+                    .send_with_outbound_intent(&reply_message(&reply))
                     .await;
             }
             return true;
         }
     };
-    if clear_history && reset_history().await.is_err() {
-        tracing::warn!("channel durable history reset failed");
-        if let Some(channel) = target_channel {
-            let copy = crate::channels::failure_copy::generic_failure(ctx.config.as_deref());
-            let _ = channel
-                .send_with_outbound_intent(
-                    &SendMessage::new(&copy, &msg.reply_target).in_thread(msg.thread_ts.clone()),
-                )
-                .await;
+    if clear_history {
+        if let Err(error) = reset_history().await {
+            tracing::warn!(%error, "channel durable history reset failed");
+            if let Some(channel) = target_channel {
+                let copy = crate::channels::failure_copy::generic_failure(ctx.config.as_deref());
+                let _ = channel
+                    .send_with_outbound_intent(&reply_message(&copy))
+                    .await;
+            }
+            return true;
         }
-        return true;
     }
     // Apply a route change only after its requested durable reset has
     // succeeded, so a failed reset cannot partially alter command state.
@@ -280,9 +285,7 @@ where
     };
     if let Some(channel) = target_channel {
         if channel
-            .send_with_outbound_intent(
-                &SendMessage::new(reply, &msg.reply_target).in_thread(msg.thread_ts.clone()),
-            )
+            .send_with_outbound_intent(&reply_message(&reply))
             .await
             .is_err()
         {
@@ -290,6 +293,27 @@ where
         }
     }
     true
+}
+
+/// Resolve the configured instance only from the account identity prepared by
+/// the owning channel module. Missing or mismatched identities stay fail-closed.
+fn configured_control_channel(
+    ctx: &ChannelRuntimeContext,
+    scope: Option<&tinychannels_bus::module_remote::RemoteSessionScope>,
+) -> Option<Box<tinychannels_bus::module_control::ConfiguredControlChannel>> {
+    let Some(scope) = scope else {
+        return None;
+    };
+    let account = scope.channel.account_id.as_deref()?;
+    let channel = ctx.channels_by_name.get(account)?;
+    if tinychannels_bus::provider_id(channel.name()) != scope.channel.id {
+        return None;
+    }
+    let configured = Box::new(tinychannels_bus::module_control::ConfiguredControlChannel {
+        name: channel.name().to_owned(),
+        capabilities: channel.capabilities(),
+    });
+    Some(configured)
 }
 
 async fn durable_channel_history_len(
@@ -346,7 +370,7 @@ async fn durable_channel_history_len(
 pub(crate) async fn handle_runtime_command_if_needed(
     ctx: &ChannelRuntimeContext,
     msg: &traits::ChannelMessage,
-    target_channel: Option<&Arc<dyn Channel>>,
+    target_channel: Option<&Arc<ChannelHandle>>,
     sender_key: &str,
 ) -> bool {
     handle_runtime_command_with_reset(

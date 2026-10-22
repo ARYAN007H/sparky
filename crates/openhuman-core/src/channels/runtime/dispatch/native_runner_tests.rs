@@ -1,6 +1,23 @@
 use super::*;
 
 #[test]
+fn channel_deadline_respects_module_floor_and_web_backstop() {
+    let minimum = tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS;
+    assert_eq!(
+        channel_turn_deadline(1, None),
+        std::time::Duration::from_secs(minimum)
+    );
+    assert_eq!(
+        channel_turn_deadline(minimum + 10, Some(std::time::Duration::from_secs(5))),
+        std::time::Duration::from_secs(5)
+    );
+    assert_eq!(
+        channel_turn_deadline(minimum + 10, Some(std::time::Duration::from_secs(60))),
+        std::time::Duration::from_secs(minimum + 10)
+    );
+}
+
+#[test]
 fn native_failure_classifier_preserves_localizable_error_metadata() {
     let failure = NativeFailures.classify_failure("429 Too Many Requests: Retry-After: 12");
 

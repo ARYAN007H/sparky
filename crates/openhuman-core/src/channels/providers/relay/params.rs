@@ -4,8 +4,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[cfg(test)]
-use crate::channels::bus::derive_inbound_thread_id;
 use tinychannels_bus::ChannelMessage;
 
 /// Longest channel name: `telegram`, `imessage`, `discord`, ...
@@ -49,6 +47,16 @@ pub struct RelayInboundParams {
 }
 
 impl RelayInboundParams {
+    /// Fixture-only identity matching the owner operation's canonical wire form.
+    /// Production callers obtain this from `PrepareChannelIdentity`.
+    #[cfg(test)]
+    pub(crate) fn thread_id(&self) -> String {
+        format!(
+            "channel:{}/{}/{}",
+            self.channel, self.sender_id, self.chat_id
+        )
+    }
+
     /// A message with the five required facts and nothing optional: no
     /// sender name, the default client id and no attachments.
     pub fn new(
@@ -103,20 +111,6 @@ impl RelayInboundParams {
             return Err("attachments are not supported by the relay yet".to_string());
         }
         Ok(())
-    }
-
-    /// The conversation's thread: `channel:<channel>/<sender>/<chat>`, the
-    /// same derivation as the backend-relayed inbound path
-    /// (`channels::bus::derive_inbound_thread_id`). A user cannot mint such
-    /// an id through `threads_upsert`, which reserves `channel:`.
-    #[cfg(test)]
-    pub fn thread_id(&self) -> String {
-        derive_inbound_thread_id(
-            &self.channel,
-            Some(&self.sender_id),
-            Some(&self.chat_id),
-            None,
-        )
     }
 
     /// The `/events` client id replies go to.

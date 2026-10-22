@@ -3,11 +3,12 @@ use super::super::context::{
     CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
 use super::super::runtime::process_channel_message;
-use super::super::Channel;
+use super::super::runtime::test_support::linked_telegram_runtime;
 use super::common::{
-    IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
-    TelegramRecordingChannel, ToolCallingModel,
+    IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel, ToolCallingModel,
 };
+use crate::channels::runtime::ChannelHandle;
+use crate::channels::runtime::TestChannel;
 use crate::inference::provider;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
@@ -19,7 +20,7 @@ use tinyinference_llm::model::ChatModel;
 async fn process_channel_message_executes_native_tool_calls() {
     let _bus_guard = super::common::use_real_agent_handler().await;
     let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
@@ -78,8 +79,12 @@ async fn process_channel_message_executes_native_tool_calls() {
 #[tokio::test]
 async fn process_channel_message_handles_models_command_without_llm_call() {
     let _bus_guard = super::common::use_real_agent_handler().await;
-    let channel_impl = Arc::new(TelegramRecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let linked = linked_telegram_runtime().await;
+    crate::core::bus::init().await.expect("bus init");
+    let _builtins =
+        crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let channel_impl = Arc::new(TestChannel::new("telegram"));
+    let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
@@ -99,10 +104,10 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         crate::agent::tinyagents::TurnModelSource::from_model(fallback_provider),
     );
 
-    let runtime_ctx = Arc::new(ChannelRuntimeContext {
+    let mut runtime_ctx = ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
-        module_objects: Arc::new(HashMap::new()),
+        module_objects: linked.module_objects(),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::clone(&default_provider),
         )),
@@ -118,13 +123,18 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
         provider_runtime_options: provider::ProviderRuntimeOptions::default(),
-        workspace_dir: Arc::new(std::env::temp_dir()),
+        workspace_dir: Arc::new(linked.config().workspace_dir.clone()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
         core: None,
-    });
+    };
+    let _core = crate::channels::runtime::test_support::bind_test_core_context(
+        &mut runtime_ctx,
+        linked.config(),
+    );
+    let runtime_ctx = Arc::new(runtime_ctx);
 
     let cmd_msg = traits::ChannelMessage {
         reply_to_id: None,
@@ -143,7 +153,10 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
 
     let sent = channel_impl.sent_messages.lock().await;
     assert_eq!(sent.len(), 1);
-    assert!(sent[0].contains("Provider switched to `openhuman`"));
+    assert!(
+        sent[0].contains("Provider switched to `openhuman`"),
+        "the module-handled command should confirm its route change: {sent:?}"
+    );
 
     let route = runtime_ctx
         .route_overrides
@@ -162,8 +175,8 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
 #[tokio::test]
 async fn process_channel_message_uses_route_override_provider_and_model() {
     let _bus_guard = super::common::use_real_agent_handler().await;
-    let channel_impl = Arc::new(TelegramRecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel_impl = Arc::new(TestChannel::new("telegram"));
+    let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
@@ -250,7 +263,7 @@ async fn process_channel_message_uses_route_override_provider_and_model() {
 async fn process_channel_message_respects_configured_max_tool_iterations_above_default() {
     let _bus_guard = super::common::use_real_agent_handler().await;
     let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
@@ -312,7 +325,7 @@ async fn process_channel_message_respects_configured_max_tool_iterations_above_d
 async fn process_channel_message_reports_configured_max_tool_iterations_limit() {
     let _bus_guard = super::common::use_real_agent_handler().await;
     let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
@@ -366,5 +379,9 @@ async fn process_channel_message_reports_configured_max_tool_iterations_limit() 
     let sent_messages = channel_impl.sent_messages.lock().await;
     assert_eq!(sent_messages.len(), 1);
     assert!(sent_messages[0].starts_with("chat-iter-fail:"));
-    assert!(sent_messages[0].contains("⚠️ Error: Agent exceeded maximum tool iterations (3)"));
+    assert!(
+        sent_messages[0].contains("maximum number of tool steps")
+            && sent_messages[0].contains("retry the same question in this thread"),
+        "the user-facing max-iteration copy should explain the cap and allow retrying: {sent_messages:?}"
+    );
 }
