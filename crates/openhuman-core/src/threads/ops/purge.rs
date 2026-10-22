@@ -24,23 +24,69 @@ async fn threads_purge_inner(
     ctx: DispatchCtx,
     dir: PathBuf,
 ) -> Result<Outcome<ApiEnvelope<PurgeConversationThreadsResponse>>, String> {
-    let stats = conversations::blocking::purge_threads(ctx.clone(), dir.clone()).await?;
-    // No parent thread survives a purge, so cancel every detached sub-agent and
-    // wipe every queued result. Same ordering as `thread_delete`: abort the
-    // in-flight runs first, then clear the delivery queue. Tombstone each
-    // cancelled sub-agent's thread BEFORE the final wipe so a straggler that
-    // wins the cooperative-abort race (records after the wipe) is still dropped
-    // by `record_completion` rather than delivered into a purged thread.
+    // Capture and fence the parents before deleting their rows. The owner
+    // index is keyed by thread, and the permanent fence prevents another child
+    // from being admitted while the purge settles the jobs already running.
+    let threads = conversations::blocking::list_threads(ctx.clone(), dir.clone()).await?;
+    let thread_ids = threads
+        .into_iter()
+        .map(|thread| thread.id)
+        .collect::<Vec<_>>();
+    let mut fenced: Vec<String> = Vec::with_capacity(thread_ids.len());
+    for thread_id in &thread_ids {
+        if let Err(error) = crate::agent::orchestration::completion_owners::begin_thread_deletion(
+            &ctx, &dir, thread_id,
+        ) {
+            for fenced_thread in &fenced {
+                crate::agent::orchestration::completion_owners::release_thread_deletion(
+                    &ctx,
+                    &dir,
+                    fenced_thread,
+                );
+            }
+            return Err(error);
+        }
+        fenced.push(thread_id.clone());
+    }
+    let stats = match conversations::blocking::purge_threads(ctx.clone(), dir.clone()).await {
+        Ok(stats) => stats,
+        Err(error) => {
+            for thread_id in &fenced {
+                crate::agent::orchestration::completion_owners::release_thread_deletion(
+                    &ctx, &dir, thread_id,
+                );
+            }
+            return Err(error);
+        }
+    };
+    // No parent thread survives a purge. Cancel and settle each thread's live
+    // driver jobs, then durably tombstone each parent before the final queue
+    // wipe so a late result cannot be delivered after purge returns.
     use crate::agent::orchestration::{background_completions, running_subagents};
-    let cancelled_threads = running_subagents::cancel_all(&ctx);
+    let cancellation = running_subagents::cancel_all(&ctx, &thread_ids).await;
     let mut discarded = 0;
-    for thread_id in &cancelled_threads {
-        discarded += background_completions::discard_for_thread(&ctx, &dir, thread_id);
+    let mut cleanup_failures = Vec::new();
+    for thread_id in &thread_ids {
+        match background_completions::delete_parent_for_thread(&ctx, &dir, thread_id) {
+            Ok(count) => discarded += count,
+            Err(error) => cleanup_failures.push(format!(
+                "failed to close purged thread {thread_id}: {error}"
+            )),
+        }
     }
     discarded += background_completions::clear_all(&ctx, &dir);
+    if let Err(error) = cancellation {
+        cleanup_failures.push(error);
+    }
+    if !cleanup_failures.is_empty() {
+        return Err(format!(
+            "threads purged but child cleanup failed: {}",
+            cleanup_failures.join("; ")
+        ));
+    }
     log::debug!(
         "[threads] threads_purge cancelled_threads={} discarded_completions={}",
-        cancelled_threads.len(),
+        thread_ids.len(),
         discarded
     );
     // Threads are gone, so any orphan turn snapshots can never be
