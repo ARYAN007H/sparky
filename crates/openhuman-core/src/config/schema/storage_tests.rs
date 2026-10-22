@@ -51,3 +51,14 @@ fn journal_retention_defaults_to_thirty_days_and_reads_from_toml() {
     let set: StorageConfig = toml::from_str("journal_retention_days = 7").unwrap();
     assert_eq!(set.journal_retention_days, 7);
 }
+
+#[test]
+fn redact_hides_userinfo_when_the_password_has_a_query_char() {
+    for url in [
+        "mongodb://app:p?ss@db.internal/oh",
+        "mongodb://app:p#ss@db.internal/oh",
+        "mongodb://app:p/ss@db.internal/oh",
+    ] {
+        assert_eq!(redact_url(url), "mongodb://***@db.internal/oh", "{url}");
+    }
+}

@@ -16,14 +16,16 @@ static SECRET_PATTERNS: Lazy<Vec<(Regex, &'static str)>> = Lazy::new(|| {
     vec![
         // Matches "Bearer <token>" and redacts the token.
         (Regex::new(r"(?i)(bearer\s+)\S+").unwrap(), "${1}[REDACTED]"),
-        // Matches "api-key: <key>" or "api_key=<key>" and redacts the key.
+        // Matches a named credential key and redacts its value: `api_key=…`,
+        // `access_token=…`, and JSON-quoted `"token":"…"`. The key list is an
+        // allowlist so `cancellation_token=` and the like stay intact.
         (
-            Regex::new(r"(?i)(api[_-]?key[=:\s]+)\S+").unwrap(),
-            "${1}[REDACTED]",
+            Regex::new(r#"(?i)\b((?:access_|refresh_|id_|auth_|session_|bearer_)?token|api[_-]?key|client_secret|password)("?\s*[=:]\s*"?)[^\s"&,;}]+"#).unwrap(),
+            "${1}${2}[REDACTED]",
         ),
-        // \b anchor prevents matching `cancellation_token=` etc.
+        // HTTP Basic credentials.
         (
-            Regex::new(r"(?i)\b(token[=:\s]+)\S+").unwrap(),
+            Regex::new(r"(?i)(basic\s+)[A-Za-z0-9+/=]{8,}").unwrap(),
             "${1}[REDACTED]",
         ),
         // Anthropic keys (sk-ant-api03-...) contain hyphens the generic

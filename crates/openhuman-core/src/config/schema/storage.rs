@@ -79,15 +79,19 @@ impl std::fmt::Debug for StorageConfig {
 /// query string and fragment dropped (they can carry tokens, such as MongoDB's
 /// `authMechanismProperties`).
 pub fn redact_url(url: &str) -> String {
-    let end = url.find(['?', '#']).unwrap_or(url.len());
-    let (base, trimmed) = (&url[..end], end < url.len());
-    let mut out = match (base.find("://"), base.rfind('@')) {
-        (Some(scheme), Some(at)) if at > scheme => {
-            format!("{}://***@{}", &base[..scheme], &base[at + 1..])
-        }
-        _ => base.to_string(),
+    // Userinfo ends at the LAST `@`, so an unencoded `?`, `#` or `/` in the
+    // password can't end it early. A query that holds an `@` hides the host
+    // too, which errs on the safe side.
+    let (mut out, rest) = match url.split_once("://") {
+        Some((scheme, rest)) => match rest.rsplit_once('@') {
+            Some((_, host)) => (format!("{scheme}://***@"), host),
+            None => (format!("{scheme}://"), rest),
+        },
+        None => (String::new(), url),
     };
-    if trimmed {
+    let end = rest.find(['?', '#']).unwrap_or(rest.len());
+    out.push_str(&rest[..end]);
+    if end < rest.len() {
         out.push_str("?***");
     }
     out

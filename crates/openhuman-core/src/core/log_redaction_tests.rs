@@ -38,3 +38,20 @@ fn leaves_plain_diagnostics_intact() {
     let msg = "profile 42: derived rate clamp exceeded (max_iterations=8)";
     assert_eq!(scrub_secrets(msg), msg);
 }
+
+#[test]
+fn scrubs_snake_case_and_json_quoted_tokens() {
+    let out = scrub_secrets("cb?access_token=abc123&refresh_token=def456");
+    assert!(!out.contains("abc123") && !out.contains("def456"), "{out}");
+    let out = scrub_secrets(r#"{"token":"ghi789","api_key":"jkl012"}"#);
+    assert!(!out.contains("ghi789") && !out.contains("jkl012"), "{out}");
+    assert_eq!(
+        scrub_secrets("Authorization: Basic dXNlcjpwYXNzd29yZA=="),
+        "Authorization: Basic [REDACTED]"
+    );
+    // Only named credential keys: a cancellation token is not a secret.
+    assert_eq!(
+        scrub_secrets("cancellation_token=abc"),
+        "cancellation_token=abc"
+    );
+}
