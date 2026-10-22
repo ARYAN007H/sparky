@@ -287,7 +287,7 @@ pub fn all_tools_with_runtime_and_pack_handle(
     if crate::inference::tokenjuice::enabled(root_config) {
         tools.push(Box::new(retrieve_tool_output_tool()));
         tools.push(Box::new(
-            crate::inference::tokenjuice::TokenjuiceRetrieveTool::new(),
+            crate::inference::tokenjuice::retrieve_tool(),
         ));
     } else {
         tracing::debug!("[tools::ops] juice component off; recovery tools not registered");

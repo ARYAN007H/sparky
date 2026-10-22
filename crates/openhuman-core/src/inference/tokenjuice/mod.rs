@@ -1,19 +1,17 @@
 //! OpenHuman host adapter for the separately released TinyJuice module.
 
 pub mod config_patch;
-pub mod focus;
-pub mod generate;
-pub mod repl_tools;
+pub use tinyjuice_host::{focus, generate};
+mod repl_tools;
 pub mod savings;
 pub mod schemas;
-pub mod tools;
 
 use crate::core::runtime::DispatchCtx;
 use tinyjuice_bus::names::methods;
 use tinyjuice_bus::types::{AgentTokenjuiceCompression, CompressorKind};
 
 pub use repl_tools::{is_repl_tool, repl_tools, repl_tools_for};
-pub use tools::TokenjuiceRetrieveTool;
+pub use tinyjuice_host::retrieve_tool::RetrieveToolOutputTool as TokenjuiceRetrieveTool;
 
 use tinyjuice_bus::wire::InstallRequest;
 
@@ -36,6 +34,13 @@ pub const RECOVERY_TOOL_VISIBLE: &[&str] = &[RETRIEVE];
 
 pub fn is_recovery_tool(name: &str) -> bool {
     RECOVERY_TOOL_NAMES.contains(&name)
+}
+
+/// Build TinyJuice's retrieval adapter over the OpenHuman module lookup.
+pub fn retrieve_tool() -> TokenjuiceRetrieveTool {
+    TokenjuiceRetrieveTool::new(std::sync::Arc::new(|token, range| {
+        Box::pin(async move { retrieve(token, range).await })
+    }))
 }
 
 /// Whether the `[components] juice` switch is on. Off means turns truncate
