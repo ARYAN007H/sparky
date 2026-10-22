@@ -169,11 +169,7 @@ async fn legacy_tinyflows_files_are_imported_into_a_configured_backend() {
         &config,
     )
     .await;
-    if !case
-        .backend()
-        .capabilities()
-        .contains(tinystoragedrivers::Capability::ConditionalWrites)
-    {
+    if case.url == "memory" {
         let error = reports
             .into_iter()
             .find(|report| report.domain == "flows")
