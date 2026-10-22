@@ -10,8 +10,7 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use tinyagents_harness_tools::media::{
-    ArtifactFiling, FiledArtifact, GeneratedArtifact, MediaArtifactKind,
-    MediaInnerFactory,
+    ArtifactFiling, FiledArtifact, GeneratedArtifact, MediaArtifactKind, MediaInnerFactory,
 };
 use tinytools::{
     PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolPolicy, ToolResult, ToolRunContext,
@@ -95,8 +94,15 @@ impl<T: Tool> MediaArtifactTool<T> {
     /// Builds the inner generator for one call around its provider progress
     /// observer and the call's own host context.
     #[must_use]
-    pub fn with_per_call_inner(self, build: MediaInnerFactory<T>) -> Self {
+    pub fn with_per_call_inner(
+        self,
+        build: impl for<'a> Fn(MediaProgressFn, Option<&'a dyn ToolRunContext>) -> T
+            + Send
+            + Sync
+            + 'static,
+    ) -> Self {
         let Self { inner, policy } = self;
+        let build: MediaInnerFactory<T> = Arc::new(build);
         let inner = inner.with_per_call_inner(Arc::new(move |progress, context| {
             ReferenceRefreshTool::new(build(progress, context), Arc::clone(&policy))
         }));
@@ -177,7 +183,9 @@ impl<T: Tool> Tool for MediaArtifactTool<T> {
         options: ToolCallOptions,
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        self.inner.execute_with_context(args, options, context).await
+        self.inner
+            .execute_with_context(args, options, context)
+            .await
     }
 }
 
@@ -269,11 +277,7 @@ impl ArtifactFiling for OpenHumanArtifactFiling {
 }
 
 impl OpenHumanArtifactFiling {
-    async fn delete_blob_after_finalize(
-        &self,
-        policy: &MediaArtifactPolicy,
-        source: &Path,
-    ) {
+    async fn delete_blob_after_finalize(&self, policy: &MediaArtifactPolicy, source: &Path) {
         if source.is_absolute() {
             return;
         }
@@ -445,10 +449,15 @@ impl<T: Tool> Tool for ReferenceRefreshTool<T> {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
-        self.execute_with_context(args, ToolCallOptions::default(), None).await
+        self.execute_with_context(args, ToolCallOptions::default(), None)
+            .await
     }
 
-    async fn execute_with_options(&self, args: Value, options: ToolCallOptions) -> anyhow::Result<ToolResult> {
+    async fn execute_with_options(
+        &self,
+        args: Value,
+        options: ToolCallOptions,
+    ) -> anyhow::Result<ToolResult> {
         self.execute_with_context(args, options, None).await
     }
 
@@ -466,9 +475,13 @@ impl<T: Tool> Tool for ReferenceRefreshTool<T> {
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .files_dir,
         ) {
-            self.refresh_allowed_references().await.map_err(anyhow::Error::msg)?;
+            self.refresh_allowed_references()
+                .await
+                .map_err(anyhow::Error::msg)?;
         }
-        self.inner.execute_with_context(args, options, context).await
+        self.inner
+            .execute_with_context(args, options, context)
+            .await
     }
 }
 
@@ -486,9 +499,15 @@ const FILE_REFERENCE_FIELDS: [&str; 8] = [
 /// Whether a media call references an absolute path under a trusted Files root.
 fn has_reusable_files_reference(args: &Value, files: &crate::artifacts::FileRoots) -> bool {
     FILE_REFERENCE_FIELDS.iter().any(|field| {
-        let Some(value) = args.get(field) else { return false; };
+        let Some(value) = args.get(field) else {
+            return false;
+        };
         let candidates = value.as_str().into_iter().chain(
-            value.as_array().into_iter().flatten().filter_map(Value::as_str),
+            value
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str),
         );
         candidates.into_iter().any(|candidate| {
             let path = Path::new(candidate);
@@ -506,19 +525,29 @@ where
         .truncate(true)
         .open(destination)
         .await
-        .map_err(|error| format!("failed to open artifact destination {}: {error}", destination.display()))?;
+        .map_err(|error| {
+            format!(
+                "failed to open artifact destination {}: {error}",
+                destination.display()
+            )
+        })?;
     let size = match tokio::io::copy(reader, &mut file).await {
         Ok(size) => size,
         Err(error) => {
             drop(file);
             let _ = tokio::fs::remove_file(destination).await;
-            return Err(format!("failed to copy generated media blob {key:?}: {error}"));
+            return Err(format!(
+                "failed to copy generated media blob {key:?}: {error}"
+            ));
         }
     };
     if let Err(error) = file.flush().await {
         drop(file);
         let _ = tokio::fs::remove_file(destination).await;
-        return Err(format!("failed to flush artifact destination {}: {error}", destination.display()));
+        return Err(format!(
+            "failed to flush artifact destination {}: {error}",
+            destination.display()
+        ));
     }
     Ok(size)
 }
@@ -526,9 +555,15 @@ where
 /// Moves a generated file into the Files folder, copying across mounts.
 async fn move_or_copy(source: &Path, destination: &Path) -> Result<u64, String> {
     if tokio::fs::rename(source, destination).await.is_err() {
-        tokio::fs::copy(source, destination).await.map_err(|error| {
-            format!("failed to copy {} -> {}: {error}", source.display(), destination.display())
-        })?;
+        tokio::fs::copy(source, destination)
+            .await
+            .map_err(|error| {
+                format!(
+                    "failed to copy {} -> {}: {error}",
+                    source.display(),
+                    destination.display()
+                )
+            })?;
         let _ = tokio::fs::remove_file(source).await;
     }
     let stat = tokio::fs::metadata(destination)

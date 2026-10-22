@@ -161,16 +161,18 @@ fn media_tools_from_with_allowlist(
                     let approval =
                         crate::agent::tinyagents::host::run_context::approval_for_tool(context);
                     let routed = generators.routed(approval.chat.as_ref());
-                    let observer = Arc::new(move |status: &tinyagents_harness::tinyinference_video::VideoJobStatus| {
-                        progress(&MediaJobProgress {
-                            id: status.id.clone(),
-                            state: status.state.to_string(),
-                            outputs: status.outputs,
-                            output_indices: status.output_indices.clone(),
-                            cost_usd: status.cost_usd,
-                            error: status.error.clone(),
-                        });
-                    });
+                    let observer = Arc::new(
+                        move |status: &tinyagents_harness::tinyinference_video::VideoJobStatus| {
+                            progress(&MediaJobProgress {
+                                id: status.id.clone(),
+                                state: status.state.to_string(),
+                                outputs: status.outputs,
+                                output_indices: status.output_indices.clone(),
+                                cost_usd: status.cost_usd,
+                                error: status.error.clone(),
+                            });
+                        },
+                    );
                     video_tool(
                         &routed.video,
                         &output,
