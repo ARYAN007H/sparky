@@ -2,12 +2,12 @@ use crate::config::Config;
 use crate::cron::job_builder::{create_agent_job, AgentJobInput};
 use crate::cron::origin::{current_job_origin, current_turn_may_skip_approval};
 use crate::security::SecurityPolicy;
-use crate::tools::schema_cache::static_schema;
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::json;
 use std::sync::Arc;
+use tinyagents_harness_tools::static_schema;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 use {crate::cron, tinyflows_bus::schedule::types::Schedule};
 

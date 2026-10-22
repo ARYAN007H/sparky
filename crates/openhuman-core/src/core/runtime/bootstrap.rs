@@ -67,7 +67,7 @@ pub(crate) async fn bootstrap_core_runtime(
         if guard_disabled {
             log::debug!("[file_state] guard disabled via OPENHUMAN_FILE_STATE_GUARD");
         }
-        tinytools_std::file_state::init_global(!guard_disabled);
+        tinyagents_harness_tools::fs::file_state::init_global(!guard_disabled);
     } else {
         log::debug!("[boot] agent file-state coordinator SKIPPED — Agent domain disabled");
     }

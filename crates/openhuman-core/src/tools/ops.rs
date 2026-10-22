@@ -5,14 +5,14 @@ use crate::config::Config;
 use crate::modules::tinybox::host_runtime::{NativeRuntime, RuntimeAdapter};
 use crate::security::{AuditLogger, SecurityPolicy};
 use std::sync::Arc;
-use tinyagents_harness_tools::{CurrentTimeTool, ResolveTimeTool};
-use tinytools::Tool;
-use tinytools_std::detect_tools::DetectToolsTool;
-use tinytools_std::filesystem::{
+use tinyagents_harness_tools::exec::detect_tools::DetectToolsTool;
+use tinyagents_harness_tools::fs::filesystem::{
     ApplyPatchTool, CsvExportTool, EditFileTool, FileReadTool, FileWriteTool, GitOperationsTool,
     GlobTool, GrepTool, ImageInfoTool, ListFilesTool, ReadDiffTool, RunLinterTool, RunTestsTool,
 };
-use tinytools_std::network::PushoverTool;
+use tinyagents_harness_tools::net::network::PushoverTool;
+use tinyagents_harness_tools::{CurrentTimeTool, ResolveTimeTool};
+use tinytools::Tool;
 
 /// Create the default tool registry
 pub fn default_tools(security: Arc<SecurityPolicy>) -> Vec<Box<dyn Tool>> {
@@ -158,7 +158,10 @@ pub fn all_tools_with_runtime_and_pack_handle(
         // value ready to paste into a tool argument.
         Box::new(ResolveTimeTool::new()),
         Box::new(DetectToolsTool::new()),
-        Box::new(InstallToolTool::new(security.clone())),
+        Box::new(InstallToolTool::with_audit(
+            security.clone(),
+            Arc::clone(&audit),
+        )),
     ]);
     tools.extend(crate::cron::tools::tools(config.clone(), security));
     #[cfg(feature = "flows")]

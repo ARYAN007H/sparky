@@ -124,7 +124,7 @@ step.
 | [`user_filter.rs`](./user_filter.rs) | `filter_tools_by_user_preference` and the UI toggle to tool-name map. |
 | [`host_extensions.rs`](./host_extensions.rs) | Readers over `tinytools`' erased host-extension slots: `pack_registry_handle`, `tool_call_id`. |
 | [`schemas.rs`](./schemas.rs), [`schemas/`](./schemas/) | The `tools.*` controllers: `registry.rs` (schemas and dispatch), `composio.rs`, `web_search.rs`. |
-| [`impl/`](impl/README.md) | Built-in tool families: `filesystem/` (the `FsGate` adapter only; the tools are `tinytools_std::filesystem`), `browser/`, `system/`, `network/`, `meta/`, and the `documents`-gated `document/` and `presentation/`. |
+| [`impl/`](impl/README.md) | Built-in tool families: `filesystem/` (the `FsGate` adapter only; the tools are `tinyagents_harness_tools::fs::filesystem`), `browser/`, `system/`, `network/`, `meta/`, and the `documents`-gated `document/` and `presentation/`. |
 | [`toolpacks/`](toolpacks/README.md) | On-demand tool disclosure (`use_skill`, pack catalog, guides) and `ToolGroups` / `GroupMode`. |
 | [`agent_policy/`](agent_policy/README.md) | Per-session tool boundary against a channel's permission ceiling. |
 | [`registry/`](registry/README.md) | Read-only discovery registry across MCP stdio, controller and connected MCP tools, plus policy diagnostics. |
@@ -135,9 +135,9 @@ Where the built-in tools come from:
 
 | Tools | Source |
 | --- | --- |
-| `file_read`, `file_write`, `edit`, `apply_patch`, `grep`, `glob`, `list`, `read_diff`, `csv_export`, `git_operations`, `run_linter`, `run_tests`, `image_info`, `read_workspace_state` | `tinytools_std::filesystem`, gated by [`impl/filesystem/gate.rs`](./impl/filesystem/gate.rs) |
-| `detect_tools`, `curl`, `pushover` | `tinytools_std` |
-| `http_request`, `web_fetch` | `tinytools_std::network`, wired with host limits, TinyJuice extraction and the x402 handler in [`impl/network/host.rs`](./impl/network/host.rs) |
+| `file_read`, `file_write`, `edit`, `apply_patch`, `grep`, `glob`, `list`, `read_diff`, `csv_export`, `git_operations`, `run_linter`, `run_tests`, `image_info`, `read_workspace_state` | `tinyagents_harness_tools::fs::filesystem`, gated by [`impl/filesystem/gate.rs`](./impl/filesystem/gate.rs) |
+| `detect_tools`, `curl`, `pushover` | `tinyagents_harness_tools` |
+| `http_request`, `web_fetch` | `tinyagents_harness_tools::net::network`, wired with host limits, TinyJuice extraction and the x402 handler in [`impl/network/host.rs`](./impl/network/host.rs) |
 | `current_time`, `resolve_time`, `ask_user_clarification` | `tinyagents_harness_tools` |
 | `shell`, `install_tool`, `schedule`, `proxy_config`, `retrieve_tool_output` | [`impl/system/`](./impl/system/) |
 | `update_check`, `update_apply` | [`platform/update/tools.rs`](../platform/update/tools.rs) |

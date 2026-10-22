@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tinytools_std::filesystem::FsGate;
+use tinyagents_harness_tools::fs::filesystem::FsGate;
 
 use crate::security::policy::{TrustedAccess, TrustedRoot};
 use crate::security::{AutonomyLevel, GateDecision, SecurityPolicy};

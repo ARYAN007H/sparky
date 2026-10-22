@@ -7,8 +7,8 @@ use crate::config::Config;
 use crate::skills::run_workflow::{AwaitWorkflowTool, RunWorkflowTool};
 use std::path::Path;
 use tinyagents_harness_tools as harness_tools;
+use tinyagents_harness_tools::fs::filesystem::WorkspaceStateTool;
 use tinytools::Tool;
-use tinytools_std::filesystem::WorkspaceStateTool;
 
 /// Build the dialogue tool family in its persisted catalogue order.
 pub(crate) fn dialogue_tools(action_dir: &Path, root_config: &Config) -> Vec<Box<dyn Tool>> {

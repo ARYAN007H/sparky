@@ -53,7 +53,6 @@ tinyagents-harness-tools = { path = "vendor/tinyagents/crates/tinyagents-harness
 # every host tool link — so there is exactly one `tinytools` package and one
 # `Tool` trait. Without this, MCP tools would not satisfy the harness's trait.
 tinytools = { path = "vendor/tinyagents/vendor/tinytools/crates/tinytools" }
-tinytools-std = { path = "vendor/tinyagents/vendor/tinytools/crates/tinytools-std" }
 tinytools-agent = { path = "vendor/tinyagents/vendor/tinytools/crates/tinytools-agent" }
 
 [patch."https://github.com/tinyhumansai/tinybus"]
