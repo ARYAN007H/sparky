@@ -1,25 +1,19 @@
 #[cfg(feature = "modules")]
 use super::shell_support::container_environment;
 use super::shell_support::{command_failure, exec_result, python_utf8_env, tool_timeout_message};
-use crate::agent::tinyagents::host::run_context::{
-    command_environment_for_tool, dispatch_ctx_for_tool,
-};
+use crate::agent::tinyagents::host::run_context::command_environment_for_tool;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use crate::modules::tinybox::host_runtime::RuntimeAdapter;
-use crate::security::{AuditLogger, CommandExecutionLog, SecurityPolicy};
-use async_trait::async_trait;
+use crate::security::{AuditLogger, SecurityPolicy};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use tinyagents_harness_tools::exec::{
-    ExecAuditEvent, ExecAuditOutcome, ExecAuthorizationRequest, ExecBackend, ExecBackendCapability,
-    ExecBackendOutcome, ExecDenied, ExecGate, ExecOperation, ExecOutput, ExecPermit,
-    ExecRefusalKind, ExecRequest, ExecTool, ShellFlavor,
-};
+#[cfg(test)]
+use tinytools::Tool;
+use tinytools::ToolResult;
 use tinytools::ToolRunContext;
-use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult, ToolTimeout};
 
 /// Maximum output size in bytes (1MB).
 const MAX_OUTPUT_BYTES: usize = 1_048_576;
@@ -65,15 +59,15 @@ fn docker_module_result(
 }
 
 /// Shell command execution tool with sandboxing
-pub struct ShellHost {
-    security: Arc<SecurityPolicy>,
-    runtime: Arc<dyn RuntimeAdapter>,
-    audit: Arc<AuditLogger>,
-    analysis_config: Option<Arc<Config>>,
+pub(super) struct ShellHost {
+    pub(super) security: Arc<SecurityPolicy>,
+    pub(super) runtime: Arc<dyn RuntimeAdapter>,
+    pub(super) audit: Arc<AuditLogger>,
+    pub(super) analysis_config: Option<Arc<Config>>,
 }
 
 impl ShellHost {
-    pub fn new(
+    pub(super) fn new(
         security: Arc<SecurityPolicy>,
         runtime: Arc<dyn RuntimeAdapter>,
         audit: Arc<AuditLogger>,
@@ -88,7 +82,7 @@ impl ShellHost {
 
     /// Builds a shell tool whose command facts come from the configured
     /// TinyBox module before host authorization and execution.
-    pub fn with_config(
+    pub(super) fn with_config(
         security: Arc<SecurityPolicy>,
         runtime: Arc<dyn RuntimeAdapter>,
         audit: Arc<AuditLogger>,
@@ -108,7 +102,10 @@ impl ShellHost {
     /// call's [`ToolExecutionContext`](tinyagents_harness::tool::ToolExecutionContext).
     /// Otherwise falls back to the shared `self.security.action_dir`.
     /// See #3376, #4249 (08.5).
-    fn effective_action_dir_for_context(&self, context: Option<&dyn ToolRunContext>) -> PathBuf {
+    pub(super) fn effective_action_dir_for_context(
+        &self,
+        context: Option<&dyn ToolRunContext>,
+    ) -> PathBuf {
         if let Some(workspace) = context.and_then(|ctx| ctx.workspace()) {
             tracing::debug!(
                 workspace_root = %workspace.root.display(),
@@ -129,7 +126,7 @@ impl ShellHost {
     /// #4023). A `0` explicitly disables it. Any positive value is clamped to
     /// `1..=3600`. See
     /// [`tinyagents_harness_tools::exec::timeout::explicit_call_timeout_duration`].
-    fn explicit_timeout(&self, requested: Option<u64>) -> Option<Duration> {
+    pub(super) fn explicit_timeout(&self, requested: Option<u64>) -> Option<Duration> {
         tinyagents_harness_tools::exec::timeout::explicit_call_timeout_duration(
             requested,
             tinyagents_harness_tools::exec::timeout::MAX_TIMEOUT_SECS,
@@ -138,13 +135,16 @@ impl ShellHost {
 }
 
 impl ShellHost {
-    fn external_effect_with_args(&self, args: &Value) -> bool {
+    pub(super) fn external_effect_with_args(&self, args: &Value) -> bool {
         args.get("command")
             .and_then(Value::as_str)
             .is_some_and(|command| !command.is_empty())
     }
 
-    async fn prepare_authorization(&self, args: &Value) -> anyhow::Result<Option<Value>> {
+    pub(super) async fn prepare_authorization(
+        &self,
+        args: &Value,
+    ) -> anyhow::Result<Option<Value>> {
         #[cfg(feature = "modules")]
         {
             let config = self
@@ -179,7 +179,7 @@ impl ShellHost {
     /// same gated execution path as the `shell` tool — all security
     /// checks (rate limits, path guards, approval gate routing) apply
     /// identically to workflow-triggered commands.
-    pub(crate) async fn run_with_security(
+    pub(super) async fn run_with_security(
         &self,
         ctx: &DispatchCtx,
         command: &str,
@@ -189,7 +189,7 @@ impl ShellHost {
             .await
     }
 
-    async fn run_with_security_in_context(
+    pub(super) async fn run_with_security_in_context(
         &self,
         ctx: &DispatchCtx,
         command: &str,

@@ -332,7 +332,7 @@ impl ShellTool {
         }
     }
 
-    fn explicit_timeout(&self, requested: Option<u64>) -> Option<Duration> {
+    pub(super) fn explicit_timeout(&self, requested: Option<u64>) -> Option<Duration> {
         self.host.explicit_timeout(requested)
     }
 
