@@ -11,7 +11,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
 use tinyagents_orchestration::subagent::{
-    orphaned_subagent_reason, record_agent_id, record_parent_session, task_status_label,
+    WaitError, orphaned_subagent_reason, record_agent_id, record_parent_session,
+    task_status_label,
 };
 use tinyagents_tasks::{
     InMemoryTaskStore, OrchestrationTaskFilter, TaskStore, TaskStoreRegistry,
@@ -87,6 +88,23 @@ pub(crate) fn task_store_for_workspace(workspace_dir: &Path) -> Arc<dyn TaskStor
             Arc::new(InMemoryTaskStore::new())
         }
     }
+}
+
+/// Open the caller's task store in its captured scope. SaaS calls without a
+/// resolved owner fail closed rather than falling back to ambient storage.
+pub(super) fn scoped_task_store(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &Path,
+) -> Result<Arc<dyn TaskStore>, WaitError> {
+    if let Some(context) = ctx.resolved() {
+        return Ok(crate::core::runtime::CoreContext::sync_scope(context, || {
+            task_store_for_workspace(workspace_dir)
+        }));
+    }
+    if crate::core::runtime::is_saas() {
+        return Err(WaitError::NotOwned);
+    }
+    Ok(task_store_for_workspace(workspace_dir))
 }
 
 /// Restart/resume reconciliation for detached sub-agents (issue #4249 / 07.2

@@ -4,9 +4,12 @@
 
 use std::path::{Path, PathBuf};
 
-use tinyagents_orchestration::subagent::FinishedOutcome;
+use tinyagents_orchestration::subagent::{
+    FinishedOutcome, WaitError, task_id_for_session_in_records,
+};
 
-use super::resolve::task_id_for_session_in_workspace;
+use super::registry::admit_workspace;
+use super::task_ledger::scoped_task_store;
 
 /// Metadata captured when a sub-agent is cancelled, so the caller can surface
 /// the cancellation back in the parent chat (record a "cancelled" completion
@@ -94,6 +97,21 @@ pub(crate) fn cancel_by_session_in_workspace(
     cancel_by_task_with_workspace_reason(ctx, &task_id, Some(workspace_dir), None)
         .ok()
         .flatten()
+}
+
+fn task_id_for_session_in_workspace(
+    ctx: &crate::core::runtime::DispatchCtx,
+    subagent_session_id: &str,
+    parent_session: &str,
+    workspace_dir: &Path,
+) -> Result<String, WaitError> {
+    admit_workspace(ctx, workspace_dir)?;
+    let store = scoped_task_store(ctx, workspace_dir)?;
+    task_id_for_session_in_records(
+        tinyagents_orchestration::subagent::list_subagent_records(store.as_ref()),
+        subagent_session_id,
+        parent_session,
+    )
 }
 
 /// Abort and drop every running sub-agent whose parent chat thread is
