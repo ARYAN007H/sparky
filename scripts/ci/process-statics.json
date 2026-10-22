@@ -227,7 +227,7 @@
     "count": 1,
     "category": "A",
     "reason": "Host callback wiring only; the callback receives provider and error values per call, while runtime-specific classifiers live in CoreContext extensions.",
-    "verification": "inference/registry_tests.rs: backend_error_classifier_is_registered_and_unregistered"
+    "verification": "inference/provider/http_error_tests.rs: provider_http_policy_uses_registered_error_ownership_metadata"
   },
   {
     "file": "crates/openhuman-core/src/inference/registry.rs",
@@ -257,7 +257,7 @@
     "count": 1,
     "category": "A",
     "reason": "Host callback wiring only; normalizers mutate the Config explicitly passed to each invocation, and runtime-specific callbacks live in CoreContext extensions.",
-    "verification": "inference/registry_tests.rs: config_normalizers_run_in_registration_order"
+    "verification": "config/migrations/config_normalizer_tests.rs: registered_normalizer_runs_at_current_schema_and_retries_failed_save"
   },
   {
     "file": "crates/openhuman-core/src/inference/registry.rs",
@@ -477,7 +477,7 @@
     "count": 1,
     "category": "A",
     "reason": "Generates unique process-local identifiers for temporary prompt-clock registrations; it stores no prompt, clock, or tenant data.",
-    "verification": "prompts/section_renderers_tests.rs: dropping_older_prompt_clock_restores_newest_live_registration"
+    "verification": "prompts/section_renderers_tests.rs: newest_prompt_clock_wins_and_non_lifo_drop_restores_the_remaining_provider"
   },
   {
     "file": "crates/openhuman-core/src/prompts/section_renderers.rs",
@@ -487,7 +487,7 @@
     "count": 1,
     "category": "A",
     "reason": "Temporary prompt-clock callbacks are process test/host wiring and are invoked only to obtain the current instant; runtime-specific registrations use CoreContext extensions.",
-    "verification": "prompts/section_renderers_tests.rs: dropping_older_prompt_clock_restores_newest_live_registration"
+    "verification": "prompts/section_renderers_tests.rs: newest_prompt_clock_wins_and_non_lifo_drop_restores_the_remaining_provider"
   },
   {
     "file": "crates/openhuman-core/src/storage/sessions/mod.rs",
