@@ -267,3 +267,26 @@ async fn parked_reviews_are_isolated_by_tenant() {
     ));
     assert_eq!(parked.await, PlanReviewResolution::Approve);
 }
+
+#[test]
+fn socket_review_scope_comes_from_server_context_and_fails_closed_in_saas() {
+    let active_profile = Tenant {
+        profile: Some("active-profile".into()),
+        agent: Some("agent-a".into()),
+    };
+    let scope = socket_scope_from_context(Ok(active_profile.clone()), true)
+        .expect("authenticated server context binds socket scope");
+    assert_eq!(scope.0, active_profile);
+    assert!(socket_scope_from_context(Err(crate::core::runtime::tenant::NoTenant), true).is_none());
+}
+
+#[test]
+fn local_socket_review_scope_preserves_the_active_profile() {
+    let active_profile = Tenant {
+        profile: Some("local-profile".into()),
+        agent: None,
+    };
+    let scope = socket_scope_from_context(Ok(active_profile.clone()), false)
+        .expect("local socket keeps its active profile");
+    assert_eq!(scope.0, active_profile);
+}
