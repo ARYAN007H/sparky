@@ -14,6 +14,8 @@ export const CONTRACT_CLOSURE = new Set([
   'proc-macro2', 'quote', 'syn', 'unicode-ident',
   // Base64 encoding of serialized binary contract fields; no transport/crypto.
   'base64',
+  // TSD v2's data-only storage contract vocabulary (Scope, specs, errors).
+  'tinystoragedrivers-types',
 ]);
 
 export function isImplementation(name, policy) {
