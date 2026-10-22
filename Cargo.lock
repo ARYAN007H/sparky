@@ -5501,7 +5501,7 @@ dependencies = [
  "tinyskills-drivers",
  "tinystoragedrivers",
  "tinystoragedrivers-bus",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-client",
  "tinytools 0.6.0",
  "tinytools-agent 0.6.0",
@@ -8805,7 +8805,7 @@ dependencies = [
  "tinybox-ssh",
  "tinybus",
  "tinybus-module",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-core",
  "tokio",
  "uuid",
@@ -8942,7 +8942,7 @@ dependencies = [
  "tinychannels",
  "tinychannels-bus",
  "tinystoragedrivers-bus",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-client",
  "tinystoragedrivers-core",
  "tokio",
@@ -9098,7 +9098,7 @@ dependencies = [
  "tinybus-module",
  "tinyconnectors-bus",
  "tinyconnectors-sync",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-core",
  "tokio",
  "tracing",
@@ -9177,7 +9177,7 @@ dependencies = [
  "tinybus",
  "tinybus-module",
  "tinyeventqueues-bus",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-core",
  "tokio",
 ]
@@ -9362,7 +9362,7 @@ dependencies = [
 
 [[package]]
 name = "tinyhumans-sdk"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "futures",
@@ -9628,7 +9628,7 @@ dependencies = [
  "tinyjuice",
  "tinyjuice-bus",
  "tinyjuice-drivers",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-core",
  "tokio",
 ]
@@ -9653,9 +9653,10 @@ dependencies = [
 
 [[package]]
 name = "tinymcp"
-version = "0.20.0"
+version = "0.20.1"
 dependencies = [
  "base64 0.23.1",
+ "data-encoding",
  "dirs 7.0.0",
  "futures-util",
  "parking_lot",
@@ -9668,10 +9669,9 @@ dependencies = [
  "tinybus",
  "tinybus-module",
  "tinymcp-bus",
- "tinystoragedrivers-busproxy",
- "tinystoragedrivers-client",
- "tinystoragedrivers-core",
- "tinystoragedrivers-secrets",
+ "tinystoragedrivers-api",
+ "tinystoragedrivers-busproxy 2.1.0",
+ "tinystoragedrivers-types",
  "tinytools 0.6.0",
  "tokio",
  "tracing",
@@ -9682,13 +9682,13 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.20.0"
+version = "0.20.1"
 dependencies = [
  "base64 0.23.1",
  "schemars",
  "serde",
  "serde_json",
- "tinystoragedrivers-core",
+ "tinystoragedrivers-types",
 ]
 
 [[package]]
@@ -9835,6 +9835,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinystoragedrivers-api"
+version = "2.1.0"
+source = "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=2856dfa6f5b4de981a4db2801ae6be80c6432b3b#2856dfa6f5b4de981a4db2801ae6be80c6432b3b"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures-core",
+ "serde",
+ "serde_json",
+ "tinystoragedrivers-types",
+ "zeroize",
+]
+
+[[package]]
 name = "tinystoragedrivers-bus"
 version = "1.0.0"
 dependencies = [
@@ -9856,6 +9870,24 @@ dependencies = [
  "tinystoragedrivers-core",
  "tinystoragedrivers-schema",
  "tokio",
+]
+
+[[package]]
+name = "tinystoragedrivers-busproxy"
+version = "2.1.0"
+source = "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=2856dfa6f5b4de981a4db2801ae6be80c6432b3b#2856dfa6f5b4de981a4db2801ae6be80c6432b3b"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures-core",
+ "serde",
+ "serde_json",
+ "tinybus",
+ "tinystoragedrivers-api",
+ "tinystoragedrivers-bus",
+ "tinystoragedrivers-types",
+ "tokio",
+ "zeroize",
 ]
 
 [[package]]
@@ -9972,6 +10004,16 @@ dependencies = [
  "tinystoragedrivers-core",
  "tokio",
  "zstd 0.13.3",
+]
+
+[[package]]
+name = "tinystoragedrivers-types"
+version = "2.1.0"
+source = "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=2856dfa6f5b4de981a4db2801ae6be80c6432b3b#2856dfa6f5b4de981a4db2801ae6be80c6432b3b"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -10183,7 +10225,7 @@ dependencies = [
  "tinybus",
  "tinybus-module",
  "tinystoragedrivers-bus",
- "tinystoragedrivers-busproxy",
+ "tinystoragedrivers-busproxy 1.0.0",
  "tinystoragedrivers-client",
  "tinystoragedrivers-core",
  "tinywallet",

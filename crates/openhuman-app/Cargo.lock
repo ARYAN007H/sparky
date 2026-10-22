@@ -6855,7 +6855,7 @@ dependencies = [
 
 [[package]]
 name = "tinyhumans-sdk"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "futures",
@@ -7056,13 +7056,13 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.20.0"
+version = "0.20.1"
 dependencies = [
  "base64 0.23.1",
  "schemars 1.2.2",
  "serde",
  "serde_json",
- "tinystoragedrivers-core",
+ "tinystoragedrivers-types",
 ]
 
 [[package]]
@@ -7299,6 +7299,16 @@ dependencies = [
  "tinystoragedrivers-core",
  "tokio",
  "zstd",
+]
+
+[[package]]
+name = "tinystoragedrivers-types"
+version = "2.1.0"
+source = "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=2856dfa6f5b4de981a4db2801ae6be80c6432b3b#2856dfa6f5b4de981a4db2801ae6be80c6432b3b"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
