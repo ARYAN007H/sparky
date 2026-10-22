@@ -79,3 +79,53 @@ async fn upsert_driver_session(
     .map_err(|error| error.to_string())?;
     Ok(crate::agent::orchestration::subagent_sessions::host_projection(session, parent_epoch))
 }
+
+async fn close_reusable_driver_session(
+    driver: &std::sync::Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore>,
+    host_store: &SubagentSessionStore,
+    ctx: &DispatchCtx,
+    workspace_dir: &std::path::Path,
+    session: &DurableSubagentSession,
+    parent_session: &str,
+    parent_thread_id: Option<&str>,
+) -> Result<(), String> {
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    >(ctx);
+    let cancelled = subagent_sessions::cancel_driver_job_for_observed_session(
+        host_store,
+        &workspace_dir.join(".openhuman/subagent_checkpoints"),
+        &jobs,
+        session,
+        parent_session,
+        parent_thread_id,
+    );
+    if !cancelled {
+        let _ = running_subagents::cancel_by_session_in_workspace(
+            ctx,
+            &session.subagent_session_id,
+            parent_session,
+            workspace_dir,
+        );
+    }
+    let (Some(task_id), Some(lifecycle_key)) = (
+        session.current_task_id.as_deref(),
+        session.lifecycle_key.as_ref(),
+    ) else {
+        return Err("reusable session has no current lifecycle identity".into());
+    };
+    driver
+        .close_if_current(
+            &session.subagent_session_id,
+            task_id,
+            lifecycle_key,
+            parent_session,
+            parent_thread_id,
+        )
+        .await
+        .map_err(|error| format!("failed to close reusable session: {error}"))?
+        .then_some(())
+        .ok_or_else(|| {
+            "reusable session changed during fresh start; retry with the current session".into()
+        })
+}

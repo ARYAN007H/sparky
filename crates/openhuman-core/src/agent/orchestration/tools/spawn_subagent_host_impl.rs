@@ -164,54 +164,20 @@ impl SpawnSubagentTool {
             .await
             {
                 Ok(Some(session)) => {
-                    let jobs = crate::core::runtime::slot_for::<
-                        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
-                    >(&dispatch);
-                    let cancelled = subagent_sessions::cancel_driver_job_for_observed_session(
+                    if let Err(error) = close_reusable_driver_session(
+                        &driver_store,
                         &store,
-                        &parent.workspace_dir.join(".openhuman/subagent_checkpoints"),
-                        &jobs,
+                        &dispatch,
+                        &parent.workspace_dir,
                         &session,
                         &parent_session,
                         parent_thread_id.as_deref(),
-                    );
-                    if !cancelled {
-                        let _ = running_subagents::cancel_by_session_in_workspace(
-                            &dispatch,
-                            &session.subagent_session_id,
-                            &parent_session,
-                            &parent.workspace_dir,
-                        );
-                    }
-                    let (Some(task_id), Some(lifecycle_key)) = (
-                        session.current_task_id.as_deref(),
-                        session.lifecycle_key.as_ref(),
-                    ) else {
-                        return Ok(ToolResult::error(
-                            "spawn_subagent: reusable session has no current lifecycle identity",
-                        ));
-                    };
-                    match driver_store
-                        .close_if_current(
-                            &session.subagent_session_id,
-                            task_id,
-                            lifecycle_key,
-                            &parent_session,
-                            parent_thread_id.as_deref(),
-                        )
-                        .await
+                    )
+                    .await
                     {
-                        Ok(true) => {}
-                        Ok(false) => {
-                            return Ok(ToolResult::error(
-                                "spawn_subagent: reusable session changed during fresh start; retry with the current session",
-                            ));
-                        }
-                        Err(err) => {
-                            return Ok(ToolResult::error(format!(
-                                "spawn_subagent: failed to close reusable session: {err}"
-                            )));
-                        }
+                        return Ok(ToolResult::error(format!(
+                            "spawn_subagent: {error}"
+                        )));
                     }
                 }
                 Ok(None) => {}
