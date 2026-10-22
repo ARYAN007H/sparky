@@ -454,3 +454,26 @@ fn persisted_mixed_case_cloud_default_uses_configured_slug_after_restart() {
         "restoring a persisted picker default must remain turn-local"
     );
 }
+
+#[tokio::test]
+async fn a_non_ascii_thread_id_builds_a_session_agent_without_panicking() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = super::session_checkout_tests::test_config(&tmp);
+    // 11 ASCII bytes, then a 3-byte char: byte 12 falls inside '日'.
+    let thread_id = "abcdefghijk日本";
+    let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        super::build_session_agent(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &config,
+            "client-1",
+            thread_id,
+            "orchestrator",
+            None,
+            None,
+        )
+        .map(|_| ())
+    }))
+    .expect("build_session_agent panicked on a non-ASCII thread id");
+    // The label truncation only runs once the agent builds.
+    built.expect("session agent must build");
+}
