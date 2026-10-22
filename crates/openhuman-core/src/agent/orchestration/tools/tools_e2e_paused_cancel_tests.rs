@@ -151,6 +151,38 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
         .is_some(),
         "spawn records the owner scope needed by the cancel RPC"
     );
+    let owner_scope = crate::agent::orchestration::completion_owners::driver_task_owner(
+        &live.data.dispatch_ctx(),
+        &task_id,
+    )
+    .expect("spawn owner metadata remains available");
+    let registry_owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &owner_scope.workspace_dir,
+        &owner_scope.parent_session,
+        owner_scope.parent_thread_id.as_deref(),
+    );
+    let registry_scope = tinyagents_orchestration::subagent::ParentJobScope::new(
+        owner_scope.workspace.clone(),
+        owner_scope.parent_thread_id.clone().expect("parent thread"),
+    );
+    let scoped_jobs = jobs
+        .list_for_parent_scope(&registry_owner, &registry_scope)
+        .expect("list exact owner-scoped driver jobs");
+    assert!(
+        scoped_jobs.iter().any(|job| {
+            job.extensions
+                .get("task_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(task_id.as_str())
+        }),
+        "exact owner/workspace/thread scope must include the paused job; owner={registry_owner}, workspace={:?}, thread={:?}, jobs={:?}",
+        owner_scope.workspace,
+        owner_scope.parent_thread_id,
+        scoped_jobs
+            .iter()
+            .map(|job| (&job.id, &job.status, &job.extensions))
+            .collect::<Vec<_>>(),
+    );
     assert_eq!(
         live.data
             .dispatch_ctx()
