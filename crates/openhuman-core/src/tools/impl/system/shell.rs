@@ -61,14 +61,14 @@ fn docker_module_result(
 }
 
 /// Shell command execution tool with sandboxing
-pub struct ShellTool {
+pub struct ShellHost {
     security: Arc<SecurityPolicy>,
     runtime: Arc<dyn RuntimeAdapter>,
     audit: Arc<AuditLogger>,
     analysis_config: Option<Arc<Config>>,
 }
 
-impl ShellTool {
+impl ShellHost {
     pub fn new(
         security: Arc<SecurityPolicy>,
         runtime: Arc<dyn RuntimeAdapter>,
@@ -163,7 +163,7 @@ impl ShellTool {
 }
 
 #[async_trait]
-impl Tool for ShellTool {
+impl Tool for ShellHost {
     fn name(&self) -> &str {
         "shell"
     }
@@ -278,7 +278,7 @@ impl Tool for ShellTool {
     }
 }
 
-impl ShellTool {
+impl ShellHost {
     async fn execute_in_context(
         &self,
         ctx: &DispatchCtx,
@@ -319,7 +319,7 @@ impl ShellTool {
     }
 }
 
-impl ShellTool {
+impl ShellHost {
     /// Run the command through the security policy and runtime. Returns
     /// `(allowed, result)` where `allowed=false` means the policy or rate
     /// limiter blocked execution before the command was launched.
