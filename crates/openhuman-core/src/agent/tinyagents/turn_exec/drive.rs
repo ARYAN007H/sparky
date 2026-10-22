@@ -197,9 +197,11 @@ pub(super) async fn drive_turn(
     // #4457 (defect C): suppressed entirely when `defer_turn_completed_to_caller`
     // is set — the caller (chat/session path) emits the single terminal
     // `TurnCompleted` itself, after its post-run wrap-up finishes streaming.
-    let turn_completed_sink = (!is_subagent && !defer_turn_completed_to_caller)
-        .then(|| on_progress.clone())
-        .flatten();
+    let turn_completed_sink = setup::turn_completed_sink(
+        &on_progress,
+        is_subagent,
+        defer_turn_completed_to_caller,
+    );
     // The EventSink is created unconditionally (bridge, cap pauser and the
     // durable journal of issue #4249, 05.1 all subscribe; it is inert when
     // nothing does), so an unobserved turn stays reconstructable.
@@ -208,20 +210,7 @@ pub(super) async fn drive_turn(
     // with it (`with_stream_id`), so every persisted observation's `event_id` is
     // the restart-stable `{run_id}-evt-{offset}` a late-attach replay
     // reconstructs the timeline from (05.1). The same id keys the journal + status.
-    let sink = EventSink::with_stream_id(journal_run_id.as_str());
-    if let Some(native) = &native_subagent {
-        *native
-            .child_events
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(sink.clone());
-        native
-            .parent_events
-            .emit(tinyagents_harness::events::AgentEvent::SubAgentRunStarted {
-                name: native.name.clone(),
-                depth: native.depth,
-                run_id: journal_run_id.clone(),
-            });
-    }
+    let sink = setup::event_sink(&journal_run_id, native_subagent.as_ref());
     // Attach the event bridge for EVERY turn — including an unobserved
     // (`on_progress = None`) background/cron turn (#4467, item 3). The bridge's
     // `record_usage` feeds the global cost tracker on each `UsageRecorded` event
@@ -235,14 +224,14 @@ pub(super) async fn drive_turn(
         &sink,
         on_progress,
         model,
-        provider_id,
+        provider_id.clone(),
         max_iterations,
-        subagent_scope,
+        subagent_scope.clone(),
         &cursor,
         &tool_names,
         &failure_map,
         &provider_usage_carry,
-        bridge_tool_sets,
+        bridge_tool_sets.clone(),
         &run_context,
     );
 
