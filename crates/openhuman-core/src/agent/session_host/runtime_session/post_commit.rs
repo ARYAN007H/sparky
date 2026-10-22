@@ -28,8 +28,7 @@ use tinyinference_llm::message::Message;
 
 pub(super) struct OpenHumanPostCommitSink {
     pub(super) state: std::sync::Arc<std::sync::Mutex<super::OpenHumanSessionState>>,
-    pub(super) hooks:
-        std::sync::Arc<Vec<std::sync::Arc<dyn tinyagents_harness::host::LearningSink>>>,
+    pub(super) hooks: Vec<std::sync::Arc<dyn tinyagents_harness::host::LearningSink>>,
     pub(super) identity: TurnIdentityOwned,
 }
 
