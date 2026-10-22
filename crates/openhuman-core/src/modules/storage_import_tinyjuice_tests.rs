@@ -39,7 +39,7 @@ fn legacy_root() -> tempfile::TempDir {
 async fn read(scoped: &ScopedStorage, token: &str) -> Option<String> {
     scoped
         .blobs()
-        .get(&format!("{CCR_BLOB_PREFIX}{token}"))
+        .get(&ccr_key(token))
         .await
         .unwrap()
         .map(|blob| String::from_utf8(blob.bytes).unwrap())
@@ -130,7 +130,7 @@ async fn a_second_run_is_a_noop_and_a_blob_already_stored_is_kept() {
     scoped
         .blobs()
         .put(
-            &format!("{CCR_BLOB_PREFIX}{FRESH}"),
+            &ccr_key(FRESH),
             b"written by the module".to_vec(),
             None,
         )
