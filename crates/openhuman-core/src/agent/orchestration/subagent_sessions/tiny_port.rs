@@ -13,7 +13,6 @@ use tinyagents_orchestration::subagent::{
 
 use super::types::{DurableSubagentSession, DurableSubagentStatus, SubagentSessionSelector};
 use super::{SubagentSessionStore, SubagentSessionUpsert};
-use crate::storage::DocumentStoreExt;
 
 /// Opens TinyAgents' async session store in the caller's explicit storage
 /// scope and binds it to one parent session/thread. The core's storage handle
@@ -120,13 +119,14 @@ fn import_host_sessions(
         // import existing terminal/reusable state as its public durable shape.
         let doc = serde_json::to_value(&session)
             .map_err(|error| SubagentError::Persistence(format!("session encode: {error}")))?;
+        let write_docs = Arc::clone(&documents);
         crate::storage::block_on(async move {
-            documents
+            write_docs
                 .ensure_collection(&tinystoragedrivers::CollectionSpec::new(
                     "subagent_sessions",
                 ))
                 .await?;
-            documents
+            write_docs
                 .put(
                     "subagent_sessions",
                     &session.subagent_session_id,
