@@ -1,9 +1,10 @@
 # OpenHuman TokenJuice Adapter
 
-TinyJuice ships as a separately released TinyBus module. OpenHuman links only
-its `tinyjuice-bus` vocabulary and declarations. Compression, cached retrieval,
-queries and HTML extraction execute inside that module. This directory owns
-configuration, model callbacks, artifact authorization and savings attribution.
+TinyJuice ships as a separately released TinyBus module. OpenHuman depends on
+its `tinyjuice-bus` contracts and `tinyjuice-host` tool adapters. Compression,
+cached retrieval, queries and HTML extraction execute inside the module. This
+directory owns configuration, model callbacks, dispatch context, artifact
+authorization and savings attribution.
 
 Token compression is one of the ways OpenHuman keeps a turn cheap and fast
 (see [docs/gitbooks/en/developing/performance.md](../../../../../docs/gitbooks/en/developing/performance.md)):
