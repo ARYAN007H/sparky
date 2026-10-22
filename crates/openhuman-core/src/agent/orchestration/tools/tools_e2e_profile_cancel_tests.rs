@@ -265,6 +265,39 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         "neither rejected control attempt emits an Alice completion"
     );
 
+    let owner_scope =
+        crate::agent::orchestration::completion_owners::driver_task_owner(&alice_ctx, &task_id)
+            .expect("Alice's cached owner scope");
+    let registered = alice_jobs
+        .list_for_parent_scope(
+            &crate::agent::tinyagents::tool_registration::subagent_owner_key(
+                &owner_scope.workspace_dir,
+                &owner_scope.parent_session,
+                owner_scope.parent_thread_id.as_deref(),
+            ),
+            &tinyagents_orchestration::subagent::ParentJobScope::new(
+                owner_scope.workspace.clone(),
+                owner_scope.parent_thread_id.as_deref().unwrap_or_default(),
+            ),
+        )
+        .expect("Alice's exact driver job scope");
+    assert!(
+        registered.iter().any(|job| {
+            job.extensions
+                .get("task_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(task_id.as_str())
+        }),
+        "Alice's owner/workspace/thread must list the driver task: session={:?}, workspace={:?}, thread={:?}, job ids={:?}",
+        owner_scope.parent_session,
+        owner_scope.workspace,
+        owner_scope.parent_thread_id,
+        registered
+            .iter()
+            .map(|job| job.id.as_str())
+            .collect::<Vec<_>>(),
+    );
+
     let owner_cancel = CoreContext::scope(Arc::clone(&alice), async {
         crate::agent::orchestration::running_subagents::cancel_by_task_with_workspace_reason(
             &alice_ctx,
