@@ -432,7 +432,8 @@ export interface ChatPlanReviewDecidedEvent {
   thread_id: string;
   request_id: string;
   decision: string;
-  resolution?: 'expired' | 'cancelled' | string;
+  /** Web-channel terminal reason, serialized on `cancel_reason`. */
+  cancel_reason?: 'expired' | 'cancelled' | string;
 }
 
 /**
@@ -1338,7 +1339,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
         EVENTS.approvalDecided,
         e.thread_id,
         e.request_id,
-        e.resolution
+        e.cancel_reason
       );
       listeners.onApprovalDecided?.(e);
     };
