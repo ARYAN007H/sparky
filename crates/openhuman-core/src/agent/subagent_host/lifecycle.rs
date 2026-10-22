@@ -49,7 +49,7 @@ pub(crate) fn detached_subagent_parent(
     let cancellation = data.cancellation.clone();
     let workspace = parent
         .workspace
-        .cloned()
+        .clone()
         .or_else(|| {
             data.parent
                 .as_ref()
