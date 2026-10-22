@@ -115,9 +115,9 @@ Record shapes and migrations stay with their owners.
 
 ## inbound
 
-| Kind | Name | Version | Scope | Indexed fields |
-| --- | --- | --- | --- | --- |
-| collection | `inbound.results` | 1 | tenant | `status`, `created_ms`, `source`, `created_ms` |
+| Collection | Indexes | Expiry field | Search fields |
+| --- | --- | --- | --- |
+| `inbound.results` | `by_source` (`source`, `created_ms`)<br>`by_status` (`status`, `created_ms`) |  |  |
 
 ## juice
 
