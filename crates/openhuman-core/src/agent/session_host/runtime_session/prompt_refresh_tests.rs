@@ -12,6 +12,28 @@ use tinyagents_session::transcript::TranscriptLocator;
 
 const THREAD: &str = "thread-prompt-refresh";
 
+#[derive(Clone, Default)]
+struct LogCapture(Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl std::io::Write for LogCapture {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for LogCapture {
+    type Writer = Self;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        self.clone()
+    }
+}
+
 /// A thread-bound session over `locator` that renders its prompt with
 /// `prompt` and answers from `model`, under the registry's definition as
 /// `define` edits it: the definition the embed factory stamps on its
@@ -230,7 +252,10 @@ async fn resume_refreshes_the_prompt_without_an_integrations_backend() {
     // Inline prompts do not render connected integrations, so that absence
     // must not keep the resumed thread on its recorded prompt.
     let mut resumed = inline_host(&locator, &model, root.path(), "You are release two.");
-    assert_eq!(resumed.turn("second message").await.unwrap(), "second reply");
+    assert_eq!(
+        resumed.turn("second message").await.unwrap(),
+        "second reply"
+    );
     assert!(
         sent_prompt(&model)
             .iter()
@@ -511,6 +536,37 @@ async fn a_composed_prompt_waits_for_the_integrations_to_be_read() {
         .await
         .expect("prepared turn");
     assert_eq!(prepared.prefix, Some(current().refreshing()));
+}
+
+#[tokio::test]
+async fn refresh_log_names_the_prefix_in_use() {
+    let root = tempfile::tempdir().expect("tempdir");
+    let prelude = prelude(root.path(), "current", true);
+    let recorded = PrefixSnapshot::new(vec![Message::system("recorded")]);
+    let history = [Message::system("recorded"), Message::user("hi")];
+    let capture = LogCapture::default();
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(capture.clone())
+        .with_ansi(false)
+        .with_max_level(tracing::Level::INFO)
+        .finish();
+    let _subscriber_guard = tracing::subscriber::set_default(subscriber);
+
+    prelude
+        .prepare_turn(
+            false,
+            &resumed(&recorded, &history),
+            &snapshot(3),
+            &mut request(),
+        )
+        .await
+        .expect("prepared turn");
+
+    let logs = String::from_utf8(capture.0.lock().unwrap().clone()).expect("UTF-8 logs");
+    assert!(
+        logs.contains("prefix_in_use=\"refreshed\"") && logs.contains("reason=\"prompt_changed\""),
+        "refresh log should identify the prefix and why it is used: {logs}"
+    );
 }
 
 fn failing_prompt(_: &PromptContext<'_>) -> anyhow::Result<String> {
