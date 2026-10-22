@@ -1,6 +1,85 @@
 use super::*;
 
 #[tokio::test]
+async fn driver_session_store_uses_the_explicit_profile_scope() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+    use tinyagents_orchestration::subagent::{
+        SubagentSessionSelector as TinySelector, SubagentSessionUpsert as TinyUpsert,
+        SubagentTaskKey,
+    };
+
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let scratch = tempfile::tempdir().expect("isolated session-store fixture");
+    let workspace = scratch.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("create workspace");
+    let make_context = |profile: &str| {
+        let mut config = crate::config::Config::default();
+        config.workspace_dir = workspace.clone();
+        CoreContext::for_test(DomainSet::full(), None).derive_with(
+            ContextOverlay::new(config, DomainSet::kernel(), ToolGroups::none())
+                .profile(profile)
+                .session_agent(profile),
+        )
+    };
+    let alice = OpenHumanTinySubagentSessionStore::open_for_context(
+        &DispatchCtx::new(make_context("session-owner-alice")),
+        workspace.clone(),
+        "alice-session",
+        Some("shared-thread".into()),
+    )
+    .expect("open Alice's explicitly scoped store");
+    let bob = OpenHumanTinySubagentSessionStore::open_for_context(
+        &DispatchCtx::new(make_context("session-owner-bob")),
+        workspace.clone(),
+        "bob-session",
+        Some("shared-thread".into()),
+    )
+    .expect("open Bob's explicitly scoped store");
+    let upsert = |parent_session: &str, task_id: &str| TinyUpsert {
+        selector: TinySelector {
+            parent_session: parent_session.into(),
+            parent_thread_id: Some("shared-thread".into()),
+            agent_id: "researcher".into(),
+            model: None,
+            sandbox_mode: "workspace".into(),
+            action_root: None,
+            task_key: "analysis".into(),
+        },
+        lifecycle_key: SubagentTaskKey {
+            root_run_id: format!("{parent_session}-root"),
+            parent_run_id: format!("{parent_session}-parent"),
+            thread_id: Some("shared-thread".into()),
+            task_id: task_id.into(),
+        },
+        display_name: None,
+        task_title: "Analyze".into(),
+        worker_thread_id: None,
+        task_id: task_id.into(),
+        force_fresh: false,
+    };
+    alice.upsert_running(upsert("alice-session", "alice-task"))
+        .await
+        .expect("write Alice's row");
+    bob.upsert_running(upsert("bob-session", "bob-task"))
+        .await
+        .expect("write Bob's row");
+
+    let alice_rows = alice
+        .list_for_parent("alice-session", Some("shared-thread"))
+        .await
+        .expect("read Alice's row");
+    let bob_rows = bob
+        .list_for_parent("bob-session", Some("shared-thread"))
+        .await
+        .expect("read Bob's row");
+    assert_eq!(alice_rows.len(), 1);
+    assert_eq!(alice_rows[0].current_task_id.as_deref(), Some("alice-task"));
+    assert_eq!(bob_rows.len(), 1);
+    assert_eq!(bob_rows[0].current_task_id.as_deref(), Some("bob-task"));
+}
+
+#[tokio::test]
 async fn old_rows_without_checkpoint_identity_remain_readable_without_fabricated_keys() {
     let workspace = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(workspace.path().to_path_buf());
