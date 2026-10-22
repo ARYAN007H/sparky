@@ -189,14 +189,6 @@ pub(super) async fn drive_turn(
     };
 
     let streaming = on_progress.is_some();
-    // Retain a clone of the progress sink so the turn can emit a terminal
-    // `TurnCompleted` after the run (the harness event stream the bridge mirrors
-    // has no run-completed event). Parent turns only — a sub-agent turn reports
-    // via its `Subagent*` events, not a top-level `TurnCompleted`.
-    //
-    // #4457 (defect C): suppressed entirely when `defer_turn_completed_to_caller`
-    // is set — the caller (chat/session path) emits the single terminal
-    // `TurnCompleted` itself, after its post-run wrap-up finishes streaming.
     let turn_completed_sink = setup::turn_completed_sink(
         &on_progress,
         is_subagent,
