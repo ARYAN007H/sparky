@@ -596,6 +596,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'No se pudieron cargar las aprobaciones pendientes del escritorio. Actualiza para reintentarlo.',
   'desktop.unsupported': 'El control del escritorio no está disponible en este entorno.',
+  'desktop.unsupportedWindows':
+    'El control del escritorio aún no está disponible en Windows. El control del navegador ya funciona en Windows.',
   'desktop.localOnly': 'Este ajuste solo se aplica a este equipo.',
   'desktop.permissions': 'Permisos del sistema',
   'desktop.openSettings': 'Abrir ajustes',
@@ -616,6 +618,10 @@ const messages: TranslationMap = {
     'No se puede acceder a la memoria ahora mismo. No se ha perdido nada guardado; inténtalo de nuevo en un momento.',
   'memory.outOfCredits.title': 'Sin créditos',
   'memory.outOfCredits.action': 'Recargar',
+  'memory.error.planRequired':
+    'Tu plan actual no incluye memoria, así que OpenHuman no puede guardar ni consultar lo que aprende. Mejora tu plan para activar la memoria, o cambia a otra opción de memoria en Configuración.',
+  'memory.planRequired.title': 'La memoria no forma parte de tu plan',
+  'memory.planRequired.action': 'Ver planes',
   'alerts.title': 'Alertas',
   'alerts.empty': 'Sin alertas aún',
   'alerts.markAllRead': 'Marcar todo como leído',
@@ -681,6 +687,15 @@ const messages: TranslationMap = {
   'invites.title': 'Invitaciones',
   'invites.noInvites': 'Sin invitaciones pendientes',
   'devOptions.titleDiagnostics': 'Desarrollador y Diagnóstico',
+  'devOptions.doctor.run': 'Ejecutar diagnóstico',
+  'devOptions.doctor.runLive': 'Ejecutar comprobaciones en vivo',
+  'devOptions.doctor.liveWarning':
+    'Las comprobaciones en vivo pueden consumir tokens al probar modelos o embeddings. ¿Continuar?',
+  'devOptions.doctor.severity.pass': 'Correcto',
+  'devOptions.doctor.severity.info': 'Información',
+  'devOptions.doctor.severity.warn': 'Advertencia',
+  'devOptions.doctor.severity.error': 'Error',
+  'devOptions.doctor.severity.skipped': 'Omitido',
   'devOptions.diagnostics': 'Diagnósticos',
   'devOptions.toolPolicyDiagnosticsDesc':
     'Inventario de herramientas, postura política, listas permitidas de MCP y bloqueos recientes',

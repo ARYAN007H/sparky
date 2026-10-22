@@ -515,3 +515,5 @@ fn anthropic_auth_cloud_slug_in_text_mode_keeps_the_compat_client() {
 
 #[path = "factory_crate_native_managed_slug_tests.rs"]
 mod managed_slug_tests;
+
+include!("factory_crate_native_cloud_tests.rs");

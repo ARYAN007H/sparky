@@ -562,3 +562,5 @@ async fn unknown_tool_call_in_a_child_run_projects_one_subagent_row() {
 
 #[path = "observability_projection_tests.rs"]
 mod projection_tests;
+
+include!("observability_tests_tool_rows.rs");

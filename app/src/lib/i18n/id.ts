@@ -589,6 +589,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'Persetujuan desktop yang tertunda tidak dapat dimuat. Segarkan untuk mencoba lagi.',
   'desktop.unsupported': 'Kontrol desktop tidak tersedia di lingkungan ini.',
+  'desktop.unsupportedWindows':
+    'Kontrol desktop belum tersedia di Windows. Kontrol Browser sudah berfungsi di Windows.',
   'desktop.localOnly': 'Pengaturan ini hanya berlaku untuk komputer ini.',
   'desktop.permissions': 'Izin sistem',
   'desktop.openSettings': 'Buka pengaturan',
@@ -609,6 +611,10 @@ const messages: TranslationMap = {
     'Memori tidak dapat dijangkau saat ini. Tidak ada data tersimpan yang hilang; coba lagi sebentar lagi.',
   'memory.outOfCredits.title': 'Kredit habis',
   'memory.outOfCredits.action': 'Isi ulang',
+  'memory.error.planRequired':
+    'Paket Anda saat ini tidak mencakup memori, sehingga OpenHuman tidak dapat menyimpan atau mencari apa yang dipelajarinya. Tingkatkan paket untuk mengaktifkan memori, atau beralih ke opsi memori lain di Pengaturan.',
+  'memory.planRequired.title': 'Memori tidak termasuk dalam paket Anda',
+  'memory.planRequired.action': 'Lihat paket',
   'alerts.title': 'Peringatan',
   'alerts.empty': 'Belum ada peringatan',
   'alerts.markAllRead': 'Tandai semua sudah dibaca',
@@ -672,6 +678,15 @@ const messages: TranslationMap = {
   'invites.title': 'Undangan',
   'invites.noInvites': 'Tidak ada undangan tertunda',
   'devOptions.titleDiagnostics': 'Developer & Diagnostik',
+  'devOptions.doctor.run': 'Jalankan diagnosis',
+  'devOptions.doctor.runLive': 'Jalankan pemeriksaan langsung',
+  'devOptions.doctor.liveWarning':
+    'Pemeriksaan langsung dapat menggunakan token untuk panggilan model atau embedding. Lanjutkan?',
+  'devOptions.doctor.severity.pass': 'Lulus',
+  'devOptions.doctor.severity.info': 'Info',
+  'devOptions.doctor.severity.warn': 'Peringatan',
+  'devOptions.doctor.severity.error': 'Error',
+  'devOptions.doctor.severity.skipped': 'Dilewati',
   'devOptions.diagnostics': 'Diagnostik',
   'devOptions.toolPolicyDiagnosticsDesc':
     'Alat inventaris, postur kebijakan, allowzes MCP, dan blok terbaru',

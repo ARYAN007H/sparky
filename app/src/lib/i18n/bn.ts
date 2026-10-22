@@ -578,6 +578,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'অপেক্ষমাণ ডেস্কটপ অনুমোদন লোড করা যায়নি। আবার চেষ্টা করতে রিফ্রেশ করুন।',
   'desktop.unsupported': 'এই পরিবেশে ডেস্কটপ নিয়ন্ত্রণ উপলব্ধ নয়।',
+  'desktop.unsupportedWindows':
+    'Windows-এ ডেস্কটপ নিয়ন্ত্রণ এখনও উপলব্ধ নয়। ব্রাউজার নিয়ন্ত্রণ এখনই Windows-এ কাজ করে।',
   'desktop.localOnly': 'এই সেটিং শুধু এই কম্পিউটারে প্রযোজ্য।',
   'desktop.permissions': 'সিস্টেম অনুমতি',
   'desktop.openSettings': 'সেটিংস খুলুন',
@@ -597,6 +599,10 @@ const messages: TranslationMap = {
     'এই মুহূর্তে মেমরিতে পৌঁছানো যাচ্ছে না। সংরক্ষিত কিছুই হারায়নি; একটু পরে আবার চেষ্টা করুন।',
   'memory.outOfCredits.title': 'ক্রেডিট শেষ',
   'memory.outOfCredits.action': 'টপ আপ করুন',
+  'memory.error.planRequired':
+    'আপনার বর্তমান প্ল্যানে মেমরি অন্তর্ভুক্ত নেই, তাই OpenHuman যা শেখে তা সংরক্ষণ করতে বা খুঁজে দেখতে পারে না। মেমরি চালু করতে আপগ্রেড করুন, অথবা সেটিংস থেকে অন্য কোনো মেমরি বিকল্পে যান।',
+  'memory.planRequired.title': 'মেমরি আপনার প্ল্যানের অংশ নয়',
+  'memory.planRequired.action': 'প্ল্যানগুলো দেখুন',
   'alerts.title': 'সতর্কতা',
   'alerts.empty': 'এখনো কোনো সতর্কতা নেই',
   'alerts.markAllRead': 'সব পঠিত চিহ্নিত করুন',
@@ -658,6 +664,15 @@ const messages: TranslationMap = {
   'invites.title': 'আমন্ত্রণ',
   'invites.noInvites': 'কোনো মুলতুবি আমন্ত্রণ নেই',
   'devOptions.titleDiagnostics': 'ডেভেলপার ও ডায়াগনস্টিক্স',
+  'devOptions.doctor.run': 'ডায়াগনস্টিক চালান',
+  'devOptions.doctor.runLive': 'লাইভ পরীক্ষা চালান',
+  'devOptions.doctor.liveWarning':
+    'লাইভ পরীক্ষায় মডেল বা এমবেডিং কলের জন্য টোকেন খরচ হতে পারে। চালিয়ে যাবেন?',
+  'devOptions.doctor.severity.pass': 'সফল',
+  'devOptions.doctor.severity.info': 'তথ্য',
+  'devOptions.doctor.severity.warn': 'সতর্কতা',
+  'devOptions.doctor.severity.error': 'ত্রুটি',
+  'devOptions.doctor.severity.skipped': 'এড়িয়ে যাওয়া',
   'devOptions.diagnostics': 'ডায়াগনস্টিক্স',
   'devOptions.toolPolicyDiagnosticsDesc': 'টুল- মেকআপ, নীতি পোস্ট, xqxqxs, এবং সম্প্রতি ব্যবহৃত',
   'devOptions.toolPolicyDiagnostics.loading': 'লোড করা হচ্ছে...',

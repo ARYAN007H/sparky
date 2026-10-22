@@ -587,6 +587,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'Не удалось загрузить ожидающие подтверждения действий на рабочем столе. Обновите страницу и повторите попытку.',
   'desktop.unsupported': 'Управление рабочим столом недоступно в этой среде.',
+  'desktop.unsupportedWindows':
+    'Управление рабочим столом пока недоступно в Windows. Управление браузером в Windows уже работает.',
   'desktop.localOnly': 'Эта настройка действует только на этом компьютере.',
   'desktop.permissions': 'Системные разрешения',
   'desktop.openSettings': 'Открыть настройки',
@@ -606,6 +608,10 @@ const messages: TranslationMap = {
     'Сейчас не удаётся связаться с памятью. Ничего из сохранённого не потеряно; повторите попытку чуть позже.',
   'memory.outOfCredits.title': 'Кредиты закончились',
   'memory.outOfCredits.action': 'Пополнить',
+  'memory.error.planRequired':
+    'Ваш текущий тариф не включает память, поэтому OpenHuman не может сохранять то, что узнаёт, и обращаться к этому. Перейдите на более высокий тариф, чтобы включить память, или выберите другой вариант памяти в настройках.',
+  'memory.planRequired.title': 'Память не входит в ваш тариф',
+  'memory.planRequired.action': 'Посмотреть тарифы',
   'alerts.title': 'Оповещения',
   'alerts.empty': 'Оповещений пока нет',
   'alerts.markAllRead': 'Отметить всё прочитанным',
@@ -671,6 +677,15 @@ const messages: TranslationMap = {
   'invites.title': 'Приглашения',
   'invites.noInvites': 'Активных приглашений нет',
   'devOptions.titleDiagnostics': 'Разработчик и Диагностика',
+  'devOptions.doctor.run': 'Запустить диагностику',
+  'devOptions.doctor.runLive': 'Запустить проверки в реальном времени',
+  'devOptions.doctor.liveWarning':
+    'Проверки в реальном времени могут расходовать токены при вызовах модели или эмбеддингов. Продолжить?',
+  'devOptions.doctor.severity.pass': 'Пройдено',
+  'devOptions.doctor.severity.info': 'Информация',
+  'devOptions.doctor.severity.warn': 'Предупреждение',
+  'devOptions.doctor.severity.error': 'Ошибка',
+  'devOptions.doctor.severity.skipped': 'Пропущено',
   'devOptions.diagnostics': 'Диагностика',
   'devOptions.toolPolicyDiagnosticsDesc':
     'Инвентаризация инструментов, положение политики, белые списки MCP и недавние блокировки',

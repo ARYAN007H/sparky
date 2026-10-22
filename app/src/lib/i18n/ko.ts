@@ -574,6 +574,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     '대기 중인 데스크톱 승인을 불러올 수 없습니다. 새로고침 후 다시 시도하세요.',
   'desktop.unsupported': '이 실행 환경에서는 데스크톱 제어를 사용할 수 없습니다.',
+  'desktop.unsupportedWindows':
+    'Windows에서는 아직 데스크톱 제어를 사용할 수 없습니다. 브라우저 제어는 현재 Windows에서 사용할 수 있습니다.',
   'desktop.localOnly': '이 설정은 이 컴퓨터에만 적용됩니다.',
   'desktop.permissions': '시스템 권한',
   'desktop.openSettings': '설정 열기',
@@ -593,6 +595,10 @@ const messages: TranslationMap = {
     '지금은 메모리에 연결할 수 없습니다. 저장된 내용은 사라지지 않았습니다. 잠시 후 다시 시도하세요.',
   'memory.outOfCredits.title': '크레딧 소진',
   'memory.outOfCredits.action': '충전하기',
+  'memory.error.planRequired':
+    '현재 요금제에는 메모리가 포함되어 있지 않아 OpenHuman이 학습한 내용을 저장하거나 찾아볼 수 없습니다. 메모리를 켜려면 요금제를 업그레이드하거나, 설정에서 다른 메모리 옵션으로 전환하세요.',
+  'memory.planRequired.title': '메모리는 현재 요금제에 포함되어 있지 않습니다',
+  'memory.planRequired.action': '요금제 보기',
   'alerts.title': '알림',
   'alerts.empty': '아직 알림이 없습니다',
   'alerts.markAllRead': '모두 읽음으로 표시',
@@ -654,6 +660,15 @@ const messages: TranslationMap = {
   'invites.title': '초대',
   'invites.noInvites': '대기 중인 초대가 없습니다',
   'devOptions.titleDiagnostics': '개발자 및 진단',
+  'devOptions.doctor.run': '진단 실행',
+  'devOptions.doctor.runLive': '라이브 검사 실행',
+  'devOptions.doctor.liveWarning':
+    '라이브 검사는 모델 또는 임베딩 호출에 토큰을 사용할 수 있습니다. 계속할까요?',
+  'devOptions.doctor.severity.pass': '통과',
+  'devOptions.doctor.severity.info': '정보',
+  'devOptions.doctor.severity.warn': '경고',
+  'devOptions.doctor.severity.error': '오류',
+  'devOptions.doctor.severity.skipped': '건너뜀',
   'devOptions.diagnostics': '진단',
   'devOptions.toolPolicyDiagnosticsDesc': '도구 인벤토리, 정책 상태, MCP 허용 목록 및 최근 차단',
   'devOptions.toolPolicyDiagnostics.loading': '로딩 중…',

@@ -540,6 +540,8 @@ const en: TranslationMap = {
   'desktop.moduleUnavailable': 'The desktop module is unavailable. Check its status and try again.',
   'desktop.pendingUnavailable': 'Could not load pending desktop approvals. Refresh to try again.',
   'desktop.unsupported': 'Desktop control is unavailable in this runtime.',
+  'desktop.unsupportedWindows':
+    "Desktop control isn't available on Windows yet. Browser Control works on Windows today.",
   'desktop.localOnly': 'This setting applies only to this computer.',
   'desktop.permissions': 'System permissions',
   'desktop.openSettings': 'Open settings',
@@ -595,6 +597,10 @@ const en: TranslationMap = {
     "Memory can't be reached right now. Nothing stored has been lost; try again in a moment.",
   'memory.outOfCredits.title': 'Out of credits',
   'memory.outOfCredits.action': 'Top up',
+  'memory.error.planRequired':
+    "Your current plan doesn't include memory, so OpenHuman can't save or look up what it learns. Upgrade to turn memory on, or switch to a different memory option in Settings.",
+  'memory.planRequired.title': "Memory isn't part of your plan",
+  'memory.planRequired.action': 'See plans',
 
   // Activity surface: Phase 3 renamed tabs
   'activity.tabs.automations': 'Automations',
@@ -728,6 +734,15 @@ const en: TranslationMap = {
 
   // Developer Options / Developer & Diagnostics
   'devOptions.titleDiagnostics': 'Developer & Diagnostics',
+  'devOptions.doctor.run': 'Run doctor',
+  'devOptions.doctor.runLive': 'Run live checks',
+  'devOptions.doctor.liveWarning':
+    'Live checks may spend tokens on model or embedding calls. Continue?',
+  'devOptions.doctor.severity.pass': 'Pass',
+  'devOptions.doctor.severity.info': 'Info',
+  'devOptions.doctor.severity.warn': 'Warning',
+  'devOptions.doctor.severity.error': 'Error',
+  'devOptions.doctor.severity.skipped': 'Skipped',
   'devOptions.diagnostics': 'Diagnostics',
   'devOptions.toolPolicyDiagnosticsDesc':
     'Tool inventory, policy posture, MCP allowlists, and recent blocks',

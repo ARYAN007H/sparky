@@ -487,6 +487,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'Bekleyen masaüstü onayları yüklenemedi. Yeniden denemek için yenileyin.',
   'desktop.unsupported': 'Masaüstü denetimi bu çalışma ortamında kullanılamıyor.',
+  'desktop.unsupportedWindows':
+    "Masaüstü denetimi henüz Windows'ta kullanılamıyor. Tarayıcı denetimi Windows'ta şu anda çalışıyor.",
   'desktop.localOnly': 'Bu ayar yalnızca bu bilgisayar için geçerlidir.',
   'desktop.permissions': 'Sistem izinleri',
   'desktop.openSettings': 'Ayarları aç',
@@ -628,6 +630,15 @@ const messages: TranslationMap = {
   'invites.redeemPlaceholder': 'Davet kodu',
   'invites.redeemSubmit': 'Kullan',
   'devOptions.titleDiagnostics': 'Geliştirici ve tanılama',
+  'devOptions.doctor.run': 'Tanılamayı çalıştır',
+  'devOptions.doctor.runLive': 'Canlı denetimleri çalıştır',
+  'devOptions.doctor.liveWarning':
+    'Canlı denetimler model veya gömme çağrılarında token harcayabilir. Devam edilsin mi?',
+  'devOptions.doctor.severity.pass': 'Başarılı',
+  'devOptions.doctor.severity.info': 'Bilgi',
+  'devOptions.doctor.severity.warn': 'Uyarı',
+  'devOptions.doctor.severity.error': 'Hata',
+  'devOptions.doctor.severity.skipped': 'Atlandı',
   'devOptions.diagnostics': 'Tanılama',
   'devOptions.toolPolicyDiagnosticsDesc':
     'Araç envanteri, politika durumu, MCP izin listeleri ve son engellemeler',
@@ -4372,6 +4383,10 @@ const messages: TranslationMap = {
     'Belleğe şu anda ulaşılamıyor. Kayıtlı hiçbir şey kaybolmadı; biraz sonra yeniden deneyin.',
   'memory.outOfCredits.title': 'Krediniz tükendi',
   'memory.outOfCredits.action': 'Kredi yükle',
+  'memory.error.planRequired':
+    "Mevcut planınız bellek içermediği için OpenHuman öğrendiklerini kaydedemez veya bunlara bakamaz. Belleği açmak için planınızı yükseltin ya da Ayarlar'dan başka bir bellek seçeneğine geçin.",
+  'memory.planRequired.title': 'Bellek planınıza dahil değil',
+  'memory.planRequired.action': 'Planları gör',
   'memoryPage.engine.badgeDegraded': 'Kısıtlı çalışıyor',
   'memoryPage.engine.badgeDown': 'Ulaşılamıyor',
   'memoryPage.engine.connecting': 'Bağlanıyor…',

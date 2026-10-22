@@ -600,6 +600,8 @@ const messages: TranslationMap = {
   'desktop.pendingUnavailable':
     'Impossible de charger les approbations du bureau en attente. Actualisez pour réessayer.',
   'desktop.unsupported': 'Le contrôle du bureau n’est pas disponible dans cet environnement.',
+  'desktop.unsupportedWindows':
+    'Le contrôle du bureau n’est pas encore disponible sous Windows. Le contrôle du navigateur fonctionne déjà sous Windows.',
   'desktop.localOnly': 'Ce réglage ne s’applique qu’à cet ordinateur.',
   'desktop.permissions': 'Autorisations système',
   'desktop.openSettings': 'Ouvrir les réglages',
@@ -620,6 +622,10 @@ const messages: TranslationMap = {
     "La mémoire est injoignable pour le moment. Rien de ce qui est stocké n'a été perdu ; réessayez dans un instant.",
   'memory.outOfCredits.title': 'Crédits épuisés',
   'memory.outOfCredits.action': 'Recharger',
+  'memory.error.planRequired':
+    "Votre forfait actuel n'inclut pas la mémoire : OpenHuman ne peut donc ni enregistrer ni retrouver ce qu'il apprend. Passez à un forfait supérieur pour activer la mémoire, ou choisissez une autre option de mémoire dans les Paramètres.",
+  'memory.planRequired.title': 'La mémoire ne fait pas partie de votre forfait',
+  'memory.planRequired.action': 'Voir les forfaits',
   'alerts.title': 'Alertes',
   'alerts.empty': "Aucune alerte pour l'instant",
   'alerts.markAllRead': 'Tout marquer comme lu',
@@ -684,6 +690,15 @@ const messages: TranslationMap = {
   'invites.title': 'Invitations',
   'invites.noInvites': 'Aucune invitation en attente',
   'devOptions.titleDiagnostics': 'Développeur et Diagnostics',
+  'devOptions.doctor.run': 'Lancer le diagnostic',
+  'devOptions.doctor.runLive': 'Lancer les vérifications en direct',
+  'devOptions.doctor.liveWarning':
+    'Les vérifications en direct peuvent consommer des jetons lors des appels de modèle ou d’intégration. Continuer ?',
+  'devOptions.doctor.severity.pass': 'Réussi',
+  'devOptions.doctor.severity.info': 'Info',
+  'devOptions.doctor.severity.warn': 'Avertissement',
+  'devOptions.doctor.severity.error': 'Erreur',
+  'devOptions.doctor.severity.skipped': 'Ignoré',
   'devOptions.diagnostics': 'Diagnostic',
   'devOptions.toolPolicyDiagnosticsDesc':
     'Inventaire des outils, posture de la politique, listes autorisées MCP et blocages récents',

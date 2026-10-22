@@ -735,3 +735,5 @@ impl OpenhumanEventBridge {
         })
     }
 }
+
+include!("event_projection_cache_layout.rs");
