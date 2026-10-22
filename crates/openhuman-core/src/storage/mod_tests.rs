@@ -175,3 +175,108 @@ async fn the_driver_name_check_agrees_with_what_each_backend_claims() {
         );
     }
 }
+
+mod storage_runtime {
+    use super::super::{block_on, connect_on_storage_runtime};
+    use super::StorageError;
+    use std::sync::mpsc as std_mpsc;
+    use std::time::Duration;
+    use tokio::sync::{mpsc, oneshot};
+
+    #[derive(Clone)]
+    struct FakePool {
+        requests: mpsc::UnboundedSender<oneshot::Sender<u32>>,
+    }
+
+    impl FakePool {
+        fn spawn() -> Self {
+            let (requests, mut receiver) = mpsc::unbounded_channel::<oneshot::Sender<u32>>();
+            tokio::spawn(async move {
+                while let Some(reply) = receiver.recv().await {
+                    let _ = reply.send(7);
+                }
+            });
+            Self { requests }
+        }
+
+        async fn ping(&self) -> Result<u32, StorageError> {
+            let (reply, answer) = oneshot::channel();
+            self.requests
+                .send(reply)
+                .map_err(|_| StorageError::backend("fake pool stopped"))?;
+            answer
+                .await
+                .map_err(|_| StorageError::backend("fake pool dropped the request"))
+        }
+    }
+
+    #[tokio::test]
+    async fn returns_what_connect_built() {
+        let value = connect_on_storage_runtime(|| async { 41 + 1 })
+            .await
+            .expect("connect runs");
+        assert_eq!(value, 42);
+    }
+
+    #[test]
+    fn runs_from_inside_the_blocking_bridge() {
+        let value = block_on(async {
+            let pool = connect_on_storage_runtime(|| async { FakePool::spawn() }).await?;
+            pool.ping().await
+        })
+        .expect("bridged connect completes");
+        assert_eq!(value, 7);
+    }
+
+    #[tokio::test]
+    async fn a_panicking_connect_is_a_storage_error() {
+        let result = connect_on_storage_runtime(|| async {
+            if true {
+                panic!("connect blew up");
+            }
+        })
+        .await;
+        assert!(result.is_err(), "a panic surfaces as a StorageError");
+    }
+
+    #[test]
+    fn bridged_calls_do_not_starve_a_capped_host_runtime() {
+        let (done, outcome) = std_mpsc::channel();
+        let host = std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
+                .max_blocking_threads(1)
+                .enable_all()
+                .build()
+                .expect("host runtime");
+            let result = runtime.block_on(async {
+                let pool = connect_on_storage_runtime(|| async { FakePool::spawn() })
+                    .await
+                    .expect("connect");
+                let calls: Vec<_> = (0..8)
+                    .map(|_| {
+                        let pool = pool.clone();
+                        tokio::spawn(async move { block_on(async move { pool.ping().await }) })
+                    })
+                    .collect();
+                let mut answers = Vec::new();
+                for call in calls {
+                    answers.push(call.await.expect("call task").expect("ping"));
+                }
+                answers
+            });
+            let _ = done.send(result);
+            runtime
+        });
+        match outcome.recv_timeout(Duration::from_secs(20)) {
+            Ok(answers) => {
+                assert_eq!(answers, vec![7; 8]);
+                drop(host.join().expect("host thread"));
+            }
+            Err(_) => {
+                std::mem::forget(host);
+                panic!("storage bridge deadlocked");
+            }
+        }
+    }
+}

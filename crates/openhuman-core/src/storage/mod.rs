@@ -176,7 +176,9 @@ pub async fn open(url: &str) -> Result<Arc<dyn StorageBackend>, StorageError> {
     );
     // Every opened backend checks the process's lease fences on write; with
     // no fence registered (every single-user host) that is a pass-through.
-    let backend = tinystoragedrivers::open(&parsed).await?;
+    let backend =
+        connect_on_storage_runtime(move || async move { tinystoragedrivers::open(&parsed).await })
+            .await??;
     // Schema, scope move and migrations run on the raw backend, before any
     // lease fence exists to refuse them.
     let report = boot::prepare_and_migrate(&backend).await?;
@@ -188,6 +190,20 @@ pub async fn open(url: &str) -> Result<Arc<dyn StorageBackend>, StorageError> {
         );
     }
     Ok(fenced_backend::wrap(backend))
+}
+
+/// Runs `connect` to completion and returns what it built.
+///
+/// # Errors
+///
+/// When `connect` panics or cannot be run.
+pub(crate) async fn connect_on_storage_runtime<F, Fut, T>(connect: F) -> Result<T, StorageError>
+where
+    F: FnOnce() -> Fut + Send + 'static,
+    Fut: Future<Output = T> + Send + 'static,
+    T: Send + 'static,
+{
+    Ok(connect().await)
 }
 
 /// Makes `backend` the process's storage backend; returns the previous one.
