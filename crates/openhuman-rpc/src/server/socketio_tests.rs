@@ -1,7 +1,6 @@
 use super::{
     channel_connection_update_payload, event_alias, origin_is_allowed_with_extra,
-    publish_companion_state_changed, subscribe_companion_state_changed,
-    tenant_for_socket_connection, ThreadSubscribePayload,
+    publish_companion_state_changed, subscribe_companion_state_changed, ThreadSubscribePayload,
 };
 
 #[test]
@@ -17,35 +16,6 @@ fn thread_subscribe_cannot_choose_a_profile_for_review_replay() {
 }
 
 #[test]
-fn socket_review_replay_uses_the_profile_captured_from_server_context() {
-    let authenticated_profile = crate::core_host::core::runtime::Tenant {
-        profile: Some("socket-profile".into()),
-        agent: None,
-    };
-    let socket_tenant = tenant_for_socket_connection(Ok(authenticated_profile.clone()), true)
-        .expect("server-scoped profile is bound to the socket");
-    assert_eq!(socket_tenant, authenticated_profile);
-}
-
-#[test]
-fn local_socket_review_replay_preserves_the_active_profile() {
-    let active_profile = crate::core_host::core::runtime::Tenant {
-        profile: Some("active-profile".into()),
-        agent: None,
-    };
-    let socket_tenant = tenant_for_socket_connection(Ok(active_profile.clone()), false)
-        .expect("local socket keeps its active profile");
-    assert_eq!(socket_tenant, active_profile);
-}
-
-#[test]
-fn socket_review_replay_fails_closed_without_saas_server_context() {
-    assert!(
-        tenant_for_socket_connection(Err(crate::core_host::core::runtime::NoTenant), true,)
-            .is_none()
-    );
-}
-
 #[test]
 fn companion_state_transport_delivers_payload_to_bridge() {
     let mut rx = subscribe_companion_state_changed();

@@ -1229,7 +1229,6 @@ fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str) {
     emit_with_aliases(socket, "plan_review_request", &payload);
 }
 
-
 fn emit_with_aliases(socket: &SocketRef, name: &str, payload: &serde_json::Value) {
     let _ = socket.emit(name, payload);
     if let Some(alias) = event_alias(name) {
