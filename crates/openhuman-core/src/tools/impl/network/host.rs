@@ -18,7 +18,7 @@ use super::gate::RoutedGate;
 use crate::config::HttpRequestConfig;
 use crate::security::approval::ApprovalChatContext;
 use crate::security::SecurityPolicy;
-use crate::tools::per_call::{context as per_call_context, PerCallTool};
+use crate::tools::per_call::{context as per_call_context, PerCallContext, PerCallTool};
 use {tinyjuice_bus::tools::summary_focus_property, tinyjuice_bus::tools::SUMMARY_FOCUS_ARG};
 
 /// The fallbacks for a `0` limit, from the `[http_request]` schema defaults, so
@@ -108,7 +108,7 @@ pub fn routed_http_request_tool(
     allowed_domains: Vec<String>,
     max_response_size: usize,
     timeout_secs: u64,
-) -> PerCallTool<HttpRequestTool> {
+) -> PerCallTool<HttpRequestTool, PerCallContext> {
     PerCallTool::new(
         per_call_context,
         move |context| {
@@ -201,7 +201,7 @@ pub fn routed_curl_tool(
     dest_subdir: String,
     max_download_bytes: u64,
     timeout_secs: u64,
-) -> PerCallTool<CurlTool> {
+) -> PerCallTool<CurlTool, PerCallContext> {
     PerCallTool::new(
         per_call_context,
         move |context| {
@@ -224,7 +224,7 @@ pub fn routed_web_fetch_tool(
     allowed_domains: Vec<String>,
     max_bytes: Option<usize>,
     timeout_secs: Option<u64>,
-) -> PerCallTool<WebFetchTool> {
+) -> PerCallTool<WebFetchTool, PerCallContext> {
     PerCallTool::new(
         per_call_context,
         move |context| {
