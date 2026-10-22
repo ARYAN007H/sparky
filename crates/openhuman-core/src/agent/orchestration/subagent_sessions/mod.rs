@@ -10,7 +10,7 @@ pub use ops::{
     DriverTaskCancellation, action_root_key, cancel_driver_job_by_task,
     cancel_driver_job_for_observed_session, cancel_driver_jobs_for_thread, close_if_current,
     find_reusable, list_for_parent, mark_failed, mark_finished, normalize_task_key,
-    resolve_lifecycle_key, reuse_decision, upsert_running,
+    resolve_driver_lifecycle_key, resolve_lifecycle_key, reuse_decision, upsert_running,
 };
 #[cfg(test)]
 pub(crate) use tiny_port::OpenHumanTinySubagentSessionStore;

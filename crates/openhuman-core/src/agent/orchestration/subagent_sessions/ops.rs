@@ -15,7 +15,8 @@ mod driver;
 use driver::record_cancel_reason;
 pub use driver::{
     DriverTaskCancellation, cancel_driver_job_by_task, cancel_driver_job_for_observed_session,
-    cancel_driver_jobs_for_thread, mark_driver_pause_cancelled, resolve_lifecycle_key,
+    cancel_driver_jobs_for_thread, mark_driver_pause_cancelled, resolve_driver_lifecycle_key,
+    resolve_lifecycle_key,
 };
 pub use tinyagents_orchestration::subagent::normalize_task_key;
 
