@@ -121,10 +121,35 @@ pub(crate) fn active_subagents_context_block(
         Ok(sessions) => sessions
             .into_iter()
             .filter(|session| {
-                session.status != tinyagents_orchestration::subagent::DurableSubagentStatus::Closed
+                session.status
+                    != crate::agent::orchestration::subagent_sessions::DurableSubagentStatus::Closed
             })
             .take(DURABLE_ROSTER_CAP)
-            .map(|session| DurableSubagentSessionSummary::from(&session))
+            .map(|session| DurableSubagentSessionSummary {
+                subagent_session_id: session.subagent_session_id,
+                parent_thread_id: session.parent_thread_id,
+                worker_thread_id: session.worker_thread_id,
+                agent_id: session.agent_id,
+                display_name: session.display_name,
+                model: session.model,
+                sandbox_mode: session.sandbox_mode,
+                action_root: session.action_root,
+                task_key: session.task_key,
+                task_title: session.task_title,
+                current_task_id: session.current_task_id,
+                status: match session.status {
+                    crate::agent::orchestration::subagent_sessions::DurableSubagentStatus::Running => tinyagents_orchestration::subagent::DurableSubagentStatus::Running,
+                    crate::agent::orchestration::subagent_sessions::DurableSubagentStatus::Idle => tinyagents_orchestration::subagent::DurableSubagentStatus::Idle,
+                    crate::agent::orchestration::subagent_sessions::DurableSubagentStatus::AwaitingUser => tinyagents_orchestration::subagent::DurableSubagentStatus::AwaitingUser,
+                    crate::agent::orchestration::subagent_sessions::DurableSubagentStatus::Failed => tinyagents_orchestration::subagent::DurableSubagentStatus::Failed,
+                    crate::agent::orchestration::subagent_sessions::DurableSubagentStatus::Closed => tinyagents_orchestration::subagent::DurableSubagentStatus::Closed,
+                },
+                reusable: session.reusable,
+                latest_error: session.latest_error,
+                created_at: session.created_at,
+                updated_at: session.updated_at,
+                last_used_at: session.last_used_at,
+            })
             .collect(),
         Err(err) => {
             log::warn!(
