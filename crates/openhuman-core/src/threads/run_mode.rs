@@ -72,8 +72,8 @@ pub fn parse_mode_label(label: &str) -> Option<RunMode> {
 // `schemas.rs` because this module IS the domain's entire surface (registry
 // + RPC), not a multi-file domain directory.
 
-use serde::Deserialize;
 use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};

@@ -1214,10 +1214,8 @@ fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str) {
     let Some(tenant) = socket.extensions.get::<SocketTenant>() else {
         return;
     };
-    let Some(row) = crate::core_host::agent::plan_review::parked_review_for_socket(
-        &tenant.0,
-        thread_id,
-    )
+    let Some(row) =
+        crate::core_host::agent::plan_review::parked_review_for_socket(&tenant.0, thread_id)
     else {
         return;
     };
