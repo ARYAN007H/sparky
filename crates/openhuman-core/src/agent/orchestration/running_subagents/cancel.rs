@@ -455,18 +455,18 @@ pub(crate) fn stop_for_thread(
                     continue;
                 };
                 let scope = ParentJobScope::new(owner_scope.workspace.clone(), parent_thread_id);
-                let matching_status = jobs
-                    .list_for_parent_scope(&owner, &scope)
-                    .ok()
-                    .and_then(|jobs| {
-                        jobs.into_iter().find_map(|job| {
-                            (job.extensions
-                                .get("task_id")
-                                .and_then(serde_json::Value::as_str)
-                                == Some(task_id.as_str()))
-                            .then_some(job.status)
-                        })
-                    });
+                let matching_status =
+                    jobs.list_for_parent_scope(&owner, &scope)
+                        .ok()
+                        .and_then(|jobs| {
+                            jobs.into_iter().find_map(|job| {
+                                (job.extensions
+                                    .get("task_id")
+                                    .and_then(serde_json::Value::as_str)
+                                    == Some(task_id.as_str()))
+                                .then_some(job.status)
+                            })
+                        });
                 if matching_status.is_some_and(|status| {
                     matches!(
                         status,
@@ -475,9 +475,10 @@ pub(crate) fn stop_for_thread(
                             | SubAgentJobStatus::AwaitingInput
                     )
                 }) {
-                    task_ids.push(task_id);
-                    if let Some((_, paused_tasks)) =
-                        stopped_scopes.iter_mut().find(|(stopped, _)| stopped == &scope)
+                    task_ids.push(task_id.clone());
+                    if let Some((_, paused_tasks)) = stopped_scopes
+                        .iter_mut()
+                        .find(|(stopped, _)| stopped == &scope)
                     {
                         if matching_status == Some(SubAgentJobStatus::AwaitingInput) {
                             paused_tasks.push(task_id);
@@ -496,7 +497,7 @@ pub(crate) fn stop_for_thread(
             }
             for (scope, paused_task_ids) in stopped_scopes {
                 match jobs.cancel_for_thread(&scope) {
-                    Ok(()) => {
+                    Ok(_) => {
                         for task_id in paused_task_ids {
                             crate::agent::orchestration::completion_owners::finish_driver_task(
                                 ctx, &task_id,

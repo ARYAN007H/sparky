@@ -399,4 +399,3 @@ async fn thread_delete_keeps_completions_when_driver_task_scope_cannot_be_resolv
         "stale-driver-task",
     );
 }
-

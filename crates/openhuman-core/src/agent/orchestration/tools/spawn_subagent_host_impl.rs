@@ -158,63 +158,18 @@ impl SpawnSubagentTool {
             task_key: task_key.clone(),
         };
 
-        let reusable = if force_fresh {
-            match find_reusable_driver_session(
-                &driver_store,
-                &dispatch,
-                &parent.workspace_dir,
-                &selector,
-            )
-            .await
-            {
-                Ok(Some(session)) => {
-                    if let Err(error) = close_reusable_driver_session(
-                        &driver_store,
-                        &store,
-                        &dispatch,
-                        &parent.workspace_dir,
-                        &session,
-                        &parent_session,
-                        parent_thread_id.as_deref(),
-                    )
-                    .await
-                    {
-                        return Ok(ToolResult::error(format!("spawn_subagent: {error}")));
-                    }
-                }
-                Ok(None) => {}
-                Err(err) => {
-                    log::warn!(
-                        "[subagent_reuse] fresh lookup failed parent_thread_id={} agent_id={} task_key={} error={}",
-                        parent_thread_id.as_deref().unwrap_or("none"),
-                        definition.id,
-                        task_key,
-                        err
-                    );
-                }
-            }
-            None
-        } else {
-            match find_reusable_driver_session(
-                &driver_store,
-                &dispatch,
-                &parent.workspace_dir,
-                &selector,
-            )
-            .await
-            {
-                Ok(session) => session,
-                Err(err) => {
-                    log::warn!(
-                        "[subagent_reuse] lookup failed parent_thread_id={} agent_id={} task_key={} error={}",
-                        parent_thread_id.as_deref().unwrap_or("none"),
-                        definition.id,
-                        task_key,
-                        err
-                    );
-                    None
-                }
-            }
+        let reusable = match reusable_driver_session_for_spawn(
+            &driver_store,
+            &store,
+            &dispatch,
+            &parent.workspace_dir,
+            &selector,
+            force_fresh,
+        )
+        .await
+        {
+            Ok(reusable) => reusable,
+            Err(error) => return Ok(ToolResult::error(format!("spawn_subagent: {error}"))),
         };
         let reuse_decision = subagent_sessions::reuse_decision(reusable.as_ref(), force_fresh);
         let follow_up_prompt = reusable_follow_up_message(&prompt, context.as_deref());

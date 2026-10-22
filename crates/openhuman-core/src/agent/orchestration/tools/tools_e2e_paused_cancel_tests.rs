@@ -300,8 +300,8 @@ async fn stopping_a_paused_driver_releases_its_active_owner() {
         parent_session,
         thread_id,
     );
-    let jobs = (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&live.data.dispatch_ctx()))
-        .clone();
+    let jobs =
+        (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&live.data.dispatch_ctx())).clone();
     let result = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
@@ -343,7 +343,11 @@ async fn stopping_a_paused_driver_releases_its_active_owner() {
     assert_eq!(
         jobs.list()
             .into_iter()
-            .find(|job| job.extensions.get("task_id").and_then(serde_json::Value::as_str) == Some(task_id.as_str()))
+            .find(|job| job
+                .extensions
+                .get("task_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(task_id.as_str()))
             .map(|job| job.status),
         Some(SubAgentJobStatus::Cancelled)
     );

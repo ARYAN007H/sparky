@@ -37,6 +37,57 @@ async fn find_reusable_driver_session(
     )))
 }
 
+async fn reusable_driver_session_for_spawn(
+    driver: &std::sync::Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore>,
+    host_store: &SubagentSessionStore,
+    ctx: &DispatchCtx,
+    workspace_dir: &std::path::Path,
+    selector: &SubagentSessionSelector,
+    force_fresh: bool,
+) -> Result<Option<DurableSubagentSession>, String> {
+    let lookup = find_reusable_driver_session(driver, ctx, workspace_dir, selector).await;
+    if force_fresh {
+        match lookup {
+            Ok(Some(session)) => {
+                close_reusable_driver_session(
+                    driver,
+                    host_store,
+                    ctx,
+                    workspace_dir,
+                    &session,
+                    &selector.parent_session,
+                    selector.parent_thread_id.as_deref(),
+                )
+                .await
+                ?;
+            }
+            Ok(None) => {}
+            Err(error) => log::warn!(
+                "[subagent_reuse] fresh lookup failed parent_thread_id={} agent_id={} task_key={} error={}",
+                selector.parent_thread_id.as_deref().unwrap_or("none"),
+                selector.agent_id,
+                selector.task_key,
+                error
+            ),
+        }
+        Ok(None)
+    } else {
+        match lookup {
+            Ok(session) => Ok(session),
+            Err(error) => {
+                log::warn!(
+                    "[subagent_reuse] lookup failed parent_thread_id={} agent_id={} task_key={} error={}",
+                    selector.parent_thread_id.as_deref().unwrap_or("none"),
+                    selector.agent_id,
+                    selector.task_key,
+                    error
+                );
+                Ok(None)
+            }
+        }
+    }
+}
+
 async fn upsert_driver_session(
     driver: &std::sync::Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore>,
     ctx: &DispatchCtx,
