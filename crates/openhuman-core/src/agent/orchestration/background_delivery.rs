@@ -56,7 +56,7 @@ use slot::DeliverySlot;
 use super::background_completions;
 use super::busy_guard::is_busy;
 #[cfg(test)]
-use super::busy_guard::{busy, clear_busy_for_thread, TurnBusy};
+use super::busy_guard::{clear_busy_for_thread, TurnBusy};
 use super::completion_notice::build_undelivered_notice;
 use super::completion_owners;
 use super::delivery_drain::{DrainFence, RECOVERY_BUSY_POLL};

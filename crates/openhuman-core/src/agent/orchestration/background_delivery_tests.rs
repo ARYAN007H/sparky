@@ -31,20 +31,21 @@ fn pending_ids(ws: &Path, thread: &str) -> Vec<String> {
         .collect()
 }
 
-fn mark_busy(session: &str) {
+fn test_turns() -> &'static std::sync::Mutex<std::collections::HashMap<String, TurnBusy>> {
     static TURNS: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, TurnBusy>>> =
         std::sync::OnceLock::new();
-    TURNS
-        .get_or_init(Default::default)
+    TURNS.get_or_init(Default::default)
+}
+
+fn mark_busy(session: &str) {
+    test_turns()
         .lock()
         .expect("test turns")
         .insert(session.to_owned(), TurnBusy::start(&cx(), session));
 }
 
 fn clear_busy(session: &str) {
-    static TURNS: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, TurnBusy>>> =
-        std::sync::OnceLock::new();
-    TURNS.get_or_init(Default::default).lock().expect("test turns").remove(session);
+    test_turns().lock().expect("test turns").remove(session);
 }
 
 #[tokio::test]

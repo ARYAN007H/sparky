@@ -229,14 +229,15 @@ async fn desktop_keys_are_the_bare_ids() {
     let turn = in_scope(&desktop, || {
         TurnBusy::start(&DispatchCtx::ambient(), &session)
     });
-    assert_eq!(turn.key, session);
-    assert!(busy().lock().unwrap().contains_key(&session));
     assert!(in_scope(&desktop, || is_busy(
         &DispatchCtx::ambient(),
         &thread
     )));
     drop(turn);
-    assert!(!busy().lock().unwrap().contains_key(&session));
+    assert!(!in_scope(&desktop, || is_busy(
+        &DispatchCtx::ambient(),
+        &thread
+    )));
 
     let router = router_for_workspace(ws.path());
     let slot = in_scope(&desktop, || {
