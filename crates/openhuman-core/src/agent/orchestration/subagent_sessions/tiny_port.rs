@@ -266,11 +266,6 @@ fn import_host_sessions(
         .map_err(SubagentError::Persistence)?
         .load()
         .map_err(SubagentError::Persistence)?;
-    let converter = OpenHumanTinySubagentSessionStore::new(
-        workspace_dir.to_path_buf(),
-        parent_session,
-        parent_thread_id.map(str::to_owned),
-    );
     for row in legacy.into_iter().filter(|row| {
         row.parent_session == parent_session && row.parent_thread_id.as_deref() == parent_thread_id
     }) {

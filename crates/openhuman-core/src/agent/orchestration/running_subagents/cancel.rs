@@ -52,7 +52,7 @@ pub(crate) async fn cancel_by_task_with_workspace_reason(
     let Some(owner_scope) =
         crate::agent::orchestration::completion_owners::driver_task_owner(ctx, task_id)
     else {
-        return terminal_legacy_session(ctx, &workspace_dir, task_id);
+        return terminal_legacy_session(ctx, &workspace_dir, task_id).await;
     };
     let Some(parent_thread_id) = owner_scope.parent_thread_id.as_deref() else {
         return Ok(None);
@@ -187,7 +187,7 @@ pub(crate) async fn cancel_by_task_with_workspace_reason(
 /// terminal host row, imports it into the scoped driver store, and returns the
 /// driver's durable projection; live cancellation still requires the owner
 /// registry.
-fn terminal_legacy_session(
+async fn terminal_legacy_session(
     ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &Path,
     task_id: &str,
