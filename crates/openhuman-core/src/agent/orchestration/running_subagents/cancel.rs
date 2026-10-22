@@ -344,7 +344,11 @@ pub(crate) async fn cancel_for_thread(
             ));
             continue;
         }
-        for job in matching_jobs {
+        let live_jobs = matching_jobs
+            .into_iter()
+            .filter(|job| !job.status.is_terminal())
+            .collect::<Vec<_>>();
+        for job in live_jobs {
             match jobs.cancel_owned(job.id.as_str(), &owner_key) {
                 Ok(cancelled_job) => {
                     cancelled += usize::from(!cancelled_job.status.is_terminal());

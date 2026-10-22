@@ -594,7 +594,7 @@ async fn thread_delete_keeps_completions_when_driver_task_scope_cannot_be_resolv
         &dispatch,
         &workspace,
         parent_session,
-        "stale-driver-task".into(),
+        "stale-driver-task",
         "task_manager_agent",
         "queued child result",
         Some(thread_id.into()),
