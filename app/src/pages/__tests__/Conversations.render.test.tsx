@@ -16,7 +16,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SidebarSlotOutlet, SidebarSlotProvider } from '../../components/layout/shell/SidebarSlot';
 import { threadApi } from '../../services/api/threadApi';
-import { chatCancel, chatRemoveQueueItem, chatSend } from '../../services/chatService';
+import { chatCancel, chatRemoveQueueItem, chatSend, editMessage } from '../../services/chatService';
 import { CoreRpcError } from '../../services/coreRpcClient';
 import chatRuntimeReducer, {
   beginInferenceTurn,
@@ -78,6 +78,7 @@ vi.mock('../../services/chatService', () => ({
   chatClearQueue: vi.fn().mockResolvedValue(0),
   chatRemoveQueueItem: vi.fn().mockResolvedValue(true),
   chatSend: vi.fn().mockResolvedValue(undefined),
+  editMessage: vi.fn().mockResolvedValue(undefined),
   subscribeChatEvents: vi.fn(() => () => {}),
   useRustChat: vi.fn(() => true),
 }));
@@ -2245,6 +2246,46 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Send message' })).not.toBeDisabled();
     });
+  });
+
+  it('restores the draft when saving the prompt locally fails', async () => {
+    vi.mocked(threadApi.appendMessage).mockRejectedValueOnce(new Error('disk full'));
+    const { textarea } = await renderSelectedConversation();
+    await act(async () => {
+      setComposerText(textarea, 'do not lose me');
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    });
+    await waitFor(() => expect(threadApi.appendMessage).toHaveBeenCalled());
+    expect(chatSend).not.toHaveBeenCalled();
+    await waitFor(() => expect(textarea).toHaveTextContent('do not lose me'));
+  });
+
+  it('keeps the failed prompt in the transcript when the corrected retry edit fails', async () => {
+    vi.mocked(chatSend).mockRejectedValueOnce(new Error('emit failed'));
+    const { store, textarea, thread } = await renderSelectedConversation();
+    await act(async () => {
+      setComposerText(textarea, 'first try');
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    });
+    await waitFor(() => expect(chatSend).toHaveBeenCalledTimes(1));
+    const transcript = () =>
+      (store!.getState().thread.messagesByThreadId[thread.id] ?? []).map(m => m.content);
+    await waitFor(() => expect(transcript()).toContain('first try'));
+
+    vi.mocked(editMessage).mockRejectedValueOnce(new Error('edit failed'));
+    await act(async () => {
+      setComposerText(textarea, 'second try');
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    });
+    await waitFor(() => expect(editMessage).toHaveBeenCalledTimes(1));
+    expect(transcript()).toContain('first try');
+    await waitFor(() => expect(textarea).toHaveTextContent('second try'));
   });
 
   it('sends with Enter when the composer is not composing text', async () => {
