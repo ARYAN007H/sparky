@@ -16,7 +16,6 @@ pub(crate) use tiny_port::{open_for_context, OpenHumanTinySubagentSessionStore};
 pub use types::{
     DurableSubagentStatus, SubagentSessionSelector, SubagentSessionStore, SubagentSessionUpsert,
 };
-// Test-only: the host keeps the raw durable row private to its persistence
-// adapter and exposes scoped operations to production callers.
-#[cfg(test)]
-pub use types::DurableSubagentSession;
+// The spawn compatibility adapter retains this host projection while the
+// remaining lifecycle writers migrate to TinyAgents' durable store.
+pub(crate) use types::DurableSubagentSession;

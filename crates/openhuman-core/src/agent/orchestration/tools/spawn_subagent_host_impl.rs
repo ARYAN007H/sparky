@@ -1,3 +1,42 @@
+async fn find_reusable_driver_session(
+    driver: &std::sync::Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore>,
+    legacy: &SubagentSessionStore,
+    selector: &SubagentSessionSelector,
+) -> Result<Option<DurableSubagentSession>, String> {
+    use tinyagents_orchestration::subagent::SubagentSessionStore as _;
+
+    let driver_selector = tinyagents_orchestration::subagent::SubagentSessionSelector {
+        parent_session: selector.parent_session.clone(),
+        parent_thread_id: selector.parent_thread_id.clone(),
+        agent_id: selector.agent_id.clone(),
+        model: selector.model.clone(),
+        sandbox_mode: selector.sandbox_mode.clone(),
+        action_root: selector.action_root.clone(),
+        task_key: selector.task_key.clone(),
+    };
+    let sessions = driver
+        .list_for_parent(
+            &selector.parent_session,
+            selector.parent_thread_id.as_deref(),
+        )
+        .await
+        .map_err(|error| error.to_string())?;
+    let Some(selected) = tinyagents_orchestration::subagent::find_reusable_session(
+        sessions,
+        &driver_selector,
+    ) else {
+        return Ok(None);
+    };
+
+    legacy
+        .load()
+        .map(|sessions| {
+            sessions.into_iter().find(|session| {
+                session.subagent_session_id == selected.subagent_session_id
+            })
+        })
+}
+
 impl SpawnSubagentTool {
     async fn execute_with_context_inner(
         &self,
@@ -97,6 +136,23 @@ impl SpawnSubagentTool {
                 )));
             }
         };
+        let jobs = crate::core::runtime::slot_for::<
+            tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        >(&dispatch);
+        let driver_store = match subagent_sessions::open_for_context(
+            &dispatch,
+            parent.workspace_dir.clone(),
+            parent_session.clone(),
+            parent_thread_id.clone(),
+            Some((*jobs).clone()),
+        ) {
+            Ok(store) => store,
+            Err(error) => {
+                return Ok(ToolResult::error(format!(
+                    "spawn_subagent: failed to open the caller-scoped driver session store: {error}"
+                )));
+            }
+        };
         let workspace_descriptor = tool_context
             .and_then(|ctx| ctx.workspace().cloned())
             .or_else(|| run_context.workspace.clone());
@@ -176,7 +232,7 @@ impl SpawnSubagentTool {
         };
 
         let reusable = if force_fresh {
-            match subagent_sessions::find_reusable(&store, &selector) {
+            match find_reusable_driver_session(&driver_store, &store, &selector).await {
                 Ok(Some(session)) => {
                     let jobs = crate::core::runtime::slot_for::<
                         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
@@ -224,7 +280,7 @@ impl SpawnSubagentTool {
             }
             None
         } else {
-            match subagent_sessions::find_reusable(&store, &selector) {
+            match find_reusable_driver_session(&driver_store, &store, &selector).await {
                 Ok(session) => session,
                 Err(err) => {
                     log::warn!(
