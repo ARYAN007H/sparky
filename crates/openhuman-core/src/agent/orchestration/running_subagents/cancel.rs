@@ -54,9 +54,10 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
     let Some(workspace_dir) = workspace_dir else {
         return Ok(None);
     };
-    let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
+    let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new_in_context(
+        ctx,
         workspace_dir.clone(),
-    );
+    )?;
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(ctx);
@@ -145,14 +146,19 @@ pub(crate) fn stop_for_thread(
                 tinyagents_harness_tools::subagents::SubAgentJobRegistry,
             >(ctx);
             let driver_stopped =
-                crate::agent::orchestration::subagent_sessions::cancel_driver_jobs_for_thread(
-                    &crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
-                        workspace_dir.clone(),
-                    ),
+                crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new_in_context(
+                    ctx,
+                    workspace_dir.clone(),
+                )
+                .map(|store| {
+                    crate::agent::orchestration::subagent_sessions::cancel_driver_jobs_for_thread(
+                    &store,
                     &workspace_dir,
                     &jobs,
                     thread_id,
-                );
+                    )
+                })
+                .unwrap_or_default();
             for task_id in driver_stopped {
                 if !task_ids.contains(&task_id) {
                     task_ids.push(task_id);
