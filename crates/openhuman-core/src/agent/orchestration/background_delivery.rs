@@ -45,7 +45,6 @@ use crate::core::events::DomainEvent;
 use tinybus::EventHandler;
 use tinybus::SubscriptionHandle;
 
-
 use super::background_completions;
 use super::busy_guard::is_busy;
 use super::completion_notice::build_undelivered_notice;
@@ -62,7 +61,6 @@ const DEBOUNCE: Duration = Duration::from_secs(3);
 /// How long after boot a recovered, never-delivered completion waits before its
 /// delivery turn, so providers and the session store are up first.
 const RECOVERY_DELAY: Duration = Duration::from_secs(15);
-
 
 /// Ask for a delivery attempt on `thread_id` soon (after a Stop cleared a stale
 /// busy mark, or anything else that may have left a drain without its trigger).
@@ -475,4 +473,3 @@ pub(crate) fn register_background_delivery() {
 #[cfg(test)]
 #[path = "background_delivery_tests.rs"]
 mod tests;
-

@@ -29,7 +29,14 @@ async fn try_deliver_applies_the_requested_turn_end_delay() {
     let workspace = TestWorkspace::new();
     let workspace_dir = workspace.path().to_path_buf();
     let thread_id = "thread-turn-end-delay";
-    record(&workspace_dir, "session-turn-end-delay", "sub-delay", "done", thread_id).await;
+    record(
+        &workspace_dir,
+        "session-turn-end-delay",
+        "sub-delay",
+        "done",
+        thread_id,
+    )
+    .await;
     let ctx = DispatchCtx::ambient();
     let requested_delay = Duration::from_millis(300);
     let started = std::time::Instant::now();

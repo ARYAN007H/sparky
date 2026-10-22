@@ -150,4 +150,3 @@ async fn a_recovered_drain_waits_for_a_relayed_turn_on_its_thread() {
     assert!(ran);
     assert!(!is_busy(&DispatchCtx::ambient(), thread));
 }
-
