@@ -162,6 +162,17 @@ pub(crate) fn run_policy_for_provider_with_backoff(
         response_cache_enabled,
         overrides: env_overrides(),
     });
+    // A call that dies at its output cap with nothing to show is retried at
+    // the same cap, never a doubled one: a model that reasons past the cap
+    // without answering does the same past twice the cap, at twice the cost.
+    policy.truncated_empty_constant_cap = true;
+    // And the call after a dead one goes out without reasoning: a model that
+    // thought to the cap without acting tends to do so again at any cap.
+    policy.truncated_empty_reasoning_off = true;
+    // From the second dead call in a turn on, the rest of the turn runs
+    // without reasoning: one reasoning-off call recovers the step, but the
+    // model thinks to the cap again as soon as reasoning comes back.
+    policy.truncated_empty_reasoning_off_sticky_after = 2;
     apply_retry_backoff_override(&mut policy, retry_backoff_ms);
     policy
 }
