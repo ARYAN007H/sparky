@@ -94,19 +94,57 @@ fn timed_out_output(secs: u64, result: &crate::sandbox::SandboxExecResult) -> St
     out
 }
 
-/// Python's text-encoding defaults for a child, unless the parent sets its own.
-/// Under `cmd.exe` the console code page is a legacy one (cp1252, cp437), so a
-/// script printing anything outside it dies with `UnicodeEncodeError`. Both are
-/// no-ops for a non-Python command. Native runs get the same from TinyBox's
-/// `python_utf8` request flag; this serves the Docker and sandbox-policy paths,
-/// which forward their environment as plain variables.
-pub(super) const PYTHON_UTF8_DEFAULTS: &[(&str, &str)] =
-    &[("PYTHONUTF8", "1"), ("PYTHONIOENCODING", "utf-8")];
+/// Python defaults for a child, unless the parent sets its own.
+///
+/// - `PYTHONUTF8`, `PYTHONIOENCODING`: under `cmd.exe` the console code page
+///   is a legacy one (cp1252, cp437), so a script printing anything outside it
+///   dies with `UnicodeEncodeError`. Native runs get these from TinyBox's
+///   `python_utf8` request flag.
+/// - `PYTHONUNBUFFERED`: Python block-buffers stdout into a pipe (about 8 KB),
+///   and a process killed at its deadline never flushes that buffer, so a
+///   script that printed its first failures and then ran long would show
+///   nothing. Any non-empty value turns buffering off; a parent that wants it
+///   on sets it to the empty string.
+///
+/// All are no-ops for a non-Python command. This serves the Docker and
+/// sandbox-policy paths, which forward their environment as plain variables;
+/// the native path adds `PYTHONUNBUFFERED` itself.
+pub(super) const PYTHON_ENV_DEFAULTS: &[(&str, &str)] = &[
+    ("PYTHONUTF8", "1"),
+    ("PYTHONIOENCODING", "utf-8"),
+    (PYTHON_UNBUFFERED, "1"),
+];
 
-pub(super) fn python_utf8_env(
+/// The variable that turns off Python's output buffering.
+pub(super) const PYTHON_UNBUFFERED: &str = "PYTHONUNBUFFERED";
+
+/// A native run's environment with `PYTHONUNBUFFERED` added, so a script killed
+/// at its deadline has written what it printed (TinyBox's `python_utf8` flag
+/// covers the encoding). A value already in `env` stays. Otherwise the
+/// process's own value is inherited, unless the turn owns its environment
+/// (`turn_environment`), as on the sandbox path; else it is `1`.
+pub(super) fn with_unbuffered_python(
+    mut env: std::collections::BTreeMap<String, String>,
+    turn_environment: bool,
+) -> std::collections::BTreeMap<String, String> {
+    if !env.contains_key(PYTHON_UNBUFFERED) {
+        let inherited = (!turn_environment)
+            .then(|| std::env::var(PYTHON_UNBUFFERED).ok())
+            .flatten();
+        env.insert(
+            PYTHON_UNBUFFERED.to_owned(),
+            inherited.unwrap_or_else(|| "1".to_owned()),
+        );
+    }
+    env
+}
+
+/// The [`PYTHON_ENV_DEFAULTS`] a child gets, each one the parent's own value
+/// when `lookup` has one.
+pub(super) fn python_env_defaults(
     lookup: impl Fn(&str) -> Option<std::ffi::OsString>,
 ) -> Vec<(&'static str, std::ffi::OsString)> {
-    PYTHON_UTF8_DEFAULTS
+    PYTHON_ENV_DEFAULTS
         .iter()
         .map(|(name, default)| {
             let value = lookup(name).unwrap_or_else(|| (*default).into());
@@ -140,7 +178,7 @@ pub(super) fn container_environment(
         Vec::new()
     }
     .into_iter()
-    .chain(python_utf8_env(|name| {
+    .chain(python_env_defaults(|name| {
         explicit
             .and_then(|overrides| overrides.get(name).map(std::ffi::OsString::from))
             .or_else(|| {
