@@ -183,7 +183,24 @@ impl SpawnSubagentTool {
                             &parent.workspace_dir,
                         );
                     }
-                    match subagent_sessions::close_if_current(&store, &session) {
+                    let (Some(task_id), Some(lifecycle_key)) = (
+                        session.current_task_id.as_deref(),
+                        session.lifecycle_key.as_ref(),
+                    ) else {
+                        return Ok(ToolResult::error(
+                            "spawn_subagent: reusable session has no current lifecycle identity",
+                        ));
+                    };
+                    match driver_store
+                        .close_if_current(
+                            &session.subagent_session_id,
+                            task_id,
+                            lifecycle_key,
+                            &parent_session,
+                            parent_thread_id.as_deref(),
+                        )
+                        .await
+                    {
                         Ok(true) => {}
                         Ok(false) => {
                             return Ok(ToolResult::error(
