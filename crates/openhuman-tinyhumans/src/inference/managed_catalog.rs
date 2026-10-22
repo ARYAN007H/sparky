@@ -20,10 +20,9 @@ use openhuman_embed::__host::security::credentials::session_support::{
 };
 use openhuman_embed::__host::util::url::join_url;
 use std::sync::Arc;
-use tinyinference_llm::catalog::{
-    append_query_param, list_models as fetch_model_catalog, parse_models_response,
-};
+use tinyinference_llm::catalog::{append_query_param, parse_models_response};
 use tinyinference_llm::model::discover::DiscoveryRequest;
+use tinyinference_llm::providers::tinyhumans::{discovery_request, list_models as fetch_model_catalog};
 
 use super::PROVIDER_OPENHUMAN;
 use crate::backend::headers::attribution_headers;
@@ -244,24 +243,35 @@ pub(super) async fn list_models(
     // request that carried only a provider key describes that key, not the
     // session.
     let session_attached = attach && session_token;
-    let mut request = DiscoveryRequest::new(&url, "")
-        .with_listing_url(url.clone())
-        .with_single_model_probe(false)
-        .with_timeout(std::time::Duration::from_secs(30));
-    if attach {
-        request = request.with_header("Authorization", format!("Bearer {token}"));
-        if let Ok(headers) = attribution_headers() {
-            for (name, value) in headers.iter() {
-                if let Ok(value) = value.to_str() {
-                    request = request.with_header(name.as_str(), value);
-                }
-            }
-        }
+    let extra_headers = if attach {
+        attribution_headers()
+            .ok()
+            .map(|headers| {
+                headers
+                    .iter()
+                    .filter_map(|(name, value)| {
+                        value
+                            .to_str()
+                            .ok()
+                            .map(|value| (name.as_str().to_owned(), value.to_owned()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     } else {
         log::warn!(
             "[tinyhumans][inference] refusing to send a bearer token to a non-https, non-loopback URL"
         );
-    }
+        Vec::new()
+    };
+    let request = discovery_request(
+        &effective_backend_api_url(&config.api_url),
+        "",
+        attach.then_some(token.as_str()),
+        &extra_headers,
+    )
+    .with_listing_url(url.clone())
+    .with_timeout(std::time::Duration::from_secs(30));
 
     let models = match fetch_model_catalog(&client, request).await {
         Ok(models) => models,
@@ -300,36 +310,44 @@ pub(super) fn limits_request(model: &str, config: &Config) -> Option<DiscoveryRe
     let inference_base = effective_api_url(&config.api_url);
     let endpoint = format!("{}/openai/v1", inference_base.trim_end_matches('/'));
     let listing_url = catalog_url(config);
-    let mut request = DiscoveryRequest::new(endpoint, model)
-        .with_listing_url(listing_url.clone())
-        .with_single_model_probe(false);
-    match resolve_backend_credential(config) {
+    let auth = match resolve_backend_credential(config) {
         Ok(BackendCredential::ApiKey(key)) if is_managed_endpoint_for_api_key(&listing_url) => {
-            request = request.with_header("Authorization", format!("Bearer {key}"));
+            Some(key)
         }
         Ok(BackendCredential::Session(token))
             if is_safe_endpoint_for_managed_bearer(&listing_url) =>
         {
-            request = request.with_header("Authorization", format!("Bearer {token}"));
+            Some(token)
         }
         Ok(_) => {
             log::warn!(
                 "[tinyhumans][inference] refusing to send the backend credential to an unsafe listing url"
             );
+            None
         }
         Err(_) => {
             log::debug!(
                 "[tinyhumans][inference] no backend credential; managed listing probed anonymously"
             );
+            None
         }
-    }
-    if let Ok(headers) = attribution_headers() {
-        for (name, value) in headers.iter() {
-            if let Ok(value) = value.to_str() {
-                request = request.with_header(name.as_str(), value);
-            }
-        }
-    }
+    };
+    let extra_headers = attribution_headers()
+        .ok()
+        .map(|headers| {
+            headers
+                .iter()
+                .filter_map(|(name, value)| {
+                    value
+                        .to_str()
+                        .ok()
+                        .map(|value| (name.as_str().to_owned(), value.to_owned()))
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let request = discovery_request(&inference_base, model, auth.as_deref(), &extra_headers)
+        .with_listing_url(listing_url);
     Some(request)
 }
 
