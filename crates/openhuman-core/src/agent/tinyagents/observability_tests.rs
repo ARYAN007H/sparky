@@ -432,7 +432,10 @@ fn emit_recovered_unknown_tool_call(sink: &EventSink, call_id: &str) {
     });
 }
 
-include!("observability_tests_tool_rows.rs");
+mod upstream_tool_rows {
+    use super::*;
+    include!("observability_tests_tool_rows.rs");
+}
 
 #[path = "observability_projection_tests.rs"]
 mod projection_tests;
