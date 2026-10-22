@@ -1,3 +1,4 @@
+mod common;
 #[path = "support/host_only_tools.rs"]
 mod scenarios;
 

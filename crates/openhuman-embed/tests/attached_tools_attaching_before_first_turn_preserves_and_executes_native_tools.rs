@@ -1,3 +1,4 @@
+mod common;
 #[path = "support/attached_tools.rs"]
 mod scenarios;
 

@@ -1,3 +1,4 @@
+mod common;
 #[path = "support/structured_turns.rs"]
 mod scenarios;
 
