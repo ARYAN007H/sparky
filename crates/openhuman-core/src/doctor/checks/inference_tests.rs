@@ -394,6 +394,9 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
     use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
     use crate::config::test_env::EnvVarGuard;
     use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
+    use crate::config::schema::cloud_providers::{
+        register_hosted_cloud_provider_policy, AuthStyle,
+    };
     use crate::inference::registry::{
         register_chat_model, register_inspection_chat_model, InspectionChatModelFactory,
     };
@@ -424,6 +427,10 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
         .without("OPENHUMAN_ACTION_DIR")
         .without("OPENAI_API_KEY")
         .without("OPENHUMAN_CORE_TOKEN");
+    register_hosted_cloud_provider_policy(
+        Arc::new(|slug| slug == "openhuman"),
+        Arc::new(|style| style == AuthStyle::OpenhumanJwt),
+    );
     let constructions = Arc::new(AtomicUsize::new(0));
     let generations = Arc::new(AtomicUsize::new(0));
     let build_constructions = Arc::clone(&constructions);
@@ -530,6 +537,10 @@ struct RegisterManagedModel;
 
 impl Drop for RegisterManagedModel {
     fn drop(&mut self) {
+        crate::config::schema::cloud_providers::register_hosted_cloud_provider_policy(
+            Arc::new(|_| false),
+            Arc::new(|_| false),
+        );
         crate::inference::registry::unregister_inspection_chat_model(
             crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         );
