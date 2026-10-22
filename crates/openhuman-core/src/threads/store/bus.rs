@@ -398,13 +398,14 @@ async fn persist_channel_turn(
     workspace_dir: &Path,
     descriptor: ChannelTurnDescriptor<'_>,
 ) -> Result<(), String> {
-    if let Some(envelope) = descriptor.inbound_envelope
-        && (envelope.channel.id != descriptor.channel
+    if let Some(envelope) = descriptor.inbound_envelope {
+        if envelope.channel.id != descriptor.channel
             || envelope.message_id != descriptor.message_id
             || envelope.sender.id != descriptor.sender
-            || envelope.conversation.id != descriptor.reply_target)
-    {
-        return Err("inbound envelope identity does not match message".into());
+            || envelope.conversation.id != descriptor.reply_target
+        {
+            return Err("inbound envelope identity does not match message".into());
+        }
     }
     // The fixture exists only where both features compile it (channels/mod.rs).
     #[cfg(all(test, feature = "channels", feature = "modules"))]
