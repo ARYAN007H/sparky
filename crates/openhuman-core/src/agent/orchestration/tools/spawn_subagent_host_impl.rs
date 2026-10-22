@@ -3,8 +3,6 @@ async fn find_reusable_driver_session(
     legacy: &SubagentSessionStore,
     selector: &SubagentSessionSelector,
 ) -> Result<Option<DurableSubagentSession>, String> {
-    use tinyagents_orchestration::subagent::SubagentSessionStore as _;
-
     let driver_selector = tinyagents_orchestration::subagent::SubagentSessionSelector {
         parent_session: selector.parent_session.clone(),
         parent_thread_id: selector.parent_thread_id.clone(),
