@@ -282,9 +282,10 @@ async fn historical_profile_fixture_conversation_survives_layout_copy_and_owner_
         raw_scope.clone(),
         tinyagents_storage_kit::Scope::new(Scope::local().as_str()).unwrap(),
     );
+    let lease_scope = owner_scope.clone();
     let migrate_storage = owner_scope.clone();
     storage::block_on(async move {
-        tinyagents_storage_kit::with_migration_lease(&owner_scope, "conversations", move |_| {
+        tinyagents_storage_kit::with_migration_lease(&lease_scope, "conversations", move |_| {
             let migration_storage = migrate_storage.clone();
             async move {
                 let docs = Arc::clone(migration_storage.documents());
@@ -303,15 +304,22 @@ async fn historical_profile_fixture_conversation_survives_layout_copy_and_owner_
     .unwrap();
 
     let conversations = DriverConversationStore::new(owner_scope);
-    let threads = storage::block_on(async { conversations.list_threads().await }).unwrap();
+    let (threads, messages) = storage::block_on_anyhow(async move {
+        let threads = conversations
+            .list_threads()
+            .await
+            .map_err(anyhow::Error::from)?;
+        let messages = conversations
+            .get_messages("fixture-thread")
+            .await
+            .map_err(anyhow::Error::from)?;
+        Ok((threads, messages))
+    })
+    .unwrap();
     assert_eq!(threads.len(), 1);
     assert_eq!(threads[0].id, "fixture-thread");
     assert_eq!(threads[0].title, "Fixture thread");
     assert_eq!(threads[0].message_count, 1);
-    let messages = storage::block_on(async {
-        conversations.get_messages("fixture-thread").await
-    })
-    .unwrap();
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0].id, "fixture-message");
     assert_eq!(messages[0].content, "historical profile message");
