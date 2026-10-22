@@ -198,9 +198,14 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     })
     .await
     .expect("driver child cancellation settles");
-    let stopped_snapshot =
-        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&core), || store.load())
-            .expect("stopped durable row readable");
+    let stopped_snapshot = super::driver_sessions_for_parent(
+        &dispatch,
+        workspace.path(),
+        "stop-detached-subagent-session",
+        Some(thread_id),
+    )
+    .await
+    .expect("stopped driver row readable");
     let stopped_snapshot = serde_json::to_string(&stopped_snapshot).expect("encode stopped row");
 
     let repeated = crate::core::runtime::CoreContext::scope(
@@ -210,9 +215,14 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
     .await
     .expect("repeated stop");
     assert_eq!(repeated.value["subagents_cancelled"], serde_json::json!(0));
-    let after_repeat =
-        crate::core::runtime::CoreContext::sync_scope(Arc::clone(&core), || store.load())
-            .expect("repeated stop leaves durable row readable");
+    let after_repeat = super::driver_sessions_for_parent(
+        &dispatch,
+        workspace.path(),
+        "stop-detached-subagent-session",
+        Some(thread_id),
+    )
+    .await
+    .expect("repeated stop leaves driver row readable");
     assert_eq!(
         serde_json::to_string(&after_repeat).expect("encode repeated stop row"),
         stopped_snapshot,
@@ -222,7 +232,6 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
 
 #[tokio::test]
 async fn cancel_of_a_completed_driver_child_reports_completed_without_rewriting_its_session() {
-    use crate::agent::orchestration::subagent_sessions::SubagentSessionStore;
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
 
     let workspace = tempfile::TempDir::new().expect("workspace");

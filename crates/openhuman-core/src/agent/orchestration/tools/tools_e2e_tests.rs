@@ -29,7 +29,8 @@ pub(super) async fn driver_sessions_for_parent(
         parent_session,
         parent_thread_id.map(str::to_owned),
         None,
-    )?
+    )
+    .map_err(|error| error.to_string())?
     .list_for_parent(parent_session, parent_thread_id)
     .await
     .map_err(|error| error.to_string())?;

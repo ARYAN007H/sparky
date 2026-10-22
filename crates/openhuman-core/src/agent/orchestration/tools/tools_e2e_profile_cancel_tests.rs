@@ -203,8 +203,14 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         SubAgentJobStatus::Running,
         "foreign cancellation leaves the owner job running"
     );
-    let after_bob = CoreContext::sync_scope(Arc::clone(&alice), || store.load())
-        .expect("durable child row remains readable")
+    let after_bob = super::driver_sessions_for_parent(
+        &alice_ctx,
+        &workspace,
+        "shared-profile-parent-session",
+        Some(thread_id),
+    )
+        .await
+        .expect("driver child row remains readable")
         .into_iter()
         .find(|row| row.subagent_session_id == row_before.subagent_session_id)
         .expect("foreign attempt keeps Alice's durable row");
@@ -230,8 +236,14 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         .is_none(),
         "SaaS cancellation without a profile fails closed"
     );
-    let after_unbound = CoreContext::sync_scope(Arc::clone(&alice), || store.load())
-        .expect("unbound attempt leaves durable child row readable")
+    let after_unbound = super::driver_sessions_for_parent(
+        &alice_ctx,
+        &workspace,
+        "shared-profile-parent-session",
+        Some(thread_id),
+    )
+        .await
+        .expect("unbound attempt leaves driver child row readable")
         .into_iter()
         .find(|row| row.subagent_session_id == row_before.subagent_session_id)
         .expect("unbound attempt keeps Alice's durable row");
