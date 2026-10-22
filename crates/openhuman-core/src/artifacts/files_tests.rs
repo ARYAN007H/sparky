@@ -453,3 +453,21 @@ async fn a_legacy_record_symlinked_out_of_the_artifacts_root_is_refused() {
         read.map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
     );
 }
+
+/// An embedder may pass a relative workspace; a legacy record must still
+/// resolve through the escape guard, which only accepts absolute paths.
+#[tokio::test]
+async fn a_legacy_record_in_a_relative_workspace_still_resolves() {
+    let tmp = tempfile::Builder::new()
+        .prefix("artifacts-relative-ws-")
+        .tempdir_in(".")
+        .unwrap();
+    let ws = Path::new(tmp.path().file_name().unwrap());
+    let meta = legacy_meta("legacy-4", "legacy-4/x.txt");
+    save_artifact_meta(ws, &meta).await.unwrap();
+    std::fs::create_dir_all(ws.join("artifacts/legacy-4")).unwrap();
+    std::fs::write(ws.join("artifacts/legacy-4/x.txt"), b"abc").unwrap();
+
+    let bytes = read_artifact_bytes(ws, ws, "legacy-4").await.unwrap();
+    assert_eq!(bytes, b"abc");
+}

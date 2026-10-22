@@ -133,8 +133,12 @@ pub(crate) async fn migrate_with(
 fn legacy_bytes(root: &Path, artifact_dir: &Path, meta: &ArtifactMeta) -> Option<PathBuf> {
     let candidate = root.join(&meta.path);
     // The escape guard also refuses a symlink that leads out of the directory.
-    (super::files::check_within(artifact_dir, &candidate).is_ok() && candidate.is_file())
-        .then_some(candidate)
+    // Check against `root` too: when `artifact_dir` is itself a symlink, both
+    // sides of the inner check resolve through it.
+    (super::files::check_within(root, &candidate).is_ok()
+        && super::files::check_within(artifact_dir, &candidate).is_ok()
+        && candidate.is_file())
+    .then_some(candidate)
 }
 
 /// For a migrated record, every regular file in its artifact directory other
