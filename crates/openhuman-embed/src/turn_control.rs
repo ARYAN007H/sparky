@@ -28,7 +28,7 @@ impl Turn {
         let dispatch = Box::pin(self.send_scoped());
         match environment {
             Some(environment) => {
-                let command_environment = tinytools_std::timeout::CommandEnvironment::new(
+                let command_environment = tinyagents_harness_tools::exec::timeout::CommandEnvironment::new(
                     environment
                         .iter()
                         .map(|(name, value)| (name.clone(), value.clone())),

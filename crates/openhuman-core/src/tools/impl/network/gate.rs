@@ -5,7 +5,7 @@
 //! directly, with the same argument and the same answer. No policy is decided
 //! here; the adapter only names the questions.
 
-use tinytools_std::network::NetGate;
+use tinyagents_harness_tools::net::network::NetGate;
 
 use crate::security::egress::{
     emit_external_transfer, local_only_tool_block, DataKind, EgressDescriptor,

@@ -9,12 +9,12 @@
 //! Resolution order, highest precedence first:
 //! 1. `OPENHUMAN_TOOL_TIMEOUT_SECS` (operator override, when valid).
 //! 2. The value pushed from config via [`set_tool_timeout_secs`].
-//! 3. `tinytools_std::timeout::DEFAULT_TIMEOUT_SECS`.
+//! 3. `tinyagents_harness_tools::exec::timeout::DEFAULT_TIMEOUT_SECS`.
 
 use std::sync::{Once, OnceLock};
 
 use tinyagents_harness::tool::ToolTimeoutSettings;
-use tinytools_std::timeout::{
+use tinyagents_harness_tools::exec::timeout::{
     self as module, MAX_TIMEOUT_SECS, MIN_TIMEOUT_SECS, TOOL_TIMEOUT_GRACE_SECS,
 };
 

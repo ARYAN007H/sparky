@@ -289,7 +289,7 @@ pub(super) fn install_turn_middleware(
         .map(std::time::Duration::from_millis);
     harness.push_middleware(Arc::new(TurnClockMiddleware::new(turn_budget)));
     let shell_turn_budget =
-        ShellTurnBudget::with_max_timeout(turn_budget, tinytools_std::timeout::MAX_TIMEOUT_SECS);
+        ShellTurnBudget::with_max_timeout(turn_budget, tinyagents_harness_tools::exec::timeout::MAX_TIMEOUT_SECS);
     harness.push_middleware(Arc::new(shell_turn_budget.notes()));
     if let Some(mw) = &repeat_progress {
         harness.push_middleware(mw.clone());

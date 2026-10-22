@@ -25,7 +25,7 @@ use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
 use tinyagents_definition::{validate_tier_transition, AgentTier, IterationPolicy, PromptSource};
 use tinyagents_harness::context::{current_run_depth, with_run_depth, RunConfig, RunDepth};
 use tinytools::{Tool, ToolSpec};
-use tinytools_std::file_state::with_file_state_agent_id;
+use tinyagents_harness_tools::fs::file_state::with_file_state_agent_id;
 
 use super::prompt::compose_subagent_system_prompt;
 use super::provider::resolve_subagent_source;

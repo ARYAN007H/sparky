@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 #[cfg(feature = "web3")]
 use tinytools::{PermissionLevel, Tool, ToolResult};
-use tinytools_std::network::{
+use tinyagents_harness_tools::net::network::{
     AsyncHtmlExtractor, CurlTool, HttpLimits, HttpRequestTool, NetGate, WebFetchTool,
 };
 
@@ -251,7 +251,7 @@ mod x402 {
     //! x402 machine payment for `http_request`'s `402 Payment Required` retry.
 
     use async_trait::async_trait;
-    use tinytools_std::network::{PaymentAttempt, PaymentHook};
+    use tinyagents_harness_tools::net::network::{PaymentAttempt, PaymentHook};
 
     use super::{ApprovalChatContext, DispatchCtx};
     use crate::modules::x402_service;

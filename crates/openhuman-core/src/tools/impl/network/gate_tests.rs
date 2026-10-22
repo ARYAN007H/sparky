@@ -3,7 +3,7 @@ use crate::security::{AutonomyLevel, SecurityPolicy};
 use serde_json::json;
 use std::sync::Arc;
 use tinytools::{PermissionLevel, Tool};
-use tinytools_std::network::{CurlTool, HttpRequestTool, PushoverTool, WebFetchTool};
+use tinyagents_harness_tools::net::network::{CurlTool, HttpRequestTool, PushoverTool, WebFetchTool};
 
 fn policy(autonomy: AutonomyLevel, max_actions_per_hour: u32) -> Arc<SecurityPolicy> {
     Arc::new(SecurityPolicy {

@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use serde_json::json;
 use tinytools::{Tool, ToolCallOptions, ToolRunContext, WorkspaceDescriptor};
-use tinytools_std::filesystem::{
+use tinyagents_harness_tools::fs::filesystem::{
     ApplyPatchTool, CsvExportTool, EditFileTool, FileReadTool, FileWriteTool, FsGate,
     GitOperationsTool, GlobTool, GrepTool, ListFilesTool,
 };

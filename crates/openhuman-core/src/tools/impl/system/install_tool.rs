@@ -19,7 +19,7 @@ use std::time::Duration;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 use tokio::process::Command as TokioCommand;
 
-use tinytools_std::detect_tools::find_on_path;
+use tinyagents_harness_tools::exec::detect_tools::find_on_path;
 
 /// Hard cap on an install before it is killed.
 const INSTALL_TIMEOUT_SECS: u64 = 300;
@@ -218,7 +218,7 @@ impl InstallToolTool {
         cmd.args(&prefix).arg(package);
         cmd.current_dir(&self.security.workspace_dir);
 
-        let output = match tinytools_std::timeout::output_or_kill(
+        let output = match tinyagents_harness_tools::exec::timeout::output_or_kill(
             &mut cmd,
             Duration::from_secs(INSTALL_TIMEOUT_SECS),
         )
