@@ -525,11 +525,6 @@ async fn thread_delete_inner(
         &dir,
         &request.thread_id,
     );
-    crate::agent::orchestration::completion_owners::release_thread_deletion(
-        &ctx,
-        &dir,
-        &request.thread_id,
-    );
     log::debug!(
         "[threads] thread_delete thread_id={} cancelled_subagents={} discarded_completions={}",
         request.thread_id,

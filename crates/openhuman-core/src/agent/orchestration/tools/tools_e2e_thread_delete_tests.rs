@@ -222,6 +222,18 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         "settled thread deletion releases active child owner slots"
     );
     assert!(
+        crate::agent::orchestration::completion_owners::note_driver_task(
+            &dispatch,
+            "late-child-after-parent-delete",
+            workspace.clone(),
+            workspace_descriptor.clone(),
+            parent_session.into(),
+            Some(thread_id.into()),
+        )
+        .is_err(),
+        "the permanent deletion fence refuses children that race after the sweep"
+    );
+    assert!(
         background_completions::pending_for(&workspace, thread_id).is_empty(),
         "queued child completions are discarded after cancellation"
     );

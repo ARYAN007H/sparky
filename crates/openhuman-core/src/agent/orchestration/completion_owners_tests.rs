@@ -62,14 +62,12 @@ fn deleting_thread_refuses_late_owner_registration_but_keeps_prior_owner() {
     ));
 
     let late = owner("late");
-    let result = remember_active_driver_task(
-        &mut st,
-        "late".into(),
-        late,
-        ACTIVE_DRIVER_TASKS_CAP,
-    );
+    let result = remember_active_driver_task(&mut st, "late".into(), late, ACTIVE_DRIVER_TASKS_CAP);
 
-    assert!(result.is_err(), "a child cannot enter after deletion fences admission");
+    assert!(
+        result.is_err(),
+        "a child cannot enter after deletion fences admission"
+    );
     assert!(
         st.driver_tasks.contains_key(&existing_key),
         "deletion still sees owners admitted before its fence"

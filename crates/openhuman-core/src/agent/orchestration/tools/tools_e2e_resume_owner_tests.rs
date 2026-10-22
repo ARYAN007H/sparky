@@ -167,10 +167,9 @@ async fn resuming_after_owner_cache_loss_registers_live_task_before_launch() {
     )
     .iter()
     .any(|(owner_task_id, _)| owner_task_id == &task_id);
-    let resumed_owner = crate::agent::orchestration::completion_owners::driver_task_owner(
-        &dispatch, &task_id,
-    )
-    .expect("resumed task retains its parent scope");
+    let resumed_owner =
+        crate::agent::orchestration::completion_owners::driver_task_owner(&dispatch, &task_id)
+            .expect("resumed task retains its parent scope");
     let owner_key = crate::agent::tinyagents::tool_registration::subagent_owner_key(
         &resumed_owner.workspace_dir,
         &resumed_owner.parent_session,

@@ -162,7 +162,7 @@ pub(crate) fn begin_thread_deletion(
     Ok(())
 }
 
-/// Release a deletion fence after either delete failure or durable parent closure.
+/// Release a temporary deletion fence when the conversation delete itself failed.
 pub(crate) fn release_thread_deletion(
     ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &std::path::Path,
