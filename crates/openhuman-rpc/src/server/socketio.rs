@@ -1192,11 +1192,17 @@ fn replay_parked_approval(socket: &SocketRef, thread_id: &str) {
 /// UI the same fire-and-forget way, so the same reconciliation applies.
 fn socket_replay_tenant(
     profile_id: Option<&str>,
-    ambient: Result<crate::core_host::core::runtime::Tenant, crate::core_host::core::runtime::NoTenant>,
-) -> Result<crate::core_host::core::runtime::Tenant, crate::core_host::core::runtime::NoTenant> {
+    ambient: Result<
+        crate::core_host::core::runtime::tenant::Tenant,
+        crate::core_host::core::runtime::tenant::NoTenant,
+    >,
+) -> Result<
+    crate::core_host::core::runtime::tenant::Tenant,
+    crate::core_host::core::runtime::tenant::NoTenant,
+> {
     match profile_id {
         Some(profile) if !profile.trim().is_empty() => {
-            Ok(crate::core_host::core::runtime::Tenant {
+            Ok(crate::core_host::core::runtime::tenant::Tenant {
                 profile: Some(profile.to_owned()),
                 agent: None,
             })

@@ -5,7 +5,7 @@ use super::{
 
 #[test]
 fn plan_review_replay_uses_the_joining_sockets_profile() {
-    let ambient = crate::core_host::core::runtime::Tenant {
+    let ambient = crate::core_host::core::runtime::tenant::Tenant {
         profile: Some("ambient-profile".into()),
         agent: None,
     };
