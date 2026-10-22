@@ -22,14 +22,17 @@ test("core chat failure keys are used even though the UI translates them dynamic
     closeSync(reportFd);
     rmSync(directory, { recursive: true, force: true });
   }
-  const table = readFileSync(
+  const failureCopySources = [
     "crates/openhuman-core/src/inference/failure_copy/table.rs",
-    "utf8",
-  );
-  const keys = [...table.matchAll(/"(chat_error\.[a-z_]+)"/g)].map(
-    (match) => match[1],
+    "vendor/tinyagents/vendor/tinyinference/crates/tinyinference-llm/src/failure/copy.rs",
+  ];
+  const keys = failureCopySources.flatMap((source) =>
+    [...readFileSync(source, "utf8").matchAll(/"(chat_error\.[a-z_]+)"/g)].map(
+      (match) => match[1],
+    ),
   );
   assert.ok(keys.length >= 28);
+  assert.equal(new Set(keys).size, keys.length, "failure-copy keys must be unique");
   assert.deepEqual(
     keys.filter((key) => report.unusedKeys.includes(key)),
     [],

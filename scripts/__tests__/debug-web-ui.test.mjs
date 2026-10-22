@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
 import net from "node:net";
 import test from "node:test";
 
@@ -103,26 +104,27 @@ test("ensureSignedInChat propagates its bounded composer wait failure", async ()
 });
 
 test("core RPC client bounds a stalled request and propagates its timeout", async () => {
-  let signal;
-  const hangingFetch = (_url, init) => {
-    signal = init.signal;
-    return new Promise((_resolve, reject) => {
-      signal.addEventListener("abort", () => reject(signal.reason), {
-        once: true,
-      });
-    });
-  };
+  const server = createServer(() => {});
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+
+  const { port } = server.address();
   const rpc = createCoreRpcClient(
-    "http://127.0.0.1:7788/rpc",
+    `http://127.0.0.1:${port}/rpc`,
     "test-token",
-    hangingFetch,
+    fetch,
     5,
   );
-
-  await assert.rejects(rpc("openhuman.auth_get_state"), {
-    name: "TimeoutError",
-  });
-  assert.equal(signal.aborted, true);
+  try {
+    await assert.rejects(rpc("openhuman.auth_get_state"), {
+      name: "TimeoutError",
+    });
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
 test("coreLaunchSpec isolates the core from operator credentials, storage, and dotenv", () => {
