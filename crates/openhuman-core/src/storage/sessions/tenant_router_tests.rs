@@ -1,5 +1,6 @@
 use super::*;
 use crate::storage::MemoryStorage;
+use tinystoragedrivers::{Capabilities, ScopedStorage, StorageError};
 
 fn stores() -> TenantSessionStores {
     TenantSessionStores::with_registry(
@@ -166,4 +167,81 @@ fn upstream_rebind_keeps_tenant_routing_and_moves_only_future_leases() {
             .is_some(),
         "a tenant first seen after rebind still gets a session store"
     );
+}
+
+#[test]
+fn failed_rebind_rolls_back_tenant_providers_already_moved() {
+    let registry = Arc::new(TenantStoreRegistry::default());
+    let first: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let second: Arc<dyn StorageBackend> = Arc::new(RejectBobTenantStorage::new());
+    let router = TenantSessionStores::with_registry(
+        Arc::clone(&first),
+        false,
+        tinyagents_harness::store::SchemaAdmission::Declare,
+        Arc::clone(&registry),
+    );
+    registry.register_backend(&router.backend);
+    let alice_key = crate::core::runtime::session_key(&crate::core::runtime::Tenant {
+        profile: Some("alice".into()),
+        agent: Some("asha".into()),
+    });
+    let bob_key = crate::core::runtime::session_key(&crate::core::runtime::Tenant {
+        profile: Some("bob".into()),
+        agent: Some("asha".into()),
+    });
+
+    let alice_before = router.lease_for_agent(&alice_key).unwrap();
+    let bob_before = router.lease_for_agent(&bob_key).unwrap();
+    let alice_destination = alice_before.stores().transcripts.destination_key();
+    let bob_destination = bob_before.stores().transcripts.destination_key();
+
+    assert_eq!(registry.rebind(&second), 0);
+    assert!(Arc::ptr_eq(&*router.backend.read().unwrap(), &first));
+
+    assert_eq!(
+        router
+            .lease_for_agent(&alice_key)
+            .unwrap()
+            .stores()
+            .transcripts
+            .destination_key(),
+        alice_destination,
+        "the earlier provider must return to its original backend when a later tenant fails"
+    );
+    assert_eq!(
+        router
+            .lease_for_agent(&bob_key)
+            .unwrap()
+            .stores()
+            .transcripts
+            .destination_key(),
+        bob_destination,
+        "the failing provider remains on its original backend"
+    );
+}
+
+#[derive(Debug)]
+struct RejectBobTenantStorage(MemoryStorage);
+
+impl RejectBobTenantStorage {
+    fn new() -> Self {
+        Self(MemoryStorage::new())
+    }
+}
+
+impl StorageBackend for RejectBobTenantStorage {
+    fn driver(&self) -> &'static str {
+        self.0.driver()
+    }
+
+    fn capabilities(&self) -> Capabilities {
+        self.0.capabilities()
+    }
+
+    fn for_scope(&self, scope: &Scope) -> Result<ScopedStorage, StorageError> {
+        if scope.as_str().starts_with("u:bob/") {
+            return Err(StorageError::invalid_input("injected Bob tenant failure"));
+        }
+        self.0.for_scope(scope)
+    }
 }
