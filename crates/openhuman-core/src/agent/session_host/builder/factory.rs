@@ -150,9 +150,6 @@ impl OpenHumanSessionHost {
         )
     }
 
-    #[path = "factory/build_session.rs"]
-    mod build_session;
-
 }
 
 /// Resolves the `AgentDefinition` a session should be built from, given the
