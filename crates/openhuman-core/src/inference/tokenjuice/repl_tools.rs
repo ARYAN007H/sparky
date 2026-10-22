@@ -72,6 +72,23 @@ fn host_tools(
     )
 }
 
+#[cfg(test)]
+pub(crate) fn repl_tools_with(
+    source: Arc<dyn QuerySource>,
+    limits: ReplLimits,
+) -> Vec<Box<dyn Tool>> {
+    host_tools(source, limits, None)
+}
+
+#[cfg(test)]
+pub(crate) fn repl_tools_with_artifacts(
+    source: Arc<dyn QuerySource>,
+    limits: ReplLimits,
+    artifacts_dir: Option<PathBuf>,
+) -> Vec<Box<dyn Tool>> {
+    host_tools(source, limits, artifacts_dir)
+}
+
 /// The current TinyJuice REPL declarations for ordinary turns.
 pub fn repl_tools() -> Vec<Box<dyn Tool>> {
     host_tools(Arc::new(ModuleSource { config: None }), ReplLimits::default(), None)
