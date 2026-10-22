@@ -40,7 +40,8 @@ pub(super) use store_adapter::{
 };
 use thread_index::{key, note_thread_workspace};
 pub(crate) use thread_index::{
-    note_session_thread, router_for_thread, thread_for_session, workspace_for_thread,
+    note_session_thread, note_thread_workspace, router_for_thread, thread_for_session,
+    workspace_for_thread,
 };
 
 use std::path::{Path, PathBuf};

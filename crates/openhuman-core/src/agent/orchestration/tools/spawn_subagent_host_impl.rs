@@ -593,6 +593,30 @@ impl SpawnSubagentTool {
             task_key
         );
 
+        if let Some(thread_id) = parent_thread_id.as_deref() {
+            crate::agent::orchestration::background_completions::note_thread_workspace(
+                &dispatch,
+                thread_id,
+                &parent.workspace_dir,
+            );
+            crate::agent::orchestration::background_completions::note_session_thread(
+                &dispatch,
+                &parent_session,
+                thread_id,
+            );
+        }
+        let task_workspace = workspace_descriptor
+            .clone()
+            .unwrap_or_else(|| tinytools::WorkspaceDescriptor::new(parent.workspace_dir.clone()));
+        crate::agent::orchestration::completion_owners::note_driver_task(
+            &dispatch,
+            &task_id,
+            parent.workspace_dir.clone(),
+            task_workspace,
+            parent_session.clone(),
+            parent_thread_id.clone(),
+        );
+
         crate::agent::orchestration::subagent_events::publish_subagent_spawned(
             parent_session.clone(),
             definition.id.clone(),
