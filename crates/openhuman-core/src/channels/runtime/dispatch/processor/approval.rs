@@ -16,8 +16,10 @@ use tinychannels_bus as traits;
 ///
 /// [`ApprovalChatContext`]: crate::security::approval::ApprovalChatContext
 /// [`ApprovalGate`]: crate::security::approval::ApprovalGate
-pub(crate) fn channel_has_approval_surface(channel: &str) -> bool {
-    tinychannels_bus::capabilities_for(channel).chat_approvals
+pub(crate) fn channel_has_approval_surface(
+    capabilities: &tinychannels_bus::ChannelCapabilities,
+) -> bool {
+    capabilities.chat_approvals
 }
 
 /// If the inbound message is a yes/no reply for a parked approval on
@@ -29,7 +31,7 @@ pub(crate) fn channel_has_approval_surface(channel: &str) -> bool {
 ///
 /// [`ApprovalGate::decide`]: crate::security::approval::ApprovalGate::decide
 pub(super) async fn try_route_approval_reply(
-    msg: &traits::ChannelMessage,
+    msg: &traits::ChannelInboundEnvelope,
     thread_id: &str,
 ) -> bool {
     let Some(gate) = crate::security::approval::ApprovalGate::try_global() else {
@@ -38,14 +40,14 @@ pub(super) async fn try_route_approval_reply(
     let Some(request_id) = gate.pending_for_thread(thread_id) else {
         return false;
     };
-    let Some(decision) = crate::security::approval::parse_approval_reply(&msg.content) else {
+    let Some(decision) = crate::security::approval::parse_approval_reply(&msg.text) else {
         return false;
     };
     match gate.decide(&request_id, decision) {
         Ok(Some(_)) => {
             tracing::info!(
                 "[dispatch] routed chat reply to approval gate channel={} thread_id={} request_id={} decision={}",
-                msg.channel,
+                msg.channel.id,
                 thread_id,
                 request_id,
                 decision.as_str()
@@ -58,7 +60,7 @@ pub(super) async fn try_route_approval_reply(
             // intercept; fall through so the reply lands as a normal turn.
             tracing::warn!(
                 "[dispatch] approval reply targeted a non-pending request channel={} thread_id={} request_id={} — dispatching as fresh turn",
-                msg.channel,
+                msg.channel.id,
                 thread_id,
                 request_id
             );
@@ -67,7 +69,7 @@ pub(super) async fn try_route_approval_reply(
         Err(err) => {
             tracing::warn!(
                 "[dispatch] approval gate decide failed channel={} thread_id={} request_id={}: {err}",
-                msg.channel,
+                msg.channel.id,
                 thread_id,
                 request_id
             );
