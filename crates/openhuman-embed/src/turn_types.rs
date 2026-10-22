@@ -206,6 +206,12 @@ pub struct TurnRequest {
     /// Additional headers owned by this turn route.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub inference_headers: Vec<(String, String)>,
+    /// Provider-specific defaults for the per-turn route.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inference_provider_options: Option<serde_json::Value>,
+    /// Reasoning effort for the per-turn route's model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inference_reasoning_effort: Option<String>,
     /// Bearer half of the per-call route. Paired with `inference_url`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
@@ -226,6 +232,8 @@ impl TurnRequest {
             cwd: None,
             inference_url: None,
             inference_headers: Vec::new(),
+            inference_provider_options: None,
+            inference_reasoning_effort: None,
             api_key: None,
             agent_id: None,
         }
