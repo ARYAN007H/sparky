@@ -1,10 +1,10 @@
 #![cfg(feature = "storage-sqlite")]
 
 use super::*;
+use crate::storage::rusqlite;
+use crate::storage::test_support::{sqlite_backend, SqliteBackend};
 use crate::storage::DocumentStoreExt as _;
 use crate::storage::Scope;
-use crate::storage::rusqlite;
-use crate::storage::test_support::{SqliteBackend, sqlite_backend};
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use tempfile::TempDir;
@@ -326,7 +326,7 @@ async fn historical_profile_fixture_conversation_survives_layout_copy_and_owner_
 #[tokio::test(flavor = "multi_thread")]
 async fn historical_profile_fixture_boots_into_typed_owner_records_without_resurrection() {
     use crate::profiles::{ProfileId, ProfileRegistry};
-    use crate::storage::layout::{Target, legacy};
+    use crate::storage::layout::{legacy, Target};
     use crate::storage::{self, Scope};
     use tinystoragedrivers::Query;
 
@@ -394,8 +394,14 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     )
     .await
     .unwrap();
-    assert!(matches!(migration, crate::storage::layout::Outcome::Migrated(_)));
-    assert!(target.storage_db().is_file(), "profile storage.db is bootable");
+    assert!(matches!(
+        migration,
+        crate::storage::layout::Outcome::Migrated(_)
+    ));
+    assert!(
+        target.storage_db().is_file(),
+        "profile storage.db is bootable"
+    );
     assert!(
         !source_db.exists(),
         "the archived v1 source is removed after successful migration"
@@ -424,9 +430,7 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     let local_scope = backend.for_scope(&Scope::local()).unwrap();
     let local_docs = Arc::clone(local_scope.documents());
     let (cost, artifact, args) = storage::block_on(async move {
-        let cost = local_docs
-            .query_all("cost.records", &Query::all())
-            .await?;
+        let cost = local_docs.query_all("cost.records", &Query::all()).await?;
         let artifact = local_docs
             .query_all("artifacts.records", &Query::all())
             .await?;
@@ -443,11 +447,10 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     assert_eq!(cost.len(), 1);
     let mut cost_body = cost[0].doc.clone();
     let cost_ms = cost_body["ts_ms"].as_i64().unwrap();
-    cost_body["usage"]["timestamp"] = serde_json::json!(
-        chrono::DateTime::from_timestamp_millis(cost_ms)
+    cost_body["usage"]["timestamp"] =
+        serde_json::json!(chrono::DateTime::from_timestamp_millis(cost_ms)
             .unwrap()
-            .to_rfc3339()
-    );
+            .to_rfc3339());
     let cost_record: crate::platform::cost::types::CostRecord =
         serde_json::from_value(cost_body).unwrap();
     assert_eq!(cost_record.id, "cost-0001");
@@ -460,11 +463,10 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     assert_eq!(artifact.len(), 1);
     let mut artifact_body = artifact[0].doc.clone();
     let created_ms = artifact_body["created_ms"].as_i64().unwrap();
-    artifact_body["created_at"] = serde_json::json!(
-        chrono::DateTime::from_timestamp_millis(created_ms)
+    artifact_body["created_at"] =
+        serde_json::json!(chrono::DateTime::from_timestamp_millis(created_ms)
             .unwrap()
-            .to_rfc3339()
-    );
+            .to_rfc3339());
     let artifact_meta: crate::artifacts::types::ArtifactMeta =
         serde_json::from_value(artifact_body).unwrap();
     assert_eq!(artifact_meta.id, "artifact-1");
@@ -484,8 +486,8 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
             .await
             .map_err(anyhow::Error::msg)
     })
-        .unwrap()
-        .unwrap();
+    .unwrap()
+    .unwrap();
     assert_eq!(profile.profile_id.as_str(), "u1");
     assert_eq!(profile.created_at, 1_738_548_306);
     assert_eq!(profile.layout_version, 1);
@@ -494,15 +496,12 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     // in the profile's TSD database and must still be readable after the
     // profile's real layout migration, including the owner-specific schema
     // conversion performed during boot.
-    let owner_docs = Arc::clone(
-        backend
-            .for_scope(&Scope::local())
-            .unwrap()
-            .documents(),
-    );
+    let owner_docs = Arc::clone(backend.for_scope(&Scope::local()).unwrap().documents());
     let (approvals, thread_keys, secrets, flows) = storage::block_on(async move {
         Ok::<_, crate::storage::StorageError>((
-            owner_docs.query_all("approvals.requests", &Query::all()).await?,
+            owner_docs
+                .query_all("approvals.requests", &Query::all())
+                .await?,
             owner_docs
                 .query_all("threads.transcript_keys", &Query::all())
                 .await?,
@@ -514,7 +513,11 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
     })
     .unwrap();
     assert_eq!(approvals.len(), 1, "historical approval remains readable");
-    assert_eq!(thread_keys.len(), 1, "historical thread key remains readable");
+    assert_eq!(
+        thread_keys.len(),
+        1,
+        "historical thread key remains readable"
+    );
     assert_eq!(secrets.len(), 1, "historical secret remains readable");
     assert_eq!(flows.len(), 1, "historical flow remains readable");
 
@@ -552,12 +555,7 @@ async fn historical_profile_fixture_boots_into_typed_owner_records_without_resur
         &Outcome::NoSource,
         "a later boot must not replay the removed v1 database: {moved:?}"
     );
-    let docs = Arc::clone(
-        backend
-            .for_scope(&Scope::local())
-            .unwrap()
-            .documents(),
-    );
+    let docs = Arc::clone(backend.for_scope(&Scope::local()).unwrap().documents());
     let remaining =
         storage::block_on(async move { docs.query_all("cost.records", &Query::all()).await })
             .unwrap();
@@ -593,18 +591,16 @@ fn processes_importing_one_workspace_at_once_import_it_once() {
         .filter(|o| matches!(o, Outcome::Imported { .. }))
         .count();
     assert_eq!(imports, 1, "exactly one process imports: {outcomes:?}");
-    assert!(
-        outcomes
-            .iter()
-            .all(|o| !matches!(o, Outcome::Imported { .. })
-                || matches!(
-                    o,
-                    Outcome::Imported {
-                        found: 20,
-                        written: 20
-                    }
-                ))
-    );
+    assert!(outcomes
+        .iter()
+        .all(|o| !matches!(o, Outcome::Imported { .. })
+            || matches!(
+                o,
+                Outcome::Imported {
+                    found: 20,
+                    written: 20
+                }
+            )));
     assert!(is_done(&backend, &config, &source).unwrap());
     assert_eq!(dump(&backend, &source, "devices.paired").len(), 20);
 }
@@ -772,11 +768,9 @@ async fn without_an_installed_backend_the_host_import_does_nothing() {
     legacy_device(&config, "chan-a", "Phone", false);
     assert!(crate::storage::installed().is_none());
 
-    assert!(
-        run(&crate::core::runtime::DispatchCtx::unbound(), &config)
-            .await
-            .is_empty()
-    );
+    assert!(run(&crate::core::runtime::DispatchCtx::unbound(), &config)
+        .await
+        .is_empty());
 }
 
 #[test]
