@@ -163,7 +163,7 @@ impl OpenHumanTurnPrelude {
                 .collect::<Vec<_>>();
             if !missing.is_empty() {
                 rebuilt.extend(
-                    crate::inference::tokenjuice::repl_tools::repl_tools_for_recorded(
+                    crate::inference::tokenjuice::repl_tools_for_recorded(
                         self.runtime_config.as_deref(),
                         &self.workspace_dir,
                         &missing,
