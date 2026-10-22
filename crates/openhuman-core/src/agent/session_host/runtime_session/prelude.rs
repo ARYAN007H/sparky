@@ -287,6 +287,7 @@ impl OpenHumanTurnPrelude {
                 &self.event_session_id,
                 &self.workspace_dir,
             )
+            .await
         {
             context.push_str(&block);
         }

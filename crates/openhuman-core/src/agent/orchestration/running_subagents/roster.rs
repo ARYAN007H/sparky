@@ -97,65 +97,12 @@ const DURABLE_ROSTER_CAP: usize = 12;
 ///    would re-delegate from scratch instead of resuming by
 ///    `subagent_session_id` (the "fresh context from day 0" bug).
 ///
-pub(crate) fn active_subagents_context_block(
+pub(crate) async fn active_subagents_context_block(
     ctx: &crate::core::runtime::DispatchCtx,
     parent_session: &str,
     workspace_dir: &std::path::Path,
 ) -> Option<String> {
     admit_workspace(ctx, workspace_dir).ok()?;
-    let store =
-        crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new_in_context(
-            ctx,
-            workspace_dir.to_path_buf(),
-        )
-        .ok()?;
-    let durable = crate::agent::orchestration::subagent_sessions::list_for_parent(
-        &store,
-        parent_session,
-        None,
-    );
-    let durable: Vec<DurableSubagentSessionSummary> = match durable {
-        Ok(sessions) => sessions
-            .into_iter()
-            .filter(|session| {
-                session.status
-                    != crate::agent::orchestration::subagent_sessions::DurableSubagentStatus::Closed
-            })
-            .take(DURABLE_ROSTER_CAP)
-            .map(|session| DurableSubagentSessionSummary {
-                subagent_session_id: session.subagent_session_id,
-                parent_thread_id: session.parent_thread_id,
-                worker_thread_id: session.worker_thread_id,
-                agent_id: session.agent_id,
-                display_name: session.display_name,
-                model: session.model,
-                sandbox_mode: session.sandbox_mode,
-                action_root: session.action_root,
-                task_key: session.task_key,
-                task_title: session.task_title,
-                current_task_id: session.current_task_id,
-                status: match session.status {
-                    crate::agent::orchestration::subagent_sessions::DurableSubagentStatus::Running => tinyagents_orchestration::subagent::DurableSubagentStatus::Running,
-                    crate::agent::orchestration::subagent_sessions::DurableSubagentStatus::Idle => tinyagents_orchestration::subagent::DurableSubagentStatus::Idle,
-                    crate::agent::orchestration::subagent_sessions::DurableSubagentStatus::AwaitingUser => tinyagents_orchestration::subagent::DurableSubagentStatus::AwaitingUser,
-                    crate::agent::orchestration::subagent_sessions::DurableSubagentStatus::Failed => tinyagents_orchestration::subagent::DurableSubagentStatus::Failed,
-                    crate::agent::orchestration::subagent_sessions::DurableSubagentStatus::Closed => tinyagents_orchestration::subagent::DurableSubagentStatus::Closed,
-                },
-                reusable: session.reusable,
-                latest_error: session.latest_error,
-                created_at: session.created_at,
-                updated_at: session.updated_at,
-                last_used_at: session.last_used_at,
-            })
-            .collect(),
-        Err(err) => {
-            log::warn!(
-                "[running_subagents] durable roster load failed parent_session={parent_session} error={err}"
-            );
-            Vec::new()
-        }
-    };
-
     let Some(thread_id) = crate::agent::orchestration::background_completions::thread_for_session(
         ctx,
         parent_session,
@@ -165,6 +112,55 @@ pub(crate) fn active_subagents_context_block(
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_harness_tools::subagents::SubAgentJobRegistry,
     >(ctx);
+    let sessions = match crate::agent::orchestration::subagent_sessions::open_for_context(
+        ctx,
+        workspace_dir.to_path_buf(),
+        parent_session,
+        Some(thread_id.clone()),
+        Some((*jobs).clone()),
+    ) {
+        Ok(store) => store
+            .list_for_parent(parent_session, Some(&thread_id))
+            .await
+            .unwrap_or_else(|error| {
+                log::warn!(
+                    "[running_subagents] durable roster load failed parent_session={parent_session} error={error}"
+                );
+                Vec::new()
+            }),
+        Err(error) => {
+            log::warn!(
+                "[running_subagents] durable roster open failed parent_session={parent_session} error={error}"
+            );
+            Vec::new()
+        }
+    };
+    let durable: Vec<DurableSubagentSessionSummary> = sessions
+        .into_iter()
+        .filter(|session| {
+            session.status != tinyagents_orchestration::subagent::DurableSubagentStatus::Closed
+        })
+        .take(DURABLE_ROSTER_CAP)
+        .map(|session| DurableSubagentSessionSummary {
+            subagent_session_id: session.subagent_session_id,
+            parent_thread_id: session.parent_thread_id,
+            worker_thread_id: session.worker_thread_id,
+            agent_id: session.agent_id,
+            display_name: session.display_name,
+            model: session.model,
+            sandbox_mode: session.sandbox_mode,
+            action_root: session.action_root,
+            task_key: session.task_key,
+            task_title: session.task_title,
+            current_task_id: session.current_task_id,
+            status: session.status,
+            reusable: session.reusable,
+            latest_error: session.latest_error,
+            created_at: session.created_at,
+            updated_at: session.updated_at,
+            last_used_at: session.last_used_at,
+        })
+        .collect();
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
         workspace_dir,
         parent_session,
