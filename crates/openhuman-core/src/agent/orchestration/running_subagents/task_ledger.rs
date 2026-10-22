@@ -11,12 +11,11 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
 use tinyagents_orchestration::subagent::{
-    WaitError, orphaned_subagent_reason, record_agent_id, record_parent_session,
-    task_status_label,
+    orphaned_subagent_reason, record_agent_id, record_parent_session, task_status_label, WaitError,
 };
 use tinyagents_tasks::{
-    InMemoryTaskStore, OrchestrationTaskFilter, TaskStore, TaskStoreRegistry,
-    open_driver_task_store_or_memory, reconcile_orphaned_tasks,
+    open_driver_task_store_or_memory, reconcile_orphaned_tasks, InMemoryTaskStore,
+    OrchestrationTaskFilter, TaskStore, TaskStoreRegistry,
 };
 
 /// One cached ledger: a workspace and the storage scope it was opened for.
@@ -97,9 +96,10 @@ pub(super) fn scoped_task_store(
     workspace_dir: &Path,
 ) -> Result<Arc<dyn TaskStore>, WaitError> {
     if let Some(context) = ctx.resolved() {
-        return Ok(crate::core::runtime::CoreContext::sync_scope(context, || {
-            task_store_for_workspace(workspace_dir)
-        }));
+        return Ok(crate::core::runtime::CoreContext::sync_scope(
+            context,
+            || task_store_for_workspace(workspace_dir),
+        ));
     }
     if crate::core::runtime::is_saas() {
         return Err(WaitError::NotOwned);

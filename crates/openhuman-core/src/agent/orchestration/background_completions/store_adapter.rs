@@ -2,8 +2,8 @@
 
 use super::*;
 use tinyagents_tasks::{
-    CompletionRouterPool, CompletionStoreFallback, CompletionStoreReplaceOutcome,
-    InMemoryCompletionStore, DEFAULT_MAX_ATTEMPTS, open_driver_completion_store_or_memory,
+    open_driver_completion_store_or_memory, CompletionRouterPool, CompletionStoreFallback,
+    CompletionStoreReplaceOutcome, InMemoryCompletionStore, DEFAULT_MAX_ATTEMPTS,
 };
 
 pub(in crate::agent::orchestration) fn router_scope_for(
