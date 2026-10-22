@@ -374,6 +374,7 @@ pub(crate) async fn cancel_for_thread(
                 }
             };
             if terminal_session.is_some() {
+                crate::agent::orchestration::completion_owners::finish_driver_task(ctx, &task_id);
                 continue;
             }
             failures.push(format!(
@@ -443,7 +444,7 @@ pub(crate) fn stop_for_thread(
                 thread_id,
             );
             let mut task_ids = Vec::new();
-            let mut stopped_scopes = Vec::new();
+            let mut stopped_scopes: Vec<(ParentJobScope, Vec<String>)> = Vec::new();
             for (task_id, owner_scope) in scopes {
                 let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
                     &owner_scope.workspace_dir,
@@ -454,33 +455,57 @@ pub(crate) fn stop_for_thread(
                     continue;
                 };
                 let scope = ParentJobScope::new(owner_scope.workspace.clone(), parent_thread_id);
-                let has_live_task =
-                    jobs.list_for_parent_scope(&owner, &scope)
-                        .ok()
-                        .is_some_and(|jobs| {
-                            jobs.iter().any(|job| {
-                                job.extensions
-                                    .get("task_id")
-                                    .and_then(serde_json::Value::as_str)
-                                    == Some(task_id.as_str())
-                                    && matches!(
-                                        job.status,
-                                        SubAgentJobStatus::Queued
-                                            | SubAgentJobStatus::Running
-                                            | SubAgentJobStatus::AwaitingInput
-                                    )
-                            })
-                        });
-                if has_live_task {
+                let matching_status = jobs
+                    .list_for_parent_scope(&owner, &scope)
+                    .ok()
+                    .and_then(|jobs| {
+                        jobs.into_iter().find_map(|job| {
+                            (job.extensions
+                                .get("task_id")
+                                .and_then(serde_json::Value::as_str)
+                                == Some(task_id.as_str()))
+                            .then_some(job.status)
+                        })
+                    });
+                if matching_status.is_some_and(|status| {
+                    matches!(
+                        status,
+                        SubAgentJobStatus::Queued
+                            | SubAgentJobStatus::Running
+                            | SubAgentJobStatus::AwaitingInput
+                    )
+                }) {
                     task_ids.push(task_id);
-                    if !stopped_scopes.contains(&scope) {
-                        stopped_scopes.push(scope);
+                    if let Some((_, paused_tasks)) =
+                        stopped_scopes.iter_mut().find(|(stopped, _)| stopped == &scope)
+                    {
+                        if matching_status == Some(SubAgentJobStatus::AwaitingInput) {
+                            paused_tasks.push(task_id);
+                        }
+                    } else {
+                        stopped_scopes.push((
+                            scope,
+                            if matching_status == Some(SubAgentJobStatus::AwaitingInput) {
+                                vec![task_id]
+                            } else {
+                                Vec::new()
+                            },
+                        ));
                     }
                 }
             }
-            for scope in stopped_scopes {
-                if let Err(error) = jobs.cancel_for_thread(&scope) {
-                    log::warn!("[running_subagents] driver thread stop failed: {error}");
+            for (scope, paused_task_ids) in stopped_scopes {
+                match jobs.cancel_for_thread(&scope) {
+                    Ok(()) => {
+                        for task_id in paused_task_ids {
+                            crate::agent::orchestration::completion_owners::finish_driver_task(
+                                ctx, &task_id,
+                            );
+                        }
+                    }
+                    Err(error) => {
+                        log::warn!("[running_subagents] driver thread stop failed: {error}");
+                    }
                 }
             }
             task_ids.sort();
