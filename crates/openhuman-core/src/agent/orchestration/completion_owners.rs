@@ -162,6 +162,24 @@ pub(crate) fn begin_thread_deletion(
     Ok(())
 }
 
+/// Mark that the durable deleted-parent marker was written successfully.
+pub(crate) fn commit_thread_deletion(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+    thread_id: &str,
+) -> Result<(), String> {
+    let profile = ctx
+        .tenant()
+        .map_err(|error| format!("cannot resolve profile for thread deletion: {error}"))?
+        .profile;
+    owners().deleting_threads.insert(driver_thread_scope(
+        profile,
+        workspace_dir.to_path_buf(),
+        thread_id.to_owned(),
+    ));
+    Ok(())
+}
+
 /// Release a temporary deletion fence when the conversation delete itself failed.
 pub(crate) fn release_thread_deletion(
     ctx: &crate::core::runtime::DispatchCtx,

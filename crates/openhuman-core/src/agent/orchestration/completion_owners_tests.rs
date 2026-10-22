@@ -74,3 +74,59 @@ fn deleting_thread_refuses_late_owner_registration_but_keeps_prior_owner() {
     );
     assert!(!st.driver_tasks.contains_key("late"));
 }
+
+#[test]
+fn failed_overlapping_delete_release_keeps_thread_owner_fenced() {
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let workspace = tempfile::tempdir().expect("workspace");
+    let thread = "overlapping-delete-release";
+    begin_thread_deletion(&ctx, workspace.path(), thread).expect("first delete begins");
+    begin_thread_deletion(&ctx, workspace.path(), thread).expect("overlapping delete begins");
+
+    release_thread_deletion(&ctx, workspace.path(), thread);
+    let late_owner = note_driver_task(
+        &ctx,
+        "overlapping-delete-late-task",
+        workspace.path().to_path_buf(),
+        tinytools::WorkspaceDescriptor::new(workspace.path()),
+        "overlapping-delete-parent".into(),
+        Some(thread.into()),
+    );
+    release_thread_deletion(&ctx, workspace.path(), thread);
+    if late_owner.is_ok() {
+        finish_driver_task(&ctx, "overlapping-delete-late-task");
+    }
+
+    assert!(
+        late_owner.is_err(),
+        "one failed attempt must not clear another's fence"
+    );
+}
+
+#[test]
+fn retry_release_cannot_remove_committed_thread_deletion_fence() {
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let workspace = tempfile::tempdir().expect("workspace");
+    let thread = "committed-delete-retry";
+    begin_thread_deletion(&ctx, workspace.path(), thread).expect("delete begins");
+    commit_thread_deletion(&ctx, workspace.path(), thread).expect("durable close commits");
+    begin_thread_deletion(&ctx, workspace.path(), thread).expect("delete retry begins");
+
+    release_thread_deletion(&ctx, workspace.path(), thread);
+    let late_owner = note_driver_task(
+        &ctx,
+        "committed-delete-late-task",
+        workspace.path().to_path_buf(),
+        tinytools::WorkspaceDescriptor::new(workspace.path()),
+        "committed-delete-parent".into(),
+        Some(thread.into()),
+    );
+    if late_owner.is_ok() {
+        finish_driver_task(&ctx, "committed-delete-late-task");
+    }
+
+    assert!(
+        late_owner.is_err(),
+        "a retry release cannot reopen a deleted parent"
+    );
+}
