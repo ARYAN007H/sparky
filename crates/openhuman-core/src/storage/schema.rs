@@ -65,10 +65,7 @@ fn declared_collections() -> Vec<CollectionOwner> {
                 .map(|collection| CollectionSpec::new(collection.name))
                 .collect(),
         ));
-        owners.push(owner(
-            "tinybox-bus",
-            tinybox_bus::storage::collections(),
-        ));
+        owners.push(owner("tinybox-bus", tinybox_bus::storage::collections()));
         owners.push(owner(
             "tinyjuice-bus",
             tinyjuice_bus::storage::collections(),
