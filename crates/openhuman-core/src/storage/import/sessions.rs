@@ -1,9 +1,9 @@
 //! Sessions, transcripts, turn states and the run ledger.
 //!
-//! Before the storage ports a workspace kept its conversation state in three
-//! shapes: a SQLite `session_db/sessions.db` (session history, the run ledger,
-//! entry trees), JSONL transcripts under `session_raw/`, and per-turn
-//! snapshots as JSON under `memory/conversations/turn_states/`. OpenHuman owns
+//! Before storage ports, a workspace kept conversation state in a SQLite
+//! `session_db/sessions.db` (history, run ledger, entry trees), JSONL under
+//! `session_raw/`, and per-turn snapshots under `memory/conversations/turn_states/`.
+//! OpenHuman owns
 //! the historical file readers and imports their decoded public records into
 //! TinyAgents' current storage ports. The readers are read-only, id-preserving,
 //! and only-if-absent. This module handles:
