@@ -787,6 +787,11 @@ describe('classifyRpcError', () => {
       undefined,
       'provider_auth',
     ],
+    [
+      'GET /teams failed (500 Internal Server Error): {"error":"upstream failed (401 Unauthorized)"}',
+      undefined,
+      'provider_auth',
+    ],
     ['Session expired. Please log in again.', undefined, 'auth_expired'],
     ['some prefix Session expired suffix', undefined, 'auth_expired'],
     [

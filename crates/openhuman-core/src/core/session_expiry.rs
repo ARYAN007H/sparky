@@ -53,12 +53,16 @@ pub fn is_session_expired_error(msg: &str) -> bool {
     // The HTTP-method prefix distinguishes these from provider-prefixed errors.
     // HEAD and OPTIONS are intentionally excluded — `authed_json` only issues
     // the five listed verbs (GET/POST/PUT/DELETE/PATCH) for REST JSON endpoints.
-    // Anchored on the status itself: a 500 whose body happens to contain
-    // `"status":401` and the word "unauthorized" is not an expired session.
+    // Anchored on the status in the `{METHOD} /path failed ({status} …)`
+    // header itself — the first ` failed (` — so a 500 whose body mentions a
+    // 401 (`"status":401`, `upstream failed (401 …)`) is not an expired session.
+    const HEADER: &str = " failed (";
     ["GET /", "POST /", "PUT /", "DELETE /", "PATCH /"]
         .iter()
         .any(|verb| msg.starts_with(verb))
-        && msg.contains(" failed (401")
+        && msg
+            .find(HEADER)
+            .is_some_and(|at| msg[at + HEADER.len()..].starts_with("401"))
 }
 
 /// The one status rule for the OpenHuman backend: only a 401 on a request

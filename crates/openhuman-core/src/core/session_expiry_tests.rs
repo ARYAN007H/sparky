@@ -238,6 +238,9 @@ fn is_session_expired_error_does_not_match_a_non_401_with_401_in_its_body() {
     assert!(!is_session_expired_error(
         "POST /auth/me failed (403 Forbidden): 401 unauthorized upstream"
     ));
+    assert!(!is_session_expired_error(
+        "GET /teams failed (500 Internal Server Error): {\"error\":\"upstream failed (401 Unauthorized)\"}"
+    ));
 }
 
 #[test]
