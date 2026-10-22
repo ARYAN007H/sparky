@@ -76,14 +76,20 @@ pub fn record(provider: &str, status: u16) -> bool {
     changed
 }
 
-/// Clear any recorded auth error for `provider` (the user updated / removed
-/// the key, or a call newly succeeded). Returns `true` if an entry was
-/// removed. Re-arms the [`record`] latch so a fresh failure re-notifies.
+/// Clear the recorded auth error for `provider` in the current scope (the
+/// user updated / removed the key, or a call newly succeeded). Another
+/// scope's failure for the same provider is its own key and stays. Returns
+/// `true` if the entry was removed, which re-arms the [`record`] latch so a
+/// fresh failure re-notifies.
 pub fn clear(provider: &str) -> bool {
-    origins()
-        .lock()
-        .unwrap_or_else(|error| error.into_inner())
-        .remove(provider);
+    let mut origins = origins().lock().unwrap_or_else(|error| error.into_inner());
+    if let (Some(scope), Some(origin)) = (current_scope(), origins.get_mut(provider)) {
+        origin.scopes.remove(&scope);
+        if !origin.scopes.is_empty() || origin.unscoped {
+            return false;
+        }
+    }
+    origins.remove(provider);
     registry().clear(provider)
 }
 
@@ -91,6 +97,24 @@ pub fn clear(provider: &str) -> bool {
 /// slug for a stable RPC payload.
 pub fn snapshot() -> Vec<ProviderAuthError> {
     registry().snapshot()
+}
+
+/// The auth errors the current workspace/tenant may see: those it recorded.
+/// Without a bound context (a single-user process) every error is its own.
+pub fn snapshot_current_scope() -> Vec<ProviderAuthError> {
+    let Some(scope) = current_scope() else {
+        return snapshot();
+    };
+    let origins = origins().lock().unwrap_or_else(|error| error.into_inner());
+    registry()
+        .snapshot()
+        .into_iter()
+        .filter(|error| {
+            origins
+                .get(&error.provider)
+                .is_some_and(|origin| origin.scopes.contains(&scope))
+        })
+        .collect()
 }
 
 #[derive(Default)]
