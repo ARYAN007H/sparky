@@ -133,12 +133,24 @@ impl<T: Tool> MediaArtifactTool<T> {
             + Sync
             + 'static,
     ) -> Self {
-        let Self { inner, policy } = self;
+        let Self {
+            inner,
+            policy,
+            workspace_dir,
+            files_dir,
+            allowed_references,
+        } = self;
         let build: MediaInnerFactory<T> = Arc::new(build);
         let inner = inner.with_per_call_inner(Arc::new(move |progress, context| {
             ReferenceRefreshTool::new(build(progress, context), Arc::clone(&policy))
         }));
-        Self { inner, policy }
+        Self {
+            inner,
+            policy,
+            workspace_dir,
+            files_dir,
+            allowed_references,
+        }
     }
 }
 
@@ -395,27 +407,23 @@ async fn refresh_allowed_references(policy: &MediaArtifactPolicy) -> Result<(), 
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone();
-    let artifacts = match crate::artifacts::store::list_artifacts(
-        &policy.workspace_dir,
-        0,
-        usize::MAX,
-        None,
-    )
-    .await
-    {
-        Ok((artifacts, _)) => artifacts,
-        Err(error) => {
-            tracing::warn!(
-                target = "media_generation",
-                %error,
-                "[media_generation] could not refresh reusable artifact paths"
-            );
-            return Err(
+    let artifacts =
+        match crate::artifacts::store::list_artifacts(&policy.workspace_dir, 0, usize::MAX, None)
+            .await
+        {
+            Ok((artifacts, _)) => artifacts,
+            Err(error) => {
+                tracing::warn!(
+                    target = "media_generation",
+                    %error,
+                    "[media_generation] could not refresh reusable artifact paths"
+                );
+                return Err(
                 "could not validate previously generated media references; retry the media call"
                     .to_owned(),
             );
-        }
-    };
+            }
+        };
 
     let mut recovered = std::collections::HashSet::new();
     for artifact in artifacts.iter().filter(|artifact| {
