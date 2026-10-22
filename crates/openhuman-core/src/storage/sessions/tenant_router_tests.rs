@@ -123,10 +123,10 @@ fn upstream_rebind_keeps_tenant_routing_and_moves_only_future_leases() {
         agent: Some("asha".into()),
     });
 
-    let alice_before = router.lease_for_agent(&alice_key).unwrap();
-    let bob_before = router.lease_for_agent(&bob_key).unwrap();
-    let alice_destination = alice_before.stores().transcripts.destination_key();
-    let bob_destination = bob_before.stores().transcripts.destination_key();
+    let alice_before = router.for_agent(&alice_key);
+    let bob_before = router.for_agent(&bob_key);
+    let alice_destination = alice_before.transcripts.destination_key();
+    let bob_destination = bob_before.transcripts.destination_key();
     assert_ne!(
         alice_destination, bob_destination,
         "profiles keep separate scopes"
@@ -199,22 +199,12 @@ fn failed_rebind_rolls_back_tenant_providers_already_moved() {
     assert!(Arc::ptr_eq(&*router.backend.read().unwrap(), &first));
 
     assert_eq!(
-        router
-            .lease_for_agent(&alice_key)
-            .unwrap()
-            .stores()
-            .transcripts
-            .destination_key(),
+        router.for_agent(&alice_key).transcripts.destination_key(),
         alice_destination,
         "the earlier provider must return to its original backend when a later tenant fails"
     );
     assert_eq!(
-        router
-            .lease_for_agent(&bob_key)
-            .unwrap()
-            .stores()
-            .transcripts
-            .destination_key(),
+        router.for_agent(&bob_key).transcripts.destination_key(),
         bob_destination,
         "the failing provider remains on its original backend"
     );
