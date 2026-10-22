@@ -322,6 +322,30 @@ impl SpawnSubagentTool {
                 run_queue: None,
                 message_run_queue: None,
             };
+            if let Err(error) = crate::agent::orchestration::completion_owners::note_driver_task(
+                &dispatch,
+                task_id,
+                parent.workspace_dir.clone(),
+                task_workspace.clone(),
+                parent_session.clone(),
+                parent_thread_id.clone(),
+            ) {
+                let message = format!("driver owner registration refused: {error}");
+                let _ = driver_store
+                    .mark_failed(
+                        &resumed_session.subagent_session_id,
+                        task_id,
+                        message.clone(),
+                    )
+                    .await;
+                completion_target
+                    .failed(task_id, &definition.id, &message)
+                    .await;
+                crate::agent::orchestration::completion_owners::finish_driver_task(
+                    &dispatch, task_id,
+                );
+                return Ok(ToolResult::error(format!("spawn_subagent: {message}")));
+            }
             if let Err(error) = crate::agent::subagent_host::resume_async_via_driver_tool(
                 detached_parent,
                 original_key,
@@ -344,6 +368,9 @@ impl SpawnSubagentTool {
                 completion_target
                     .failed(task_id, &definition.id, &message)
                     .await;
+                crate::agent::orchestration::completion_owners::finish_driver_task(
+                    &dispatch, task_id,
+                );
                 crate::agent::orchestration::subagent_events::publish_subagent_failed(
                     parent_session,
                     task_id.to_owned(),
