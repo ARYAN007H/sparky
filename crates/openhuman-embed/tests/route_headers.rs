@@ -71,7 +71,7 @@ async fn scenario() {
         "Bearer a-key"
     );
     let a_body: serde_json::Value = serde_json::from_slice(&a_requests[0].body).unwrap();
-    eprintln!("route request body: {a_body}");
+    eprintln!("provider={:?} reasoning={:?}", a_body.get("provider"), a_body.get("reasoning_effort"));
     assert_eq!(
         a_body["provider"],
         serde_json::json!({"sort": "latency", "order": ["fast"]})
