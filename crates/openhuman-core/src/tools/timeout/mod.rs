@@ -1,7 +1,7 @@
 //! Host adapter for tool-execution timeouts.
 //!
 //! The bounds, resolution, process-group capture and cleanup live in
-//! `tinytools_std::timeout`. This module keeps only what OpenHuman owns: the
+//! `tinyagents_harness_tools::exec::timeout`. This module keeps only what OpenHuman owns: the
 //! `OPENHUMAN_TOOL_TIMEOUT_SECS` operator override, pushing the persisted
 //! config value into the module's settings, installing the harness-side
 //! settings, and carrying `CoreContext` into the module's waiter tasks.

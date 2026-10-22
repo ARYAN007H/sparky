@@ -1,6 +1,6 @@
 //! The filesystem tools driven through the real [`SecurityPolicy`] adapter.
 //!
-//! The tools' own behavior is tested in `tinytools_std::filesystem` against a
+//! The tools' own behavior is tested in `tinyagents_harness_tools::fs::filesystem` against a
 //! fake gate. What can only be tested here is the policy semantics the adapter
 //! exposes to them: the autonomy tiers, the workspace boundary, symlink
 //! escapes, the action budget, the approval flag, and the per-call workspace

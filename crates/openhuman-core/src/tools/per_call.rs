@@ -2,7 +2,7 @@
 //!
 //! Some tools reach the host through an object they are constructed with and
 //! call without a run context: the network tools' `NetGate::disclose` and the
-//! x402 payment hook live in `tinytools_std`, whose traits take no context. For
+//! x402 payment hook live in `tinyagents_harness_tools::net::network`, whose traits take no context. For
 //! those, the only explicit way to give the object the turn's chat routing is to
 //! build it per call. This wrapper holds a prototype that answers every static
 //! `Tool` question (name, schema, permission, ...), and builds a fresh tool from

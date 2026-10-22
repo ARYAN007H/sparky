@@ -1,4 +1,4 @@
-//! Host wiring for the network tools that live in `tinytools_std::network`.
+//! Host wiring for the network tools that live in `tinyagents_harness_tools::net::network`.
 //!
 //! The tools take their limits' fallbacks, their HTML engine and their 402
 //! handler from the host. This file is where OpenHuman supplies them: the

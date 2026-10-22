@@ -37,7 +37,7 @@ pub(super) fn network_egress_descriptor(
 /// `SecurityPolicy` as the network tools' [`NetGate`] for one turn: every answer is
 /// the policy's, and the disclosure additionally reaches the turn's chat.
 ///
-/// `NetGate::disclose` takes no run context (the trait lives in `tinytools_std`),
+/// `NetGate::disclose` takes no run context (the trait lives in `tinyagents_harness_tools`),
 /// so the chat the disclosure is routed to is held by the gate itself, which the
 /// per-call tool wrapper ([`crate::tools::per_call::PerCallTool`]) builds for each
 /// call.
