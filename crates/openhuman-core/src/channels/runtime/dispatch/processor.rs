@@ -23,7 +23,7 @@ mod bus_turn;
 mod in_order;
 mod turn;
 
-use super::inbound_batch::{merge_channel_batch, QueuedInbound};
+use super::inbound_batch::{QueuedInbound, merge_channel_batch};
 use crate::channels::context::ChannelRuntimeContext;
 use crate::config::InboundDebounceConfig;
 use crate::inbound_debounce::{KeyedDebouncer, Push};
@@ -64,8 +64,8 @@ impl RuntimeChannelMessage {
     }
 }
 
-use admit::admit_runtime_message;
 pub(crate) use admit::AdmittedInbound;
+use admit::admit_runtime_message;
 #[cfg(test)]
 pub(crate) use approval::channel_has_approval_surface;
 use turn::run_admitted_turn;

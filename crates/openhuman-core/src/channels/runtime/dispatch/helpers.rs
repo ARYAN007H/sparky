@@ -54,7 +54,9 @@ pub(super) fn spawn_typing_task(
 /// Reminders and scheduled tasks created from this chat are delivered back to
 /// it automatically (the job records its origin), so the model is told only
 /// that, not a target to copy.
-pub(super) fn build_channel_context_block(msg: &tinychannels_bus::ChannelInboundEnvelope) -> String {
+pub(super) fn build_channel_context_block(
+    msg: &tinychannels_bus::ChannelInboundEnvelope,
+) -> String {
     let channel = msg.channel.id.trim();
     if channel.is_empty()
         || channel.eq_ignore_ascii_case("web")

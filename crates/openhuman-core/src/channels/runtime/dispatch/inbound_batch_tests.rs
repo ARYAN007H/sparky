@@ -7,14 +7,20 @@ fn queued(seq: u64, id: &str, timestamp: u64, content: &str) -> QueuedInbound {
         inbound: AdmittedInbound {
             msg: ChannelInboundEnvelope {
                 message_id: id.to_string(),
-                sender: SenderRef { id: "alice".to_string(), ..Default::default() },
+                sender: SenderRef {
+                    id: "alice".to_string(),
+                    ..Default::default()
+                },
                 conversation: ConversationRef {
                     id: format!("reply-{id}"),
                     thread_id: Some(format!("thread-{id}")),
                     ..Default::default()
                 },
                 text: content.to_string(),
-                channel: ChannelRef { id: "telegram".to_string(), ..Default::default() },
+                channel: ChannelRef {
+                    id: "telegram".to_string(),
+                    ..Default::default()
+                },
                 timestamp_unix_ms: Some(timestamp),
                 ..Default::default()
             },
@@ -29,7 +35,10 @@ fn single_message_passes_through_unchanged() {
     let merged = merge_channel_batch(vec![one.clone()]).unwrap();
     assert_eq!(merged.msg.text, "  hello  ");
     assert_eq!(merged.msg.message_id, "m1");
-    assert_eq!(merged.msg.conversation.thread_id.as_deref(), Some("thread-m1"));
+    assert_eq!(
+        merged.msg.conversation.thread_id.as_deref(),
+        Some("thread-m1")
+    );
     assert_eq!(merged.history_key, one.inbound.history_key);
     assert!(merge_channel_batch(Vec::new()).is_none());
 }
@@ -45,7 +54,10 @@ fn merge_orders_by_timestamp_then_receive_order_and_uses_newest_as_base() {
     assert_eq!(merged.msg.text, "first\nsecond\nthird");
     assert_eq!(merged.msg.message_id, "m3");
     assert_eq!(merged.msg.conversation.id, "reply-m3");
-    assert_eq!(merged.msg.conversation.thread_id.as_deref(), Some("thread-m3"));
+    assert_eq!(
+        merged.msg.conversation.thread_id.as_deref(),
+        Some("thread-m3")
+    );
     assert_eq!(merged.msg.timestamp_unix_ms, Some(20));
 }
 
