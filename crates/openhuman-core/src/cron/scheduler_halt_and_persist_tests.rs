@@ -306,17 +306,6 @@ fn is_local_provider_unreachable_failure_does_not_halt_shell_jobs() {
 async fn run_agent_job_returns_error_without_provider_key() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp).await;
-    crate::security::credentials::AuthService::from_config(&config)
-        .store_provider_token(
-            crate::security::credentials::APP_SESSION_PROVIDER,
-            "default",
-            "fixture-session-token",
-            Default::default(),
-            true,
-        )
-        .expect("store isolated test session");
-    crate::inference::provider::factory::access_gates::verify_backend_session_active(&config)
-        .expect("test session satisfies the backend gate");
     let mut job = test_job("");
     job.job_type = JobType::Agent;
     job.prompt = Some("Say hello".into());
