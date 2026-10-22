@@ -68,8 +68,10 @@ use admit::admit_runtime_message;
 pub(crate) use admit::AdmittedInbound;
 #[cfg(test)]
 pub(crate) use approval::channel_has_approval_surface;
+#[cfg(test)]
+pub(crate) use turn::process_channel_message;
+pub(crate) use turn::process_channel_runtime_message;
 use turn::run_admitted_turn;
-pub(crate) use turn::{process_channel_message, process_channel_runtime_message};
 
 /// Run every inbound message through the agent pipeline until `rx` closes.
 ///
