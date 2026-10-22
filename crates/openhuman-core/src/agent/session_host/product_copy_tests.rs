@@ -56,6 +56,16 @@ fn close_verification_prompt(user_request: &str, records: &str, reply: &str) -> 
     )
 }
 
+fn harness_instruction_needles(stop_reason: Option<&str>) -> Vec<String> {
+    tinyagents_harness::close::instruction_needles(&OPENHUMAN_CLOSE_COPY, stop_reason)
+}
+
+fn quotes_harness_instruction(candidate: &str, stop_reason: Option<&str>) -> bool {
+    let needles = harness_instruction_needles(stop_reason);
+    let phrases = needles.iter().map(String::as_str).collect::<Vec<_>>();
+    tinyagents_harness::close::quotes_harness_instruction(candidate, &phrases)
+}
+
 fn close_repair_instruction(
     instruction: &str,
     violation: tinyagents_harness::close::CloseViolation,
