@@ -53,11 +53,11 @@ fn inbound(
 )]
 fn route_compat_message_preserves_legacy_addressing_and_sender_metadata() {
     let mut message = inbound(
-        "message-1",
-        "sender-1",
-        "conversation-1",
-        "/status",
-        "telegram",
+        "message-1".to_string(),
+        "sender-1".to_string(),
+        "conversation-1".to_string(),
+        "/status".to_string(),
+        "telegram".to_string(),
         Some("thread-1".into()),
     );
     message.timestamp_unix_ms = Some(123);

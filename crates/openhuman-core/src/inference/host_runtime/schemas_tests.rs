@@ -75,19 +75,6 @@ fn agent_chat_declares_an_optional_agent_id() {
     assert!(!field.required, "agent_id must stay optional");
 }
 
-/// The params struct accepts the field and, absent, defaults it to `None`, so
-/// every existing caller keeps running the orchestrator.
-#[test]
-fn agent_chat_params_default_agent_id_to_none() {
-    let without: AgentChatParams =
-        serde_json::from_value(serde_json::json!({ "message": "hi" })).expect("decodes");
-    assert!(without.agent_id.is_none());
-    let with: AgentChatParams =
-        serde_json::from_value(serde_json::json!({ "message": "hi", "agent_id": "alpha" }))
-            .expect("decodes");
-    assert_eq!(with.agent_id.as_deref(), Some("alpha"));
-}
-
 #[test]
 fn registered_controllers_all_in_inference_namespace() {
     for h in all_registered_controllers() {

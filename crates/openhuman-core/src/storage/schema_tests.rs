@@ -48,5 +48,11 @@ fn module_collections_are_limited_to_the_named_owner() {
 
 #[test]
 fn tinyjuice_ccr_blobs_stay_inside_the_juice_owner_namespace() {
-    assert_eq!(module_items("juice").blobs, ["juice/ccr/"]);
+    assert_eq!(
+        module_collections("juice")
+            .iter()
+            .map(|collection| collection.name.as_str())
+            .collect::<Vec<_>>(),
+        [tinyjuice_bus::storage::SAVINGS_COLLECTION]
+    );
 }
