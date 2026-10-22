@@ -20,7 +20,9 @@ use openhuman_embed::__host::security::credentials::session_support::{
 };
 use openhuman_embed::__host::util::url::join_url;
 use std::sync::Arc;
-use tinyinference_llm::catalog::fetch::list_models as fetch_model_catalog;
+use tinyinference_llm::catalog::{
+    append_query_param, list_models as fetch_model_catalog, parse_models_response,
+};
 use tinyinference_llm::model::discover::DiscoveryRequest;
 
 use super::PROVIDER_OPENHUMAN;
