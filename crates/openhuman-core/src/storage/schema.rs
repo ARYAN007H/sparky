@@ -53,10 +53,9 @@ pub fn owner_schemas() -> Vec<Schema> {
             Schema::new(crate::storage::schema_support::owner("tinyjuice"))
                 .collection_with(
                     1,
-                    tinyjuice_bus::storage::collections()
-                        .into_iter()
-                        .next()
-                        .expect("TinyJuice declares its savings collection"),
+                    tinystoragedrivers::CollectionSpec::new(
+                        tinyjuice_bus::storage::SAVINGS_COLLECTION,
+                    ),
                     ScopeClass::Module,
                 )
                 .blobs(tinyjuice_bus::storage::CCR_PREFIX, ScopeClass::Module),
