@@ -33,7 +33,7 @@ struct TenantStoreRegistryState {
 }
 
 impl TenantStoreRegistry {
-    fn rebind(&self, backend: &Arc<dyn StorageBackend>) -> usize {
+    fn rebind(&self, backend: &Arc<dyn StorageBackend>) -> Result<usize, StorageError> {
         let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         let backends = state
             .backends
@@ -85,13 +85,14 @@ impl TenantStoreRegistry {
                 }
                 if rollback_failures.is_empty() {
                     tracing::error!(target: "openhuman::storage", %error, "[session_store] tenant provider rebind failed; prior providers were restored");
-                    return 0;
+                    return Err(error);
                 }
                 tracing::error!(target: "openhuman::storage", %error, rollback_errors = ?rollback_failures, restored = moved.len() - rollback_failures.len(), "[session_store] tenant provider rebind and rollback failed; providers may remain split across backends");
-                // The return count is intentionally non-zero when rollback
-                // could not restore every provider, so callers cannot mistake
-                // this for a clean no-op.
-                return rollback_failures.len();
+                return Err(StorageError::invalid_input(format!(
+                    "tenant session-store rebind failed ({error}); rollback failed for {} provider(s): {}",
+                    rollback_failures.len(),
+                    rollback_failures.join("; ")
+                )));
             }
             moved.push((Arc::clone(provider), Arc::clone(old_backend)));
         }
@@ -102,7 +103,7 @@ impl TenantStoreRegistry {
         state.backends.retain(|weak| weak.strong_count() > 0);
         state.tenants.retain(|weak| weak.strong_count() > 0);
         state.current_backend = Some(Arc::clone(backend));
-        moved.len()
+        Ok(moved.len())
     }
 
     fn register_backend(
@@ -125,7 +126,7 @@ static PROCESS_SESSION_STORES: LazyLock<Arc<TenantStoreRegistry>> =
     LazyLock::new(|| Arc::new(TenantStoreRegistry::default()));
 
 /// Rebinds the host's live tenant routers to `backend`.
-pub fn rebind_all(backend: &Arc<dyn StorageBackend>) -> usize {
+pub fn rebind_all(backend: &Arc<dyn StorageBackend>) -> Result<usize, StorageError> {
     PROCESS_SESSION_STORES.rebind(backend)
 }
 

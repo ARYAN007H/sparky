@@ -51,9 +51,9 @@ pub fn rebind(config: &Config) -> Result<Option<Rebound>> {
     rebind_with(config, super::installed_url(), |url, backend| {
         // Sessions first: no store may read one workspace's sessions beside
         // another's documents, so both move together.
-        let rebound = crate::storage::sessions::rebind_all(&backend);
+        let rebound = crate::storage::sessions::rebind_all(&backend)?;
         super::install_for_url(url, backend);
-        rebound
+        Ok(rebound)
     })
 }
 
@@ -64,7 +64,7 @@ pub fn rebind(config: &Config) -> Result<Option<Rebound>> {
 pub(crate) fn rebind_with(
     config: &Config,
     current: Option<String>,
-    install: impl FnOnce(&str, Arc<dyn StorageBackend>) -> usize,
+    install: impl FnOnce(&str, Arc<dyn StorageBackend>) -> Result<usize>,
 ) -> Result<Option<Rebound>> {
     let Some(current) = current else {
         return Ok(None);

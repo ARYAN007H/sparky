@@ -16,11 +16,15 @@ fn config_in(dir: &TempDir) -> Config {
 struct Installed(Mutex<Vec<(String, Arc<dyn StorageBackend>)>>);
 
 impl Installed {
-    fn install(&self) -> impl FnOnce(&str, Arc<dyn StorageBackend>) -> usize + '_ {
+    fn install(&self) -> impl FnOnce(&str, Arc<dyn StorageBackend>) -> Result<usize> + '_ {
         |url, backend| {
             self.0.lock().unwrap().push((url.to_string(), backend));
-            0
+            Ok(0)
         }
+    }
+
+    fn reject_install(&self) -> impl FnOnce(&str, Arc<dyn StorageBackend>) -> Result<usize> + '_ {
+        |_url, _backend| Err(anyhow::anyhow!("session stores refused the backend"))
     }
 
     fn urls(&self) -> Vec<String> {
@@ -189,6 +193,23 @@ fn a_backend_that_cannot_be_opened_keeps_the_previous_one() {
 
     assert!(error.is_err());
     assert!(installed.urls().is_empty(), "nothing was installed");
+}
+
+#[test]
+fn a_session_store_rebind_failure_keeps_the_previous_backend_installed() {
+    let first = TempDir::new().unwrap();
+    let second = TempDir::new().unwrap();
+    let installed = Installed::default();
+    let current = super::super::config::default_url(first.path());
+
+    let error = rebind_with(
+        &config_in(&second),
+        Some(current),
+        installed.reject_install(),
+    );
+
+    assert!(error.is_err());
+    assert!(installed.urls().is_empty(), "the new backend was not installed");
 }
 
 #[test]
