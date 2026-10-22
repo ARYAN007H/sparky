@@ -13,6 +13,40 @@ use tinytools_agent::dialect::ToolCallFormat;
 
 const SPAWN_SUBAGENT_CANARY: &str = "tool-e2e-spawn-subagent-canary";
 
+pub(super) async fn driver_sessions_for_parent(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &Path,
+    parent_session: &str,
+    parent_thread_id: Option<&str>,
+) -> Result<Vec<crate::agent::orchestration::subagent_sessions::DurableSubagentSession>, String> {
+    use crate::agent::orchestration::subagent_sessions::{
+        host_projection, open_for_context, parent_epoch_for_context,
+    };
+
+    let sessions = open_for_context(
+        ctx,
+        workspace_dir.to_path_buf(),
+        parent_session,
+        parent_thread_id.map(str::to_owned),
+        None,
+    )?
+    .list_for_parent(parent_session, parent_thread_id)
+    .await
+    .map_err(|error| error.to_string())?;
+    sessions
+        .into_iter()
+        .map(|session| {
+            let parent_epoch = parent_epoch_for_context(
+                ctx,
+                workspace_dir,
+                session.subagent_session_id.clone(),
+            )
+            .map_err(|error| error.to_string())?;
+            Ok(host_projection(session, parent_epoch))
+        })
+        .collect()
+}
+
 #[tokio::test]
 async fn spawn_subagent_returns_async_reference_and_runs_child_e2e() {
     let workspace = tempfile::TempDir::new().expect("workspace");
