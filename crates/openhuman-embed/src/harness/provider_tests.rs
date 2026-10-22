@@ -10,6 +10,19 @@ fn openai_compatible_carries_both_halves() {
 }
 
 #[test]
+fn openai_compatible_route_accepts_provider_options_and_reasoning_effort() {
+    let route = Route::openai_compatible("https://api.example/v1", "sk-test")
+        .provider_options(serde_json::json!({"provider": {"order": ["fast"]}}))
+        .reasoning_effort(ReasoningEffort::High);
+
+    assert_eq!(
+        route.provider_options,
+        Some(serde_json::json!({"provider": {"order": ["fast"]}}))
+    );
+    assert_eq!(route.reasoning_effort, Some(ReasoningEffort::High));
+}
+
+#[test]
 fn inherit_states_no_route() {
     let provider = Provider::inherit();
     assert!(provider.route().is_none());
