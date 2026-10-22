@@ -22,9 +22,9 @@ fn ctx(
 }
 
 fn typing(channel: &str) -> ChannelBackendRequest {
-    ChannelBackendRequest::ProgressiveTransport(ProgressiveTransportRequest::Typing {
+    ChannelBackendRequest::ProgressiveTransport(Box::new(ProgressiveTransportRequest::Typing {
         channel: channel.to_string(),
-    })
+    }))
 }
 
 // Route absence and message absence need different recoveries in the
