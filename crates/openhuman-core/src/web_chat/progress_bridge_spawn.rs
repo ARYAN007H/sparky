@@ -258,4 +258,3 @@ pub(crate) fn spawn_progress_bridge(
         timing: timing_snapshot,
     }
 }
-

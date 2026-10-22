@@ -367,7 +367,13 @@ pub enum ExpectedErrorKind {
     WalletNotConfigured,
 }
 
-include!("observability_expected_error_classification.rs");include!("observability_plan_and_session_errors.rs");include!("observability_provider_local_errors.rs");include!("observability_network_provider_errors.rs");include!("observability_reporting.rs");include!("observability_event_classification.rs");include!("observability_backend_event_classification.rs");
+include!("observability_expected_error_classification.rs");
+include!("observability_plan_and_session_errors.rs");
+include!("observability_provider_local_errors.rs");
+include!("observability_network_provider_errors.rs");
+include!("observability_reporting.rs");
+include!("observability_event_classification.rs");
+include!("observability_backend_event_classification.rs");
 #[cfg(test)]
 #[path = "observability_tests.rs"]
 mod tests;
