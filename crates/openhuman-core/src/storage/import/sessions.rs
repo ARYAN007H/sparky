@@ -325,8 +325,16 @@ fn decode_transcript(
         let value: serde_json::Value = serde_json::from_str(line)
             .with_context(|| format!("parse transcript {} line {}", path.display(), line_no + 1))?;
         if let Some(header) = value.get("_meta") {
+            let mut header = header.clone();
+            if let Some(fields) = header.as_object_mut() {
+                if !fields.contains_key("agent_name") {
+                    if let Some(agent) = fields.get("agent").cloned() {
+                        fields.insert("agent_name".into(), agent);
+                    }
+                }
+            }
             meta =
-                Some(serde_json::from_value(header.clone()).with_context(|| {
+                Some(serde_json::from_value(header).with_context(|| {
                     format!("decode transcript metadata in {}", path.display())
                 })?);
             continue;
@@ -704,6 +712,7 @@ pub(crate) fn import_transcript_groups(
             .try_for_agent(&agent)
             .map_err(|error| anyhow::anyhow!("open the transcripts of {agent}: {error}"))?;
         for (stem, path) in files {
+            let stem_names_known_agent = agent_of(&stem, &known).is_some();
             let (meta, tools, records) = match decode_transcript(&path) {
                 Ok(decoded) => decoded,
                 Err(error) => {
@@ -716,7 +725,17 @@ pub(crate) fn import_transcript_groups(
                 }
             };
             found += 1;
-            let history = stores.transcripts.open_stem(&stem, meta.clone())?;
+            let destination_stem = if !stem_names_known_agent {
+                meta.thread_id
+                    .as_deref()
+                    .map(|thread_id| session_stem(&SessionRef::scoped(thread_id, &agent)))
+                    .unwrap_or(stem)
+            } else {
+                stem
+            };
+            let history = stores
+                .transcripts
+                .open_stem(&destination_stem, meta.clone())?;
             if history.read_session()?.is_some() {
                 continue;
             }
