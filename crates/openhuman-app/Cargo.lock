@@ -6733,7 +6733,6 @@ dependencies = [
  "tinyagents-harness",
  "tinyagents-storage-kit",
  "tinyinference-llm",
- "tinytools",
  "tokio",
  "tracing",
 ]
@@ -7062,7 +7061,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.20.0"
+version = "0.20.1"
 dependencies = [
  "base64 0.23.1",
  "schemars 1.2.3",

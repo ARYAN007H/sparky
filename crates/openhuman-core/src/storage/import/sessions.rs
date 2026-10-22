@@ -36,7 +36,7 @@ use tinyagents_session::port::{SessionStoreProvider, TurnStates};
 use tinyagents_session::run_ledger::RunLedgerStore;
 use tinyagents_session::run_ledger::{ImportCounts, LegacyDatabaseReport, LegacySessionImport};
 use tinyagents_session::transcript::{
-    decode_transcript_jsonl, session_stem, DisplayMessage, DisplayRecord, SessionRef,
+    session_stem, DisplayMessage, DisplayRecord, SessionRef,
     TranscriptHistory, TranscriptMessage, TranscriptMeta, TranscriptPartial, TranscriptTurn,
 };
 use tinyagents_session::turn_state::TurnState;
@@ -265,24 +265,76 @@ fn decode_transcript(
 )> {
     let bytes =
         std::fs::read(path).with_context(|| format!("read transcript {}", path.display()))?;
-    let (import_bytes, _) =
-        tinyagents_session::transcript::rewrite_first_system_message_jsonl(&bytes, |content| {
-            let Some(cleaned) =
-                crate::config::migrations::phase_out_profile_md::strip_profile_md_block(content)
-            else {
-                return false;
-            };
-            *content = cleaned;
-            true
-        })
-        .with_context(|| format!("sanitize imported transcript {}", path.display()))?;
-    let decoded = decode_transcript_jsonl(&import_bytes)
-        .with_context(|| format!("decode transcript {}", path.display()))?;
-    Ok((
-        decoded.session.meta,
-        decoded.session.tools,
-        decoded.display.records,
-    ))
+    let text = std::str::from_utf8(&bytes)
+        .with_context(|| format!("decode transcript {} as UTF-8", path.display()))?;
+    let mut meta = None;
+    let mut tools = None;
+    let mut records = Vec::new();
+    for (line_no, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() { continue; }
+        let value: serde_json::Value = serde_json::from_str(line)
+            .with_context(|| format!("parse transcript {} line {}", path.display(), line_no + 1))?;
+        if let Some(header) = value.get("_meta") {
+            meta = Some(serde_json::from_value(header.clone())
+                .with_context(|| format!("decode transcript metadata in {}", path.display()))?);
+            continue;
+        }
+        if value.get("kind").and_then(serde_json::Value::as_str) == Some("tools") {
+            tools = value.get("tools").cloned();
+            continue;
+        }
+        if value.get("kind").and_then(serde_json::Value::as_str) == Some("compaction") {
+            let replacement = value.get("replacement").and_then(serde_json::Value::as_array)
+                .into_iter().flatten().filter_map(|row| decode_display_message(row).ok()).collect();
+            records.push(DisplayRecord::Compaction(tinyagents_session::transcript::CompactionMarker {
+                replacement,
+                ts: value.get("ts").and_then(serde_json::Value::as_str).map(str::to_owned),
+                request_id: value.get("request_id").and_then(serde_json::Value::as_str).map(str::to_owned),
+            }));
+            continue;
+        }
+        if let Ok(message) = decode_display_message(&value) {
+            records.push(DisplayRecord::Message(Box::new(message)));
+        }
+    }
+    let meta = meta.ok_or_else(|| anyhow::anyhow!("transcript {} has no _meta header", path.display()))?;
+    Ok((meta, tools, records))
+}
+
+fn decode_display_message(value: &serde_json::Value) -> Result<DisplayMessage> {
+    let mut message: TranscriptMessage = serde_json::from_value(value.clone())
+        .context("decode transcript message")?;
+    if message.role.is_empty() { anyhow::bail!("transcript message has no role"); }
+    let content = message.content.clone();
+    if message.role == "system"
+        && let Some(cleaned) = crate::config::migrations::phase_out_profile_md::strip_profile_md_block(&content)
+    { message.content = cleaned; }
+    let turn_usage = value.get("usage").cloned()
+        .and_then(|usage| serde_json::from_value(usage).ok())
+        .map(|usage| tinyagents_session::transcript::TurnUsage {
+            provider: value.get("provider").and_then(serde_json::Value::as_str).unwrap_or_default().to_owned(),
+            model: value.get("model").and_then(serde_json::Value::as_str).unwrap_or_default().to_owned(),
+            usage,
+            ts: value.get("ts").and_then(serde_json::Value::as_str).unwrap_or_default().to_owned(),
+            reasoning_content: value.get("reasoning_content").and_then(serde_json::Value::as_str).map(str::to_owned),
+            tool_calls: Vec::new(),
+            iteration: value.get("iteration").and_then(serde_json::Value::as_u64).unwrap_or_default() as u32,
+        });
+    message.turn_usage = turn_usage.clone();
+    let reasoning_content = value.get("reasoning_content").and_then(serde_json::Value::as_str).map(str::to_owned);
+    Ok(DisplayMessage {
+        interrupted: value.get("interrupted").and_then(serde_json::Value::as_bool).unwrap_or(false),
+        request_id: value.get("request_id").and_then(serde_json::Value::as_str).map(str::to_owned),
+        iteration: value.get("iteration").and_then(serde_json::Value::as_u64).map(|n| n as u32),
+        ts: value.get("ts").and_then(serde_json::Value::as_str).map(str::to_owned),
+        reasoning_content,
+        turn_usage,
+        failure: value.get("failure").and_then(serde_json::Value::as_bool).unwrap_or(false),
+        failure_detail: value.get("failure_detail").and_then(serde_json::Value::as_str).map(str::to_owned),
+        background: value.get("background").cloned().and_then(|raw| serde_json::from_value(raw).ok()),
+        message,
+    })
 }
 
 fn replay_transcript(
