@@ -9,10 +9,10 @@ logic behind the Socket.IO `chat:start` and `chat:cancel` handlers.
 Two shared engines do the generic work, and this module is only what OpenHuman
 alone can supply:
 
-| Engine | Owns | Where |
+| Owner | Owns | OpenHuman's host seam |
 | --- | --- | --- |
-| TinyAgents' turn runner | The lifecycle of a turn: ingress order, per-thread serialization, the five queue modes, cancellation generations, idle and wall-clock guards, reply-store ordering through a host port, exactly one terminal event | `vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/` |
-| TinyChannels' compiled web projection module | The projection of canonical output events onto typed web events, with per-turn `seq` | `vendor/tinychannels/crates/tinychannels-module/`, called through `tinychannels-bus` |
+| TinyAgents harness | The generic turn runner and run-queue mechanics used by web chat | `agent/queued_turn.rs` supplies the product payload; `runner.rs` and `turn_host.rs` adapt web-chat policy and ports. |
+| TinyChannels module | The projection of canonical output events onto typed web events, with per-turn `seq` | `surface.rs` calls the compiled module through `tinychannels-bus`; the host keeps routing and process-wide event publication. |
 
 Hosted channel domain events are dispatched through this module's `start_chat`
 via `channels/bus/subscriber.rs`; those turns share the web-chat runner. Relay
