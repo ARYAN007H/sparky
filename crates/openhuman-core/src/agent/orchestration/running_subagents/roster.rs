@@ -3,6 +3,10 @@
 
 use super::registry::admit_workspace;
 
+#[cfg(test)]
+#[path = "roster_tests.rs"]
+mod tests;
+
 /// The single supported follow-up path for a durable sub-agent task.
 fn roster_guidance() -> &'static str {
     "reuse its task_key with spawn_subagent to continue or answer a clarification; completed results are delivered automatically."
