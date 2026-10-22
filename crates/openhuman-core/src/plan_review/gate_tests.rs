@@ -280,6 +280,31 @@ fn socket_review_scope_comes_from_server_context_and_fails_closed_in_saas() {
     assert!(socket_scope_from_context(Err(crate::core::runtime::tenant::NoTenant), true).is_none());
 }
 
+#[tokio::test]
+async fn socket_scope_uses_explicit_dispatch_context_after_task_handoff() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+
+    let root = CoreContext::for_test(DomainSet::full(), None);
+    let active = root.derive_with(
+        ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .profile("active-profile"),
+    );
+    let dispatch = DispatchCtx::new(active);
+    let gate = PlanReviewGate::new(Duration::from_secs(1));
+
+    // Socket.IO spawns its async connect callback. The task-local context is
+    // absent there; the request's explicit DispatchCtx remains the authority.
+    let scope = tokio::spawn(async move { gate.socket_scope_for_dispatch(&dispatch) })
+        .await
+        .expect("spawned callback completes")
+        .expect("request context binds socket scope");
+    assert_eq!(scope.0.profile.as_deref(), Some("active-profile"));
+}
+
 #[test]
 fn local_socket_review_scope_preserves_the_active_profile() {
     let active_profile = Tenant {
