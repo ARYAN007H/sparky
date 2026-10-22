@@ -2,11 +2,13 @@
 //! abstract-tier remapping, credentials, codex routing) and the crate-native builders.
 
 use super::{
-    access_gates::{emit_inference_egress, enforce_local_only_inference},
+    access_gates::enforce_local_only_inference,
+    cloud_spec,
     credentials::CredentialAccess,
-    openai_bearer_is_oauth, provider_for_role, resolve_codex_routing,
-    InspectionOutputBudgetCapability, OptionalChatModelResult, CLAUDE_AGENT_SDK_PREFIX,
-    CLAUDE_AGENT_SDK_PROVIDER, PROVIDER_OPENHUMAN,
+    managed_backend::managed_chat_model_for,
+    openai_bearer_is_oauth, provider_for_role, redact_endpoint_origin, resolve_codex_routing,
+    InspectionOutputBudgetCapability, OptionalChatModelResult, BYOK_INCOMPLETE_SENTINEL,
+    CLAUDE_AGENT_SDK_PREFIX, CLAUDE_AGENT_SDK_PROVIDER, PROVIDER_OPENHUMAN,
 };
 use crate::config::ops::resolve_primary_cloud_provider_string;
 use crate::config::schema::cloud_providers::AuthStyle;
@@ -23,6 +25,12 @@ use tinyinference_llm::providers::anthropic::endpoint_is_anthropic_messages;
 use tinyinference_llm::providers::registry::{
     resolve_slug_model, ProviderBuildOptions, ProviderRegistry,
 };
+use tinyinference_llm::providers::openai::codex::{
+    openai_codex_client_version, openai_codex_user_agent, OPENAI_CODEX_ACCOUNT_HEADER,
+    OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
+};
+use tinyinference_providers::route::split_model_and_temperature;
+use crate::inference::provider::openai_codex::resolve_openai_codex_routing_for_inspection;
 
 type CloudSlugInspectionChatModelResult = Option<
     anyhow::Result<(
