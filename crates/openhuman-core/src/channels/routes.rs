@@ -204,7 +204,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
         }
         Err(_) => {
             if let Some(channel) = target_channel {
-                    let _ = channel
+                let _ = channel
                     .send_typed(&text_message(
                         &msg.channel.id,
                         &msg.conversation.id,

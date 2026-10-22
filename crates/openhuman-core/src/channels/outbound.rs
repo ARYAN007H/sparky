@@ -1,7 +1,7 @@
 //! Host adapters for canonical TinyChannels outbound messages.
 
 use tinychannels_bus::{
-    ChannelOutboundMessage, ChannelOutboundIntent, ChannelRef, ConversationRef, DeliveryDurability,
+    ChannelOutboundIntent, ChannelOutboundMessage, ChannelRef, ConversationRef, DeliveryDurability,
     OutboundPayload,
 };
 
@@ -48,8 +48,6 @@ pub(crate) async fn send_draft(
     thread_id: Option<String>,
 ) -> anyhow::Result<Option<String>> {
     channel
-        .send_draft(
-            &tinychannels_bus::SendMessage::new(text, conversation).in_thread(thread_id),
-        )
+        .send_draft(&tinychannels_bus::SendMessage::new(text, conversation).in_thread(thread_id))
         .await
 }

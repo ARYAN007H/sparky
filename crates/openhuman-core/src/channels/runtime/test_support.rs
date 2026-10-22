@@ -22,7 +22,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tinychannels_bus::context::ChatMessage;
-use tinychannels_bus::{ChannelMessage, SendMessage};
+use tinychannels_bus::{ChannelInboundEnvelope, ChannelOutboundMessage, ChannelRef, ConversationRef, SenderRef};
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
 
@@ -158,7 +158,11 @@ impl Channel for HarnessChannel {
         &self.name
     }
 
-    async fn send(&self, message: &SendMessage) -> Result<()> {
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v0.1.39 requires the v21 Channel::send test-double method"
+    )]
+    async fn send(&self, message: &tinychannels_bus::SendMessage) -> Result<()> {
         self.state.sends.lock().await.push(ObservedSend {
             kind: "send",
             recipient: message.recipient.clone(),
@@ -168,7 +172,24 @@ impl Channel for HarnessChannel {
         Ok(())
     }
 
-    async fn listen(&self, _tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> Result<()> {
+    async fn send_typed(&self, message: &ChannelOutboundMessage) -> Result<()> {
+        self.state.sends.lock().await.push(ObservedSend {
+            kind: "send",
+            recipient: message.conversation_id.clone(),
+            content: outbound_text(message)?,
+            thread_ts: message.thread_id.clone(),
+        });
+        Ok(())
+    }
+
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v0.1.39 still requires the legacy listener method on Channel"
+    )]
+    async fn listen(
+        &self,
+        _tx: tokio::sync::mpsc::Sender<tinychannels_bus::ChannelMessage>,
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -190,7 +211,14 @@ impl Channel for HarnessChannel {
         self.streaming
     }
 
-    async fn send_draft(&self, message: &SendMessage) -> Result<Option<String>> {
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v0.1.39 exposes drafts only through its v21 test-double method"
+    )]
+    async fn send_draft(
+        &self,
+        message: &tinychannels_bus::SendMessage,
+    ) -> Result<Option<String>> {
         self.state.sends.lock().await.push(ObservedSend {
             kind: "draft",
             recipient: message.recipient.clone(),
@@ -225,6 +253,19 @@ impl Channel for HarnessChannel {
         });
         Ok(())
     }
+}
+
+fn outbound_text(message: &ChannelOutboundMessage) -> Result<String> {
+    let mut text = String::new();
+    for part in &message.parts {
+        match part {
+            tinychannels_bus::channel::OutboundContentPart::Content {
+                part: tinychannels_bus::channel::ContentPart::Text { text: segment, .. },
+            } => text.push_str(segment),
+            _ => anyhow::bail!("test channel supports text outbound content only"),
+        }
+    }
+    Ok(text)
 }
 
 struct HarnessModel;
@@ -437,27 +478,34 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
 
     let expected_event_channel = options.channel_name.clone();
 
-    let message = ChannelMessage {
-        id: "m1".to_string(),
-        sender: "alice".to_string(),
-        reply_target: "reply".to_string(),
-        content: options.content,
-        channel: options.channel_name,
-        timestamp: 1,
-        thread_ts: options.thread_ts,
-        sender_name: None,
-        reply_to_id: None,
-        topic_id: None,
-    };
-    if let Some(inbound_envelope) = options.inbound_envelope {
-        process_channel_runtime_message(
-            Arc::clone(&ctx),
-            RuntimeChannelMessage::with_inbound_envelope(message, inbound_envelope),
-        )
-        .await;
-    } else {
-        process_channel_message(Arc::clone(&ctx), message).await;
-    }
+    let message = options.inbound_envelope.unwrap_or_else(|| ChannelInboundEnvelope {
+        channel: ChannelRef {
+            id: options.channel_name,
+            account_id: None,
+        },
+        message_id: "m1".to_string(),
+        conversation: ConversationRef {
+            id: "reply".to_string(),
+            thread_id: options.thread_ts,
+            ..Default::default()
+        },
+        sender: SenderRef {
+            id: "alice".to_string(),
+            ..Default::default()
+        },
+        timestamp_unix_ms: Some(1),
+        text: options.content.clone(),
+        parts: vec![tinychannels_bus::channel::ContentPart::Text {
+            text: options.content,
+            markdown_dialect: None,
+        }],
+        ..Default::default()
+    });
+    process_channel_runtime_message(
+        Arc::clone(&ctx),
+        RuntimeChannelMessage::with_inbound_envelope(message),
+    )
+    .await;
 
     let received_event_envelope = loop {
         match event_rx.try_recv() {

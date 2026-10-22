@@ -45,9 +45,7 @@ pub(crate) struct RuntimeChannelMessage {
 }
 
 impl RuntimeChannelMessage {
-    pub(crate) fn with_inbound_envelope(
-        message: ChannelInboundEnvelope,
-    ) -> Self {
+    pub(crate) fn with_inbound_envelope(message: ChannelInboundEnvelope) -> Self {
         Self {
             message,
             authenticated_relay: false,

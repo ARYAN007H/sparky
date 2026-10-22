@@ -6,8 +6,8 @@ use crate::agent::bus::AgentTurnResponse;
 use crate::channels::context::{
     compact_sender_history, is_context_window_overflow_error, ChannelRuntimeContext,
 };
-use crate::channels::routes::{get_or_create_turn_model_source, get_route_selection};
 use crate::channels::outbound::text_message;
+use crate::channels::routes::{get_or_create_turn_model_source, get_route_selection};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::progress::AgentProgress;
