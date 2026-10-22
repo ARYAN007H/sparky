@@ -70,5 +70,5 @@ fi
 echo "[ci][route] author=${AUTHOR} actor=${ACTOR} outsider=${outsider} (${reason})"
 echo "outsider=${outsider}" >> "$GITHUB_OUTPUT"
 # Whether ci-fast.yml's own run decided (ci-fast) or the association fallback
-# did (fallback). ci-lite.yml skips only on a ci-fast decision.
-case "${reason}" in fallback*) echo "source=fallback" ;; *) echo "source=ci-fast" ;; esac >> "$GITHUB_OUTPUT"
+# did (fallback), or the PR is a draft (draft).
+case "${reason}" in fallback*) echo "source=fallback" ;; draft*) echo "source=draft" ;; *) echo "source=ci-fast" ;; esac >> "$GITHUB_OUTPUT"
