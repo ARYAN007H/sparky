@@ -136,7 +136,7 @@ async fn a_byok_cloud_fallback_without_a_key_reports_construction_failure() {
 #[tokio::test]
 async fn a_fully_configured_managed_default_constructs_cleanly() {
     use crate::config::schema::cloud_providers::{
-        register_hosted_cloud_provider_policy, AuthStyle, CloudProviderCreds,
+    register_hosted_cloud_provider_policy_in, AuthStyle, CloudProviderCreds,
     };
     use crate::config::test_env::EnvVarGuard;
     use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
@@ -169,7 +169,9 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
         .with("OPENHUMAN_WORKSPACE", temp.path())
         .without("OPENAI_API_KEY")
         .without("OPENHUMAN_CORE_TOKEN");
-    register_hosted_cloud_provider_policy(
+    let extensions = crate::core::slots::Extensions::new();
+    register_hosted_cloud_provider_policy_in(
+        &extensions,
         Arc::new(|slug| slug == "openhuman"),
         Arc::new(|style| style == AuthStyle::OpenhumanJwt),
     );
@@ -188,6 +190,89 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
             credential: "doctor-test-session-token".to_owned(),
         })
     });
+    crate::inference::registry::register_inspection_chat_model_in(
+        &extensions,
+        PROVIDER_OPENHUMAN,
+        inspection_factory,
+    );
+    crate::inference::registry::register_chat_model_in(
+        &extensions,
+        PROVIDER_OPENHUMAN,
+        ChatModelEntry {
+            build: Arc::new(|request| {
+                Ok((
+                    Arc::new(ManagedModel {
+                        generations: Arc::new(AtomicUsize::new(0)),
+                    }) as Arc<dyn ChatModel<()>>,
+                    request
+                        .model_override
+                        .or(request.default_model)
+                        .unwrap_or("managed-test-model")
+                        .to_owned(),
+                ))
+            }),
+            probe: None,
+            models: None,
+        },
+    );
+    let mut config = isolated_config(temp.path());
+    config.api_url = Some("https://api.openhuman.invalid".to_owned());
+    config.api_key = Some("doctor-test-session-token".to_owned());
+    config.primary_cloud = Some("provider-openhuman".to_owned());
+    config.cloud_providers = vec![CloudProviderCreds {
+        id: "provider-openhuman".to_owned(),
+        slug: "openhuman".to_owned(),
+        label: "OpenHuman".to_owned(),
+        endpoint: "https://api.openhuman.invalid/v1".to_owned(),
+        auth_style: AuthStyle::OpenhumanJwt,
+        default_model: Some("managed-test-model".to_owned()),
+    }];
+    let before = filesystem_snapshot(temp.path());
+    let core_context = crate::core::runtime::CoreContext::for_test_with_extensions(
+        crate::core::runtime::DomainSet::full(),
+        Some(temp.path().to_path_buf()),
+        extensions,
+    );
+    let findings = crate::core::runtime::CoreContext::scope(
+        core_context,
+        run_only(config, CONSTRUCT),
+    )
+    .await;
+    assert_eq!(filesystem_snapshot(temp.path()), before);
+
+    assert!(
+        !findings.is_empty()
+            && findings
+                .iter()
+                .all(|result| result.severity == FindingSeverity::Pass),
+        "managed defaults should not report construction errors: {findings:#?}"
+    );
+    assert!(
+        constructions.load(Ordering::SeqCst) > 0,
+        "the managed provider factory must be consulted"
+    );
+    assert_eq!(generations.load(Ordering::SeqCst), 0);
+    assert!(findings
+        .iter()
+        .all(|result| !result.message.contains("doctor-test-session-token")));
+    assert!(!temp.path().join("auth-profiles.json").exists());
+    assert!(!temp.path().join("auth-profiles.lock").exists());
+}
+
+#[tokio::test]
+async fn an_out_of_range_temperature_reports_the_role_setting() {
+    let mut config = Config::default();
+    config.default_temperature = 3.5;
+
+    let findings = run_only(config, TEMPERATURE).await;
+    let result = finding(&findings, TEMPERATURE);
+
+    assert_eq!(result.severity, FindingSeverity::Error);
+    assert_eq!(result.config_path.as_deref(), Some("default_temperature"));
+}
+
+/* PROCESS_REGISTRATION_BLOCK_REMOVED */
+/*
     register_inspection_chat_model(PROVIDER_OPENHUMAN, inspection_factory);
     register_chat_model(
         PROVIDER_OPENHUMAN,
