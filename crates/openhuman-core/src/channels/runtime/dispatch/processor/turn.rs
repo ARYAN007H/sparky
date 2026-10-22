@@ -232,11 +232,13 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
     // Send initial draft message if streaming
     let draft_message_id = if use_streaming {
         if let Some(channel) = target_channel.as_ref() {
-            match channel
-                .send_draft(
-                    &SendMessage::new("...", &msg.conversation.id).in_thread(msg.conversation.thread_id.clone()),
-                )
-                .await
+            match crate::channels::outbound::send_draft(
+                channel.as_ref(),
+                &msg.conversation.id,
+                "...",
+                msg.conversation.thread_id.clone(),
+            )
+            .await
             {
                 Ok(id) => id,
                 Err(e) => {
@@ -345,7 +347,7 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
     // gates compare these for equality before honouring confirmations.
     let turn_origin = crate::security::turn_origin::AgentTurnOrigin::ExternalChannel {
         sender_name: msg.sender.name.clone(),
-        channel: msg.channel.clone(),
+        channel: msg.channel.id.clone(),
         sender: Some(msg.sender.id.clone()),
         reply_target: msg.conversation.id.clone(),
         message_id: msg.message_id.clone(),
@@ -362,7 +364,7 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
         crate::security::approval::ApprovalTurnContext::chat(
             crate::security::approval::ApprovalChatContext {
                 thread_id: history_key.clone(),
-                client_id: msg.channel.clone(),
+                client_id: msg.channel.id.clone(),
                 request_id: Some(msg.message_id.clone()),
             },
         )
@@ -379,7 +381,7 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
             *host,
             HostChannelTurn {
                 relay_thread: ctx.relay_thread.clone(),
-                channel: msg.channel.clone(),
+                channel: msg.channel.id.clone(),
                 history_key: history_key.clone(),
                 prior_turns: seed_rows(&history),
                 message: enriched_message.clone(),
@@ -457,17 +459,21 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
                     {
                         tracing::warn!("Failed to finalize draft: {e}; sending as new message");
                         let _ = channel
-                            .send_with_outbound_intent(
-                                &SendMessage::new(&response_text, &msg.conversation.id)
-                                    .in_thread(msg.conversation.thread_id.clone()),
-                            )
+                            .send_typed(&text_message(
+                                &msg.channel.id,
+                                &msg.conversation.id,
+                                &response_text,
+                                msg.conversation.thread_id.clone(),
+                            ))
                             .await;
                     }
                 } else if let Err(e) = channel
-                    .send_with_outbound_intent(
-                        &SendMessage::new(&response_text, &msg.conversation.id)
-                            .in_thread(msg.conversation.thread_id.clone()),
-                    )
+                    .send_typed(&text_message(
+                        &msg.channel.id,
+                        &msg.conversation.id,
+                        &response_text,
+                        msg.conversation.thread_id.clone(),
+                    ))
                     .await
                 {
                     eprintln!("  ❌ Failed to reply on {}: {e}", channel.name());
@@ -503,16 +509,18 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
                             .await;
                     } else {
                         let _ = channel
-                            .send_with_outbound_intent(
-                                &SendMessage::new(error_text, &msg.conversation.id)
-                                    .in_thread(msg.conversation.thread_id.clone()),
-                            )
+                            .send_typed(&text_message(
+                                &msg.channel.id,
+                                &msg.conversation.id,
+                                error_text,
+                                msg.conversation.thread_id.clone(),
+                            ))
                             .await;
                     }
                 }
 
                 BUS.publish(DomainEvent::ChannelMessageProcessed {
-                    channel: msg.channel.clone(),
+                    channel: msg.channel.id.clone(),
                     message_id: msg.message_id.clone(),
                     sender: msg.sender.id.clone(),
                     reply_target: msg.conversation.id.clone(),
@@ -548,7 +556,7 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
                     target: "channels",
                     "[channels.dispatch] suppressed Sentry emission for max-iteration cap \
                      channel={} provider={} message={}",
-                    msg.channel.as_str(),
+                    msg.channel.id.as_str(),
                     route.provider.as_str(),
                     e
                 );
@@ -575,7 +583,7 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
                     "channels",
                     "dispatch_llm_error",
                     &[
-                        ("channel", msg.channel.as_str()),
+                        ("channel", msg.channel.id.as_str()),
                         ("provider", route.provider.as_str()),
                     ],
                 );
@@ -592,10 +600,12 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
                         .await;
                 } else {
                     let _ = channel
-                        .send_with_outbound_intent(
-                            &SendMessage::new(&error_response, &msg.conversation.id)
-                                .in_thread(msg.conversation.thread_id.clone()),
-                        )
+                        .send_typed(&text_message(
+                            &msg.channel.id,
+                            &msg.conversation.id,
+                            &error_response,
+                            msg.conversation.thread_id.clone(),
+                        ))
                         .await;
                 }
             }
@@ -618,7 +628,7 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
                 "channels",
                 "dispatch_llm_timeout",
                 &[
-                    ("channel", msg.channel.as_str()),
+                    ("channel", msg.channel.id.as_str()),
                     ("timeout_secs", &ctx.message_timeout_secs.to_string()),
                 ],
             );
@@ -636,10 +646,12 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
                         .await;
                 } else {
                     let _ = channel
-                        .send_with_outbound_intent(
-                            &SendMessage::new(&error_text, &msg.conversation.id)
-                                .in_thread(msg.conversation.thread_id.clone()),
-                        )
+                        .send_typed(&text_message(
+                            &msg.channel.id,
+                            &msg.conversation.id,
+                            &error_text,
+                            msg.conversation.thread_id.clone(),
+                        ))
                         .await;
                 }
             }
@@ -653,7 +665,7 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
     };
 
     BUS.publish(DomainEvent::ChannelMessageProcessed {
-        channel: msg.channel.clone(),
+        channel: msg.channel.id.clone(),
         message_id: msg.message_id.clone(),
         sender: msg.sender.id.clone(),
         reply_target: msg.conversation.id.clone(),
