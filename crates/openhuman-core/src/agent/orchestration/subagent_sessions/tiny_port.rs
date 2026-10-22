@@ -19,7 +19,7 @@ const EPOCHS: &str = "subagents.session_epochs";
 
 #[derive(Deserialize, Serialize)]
 struct ParentEpochRecord {
-    parent_epoch: u64,
+    parent_epoch: Option<u64>,
 }
 
 fn import_parent_epoch(
@@ -27,9 +27,6 @@ fn import_parent_epoch(
     session_id: String,
     parent_epoch: Option<u64>,
 ) -> Result<(), SubagentError> {
-    let Some(parent_epoch) = parent_epoch else {
-        return Ok(());
-    };
     crate::storage::block_on(async move {
         documents
             .ensure_collection(&tinystoragedrivers::CollectionSpec::new(EPOCHS))
@@ -57,6 +54,7 @@ pub(crate) fn parent_epoch_from_sidecar(
             .get(&session_id)
             .await?
             .map(|record| record.doc.parent_epoch))
+            .flatten()
     })
     .map_err(|error| SubagentError::Persistence(format!("read parent epoch: {error}")))
 }
