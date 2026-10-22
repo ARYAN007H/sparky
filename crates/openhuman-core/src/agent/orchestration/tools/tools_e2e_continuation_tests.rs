@@ -12,6 +12,7 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
     let _lock = crate::config::TEST_ENV_LOCK.lock().await;
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
+    let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
     let provider = Arc::new(PauseThenAnswerModel {
         calls: std::sync::atomic::AtomicUsize::new(0),
         seen: Mutex::new(Vec::new()),
