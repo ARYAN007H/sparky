@@ -461,6 +461,27 @@ async fn learnings_are_shared_under_a_root_and_a_team_root_is_kept_apart() {
         .any(|hit| hit.text.contains("british english")));
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_bound_dispatch_can_write_memory_without_nesting_runtimes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    bind_reference(&config);
+    let dispatch = DispatchCtx::new(crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config.clone(),
+    ));
+
+    let result = run_action(
+        &dispatch,
+        &config,
+        &json!({"action":"learn","text":"The user likes oolong tea"}),
+        &facts(),
+    )
+    .await;
+
+    assert!(!result.is_error, "{}", text(&result));
+}
+
 /// The reference engine, recording how far each single store waited.
 struct WaitRecorder {
     inner: tinymemory_api::conformance::ReferenceEngine,
@@ -713,20 +734,4 @@ async fn refers_to_reaches_the_engine_in_the_users_time_zone() {
             ),
         ]
     );
-}
-
-#[tokio::test]
-async fn learning_is_durably_queued_even_when_the_backend_refuses_writes() {
-    let tmp = tempfile::tempdir().unwrap();
-    let config = config_in(&tmp);
-    crate::memory::test_fixtures::RefusingEngine::out_of_credits().bind(&config);
-    let tool = MemoryTool::new(Arc::new(config.clone()));
-    let result = tool
-        .execute(json!({"action":"learn","text":"Prefers tea"}))
-        .await
-        .unwrap();
-    assert!(!result.is_error, "{}", result.text());
-    let value: Value = serde_json::from_str(&result.text()).unwrap();
-    assert_eq!(value["status"], "queued; not yet saved to memory");
-    assert_eq!(super::super::tool_writes::drain(&config).await, 0);
 }

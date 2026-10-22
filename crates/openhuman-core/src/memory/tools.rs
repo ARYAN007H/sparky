@@ -195,9 +195,11 @@ impl MemoryTool {
             };
             let outcome = if is_write_action(&args) {
                 let runtime = tokio::runtime::Handle::current();
-                match dispatch
-                    .spawn_blocking(move || runtime.block_on(call))
-                    .await
+                let write_dispatch = dispatch.clone();
+                match tokio::task::spawn_blocking(move || {
+                    runtime.block_on(write_dispatch.enter(call))
+                })
+                .await
                 {
                     Ok(result) => result,
                     Err(_) => {
@@ -346,6 +348,9 @@ mod offline_tests;
 #[cfg(test)]
 #[path = "tools_queue_failure_tests.rs"]
 mod queue_failure_tests;
+#[cfg(test)]
+#[path = "tools_queue_tests.rs"]
+mod queue_tests;
 #[cfg(test)]
 #[path = "tools_read_tests.rs"]
 mod read_tests;
