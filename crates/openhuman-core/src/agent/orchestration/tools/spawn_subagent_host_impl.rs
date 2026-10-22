@@ -11,7 +11,19 @@ impl SpawnSubagentTool {
             >,
         >,
     ) -> anyhow::Result<ToolResult> {
-        include!("spawn_subagent_preflight.rs");
+        spawn_subagent_preflight!(
+            dispatch,
+            agent_id,
+            prompt,
+            context,
+            model_override,
+            task_title,
+            task_key,
+            force_fresh,
+            run_context,
+            args,
+            detached_parent
+        );
 
         let parent = match run_context.parent.clone() {
             Some(parent) => parent,
