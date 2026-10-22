@@ -232,6 +232,15 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
         config,
     );
     let ctx = DispatchCtx::new(Arc::clone(&core));
+    crate::agent::orchestration::completion_owners::note_driver_task(
+        &ctx,
+        task_id,
+        workspace_dir.clone(),
+        tinytools::WorkspaceDescriptor::new(workspace_dir.clone()),
+        parent_session.into(),
+        parent_thread.clone(),
+    )
+    .expect("paused child owner registered");
     assert!(settle_paused_driver_cancel(
         &ctx,
         &observed,
@@ -260,6 +269,12 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
         row.status,
         tinyagents_orchestration::subagent::DurableSubagentStatus::Failed
     );
+    assert!(crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+        &ctx,
+        &workspace_dir,
+        parent_thread.as_deref().expect("parent thread"),
+    )
+    .is_empty(), "settled paused child releases its active owner slot");
     let delivery = pending_for(&workspace_dir, parent_thread.as_deref().unwrap());
     assert_eq!(delivery.len(), 1);
     assert_eq!(delivery[0].status, CompletionStatus::Failed);

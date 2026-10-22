@@ -396,11 +396,16 @@ pub(crate) async fn cancel_for_thread(
                     ));
                 }
             }
-            if let Err(error) = jobs.wait_owned(job.id.as_str(), &owner_key).await {
-                failures.push(format!(
+            match jobs.wait_owned(job.id.as_str(), &owner_key).await {
+                Ok(_) => {
+                    crate::agent::orchestration::completion_owners::finish_driver_task(
+                        ctx, &task_id,
+                    );
+                }
+                Err(error) => failures.push(format!(
                     "failed waiting for deleted-thread child {} to settle: {error}",
                     job.id
-                ));
+                )),
             }
         }
     }

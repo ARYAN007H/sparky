@@ -526,6 +526,13 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         "deleting a parent thread cancels its live TinyAgents child"
     );
     assert!(
+        crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+            &dispatch, &workspace, thread_id,
+        )
+        .is_empty(),
+        "settled thread deletion releases active child owner slots"
+    );
+    assert!(
         background_completions::pending_for(&workspace, thread_id).is_empty(),
         "queued child completions are discarded after cancellation"
     );

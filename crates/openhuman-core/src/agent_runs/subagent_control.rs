@@ -229,6 +229,7 @@ async fn settle_paused_driver_cancel(
         .await
         .map_err(|error| format!("subagent_cancel: failed to settle paused child: {error}"))?;
     if transitioned {
+        crate::agent::orchestration::completion_owners::finish_driver_task(ctx, &paused.task_id);
         let parent_epoch = paused
             .parent_thread_id
             .as_ref()
