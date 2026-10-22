@@ -72,7 +72,7 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
             .with_thread(thread_id),
         host_context,
     )
-    .with_workspace(workspace_descriptor);
+    .with_workspace(workspace_descriptor.clone());
     let dispatch = live.data.dispatch_ctx();
     blocking::ensure_thread(
         dispatch.clone(),
