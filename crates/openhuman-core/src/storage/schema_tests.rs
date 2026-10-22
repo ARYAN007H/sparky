@@ -35,7 +35,7 @@ fn every_linked_crate_exposes_its_valid_collection_declarations() {
         ("openhuman-core", "threads.transcript_keys"),
         ("openhuman-core", "subagents.sessions"),
     ] {
-        assert!(names.contains(expected), "{expected:?} missing: {names:?}");
+        assert!(names.contains(&expected), "{expected:?} missing: {names:?}");
     }
 }
 
