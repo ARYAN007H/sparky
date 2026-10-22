@@ -307,9 +307,11 @@ fn decode_display_message(value: &serde_json::Value) -> Result<DisplayMessage> {
         .context("decode transcript message")?;
     if message.role.is_empty() { anyhow::bail!("transcript message has no role"); }
     let content = message.content.clone();
-    if message.role == "system"
-        && let Some(cleaned) = crate::config::migrations::phase_out_profile_md::strip_profile_md_block(&content)
-    { message.content = cleaned; }
+    if message.role == "system" {
+        if let Some(cleaned) = crate::config::migrations::phase_out_profile_md::strip_profile_md_block(&content) {
+            message.content = cleaned;
+        }
+    }
     let turn_usage = value.get("usage").cloned()
         .and_then(|usage| serde_json::from_value(usage).ok())
         .map(|usage| tinyagents_session::transcript::TurnUsage {
