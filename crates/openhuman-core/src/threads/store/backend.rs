@@ -16,7 +16,7 @@
 //! the async workers.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, OnceLock, Weak};
 
 use super::ConversationPurgeStats;
@@ -45,10 +45,35 @@ struct WorkspaceThreadAdmission {
 static THREAD_ADMISSIONS: OnceLock<Mutex<HashMap<PathBuf, Weak<WorkspaceThreadAdmission>>>> =
     OnceLock::new();
 
+fn normalized_workspace_path(workspace_dir: &Path) -> PathBuf {
+    let absolute = if workspace_dir.is_absolute() {
+        workspace_dir.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join(workspace_dir)
+    };
+    if let Ok(canonical) = std::fs::canonicalize(&absolute) {
+        return canonical;
+    }
+    let mut normalized = PathBuf::new();
+    for component in absolute.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            other => normalized.push(other.as_os_str()),
+        }
+    }
+    normalized
+}
+
 fn thread_admission(workspace_dir: &Path) -> Arc<WorkspaceThreadAdmission> {
     let admissions = THREAD_ADMISSIONS.get_or_init(|| Mutex::new(HashMap::new()));
     let mut admissions = admissions.lock().unwrap_or_else(|error| error.into_inner());
-    if let Some(admission) = admissions.get(workspace_dir).and_then(Weak::upgrade) {
+    let workspace_key = normalized_workspace_path(workspace_dir);
+    if let Some(admission) = admissions.get(&workspace_key).and_then(Weak::upgrade) {
         return admission;
     }
     admissions.retain(|_, admission| admission.strong_count() > 0);
@@ -56,7 +81,7 @@ fn thread_admission(workspace_dir: &Path) -> Arc<WorkspaceThreadAdmission> {
         state: Mutex::new(ThreadAdmissionState::default()),
         changed: Condvar::new(),
     });
-    admissions.insert(workspace_dir.to_path_buf(), Arc::downgrade(&admission));
+    admissions.insert(workspace_key, Arc::downgrade(&admission));
     admission
 }
 

@@ -316,7 +316,8 @@ async fn thread_creation_cannot_enter_the_snapshot_to_purge_window() {
     // Exercise both the synchronous facade directly (which many non-RPC
     // callers use) and the request path used by thread_upsert. They must not
     // create a row after the purge snapshot but before the store-wide delete.
-    let direct_result = ConversationStore::new(ctx.clone(), workspace.clone())
+    let alias_workspace = workspace.join(".").join("..").join("workspace");
+    let direct_result = ConversationStore::new(ctx.clone(), alias_workspace)
         .ensure_thread(make_thread("purge-race-direct-facade"));
     let request_ctx = ctx.clone();
     let request_result = tokio::spawn(async move {
