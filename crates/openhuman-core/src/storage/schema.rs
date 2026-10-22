@@ -37,7 +37,6 @@ pub fn owner_schemas() -> Vec<Schema> {
         tinyagents_session::ledger_storage_schema(),
         tinyagents_session::history_storage_schema(),
         tinyagents_session::conversations_storage_schema(),
-        tinyagents_graph::storage_schema(),
         tinyagents_tasks::storage_schema(),
         crate::security::approval::storage_schema(),
         crate::security::devices::storage_schema(),

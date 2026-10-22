@@ -18,8 +18,8 @@ use std::sync::Arc;
 use tinyagents_harness::cancel::CancellationToken;
 use tinyagents_harness::turn_deadline::TurnDeadline;
 
-use crate::agent::tinyagents::budget::ModelBudget;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
+use tinyagents_harness::cost::ModelBudget;
 
 /// Per-turn values an entry point hands to the session it runs.
 ///

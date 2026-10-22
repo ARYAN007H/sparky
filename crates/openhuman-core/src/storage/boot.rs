@@ -205,12 +205,6 @@ async fn post_migrate_importers(
             record(report, scope, "import_legacy_kv", &error);
         }
     }
-    if let Err(error) = tinyagents_graph::import_legacy_leases(scoped).await {
-        record(report, scope, "import_legacy_leases", &error);
-    }
-    if let Err(error) = tinyagents_graph::import_legacy_task_cache(scoped).await {
-        record(report, scope, "import_legacy_task_cache", &error);
-    }
     for (step, error) in super::host_importers::run(scoped).await {
         record(report, scope, step, &error);
     }

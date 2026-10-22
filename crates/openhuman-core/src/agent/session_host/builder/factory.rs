@@ -372,7 +372,7 @@ impl OpenHumanSessionHost {
             crate::agent_registry::host_definition::AgentDefinitionRegistry::current(),
         ) {
             // Host-only: no delegation; the host's names join an empty belt.
-            _ if host_only => (Vec::new(), Some(super::host_only::empty_belt())),
+            _ if host_only => (Vec::new(), Some(super::host_policy::empty_belt())),
             (Some(def), Some(_reg)) => {
                 let synthed = if should_synthesize_delegation_tools(def) {
                     crate::integrations::composio::orchestrator_actions::collect_orchestrator_tools(
@@ -720,7 +720,7 @@ impl OpenHumanSessionHost {
         )?;
         let session_definition = super::host_tools::scope_def(target_def, &merged_host_tools);
         let host_policy =
-            super::host_only::session_policy(host_only, &tools, merged_host_tools.policy);
+            super::host_policy::session_policy(host_only, &tools, merged_host_tools.policy);
         let withheld_tool_names = merged_host_tools.withheld;
         let mut builder = OpenHumanSessionHost::builder()
             .tools(tools)

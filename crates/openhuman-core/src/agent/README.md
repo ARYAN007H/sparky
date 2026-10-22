@@ -42,7 +42,7 @@ is adapters that hand TinyAgents the things only OpenHuman knows.
   |   tinyagents-runtime   Session: history, resume, commit         |
   |   tinyagents-session   SessionRef, transcripts, run ledger      |
   |   tinyagents-harness   AgentHarness loop, middleware, RunQueue  |
-  |   tinyagents-graph / -orchestration   delegation, sub-agents    |
+  |   tinyagents-orchestration            delegation, sub-agents    |
   |   tinytools, tinyinference   Tool trait, ChatModel, providers   |
   +-----------------------------------------------------------------+
      |                         |

@@ -3,6 +3,21 @@ use crate::plan_review::PlanReviewResolution;
 use serde_json::json;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolRunContext};
 
+struct RunModeEventCollector(tokio::sync::mpsc::UnboundedSender<(String, String)>);
+
+#[async_trait::async_trait]
+impl tinybus::EventHandler<crate::core::events::DomainEvent> for RunModeEventCollector {
+    fn name(&self) -> &str {
+        "plan-exit-test"
+    }
+
+    async fn handle(&self, event: &crate::core::events::DomainEvent) {
+        if let crate::core::events::DomainEvent::ThreadRunModeChanged { thread_id, mode } = event {
+            let _ = self.0.send((thread_id.clone(), mode.clone()));
+        }
+    }
+}
+
 struct ThreadContext(&'static str);
 impl ToolRunContext for ThreadContext {
     fn thread_id(&self) -> Option<&str> {
@@ -103,6 +118,48 @@ async fn plan_exit_emits_marker() {
     let output = result.output();
     assert!(output.starts_with(PLAN_EXIT_MARKER));
     assert!(output.contains("Read X"));
+}
+
+#[tokio::test]
+async fn plan_exit_publishes_build_run_mode_change() {
+    crate::core::bus::init().await.expect("bus init");
+    let (tx, mut events) = tokio::sync::mpsc::unbounded_channel();
+    let _subscription = crate::core::bus::BUS
+        .subscribe(std::sync::Arc::new(RunModeEventCollector(tx)))
+        .expect("subscribe to core events");
+    let thread_id = "plan-exit-publishes-run-mode";
+    crate::threads::run_mode::set_mode(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        thread_id,
+        tinyagents_harness::middleware::RunMode::Plan,
+    );
+    let tool = PlanExitTool::new();
+    let result = tool
+        .execute_with_context(
+            json!({ "plan": "1. Do the thing" }),
+            ToolCallOptions::default(),
+            Some(&ThreadContext(thread_id)),
+        )
+        .await
+        .unwrap();
+    assert!(!result.is_error);
+
+    let event = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        loop {
+            match events.recv().await {
+                Some((event_thread_id, mode))
+                    if event_thread_id == thread_id && mode == "build" =>
+                {
+                    break (event_thread_id, mode);
+                }
+                Some(_) => continue,
+                None => panic!("run mode event stream ended"),
+            }
+        }
+    })
+    .await
+    .expect("plan_exit must publish run_mode_changed");
+    assert_eq!(event, (thread_id.into(), "build".into()));
 }
 
 #[tokio::test]

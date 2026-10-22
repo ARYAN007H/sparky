@@ -1,5 +1,48 @@
 use super::*;
 
+struct DecisionCollector {
+    thread_id: &'static str,
+    sender: tokio::sync::mpsc::UnboundedSender<(String, Option<String>)>,
+}
+
+#[async_trait::async_trait]
+impl tinybus::EventHandler<crate::core::events::DomainEvent> for DecisionCollector {
+    fn name(&self) -> &str {
+        "plan-review-gate-test"
+    }
+
+    async fn handle(&self, event: &crate::core::events::DomainEvent) {
+        if let crate::core::events::DomainEvent::PlanReviewDecided {
+            decision,
+            resolution,
+            thread_id: Some(thread_id),
+            ..
+        } = event
+        {
+            if thread_id == self.thread_id {
+                let _ = self.sender.send((decision.clone(), resolution.clone()));
+            }
+        }
+    }
+}
+
+async fn decision_events(
+    thread_id: &'static str,
+) -> (
+    impl Drop,
+    tokio::sync::mpsc::UnboundedReceiver<(String, Option<String>)>,
+) {
+    crate::core::bus::init().await.expect("bus init");
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    let handle = crate::core::bus::BUS
+        .subscribe(std::sync::Arc::new(DecisionCollector {
+            thread_id,
+            sender: tx,
+        }))
+        .expect("subscribe to core events");
+    (handle, rx)
+}
+
 fn tenant() -> crate::core::runtime::Tenant {
     crate::core::runtime::Tenant::default()
 }
@@ -59,6 +102,7 @@ async fn revise_carries_feedback_back() {
 
 #[tokio::test]
 async fn timeout_fails_closed_to_reject() {
+    let (_subscription, mut decisions) = decision_events("t3").await;
     let gate = PlanReviewGate::new(Duration::from_millis(40));
     let resolution = gate
         .request_review(
@@ -71,8 +115,41 @@ async fn timeout_fails_closed_to_reject() {
         )
         .await;
     assert_eq!(resolution, PlanReviewResolution::Reject);
+    assert_eq!(
+        decisions.recv().await,
+        Some(("reject".into(), Some("expired".into())))
+    );
     // The waiter is cleaned up after timeout.
     assert!(!gate.decide_by_thread(&tenant(), "t3", PlanReviewResolution::Approve));
+}
+
+#[tokio::test]
+async fn cancelled_park_publishes_cancelled_decision() {
+    let (_subscription, mut decisions) = decision_events("t-cancel-event").await;
+    let gate = std::sync::Arc::new(PlanReviewGate::new(Duration::from_secs(30)));
+    let g2 = gate.clone();
+    let handle = tokio::spawn(async move {
+        g2.request_review(
+            tenant(),
+            Some("t-cancel-event".into()),
+            Some("client-cancel".into()),
+            "Plan".into(),
+            vec![],
+            None,
+        )
+        .await
+    });
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    handle.abort();
+    let _ = handle.await;
+
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(1), decisions.recv())
+            .await
+            .unwrap(),
+        Some(("reject".into(), Some("cancelled".into()))),
+        "cancelling a parked review must tell the frontend to clear its card"
+    );
 }
 
 #[tokio::test]
@@ -189,4 +266,52 @@ async fn parked_reviews_are_isolated_by_tenant() {
         PlanReviewResolution::Approve
     ));
     assert_eq!(parked.await, PlanReviewResolution::Approve);
+}
+
+#[test]
+fn socket_review_scope_comes_from_server_context_and_fails_closed_in_saas() {
+    let active_profile = Tenant {
+        profile: Some("active-profile".into()),
+        agent: Some("agent-a".into()),
+    };
+    let scope = socket_scope_from_context(Ok(active_profile.clone()), true)
+        .expect("authenticated server context binds socket scope");
+    assert_eq!(scope.0, active_profile);
+    assert!(socket_scope_from_context(Err(crate::core::runtime::tenant::NoTenant), true).is_none());
+}
+
+#[tokio::test]
+async fn socket_scope_uses_explicit_dispatch_context_after_task_handoff() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+
+    let root = CoreContext::for_test(DomainSet::full(), None);
+    let active = root.derive_with(
+        ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .profile("active-profile"),
+    );
+    let dispatch = DispatchCtx::new(active);
+    let gate = PlanReviewGate::new(Duration::from_secs(1));
+
+    // Socket.IO spawns its async connect callback. The task-local context is
+    // absent there; the request's explicit DispatchCtx remains the authority.
+    let scope = tokio::spawn(async move { gate.socket_scope_for_dispatch(&dispatch) })
+        .await
+        .expect("spawned callback completes")
+        .expect("request context binds socket scope");
+    assert_eq!(scope.0.profile.as_deref(), Some("active-profile"));
+}
+
+#[test]
+fn local_socket_review_scope_preserves_the_active_profile() {
+    let active_profile = Tenant {
+        profile: Some("local-profile".into()),
+        agent: None,
+    };
+    let scope = socket_scope_from_context(Ok(active_profile.clone()), false)
+        .expect("local socket keeps its active profile");
+    assert_eq!(scope.0, active_profile);
 }

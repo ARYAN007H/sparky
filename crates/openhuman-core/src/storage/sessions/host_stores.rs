@@ -100,7 +100,7 @@ pub(super) fn fallback_provider(workspace_dir: &Path) -> Arc<dyn SessionStorePro
             return existing.provider.clone();
         }
     }
-    match TenantSessionStores::new(Arc::clone(&backend), false) {
+    match TenantSessionStores::new_workspace_local(Arc::clone(&backend), false) {
         Ok(provider) => {
             let provider = Arc::new(provider);
             fallbacks.insert(
@@ -127,7 +127,7 @@ fn memory_fallback(workspace_dir: &Path) -> Arc<dyn SessionStoreProvider> {
         .entry(workspace_dir.to_path_buf())
         .or_insert_with(|| {
             let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
-            match TenantSessionStores::new(backend, false) {
+            match TenantSessionStores::new_workspace_local(backend, false) {
                 Ok(provider) => Arc::new(provider),
                 Err(_) => Arc::new(tinyagents_session::port::InMemorySessionStores::new()),
             }
@@ -420,7 +420,7 @@ where
 /// For the one host with no single backend to install: a SaaS core with no
 /// storage URL, where every profile has a workspace of its own and so a
 /// database of its own. Every other host installs
-/// [`ReboundSessionStores`](super::ReboundSessionStores) over its backend.
+/// [`TenantSessionStores`](super::TenantSessionStores) over its backend.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct WorkspaceSessionStores;
 
@@ -486,5 +486,5 @@ pub fn session_scope(key: &str) -> tinystoragedrivers::Scope {
 }
 
 #[cfg(test)]
-#[path = "workspace_tests.rs"]
+#[path = "host_stores_tests.rs"]
 mod tests;

@@ -1,6 +1,6 @@
 //! `SessionHostBuilder::build` — validates and assembles the final [`OpenHumanSessionHost`].
 
-use super::{dedup_visible_tool_specs, visible_tool_specs_for_policy};
+use super::visible_tool_specs_for_policy;
 use crate::agent::session_host::types::{OpenHumanSessionHost, SessionHostBuilder};
 use anyhow::Result;
 use std::sync::Arc;
@@ -292,7 +292,7 @@ impl SessionHostBuilder {
         // accept duplicates, which hid this bug until #1710's per-role
         // routing started sending the same tool list to Anthropic.
         let visible_tool_specs: Vec<Arc<ToolSpec>> =
-            dedup_visible_tool_specs(visible_tool_specs_unfiltered);
+            tinyagents_runtime::dedup_visible_tool_specs(visible_tool_specs_unfiltered);
 
         let visible_names_list: Vec<&str> =
             visible_tool_specs.iter().map(|s| s.name.as_str()).collect();
@@ -458,7 +458,6 @@ impl SessionHostBuilder {
             // `subagents` declaration against the global registry.
             agent_definition_id: agent_definition_name.clone(),
             session_history_locator: self.session_history_locator,
-            session_history_locator_memo: std::sync::OnceLock::new(),
             session_key: {
                 let unix_ts = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)

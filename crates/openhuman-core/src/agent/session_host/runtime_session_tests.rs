@@ -512,19 +512,10 @@ async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
     );
 }
 
-/// The incident this guards: `session_locator()` is called from more than one
-/// place while assembling a session's runtime turn machinery (the
-/// `before_resume` resume target and the eager construction-time
-/// `builder.session(...)` bind), and tinyagents only accepts a later
-/// transcript-target change when it is the exact same locator object
-/// (`Arc::ptr_eq`), not merely an equivalent one over the same file. Before
-/// this was memoized, each call minted a fresh `FileTranscriptLocator`, so a
-/// thread's second turn was rejected with "cannot change a transcript target
-/// after it is bound or committed" even though both binds agreed on the
-/// destination. Pin the fix directly: every call must return the identical
-/// `Arc`.
+/// Session admission is deterministic for the same OpenHuman run context and
+/// returns a pinned lease from the workspace provider.
 #[tokio::test]
-async fn session_locator_is_memoized_across_calls() {
+async fn session_identity_resolver_admits_stable_workspace_stores() {
     let action_dir = tempfile::tempdir().expect("tempdir");
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
@@ -538,12 +529,23 @@ async fn session_locator_is_memoized_across_calls() {
         .build()
         .expect("session build");
 
-    let first = host.session_locator();
-    let second = host.session_locator();
-    assert!(
-        Arc::ptr_eq(&first, &second),
-        "session_locator() must return the same Arc on every call, or tinyagents' \
-         same-binding check rejects the second transcript bind"
+    let resolver = host.session_identity_resolver();
+    let context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+    let request = tinyagents_runtime::SessionIdentityRequest {
+        thread_id: Some("stable-thread".into()),
+        session_key: "stable-thread".into(),
+        parent: None,
+        child_key: None,
+    };
+    let first = tinyagents_runtime::SessionIdentityResolver::resolve(&resolver, &request, &context)
+        .expect("first admission");
+    let second =
+        tinyagents_runtime::SessionIdentityResolver::resolve(&resolver, &request, &context)
+            .expect("second admission");
+    assert_eq!(first.agent_id, second.agent_id);
+    assert_eq!(
+        first.stores.stores().transcripts.destination_key(),
+        second.stores.stores().transcripts.destination_key()
     );
 }
 

@@ -163,7 +163,7 @@ pub use dispatch_control::{decide_dispatch, DispatchDecision, DispatchInputs, Tu
 #[derive(Clone)]
 pub struct OpenHumanRunContext {
     /// Explicit shared model-call budget inherited by synchronous children.
-    pub model_budget: Option<super::super::budget::ModelBudget>,
+    pub model_budget: Option<tinyagents_harness::cost::ModelBudget>,
     /// Host admission policy shared by this run and its synchronous descendants.
     pub dispatch_admission: Option<Arc<dyn super::super::budget::PhysicalDispatchAdmission>>,
     /// The response format and output cap this root turn asks of every model

@@ -2561,6 +2561,17 @@ const chatRuntimeSlice = createSlice({
     clearPendingPlanReviewForThread: (state, action: PayloadAction<{ threadId: string }>) => {
       delete state.pendingPlanReviewByThread[action.payload.threadId];
     },
+    clearPendingPlanReviewIfRequest: (
+      state,
+      action: PayloadAction<{ threadId: string; requestId: string }>
+    ) => {
+      if (
+        state.pendingPlanReviewByThread[action.payload.threadId]?.requestId ===
+        action.payload.requestId
+      ) {
+        delete state.pendingPlanReviewByThread[action.payload.threadId];
+      }
+    },
     setWorkflowProposalForThread: (
       state,
       action: PayloadAction<{ threadId: string; proposal: WorkflowProposal }>
@@ -3294,6 +3305,7 @@ export const {
   resolvePendingApprovalForThread,
   setPendingPlanReviewForThread,
   clearPendingPlanReviewForThread,
+  clearPendingPlanReviewIfRequest,
   setWorkflowProposalForThread,
   clearWorkflowProposalForThread,
   markWorkflowProposalCompleted,

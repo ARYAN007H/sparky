@@ -19,19 +19,17 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock};
 
 use tinyagents_session::port::{AgentStores, SessionStoreProvider};
 
-mod rebound;
+mod host_stores;
 mod tenant_router;
-mod workspace;
 
-pub use rebound::{rebind_all, ReboundSessionStores, StoreRegistry};
-pub use tenant_router::TenantSessionStores;
-pub use workspace::{
+pub use host_stores::{
     artifact_blobs_for, artifact_scoped_for_in, attachment_stash_for, current_documents_for,
     default_turn_states_for, ledger_for, provider_for_workspace, provider_for_workspace_in,
     release_workspace, release_workspace_defaults, require_ledger, session_scope, status_store_for,
     stores_for, stores_or_ephemeral, turn_states_for, with_ledger, with_ledger_async,
     WorkspaceSessionStores,
 };
+pub use tenant_router::{rebind_all, TenantSessionStores};
 
 static PROVIDER: LazyLock<RwLock<Option<Arc<dyn SessionStoreProvider>>>> =
     LazyLock::new(|| RwLock::new(None));

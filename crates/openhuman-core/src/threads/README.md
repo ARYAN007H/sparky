@@ -198,7 +198,7 @@ through `all_threads_registered_controllers`:
 | Live agent state | `goal_get`, `todos_get` |
 
 `goal_get` and `todos_get` are read-only. Goals and todos are written by the
-agent (`agent::goals`, `agent::todos`, backed by `tinyagents_graph`) and their
+agent (`agent::goals`, `agent::todos`, backed by `tinyagents_harness_tools`) and their
 live updates stream over the web channel (`thread_goal_updated`,
 `thread_goal_cleared`, `thread_todos_changed`). There is no task-board or
 todo-editing surface here.

@@ -150,26 +150,6 @@ Migration steps:
 
 - `paired_v2`: `devices.paired` v1 to v2 from `paired_devices`
 
-## graph
-
-| Kind | Name | Version | Scope | Indexed fields |
-| --- | --- | --- | --- | --- |
-| collection | `graph.checkpoints` | 4 | agent | `ns`, `thread`, `seq`, `ns`, `thread`, `checkpoint_id`, `ns`, `thread`, `subgraph`, `seq` |
-| collection | `graph.threads` | 4 | agent | `ns` |
-| collection | `graph.writes` | 4 | agent | `ns`, `thread` |
-
-Migration steps:
-
-- `checkpoints_graph_v2`: `graph.checkpoints` v1 to v2 from `graph_checkpoints`
-- `checkpoints_delegation_v2`: `graph.checkpoints` v2 to v3 from `delegation_graph_checkpoints`
-- `checkpoints_flows_v2`: `graph.checkpoints` v3 to v4 from `flows_graph_checkpoints`
-- `threads_graph_v2`: `graph.threads` v1 to v2 from `graph_threads`
-- `threads_delegation_v2`: `graph.threads` v2 to v3 from `delegation_graph_threads`
-- `threads_flows_v2`: `graph.threads` v3 to v4 from `flows_graph_threads`
-- `writes_graph_v2`: `graph.writes` v1 to v2 from `graph_writes`
-- `writes_delegation_v2`: `graph.writes` v2 to v3 from `delegation_graph_writes`
-- `writes_flows_v2`: `graph.writes` v3 to v4 from `flows_graph_writes`
-
 ## harness
 
 | Kind | Name | Version | Scope | Indexed fields |

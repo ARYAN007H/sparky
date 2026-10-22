@@ -54,7 +54,7 @@ pub(crate) fn incomplete_stop(
     failure_cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
 ) -> Option<tinyagents_harness::turn_stop::TurnStop> {
     Some(
-        crate::agent::session_host::stop_summary::stop_from_incomplete_with_cause(
+        crate::agent::session_host::stop_policy::stop_from_incomplete_with_cause(
             reason,
             failure_cause,
         ),

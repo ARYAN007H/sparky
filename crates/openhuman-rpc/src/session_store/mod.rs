@@ -3,8 +3,8 @@
 //! One storage URL decides where every conversation lives
 //! (`OPENHUMAN_STORAGE_URL`, else `[storage] url`, else the default
 //! `sqlite:<workspace>/storage`). The backend is opened and made the process's
-//! storage backend, and TinyAgents' `DriverSessionStores` goes in over it
-//! ([`ReboundSessionStores`], so a different user signing in can move it to
+//! storage backend, and TinyAgents' rebindable tenant router goes in over it
+//! ([`TenantSessionStores`], so a different user signing in can move it to
 //! their workspace's backend without reinstalling the provider): every agent's
 //! transcripts, turn states, records, run ledger and journal in that backend,
 //! one storage scope per agent. There is no file layout beside it; what older
@@ -43,14 +43,14 @@ use std::sync::Arc;
 use anyhow::Context as _;
 use tinyagents_session::port::SessionStoreProvider;
 
-use crate::core_host::agent::session_store::{ReboundSessionStores, WorkspaceSessionStores};
+use crate::core_host::agent::session_store::{TenantSessionStores, WorkspaceSessionStores};
 
 /// Installs the session store the host's configuration asks for, before the
 /// core boots.
 ///
 /// The backend is opened and made the process's storage backend
 /// ([`crate::core_host::storage::install_for_url`]), and TinyAgents'
-/// `DriverSessionStores` is installed over it.
+/// TinyAgents' rebindable tenant router is installed over it.
 ///
 /// A single-process backend (SQLite, memory, files) also interrupts an
 /// agent's in-flight turns the first time it is opened, since only an earlier
@@ -184,8 +184,10 @@ async fn provider_for_url_with(
         .context("opening the configured storage backend")?;
     let recover = recover_on_open
         .unwrap_or_else(|| !crate::core_host::storage::driver_is_shared(backend.driver()));
-    let provider = ReboundSessionStores::new(Arc::clone(&backend), recover)
-        .context("starting the session store bridge")?;
+    let provider = Arc::new(
+        TenantSessionStores::new(Arc::clone(&backend), recover)
+            .context("starting the session store")?,
+    );
     // Only a fully working bridge makes the backend the process's storage.
     crate::core_host::storage::install_for_url(&url, backend);
     log::info!(
