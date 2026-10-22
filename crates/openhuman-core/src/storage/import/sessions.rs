@@ -97,7 +97,7 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
             let mut rows = super::session_db::SessionDatabase::read(snapshot.db())
                 .context("[sessions] read the session database snapshot")?;
             sanitize_legacy_system_messages(&mut rows.messages);
-            let fingerprint = source_fingerprint(&rows)?;
+            let fingerprint = source_fingerprint((&rows.agent_runs, &rows.events, &rows.telemetry))?;
             let history_batch = SessionHistoryImport {
                 sessions: rows.sessions,
                 messages: rows.messages,
@@ -196,9 +196,9 @@ fn database_totals(counts: [ImportCounts; 11]) -> (usize, usize) {
     )
 }
 
-fn source_fingerprint<T: serde::Serialize>(rows: &T) -> Result<String> {
+fn source_fingerprint<T: serde::Serialize>(rows: T) -> Result<String> {
     use sha2::{Digest, Sha256};
-    let bytes = serde_json::to_vec(rows).context("serialize decoded legacy session rows")?;
+    let bytes = serde_json::to_vec(&rows).context("serialize decoded legacy agent rows")?;
     Ok(format!("sha256:{}", hex::encode(Sha256::digest(bytes))))
 }
 
@@ -370,7 +370,7 @@ fn decode_display_message(
     value: &serde_json::Value,
     sanitized_system: &mut bool,
 ) -> Result<DisplayMessage> {
-    let mut message: TranscriptMessage = serde_json::from_value(value.clone())
+    let mut message: TranscriptMessage = serde_json::from_value::<TranscriptMessage>(value.clone())
         .context("decode transcript message")?
         .normalized();
     if message.role.is_empty() {

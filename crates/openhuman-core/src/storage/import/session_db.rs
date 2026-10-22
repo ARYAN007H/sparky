@@ -20,7 +20,7 @@ use crate::storage::rusqlite::{self, types::ValueRef};
 /// Typed rows from the historical session database, in deterministic source
 /// order. The owner import operation performs the destination preflight and
 /// checked batch write.
-#[derive(Debug, Default, serde::Serialize)]
+#[derive(Debug, Default)]
 pub(crate) struct SessionDatabase {
     pub sessions: Vec<SessionRecord>,
     pub messages: Vec<SessionMessage>,

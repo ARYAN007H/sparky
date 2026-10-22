@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tinyagents_harness::events::ExecutionStatus;
+use tinyagents_harness::ids::ExecutionStatus;
 use tinyagents_harness::observability::{DriverStatusStore, HarnessStatusStore};
 use tinyagents_harness::store::DriverAppendStore;
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, StorageBackend};
