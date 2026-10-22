@@ -1,4 +1,5 @@
 use super::*;
+use crate::security::AutonomyLevel;
 
 #[test]
 fn name_and_permission() {

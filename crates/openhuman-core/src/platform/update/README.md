@@ -21,7 +21,7 @@ Self-update domain for the `openhuman-core` binary. Checks GitHub Releases (`tin
 | `crates/openhuman-core/src/platform/update/schemas.rs` | Controller registry: `all_controller_schemas`, `all_registered_controllers`, `schemas(fn)`, and `handle_*` thunks delegating to `ops`. |
 | `crates/openhuman-core/src/platform/update/types.rs` | Serde types: `UpdateInfo`, `VersionInfo`, `UpdateRunResult`, `UpdateApplyResult`, `GitHubRelease`, `GitHubAsset`. |
 | `crates/openhuman-core/src/platform/update/tools.rs` | Agent tools for checking and applying updates, registered by `tools/ops.rs`. |
-| `crates/openhuman-core/src/platform/update/*_tests.rs` | Sibling test suites (`core_tests`, `ops_tests`, `ops_tests_2_tests`, `scheduler_tests`, `schemas_tests`), included via `#[path]`. |
+| `crates/openhuman-core/src/platform/update/*_tests.rs` | Sibling test suites (`core_tests`, `ops_tests`, `ops_tests_2_tests`, `scheduler_tests`, `schemas_tests`, `tools_tests`), included via `#[path]`. |
 
 ## Public surface
 - Types ([`types.rs`](./types.rs)): `UpdateInfo`, `VersionInfo`, `UpdateRunResult`, `UpdateApplyResult`, `GitHubRelease`, `GitHubAsset`.
