@@ -12,10 +12,9 @@ use tinyagents_orchestration::subagent::{
     SubagentSessionStore as TinySessionStore, SubagentSessionUpsert as TinyUpsert,
 };
 
+use super::storage_schema::EPOCHS;
 use super::types::{DurableSubagentSession, DurableSubagentStatus, SubagentSessionSelector};
 use super::{SubagentSessionStore, SubagentSessionUpsert};
-
-const EPOCHS: &str = "subagents.session_epochs";
 
 #[derive(Deserialize, Serialize)]
 struct ParentEpochRecord {
