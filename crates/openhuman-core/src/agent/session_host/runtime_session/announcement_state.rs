@@ -29,8 +29,10 @@ pub(super) struct OpenHumanTurnPreludeMutable {
     /// snapshot simply had no TinyJuice declarations.
     pub(super) recorded_tool_snapshot_adopted: bool,
     pub(super) workflows: Vec<tinyskills::Skill>,
-    pub(super) composio_events: Option<tinybus::events::EventReceiver<crate::core::events::DomainEvent>>,
-    pub(super) skill_events: Option<tinybus::events::EventReceiver<crate::core::events::DomainEvent>>,
+    pub(super) composio_events:
+        Option<tinybus::events::EventReceiver<crate::core::events::DomainEvent>>,
+    pub(super) skill_events:
+        Option<tinybus::events::EventReceiver<crate::core::events::DomainEvent>>,
     /// The user-authored text of the in-flight turn, held until commit so the
     /// committed turn can be handed to memory.
     pub(super) pending_user_text: Option<String>,

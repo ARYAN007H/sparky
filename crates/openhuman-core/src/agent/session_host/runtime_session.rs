@@ -165,7 +165,6 @@ struct OpenHumanTurnToolSurface {
 mod announcement_state;
 use announcement_state::OpenHumanTurnPreludeMutable;
 
-
 #[path = "runtime_session/ensure.rs"]
 mod ensure;
 
@@ -227,7 +226,6 @@ impl OpenHumanSessionHost {
     pub async fn turn(&mut self, user_message: &str) -> Result<String> {
         self.turn_with_origin(user_message, None).await
     }
-
 
     /// Publish a caller-driven visibility/policy mutation into the live hook
     /// state. The runtime keeps generic snapshots immutable per request; this

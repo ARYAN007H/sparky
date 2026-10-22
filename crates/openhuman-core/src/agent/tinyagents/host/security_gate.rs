@@ -410,7 +410,6 @@ impl OpenHumanSecurityGate {
         }
         decision_for_outcome(&call.tool_name, outcome)
     }
-
 }
 
 #[path = "security_gate/authorize.rs"]

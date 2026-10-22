@@ -372,11 +372,18 @@ impl OpenHumanSessionHost {
         // `refresh_delegation_tools` replaces the whole set later (#6145).
 
         let tool_dispatcher = helpers::tool_dispatcher(
-            &tools, &delegation_tools, &dispatcher_choice, supports_native, agent_id,
+            &tools,
+            &delegation_tools,
+            &dispatcher_choice,
+            supports_native,
+            agent_id,
         );
 
-        let (effective_temperature, effective_omit_memory_context, effective_tokenjuice_compression) =
-            helpers::effective_settings(target_def, config);
+        let (
+            effective_temperature,
+            effective_omit_memory_context,
+            effective_tokenjuice_compression,
+        ) = helpers::effective_settings(target_def, config);
 
         helpers::log_agent_definition_name(agent_id);
 
@@ -387,8 +394,7 @@ impl OpenHumanSessionHost {
         // a host provider. The `agent_harness_e2e` mock now serves SSE for streaming,
         // so the crate-native streaming path is exercised end-to-end.
         //
-        let effective_agent_config =
-            helpers::effective_agent_config(config, target_def, agent_id);
+        let effective_agent_config = helpers::effective_agent_config(config, target_def, agent_id);
         let merged_host_tools = super::host_tools::merge_for_turn(
             ctx,
             host,

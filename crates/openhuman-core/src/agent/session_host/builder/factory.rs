@@ -19,12 +19,12 @@ use tinytools_agent::dialect::{
     CodeDialect, CodeStyle, NativeDialect, PFormatDialect, ToolCallFormat, ToolDialect, XmlDialect,
 };
 
+#[path = "factory/build_session.rs"]
+mod build_session;
 #[path = "factory_tool_registry.rs"]
 mod tool_registry;
 #[path = "factory_workflows.rs"]
 mod workflows;
-#[path = "factory/build_session.rs"]
-mod build_session;
 
 impl OpenHumanSessionHost {
     /// Returns whether `agent_id` resolves to a runnable definition for this
@@ -149,7 +149,6 @@ impl OpenHumanSessionHost {
             ctx, config, agent_id, target_def, host_only, host, session_id, None,
         )
     }
-
 }
 
 /// Resolves the `AgentDefinition` a session should be built from, given the
