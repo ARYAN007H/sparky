@@ -95,6 +95,9 @@ pub(super) fn managed_chat_model_for(
         thread_id,
         context: &context,
     };
+    let entry = crate::inference::registry::provider_overrides(extensions.cloned())
+        .chat_entry(PROVIDER_OPENHUMAN)
+        .unwrap_or(entry);
     Ok((entry.build)(&request)?)
 }
 
