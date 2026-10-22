@@ -503,20 +503,7 @@ impl ModuleChannel {
         &self,
         message: &tinychannels_bus::ChannelOutboundMessage,
     ) -> anyhow::Result<()> {
-        let intent = tinychannels_bus::ChannelOutboundIntent {
-            channel_id: message.channel_id.clone(),
-            conversation_id: message.conversation_id.clone(),
-            channel_ref: message.channel_ref.clone(),
-            conversation_ref: message.conversation_ref.clone(),
-            reply_to_id: message.reply_to_id.clone(),
-            thread_id: message.thread_id.clone(),
-            turn_id: message.turn_id.clone(),
-            idempotency_key: message.idempotency_key.clone(),
-            payload: tinychannels_bus::OutboundPayload::Parts {
-                parts: message.parts.clone(),
-            },
-            ..Default::default()
-        };
+        let intent = outbound_intent(message);
         let prepared: tinychannels_bus::module_runtime::PreparedChannelIntent = self
             .object
             .call_confidential(
@@ -563,3 +550,26 @@ impl ModuleChannel {
         }
     }
 }
+
+fn outbound_intent(
+    message: &tinychannels_bus::ChannelOutboundMessage,
+) -> tinychannels_bus::ChannelOutboundIntent {
+    tinychannels_bus::ChannelOutboundIntent {
+        channel_id: message.channel_id.clone(),
+        conversation_id: message.conversation_id.clone(),
+        channel_ref: message.channel_ref.clone(),
+        conversation_ref: message.conversation_ref.clone(),
+        reply_to_id: message.reply_to_id.clone(),
+        thread_id: message.thread_id.clone(),
+        turn_id: message.turn_id.clone(),
+        idempotency_key: message.idempotency_key.clone(),
+        payload: tinychannels_bus::OutboundPayload::Parts {
+            parts: message.parts.clone(),
+        },
+        ..Default::default()
+    }
+}
+
+#[cfg(test)]
+#[path = "module_providers_tests.rs"]
+mod tests;
