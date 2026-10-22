@@ -298,7 +298,12 @@ async fn maintain_run_journals(
                 Some(ExecutionStatus::Running | ExecutionStatus::Pending)
             )
         {
-            if streams.seal(&name).await?.sealed_ms.is_some() {
+            let already_sealed = streams
+                .info(&name)
+                .await?
+                .is_some_and(|info| info.sealed_ms.is_some());
+            if !already_sealed {
+                streams.seal(&name).await?;
                 report.backfilled += 1;
             }
         }

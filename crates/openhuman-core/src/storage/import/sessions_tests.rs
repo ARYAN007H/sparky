@@ -90,6 +90,7 @@ fn profile_phase_out_rewrites_imported_bytes_without_mutating_legacy_source() {
         &path,
         &[
             TranscriptMessage::system(prompt),
+            TranscriptMessage::system("a later system message mentioning PROFILE.md stays intact"),
             TranscriptMessage::user("question"),
         ],
         &TranscriptMeta {
@@ -123,6 +124,10 @@ fn profile_phase_out_rewrites_imported_bytes_without_mutating_legacy_source() {
     assert!(!system.message.content.contains("PROFILE.md"));
     assert!(!system.message.content.contains("private"));
     assert!(system.message.content.contains("### Tools"));
+    let DisplayRecord::Message(later_system) = &records[1] else {
+        panic!("expected the second system message");
+    };
+    assert!(later_system.message.content.contains("PROFILE.md"));
     assert_eq!(std::fs::read(&path).unwrap(), source_before);
 }
 

@@ -315,6 +315,7 @@ fn decode_transcript(
     let mut meta = None;
     let mut tools = None;
     let mut records = Vec::new();
+    let mut sanitized_system = false;
     for (line_no, line) in text.lines().enumerate() {
         let line = line.trim();
         if line.is_empty() {
@@ -339,7 +340,7 @@ fn decode_transcript(
                 .and_then(serde_json::Value::as_array)
                 .into_iter()
                 .flatten()
-                .filter_map(|row| decode_display_message(row).ok())
+                .filter_map(|row| decode_display_message(row, &mut sanitized_system).ok())
                 .collect();
             records.push(DisplayRecord::Compaction(
                 tinyagents_session::transcript::CompactionMarker {
@@ -356,7 +357,7 @@ fn decode_transcript(
             ));
             continue;
         }
-        if let Ok(message) = decode_display_message(&value) {
+        if let Ok(message) = decode_display_message(&value, &mut sanitized_system) {
             records.push(DisplayRecord::Message(Box::new(message)));
         }
     }
@@ -365,7 +366,10 @@ fn decode_transcript(
     Ok((meta, tools, records))
 }
 
-fn decode_display_message(value: &serde_json::Value) -> Result<DisplayMessage> {
+fn decode_display_message(
+    value: &serde_json::Value,
+    sanitized_system: &mut bool,
+) -> Result<DisplayMessage> {
     let mut message: TranscriptMessage = serde_json::from_value(value.clone())
         .context("decode transcript message")?
         .normalized();
@@ -373,7 +377,8 @@ fn decode_display_message(value: &serde_json::Value) -> Result<DisplayMessage> {
         anyhow::bail!("transcript message has no role");
     }
     let content = message.content.clone();
-    if message.role == "system" {
+    if message.role == "system" && !*sanitized_system {
+        *sanitized_system = true;
         if let Some(cleaned) =
             crate::config::migrations::phase_out_profile_md::strip_profile_md_block(&content)
         {
