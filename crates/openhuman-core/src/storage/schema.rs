@@ -11,13 +11,13 @@
 //! gap, so a collision between two owners fails here, at boot and in
 //! `scripts/ci/check-storage-schema.mjs`, never at a first write.
 //!
-//! Module owners come from their `*-bus` contract crates (optional `storage` feature),
-//! never from the implementation libraries. Owners whose crate is gated off in a build are absent from its registry, as
-//! their data is.
+//! Module owners are composed by this host from their bus-level storage
+//! vocabulary. Owners whose crate is gated off in a build are absent from its
+//! registry, as their data is.
 
 use std::sync::OnceLock;
 
-use tinystoragedrivers::schema::{Item, Registry, Schema, ScopeClass};
+use tinystoragedrivers::schema::{Item, Registry, Schema, ScopeClass, Step};
 
 /// Every owner's schema that this build links.
 pub fn owner_schemas() -> Vec<Schema> {
@@ -49,7 +49,7 @@ pub fn owner_schemas() -> Vec<Schema> {
         schemas.push(tinychannels_bus::storage::storage_schema());
         schemas.push(tinyconnectors_bus::storage::storage_schema());
         schemas.push(tinybox_bus::storage::storage_schema());
-        schemas.push(tinyjuice_bus::storage::storage_schema());
+        schemas.push(tinyjuice_storage_schema());
     }
     #[cfg(feature = "web3")]
     schemas.push(tinywallet_bus::storage::storage_schema());
@@ -61,6 +61,37 @@ pub fn owner_schemas() -> Vec<Schema> {
         schemas.push(crate::inbound::results::storage_schema());
     }
     schemas
+}
+
+/// TinyJuice's storage owner contract composed into the host registry.
+#[cfg(feature = "modules")]
+fn tinyjuice_storage_schema() -> Schema {
+    use crate::storage::schema_support::owner;
+
+    let prefix = format!("{}/", tinyjuice_bus::storage::CCR_PREFIX);
+    Schema::new(owner("juice"))
+        .blobs(&prefix, ScopeClass::Module)
+        .collection(
+            tinyjuice_bus::storage::SAVINGS_COLLECTION,
+            1,
+            ScopeClass::Module,
+        )
+        .step(
+            Step::blobs(
+                "ccr_prefix_v2",
+                tinyjuice_bus::storage::CCR_BLOB_PREFIX,
+                1,
+                2,
+                |key, content_type, bytes| {
+                    Ok(tinyjuice_bus::storage::migrate_ccr_blob(
+                        key,
+                        content_type,
+                        bytes,
+                    ))
+                },
+            )
+            .source_prefix(tinyjuice_bus::storage::LEGACY_CCR_PREFIX),
+        )
 }
 
 /// The registry composed from [`owner_schemas`].
