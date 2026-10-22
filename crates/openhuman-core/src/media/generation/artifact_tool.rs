@@ -51,6 +51,10 @@ impl<T: Tool + 'static> MediaArtifactTool<T> {
     ) -> Self {
         let workspace_dir = workspace_dir.into();
         let files_dir = files_dir.into();
+        let upstream_kind = match &kind {
+            ArtifactKind::Image => MediaArtifactKind::Image,
+            _ => MediaArtifactKind::Video,
+        };
         let policy = Arc::new(RwLock::new(MediaArtifactPolicy {
             kind,
             workspace_dir: workspace_dir.clone(),
@@ -58,10 +62,6 @@ impl<T: Tool + 'static> MediaArtifactTool<T> {
             blobs: None,
             allowed_references: None,
         }));
-        let upstream_kind = match &kind {
-            ArtifactKind::Image => MediaArtifactKind::Image,
-            _ => MediaArtifactKind::Video,
-        };
         let filing = Arc::new(OpenHumanArtifactFiling(Arc::clone(&policy)));
         let refreshing = ReferenceRefreshTool::new(inner, Arc::clone(&policy));
         let inner = tinyagents_harness_tools::media::MediaArtifactTool::new(
