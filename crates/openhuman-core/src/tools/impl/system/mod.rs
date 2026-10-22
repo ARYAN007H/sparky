@@ -4,6 +4,7 @@
 //! `tools/impl/README.md`.
 
 mod install_tool;
+mod exec_adapters;
 mod proxy_config;
 mod retrieve_tool_output;
 mod schedule;
