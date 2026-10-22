@@ -140,9 +140,7 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
     };
     use crate::config::test_env::EnvVarGuard;
     use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
-    use crate::inference::registry::{
-        register_chat_model, register_inspection_chat_model, InspectionChatModelFactory,
-    };
+    use crate::inference::registry::InspectionChatModelFactory;
     use tinyinference_llm::providers::overrides::ChatModelEntry;
 
     struct ManagedModel {
@@ -271,5 +269,3 @@ async fn an_out_of_range_temperature_reports_the_role_setting() {
     assert_eq!(result.config_path.as_deref(), Some("default_temperature"));
 }
 
-/* PROCESS_REGISTRATION_BLOCK_REMOVED */
-*/
