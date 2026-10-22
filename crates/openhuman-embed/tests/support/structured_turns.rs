@@ -7,7 +7,7 @@
 //! answered, and the reasoning it spent). The document is untrusted data, so a
 //! host-only agent may take it past the prompt guard; no other agent may.
 
-mod common;
+use crate::common;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -132,8 +132,7 @@ fn body(request: &Request) -> Value {
     serde_json::from_slice(&request.body).expect("json body")
 }
 
-#[test]
-fn a_tool_loop_ends_in_a_structured_answer() {
+pub fn a_tool_loop_ends_in_a_structured_answer() {
     let _guard = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -197,8 +196,7 @@ fn a_tool_loop_ends_in_a_structured_answer() {
     });
 }
 
-#[test]
-fn successful_turn_preserves_reported_charges_and_invalid_buyer_cost_is_unknown() {
+pub fn successful_turn_preserves_reported_charges_and_invalid_buyer_cost_is_unknown() {
     let _guard = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -252,8 +250,7 @@ fn successful_turn_preserves_reported_charges_and_invalid_buyer_cost_is_unknown(
     });
 }
 
-#[test]
-fn untrusted_input_passes_the_prompt_guard_only_on_a_host_only_agent() {
+pub fn untrusted_input_passes_the_prompt_guard_only_on_a_host_only_agent() {
     let _guard = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -316,8 +313,7 @@ fn untrusted_input_passes_the_prompt_guard_only_on_a_host_only_agent() {
     });
 }
 
-#[test]
-fn terminal_schema_validation_retries_without_accepting_a_wrong_type() {
+pub fn terminal_schema_validation_retries_without_accepting_a_wrong_type() {
     let _guard = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -362,8 +358,7 @@ fn terminal_schema_validation_retries_without_accepting_a_wrong_type() {
     });
 }
 
-#[test]
-fn a_complete_json_value_with_a_length_finish_is_not_a_valid_answer() {
+pub fn a_complete_json_value_with_a_length_finish_is_not_a_valid_answer() {
     let _guard = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -407,8 +402,7 @@ fn a_complete_json_value_with_a_length_finish_is_not_a_valid_answer() {
     });
 }
 
-#[test]
-fn shared_budget_stops_the_tool_loop_before_its_next_provider_call() {
+pub fn shared_budget_stops_the_tool_loop_before_its_next_provider_call() {
     let _guard = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -436,8 +430,7 @@ fn shared_budget_stops_the_tool_loop_before_its_next_provider_call() {
     });
 }
 
-#[test]
-fn empty_truncated_terminal_answers_use_only_the_explicit_repair_allowance() {
+pub fn empty_truncated_terminal_answers_use_only_the_explicit_repair_allowance() {
     let _guard = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);

@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 use common::{chat_completion, chat_requests, offline_config, runtime, stub_backend};
 use openhuman_embed::session_store::SessionRef;
 use openhuman_embed::{
@@ -31,8 +31,7 @@ impl Tool for Marker {
         Ok(tinytools::ToolResult::success("accepted"))
     }
 }
-#[test]
-fn attached_tools_survive_clones_and_session_resume() {
+pub fn attached_tools_survive_clones_and_session_resume() {
     let _runtime = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -283,8 +282,7 @@ fn attached_tools_survive_clones_and_session_resume() {
     });
 }
 
-#[test]
-fn attaching_before_first_turn_preserves_and_executes_native_tools() {
+pub fn attaching_before_first_turn_preserves_and_executes_native_tools() {
     let _runtime = RUNTIME_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -347,8 +345,7 @@ fn attaching_before_first_turn_preserves_and_executes_native_tools() {
     });
 }
 
-#[test]
-fn permanent_metadata_requires_a_real_source() {
+pub fn permanent_metadata_requires_a_real_source() {
     let factory = HostTurnTools {
         permanent: std::collections::HashSet::from(["missing_source".into()]),
         ..Default::default()
