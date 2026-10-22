@@ -5,11 +5,11 @@ use std::path::Path;
 use std::sync::Mutex as StdMutex;
 #[cfg(feature = "e2e-test-support")]
 use tempfile::tempdir;
-use tinychannels_bus::{ChannelMessage, SendMessage};
+use tinychannels_bus::ChannelOutboundMessage;
 
 struct RecordingChannel {
     name: String,
-    sent: StdMutex<Vec<SendMessage>>,
+    sent: StdMutex<Vec<ChannelOutboundMessage>>,
 }
 
 #[async_trait]
@@ -17,11 +17,25 @@ impl Channel for RecordingChannel {
     fn name(&self) -> &str {
         &self.name
     }
-    async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v0.1.39 requires the v21 Channel::send method on test doubles"
+    )]
+    async fn send(&self, _message: &tinychannels_bus::SendMessage) -> anyhow::Result<()> {
+        anyhow::bail!("tests exercise the typed v22 send method")
+    }
+    async fn send_typed(&self, message: &ChannelOutboundMessage) -> anyhow::Result<()> {
         self.sent.lock().unwrap().push(message.clone());
         Ok(())
     }
-    async fn listen(&self, _tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v0.1.39 still requires the legacy listener method on Channel"
+    )]
+    async fn listen(
+        &self,
+        _tx: tokio::sync::mpsc::Sender<tinychannels_bus::ChannelMessage>,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
     fn supports_chat_approvals(&self) -> bool {
@@ -102,15 +116,22 @@ async fn remote_status(ws: &Path, channel: &str, reply_target: &str) -> Option<S
                 tinychannels_bus::methods::EXECUTE_REMOTE,
                 (tinychannels_bus::module_remote::RemoteOperation::Execute {
                     workspace_dir: ws.to_string_lossy().into_owned(),
-                    message: ChannelMessage {
-                        id: "status-1".into(),
-                        channel: channel.into(),
-                        sender: "alice".into(),
-                        reply_target: reply_target.into(),
-                        content: "/status".into(),
-                        timestamp: 0,
-                        thread_ts: None,
-                        sender_name: None,
+                    message: tinychannels_bus::ChannelInboundEnvelope {
+                        channel: tinychannels_bus::ChannelRef {
+                            id: channel.into(),
+                            account_id: None,
+                        },
+                        message_id: "status-1".into(),
+                        conversation: tinychannels_bus::ConversationRef {
+                            id: reply_target.into(),
+                            ..Default::default()
+                        },
+                        sender: tinychannels_bus::SenderRef {
+                            id: "alice".into(),
+                            ..Default::default()
+                        },
+                        text: "/status".into(),
+                        ..Default::default()
                     },
                     route: tinychannels_bus::module_remote::RemoteRoute {
                         provider: "openai".into(),
@@ -156,9 +177,14 @@ async fn approval_prompts_reach_every_chat_channel() {
         sub.handle(&approval(Some(key), Some(channel))).await;
         let sent = ch.sent.lock().unwrap().clone();
         assert_eq!(sent.len(), 1, "{channel}");
-        assert_eq!(sent[0].recipient, "chat-1");
-        assert_eq!(sent[0].thread_ts.as_deref(), thread_ts);
-        assert!(sent[0].content.contains("file_write"));
+        assert_eq!(sent[0].conversation_id, "chat-1");
+        assert_eq!(sent[0].thread_id.as_deref(), thread_ts);
+        assert!(matches!(
+            &sent[0].parts[0],
+            tinychannels_bus::channel::OutboundContentPart::Content {
+                part: tinychannels_bus::channel::ContentPart::Text { text, .. }
+            } if text.contains("file_write")
+        ));
     }
 }
 
