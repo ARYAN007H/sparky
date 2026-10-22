@@ -27,7 +27,7 @@ use super::super::context::{
     conversation_history_key, ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
 use super::super::runtime::process_channel_message;
-use super::super::{Channel, SendMessage};
+use super::super::Channel;
 use super::common::{channel_envelope, HistoryCaptureModel};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -43,7 +43,7 @@ use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 /// real `DiscordChannel`. No HTTP is involved.
 #[derive(Default)]
 struct DiscordRecordingChannel {
-    sent: tokio::sync::Mutex<Vec<SendMessage>>,
+    sent: tokio::sync::Mutex<Vec<traits::ChannelOutboundMessage>>,
     start_typing_calls: AtomicUsize,
     stop_typing_calls: AtomicUsize,
 }
@@ -54,11 +54,23 @@ impl Channel for DiscordRecordingChannel {
         "discord"
     }
 
-    async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
+    #[allow(deprecated, reason = "Channel still requires its v21 adapter for one release")]
+    async fn send(&self, message: &traits::SendMessage) -> anyhow::Result<()> {
+        self.send_typed(&traits::ChannelOutboundMessage::from_legacy_message(
+            self.name(), message,
+        ))
+        .await
+    }
+
+    async fn send_typed(
+        &self,
+        message: &traits::ChannelOutboundMessage,
+    ) -> anyhow::Result<()> {
         self.sent.lock().await.push(message.clone());
         Ok(())
     }
 
+    #[allow(deprecated, reason = "Channel still requires its v21 listener for one release")]
     async fn listen(
         &self,
         _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
@@ -169,16 +181,16 @@ async fn discord_inbound_dispatches_through_full_pipeline() {
         "expected exactly one send for discord dispatch"
     );
     assert_eq!(
-        sent[0].recipient, "channel-456",
+        sent[0].conversation_id, "channel-456",
         "recipient must match reply_target"
     );
     assert!(
-        sent[0].content.contains("hi from discord"),
+        sent[0].legacy_text().unwrap().contains("hi from discord"),
         "dispatch must forward the stubbed provider response verbatim, got {:?}",
-        sent[0].content
+        sent[0].legacy_text().unwrap()
     );
     assert!(
-        sent[0].thread_ts.is_none(),
+        sent[0].thread_id.is_none(),
         "absent inbound thread_ts must not be fabricated on discord send"
     );
 }
@@ -221,14 +233,17 @@ async fn discord_threaded_message_does_not_emit_reaction_ack() {
         "Discord must not receive an ack reaction alongside the reply"
     );
     assert!(
-        !sent[0].content.starts_with("[REACTION:"),
+        !sent[0]
+            .legacy_text()
+            .unwrap()
+            .starts_with("[REACTION:"),
         "discord send must not contain a reaction marker, got {:?}",
-        sent[0].content
+        sent[0].legacy_text().unwrap()
     );
     assert!(
-        sent[0].content.contains("roger"),
+        sent[0].legacy_text().unwrap().contains("roger"),
         "expected the normal reply content, got {:?}",
-        sent[0].content
+        sent[0].legacy_text().unwrap()
     );
 }
 
