@@ -1,7 +1,7 @@
 //! Per-sender routing and runtime command handling.
 
-use super::context::{ChannelRouteSelection, ChannelRuntimeContext, clear_sender_history};
-use super::{Channel, outbound::text_message};
+use super::context::{clear_sender_history, ChannelRouteSelection, ChannelRuntimeContext};
+use super::{outbound::text_message, Channel};
 use crate::inference::provider;
 use std::sync::Arc;
 use tinychannels_bus as traits;
