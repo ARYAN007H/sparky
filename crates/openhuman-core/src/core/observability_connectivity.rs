@@ -66,4 +66,3 @@ pub fn is_connectivity_event(event: &sentry::protocol::Event<'_>) -> bool {
 
     false
 }
-
