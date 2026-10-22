@@ -48,6 +48,18 @@ test('contracts permit only the serialization/schema/error closure', () => {
   const m = metadata({ 'tinyjuice-bus': [['serde'], ['thiserror']], serde: [['serde_derive']], serde_derive: [['syn']], thiserror: [['thiserror-impl']] });
   assert.deepEqual(auditGraph(m, ['tinyjuice-bus'], strict, 'tinyjuice-bus').violations, []);
 });
+test('contracts allow pinned canonical TSD vocabulary and reject other git sources', () => {
+  const m = metadata({ 'tinyjuice-bus': [['tinystoragedrivers-types']] });
+  const types = m.packages.find(pkg => pkg.name === 'tinystoragedrivers-types');
+  const revision = 'a'.repeat(40);
+  types.source = `git+https://github.com/tinyhumansai/tinystoragedrivers?rev=${revision}#${revision}`;
+  assert.deepEqual(auditGraph(m, ['tinyjuice-bus'], strict, 'tinyjuice-bus').violations, []);
+
+  types.source = `git+https://github.com/senamakel/tinystoragedrivers?rev=${revision}#${revision}`;
+  assert.equal(auditGraph(m, ['tinyjuice-bus'], strict, 'tinyjuice-bus').violations[0].package, 'tinystoragedrivers-types');
+  types.source = 'git+https://github.com/tinyhumansai/tinystoragedrivers#main';
+  assert.equal(auditGraph(m, ['tinyjuice-bus'], strict, 'tinyjuice-bus').violations[0].package, 'tinystoragedrivers-types');
+});
 test('contracts reject transport, runtime, HTTP, database and native libraries', () => {
   for (const dependency of ['tinybus', 'tokio', 'reqwest', 'rusqlite', 'cpal', 'tinyjuice']) {
     const m = metadata({ 'tinyjuice-bus': [[dependency]] });
