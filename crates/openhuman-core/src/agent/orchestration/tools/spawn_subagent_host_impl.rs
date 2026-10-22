@@ -486,7 +486,7 @@ impl SpawnSubagentTool {
             .and_then(|session| session.worker_thread_id.clone())
             .or_else(|| {
                 parent_thread_id.as_ref().and_then(|parent_thread_id| {
-                    crate::threads::worker_thread::create_worker_thread(
+                    crate::agent::subagent_host::create_worker_thread(
                         &dispatch,
                         parent.workspace_dir.clone(),
                         parent_thread_id,
@@ -501,7 +501,7 @@ impl SpawnSubagentTool {
             (reusable.as_ref(), worker_thread_id.as_ref())
         {
             if session.worker_thread_id.as_deref() == Some(worker_thread_id.as_str()) {
-                crate::threads::worker_thread::append_reuse_follow_up(
+                crate::agent::subagent_host::append_reuse_follow_up(
                     &dispatch,
                     parent.workspace_dir.clone(),
                     worker_thread_id,

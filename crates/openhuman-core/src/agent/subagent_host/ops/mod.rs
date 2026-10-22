@@ -28,6 +28,15 @@ mod prompt;
 mod provider;
 mod runner;
 mod runner_artifacts;
+mod worker_mirror;
+mod worker_thread;
+
+pub(crate) use worker_mirror::{mirror_worker_thread, mirror_worker_thread_from_history};
+pub(crate) use worker_thread::{append_reuse_follow_up, create_worker_thread};
+
+#[cfg(test)]
+#[path = "worker_thread_tests.rs"]
+mod worker_thread_tests;
 
 // The lifecycle adapter owns the public entry point.  This is its host-only
 // execution leaf after a neutral driver has prepared and admitted a request.
