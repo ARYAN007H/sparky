@@ -1,4 +1,4 @@
-use super::registry_test_support::{BoundFamilyWireContract, verify_family_contract};
+use super::registry_test_support::{verify_family_contract, BoundFamilyWireContract};
 use super::*;
 
 #[test]
@@ -55,16 +55,14 @@ fn family_verifier_rejects_group_visibility_and_inventory_mutations() {
             .unwrap_err()
             .contains("wrong domain group")
     );
-    assert!(
-        verify_family_contract(
-            std::slice::from_ref(&good),
-            std::slice::from_ref(&good),
-            &contract,
-            &fixtures
-        )
-        .unwrap_err()
-        .contains("internal registry")
-    );
+    assert!(verify_family_contract(
+        std::slice::from_ref(&good),
+        std::slice::from_ref(&good),
+        &contract,
+        &fixtures
+    )
+    .unwrap_err()
+    .contains("internal registry"));
 
     for (methods, message) in [
         (

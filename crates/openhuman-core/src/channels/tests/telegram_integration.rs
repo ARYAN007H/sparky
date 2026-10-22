@@ -5,12 +5,12 @@
 //! captures every `SendMessage` — including `thread_ts` — so assertions can be made
 //! about exactly what the channel receives, without needing a real Telegram HTTP server.
 
-use super::super::Channel;
 use super::super::context::{
-    CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext, conversation_history_key,
+    conversation_history_key, ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
 use super::super::runtime::process_channel_message;
-use super::common::{SlowModel, channel_envelope};
+use super::super::Channel;
+use super::common::{channel_envelope, SlowModel};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};

@@ -1,12 +1,12 @@
-use super::super::Channel;
 use super::super::context::{
-    CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRouteSelection, ChannelRuntimeContext,
-    conversation_history_key,
+    conversation_history_key, ChannelRouteSelection, ChannelRuntimeContext,
+    CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
 use super::super::runtime::process_channel_message;
+use super::super::Channel;
 use super::common::{
-    IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
-    TelegramRecordingChannel, ToolCallingModel, channel_envelope,
+    channel_envelope, IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
+    TelegramRecordingChannel, ToolCallingModel,
 };
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;

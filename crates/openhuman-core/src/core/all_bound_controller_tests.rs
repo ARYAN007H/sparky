@@ -1,8 +1,8 @@
 use super::*;
-use crate::core::{FieldSchema, TypeSchema, runtime::DispatchCtx};
+use crate::core::{runtime::DispatchCtx, FieldSchema, TypeSchema};
 use std::sync::{
-    Mutex,
     atomic::{AtomicUsize, Ordering},
+    Mutex,
 };
 
 static CALLS: AtomicUsize = AtomicUsize::new(0);
@@ -101,11 +101,9 @@ fn production_registry_binds_every_socket_controller_to_its_declared_parser() {
         contracts.len(),
         "complete raw socket inventory"
     );
-    assert!(
-        entries
-            .iter()
-            .all(|entry| entry.schema.namespace == "socket")
-    );
+    assert!(entries
+        .iter()
+        .all(|entry| entry.schema.namespace == "socket"));
     assert_eq!(
         entries
             .iter()
@@ -441,11 +439,9 @@ fn production_registry_binds_mcp_registry_get_to_its_declared_parser() {
         .filter(|grouped| grouped.controller.schema.method_name() == "mcp_clients.registry_get")
         .collect();
     assert_eq!(entries.len(), 1, "registry_get has one public raw entry");
-    assert!(
-        !internal_registry()
-            .iter()
-            .any(|grouped| grouped.controller.schema.method_name() == "mcp_clients.registry_get")
-    );
+    assert!(!internal_registry()
+        .iter()
+        .any(|grouped| grouped.controller.schema.method_name() == "mcp_clients.registry_get"));
     let grouped = entries[0];
     assert_eq!(grouped.group, DomainGroup::Mcp);
     let entry = &grouped.controller;
@@ -479,11 +475,9 @@ fn production_registry_binds_mcp_registry_get_to_its_declared_parser() {
                 .expect("positive contract includes its required input")
                 .required = false;
         }
-        assert!(
-            required_input_contract(&broken, contract.required)
-                .unwrap_err()
-                .contains("required inputs mismatch")
-        );
+        assert!(required_input_contract(&broken, contract.required)
+            .unwrap_err()
+            .contains("required inputs mismatch"));
     }
 }
 
@@ -501,11 +495,9 @@ fn production_registry_binds_computer_status_to_its_declared_parser() {
         1,
         "computer_status has one internal raw registry entry"
     );
-    assert!(
-        !registry()
-            .iter()
-            .any(|grouped| grouped.controller.schema.method_name() == "modules.computer_status")
-    );
+    assert!(!registry()
+        .iter()
+        .any(|grouped| grouped.controller.schema.method_name() == "modules.computer_status"));
     let grouped = entries[0];
     assert_eq!(grouped.group, DomainGroup::Modules);
     let entry = &grouped.controller;
@@ -585,11 +577,9 @@ fn production_registry_binds_composio_execute_to_its_declared_parser() {
         .expect("independent required-field contract matches production schema");
     let mut missing_required = entry.schema.clone();
     missing_required.inputs.retain(|field| field.name != "tool");
-    assert!(
-        required_input_contract(&missing_required, &["tool"])
-            .unwrap_err()
-            .contains("required inputs mismatch")
-    );
+    assert!(required_input_contract(&missing_required, &["tool"])
+        .unwrap_err()
+        .contains("required inputs mismatch"));
     let mut optional_required = entry.schema.clone();
     optional_required
         .inputs
@@ -597,11 +587,9 @@ fn production_registry_binds_composio_execute_to_its_declared_parser() {
         .find(|field| field.name == "tool")
         .expect("tool schema field")
         .required = false;
-    assert!(
-        required_input_contract(&optional_required, &["tool"])
-            .unwrap_err()
-            .contains("required inputs mismatch")
-    );
+    assert!(required_input_contract(&optional_required, &["tool"])
+        .unwrap_err()
+        .contains("required inputs mismatch"));
 
     for example in [
         json!({"tool":"GMAIL_SEND_EMAIL"}),

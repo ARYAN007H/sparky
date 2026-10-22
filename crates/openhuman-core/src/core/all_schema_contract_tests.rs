@@ -40,11 +40,9 @@ fn registered_memory_contract_rejects_missing_or_optional_question() {
                 .expect("real recall schema declares question")
                 .required = false;
         }
-        assert!(
-            independent_registered_schema_contract(&broken)
-                .unwrap_err()
-                .contains("memory.recall required inputs mismatch")
-        );
+        assert!(independent_registered_schema_contract(&broken)
+            .unwrap_err()
+            .contains("memory.recall required inputs mismatch"));
     }
 }
 
@@ -142,11 +140,9 @@ fn registered_wallet_schema_contract_rejects_missing_encrypted_mnemonic() {
         .inputs
         .retain(|input| input.name != "encryptedMnemonic");
 
-    assert!(
-        independent_registered_schema_contract(&schema)
-            .unwrap_err()
-            .contains("is missing required input `encryptedMnemonic`")
-    );
+    assert!(independent_registered_schema_contract(&schema)
+        .unwrap_err()
+        .contains("is missing required input `encryptedMnemonic`"));
 }
 
 /// Built-in/internal snapshots avoid ambient DomainSet filtering and global
@@ -166,14 +162,10 @@ fn optional_domain_controller_methods_are_absent_when_features_are_disabled() {
         .into_iter()
         .map(|controller| controller.schema.method_name())
         .collect::<Vec<_>>();
-    assert!(
-        !methods
-            .iter()
-            .any(|method| method == "mcp_clients.registry_get")
-    );
-    assert!(
-        !methods
-            .iter()
-            .any(|method| method == "modules.computer_status")
-    );
+    assert!(!methods
+        .iter()
+        .any(|method| method == "mcp_clients.registry_get"));
+    assert!(!methods
+        .iter()
+        .any(|method| method == "modules.computer_status"));
 }

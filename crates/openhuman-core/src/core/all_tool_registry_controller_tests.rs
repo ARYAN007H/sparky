@@ -1,5 +1,5 @@
 use super::*;
-use serde_json::{Map, json};
+use serde_json::{json, Map};
 
 fn tool_registry_entries() -> Vec<ControllerEntry> {
     registry()

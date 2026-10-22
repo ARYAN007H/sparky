@@ -78,11 +78,9 @@ fn contract_inventory_rejects_missing_extra_duplicate_and_empty_rows() {
             .unwrap_err()
             .contains("duplicate contract")
     );
-    assert!(
-        verify_parameter_contracts(&[], &[])
-            .unwrap_err()
-            .contains("empty")
-    );
+    assert!(verify_parameter_contracts(&[], &[])
+        .unwrap_err()
+        .contains("empty"));
 }
 
 #[test]
@@ -151,38 +149,30 @@ fn missing_examples_and_actual_parser_rejection_are_not_hidden() {
     );
     let mut broken = contract;
     broken.examples = vec![serde_json::json!({"id":7})];
-    assert!(
-        verify_parameter_contracts(&[controller], &[broken])
-            .unwrap_err()
-            .contains("schema rejects example")
-    );
+    assert!(verify_parameter_contracts(&[controller], &[broken])
+        .unwrap_err()
+        .contains("schema rejects example"));
 }
 
 #[test]
 fn duplicate_controller_and_schema_identity_failures_are_rejected() {
     let (controller, contract) = fixture();
-    assert!(
-        verify_parameter_contracts(
-            &[controller.clone(), controller.clone()],
-            std::slice::from_ref(&contract)
-        )
-        .unwrap_err()
-        .contains("duplicate controller")
-    );
+    assert!(verify_parameter_contracts(
+        &[controller.clone(), controller.clone()],
+        std::slice::from_ref(&contract)
+    )
+    .unwrap_err()
+    .contains("duplicate controller"));
     let mut broken = controller.schema.clone();
     broken.function = "other";
-    assert!(
-        verify_parameter_schema(&broken, &contract)
-            .unwrap_err()
-            .contains("method identity")
-    );
+    assert!(verify_parameter_schema(&broken, &contract)
+        .unwrap_err()
+        .contains("method identity"));
     let mut broken = controller.schema;
     broken.description = " ";
-    assert!(
-        verify_parameter_schema(&broken, &contract)
-            .unwrap_err()
-            .contains("no description")
-    );
+    assert!(verify_parameter_schema(&broken, &contract)
+        .unwrap_err()
+        .contains("no description"));
 }
 
 #[test]
@@ -192,28 +182,22 @@ fn legacy_entries_are_rejected_without_running_the_legacy_handler() {
         schema: bound.schema,
         handler: legacy_handler,
     });
-    assert!(
-        verify_parameter_contracts(&[legacy], &[contract])
-            .unwrap_err()
-            .contains("registry entry is legacy")
-    );
+    assert!(verify_parameter_contracts(&[legacy], &[contract])
+        .unwrap_err()
+        .contains("registry entry is legacy"));
 }
 
 #[test]
 fn examples_must_be_objects_and_satisfy_schema_before_decoding() {
     let (controller, mut contract) = fixture();
     contract.examples = vec![Value::Null];
-    assert!(
-        verify_parameter_schema(&controller.schema, &contract)
-            .unwrap_err()
-            .contains("not an object")
-    );
+    assert!(verify_parameter_schema(&controller.schema, &contract)
+        .unwrap_err()
+        .contains("not an object"));
     contract.examples = vec![serde_json::json!({})];
-    assert!(
-        verify_parameter_schema(&controller.schema, &contract)
-            .unwrap_err()
-            .contains("schema rejects example")
-    );
+    assert!(verify_parameter_schema(&controller.schema, &contract)
+        .unwrap_err()
+        .contains("schema rejects example"));
 }
 
 #[test]
@@ -272,11 +256,9 @@ fn wire_field_contract_pins_count_order_type_and_requiredness() {
             .unwrap_err()
             .contains("name mismatch")
     );
-    assert!(
-        verify_wire_fields(std::slice::from_ref(&field), &[])
-            .unwrap_err()
-            .contains("count mismatch")
-    );
+    assert!(verify_wire_fields(std::slice::from_ref(&field), &[])
+        .unwrap_err()
+        .contains("count mismatch"));
     let wrong_required = [("items", expected[0].1.clone(), true)];
     assert!(
         verify_wire_fields(std::slice::from_ref(&field), &wrong_required)
@@ -314,9 +296,7 @@ fn wire_field_contract_pins_count_order_type_and_requiredness() {
         ("first", crate::core::TypeSchema::String, true),
         ("second", crate::core::TypeSchema::Bool, true),
     ];
-    assert!(
-        verify_wire_fields(&reversed, &ordered)
-            .unwrap_err()
-            .contains("name mismatch")
-    );
+    assert!(verify_wire_fields(&reversed, &ordered)
+        .unwrap_err()
+        .contains("name mismatch"));
 }

@@ -1,11 +1,11 @@
-use super::super::Channel;
-use super::super::context::{CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext};
-use super::super::runtime::test_support::{DispatchHarnessOptions, run_dispatch_harness};
+use super::super::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
+use super::super::runtime::test_support::{run_dispatch_harness, DispatchHarnessOptions};
 use super::super::runtime::{
-    RuntimeChannelMessage, process_channel_message, run_message_dispatch_loop,
+    process_channel_message, run_message_dispatch_loop, RuntimeChannelMessage,
 };
-use super::common::{RecordingChannel, SlowModel, channel_envelope, use_real_agent_handler};
-use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, mock_agent_run_turn};
+use super::super::Channel;
+use super::common::{channel_envelope, use_real_agent_handler, RecordingChannel, SlowModel};
+use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::core::events::DomainEvent;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -685,10 +685,8 @@ async fn dispatch_replies_with_timeout_notice_when_handler_exceeds_deadline() {
         ..Default::default()
     })
     .await;
-    assert!(
-        timed_out
-            .sends
-            .iter()
-            .any(|send| send.content.contains("Request timed out"))
-    );
+    assert!(timed_out
+        .sends
+        .iter()
+        .any(|send| send.content.contains("Request timed out")));
 }
