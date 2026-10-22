@@ -54,6 +54,7 @@ fn route() -> EphemeralRoute {
         endpoint: "http://127.0.0.1:41234/openai".to_string(),
         api_key: "mdl-token".to_string(),
         headers: Vec::new(),
+        ..EphemeralRoute::default()
     }
 }
 
@@ -67,6 +68,7 @@ fn from_params_needs_both_halves() {
             endpoint: "http://x/openai".into(),
             api_key: "k".into(),
             headers: Vec::new(),
+            ..EphemeralRoute::default()
         })
     );
     // An endpoint with no credential and a credential with no endpoint are both
@@ -96,6 +98,7 @@ fn from_params_treats_blank_as_absent_and_trims() {
             endpoint: "http://x/openai".into(),
             api_key: "k".into(),
             headers: Vec::new(),
+            ..EphemeralRoute::default()
         })
     );
 }
@@ -197,6 +200,7 @@ fn apply_twice_leaves_one_entry() {
             endpoint: "http://127.0.0.1:9999/openai".into(),
             api_key: "mdl-other".into(),
             headers: Vec::new(),
+            ..EphemeralRoute::default()
         },
     );
     let entries: Vec<_> = config
@@ -274,6 +278,7 @@ fn a_changed_route_is_applied_and_logged_once() {
         endpoint: "http://127.0.0.1:9999/openai".into(),
         api_key: "mdl-other".into(),
         headers: Vec::new(),
+        ..EphemeralRoute::default()
     };
 
     apply(&mut config, changed.clone());
@@ -313,6 +318,7 @@ fn debug_never_discloses_route_bearer_or_header_values() {
         endpoint: "https://fixture.example/v1".into(),
         api_key: "u2-unique-route-secret".into(),
         headers: vec![("x-private".into(), "u2-unique-header-secret".into())],
+        ..EphemeralRoute::default()
     };
     let debug = format!("{route:?}");
     assert!(!debug.contains("u2-unique-route-secret"));
