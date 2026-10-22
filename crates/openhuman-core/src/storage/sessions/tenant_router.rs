@@ -75,10 +75,13 @@ impl TenantStoreRegistry {
 
         let mut moved: Vec<(Arc<RebindableSessionStores>, Arc<dyn StorageBackend>)> =
             Vec::with_capacity(providers.len());
-        for (_, provider, old_backend) in &providers {
+        for (tenant, provider, old_backend) in &providers {
+            eprintln!("rebind {tenant} old={} new={}", old_backend.driver(), backend.driver());
             if let Err(error) = provider.rebind(Arc::clone(backend)) {
+                eprintln!("failure {tenant}: {error}; rolling back {}", moved.len());
                 let mut rollback_failures = Vec::new();
                 for (moved_provider, moved_backend) in moved.iter().rev() {
+                    eprintln!("rollback to {}", moved_backend.driver());
                     if let Err(rollback_error) = moved_provider.rebind(Arc::clone(moved_backend)) {
                         rollback_failures.push(rollback_error.to_string());
                     }
