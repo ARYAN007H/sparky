@@ -41,6 +41,13 @@ pub(crate) fn open_for_context(
     let documents = crate::core::runtime::CoreContext::sync_scope(context, open_documents)?;
     let driver = Arc::new(DriverSubagentSessionStore::new(documents)?);
     let parent_session = parent_session.into();
+    import_host_sessions(
+        ctx,
+        &workspace_dir,
+        &parent_session,
+        parent_thread_id.as_deref(),
+        &driver,
+    )?;
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
         &workspace_dir,
         &parent_session,
@@ -69,6 +76,55 @@ pub(crate) fn open_for_context(
         parent_session,
         parent_thread_id,
     }))
+}
+
+/// Copies the pre-driver host collection into TinyAgents' collection without
+/// removing or rewriting the source rows. The old collection remains the
+/// owner of OpenHuman-only `parent_epoch` until the host's epoch sidecar is
+/// established independently.
+fn import_host_sessions(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+    parent_session: &str,
+    parent_thread_id: Option<&str>,
+    driver: &DriverSubagentSessionStore,
+) -> Result<(), SubagentError> {
+    let legacy = SubagentSessionStore::new_in_context(ctx, workspace_dir.to_path_buf())
+        .map_err(SubagentError::Persistence)?
+        .load()
+        .map_err(SubagentError::Persistence)?;
+    let converter = OpenHumanTinySubagentSessionStore::new(
+        workspace_dir.to_path_buf(),
+        parent_session,
+        parent_thread_id.map(str::to_owned),
+    );
+    for row in legacy.into_iter().filter(|row| {
+        row.parent_session == parent_session
+            && row.parent_thread_id.as_deref() == parent_thread_id
+    }) {
+        let session = converter.convert(row)?;
+        if driver.get(&session.subagent_session_id).is_ok_and(|found| found.is_some()) {
+            continue;
+        }
+        // The driver's upsert API intentionally only creates a Running row;
+        // import existing terminal/reusable state as its public durable shape.
+        let docs = driver.document_store();
+        let doc = serde_json::to_value(&session)
+            .map_err(|error| SubagentError::Persistence(format!("session encode: {error}")))?;
+        crate::storage::block_on(async move {
+            docs.put(
+                "subagent_sessions",
+                &session.subagent_session_id,
+                doc,
+                tinystoragedrivers_core::Precondition::Absent,
+            )
+            .await
+            .map(|_| ())
+            .map_err(|error| crate::storage::StorageError::backend(error.to_string()))
+        })
+        .map_err(|error| SubagentError::Persistence(format!("import host sessions: {error}")))?;
+    }
+    Ok(())
 }
 
 /// Host compatibility seam: public orchestration tools historically accept a
