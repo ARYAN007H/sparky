@@ -19,8 +19,8 @@ use tinyagents_harness::host::{
 use tinyinference_llm::model::{
     ChatModel, ModelRequestDefaults, ProfileOverrideModel, ResolvedModelRoute,
 };
-use tinyinference_providers::route::{ProviderRoute, RouteKind};
 use tinyinference_providers::route::split_model_and_temperature;
+use tinyinference_providers::route::{ProviderRoute, RouteKind};
 
 /// OpenHuman's host policy and construction adapter for a harness turn.
 ///
