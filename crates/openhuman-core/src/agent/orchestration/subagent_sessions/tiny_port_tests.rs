@@ -59,6 +59,19 @@ async fn driver_store_imports_legacy_rows_without_losing_host_epoch() {
 
     let retained = legacy.load().unwrap();
     assert_eq!(retained[0].parent_epoch, Some(7));
+    let context = dispatch.resolved().unwrap();
+    let documents = crate::core::runtime::CoreContext::sync_scope(context, || {
+        crate::storage::local::open("subagent_sessions", &workspace)
+            .unwrap()
+            .scoped()
+            .unwrap()
+            .documents()
+            .clone()
+    });
+    assert_eq!(
+        parent_epoch_from_sidecar(documents, "legacy-session".into()).unwrap(),
+        Some(7)
+    );
 }
 
 #[tokio::test]

@@ -56,7 +56,7 @@ pub(crate) fn parent_epoch_from_sidecar(
         Ok(repo
             .get(&session_id)
             .await?
-            .map(|(record, _)| record.parent_epoch))
+            .map(|record| record.doc.parent_epoch))
     })
     .map_err(|error| SubagentError::Persistence(format!("read parent epoch: {error}")))
 }
