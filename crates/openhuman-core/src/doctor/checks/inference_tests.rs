@@ -394,7 +394,10 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
     use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
     use crate::config::test_env::EnvVarGuard;
     use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
-    use crate::inference::registry::{register_inspection_chat_model, InspectionChatModelFactory};
+    use crate::inference::registry::{
+        register_chat_model, register_inspection_chat_model, ChatModelEntry,
+        InspectionChatModelFactory,
+    };
 
     struct ManagedModel {
         generations: Arc<AtomicUsize>,
@@ -437,6 +440,25 @@ async fn a_fully_configured_managed_default_constructs_cleanly() {
         })
     });
     register_inspection_chat_model(PROVIDER_OPENHUMAN, inspection_factory);
+    register_chat_model(
+        PROVIDER_OPENHUMAN,
+        ChatModelEntry {
+            build: Arc::new(|request| {
+                Ok((
+                    Arc::new(ManagedModel {
+                        generations: Arc::new(AtomicUsize::new(0)),
+                    }) as Arc<dyn ChatModel<()>>,
+                    request
+                        .model_override
+                        .or(request.default_model)
+                        .unwrap_or("managed-test-model")
+                        .to_owned(),
+                ))
+            }),
+            probe: None,
+            models: None,
+        },
+    );
     let _registered_model = RegisterManagedModel;
 
     let mut config = isolated_config(temp.path());
@@ -509,6 +531,9 @@ struct RegisterManagedModel;
 impl Drop for RegisterManagedModel {
     fn drop(&mut self) {
         crate::inference::registry::unregister_inspection_chat_model(
+            crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        );
+        crate::inference::registry::unregister_chat_model(
             crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         );
     }

@@ -299,7 +299,8 @@ async fn live_probe_uses_selected_doctor_config_inside_another_ambient_context()
 #[tokio::test]
 async fn managed_chat_probe_uses_the_inspection_only_factory_callback() {
     use crate::inference::registry::{
-        register_inspection_chat_model_in, InspectionChatModelFactory,
+        register_chat_model_in, register_inspection_chat_model_in, ChatModelEntry,
+        InspectionChatModelFactory,
     };
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
@@ -340,6 +341,25 @@ async fn managed_chat_probe_uses_the_inspection_only_factory_callback() {
         },
     );
     register_inspection_chat_model_in(&extensions, "openhuman", factory);
+    register_chat_model_in(
+        &extensions,
+        "openhuman",
+        ChatModelEntry {
+            build: Arc::new(move |request| {
+                Ok((
+                    Arc::new(CountingModel(Arc::new(AtomicUsize::new(0))))
+                        as Arc<dyn ChatModel<()>>,
+                    request
+                        .model_override
+                        .or(request.default_model)
+                        .unwrap_or("managed-test-model")
+                        .to_owned(),
+                ))
+            }),
+            probe: None,
+            models: None,
+        },
+    );
 
     let mut fixture = isolated_config();
     let config = &mut fixture.config;
