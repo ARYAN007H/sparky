@@ -391,12 +391,12 @@ async fn inspection_reports_refresh_required_without_refreshing_or_publishing_se
 
 #[tokio::test]
 async fn a_fully_configured_managed_default_constructs_cleanly() {
-    use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
-    use crate::config::test_env::EnvVarGuard;
-    use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
     use crate::config::schema::cloud_providers::{
         register_hosted_cloud_provider_policy, AuthStyle,
     };
+    use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
+    use crate::config::test_env::EnvVarGuard;
+    use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
     use crate::inference::registry::{
         register_chat_model, register_inspection_chat_model, InspectionChatModelFactory,
     };
