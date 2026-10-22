@@ -445,11 +445,28 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
         .into_iter()
         .find(|job| job.status == SubAgentJobStatus::Running && job.agent == "task_manager_agent")
         .expect("spawned child is live in the TinyAgents job registry");
+    let owner = crate::agent::orchestration::completion_owners::driver_task_owner(
+        &dispatch,
+        &task_id,
+    )
+    .expect("spawn registers the exact task owner");
+    assert_eq!(owner.workspace_dir, workspace);
+    assert_eq!(owner.parent_thread_id.as_deref(), Some(thread_id));
+    assert_eq!(
+        crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+            &dispatch,
+            &workspace,
+            thread_id,
+        )
+        .len(),
+        1,
+        "owner index selects the job in its exact profile/workspace/thread scope"
+    );
     background_completions::record_outcome(
         &dispatch,
         &workspace,
         parent_session,
-        task_id,
+        task_id.clone(),
         "task_manager_agent",
         "queued child result",
         Some(thread_id.into()),
