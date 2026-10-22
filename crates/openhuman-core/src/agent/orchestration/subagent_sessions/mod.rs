@@ -12,9 +12,9 @@ pub use ops::{
     mark_driver_pause_cancelled, mark_failed, mark_finished, normalize_task_key,
     resolve_lifecycle_key, reuse_decision, upsert_running, DriverTaskCancellation,
 };
-pub(crate) use tiny_port::{host_projection, open_for_context, set_parent_epoch_for_context};
 #[cfg(test)]
 pub(crate) use tiny_port::OpenHumanTinySubagentSessionStore;
+pub(crate) use tiny_port::{host_projection, open_for_context, set_parent_epoch_for_context};
 pub use types::{
     DurableSubagentStatus, SubagentSessionSelector, SubagentSessionStore, SubagentSessionUpsert,
 };

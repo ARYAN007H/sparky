@@ -289,8 +289,10 @@ impl SpawnSubagentTool {
                     ));
                 }
             }
-            let resumed_session = match subagent_sessions::upsert_running(
-                &store,
+            let resumed_session = match upsert_driver_session(
+                &driver_store,
+                &dispatch,
+                &parent.workspace_dir,
                 SubagentSessionUpsert {
                     selector: selector.clone(),
                     display_name: Some(definition.display_name().to_string()),
@@ -300,8 +302,10 @@ impl SpawnSubagentTool {
                     lifecycle_key: Some(original_key.clone()),
                     parent_epoch: completion_target.parent_epoch(),
                 },
-                Some(session),
-            ) {
+                false,
+            )
+            .await
+            {
                 Ok(session) => session,
                 Err(error) => {
                     return Ok(ToolResult::error(format!(
@@ -534,8 +538,10 @@ impl SpawnSubagentTool {
                 );
             }
         }
-        let durable_session = match subagent_sessions::upsert_running(
-            &store,
+        let durable_session = match upsert_driver_session(
+            &driver_store,
+            &dispatch,
+            &parent.workspace_dir,
             SubagentSessionUpsert {
                 selector,
                 display_name: Some(definition.display_name().to_string()),
@@ -551,8 +557,10 @@ impl SpawnSubagentTool {
                 ),
             parent_epoch: completion_target.parent_epoch(),
             },
-            reusable.as_ref(),
-        ) {
+            force_fresh,
+        )
+        .await
+        {
             Ok(session) => session,
             Err(err) => {
                 log::warn!(
