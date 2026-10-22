@@ -1,6 +1,7 @@
 use super::*;
 use crate::security::approval::ApprovalChatContext;
 use crate::security::AutonomyLevel;
+use serde_json::json;
 
 fn policy(allow_install: bool, autonomy: AutonomyLevel) -> Arc<SecurityPolicy> {
     Arc::new(SecurityPolicy {
