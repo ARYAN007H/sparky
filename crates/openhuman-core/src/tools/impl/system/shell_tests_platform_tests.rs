@@ -57,7 +57,9 @@ fn every_description_keeps_the_stdout_only_warning() {
         Arc::new(CmdRuntime),
         test_audit(),
     );
-    assert!(posix.description().contains("Only stdout/stderr comes back"));
+    assert!(posix
+        .description()
+        .contains("Only stdout/stderr comes back"));
     assert!(cmd.description().contains("Only stdout/stderr comes back"));
 }
 
@@ -217,10 +219,12 @@ fn the_tool_describes_the_shell_its_runtime_spawns() {
         test_audit(),
     );
     assert!(cmd_tool.description().contains("cmd.exe"));
-    assert!(cmd_tool.parameters_schema()["properties"]["command"]["description"]
-        .as_str()
-        .unwrap()
-        .contains("cmd.exe"));
+    assert!(
+        cmd_tool.parameters_schema()["properties"]["command"]["description"]
+            .as_str()
+            .unwrap()
+            .contains("cmd.exe")
+    );
 }
 
 #[test]
