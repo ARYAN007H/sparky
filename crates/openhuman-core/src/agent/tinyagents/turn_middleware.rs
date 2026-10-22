@@ -427,14 +427,11 @@ pub(super) fn install_turn_middleware(
     // session `todo` list, and the per-thread `goal_*` tools.
     if let Some(mode) = run_mode {
         harness.push_middleware(Arc::new(
-            plan_mode_middleware(mode, harness.tools().policies()).allow([
-                "plan_exit",
-                "request_plan_review",
-                "todo",
-                "goal_set",
-                "goal_get",
-                "goal_complete",
-            ]),
+            plan_mode_middleware(mode, harness.tools().policies()).allow(
+                tinyagents_harness::middleware::library::plan_mode_allowlist()
+                    .iter()
+                    .copied(),
+            ),
         ));
     }
 

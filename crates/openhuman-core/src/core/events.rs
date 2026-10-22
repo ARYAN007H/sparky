@@ -648,9 +648,9 @@ pub enum DomainEvent {
 
     // ── Plan review (interactive plan-mode gate) ────────────────────────
     /// An interactive turn parked on a thread-scoped plan the user must
-    /// review before execution. Published by
-    /// [`crate::plan_review::gate::PlanReviewGate::request_review`]
-    /// and bridged to the web channel as a `plan_review_request` socket event.
+    /// review before execution. Published by the OpenHuman notifier for
+    /// TinyAgents' plan-review store and bridged to the web channel as a
+    /// `plan_review_request` socket event.
     PlanReviewRequested {
         /// Unique id correlating the decision back to the parked turn.
         request_id: String,

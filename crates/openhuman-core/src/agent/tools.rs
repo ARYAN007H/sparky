@@ -7,8 +7,8 @@
 //! - `AskClarificationTool` (`ask_user_clarification`, from `tinyagents_harness_tools`) — returns the
 //!   question as its output; the turn actually pauses only because callers
 //!   list this name in the harness seam's `early_exit_tools`.
-//! - [`PlanExitTool`] — ends a plan-mode pass by returning the plan plus
-//!   [`PLAN_EXIT_MARKER`], which TinyAgents consumes to switch to build mode.
+//! - `plan_exit_tool` — configures TinyAgents' plan-exit tool with OpenHuman's
+//!   tenant-scoped mode and parked-review stores.
 //! - `RunWorkflowTool` / `AwaitWorkflowTool` — spawn a
 //!   `crate::skills::runtime` workflow run and wait on its outcome. Compiled
 //!   in only with the `skills` feature, so builds without it omit both tools
@@ -21,7 +21,6 @@ pub(crate) mod plan_exit;
 mod todo;
 mod wait;
 
-pub use plan_exit::PlanExitTool;
 pub const PLAN_EXIT_MARKER: &str = tinyagents_harness_tools::PLAN_EXIT_MARKER;
 pub use todo::TodoTool;
 pub(crate) use todo::TodoToolDispatch;

@@ -69,7 +69,7 @@ struct AuthedConnection;
 /// The per-process bearer authenticates the connection but does not encode a
 /// SaaS profile, so never accept tenant selection from a later event payload.
 #[derive(Clone, Debug)]
-struct SocketTenant(crate::core_host::agent::plan_review::gate::SocketReviewScope);
+struct SocketTenant(crate::core_host::agent::plan_review::SocketReviewScope);
 
 /// Bind replay tenancy from the HTTP request extensions retained by
 /// Socket.IO. Its async connect callback is spawned independently of the
@@ -78,8 +78,7 @@ fn socket_tenant_from_request_extensions(
     extensions: &axum::http::Extensions,
 ) -> Option<SocketTenant> {
     let dispatch = extensions.get::<crate::core_host::core::runtime::DispatchCtx>()?;
-    let scope =
-        crate::core_host::agent::plan_review::gate::global().socket_scope_for_dispatch(dispatch)?;
+    let scope = crate::core_host::agent::plan_review::socket_scope_for_dispatch(dispatch)?;
     Some(SocketTenant(scope))
 }
 
@@ -1215,8 +1214,8 @@ fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str) {
     let Some(tenant) = socket.extensions.get::<SocketTenant>() else {
         return;
     };
-    let Some(row) = crate::core_host::agent::plan_review::gate::global()
-        .parked_review_for_socket(&tenant.0, thread_id)
+    let Some(row) =
+        crate::core_host::agent::plan_review::parked_review_for_socket(&tenant.0, thread_id)
     else {
         return;
     };
@@ -1228,7 +1227,7 @@ fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str) {
         thread_id,
         &client_id,
         row.tool_call_id.as_deref(),
-        row.expires_at.as_deref(),
+        Some(row.expires_at.as_str()),
     );
     event.ts = Some(crate::core_host::web_chat::unix_epoch_ms());
     let Ok(payload) = serde_json::to_value(&event) else {

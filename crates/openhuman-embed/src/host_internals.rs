@@ -181,9 +181,9 @@ pub mod agent {
         pub use openhuman_core::agent::orchestration::release_background_completion_stores;
     }
     pub mod plan_review {
-        pub mod gate {
-            pub use openhuman_core::plan_review::gate::{global, SocketReviewScope};
-        }
+        pub use openhuman_core::plan_review::host::{
+            parked_review_for_socket, socket_scope_for_dispatch, SocketReviewScope,
+        };
     }
     pub mod session_store {
         pub use openhuman_core::storage::sessions::{
