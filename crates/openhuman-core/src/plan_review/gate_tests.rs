@@ -1,6 +1,9 @@
 use super::*;
 
-struct DecisionCollector(tokio::sync::mpsc::UnboundedSender<(String, Option<String>)>);
+struct DecisionCollector {
+    thread_id: &'static str,
+    sender: tokio::sync::mpsc::UnboundedSender<(String, Option<String>)>,
+}
 
 #[async_trait::async_trait]
 impl tinybus::EventHandler<crate::core::events::DomainEvent> for DecisionCollector {
@@ -9,19 +12,30 @@ impl tinybus::EventHandler<crate::core::events::DomainEvent> for DecisionCollect
     }
 
     async fn handle(&self, event: &crate::core::events::DomainEvent) {
-        if let crate::core::events::DomainEvent::PlanReviewDecided { decision, resolution, .. } = event {
-            let _ = self.0.send((decision.clone(), resolution.clone()));
+        if let crate::core::events::DomainEvent::PlanReviewDecided {
+            decision,
+            resolution,
+            thread_id: Some(thread_id),
+            ..
+        } = event
+        {
+            if thread_id == self.thread_id {
+                let _ = self.sender.send((decision.clone(), resolution.clone()));
+            }
         }
     }
 }
 
-async fn decision_events() -> (
+async fn decision_events(thread_id: &'static str) -> (
     impl Drop,
     tokio::sync::mpsc::UnboundedReceiver<(String, Option<String>)>,
 ) {
     crate::core::bus::init().await.expect("bus init");
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-    let handle = crate::core::bus::BUS.subscribe(std::sync::Arc::new(DecisionCollector(tx)))
+    let handle = crate::core::bus::BUS.subscribe(std::sync::Arc::new(DecisionCollector {
+        thread_id,
+        sender: tx,
+    }))
         .expect("subscribe to core events");
     (handle, rx)
 }
@@ -85,7 +99,7 @@ async fn revise_carries_feedback_back() {
 
 #[tokio::test]
 async fn timeout_fails_closed_to_reject() {
-    let (_subscription, mut decisions) = decision_events().await;
+    let (_subscription, mut decisions) = decision_events("t3").await;
     let gate = PlanReviewGate::new(Duration::from_millis(40));
     let resolution = gate
         .request_review(
@@ -105,7 +119,7 @@ async fn timeout_fails_closed_to_reject() {
 
 #[tokio::test]
 async fn cancelled_park_publishes_cancelled_decision() {
-    let (_subscription, mut decisions) = decision_events().await;
+    let (_subscription, mut decisions) = decision_events("t-cancel-event").await;
     let gate = std::sync::Arc::new(PlanReviewGate::new(Duration::from_secs(30)));
     let g2 = gate.clone();
     let handle = tokio::spawn(async move {
