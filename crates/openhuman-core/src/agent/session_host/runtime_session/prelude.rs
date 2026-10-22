@@ -364,11 +364,11 @@ impl OpenHumanTurnPrelude {
 /// occurrence wins, as it does for the advertised list, so the host's tool is
 /// the one granted.
 fn granted_tool_specs(
-    visible: &[Arc<ToolSpec>],
-    registered: &[Arc<ToolSpec>],
+    visible: &[Arc<tinytools::ToolSpec>],
+    registered: &[Arc<tinytools::ToolSpec>],
     deferred: &std::collections::HashSet<String>,
     has_thread: bool,
-) -> Vec<ToolSpec> {
+) -> Vec<tinytools::ToolSpec> {
     let specs = visible
         .iter()
         .chain(
