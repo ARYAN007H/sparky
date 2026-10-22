@@ -167,10 +167,36 @@ async fn resuming_after_owner_cache_loss_registers_live_task_before_launch() {
     )
     .iter()
     .any(|(owner_task_id, _)| owner_task_id == &task_id);
+    let resumed_owner = crate::agent::orchestration::completion_owners::driver_task_owner(
+        &dispatch, &task_id,
+    )
+    .expect("resumed task retains its parent scope");
+    let owner_key = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &resumed_owner.workspace_dir,
+        &resumed_owner.parent_session,
+        resumed_owner.parent_thread_id.as_deref(),
+    );
     release.notify_one();
     assert!(
         owner_restored,
         "resume must register the active task owner before launching its provider"
+    );
+    let settled = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        jobs.wait_owned(paused_job.id.as_str(), &owner_key),
+    )
+    .await
+    .expect("resumed child settles after provider release")
+    .expect("wait for resumed child settlement");
+    assert!(settled.status.is_terminal());
+    assert!(
+        crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
+            &dispatch,
+            workspace.path(),
+            "restart-resume-owner-thread",
+        )
+        .is_empty(),
+        "settled resumed task releases its active owner slot"
     );
 }
 
