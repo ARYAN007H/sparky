@@ -3850,6 +3850,7 @@ async fn json_rpc_plan_review_decide_wakes_a_parked_review() {
             let frame = live_socket
                 .next()
                 .await
+                .inspect(|message| eprintln!("socket subscribe response: {message:?}"))
                 .expect("thread subscription acknowledgement")
                 .expect("read thread subscription acknowledgement")
                 .into_text()
