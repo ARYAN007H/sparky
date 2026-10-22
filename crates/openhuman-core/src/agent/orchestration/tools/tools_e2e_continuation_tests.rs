@@ -426,6 +426,10 @@ async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
         .with_policy_id("idle-roster-policy");
     live.workspace = Some(workspace_descriptor.clone());
     assert!(live.data.dispatch_ctx().resolved().is_some());
+    let tool_context = tinyagents_harness::tool::ToolExecutionContext::from_run_context(
+        &live,
+        tinyagents_harness::ids::CallId::new("idle-roster-spawn"),
+    );
     let tool = SpawnSubagentTool::new();
     let first = tool
         .execute_with_live_parent_context(
@@ -435,7 +439,7 @@ async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
                 "model": "test-model",
                 "task_key": "idle-history-fixture"
             }),
-            None,
+            Some(&tool_context),
             live.data.child(),
             crate::agent::subagent_host::detached_subagent_parent(&live, "idle-reuse-child")
                 .expect("detached parent"),
@@ -524,7 +528,7 @@ async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
                 "model": "test-model",
                 "task_key": "idle-history-fixture"
             }),
-            None,
+            Some(&tool_context),
             live.data.child(),
             crate::agent::subagent_host::detached_subagent_parent(&live, "idle-reuse-child")
                 .expect("detached parent"),
