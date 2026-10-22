@@ -6819,7 +6819,6 @@ version = "0.21.0"
 dependencies = [
  "serde",
  "serde_json",
- "tinystoragedrivers-types",
 ]
 
 [[package]]
@@ -7434,7 +7433,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
- "tinystoragedrivers-types",
 ]
 
 [[package]]
