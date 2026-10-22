@@ -34,6 +34,24 @@ impl OpenHumanSessionHost {
         }
     }
 
+    pub(super) fn subagent_transcript_locator(
+        &self,
+    ) -> std::sync::Arc<dyn tinyagents_session::transcript::TranscriptLocator> {
+        if let Some(locator) = &self.session_history_locator {
+            return std::sync::Arc::clone(locator);
+        }
+        let dispatch = self.dispatch_ctx();
+        let workspace = dispatch
+            .resolved()
+            .and_then(|core| core.workspace_dir().ok())
+            .unwrap_or_else(|| self.workspace_dir.clone());
+        let agent_id =
+            crate::storage::sessions::current_agent_key_or(&dispatch, &self.agent_definition_id);
+        crate::storage::sessions::provider_for_workspace_in(&workspace, &dispatch)
+            .for_agent(&agent_id)
+            .transcripts
+    }
+
     pub(super) fn runtime_transcript_meta(&self) -> TranscriptMeta {
         let now = chrono::Utc::now().to_rfc3339();
         TranscriptMeta {
