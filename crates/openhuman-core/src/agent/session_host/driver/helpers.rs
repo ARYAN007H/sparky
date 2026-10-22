@@ -1,29 +1,5 @@
 use super::*;
 
-pub(super) fn system_prefix_len(history: &[Message]) -> usize {
-    history
-        .iter()
-        .take_while(|message| matches!(message, Message::System(_)))
-        .count()
-}
-
-/// Drop `tool` messages that open the history right after the system prefix.
-/// Their assistant turn is gone (an old unpaired trim, #6721), and the provider
-/// rejects every request that carries them, so the thread can never recover
-/// without this. Later system rows (e.g. a steering nudge) are kept.
-pub(super) fn repair_orphaned_tool_head(history: &mut Vec<Message>) {
-    let prefix_len = system_prefix_len(history);
-    let orphans =
-        tinyagents_harness::summarization::advance_past_orphan_tools(&history[prefix_len..], 0);
-    if orphans > 0 {
-        tracing::warn!(
-            orphans,
-            "[session_host::driver] repaired orphaned tool head: dropped {orphans} leading tool message(s)"
-        );
-        history.drain(prefix_len..prefix_len + orphans);
-    }
-}
-
 pub(super) fn driver_error(error: impl std::fmt::Display) -> DriverFailure {
     driver_failure(error)
 }

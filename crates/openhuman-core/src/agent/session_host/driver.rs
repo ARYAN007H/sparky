@@ -9,7 +9,6 @@ use crate::agent::tinyagents::SupplementalTrace;
 use helpers::{
     append_synthesized_block, driver_cancelled_with_snapshot, driver_error,
     driver_error_with_snapshot, driver_failure, ensure_snapshot_tools_are_executable,
-    repair_orphaned_tool_head,
 };
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
@@ -84,8 +83,6 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         &self,
         mut request: DriverRequest<OpenHumanRunContext>,
     ) -> Result<DriverOutcome, DriverFailure> {
-        // Heal an orphaned tool head before reading history.
-        repair_orphaned_tool_head(&mut request.history);
         // Use the policy and context prepared for this exact request.
         let tool_policy = request
             .run_context
