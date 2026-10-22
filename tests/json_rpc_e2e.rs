@@ -755,6 +755,16 @@ async fn serve_on_ephemeral(
     (addr, handle)
 }
 
+async fn attach_process_dispatch_context(
+    mut request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    request
+        .extensions_mut()
+        .insert(openhuman_core::core::runtime::DispatchCtx::process_default());
+    next.run(request).await
+}
+
 async fn post_json_rpc(rpc_base: &str, id: i64, method: &str, params: Value) -> Value {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(120))
@@ -3786,7 +3796,9 @@ async fn json_rpc_plan_review_decide_wakes_a_parked_review() {
 
     let (api_addr, api_join) = serve_on_ephemeral(mock_upstream_router()).await;
     write_min_config(openhuman_home.as_path(), &format!("http://{api_addr}"));
-    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(true)).await;
+    let socket_router = build_core_http_router(true)
+        .layer(axum::middleware::from_fn(attach_process_dispatch_context));
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(socket_router).await;
     let rpc_base = format!("http://{rpc_addr}");
 
     let dispatch = openhuman_core::core::runtime::DispatchCtx::ambient();
