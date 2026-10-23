@@ -115,6 +115,17 @@ fn the_default_config_enables_modules_and_downloads() {
 }
 
 #[test]
+fn tinymcp_receives_the_host_storage_service_name() {
+    let config = Config::default();
+    let module_config = ops::module_config_for_test(&config, "tinymcp");
+
+    assert_eq!(
+        module_config["storage_callback"],
+        tinystoragedrivers_bus::STORAGE_INTERFACE
+    );
+}
+
+#[test]
 fn list_reports_every_registry_entry() {
     let statuses = list(&offline_config());
     assert_eq!(statuses.len(), registry::ALL.len());
