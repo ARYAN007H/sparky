@@ -1147,18 +1147,6 @@ async fn run_managed_capture_turn(
     // Session transcript stores and their SQLite backend are also cached by
     // workspace path; release them before the next repetition removes it.
     openhuman_core::storage::sessions::release_workspace(&workspace_dir);
-    let reset_locator = openhuman_core::storage::sessions::workspace_transcripts(
-        "orchestrator",
-        &workspace_dir,
-    );
-    eprintln!(
-        "managed capture transcript immediately after workspace release: {} destination: {:?}",
-        reset_locator
-            .root_for_thread("managed-capture-thread")
-            .is_some(),
-        reset_locator.destination_key()
-    );
-
     with_captured_proxy_requests(|requests| requests.clone())
 }
 
