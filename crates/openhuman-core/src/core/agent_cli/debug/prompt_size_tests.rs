@@ -87,6 +87,7 @@ fn session_report_measures_the_visible_belt_not_the_registry() {
         ..crate::config::Config::default()
     };
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
     let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,

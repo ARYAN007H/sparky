@@ -16,6 +16,7 @@ fn test_config(tmp: &TempDir) -> Arc<Config> {
         ..Config::default()
     };
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
     Arc::new(config)
 }
 
