@@ -657,7 +657,10 @@ async fn a_pinned_source_in_a_mixed_digest_still_runs_its_agent() {
     let runs = agent.runs();
     assert_eq!(runs.len(), 1, "the pinned events skipped their agent");
     assert!(runs[0].message.contains("hello t1") && runs[0].message.contains("hello t2"));
-    let stored = results.get("turn-1:x:mentions:mentions:t1..t2").unwrap().unwrap();
+    let stored = results
+        .get("turn-1:x:mentions:mentions:t1..t2")
+        .unwrap()
+        .unwrap();
     assert_eq!(stored.result.status, ResultStatus::Completed);
     assert_eq!(stored.result.event_ids, ["t1", "t2"]);
     // The rest of the digest is still triaged, once.
@@ -702,22 +705,34 @@ async fn a_mixed_digest_runs_each_conversation_key_oldest_first() {
         .unwrap()
         .unwrap();
     assert_eq!(mentions.result.event_ids, ["z-old", "a-new"]);
-    assert!(results.get("turn-1:x:mentions:dms:d1..d1").unwrap().is_some());
+    assert!(results
+        .get("turn-1:x:mentions:dms:d1..d1")
+        .unwrap()
+        .is_some());
 }
 
 #[tokio::test]
 async fn the_rest_of_a_mixed_digest_waits_when_the_pinned_parts_spent_the_budget() {
     let triage = ScriptedTriage::new([decision(TriageAction::Acknowledge)]);
-    let agent = ScriptedAgent::new([Reply::Text("draft")]);
+    let agent = ScriptedAgent::new([Reply::Text("draft"), Reply::Text("late")]);
     let results = memory_results();
     let response = pinned_deliverer(&triage, &agent, &results)
         .with_budget(Duration::ZERO)
         .deliver(turn(
-            vec![mention("t1"), trigger_event("u1")],
+            vec![
+                mention("t1"),
+                mention_at("d1", "dms", 3),
+                trigger_event("u1"),
+            ],
             Lane::Digest,
             1,
         ))
         .await;
     assert!(matches!(response.status, DeliverStatus::Retry { .. }));
+    assert_eq!(
+        agent.runs().len(),
+        1,
+        "a second part started with no budget"
+    );
     assert_eq!(triage.runs(), 0, "triage started with no budget left");
 }

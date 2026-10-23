@@ -470,7 +470,16 @@ impl Deliverer {
             return DeliverResponse::new(status);
         }
         let (parts, rest) = self.split_pinned(&turn).await;
-        for (part, name, source) in &parts {
+        for (index, (part, name, source)) in parts.iter().enumerate() {
+            if index > 0 && started.elapsed() >= self.budget {
+                // Don't start another part with no budget left; the redelivery
+                // skips the finished parts and resumes here.
+                return DeliverResponse::new(self.retry(
+                    &turn,
+                    None,
+                    "delivery budget spent on pinned parts",
+                ));
+            }
             let remaining = self.budget.saturating_sub(started.elapsed());
             let status = self.deliver_pinned(part, name, source, remaining).await;
             // Retried before the rest is triaged, so the rest is decided once;
