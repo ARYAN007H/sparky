@@ -65,6 +65,10 @@ pub fn start(config: &crate::config::Config) {
 #[cfg(feature = "mcp")]
 pub(crate) mod module_client;
 
+#[cfg(test)]
+#[path = "test_module_port.rs"]
+mod test_module_port;
+
 mod host_cleanup;
 
 /// Brings this domain up — the build without it, where there is nothing to do.
