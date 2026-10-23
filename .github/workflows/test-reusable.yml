@@ -257,6 +257,13 @@ jobs:
             cron::documents_port::tests::a_collection_outside_the_schedule_port_is_refused
             cron::documents_port::tests::an_unknown_operation_is_refused_not_guessed
             cron::documents_port::tests::one_object_is_served_per_scope_and_reused
+            mcp::audit::schemas::tests::handle_list_returns_persisted_audit_records
+            mcp::server::tools::tests::dispatch_tests::call_tool_judges_the_policy_of_the_explicit_context_across_scopes
+            mcp::server::tools::tests::dispatch_tests::call_tool_records_write_argument_rejection
+            mcp::server::tools::tests::dispatch_tests::call_tool_validates_memory_arguments_before_dispatch
+            mcp::server::write_dispatch::tests::audit_write_rejection_records_failure_row
+            mcp::server::write_dispatch::tests::test_audit_write_success_path
+            mcp::server::write_dispatch::tests::test_dispatch_write_tool_rpc_error_records_audit_and_returns_tool_error
           )
           MODULE_TEST_SKIP_ARGS=()
           for module_test in "${MODULE_TESTS[@]}"; do
