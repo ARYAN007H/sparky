@@ -4,7 +4,7 @@
 //! disabled component's library would be mapped (and never unloaded) just by
 //! sitting on the path. This walks the same directories but leaves out files
 //! named after a disabled module's library, without opening them. TinyMCP is
-//! also loaded separately because it requires the host storage callback.
+//! also loaded separately because they require the host storage callback.
 
 use std::path::Path;
 
@@ -14,17 +14,19 @@ use tinybus::module::{ModuleHost, ModuleInfo};
 /// TinyBus's generic search-path loader, which initializes them with `{}`.
 /// Leave those artifacts for the configured load below.
 pub fn configured_module_lib_stems() -> Vec<String> {
-    let Some(record) = super::registry::find("tinymcp") else {
-        return Vec::new();
-    };
-    let stem = record.source.lib_name.to_string();
-    [
-        stem.clone(),
-        format!("lib{stem}"),
-        format!("{stem}_module"),
-        format!("lib{stem}_module"),
-    ]
-    .to_vec()
+    ["tinymcp", "tinyeventqueues"]
+        .into_iter()
+        .filter_map(super::registry::find)
+        .flat_map(|record| {
+            let stem = record.source.lib_name.to_string();
+            [
+                stem.clone(),
+                format!("lib{stem}"),
+                format!("{stem}_module"),
+                format!("lib{stem}_module"),
+            ]
+        })
+        .collect()
 }
 
 fn module_id_for_artifact(path: &Path) -> Option<&'static str> {
