@@ -128,7 +128,7 @@ pub(crate) fn cancel_in_flight_gracefully(entry: InFlightEntry) -> String {
     request_id
 }
 
-pub async fn invalidate_thread_sessions(ctx: &DispatchCtx, thread_id: &str) {
+pub async fn invalidate_thread_sessions(ctx: &DispatchCtx, thread_id: &str) -> usize {
     // Under an embedded agent or a profile only that tenant's entry goes.
     // Outside both every entry for the thread in the current table goes.
     let tenant = tenant_of(ctx);
@@ -158,6 +158,7 @@ pub async fn invalidate_thread_sessions(ctx: &DispatchCtx, thread_id: &str) {
             thread_id
         );
     }
+    keys_to_remove.len()
 }
 
 /// Invalidate only the captured tenant, unless its channel session ended.
