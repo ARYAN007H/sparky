@@ -37,6 +37,10 @@ fn scheduled_agent_fixture(
     let mut config = Config::default();
     config.workspace_dir = temp.path().join("workspace");
     config.action_dir = config.workspace_dir.clone();
+    config.storage.url = Some(format!(
+        "sqlite:{}",
+        temp.path().join("storage.sqlite").display()
+    ));
     config.default_model = Some("test-model".into());
     config.chat_provider = Some("omlx:test-model".into());
     config.agent.agent_timeout_secs = timeout_secs;
