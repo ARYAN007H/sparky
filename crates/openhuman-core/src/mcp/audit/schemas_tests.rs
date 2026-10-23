@@ -34,8 +34,9 @@ async fn handle_list_returns_persisted_audit_records() {
     let config = config_rpc::load_config_with_timeout()
         .await
         .expect("config");
+    let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
     let _storage = crate::storage::test_support::install_backend_for_test(
-        crate::storage::test_support::memory_backend(),
+        std::sync::Arc::clone(&backend.backend),
     );
     crate::modules::ops::ensure_loaded(&config, "tinymcp")
         .await

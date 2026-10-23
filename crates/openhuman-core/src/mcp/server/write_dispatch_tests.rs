@@ -59,8 +59,9 @@ async fn audit_write_rejection_records_failure_row() {
     let mut config = Config::default();
     config.workspace_dir = tmp.path().join("workspace");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
     let _storage = crate::storage::test_support::install_backend_for_test(
-        crate::storage::test_support::memory_backend(),
+        std::sync::Arc::clone(&backend.backend),
     );
     crate::modules::ops::ensure_loaded(&config, "tinymcp")
         .await
@@ -165,8 +166,9 @@ async fn test_dispatch_write_tool_rpc_error_records_audit_and_returns_tool_error
     let mut config = Config::default();
     config.workspace_dir = tmp.path().join("workspace");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
     let _storage = crate::storage::test_support::install_backend_for_test(
-        crate::storage::test_support::memory_backend(),
+        std::sync::Arc::clone(&backend.backend),
     );
     crate::modules::ops::ensure_loaded(&config, "tinymcp")
         .await
@@ -219,8 +221,9 @@ async fn test_audit_write_success_path() {
     let mut config = Config::default();
     config.workspace_dir = tmp.path().join("workspace");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
     let _storage = crate::storage::test_support::install_backend_for_test(
-        crate::storage::test_support::memory_backend(),
+        std::sync::Arc::clone(&backend.backend),
     );
     crate::modules::ops::ensure_loaded(&config, "tinymcp")
         .await

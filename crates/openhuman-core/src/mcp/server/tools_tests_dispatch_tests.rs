@@ -10,8 +10,9 @@ async fn call_tool_records_write_argument_rejection() {
     let config = config_rpc::load_config_with_timeout()
         .await
         .expect("config");
+    let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
     let _storage = crate::storage::test_support::install_backend_for_test(
-        crate::storage::test_support::memory_backend(),
+        std::sync::Arc::clone(&backend.backend),
     );
     crate::modules::ops::ensure_loaded(&config, "tinymcp")
         .await
@@ -90,8 +91,9 @@ async fn call_tool_validates_memory_arguments_before_dispatch() {
     let config = config_rpc::load_config_with_timeout()
         .await
         .expect("config");
+    let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
     let _storage = crate::storage::test_support::install_backend_for_test(
-        crate::storage::test_support::memory_backend(),
+        std::sync::Arc::clone(&backend.backend),
     );
     crate::modules::ops::ensure_loaded(&config, "tinymcp")
         .await
@@ -138,8 +140,9 @@ async fn call_tool_judges_the_policy_of_the_explicit_context_across_scopes() {
     let mut allowing = crate::config::Config::default();
     allowing.workspace_dir = tmp_allow.path().to_path_buf();
     allowing.action_dir = tmp_allow.path().to_path_buf();
+    let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
     let _storage = crate::storage::test_support::install_backend_for_test(
-        crate::storage::test_support::memory_backend(),
+        std::sync::Arc::clone(&backend.backend),
     );
     crate::modules::ops::ensure_loaded(&allowing, "tinymcp")
         .await
