@@ -7,7 +7,6 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
 
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
-    crate::storage::local::use_persistent_default_for_test(workspace.path());
     let provider = Arc::new(PauseThenAnswerModel {
         calls: std::sync::atomic::AtomicUsize::new(0),
         seen: Mutex::new(Vec::new()),
@@ -122,6 +121,7 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
     let _lock = crate::config::TEST_ENV_LOCK.lock().await;
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::tempdir().expect("workspace");
+    crate::storage::local::use_persistent_default_for_test(workspace.path());
     let provider = Arc::new(PauseThenAnswerModel {
         calls: std::sync::atomic::AtomicUsize::new(0),
         seen: Mutex::new(Vec::new()),
@@ -338,7 +338,6 @@ async fn delegate_graph_runs_every_stage_through_shared_driver_jobs() {
 
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
-    crate::storage::local::use_persistent_default_for_test(workspace.path());
     crate::storage::local::use_persistent_default_for_test(workspace.path());
     let provider = Arc::new(ScriptedModel::new(vec![
         ("Produce a short, concrete", "1. inspect the fixture"),
