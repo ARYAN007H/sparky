@@ -144,6 +144,7 @@ async fn open_default_backend(_workspace_dir: PathBuf) -> Result<Arc<dyn Storage
             .get(&_workspace_dir)
             .cloned();
         if let Some(url) = persistent_url {
+            eprintln!("test backend mode: persistent sqlite for {}", _workspace_dir.display());
             super::config::prepare_default_dir(&_workspace_dir).with_context(|| {
                 format!(
                     "create the storage directory for {}",
@@ -158,6 +159,7 @@ async fn open_default_backend(_workspace_dir: PathBuf) -> Result<Arc<dyn Storage
 
     #[cfg(test)]
     {
+        eprintln!("test backend mode: memory for {}", _workspace_dir.display());
         let backend: Arc<dyn StorageBackend> =
             Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
         super::boot::prepare_and_migrate(&backend).await?;
@@ -166,6 +168,7 @@ async fn open_default_backend(_workspace_dir: PathBuf) -> Result<Arc<dyn Storage
 
     #[cfg(not(test))]
     {
+        eprintln!("test backend mode: production sqlite for {}", _workspace_dir.display());
         let url = super::config::default_url(&_workspace_dir);
         super::config::prepare_default_dir(&_workspace_dir).with_context(|| {
             format!(
