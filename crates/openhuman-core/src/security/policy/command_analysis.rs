@@ -81,7 +81,11 @@ impl CommandAnalysis {
                                 | "PATH"
                         )
                     });
-            let executor = is_command_executor_name(&normalized_name);
+            let executor = is_command_executor_name(&normalized_name)
+                || normalized_name == "env"
+                    && arguments
+                        .iter()
+                        .any(|argument| is_command_executor_name(argument));
             let class = classify_host_command(&normalized_name, &arguments, &lower);
             analysis.hidden_execution |= lower.contains("$(")
                 || lower.contains("<(")
@@ -143,6 +147,8 @@ pub(super) fn classify_host_command(base: &str, args: &[String], source: &str) -
             | "userdel"
             | "usermod"
             | "passwd"
+            | "format"
+            | "diskpart"
     ) || source.contains("rm -rf /")
         || source.contains("rm -fr /")
         || source.contains(":(){:|:&};:")
@@ -151,11 +157,34 @@ pub(super) fn classify_host_command(base: &str, args: &[String], source: &str) -
     }
     if matches!(
         base,
-        "curl" | "wget" | "ssh" | "scp" | "sftp" | "ftp" | "telnet" | "nc" | "ncat" | "netcat"
+        "curl"
+            | "wget"
+            | "ssh"
+            | "scp"
+            | "sftp"
+            | "ftp"
+            | "telnet"
+            | "nc"
+            | "ncat"
+            | "netcat"
+            | "invoke-webrequest"
+            | "invoke-restmethod"
+            | "iwr"
+            | "irm"
     ) {
         return CommandClass::Network;
     }
     let first = args.first().map(String::as_str).unwrap_or_default();
+    if base == "find"
+        && args.iter().any(|argument| {
+            matches!(
+                argument.as_str(),
+                "-delete" | "-fprint" | "-fprint0" | "-fprintf" | "-fls"
+            )
+        })
+    {
+        return CommandClass::Write;
+    }
     let global_flag = args
         .iter()
         .any(|arg| matches!(arg.as_str(), "-g" | "--global"));

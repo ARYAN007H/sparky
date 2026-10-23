@@ -192,7 +192,12 @@ impl SecurityPolicy {
 
             let base = normalized_command_name(base_raw);
 
-            let args: Vec<String> = words.map(|w| w.to_ascii_lowercase()).collect();
+            let args: Vec<String> = words
+                .map(|word| {
+                    word.trim_matches(|character: char| matches!(character, '\'' | '"'))
+                        .to_ascii_lowercase()
+                })
+                .collect();
             let joined_segment = cmd_part.to_ascii_lowercase();
 
             // High-risk = catastrophic / irreversible / privilege-escalating /
@@ -271,7 +276,9 @@ impl SecurityPolicy {
             // Interpreters / code executors run arbitrary code — medium-risk
             // (that is the job of a coding agent): prompted in Supervised,
             // allowed in Full. They are no longer classified high-risk.
-            let medium = medium || is_command_executor(base.as_str());
+            let medium = medium
+                || is_command_executor(base.as_str())
+                || base == "env" && args.iter().any(|arg| is_command_executor(arg));
 
             saw_medium |= medium;
         }
