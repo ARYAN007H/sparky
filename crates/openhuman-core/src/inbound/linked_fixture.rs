@@ -366,6 +366,12 @@ impl Rig {
             "timer": { "min_interval_ms": 5, "max_interval_ms": 25 },
             "storage_callback": binding.unique_name().as_str(),
         });
+        if std::env::var_os("OPENHUMAN_TEST_MODULE_TRACE").is_some() {
+            let _ = tracing_subscriber::fmt()
+                .with_max_level(tracing::Level::TRACE)
+                .with_test_writer()
+                .try_init();
+        }
         modules
             .load_file_with_host_callbacks(&artifact, config, &binding)
             .await
