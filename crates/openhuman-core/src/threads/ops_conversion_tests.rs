@@ -696,7 +696,7 @@ async fn thread_update_title_rejects_empty_and_whitespace_only_titles() {
 async fn thread_delete_forgets_its_conversation_memory_or_queues_it() {
     let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let workspace = tempfile::tempdir().expect("workspace");
-    crate::storage::local::use_persistent_default_for_test(workspace.path());
+    crate::storage::local::use_persistent_default_for_test(&workspace.path().join("workspace"));
     let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
     let thread_id = "thread-delete-memory";
     create_thread_with_title(&workspace, thread_id, "Chat Jan 1 1:00 AM").await;
