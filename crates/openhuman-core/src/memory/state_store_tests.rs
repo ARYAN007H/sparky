@@ -75,8 +75,7 @@ async fn host_memory_state_adapters_use_the_state_kv_port() {
 fn workspace_scopes_keep_retry_queues_stable_and_isolated_on_shared_storage() {
     let first = tempfile::tempdir().unwrap();
     let second = tempfile::tempdir().unwrap();
-    let backend_fixture = crate::storage::test_support::sqlite_backend().unwrap();
-    let backend = std::sync::Arc::clone(&backend_fixture.backend);
+    let backend = crate::storage::test_support::memory_backend();
     let first_scope = super::workspace_scope(first.path()).unwrap();
     let second_scope = super::workspace_scope(second.path()).unwrap();
     let first_storage = backend.for_scope(&first_scope).unwrap();
