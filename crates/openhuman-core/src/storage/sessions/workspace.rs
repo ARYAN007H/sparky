@@ -37,7 +37,7 @@ static FALLBACKS: LazyLock<Mutex<HashMap<PathBuf, Fallback>>> = LazyLock::new(Mu
 /// Drops the fallback providers (and, with them, the default backends they
 /// held), so a data reset can delete the files.
 pub fn release_workspace_defaults() {
-    FALLBACKS
+    let fallback_removed = FALLBACKS
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .clear();
