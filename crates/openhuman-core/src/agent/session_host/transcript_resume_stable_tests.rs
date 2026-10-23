@@ -59,41 +59,34 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
         let root = tempfile::tempdir().expect("tempdir");
         let thread = thread_id(scenario.name);
         let legacy_stems = ["1700000001_orchestrator", "1700000002_orchestrator"];
-        let legacy_rows = |root: &Path| -> Vec<Value> {
-            let locator = store_locator(root);
-            legacy_stems
-                .iter()
-                .map(|stem| {
-                    let history = locator
-                        .open_stem(
-                            stem,
-                            crate::storage::sessions::splice_fixture_tests::blank_meta(),
-                        )
-                        .expect("bind a legacy stem");
-                    serde_json::to_value(history.messages().expect("read a legacy root"))
-                        .expect("rows")
-                })
-                .collect()
-        };
-        let imported;
+        let legacy_files: Vec<_> = legacy_stems
+            .iter()
+            .map(|stem| super::transcript_compat_tests::classic_path(root.path(), stem))
+            .collect();
+        let legacy_bytes;
         let after_first;
         {
             let next = model(vec![ModelResponse::assistant("unused")], scenario.native);
             let mut host = build_host(root.path(), next, scenario.native, &thread);
             let stem = host.session_id().expect("bound session id");
-            place_fixture(root.path(), scenario, &stem, "");
-            imported = legacy_rows(root.path());
-            assert!(imported
+            let import = place_fixture(root.path(), scenario, &stem, "");
+            assert_eq!(import, (2, 2, 0), "legacy fixture import counts");
+            legacy_bytes = legacy_files
                 .iter()
-                .all(|rows| !rows.as_array().unwrap().is_empty()));
+                .map(|path| std::fs::read(path).expect("read placed legacy transcript"))
+                .collect::<Vec<_>>();
             assert!(host.resume_bound_session().await.expect("first resume"));
             after_first = tree(root.path(), &thread, &host);
         }
-        // Adoption writes the session's own transcript and modifies no legacy root.
+        // Adoption writes the canonical session stem without changing the old
+        // source files that the one-time importer read.
         assert_eq!(
-            legacy_rows(root.path()),
-            imported,
-            "legacy roots must stay as imported"
+            legacy_files
+                .iter()
+                .map(|path| std::fs::read(path).expect("read legacy transcript after resume"))
+                .collect::<Vec<_>>(),
+            legacy_bytes,
+            "legacy source files must stay byte-for-byte untouched"
         );
         assert!(
             after_first
@@ -106,6 +99,14 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
         let next = model(vec![ModelResponse::assistant("unused")], scenario.native);
         let mut host = build_host(root.path(), next, scenario.native, &thread);
         assert!(host.resume_bound_session().await.expect("second resume"));
+        assert_eq!(
+            legacy_files
+                .iter()
+                .map(|path| std::fs::read(path).expect("read legacy transcript after restart"))
+                .collect::<Vec<_>>(),
+            legacy_bytes,
+            "a second process must not modify the legacy source files"
+        );
         assert_eq!(
             after_first,
             tree(root.path(), &thread, &host),
