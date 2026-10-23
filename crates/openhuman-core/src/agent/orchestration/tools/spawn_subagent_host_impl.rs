@@ -1,14 +1,13 @@
+type DetachedSpawnParent<'a> =
+    &'a RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>;
+
 impl SpawnSubagentTool {
     async fn execute_with_context_inner(
         &self,
         args: serde_json::Value,
         tool_context: Option<&dyn ToolRunContext>,
         run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
-        detached_parent: Option<
-            &tinyagents_harness::context::RunContext<
-                crate::agent::tinyagents::host::OpenHumanRunContext,
-            >,
-        >,
+        detached_parent: Option<DetachedSpawnParent<'_>>,
     ) -> anyhow::Result<ToolResult> {
         spawn_subagent_preflight!(
             dispatch,
