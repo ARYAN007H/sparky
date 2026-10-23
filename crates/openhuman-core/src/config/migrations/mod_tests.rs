@@ -120,8 +120,8 @@ async fn run_pending_runs_phase_out_when_version_zero() {
     let rows = read_classic_rows(&path);
     let first = rows[0]["content"].as_str().unwrap();
     assert!(
-        !first.contains("### PROFILE.md"),
-        "PROFILE.md block must be stripped, got:\n{first}"
+        first.contains("### PROFILE.md"),
+        "migration must preserve the source transcript; import strips the retired section"
     );
 
     let on_disk = std::fs::read_to_string(&config.config_path).unwrap();
