@@ -563,7 +563,7 @@ langfuse = ["tinyagents-harness/langfuse"]
 # not the core or its storage-driver feature set.
 storage-sqlite = ["tinystoragedrivers/sqlite"]
 legacy-import = ["dep:tinystoragedrivers-connect"]
-storage-mongodb = ["tinystoragedrivers/mongodb"]
+storage-mongodb = ["tinystoragedrivers/mongodb", "dep:tinystoragedrivers-connect", "tinystoragedrivers-connect/mongodb"]
 # `s3://` blob URLs and composite storage. In neither the contributor set nor
 # the product: an object-store client is only for a deployment that wants one.
 storage-s3 = ["tinystoragedrivers/s3"]

@@ -84,10 +84,12 @@ async fn inspect_storage_config(check_id: &str, config: StorageConfig) -> Vec<Fi
         StorageConfig::MongoDb { uri, database } => {
             #[cfg(feature = "storage-mongodb")]
             {
-                let config = StorageConfig::MongoDb { uri, database };
-                match tinystoragedrivers::open(&config).await {
-                    Ok(storage) => {
-                        drop(storage);
+                // `hello` only. `tinystoragedrivers::open` would create the
+                // driver's collections and indexes, which a read-only probe
+                // must not do and a read-only credential can't.
+                match tinystoragedrivers_connect::MongoConnection::connect(&uri, &database).await {
+                    Ok(connection) => {
+                        drop(connection);
                         vec![Finding::pass(
                             check_id,
                             "The selected MongoDB server answered a read-only hello request.",
