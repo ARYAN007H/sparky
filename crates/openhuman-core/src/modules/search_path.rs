@@ -24,6 +24,7 @@ pub fn configured_module_lib_stems() -> Vec<String> {
         format!("{stem}_module"),
         format!("lib{stem}_module"),
     ]
+    .to_vec()
 }
 
 fn module_id_for_artifact(path: &Path) -> Option<&'static str> {
@@ -31,7 +32,7 @@ fn module_id_for_artifact(path: &Path) -> Option<&'static str> {
     let stem = stem.strip_prefix("lib").unwrap_or(stem);
     let stem = stem.strip_suffix("_module").unwrap_or(stem);
     super::registry::ALL.iter().find_map(|record| {
-        (record.id == stem || record.source.lib_name.as_str() == stem).then_some(record.id)
+        (record.id == stem || record.source.lib_name == stem).then_some(record.id)
     })
 }
 
