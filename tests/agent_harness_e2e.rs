@@ -1139,19 +1139,11 @@ async fn run_managed_capture_turn(
     // The bare test router dispatches RPC with DispatchCtx::unbound(). Its
     // cached web-chat agent outlives a router shutdown, so remove that session
     // from the same process-default slot before the fixture resets its files.
-    let invalidated = openhuman_core::web_chat::invalidate_thread_sessions(
+    openhuman_core::web_chat::invalidate_thread_sessions(
         &openhuman_core::core::runtime::DispatchCtx::unbound(),
         "managed-capture-thread",
     )
     .await;
-    eprintln!("managed capture invalidated sessions: {invalidated}");
-    tokio::time::sleep(Duration::from_secs(1)).await;
-    let late_invalidated = openhuman_core::web_chat::invalidate_thread_sessions(
-        &openhuman_core::core::runtime::DispatchCtx::unbound(),
-        "managed-capture-thread",
-    )
-    .await;
-    eprintln!("managed capture late invalidated sessions: {late_invalidated}");
     // Session transcript stores and their SQLite backend are also cached by
     // workspace path; release them before the next repetition removes it.
     openhuman_core::storage::sessions::release_workspace(&workspace_dir);
