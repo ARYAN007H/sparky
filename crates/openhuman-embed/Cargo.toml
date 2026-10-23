@@ -195,4 +195,4 @@ required-features = ["profiles"]
 # scripted HTTP MCP server through the module.
 [[test]]
 name = "mcp_module"
-required-features = ["mcp", "modules"]
+required-features = ["mcp", "modules", "storage-sqlite"]

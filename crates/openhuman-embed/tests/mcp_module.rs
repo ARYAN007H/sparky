@@ -2,11 +2,16 @@
 //! HTTP MCP server reaches a tool on it through the module.
 //!
 //! The module is linked into the test binary (`register_linked`) instead of
-//! downloaded; the host still supplies everything a released module gets.
+//! downloaded; the host still supplies everything a released module gets: the
+//! storage destination in its config, a storage backend (here the workspace
+//! default, which needs `storage-sqlite`), and a grant covering what the
+//! module's client asks for when it connects. Without any one of them the
+//! module faults at startup and the call answers "TinyMCP module is
+//! unavailable" (tinyhumansai/openhuman#8280).
 
 mod common;
 
-use common::{chat_completion, offline_config, route, runtime, scripted_provider, stub_backend};
+use common::{offline_config, route, runtime, scripted_provider, stub_backend};
 use openhuman_core::config::schema::{ModuleOverride, ModuleSourceMode};
 use openhuman_embed::{
     Access, AgentSpec, McpServer, Runtime, RuntimeModule, ServiceSet, Workspace,
@@ -51,10 +56,6 @@ fn an_embedded_runtime_calls_a_tool_through_the_tinymcp_module() {
 }
 
 fn scenario() {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter("debug,hyper=info,reqwest=info")
-        .with_test_writer()
-        .try_init();
     let rt = runtime();
     openhuman_embed::modules::register_linked("tinymcp", tinymcp::linked_module);
     rt.block_on(async {
@@ -129,6 +130,5 @@ fn scenario() {
             "{methods:?} / {results}"
         );
         assert!(results.contains("sunny"), "{results}");
-        let _ = chat_completion;
     });
 }
