@@ -206,30 +206,64 @@ pub(crate) async fn save(
     }
     migrate_legacy(ctx, config).await;
     let _legacy = LEGACY.lock().await;
+    // A migration still deferred would push this toolkit's legacy row again
+    // on the next read and undo the choice stored below, so that row is
+    // dropped after the write. Drop it only after the write succeeded:
+    // dropping it first and then failing the write would fall back to the
+    // permissive default.
+    let pending = !migrated()
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .contains(&config.workspace_dir);
+    // The row the module enforces now, put back if the drop fails, so a save
+    // reported as failed leaves the module as the UI will show it.
+    let prior = if pending {
+        let request = ComposioGetUserScopesRequest {
+            toolkit: key.clone(),
+        };
+        Some(
+            connectors::call::<_, ComposioUserScopesResponse>(
+                config,
+                methods::GET_USER_SCOPES,
+                request,
+            )
+            .await?
+            .scopes,
+        )
+    } else {
+        None
+    };
     let request = ComposioSetUserScopesRequest {
         toolkit: key.clone(),
         scopes: to_wire(pref),
     };
     connectors::call::<_, ComposioUserScopesResponse>(config, methods::SET_USER_SCOPES, request)
         .await?;
-    // A migration still deferred would push this toolkit's legacy row again
-    // on the next read and undo the choice just stored. Drop the row only
-    // after the write succeeded: dropping it first and then failing the write
-    // would fall back to the permissive default.
-    let pending = !migrated()
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .contains(&config.workspace_dir);
-    if pending {
+    if let Some(prior) = prior {
         let row = key.clone();
-        file_store::update(
+        let cleared = file_store::update(
             ctx,
             config,
             USER_SCOPES_FILE,
             move |prefs: &mut LegacyScopeFile| ((), prefs.remove(&row).is_some()),
         )
-        .await
-        .map_err(|error| format!("user_scopes: legacy row not cleared: {error}"))?;
+        .await;
+        if let Err(error) = cleared {
+            let request = ComposioSetUserScopesRequest {
+                toolkit: key.clone(),
+                scopes: prior,
+            };
+            if let Err(restore) = connectors::call::<_, ComposioUserScopesResponse>(
+                config,
+                methods::SET_USER_SCOPES,
+                request,
+            )
+            .await
+            {
+                tracing::error!(toolkit = %key, %restore, "{LOG} prior pref not restored");
+            }
+            return Err(format!("user_scopes: legacy row not cleared: {error}"));
+        }
     }
     tracing::info!(
         toolkit = %key,

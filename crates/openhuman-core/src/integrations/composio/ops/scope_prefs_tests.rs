@@ -152,3 +152,59 @@ async fn a_saved_pref_survives_a_deferred_legacy_migration() {
         "an unmigrated row is kept for retry"
     );
 }
+
+/// When the legacy row can't be dropped (an unreadable legacy file), the save
+/// reports failure, so the module must keep the row it enforced before rather
+/// than the one the UI is about to roll back.
+#[tokio::test]
+async fn a_save_whose_legacy_cleanup_fails_leaves_the_prior_row() {
+    use crate::integrations::composio::module_client::module_guard;
+    let _serialised = module_guard().await;
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config_in(&tmp);
+    config.workspace_dir = tmp.path().join("workspace");
+    config.config_path = tmp.path().join("config.toml");
+    let granted = UserScopePref {
+        read: true,
+        write: true,
+        admin: true,
+    };
+    connectors::call::<_, ComposioUserScopesResponse>(
+        &config,
+        methods::SET_USER_SCOPES,
+        ComposioSetUserScopesRequest {
+            toolkit: "gmail".into(),
+            scopes: to_wire(granted),
+        },
+    )
+    .await
+    .unwrap();
+    file_store::save(
+        &ctx,
+        &config,
+        USER_SCOPES_FILE,
+        &serde_json::json!({"gmail": "not a pref"}),
+    )
+    .await
+    .unwrap();
+
+    let saved = save(&ctx, &config, "gmail", UserScopePref::default()).await;
+    let enforced = connectors::call::<_, ComposioUserScopesResponse>(
+        &config,
+        methods::GET_USER_SCOPES,
+        ComposioGetUserScopesRequest {
+            toolkit: "gmail".into(),
+        },
+    )
+    .await
+    .map(|reply| from_wire(reply.scopes));
+
+    file_store::save(&ctx, &config, USER_SCOPES_FILE, &serde_json::json!({}))
+        .await
+        .unwrap();
+    let _ = save(&ctx, &config, "gmail", UserScopePref::default()).await;
+
+    assert!(saved.is_err(), "the save must report the failed cleanup");
+    assert_eq!(enforced.unwrap(), granted, "the module keeps the prior row");
+}
