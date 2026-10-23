@@ -502,3 +502,32 @@ fn chat_error_event_serializes_copy_key_and_params_to_literal_json() {
     let bare = serde_json::to_value(WebChannelEvent::default()).expect("serializes");
     assert!(bare.get("copy_key").is_none() && bare.get("copy_params").is_none());
 }
+
+#[test]
+fn a_key_echoed_in_provider_detail_never_reaches_the_copy() {
+    // A rejected request's provider detail is quoted into the user-facing
+    // message and sent as a copy param; a provider may echo the key in it.
+    for key in [
+        "sk-proj-AbCdEf0123456789AbCdEf0123456789",
+        "sk-ant-api03-AbCdEf0123456789AbCdEf0123456789",
+    ] {
+        let got = classify_inference_error(&format!(
+            r#"someprovider API error (422 Unprocessable Entity): {{"error":{{"message":"bad parameter for key {key}"}}}}"#
+        ));
+        assert!(
+            got.message.contains("bad parameter"),
+            "the provider detail must still be quoted: {}",
+            got.message
+        );
+        assert!(
+            !got.message.contains("AbCdEf0123456789"),
+            "key leaked into the message: {}",
+            got.message
+        );
+        let params = got.copy_params.map(|p| p.to_string()).unwrap_or_default();
+        assert!(
+            !params.contains("AbCdEf0123456789"),
+            "key leaked into the copy params: {params}"
+        );
+    }
+}
