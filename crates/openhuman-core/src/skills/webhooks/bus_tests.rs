@@ -189,12 +189,12 @@ mod inbound {
         route(&rig, Some(active_config()), "corr-deferred").await;
 
         let applied = triage.until_applied(1, Duration::from_secs(15)).await;
+        assert_eq!(triage.runs(), 2, "triage must run again after the deferral");
         assert_eq!(
             applied,
             vec![LABEL.to_owned()],
             "the deferred webhook was dropped"
         );
-        assert_eq!(triage.runs(), 2, "triaged, deferred, then triaged again");
         assert!(
             started.elapsed() >= Duration::from_millis(350),
             "retried before the deferral ran out: {:?}",
