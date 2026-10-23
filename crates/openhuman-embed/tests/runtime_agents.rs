@@ -278,12 +278,15 @@ fn one_runtime_hosts_independently_configured_agents() {
                 )
                 .expect("budget agent instantiates");
 
-            withholding_agent
+            if let Err(error) = withholding_agent
                 .turn("hide the configured tool")
                 .session("hidden-turn")
                 .send()
                 .await
-                .expect("hidden turn runs");
+            {
+                eprintln!("hidden turn failed: {error:#}");
+                panic!("hidden turn runs");
+            }
             withholding_agent
                 .turn("restore the configured tool")
                 .session("visible-turn")
