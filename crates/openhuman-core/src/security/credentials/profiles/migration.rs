@@ -206,13 +206,14 @@ impl AuthProfilesStore {
                         })();
                         match decrypted {
                             Ok(v) => v,
-                            Err(e) => {
+                            Err(decrypt_error) => {
+                                // The keychain may still hold this profile's
+                                // secrets: fail the load rather than drop it.
                                 log::warn!(
-                                    "[auth] dropping unrecoverable profile provider={}: {e}",
-                                    p.provider
+                                    "[auth] JSON fallback undecryptable for profile_id={id}: \
+                                     {decrypt_error}; refusing to load a partial view"
                                 );
-                                dropped_ids.push(id.clone());
-                                continue;
+                                return Err(e);
                             }
                         }
                     }

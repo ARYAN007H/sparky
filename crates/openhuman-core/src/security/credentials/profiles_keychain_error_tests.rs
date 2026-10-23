@@ -137,3 +137,29 @@ fn keychain_read_error_refuses_writes_and_keeps_every_secret() {
         "keychain entries were rewritten from a partial view"
     );
 }
+
+#[test]
+fn keychain_read_error_with_undecryptable_json_keeps_the_profile() {
+    // The JSON still names an access token for the OAuth profile, but it
+    // cannot be decrypted: falling back to it would drop a profile whose
+    // secret the keychain may still hold. Only that profile is kept, so the
+    // keychain-only Token profile cannot fail the load on its own.
+    let f = locked_keychain_store();
+    let mut json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(f.store.path()).unwrap()).unwrap();
+    let profiles = json["profiles"].as_object_mut().unwrap();
+    profiles.retain(|id, _| id == &f.oauth_id);
+    profiles[&f.oauth_id]["access_token"] = "enc2:not-decryptable".into();
+    json["active_profiles"] = serde_json::json!({});
+    std::fs::write(f.store.path(), json.to_string()).unwrap();
+    let json_before = std::fs::read_to_string(f.store.path()).unwrap();
+
+    assert!(
+        f.store.load().is_err(),
+        "an undecryptable fallback must fail the load"
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.store.path()).unwrap(),
+        json_before
+    );
+}
