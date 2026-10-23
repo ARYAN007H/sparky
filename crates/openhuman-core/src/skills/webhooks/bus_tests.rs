@@ -165,9 +165,14 @@ mod inbound {
     }
 
     async fn route(rig: &Rig, config: Option<crate::config::Config>, correlation_id: &str) {
+        let queues_active = config.as_ref().is_some_and(crate::inbound::active);
         let envelope = request();
         let queued =
             route_agent_trigger(config, &envelope, correlation_id, Some(rig.client.clone())).await;
+        assert_eq!(
+            queued, queues_active,
+            "webhook queue handoff did not match config"
+        );
         if !queued {
             triage_agent_directly(
                 DispatchCtx::host_default(),
