@@ -485,7 +485,13 @@ fn one_runtime_hosts_independently_configured_agents() {
             );
 
             // Managed inference authenticates with the runtime's API key.
-            let g1 = gamma.run("hello from gamma").await.expect("gamma turn");
+            let g1 = match gamma.run("hello from gamma").await {
+                Ok(outcome) => outcome,
+                Err(error) => {
+                    eprintln!("gamma turn failed: {error:#}");
+                    panic!("gamma turn");
+                }
+            };
             assert!(g1.reply.contains("managed-ok"), "{:?}", g1.reply);
             let managed: Vec<_> = backend
                 .received_requests()
