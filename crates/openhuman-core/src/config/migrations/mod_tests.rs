@@ -97,7 +97,6 @@ async fn run_pending_skips_when_version_current() {
     let tmp = TempDir::new().unwrap();
     let path = seed_tainted_transcript(&tmp.path().join("workspace"));
     let before = fs::read(&path).unwrap();
-    let before = fs::read(&path).unwrap();
 
     let mut config = config_in(&tmp);
     config.schema_version = CURRENT_SCHEMA_VERSION;
@@ -112,6 +111,7 @@ async fn run_pending_skips_when_version_current() {
 async fn run_pending_runs_phase_out_when_version_zero() {
     let tmp = TempDir::new().unwrap();
     let path = seed_tainted_transcript(&tmp.path().join("workspace"));
+    let before = fs::read(&path).unwrap();
 
     let mut config = config_in(&tmp);
     assert_eq!(config.schema_version, 0);
