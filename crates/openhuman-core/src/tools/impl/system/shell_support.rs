@@ -247,10 +247,10 @@ pub(super) const MIN_YIELD_AFTER_SECS: u64 = 30;
 
 /// The yield point for `command` with `deadline` to run: the requested time
 /// (default 120 s, at most 600 s), but no later than an eighth of the deadline
-/// (and not earlier than 30 s for that cap), so a command started late in a
-/// turn still comes back before the turn's deadline kills it. None for `0`, and
-/// none for a deliberate wait (a command that starts with `sleep`), which would
-/// only come back with nothing to show.
+/// (and not earlier than 30 s for that cap), and always before the deadline
+/// itself, so a command started late in a turn still comes back before the
+/// turn's deadline kills it. None for `0`, and none for a deliberate wait
+/// ([`is_deliberate_wait`]), which would only come back with nothing to show.
 pub(super) fn yield_after(
     requested: Option<u64>,
     deadline: Duration,
@@ -259,12 +259,35 @@ pub(super) fn yield_after(
     let secs = requested
         .unwrap_or(DEFAULT_YIELD_AFTER_SECS)
         .min(MAX_YIELD_AFTER_SECS);
-    let first = command.split_whitespace().next();
-    if secs == 0 || first == Some("sleep") {
+    if secs == 0 || is_deliberate_wait(command) {
         return None;
     }
-    let cap = (deadline.as_secs() / 8).max(MIN_YIELD_AFTER_SECS);
-    Some(Duration::from_secs(secs.min(cap)))
+    let deadline = deadline.as_secs();
+    let cap = (deadline / 8).max(MIN_YIELD_AFTER_SECS).min(deadline / 2);
+    (cap > 0).then(|| Duration::from_secs(secs.min(cap)))
+}
+
+/// Commands that only look at the state a wait led to: reading a log,
+/// listing files, checking a process.
+const QUICK_LOOKS: &[&str] = &[
+    "cat", "date", "df", "du", "echo", "grep", "head", "ls", "pgrep", "printf", "ps", "stat",
+    "tail", "test", "wc",
+];
+
+/// A command that starts with `sleep` and then only looks at what happened
+/// (`sleep 60; tail -20 build.log`). It is meant to wait, so it is not cut
+/// short. `sleep 2; make -j8` starts real work after the sleep and yields as
+/// usual.
+pub(super) fn is_deliberate_wait(command: &str) -> bool {
+    let mut steps = command
+        .split(['\n', ';', '&', '|'])
+        .map(str::trim)
+        .filter(|step| !step.is_empty());
+    let first_word = |step: &str| step.split_whitespace().next().unwrap_or("").to_owned();
+    if steps.next().map(first_word).as_deref() != Some("sleep") {
+        return false;
+    }
+    steps.all(|step| QUICK_LOOKS.contains(&first_word(step).as_str()))
 }
 
 /// The result of a call that came back with its command still running.
@@ -287,48 +310,6 @@ pub(super) fn yielded_output(
          command again while it runs."
     ));
     out
-}
-
-/// Run a native shell command for a `shell` call. In a turn with room for
-/// another process, a command still running at its yield point is handed to
-/// the turn's registry and comes back as a process id; direct dispatch (no run
-/// context) and a turn already following its limit of processes wait for the
-/// end as before.
-pub(super) async fn run_native(
-    ctx: &crate::core::runtime::DispatchCtx,
-    config: &crate::config::Config,
-    mut run: crate::sandbox::shell_exec::NativeShellRun,
-    requested_yield: Option<u64>,
-    context: Option<&dyn tinytools::ToolRunContext>,
-) -> ToolResult {
-    use crate::sandbox::shell_exec::{run_yielding, ShellRunOutcome};
-    let processes = crate::agent::tinyagents::host::run_context::shell_processes_for_tool(context)
-        .filter(|processes| processes.has_room());
-    if processes.is_some() {
-        run.yield_after = yield_after(requested_yield, run.timeout, &run.command);
-    }
-    let (command, timeout) = (run.command.clone(), run.timeout);
-    let started = std::time::Instant::now();
-    match run_yielding(ctx, config, run).await {
-        Ok(ShellRunOutcome::Running(live)) => {
-            let Some(processes) = processes else {
-                // Unreachable: no yield point without a registry. The dropped
-                // handle stops the process.
-                return ToolResult::error("Command was left running unexpectedly.");
-            };
-            let (stdout, stderr) = (live.stdout.clone(), live.stderr.clone());
-            let id = processes.adopt(live, &command, started, timeout);
-            ToolResult::success(yielded_output(
-                &id,
-                started.elapsed(),
-                timeout,
-                &stdout,
-                &stderr,
-            ))
-        }
-        Ok(ShellRunOutcome::Finished(result)) => exec_result(Ok(result), timeout),
-        Err(error) => exec_result(Err(error), timeout),
-    }
 }
 
 /// `label` and the non-empty streams, or `empty` when both are empty.

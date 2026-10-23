@@ -68,6 +68,17 @@ impl LiveHandle {
         }
     }
 
+    /// Whether the process has stopped and its resource is released, so a
+    /// failed read leaves nothing running.
+    pub(crate) fn finished(&self) -> bool {
+        match self {
+            #[cfg(feature = "modules")]
+            Self::TinyBox(live) => live.released,
+            #[cfg(test)]
+            Self::Fixture(live) => live.finished(),
+        }
+    }
+
     /// Stop the process and return what it wrote since the previous read.
     pub(crate) async fn kill(&mut self) -> anyhow::Result<LiveRead> {
         match self {
@@ -112,18 +123,26 @@ impl TinyBoxLive {
         self.read_until(until).await
     }
 
+    /// Cancel the process and read until it reports how it ended. One still
+    /// running after [`KILL_GRACE`] comes back as `Running`: the cancel did
+    /// not take, and the process keeps its place until it does stop.
     async fn kill(&mut self) -> anyhow::Result<LiveRead> {
         if !self.released {
             tracing::debug!("[sandbox:shell] stopping a running process on request");
             // A process that ended on its own refuses the cancel; the read
             // below reports how it ended either way.
-            let _ = tinybox::cancel(&self.config, self.process.clone()).await;
+            if tinybox::cancel(&self.config, self.process.clone())
+                .await
+                .is_err()
+            {
+                tracing::debug!("[sandbox:shell] TinyBox refused the cancel");
+            }
         }
-        let mut read = self
+        let read = self
             .read_until(tokio::time::Instant::now() + KILL_GRACE)
             .await?;
         if read.state == LiveState::Running {
-            read.state = LiveState::Stopped;
+            tracing::warn!("[sandbox:shell] a process is still running after its cancel");
         }
         Ok(read)
     }

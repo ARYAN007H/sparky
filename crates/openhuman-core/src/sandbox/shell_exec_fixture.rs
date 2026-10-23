@@ -178,6 +178,10 @@ impl FixtureLive {
         Ok(self.take(state))
     }
 
+    pub(crate) fn finished(&self) -> bool {
+        self.ended
+    }
+
     pub(crate) async fn kill(&mut self) -> anyhow::Result<LiveRead> {
         if !self.ended {
             self.stop().await;

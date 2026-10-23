@@ -89,11 +89,20 @@ In a turn, `shell`'s `timeout_secs` is a **yield point**, not a kill.
   The result is not an error. A command that finishes before the yield point
   returns exactly as today.
 - The yield point comes no later than an eighth of the command's deadline
-  (not earlier than 30 s for that cap), so a command started late in a turn
-  still yields before the turn kills it.
-- A command that starts with `sleep` is a deliberate wait: it runs to its end
-  instead of yielding with nothing to show (Claude Code makes the same
-  exception).
+  (not earlier than 30 s for that cap) and always before the deadline itself,
+  so a command started late in a turn still yields before the turn kills it.
+- A deliberate wait, `sleep` followed only by commands that look at the
+  result (`sleep 60; tail -20 build.log`), runs to its end instead of
+  yielding with nothing to show. Claude Code makes a similar exception.
+  `sleep 2; make -j8` yields as usual.
+- **A call that cannot yield is still bounded by the model's time.** When the
+  turn already follows four processes, when the command is a deliberate wait,
+  or on a backend that cannot leave a command running (Docker), the model's
+  `timeout_secs` stays the command's deadline, as before.
+- **Only where the model can follow.** The host middleware moves
+  `timeout_secs` aside only in a turn that registers `shell_process`. An
+  agent whose tool belt names `shell` alone keeps `timeout_secs` as a kill
+  and never yields.
 - **The kill is the turn's.** TinyAgents' `ShellTurnBudget` clamp writes the
   turn's remaining budget into `timeout_secs`, and the shell passes that to
   TinyBox as the command's `timeout_ms`. So a host middleware
@@ -119,13 +128,17 @@ A new tool, `shell_process`:
 |---|---|
 | `process` | The id a yield returned. |
 | `action` | `wait` (default), `kill` or `status`. |
-| `wait_secs` | For `wait`: how long to block before returning, default 120, capped by the hard deadline and the turn budget. |
+| `wait_secs` | For `wait`: how long to block before returning, default 120, clamped to 1–600. The process's own deadline still stops it. |
 
 - `wait` blocks host-side until the process exits or `wait_secs` passes, then
   returns only the output written since the last read, plus "exited with
   code N" or "still running (Nm Ns)".
 - `kill` cancels it and returns its remaining output.
-- `status` returns running or exited and the byte count, without output.
+- `status` says whether it is still running, without output. It refreshes
+  the state with a read that returns at once and keeps that output for the
+  next `wait`, so a process that has ended says so and frees its place.
+- A `kill` that did not take within 10 s is reported as such; the process
+  keeps its place until it stops.
 - A `wait` on a process that has already exited and been read returns
   "already exited with code N" at once, so a loop cannot spin on it.
 
@@ -133,11 +146,18 @@ A new tool, `shell_process`:
 
 A per-turn registry, e.g. `sandbox/shell_processes.rs`:
 
-- An entry holds the TinyBox resource and process, the read cursor, the start
-  time, the command line (for display), the hard deadline and the meter.
+- An entry holds the live handle (TinyBox resource, process and read cursor),
+  the start time, the command line (for display) and the hard deadline.
+  Output read after the yield goes to the model in `shell_process` replies,
+  not through the shell's progress meter.
 - Ids are short and turn-local (`p1`, `p2`, …).
-- At most 4 live processes per turn; a fifth command waits for its end as
-  before.
+- At most 4 live processes per turn. A call reserves its place before the
+  command starts, so parallel calls cannot overshoot; a command that finishes
+  first frees it. A fifth command waits for its end, bounded by the model's
+  `timeout_secs`.
+- **Audit:** a command left running is audited when it ends (or is stopped
+  at turn end), with its real outcome and duration, not as a success at the
+  yield.
 - When a process has stopped and its output has been read, the registry
   releases the output and closes the resource.
 - **Turn end:** the registry lives on the turn's run context
@@ -165,8 +185,9 @@ A per-turn registry, e.g. `sandbox/shell_processes.rs`:
 The shell tool's description says that a command still running after
 `timeout_secs` comes back with its output so far and keeps running as a
 process, to follow it with `shell_process` rather than start a second copy,
-that it is stopped when the turn's time runs out, that `timeout_secs` never
-kills (put `timeout N` in the command for that), and not to pipe a long
+that it is stopped when the turn's time runs out, that `timeout_secs` is when
+the call comes back rather than a kill (put `timeout N` in the command for
+that), and not to pipe a long
 command through `tail` or `head` (a pipeline holds its output until the
 command ends, so a yield shows nothing).
 
@@ -186,8 +207,8 @@ command ends, so a yield shows nothing).
 |---|---|
 | Native TinyBox shell (default) | yes |
 | Native jail | yes (same process API) |
-| Docker module (`run_docker`) | no: it is one-shot and has no process handle; behaves as today |
-| Sandbox-policy path | yes where it reaches `shell_exec::run_host`, otherwise as today |
+| Docker module (`run_docker`) | no: it is one-shot and has no process handle; the model's `timeout_secs` is its deadline, as before |
+| Sandbox-policy path (sandboxed agents, SaaS) | yes on the no-sandbox and native-jail backends; Docker as above |
 | Cron jobs | unchanged; they keep blocking semantics |
 | Windows | yes, nothing here is Unix-specific |
 

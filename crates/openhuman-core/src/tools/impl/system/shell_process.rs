@@ -148,6 +148,16 @@ pub(super) fn render(report: &Report, action: &str) -> ToolResult {
             "Process {id} is still running ({elapsed}; it stops at its {} timeout).",
             human_duration(report.timeout)
         )),
+        ReportState::Running if action == "kill" => ToolResult::error(format!(
+            "Process {id} did not stop: it is still running ({elapsed}) after the stop request. \
+             Check it with {{\"process\": \"{id}\", \"action\": \"status\"}}; it is stopped \
+             at its {} timeout or when the turn ends.",
+            human_duration(report.timeout)
+        )),
+        ReportState::Ended(ended) if action == "status" => ToolResult::success(format!(
+            "Process {id} has {} ({elapsed}); {{\"process\": \"{id}\"}} returns its last output.",
+            ended_phrase(*ended)
+        )),
         ReportState::Running => {
             let mut out = format!("Process {id} is still running ({elapsed}).");
             out.push_str(&printed(
@@ -200,12 +210,17 @@ pub(super) fn render(report: &Report, action: &str) -> ToolResult {
         }
         ReportState::AlreadyEnded(ended) => ToolResult::success(format!(
             "Process {id} already {}; its output was returned earlier.",
-            match ended {
-                Ended::Exited(code) => format!("exited with code {code}"),
-                Ended::TimedOut => "stopped at its timeout".to_owned(),
-                Ended::Stopped => "stopped".to_owned(),
-            }
+            ended_phrase(*ended)
         )),
+    }
+}
+
+/// How a process ended, as a verb phrase.
+fn ended_phrase(ended: Ended) -> String {
+    match ended {
+        Ended::Exited(code) => format!("exited with code {code}"),
+        Ended::TimedOut => "stopped at its timeout".to_owned(),
+        Ended::Stopped => "stopped".to_owned(),
     }
 }
 

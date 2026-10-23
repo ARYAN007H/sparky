@@ -2,6 +2,7 @@
 //! tool's `timeout_secs` (#6953).
 
 use super::*;
+use crate::tools::implementations::system::shell_support::exec_result;
 
 #[cfg(not(windows))]
 fn process_is_running(pid: i32) -> bool {

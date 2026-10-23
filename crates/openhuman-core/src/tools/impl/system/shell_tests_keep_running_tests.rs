@@ -52,10 +52,14 @@ async fn a_long_command_yields_and_shell_process_follows_it_to_its_end() {
 #[tokio::test]
 async fn without_a_turn_a_command_runs_to_its_end() {
     let result = shell()
-        .execute(json!({"command": "sleep 2; echo done", "yield_after_secs": 1}))
+        .execute(json!({"command": "echo start; sleep 2; echo done", "yield_after_secs": 30}))
         .await
         .unwrap();
-    assert_eq!(result.output().trim(), "done");
+    assert_eq!(
+        result.output().trim(),
+        "start\ndone",
+        "nothing to follow it with"
+    );
 }
 
 #[cfg(not(windows))]
@@ -76,18 +80,25 @@ async fn yield_after_zero_waits_for_the_end() {
 
 #[cfg(not(windows))]
 #[tokio::test]
-async fn a_deliberate_wait_runs_to_its_end() {
+async fn a_call_that_cannot_yield_comes_back_by_the_models_time() {
+    // A deliberate wait does not yield, so the model's `timeout_secs` stops it
+    // instead, as `timeout_secs` did before it yielded.
     let run = test_turn_run();
     let call = ToolExecutionContext::from_run_context(&run, CallId::new("c1"));
     let result = shell()
         .execute_with_context(
-            json!({"command": "sleep 2; echo done", "yield_after_secs": 1}),
+            json!({"command": "sleep 5; tail -1 /dev/null", "yield_after_secs": 1}),
             ToolCallOptions::default(),
             Some(&call),
         )
         .await
         .unwrap();
-    assert_eq!(result.output().trim(), "done");
+    assert!(result.is_error);
+    assert!(
+        result.output().starts_with("Command timed out after 1s"),
+        "{}",
+        result.output()
+    );
 }
 
 #[cfg(not(windows))]

@@ -16,8 +16,11 @@ fn the_models_timeout_becomes_the_yield_point() {
 }
 
 #[test]
-fn a_call_without_a_timeout_is_left_to_the_default() {
-    assert_eq!(moved(json!({"command": "ls"})), json!({"command": "ls"}));
+fn a_call_without_a_timeout_may_yield_at_the_default_point() {
+    assert_eq!(
+        moved(json!({"command": "ls"})),
+        json!({"command": "ls", YIELD_AFTER_ARG: null})
+    );
 }
 
 #[test]
@@ -40,4 +43,33 @@ fn the_turn_clamp_then_sets_the_deadline() {
     let clamp = clamp_shell_timeout(requested, Duration::from_secs(600), 3600).unwrap();
     assert_eq!(clamp.requested, None);
     assert_eq!(clamp.clamped_secs, 510);
+}
+
+#[tokio::test]
+async fn a_turn_that_cannot_follow_a_process_leaves_the_kill() {
+    use tinyagents_harness::context::RunConfig;
+    let mut ctx = OpenHumanRunContext::new().into_tinyagents(RunConfig::new("shell-yield"));
+    let mut call = TaToolCall {
+        id: "c1".into(),
+        name: "shell".into(),
+        arguments: json!({"command": "make", "timeout_secs": 60}),
+        invalid: None,
+    };
+    ShellYieldMiddleware { can_follow: false }
+        .before_tool(&mut ctx, &(), &mut call)
+        .await
+        .unwrap();
+    assert_eq!(
+        call.arguments,
+        json!({"command": "make", "timeout_secs": 60})
+    );
+
+    ShellYieldMiddleware { can_follow: true }
+        .before_tool(&mut ctx, &(), &mut call)
+        .await
+        .unwrap();
+    assert_eq!(
+        call.arguments,
+        json!({"command": "make", YIELD_AFTER_ARG: 60})
+    );
 }

@@ -88,3 +88,26 @@ fn status_reports_without_output() {
         "Process p2 is still running (3m 5s; it stops at its 30m 0s timeout)."
     );
 }
+
+#[test]
+fn a_stop_that_did_not_take_says_so() {
+    let result = render(&report(ReportState::Running, "", 0), "kill");
+    assert!(result.is_error);
+    assert!(
+        result.output().contains("did not stop"),
+        "{}",
+        result.output()
+    );
+}
+
+#[test]
+fn status_reports_an_end_and_points_at_wait_for_the_output() {
+    let result = render(
+        &report(ReportState::Ended(Ended::Exited(2)), "", 0),
+        "status",
+    );
+    assert!(!result.is_error);
+    let out = result.output();
+    assert!(out.contains("has exited with code 2"), "{out}");
+    assert!(out.contains("returns its last output"), "{out}");
+}

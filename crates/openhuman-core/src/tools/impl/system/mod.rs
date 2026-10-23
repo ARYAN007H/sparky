@@ -12,6 +12,7 @@ mod schedule;
 mod shell;
 mod shell_description;
 mod shell_process;
+mod shell_run;
 mod shell_saas;
 mod shell_support;
 mod update_apply;

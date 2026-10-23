@@ -31,8 +31,25 @@ fn zero_waits_for_the_end() {
 fn a_deliberate_wait_is_not_cut_short() {
     assert_eq!(yield_after(None, LONG, "sleep 100; tail run.log"), None);
     assert_eq!(yield_after(Some(30), LONG, "  sleep 5"), None);
+    assert_eq!(
+        yield_after(None, LONG, "sleep 240 && tail -3 /app/run.log; ls -la /app"),
+        None
+    );
     assert!(yield_after(None, LONG, "sleeper --run").is_some());
     assert!(yield_after(None, LONG, "make; sleep 5").is_some());
+    assert!(
+        yield_after(None, LONG, "sleep 2; make -j8").is_some(),
+        "real work after the sleep still yields"
+    );
+}
+
+#[test]
+fn the_yield_point_stays_before_a_short_deadline() {
+    assert_eq!(
+        yield_after(None, Duration::from_secs(20), "make"),
+        Some(Duration::from_secs(10))
+    );
+    assert_eq!(yield_after(None, Duration::from_secs(1), "make"), None);
 }
 
 #[test]
