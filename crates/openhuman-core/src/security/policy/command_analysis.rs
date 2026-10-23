@@ -171,10 +171,18 @@ pub(super) fn classify_host_command(base: &str, args: &[String], source: &str) -
         return CommandClass::Network;
     }
     let first = args.first().map(String::as_str).unwrap_or_default();
-    if matches!(base, "npm" | "pnpm" | "yarn" | "pip" | "pip3")
-        && matches!(first, "install" | "add" | "remove" | "uninstall" | "update")
-        || base == "cargo" && matches!(first, "add" | "remove" | "install" | "update")
-    {
+    let global_flag = args
+        .iter()
+        .any(|arg| matches!(arg.as_str(), "-g" | "--global"));
+    let second = args.get(1).map(String::as_str).unwrap_or_default();
+    let system_install = matches!(base, "apt" | "apt-get" | "brew" | "dnf") && first == "install"
+        || base == "apk" && first == "add"
+        || base == "pacman" && matches!(first, "-s" | "-sy" | "-syu")
+        || matches!(base, "pip" | "pip3" | "pipx" | "gem" | "cargo" | "go") && first == "install";
+    let global_node_install =
+        matches!(base, "npm" | "pnpm") && matches!(first, "install" | "add") && global_flag
+            || base == "yarn" && first == "global" && second == "add";
+    if system_install || global_node_install {
         return CommandClass::Install;
     }
     if matches!(
