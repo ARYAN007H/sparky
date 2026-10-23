@@ -234,15 +234,17 @@ impl Drop for DeepLinkSocketGuard {
 /// unconditionally removes a live primary's socket file: we only remove the
 /// file when we can confirm it is stale (connect fails).
 pub(crate) fn bind_and_listen() -> Option<DeepLinkSocketGuard> {
-    let path = socket_path();
+    bind_and_listen_as(socket_path(), nix::unistd::getuid().as_raw())
+}
 
+fn bind_and_listen_as(path: PathBuf, uid: u32) -> Option<DeepLinkSocketGuard> {
     let listener = match UnixListener::bind(&path) {
         Ok(l) => l,
         Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
             // Another user's socket is neither our primary nor ours to unlink.
             // One that vanished since `bind` (an old instance exiting) falls
             // through to the rebind below.
-            if socket_owner(&path).is_some_and(|owner| owner != nix::unistd::getuid().as_raw()) {
+            if socket_owner(&path).is_some_and(|owner| owner != uid) {
                 log::warn!(
                     "[deep-link-ipc] socket {} is owned by another user; \
                      deep-link forwarding disabled for this session",

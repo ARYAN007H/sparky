@@ -168,3 +168,19 @@ fn a_socket_held_by_another_user_receives_nothing() {
     accepted.read_to_string(&mut received).unwrap();
     assert!(received.is_empty(), "token leaked: {received:?}");
 }
+
+#[test]
+fn another_users_socket_is_neither_bound_over_nor_unlinked() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let sock_path = tmp.path().join("foreign-deeplink.sock");
+    let listener = UnixListener::bind(&sock_path).unwrap();
+    let me = nix::unistd::getuid().as_raw();
+
+    // Binding as a different user: the existing socket is "foreign" to them.
+    assert!(bind_and_listen_as(sock_path.clone(), me.wrapping_add(1)).is_none());
+
+    // The owner's socket is still there and still serves.
+    assert!(sock_path.exists());
+    let _client = UnixStream::connect(&sock_path).unwrap();
+    listener.accept().unwrap();
+}
