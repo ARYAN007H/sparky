@@ -81,6 +81,7 @@ fn contains_unquoted_single_ampersand(command: &str) -> bool {
 
 #[cfg(test)]
 fn has_hidden_execution(command: &str) -> bool {
+    let command = strip_quoted_heredoc_bodies(command);
     ["$(", "<(", ">("]
         .iter()
         .any(|needle| command.contains(needle))
