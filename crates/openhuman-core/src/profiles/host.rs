@@ -305,6 +305,25 @@ impl ProfileHost {
         let mut config = self
             .serving_config(&layout, id)
             .map_err(OpenError::Storage)?;
+        // A profile context carries a write fence that depends on atomic
+        // storage conditions. The default testkit backend intentionally
+        // lacks them, so mirror the production SQLite default in profile
+        // tests unless a backend was installed by the test.
+        #[cfg(all(test, feature = "storage-sqlite"))]
+        if crate::storage::installed().is_none() {
+            crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
+        }
+        #[cfg(all(test, feature = "storage-sqlite"))]
+        {
+            let backend = crate::storage::local::backend_for(&config.workspace_dir)
+                .expect("profile test backend opens");
+            eprintln!(
+                "profile test backend installed={} capabilities={:?} workspace={}",
+                crate::storage::installed().is_some(),
+                backend.capabilities(),
+                config.workspace_dir.display()
+            );
+        }
         if let Some(capabilities) = &self.capabilities {
             capabilities.configure(&mut config);
         }
