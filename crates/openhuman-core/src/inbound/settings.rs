@@ -1,11 +1,12 @@
 //! What `[inbound]` resolves to: the queue manifest and pipeline configuration
 //! the module runs, where its queues live, and whether routing is on.
 //!
-//! The host hands the module its configuration (`queues`, `pipeline`) in the
-//! module's private blob when it loads it ([`module_config`]), and declares
-//! the same manifest on the module's storage scope when the storage host
-//! binds it ([`queue_grant`]). Both read the last resolution, so the queues
-//! the module asks for are exactly the queues the host serves.
+//! The host hands the module its configuration (`queues`, `pipeline`, and the
+//! storage callback) in the module's private blob when it loads it
+//! ([`module_config`]), and declares the same manifest on the module's storage
+//! scope when the storage host binds it ([`queue_grant`]). Both read the last
+//! resolution, so the queues the module asks for are exactly the queues the
+//! host serves.
 
 use std::path::Path;
 use std::sync::{Arc, RwLock};
@@ -220,6 +221,7 @@ pub fn module_config(config: &Config) -> Value {
     json!({
         "queues": resolved.queues_json,
         "pipeline": resolved.pipeline_json,
+        "storage_callback": tinystoragedrivers_bus::STORAGE_INTERFACE,
     })
 }
 

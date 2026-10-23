@@ -112,6 +112,10 @@ async fn the_module_config_is_what_the_storage_grant_declares() {
     let blob = module_config(&config);
     assert_eq!(blob["queues"]["queues"][0]["max_attempts"], 4);
     assert_eq!(blob["pipeline"]["version"], 1);
+    assert_eq!(
+        blob["storage_callback"],
+        tinystoragedrivers_bus::STORAGE_INTERFACE
+    );
     let grant = queue_grant().unwrap();
     assert_eq!(
         grant
