@@ -60,6 +60,19 @@ pub fn install_for_test(url: &str, backend: Arc<dyn StorageBackend>) -> Installe
     }
 }
 
+/// Installs a backend for tests that need scoped storage but do not exercise
+/// the configured-URL boot path.
+pub fn install_backend_for_test(backend: Arc<dyn StorageBackend>) -> InstalledBackendGuard {
+    let slot_lock = lock_storage_slot();
+    let previous_url = crate::storage::installed_url();
+    let previous_backend = crate::storage::install(backend);
+    InstalledBackendGuard {
+        _slot_lock: slot_lock,
+        previous_backend,
+        previous_url,
+    }
+}
+
 impl Drop for InstalledBackendGuard {
     fn drop(&mut self) {
         match (self.previous_backend.take(), self.previous_url.take()) {
