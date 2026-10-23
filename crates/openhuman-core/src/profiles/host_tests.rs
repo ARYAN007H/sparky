@@ -247,9 +247,12 @@ fn host(tmp: &tempfile::TempDir, max_open: usize, idle_secs: u64) -> ProfileHost
     saas.idle_evict_secs = idle_secs;
     let backend_path = tmp.path().join("profile-storage");
     let backend_url = format!("sqlite:{}", backend_path.display());
-    let backend =
-        crate::storage::block_on_anyhow(async { crate::storage::open(&backend_url).await })
-            .expect("profile test SQLite backend opens");
+    let backend = crate::storage::block_on_anyhow(async {
+        crate::storage::open(&backend_url)
+            .await
+            .map_err(anyhow::Error::from)
+    })
+    .expect("profile test SQLite backend opens");
     ProfileHost::with_backend(
         saas,
         CoreContext::for_test(DomainSet::full(), None),
