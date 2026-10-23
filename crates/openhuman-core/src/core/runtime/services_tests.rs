@@ -52,6 +52,7 @@ async fn flows_boot_reconcile_uses_the_runtime_captured_config() {
         .expect("captured runtime configuration loads");
     assert_eq!(swept, 0);
     let warning = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
+    eprintln!("captured flow reconciliation warning: {warning:?}");
     assert!(
         warning.contains(&blocker.display().to_string()),
         "BootSweep must use the workspace captured by this runtime; got {warning:?}"
