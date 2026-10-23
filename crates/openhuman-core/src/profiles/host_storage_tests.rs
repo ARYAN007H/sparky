@@ -86,8 +86,9 @@ async fn assert_supplied_backend_owns_the_cap_and_fence(
             job_id: first.id.clone(),
         },
     )
-    .await
-    .unwrap();
+    .await;
+    eprintln!("unchanged cron read result: {unchanged:?}");
+    let unchanged = unchanged.unwrap();
     assert_eq!(unchanged.name, first.name);
 }
 
