@@ -8,7 +8,7 @@ fn scoped() -> Storage {
     memory_storage(&Scope::new("module:tinybox@local").unwrap())
 }
 
-const INDEX: &str = r#"{"schema_version":1,"records":{"j1":{"id":"j1","label":"build","dir":"/w/jails/j1","backend_at_create":"landlock","created_at_unix":10,"updated_at_unix":20,"notes":"keep"}}}"#;
+const INDEX: &str = r#"{"records":{"j1":{"id":"j1","label":"build","dir":"/w/jails/j1","backend_at_create":"landlock","created_at_unix":10,"updated_at_unix":20,"notes":"keep"}}}"#;
 
 fn legacy_workspace() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
