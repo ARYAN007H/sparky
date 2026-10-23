@@ -125,8 +125,10 @@ tinyagents-storage-kit = { path = "../../vendor/tinyagents/crates/tinyagents-sto
 tinystoragedrivers = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "05eaada962decbab33bafa4763d2bd1a67f6b456", default-features = false }
 tinystoragedrivers-api = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "05eaada962decbab33bafa4763d2bd1a67f6b456" }
 # Legacy source readers use the shared SQLite binding only while the host
-# migration feature is enabled; production storage opens through the facade.
-tinystoragedrivers-connect = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "05eaada962decbab33bafa4763d2bd1a67f6b456", features = ["sqlite"], optional = true }
+# migration feature is enabled (`legacy-import`); the doctor's MongoDB probe
+# uses its hello-only connection (`storage-mongodb`). Production storage opens
+# through the facade.
+tinystoragedrivers-connect = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "05eaada962decbab33bafa4763d2bd1a67f6b456", optional = true }
 tinystoragedrivers-types = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "05eaada962decbab33bafa4763d2bd1a67f6b456" }
 # The host config and secret adapters use the driver's established `enc2`
 # codec and per-scope key provider while storing through the v2 SecretStore
@@ -562,7 +564,7 @@ langfuse = ["tinyagents-harness/langfuse"]
 # it on. OS keychain support belongs to openhuman-rpc's `os-keyring` feature,
 # not the core or its storage-driver feature set.
 storage-sqlite = ["tinystoragedrivers/sqlite"]
-legacy-import = ["dep:tinystoragedrivers-connect"]
+legacy-import = ["dep:tinystoragedrivers-connect", "tinystoragedrivers-connect/sqlite"]
 storage-mongodb = ["tinystoragedrivers/mongodb", "dep:tinystoragedrivers-connect", "tinystoragedrivers-connect/mongodb"]
 # `s3://` blob URLs and composite storage. In neither the contributor set nor
 # the product: an object-store client is only for a deployment that wants one.

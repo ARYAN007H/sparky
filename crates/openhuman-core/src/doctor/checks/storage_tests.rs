@@ -82,7 +82,12 @@ async fn mongodb_connect_probe_creates_nothing_in_the_inspected_database() {
         );
         return;
     };
-    let database = format!("oh_doctor_probe_{}", std::process::id());
+    // Unique per run, and dropped below only if the probe itself created it.
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let database = format!("oh_doctor_probe_{}_{nanos}", std::process::id());
     let findings = inspect_storage_config(
         "storage/connect",
         StorageConfig::MongoDb {
@@ -96,7 +101,9 @@ async fn mongodb_connect_probe_creates_nothing_in_the_inspected_database() {
         .expect("test client")
         .database();
     let created = db.list_collection_names().await.expect("list collections");
-    let _ = db.drop().await;
+    if !created.is_empty() {
+        let _ = db.drop().await;
+    }
     assert_eq!(findings[0].severity, FindingSeverity::Pass);
     assert!(
         created.is_empty(),
