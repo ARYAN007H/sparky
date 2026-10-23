@@ -411,9 +411,10 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
         Err(_) => {
             let result = tokio::time::timeout(std::time::Duration::from_secs(5), run).await;
             eprintln!(
-                "scheduled child never reached its model (spawn calls: {}, child calls: {}, result: {result:?})",
+                "scheduled child never reached its model (spawn calls: {}, child calls: {}, result: {result:?}, runs: {:?})",
                 model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
                 model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
+                crate::cron::list_runs(&config, &job.id, 10),
             );
             panic!("scheduled child never reached its model");
         }
