@@ -64,7 +64,7 @@ fn agents_on_one_workspace_keep_their_own_state() {
             let session_store = std::sync::Arc::new(InMemorySessionStores::new());
             let runtime = Runtime::builder()
                 .config(offline_config())
-                .workspace(Workspace::Ephemeral)
+                .workspace(Workspace::Stateless)
                 .backend_url(backend.uri())
                 .session_store(session_store.clone())
                 .access(Access::full())

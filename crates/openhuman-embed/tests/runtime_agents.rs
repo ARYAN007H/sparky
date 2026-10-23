@@ -124,7 +124,7 @@ fn one_runtime_hosts_independently_configured_agents() {
             let runtime = std::sync::Arc::new(
                 Runtime::builder()
                     .config(offline_config())
-                    .workspace(Workspace::Ephemeral)
+                    .workspace(Workspace::Stateless)
                     .backend_url(backend.uri())
                     .api_key(API_KEY)
                     .session_store(session_store.clone())
@@ -278,15 +278,12 @@ fn one_runtime_hosts_independently_configured_agents() {
                 )
                 .expect("budget agent instantiates");
 
-            if let Err(error) = withholding_agent
+            withholding_agent
                 .turn("hide the configured tool")
                 .session("hidden-turn")
                 .send()
                 .await
-            {
-                eprintln!("hidden turn failed: {error:#}");
-                panic!("hidden turn runs");
-            }
+                .expect("hidden turn runs");
             withholding_agent
                 .turn("restore the configured tool")
                 .session("visible-turn")

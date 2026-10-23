@@ -137,7 +137,7 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
                     "building the harness",
                     Harness::builder()
                         .config(config)
-                        .workspace(Workspace::Ephemeral)
+                        .workspace(Workspace::Stateless)
                         .backend_url(backend.uri())
                         .session_store(session_store.clone())
                         .provider(
