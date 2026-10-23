@@ -190,6 +190,7 @@ fn core_notifications_survive_a_moved_workspace() {
         workspace_dir: moved_dir.clone(),
         ..Config::default()
     };
+    crate::storage::local::use_persistent_default_for_test(&moved_dir);
     let core = live::list_core_notifications(&moved, false, 10).unwrap();
     let ids: Vec<_> = core.iter().map(|e| e.id.as_str()).collect();
     assert_eq!(ids, ["e2", "e1"]);
