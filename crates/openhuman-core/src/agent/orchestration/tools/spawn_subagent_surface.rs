@@ -303,12 +303,11 @@ impl Tool for SpawnSubagentTool {
     async fn execute_with_context(
         &self,
         args: serde_json::Value,
-        options: ToolCallOptions,
+        _options: ToolCallOptions,
         tool_context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         self.execute_with_context_inner(
             args,
-            options,
             tool_context,
             crate::agent::tinyagents::host::OpenHumanRunContext::new().with_core(
                 crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context)
@@ -328,7 +327,7 @@ impl SpawnSubagentTool {
     pub(crate) async fn execute_under_parent(
         &self,
         args: serde_json::Value,
-        options: ToolCallOptions,
+        _options: ToolCallOptions,
         tool_context: Option<&dyn ToolRunContext>,
         parent: crate::agent::subagent_host::ParentExecutionContext,
     ) -> anyhow::Result<ToolResult> {
@@ -337,7 +336,6 @@ impl SpawnSubagentTool {
             crate::agent::subagent_host::detached_subagent_parent(&live_parent, "async-subagent")?;
         self.execute_with_context_inner(
             args,
-            options,
             tool_context,
             live_parent.data.child(),
             Some(&detached_parent),
@@ -357,7 +355,6 @@ impl SpawnSubagentTool {
     {
         self.execute_with_context_inner(
             args,
-            ToolCallOptions::default(),
             tool_context,
             run_context,
             Some(detached_parent.borrow()),

@@ -2,7 +2,6 @@ impl SpawnSubagentTool {
     async fn execute_with_context_inner(
         &self,
         args: serde_json::Value,
-        _options: ToolCallOptions,
         tool_context: Option<&dyn ToolRunContext>,
         run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
         detached_parent: Option<
@@ -34,8 +33,7 @@ impl SpawnSubagentTool {
             }
         };
 
-        // Preserve the actual caller's authority before any filesystem/session
-        // effects. A scoped refusal cannot become an accepted/running reference.
+        // Refuse out-of-scope callers before any session or filesystem effects.
         if let Err(error) = running_subagents::admit_spawn(&dispatch, &parent.workspace_dir) {
             return Ok(ToolResult::error(format!(
                 "spawn_subagent: registration refused: {error}"
@@ -471,8 +469,7 @@ impl SpawnSubagentTool {
                 ));
             }
         }
-        // Capture the admitted parent generation before worker/session creation.
-        // Denied lifecycle admission must leave no phantom child or spawn event.
+        // Capture the admitted generation before creating the worker/session.
         let completion_target =
             match crate::agent::orchestration::background_completions::CompletionTarget::new(
                 dispatch.clone(),
