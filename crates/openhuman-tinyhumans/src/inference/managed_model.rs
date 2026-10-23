@@ -5,7 +5,9 @@
 //! supplies OpenHuman's live credential resolver and client policy.
 
 use std::path::PathBuf;
-use tinyinference_llm::providers::tinyhumans::{TinyHumansFailurePoint, TinyHumansModel};
+use tinyinference_llm::providers::tinyhumans::{
+    TinyHumansCredential, TinyHumansCredentialKind, TinyHumansFailurePoint, TinyHumansModel,
+};
 
 use super::managed_session::{publish_managed_auth_failure, resolve_session_bearer};
 use crate::backend::url::effective_api_url;
@@ -94,11 +96,10 @@ pub(super) fn build_chat_model(
     let endpoint = effective_api_url(&api_url.map(str::to_owned));
     let resolver_options = options.clone();
     let resolver_endpoint = endpoint.clone();
-    // Which credential the last request carried: an API-key 401 is a rejected
-    // key, not an expired session.
-    let sent_api_key = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let resolver_sent_api_key = sent_api_key.clone();
-    let mut managed = TinyHumansModel::new(
+    // The owner hands each request's credential kind back on that request's
+    // auth failure, so an API-key 401 (a rejected key) is never read as an
+    // expired session, even while the stored credential changes mid-flight.
+    let mut managed = TinyHumansModel::new_with_credential(
         endpoint,
         model,
         super::tiers::MODEL_MANAGED_DEFAULT,
@@ -106,8 +107,12 @@ pub(super) fn build_chat_model(
             let (bearer, api_key) = resolver_options
                 .resolve_bearer_kind(&resolver_endpoint)
                 .map_err(|error| tinyinference_llm::Error::Model(error.to_string()))?;
-            resolver_sent_api_key.store(api_key, std::sync::atomic::Ordering::Relaxed);
-            Ok(bearer)
+            let kind = if api_key {
+                TinyHumansCredentialKind::ApiKey
+            } else {
+                TinyHumansCredentialKind::Session
+            };
+            Ok(TinyHumansCredential { bearer, kind })
         },
     )?
     .with_cache_namespace("openhuman")
@@ -116,10 +121,7 @@ pub(super) fn build_chat_model(
     .with_error_observer(log_managed_error);
 
     if observe_auth_failures {
-        managed = managed.with_managed_auth_failure_handler(move |error, context| {
-            let api_key = sent_api_key.load(std::sync::atomic::Ordering::Relaxed);
-            publish_managed_auth_failure(error, context, api_key);
-        });
+        managed = managed.with_managed_auth_failure_handler(publish_managed_auth_failure);
     }
     Ok(managed)
 }

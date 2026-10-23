@@ -397,3 +397,120 @@ async fn managed_auth_failure_expires_the_session_only_on_a_session_401() {
         assert_eq!(source.as_deref(), expected, "{name}");
     }
 }
+
+/// A late API-key 401 must not be read as the session's: the failure carries
+/// the credential its own request was sent with, not whichever credential the
+/// model resolved most recently.
+#[tokio::test]
+async fn a_late_api_key_401_after_a_session_request_keeps_the_session() {
+    use axum::http::{HeaderMap, StatusCode};
+    use axum::response::IntoResponse;
+    use openhuman_embed::__host::core::events::DomainEvent;
+    use openhuman_embed::__host::security::credentials::{
+        api_key::API_KEY_PROVIDER, AuthService, DEFAULT_AUTH_PROFILE_NAME,
+    };
+    use std::sync::Arc;
+    use tokio::sync::Notify;
+
+    openhuman_embed::__host::core::bus::init()
+        .await
+        .expect("initialize event bus");
+    let mut events = openhuman_embed::__host::core::bus::BUS
+        .get()
+        .expect("event bus initialized")
+        .receiver();
+    let tmp = tempfile::TempDir::new().expect("temporary credentials");
+    seed_app_session(tmp.path(), Some("2999-01-01T00:00:00Z"));
+    openhuman_embed::__host::security::credentials::api_key::store_api_key_in(
+        tmp.path(),
+        false,
+        "test-managed-key",
+    )
+    .expect("store test API key");
+
+    // The API-key request is held until the session request has resolved its
+    // own bearer and failed.
+    let key_request_arrived = Arc::new(Notify::new());
+    let release_key_request = Arc::new(Notify::new());
+    let (arrived, release) = (key_request_arrived.clone(), release_key_request.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind fixture server");
+    let addr = listener.local_addr().expect("fixture address");
+    let app = axum::Router::new().route(
+        "/openai/v1/chat/completions",
+        axum::routing::post(move |headers: HeaderMap| {
+            let (arrived, release) = (arrived.clone(), release.clone());
+            async move {
+                let api_key = headers
+                    .get(axum::http::header::AUTHORIZATION)
+                    .and_then(|value| value.to_str().ok())
+                    == Some("Bearer test-managed-key");
+                let (status, marker) = if api_key {
+                    arrived.notify_one();
+                    release.notified().await;
+                    (StatusCode::UNAUTHORIZED, "HOST_AUTH_LATE_API_KEY_401")
+                } else {
+                    (StatusCode::FORBIDDEN, "HOST_AUTH_SESSION_403")
+                };
+                (
+                    status,
+                    axum::Json(serde_json::json!({ "error": { "message": marker } })),
+                )
+                    .into_response()
+            }
+        }),
+    );
+    let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let model = Arc::new(
+        build_chat_model(
+            Some(&format!("http://{addr}")),
+            &managed_options_at(tmp.path()),
+            "reasoning-v1",
+            true,
+            None,
+            true,
+        )
+        .expect("build owner model"),
+    );
+
+    tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        let key_model = model.clone();
+        let key_request = tokio::spawn(async move {
+            key_model
+                .invoke(&(), ModelRequest::new(vec![Message::user("ping")]))
+                .await
+                .is_err()
+        });
+        key_request_arrived.notified().await;
+
+        // The stored credential switches to the session mid-flight.
+        AuthService::new(tmp.path(), false)
+            .remove_profile(API_KEY_PROVIDER, DEFAULT_AUTH_PROFILE_NAME)
+            .expect("remove test API key");
+        assert!(model
+            .invoke(&(), ModelRequest::new(vec![Message::user("ping")]))
+            .await
+            .is_err());
+
+        release_key_request.notify_one();
+        assert!(key_request.await.expect("API-key request task"));
+    })
+    .await
+    .expect("the held API-key request completes");
+    server.abort();
+
+    loop {
+        match events.try_recv() {
+            Ok(DomainEvent::SessionExpired { source, reason }) => {
+                assert!(
+                    !reason.contains("HOST_AUTH_LATE_API_KEY_401")
+                        && !reason.contains("HOST_AUTH_SESSION_403"),
+                    "a refusal signed the user out: {source}: {reason}"
+                );
+            }
+            Ok(_) | Err(tinybus::TryRecvError::Lagged(_)) => continue,
+            Err(_) => break,
+        }
+    }
+}
