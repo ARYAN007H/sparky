@@ -251,7 +251,8 @@ fn legacy_envelope_rows_lift_to_the_same_messages_as_typed_rows() {
 
 #[test]
 fn typed_legacy_envelope_rows_replay_the_envelope_body_and_calls() {
-    let envelope = r#"{"content":"checking","tool_calls":[{"id":"call-1","name":"echo","arguments":"{}"}]}"#;
+    let envelope =
+        r#"{"content":"checking","tool_calls":[{"id":"call-1","name":"echo","arguments":"{}"}]}"#;
     let row = TranscriptMessage::assistant_with_calls(
         envelope,
         vec![TranscriptToolCall {
