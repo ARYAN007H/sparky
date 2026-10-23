@@ -711,4 +711,3 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         .iter()
         .all(|message| message.thread_id.as_deref() == Some("42")));
 }
-
