@@ -45,8 +45,9 @@ fn run_log_store(workspace: &Path) -> anyhow::Result<RunLogStore> {
     let opened = crate::storage::local::open("skills::run_log", workspace)?;
     let storage = opened.scoped()?;
     let prepared = storage.clone();
+    let scope = opened.scope.to_storage_scope();
     crate::storage::block_on(async move {
-        crate::storage::boot::prepare_scope(&prepared).await?;
+        crate::storage::boot::prepare_scope(&prepared, &scope).await?;
         Ok(())
     })?;
     Ok(RunLogStore::new(Arc::clone(storage.streams())))

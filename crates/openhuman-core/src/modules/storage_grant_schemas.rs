@@ -118,7 +118,7 @@ pub(super) async fn migrate_imported(ctx: &crate::core::runtime::DispatchCtx, mo
     };
     let result = async {
         let storage = backend.for_scope(&scope)?;
-        crate::storage::boot::prepare_scope(&storage).await
+        crate::storage::boot::prepare_scope(&storage, &scope).await
     }
     .await;
     if let Err(error) = result {
