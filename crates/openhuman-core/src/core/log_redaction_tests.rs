@@ -75,3 +75,21 @@ fn scrubs_a_short_basic_authorization_header() {
         "Authorization: Basic [REDACTED]"
     );
 }
+
+#[test]
+fn scrubs_any_snake_case_token_key_and_escaped_json() {
+    assert_eq!(scrub_secrets("bot_token=b0t12345"), "bot_token=[REDACTED]");
+    assert_eq!(
+        scrub_secrets(r#"body {\"token\":\"ghi 789\"} sent"#),
+        r#"body {\"token\":\"[REDACTED]\"} sent"#
+    );
+    assert_eq!(
+        scrub_secrets(r#"{\"api_key\": \"k1\", \"x\": 1}"#),
+        r#"{\"api_key\": \"[REDACTED]\", \"x\": 1}"#
+    );
+    // Still not a secret.
+    assert_eq!(
+        scrub_secrets("cancellation_token=abc"),
+        "cancellation_token=abc"
+    );
+}
