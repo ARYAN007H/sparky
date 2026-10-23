@@ -259,14 +259,38 @@ impl ErrorReporter for HostErrorReporter<'_> {
     }
 }
 
+/// An error body is only classified and quoted (a few hundred characters at
+/// most), so read no more than this: a misbehaving endpoint must not make the
+/// client buffer an unbounded body.
+const MAX_ERROR_BODY_BYTES: usize = 64 * 1024;
+
+/// The first [`MAX_ERROR_BODY_BYTES`] of a failed response's body.
+async fn read_error_body(mut response: reqwest::Response) -> String {
+    let mut body = Vec::new();
+    loop {
+        match response.chunk().await {
+            Ok(Some(chunk)) => {
+                let room = MAX_ERROR_BODY_BYTES - body.len();
+                body.extend_from_slice(&chunk[..chunk.len().min(room)]);
+                if body.len() == MAX_ERROR_BODY_BYTES {
+                    break;
+                }
+            }
+            Ok(None) => break,
+            Err(_) if body.is_empty() => {
+                return "<failed to read provider error body>".to_string();
+            }
+            Err(_) => break,
+        }
+    }
+    String::from_utf8_lossy(&body).into_owned()
+}
+
 /// Build a sanitized provider error from a failed HTTP response, classifying
 /// it upstream and routing the reaction through [`HostErrorReporter`].
 pub async fn api_error(provider: &str, response: reqwest::Response) -> anyhow::Error {
     let status = response.status();
-    let body = response
-        .text()
-        .await
-        .unwrap_or_else(|_| "<failed to read provider error body>".to_string());
+    let body = read_error_body(response).await;
     let message = format!(
         "{provider} API error ({status}): {}",
         sanitize_api_error(&body)
