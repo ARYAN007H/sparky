@@ -80,7 +80,7 @@ async fn a_new_artifact_shares_one_id_and_one_file_between_card_and_record() {
     production.complete().await.unwrap();
 
     let card = get_artifact(&workspace, &id).await.unwrap();
-    assert_eq!(card.status, CardStatus::Ready);
+    assert_eq!(card.status, CardStatus::Ready, "card error: {:?}", card.error);
     assert_eq!(card.size_bytes, 7);
     let record = versioned_store(&workspace).get(&id).await.unwrap().unwrap();
     assert_eq!(record.status, RecordStatus::Ready);
