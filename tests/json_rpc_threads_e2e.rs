@@ -921,6 +921,13 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
         ),
         "import classic session transcripts: {reports:?}"
     );
+    let imported = openhuman_core::storage::sessions::provider_for_workspace(&config.workspace_dir)
+        .for_agent("orchestrator");
+    let spend = tinyagents_session::transcript::spend::thread_spend_in(
+        imported.transcripts.as_ref(),
+        "thr-e2e",
+    );
+    assert_eq!(spend.root.input_tokens, 4200, "imported root spend: {spend:?}");
 
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
