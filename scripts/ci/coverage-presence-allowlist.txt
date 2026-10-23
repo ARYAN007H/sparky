@@ -38,6 +38,11 @@ crates/openhuman-core/src/modules/unloaded.rs
 # no-secret-file nextest case.
 crates/openhuman-core/src/security/secret_storage/encrypted_file_backend_disabled.rs
 
+# This standalone generator is a developer fixture tool, not a core module or
+# Cargo target in the product coverage graph. The fixture is consumed by the
+# storage import tests; compiling the generator itself is outside that suite.
+crates/openhuman-core/src/storage/import/fixtures/legacy-v1-profile/generator/src/main.rs
+
 # `helper/swift_source.rs` assembles these fragments only to build the macOS
 # Swift accessibility helper. The production feature set is compiled for Linux
 # in this coverage lane, so each fragment's `#[cfg(target_os = "macos")]`
