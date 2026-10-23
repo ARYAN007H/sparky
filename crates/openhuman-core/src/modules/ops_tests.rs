@@ -115,14 +115,11 @@ fn the_default_config_enables_modules_and_downloads() {
 }
 
 #[test]
-fn tinymcp_receives_the_host_storage_service_name() {
+fn tinymcp_storage_destination_is_not_a_generic_module_config_value() {
     let config = Config::default();
     let module_config = ops::module_config_for_test(&config, "tinymcp");
 
-    assert_eq!(
-        module_config["storage_callback"],
-        tinystoragedrivers_bus::STORAGE_INTERFACE
-    );
+    assert!(module_config.get("storage_callback").is_none());
 }
 
 #[test]
@@ -719,14 +716,11 @@ fn the_ahead_warning_is_silent_for_released_modules_other_ids_and_release_builds
 }
 
 #[test]
-fn tinymcp_is_told_which_bus_name_serves_its_storage() {
-    // TinyMCP refuses to load without a storage destination, so an empty config
-    // faults the module at startup and every MCP call reports "unavailable".
+fn tinymcp_storage_destination_is_bound_by_the_verified_loader() {
+    // A generic config cannot choose the callback destination. The verified
+    // loader injects the unique name bound to this exact module instance.
     let config = ops::module_config_for_test(&Config::default(), "tinymcp");
-    assert_eq!(
-        config,
-        serde_json::json!({ "storage_callback": "ai.tinyhumans.tinystorage.Storage" })
-    );
+    assert_eq!(config, serde_json::json!({}));
     assert_eq!(
         ops::module_config_for_test(&Config::default(), "tinybox"),
         serde_json::json!({})

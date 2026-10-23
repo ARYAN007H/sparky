@@ -1,8 +1,8 @@
-//! The `tinyeventqueues` module linked into the test binary on a private bus,
-//! with the host callbacks served by a scripted triage runner.
+//! The staged `tinyeventqueues` artifact on a private bus, with the host
+//! callbacks served by a scripted triage runner.
 //!
-//! Each [`Rig`] is its own broker and module host: the real module (its
-//! `static-link` build) is attached with fast timers, the host's
+//! Each [`Rig`] is its own broker and module host: the verified release module
+//! is loaded with fast timers and a per-module storage callback, the host's
 //! `ai.tinyhumans.tinyeventqueues.Host` is served by an [`InboundHost`] whose
 //! [`Deliverer`] triages with a [`ScriptedTriage`], and [`Rig::client`] is a
 //! module client bound to the module's object, as `route::offer` takes it.
@@ -299,6 +299,8 @@ pub(crate) struct Rig {
     _host: Connection,
     _modules: ModuleHost,
     _storage: crate::storage::test_support::InstalledBackendGuard,
+    _callback_binding: Arc<tinybus::module::HostCallbackBinding>,
+    _callback_storage: tinystoragedrivers_busproxy::ServedStorage,
 }
 
 impl Rig {
@@ -353,15 +355,20 @@ impl Rig {
         crate::modules::storage_host::install(&host, &modules)
             .await
             .unwrap();
+        let artifact = crate::modules::ops::local_artifact_for_test("tinyeventqueues")
+            .expect("the staged tinyeventqueues artifact is required for callback tests");
+        let (binding, callback_storage) =
+            crate::modules::storage_host::prepare_callbacks(&host, &modules)
+                .await
+                .unwrap();
+        let config = json!({
+            "pipeline": pipeline,
+            "timer": { "min_interval_ms": 5, "max_interval_ms": 25 },
+            "storage_callback": binding.unique_name().as_str(),
+        });
         modules
-            .attach_linked_with_config(
-                tinyeventqueues::linked_module().unwrap(),
-                json!({
-                    "pipeline": pipeline,
-                    "timer": { "min_interval_ms": 5, "max_interval_ms": 25 },
-                    "storage_callback": tinystoragedrivers_bus::STORAGE_INTERFACE,
-                }),
-            )
+            .load_file_with_host_callbacks(&artifact, config, &binding)
+            .await
             .unwrap();
         tokio::time::timeout(Duration::from_secs(10), async {
             loop {
@@ -383,6 +390,8 @@ impl Rig {
             _host: host,
             _modules: modules,
             _storage: storage,
+            _callback_binding: binding,
+            _callback_storage: callback_storage,
         }
     }
 }
