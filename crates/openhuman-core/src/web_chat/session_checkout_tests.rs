@@ -143,7 +143,7 @@ async fn checkout_cold_boots_from_the_thread_transcript_and_checkin_keeps_it_war
         CheckoutPolicy::AdoptCached,
     )
     .await
-    .unwrap_or_else(|error| panic!("first checkout failed: {error}"));
+    .unwrap();
     // Checkout binds the thread's durable session identity; the history loads
     // when the session resumes, which every turn does for itself. The
     // conversation the transcript holds must come back either way.
@@ -376,7 +376,7 @@ async fn a_thread_binds_one_stable_session_across_cold_boots() {
         CheckoutPolicy::Exact,
     )
     .await
-    .unwrap();
+    .unwrap_or_else(|error| panic!("first checkout failed: {error}"));
     // Nothing is checked back in, so the next checkout is a genuine cold boot.
     let second = checkout_session_agent(
         &DispatchCtx::ambient(),
