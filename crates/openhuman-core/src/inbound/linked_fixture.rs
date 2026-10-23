@@ -21,6 +21,10 @@ use tinybus::transport::memory::MemoryBus;
 use tinybus::{Connection, ObjectPath};
 use tinyeventqueues_bus::names;
 use tinyeventqueues_bus::storage::SHIPPED_PIPELINE_JSON;
+use tinystoragedrivers_api::StorageBackend;
+use tinystoragedrivers_busproxy::{serve, PerCallerEndpoint, StorageServer};
+use tinystoragedrivers_testkit::MemoryBackend;
+use tinystoragedrivers_types::Scope;
 
 use super::deliver::Deliverer;
 use super::host::InboundHost;
@@ -298,6 +302,7 @@ pub(crate) struct Rig {
     pub(crate) triage: Arc<ScriptedTriage>,
     _host: Connection,
     _modules: ModuleHost,
+    _storage: tinystoragedrivers_busproxy::ServedStorage,
 }
 
 impl Rig {
@@ -323,6 +328,13 @@ impl Rig {
         let host = Connection::connect(bus.connect().await.unwrap())
             .await
             .unwrap();
+        let backend = Arc::new(MemoryBackend::new());
+        let storage_backend = Arc::clone(&backend);
+        let endpoint = PerCallerEndpoint::new(move |_sender| {
+            let storage = storage_backend.for_scope(&Scope::new("local").ok()?).ok()?;
+            Some(StorageServer::new(storage))
+        });
+        let storage = serve(&host, Arc::new(endpoint)).await.unwrap();
         let deliverer = Deliverer::new(
             triage.clone() as Arc<dyn TriageRunner>,
             DispatchCtx::host_default(),
@@ -346,14 +358,13 @@ impl Rig {
         host.request_name(names::host::INTERFACE).await.unwrap();
 
         let modules = ModuleHost::new(broker);
+        let mut module_config = json!({
+            "pipeline": pipeline,
+            "timer": { "min_interval_ms": 5, "max_interval_ms": 25 },
+        });
+        module_config["storage_callback"] = json!(host.unique_name().unwrap().as_str());
         modules
-            .attach_linked_with_config(
-                tinyeventqueues::linked_module().unwrap(),
-                json!({
-                    "pipeline": pipeline,
-                    "timer": { "min_interval_ms": 5, "max_interval_ms": 25 },
-                }),
-            )
+            .attach_linked_with_config(tinyeventqueues::linked_module().unwrap(), module_config)
             .unwrap();
         tokio::time::timeout(Duration::from_secs(10), async {
             loop {
@@ -374,6 +385,7 @@ impl Rig {
             triage,
             _host: host,
             _modules: modules,
+            _storage: storage,
         }
     }
 }
