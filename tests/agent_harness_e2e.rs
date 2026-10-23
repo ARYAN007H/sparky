@@ -1305,11 +1305,12 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
             &home.join("workspace"),
         );
         eprintln!(
-            "managed capture transcript after profile deletion: {} destination: {:?}",
+            "managed capture transcript after profile deletion: {} destination: {:?} storage_url: {}",
             reset_locator
                 .root_for_thread("managed-capture-thread")
                 .is_some(),
-            reset_locator.destination_key()
+            reset_locator.destination_key(),
+            openhuman_core::storage::config::default_url(&home.join("workspace"))
         );
         let expected_summary_count = prior_count + 2;
         let metadata = run_managed_capture_turn(
