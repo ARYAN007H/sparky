@@ -1117,6 +1117,17 @@ async fn run_managed_capture_turn(
         openhuman_core::storage::sessions::is_installed(),
         openhuman_core::storage::installed().is_some()
     );
+    let transcript_locator = openhuman_core::storage::sessions::workspace_transcripts(
+        "orchestrator",
+        &workspace_dir,
+    );
+    eprintln!(
+        "managed capture prior transcript present: {} destination: {:?}",
+        transcript_locator
+            .root_for_thread("managed-capture-thread")
+            .is_some(),
+        transcript_locator.destination_key()
+    );
     let mut events = spawn_sse_collector(format!(
         "{}/events?client_id=managed-capture-client",
         stack.rpc_base
