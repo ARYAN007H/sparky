@@ -4,7 +4,6 @@
 
 use std::sync::atomic::Ordering;
 
-use tinyagents_harness::cache::CacheLayoutEvent;
 use tinyagents_harness::events::{AgentEvent, EventListener, EventRecord};
 
 use crate::progress::AgentProgress;
@@ -736,5 +735,3 @@ impl OpenhumanEventBridge {
         })
     }
 }
-
-include!("event_projection_cache_layout.rs");
