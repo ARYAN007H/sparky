@@ -130,3 +130,23 @@ async fn complete_and_clear_are_safe_without_a_goal_or_thread() {
     complete_for_thread(&dir, None).await;
     clear_for_thread(&dir, None).await;
 }
+
+#[tokio::test]
+async fn account_turn_accrues_each_turns_wall_time_on_the_goal() {
+    // The host hands each turn's duration to the goal; the UI's time budget
+    // reads `time_used_seconds`, so it must add up across turns.
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().to_path_buf();
+    let store = crate::storage::sessions::stores_or_ephemeral(&dir).kv;
+    tinyagents_harness_tools::goals::store::set(&store, "t-time", "obj", Some(1_000_000))
+        .await
+        .unwrap();
+    account_turn_against_goal(&dir, Some("t-time"), 1, 1, 3).await;
+    account_turn_against_goal(&dir, Some("t-time"), 1, 1, 4).await;
+    let g = tinyagents_harness_tools::goals::store::get(&store, "t-time")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(g.time_used_seconds, 7);
+    assert_eq!(g.tokens_used, 4);
+}
