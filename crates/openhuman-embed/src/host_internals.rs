@@ -519,7 +519,7 @@ pub mod storage {
         /// URL. In builds without `legacy-import`, there is no layout migration
         /// to run and the configured workspace remains unchanged.
         #[cfg(not(feature = "legacy-import"))]
-        pub async fn auto_migrate(_config: &crate::core_host::config::Config) -> bool {
+        pub async fn auto_migrate(_config: &openhuman_core::config::Config) -> bool {
             false
         }
     }
