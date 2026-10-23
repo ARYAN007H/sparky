@@ -487,6 +487,7 @@ async fn agent_turn_runs_long_parallel_subagent_flow_with_many_nested_tool_calls
     AgentDefinitionRegistry::init_global_builtins().unwrap();
 
     let workspace = tempfile::TempDir::new().expect("temp workspace");
+    crate::storage::local::use_persistent_default_for_test(workspace.path());
     let workspace_path = workspace.path().to_path_buf();
     let provider = ParallelHarnessProvider::default();
     let fixture_state = Arc::new(FixtureStepState::default());
