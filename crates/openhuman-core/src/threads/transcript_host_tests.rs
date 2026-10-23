@@ -325,6 +325,7 @@ fn calls_recorded_after_their_results_project_as_settled() {
     eprintln!("roots: {}", listed.roots.len());
     for root in &listed.roots {
         let display = root.transcript.read_display().unwrap().unwrap();
+        eprintln!("direct: {:#?}", project_records(&display.records));
         for record in &display.records {
             if let tinyagents_session::transcript::DisplayRecord::Message(message) = record {
                 eprintln!(
