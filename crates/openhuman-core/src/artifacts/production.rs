@@ -240,7 +240,8 @@ impl Production {
             &self.workspace_dir,
             self.files.clone(),
             self.chat.as_ref(),
-        );
+        )
+        .with_file_store(super::tiny_store::artifact_file_store(&self.workspace_dir));
         if let Err(err) = bridge.show_newest(&record).await {
             tracing::warn!(
                 target: "tiny-artifacts",

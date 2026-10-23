@@ -111,14 +111,21 @@ impl LegacyUiBridge {
         workspace_dir: impl Into<PathBuf>,
         files: FileRoots,
         chat: Option<&ApprovalChatContext>,
-        file_store: Option<Arc<dyn tiny_artifacts::FileStore>>,
     ) -> Self {
         Self {
             workspace_dir: workspace_dir.into(),
             files,
             chat: chat.cloned(),
-            file_store,
+            file_store: None,
         }
+    }
+
+    pub(crate) fn with_file_store(
+        mut self,
+        file_store: Option<Arc<dyn tiny_artifacts::FileStore>>,
+    ) -> Self {
+        self.file_store = file_store;
+        self
     }
 
     async fn read_version_file(&self, file: &tiny_artifacts::FileRef) -> anyhow::Result<Vec<u8>> {
@@ -316,28 +323,33 @@ pub fn artifacts_service(
     chat: Option<&ApprovalChatContext>,
 ) -> Artifacts {
     let roots = file_roots(workspace_dir, &files, action_dir);
-    let file_store = match crate::storage::local::open("artifacts::files", workspace_dir)
-        .and_then(|opened| opened.scoped())
-    {
-        Ok(scoped) => Some(Arc::new(tiny_artifacts::BlobFileStore::new(&scoped))
-            as Arc<dyn tiny_artifacts::FileStore>),
-        Err(error) => {
-            log::warn!("[artifacts] file storage unavailable: {error:#}");
-            None
-        }
-    };
+    let file_store = artifact_file_store(workspace_dir);
     let mut service = Artifacts::new(Arc::new(versioned_store(workspace_dir)))
-        .with_observer(Arc::new(LegacyUiBridge::new(
-            workspace_dir,
-            files,
-            chat,
-            file_store.clone(),
-        )))
+        .with_observer(Arc::new(
+            LegacyUiBridge::new(workspace_dir, files, chat)
+                .with_file_store(file_store.clone()),
+        ))
         .with_file_roots(guarded_roots(roots));
     if let Some(file_store) = file_store {
         service = service.with_file_store(file_store);
     }
     service
+}
+
+pub(crate) fn artifact_file_store(
+    workspace_dir: &Path,
+) -> Option<Arc<dyn tiny_artifacts::FileStore>> {
+    match crate::storage::local::open("artifacts::files", workspace_dir)
+        .and_then(|opened| opened.scoped())
+    {
+        Ok(scoped) => {
+            Some(Arc::new(tiny_artifacts::BlobFileStore::new(&scoped)))
+        }
+        Err(error) => {
+            log::warn!("[artifacts] file storage unavailable: {error:#}");
+            None
+        }
+    }
 }
 
 /// Where each file version keeps its own copy:
