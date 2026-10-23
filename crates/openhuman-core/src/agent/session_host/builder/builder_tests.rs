@@ -34,6 +34,8 @@ fn test_config(tmp: &tempfile::TempDir) -> crate::config::Config {
     let mut config = test_config_without_inference(tmp);
     crate::agent::session_host::test_support::install_model_fixture();
     config.default_model = Some("test/session-fixture".to_string());
+    crate::security::credentials::api_key::store_api_key(&config, "test-session-fixture-key")
+        .expect("store the managed inference fixture credential");
     config
 }
 
