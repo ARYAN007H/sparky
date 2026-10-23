@@ -137,13 +137,13 @@ fn host_and_module_contract_versions_must_cover_the_full_host_surface() {
         Ok(())
     );
     assert_eq!(
-        require_compatible((2, contract::CONTRACT_VERSION.1 - 1))
-            .expect_err("older member set is refused"),
+        require_compatible((1, contract::CONTRACT_VERSION.1))
+            .expect_err("an older contract major is refused"),
         ModuleCallError::IncompatibleContract
     );
     assert_eq!(
-        require_compatible((2, contract::CONTRACT_VERSION.1))
-            .expect_err("different major is refused"),
+        require_compatible((3, contract::CONTRACT_VERSION.1))
+            .expect_err("a newer contract major is refused"),
         ModuleCallError::IncompatibleContract
     );
 }
