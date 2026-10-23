@@ -46,35 +46,43 @@ fn test_bundled_record() -> &'static crate::modules::types::ModuleRecord {
     }))
 }
 
+/// The record pins the empty-input digest, so `b""` is a bundle whose digest
+/// matches but whose archive cannot be read, and `b"tampered"` is one whose
+/// digest does not match. Both must be reported, never replaced by the cache.
 #[tokio::test]
-async fn invalid_installer_bundle_is_reported_without_falling_back_to_the_cache() {
-    let record = test_bundled_record();
-    let bundled = tempfile::tempdir().unwrap();
-    let user_cache = tempfile::tempdir().unwrap();
-    let bundle_dir = tinybus::module::artifact_dir(
-        bundled.path(),
-        record.id,
-        record.version,
-        record.assets[0].host_key,
-    )
-    .unwrap();
-    std::fs::create_dir_all(&bundle_dir).unwrap();
-    std::fs::write(bundle_dir.join(record.assets[0].archive), b"").unwrap();
+async fn a_bad_installer_bundle_is_reported_without_falling_back_to_the_cache() {
+    for staged in [&b""[..], &b"tampered"[..]] {
+        let record = test_bundled_record();
+        let bundled = tempfile::tempdir().unwrap();
+        let user_cache = tempfile::tempdir().unwrap();
+        let bundle_dir = tinybus::module::artifact_dir(
+            bundled.path(),
+            record.id,
+            record.version,
+            record.assets[0].host_key,
+        )
+        .unwrap();
+        std::fs::create_dir_all(&bundle_dir).unwrap();
+        std::fs::write(bundle_dir.join(record.assets[0].archive), staged).unwrap();
 
-    let runtime = crate::modules::runtime::runtime().await.unwrap();
-    let error = Resolver::load_cached(
-        runtime,
-        &record.release(),
-        user_cache.path(),
-        &serde_json::json!({}),
-        false,
-        Some(bundled.path()),
-    )
-    .unwrap_err();
+        let runtime = crate::modules::runtime::runtime().await.unwrap();
+        let error = Resolver::load_cached(
+            runtime,
+            &record.release(),
+            user_cache.path(),
+            &serde_json::json!({}),
+            false,
+            Some(bundled.path()),
+        )
+        .unwrap_err();
 
-    assert!(error.contains("installer bundle"), "{error}");
-    assert!(error.contains("repairing the installation"), "{error}");
-    assert!(!user_cache.path().join(record.id).exists());
+        assert!(error.contains("installer bundle"), "{staged:?}: {error}");
+        assert!(
+            error.contains("repairing the installation"),
+            "{staged:?}: {error}"
+        );
+        assert!(!user_cache.path().join(record.id).exists());
+    }
 }
 
 #[tokio::test]
