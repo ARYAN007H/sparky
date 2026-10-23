@@ -1,10 +1,13 @@
-//! Scope-bound storage handles guarded by a profile lease condition.
+//! Scope-bound storage handles guarded by a profile lease.
 //!
-//! The driver evaluates the persisted lease predicate atomically with each
-//! mutation. `FencedBackend` composes that predicate with any caller-supplied
-//! condition, so an importer claim or other host condition cannot replace the
-//! profile's authority. A captured backend keeps the exact lease epoch it was
-//! created for; it never resolves a later registry entry for that profile.
+//! When leases live in the storage backend, the driver evaluates their
+//! persisted predicate atomically with each mutation. File leases have no
+//! driver-visible record; their handles use the local fence checks, and the
+//! OS lock cannot be lost while its process lives. `FencedBackend` composes a
+//! driver predicate with any caller-supplied condition, so an importer claim
+//! or other host condition cannot replace the profile's authority. A captured
+//! backend keeps the exact lease epoch it was created for; it never resolves
+//! a later registry entry for that profile.
 
 use std::sync::Arc;
 
@@ -63,7 +66,7 @@ impl FencedBackend {
     fn condition_for(
         &self,
         scope: &Scope,
-    ) -> Result<Option<(Arc<LeaseFence>, WriteCondition)>, StorageError> {
+    ) -> Result<Option<(Arc<LeaseFence>, Option<WriteCondition>)>, StorageError> {
         let fence = if let Some(captured) = &self.captured {
             if !captured.covers(scope.as_str()) {
                 return Err(StorageError::backend(
@@ -87,12 +90,7 @@ impl FencedBackend {
                     .map_or_else(super::fence::system_now_ms, |registry| registry.now_ms()),
             )
             .map_err(|error| error.into_storage())?;
-        let condition = fence.write_condition().ok_or_else(|| {
-            StorageError::backend(
-                "profile lease has no atomic storage condition; refusing unguarded handles",
-            )
-        })?;
-        Ok(Some((fence, condition)))
+        Ok(Some((fence.clone(), fence.write_condition())))
     }
 }
 
@@ -109,7 +107,10 @@ impl StorageBackend for FencedBackend {
     fn for_scope(&self, scope: &Scope) -> Result<Storage, StorageError> {
         match self.condition_for(scope)? {
             Some((fence, condition)) => {
-                let storage = self.inner.for_scope_conditioned(scope, &condition)?;
+                let storage = match condition {
+                    Some(condition) => self.inner.for_scope_conditioned(scope, &condition)?,
+                    None => self.inner.for_scope(scope)?,
+                };
                 Ok(super::fenced_ports::wrap(
                     storage,
                     fence,
@@ -127,9 +128,12 @@ impl StorageBackend for FencedBackend {
     ) -> Result<Storage, StorageError> {
         match self.condition_for(scope)? {
             Some((fence, profile_condition)) => {
-                let storage = self
-                    .inner
-                    .for_scope_conditioned(scope, &profile_condition.and(condition.clone())?)?;
+                let storage = match profile_condition {
+                    Some(profile_condition) => self
+                        .inner
+                        .for_scope_conditioned(scope, &profile_condition.and(condition.clone())?)?,
+                    None => self.inner.for_scope_conditioned(scope, condition)?,
+                };
                 Ok(super::fenced_ports::wrap(
                     storage,
                     fence,
