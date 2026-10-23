@@ -5738,7 +5738,7 @@ dependencies = [
  "tinyagents-session",
  "tinyagents-storage-kit",
  "tinyagents-tasks",
- "tinybox-bus 0.2.0",
+ "tinybox-bus 0.2.1",
  "tinybox-core",
  "tinybus",
  "tinybus-module",
@@ -9067,7 +9067,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -9076,17 +9076,17 @@ dependencies = [
 
 [[package]]
 name = "tinybox-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "serde",
  "thiserror 2.0.21",
- "tinybox-bus 0.2.0",
+ "tinybox-bus 0.2.1",
 ]
 
 [[package]]
 name = "tinybox-docker"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "serde_json",
@@ -9097,12 +9097,12 @@ dependencies = [
 
 [[package]]
 name = "tinybox-drivers"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "log",
  "serde",
  "serde_json",
- "tinybox-bus 0.2.0",
+ "tinybox-bus 0.2.1",
  "tinybox-core",
  "tinybox-jail",
  "tinystoragedrivers-api",
@@ -9112,13 +9112,13 @@ dependencies = [
 
 [[package]]
 name = "tinybox-host"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "cap-std",
  "command-group",
  "nix 0.31.3",
- "tinybox-bus 0.2.0",
+ "tinybox-bus 0.2.1",
  "tinybox-core",
  "tinybox-jail",
  "tokio",
@@ -9126,13 +9126,13 @@ dependencies = [
 
 [[package]]
 name = "tinybox-jail"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "landlock",
  "log",
  "serde",
  "serde_json",
- "tinybox-bus 0.2.0",
+ "tinybox-bus 0.2.1",
  "tinybox-core",
  "tinybox-linux",
  "windows-sys 0.61.2",
@@ -9140,7 +9140,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-linux"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "tinybox-core",
@@ -9148,7 +9148,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-microvm"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "serde",
@@ -9158,12 +9158,12 @@ dependencies = [
 
 [[package]]
 name = "tinybox-module"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "log",
  "nix 0.31.3",
  "tempfile",
- "tinybox-bus 0.2.0",
+ "tinybox-bus 0.2.1",
  "tinybox-core",
  "tinybox-docker",
  "tinybox-drivers",
@@ -9183,7 +9183,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-ssh"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "tinybox-core",
