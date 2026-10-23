@@ -654,3 +654,54 @@ async fn a_catalogue_change_under_a_rendered_but_identical_prompt_carries_no_not
         "a catalogue change under a kept prompt is not a replaced prompt"
     );
 }
+
+#[tokio::test]
+async fn a_recorded_catalogue_is_not_read_as_a_replaced_prompt() {
+    // The thread recorded a permanent-tool catalogue beside its prompt, and
+    // the current prompt renders identical to the recorded one. Whether the
+    // catalogue is unchanged or names another tool now, the prompt was not
+    // replaced, so the user's message carries no note.
+    let spec = |name: &str| {
+        Arc::new(tinytools::ToolSpec {
+            name: name.into(),
+            description: "d".into(),
+            parameters: serde_json::json!({"type": "object"}),
+        })
+    };
+    let recorded = tinyagents_runtime::refresh_prefix(
+        &current(),
+        &[spec("A_TOOL")],
+        &["A_TOOL".to_string()].into(),
+        super::super::permanent::PERMANENT_TOOLS_MARKER,
+        "</openhuman-permanent-tools>",
+    )
+    .expect("a recorded catalogue");
+    for now in ["A_TOOL", "B_TOOL"] {
+        let root = tempfile::tempdir().expect("tempdir");
+        let prelude = prelude(root.path(), "current", true);
+        {
+            let mut surface = prelude
+                .tool_surface
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            surface.visible_tool_specs = Arc::new(vec![spec(now)]);
+            surface.permanent_tool_names = [now.to_string()].into();
+        }
+        let history = [Message::user("earlier"), Message::assistant("hello")];
+        let mut request = request();
+        prelude
+            .prepare_turn(
+                false,
+                &resumed(&recorded, &history),
+                &snapshot(4),
+                &mut request,
+            )
+            .await
+            .expect("prepared turn");
+        assert_eq!(
+            request.input.text(),
+            "hi",
+            "catalogue now names {now}: the prompt was not replaced"
+        );
+    }
+}

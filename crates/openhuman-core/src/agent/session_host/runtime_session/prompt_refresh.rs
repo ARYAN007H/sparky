@@ -29,9 +29,19 @@ use tinyagents_runtime::{
 };
 use tinyinference_llm::message::Message;
 
+use super::permanent::PERMANENT_TOOLS_MARKER;
 use super::OpenHumanTurnPrelude;
 use crate::agent::message_convert::{user_message_from_text, user_text_with_markers};
 use crate::agent::tinyagents::middleware::turn_context::TranscriptSnapshotSink;
+
+/// A prefix's messages without the permanent-tool catalogue, which the
+/// recorded prefix carries and a freshly rendered prompt does not.
+fn prompt_messages(prefix: &PrefixSnapshot) -> impl Iterator<Item = &Message> {
+    prefix
+        .messages()
+        .iter()
+        .filter(|message| !message.text().starts_with(PERMANENT_TOOLS_MARKER))
+}
 
 fn prompt_refresh_log_fields(prompt_changed: bool) -> (&'static str, &'static str) {
     if prompt_changed {
@@ -73,12 +83,13 @@ impl OpenHumanTurnPrelude {
             false
         };
         // Compared before the catalogue refresh below, which changes the
-        // prefix of a kept prompt too: only the rendered prompt itself counts.
+        // prefix of a kept prompt too, and without the catalogue the recorded
+        // prefix carries: only the rendered prompt itself counts.
         let changed = rendered
             && preparation
                 .prefix
                 .as_ref()
-                .is_some_and(|prefix| prefix.messages() != view.prefix.messages());
+                .is_some_and(|prefix| !prompt_messages(prefix).eq(prompt_messages(view.prefix)));
         self.refresh_permanent_prefix(&mut preparation, view.prefix);
         if let Some(prefix) = preparation.prefix.as_ref() {
             // The runtime sends `prefix` in place of the recorded one, so the
