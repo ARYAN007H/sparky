@@ -30,10 +30,17 @@ async fn an_out_of_credits_tool_failure_halts_with_bounded_copy_and_a_typed_caus
 
     assert_eq!(drain_pause_count(&handle), 1, "halts on the first failure");
     let summary = slot.lock().unwrap().clone().expect("a halt summary");
+    let start = summary
+        .find("Sub-agent inference failed")
+        .expect("the summary quotes the error");
+    let end = summary[start..]
+        .find("\n… [truncated]")
+        .map(|offset| start + offset)
+        .expect("the quoted error is cut at the halt bound");
+    let quoted = summary[start..end].chars().count();
     assert!(
-        summary.contains("[truncated]") && !summary.contains(&"x".repeat(601)),
-        "the quoted error is not cut to the halt bound: {} chars",
-        summary.chars().count()
+        quoted <= 600,
+        "the quoted error runs {quoted} chars, past the 600-char bound"
     );
 
     assert_eq!(
