@@ -158,3 +158,42 @@ async fn a_failed_release_write_keeps_the_lock_and_the_holding() {
     }
     a.release(grant).await.unwrap();
 }
+
+#[tokio::test]
+async fn acquire_rides_out_a_transient_inspection_lock() {
+    // The doctor's `holder_readonly` (often another process) checks liveness
+    // by taking the lock for an instant; an `acquire` landing in that window
+    // must not report the dead previous owner as the holder.
+    let dir = tempfile::tempdir().unwrap();
+    let key_dir = local_dir(dir.path(), "k");
+    fs::create_dir_all(&key_dir).unwrap();
+    fs::write(
+        key_dir.join(RECORD_FILE),
+        serde_json::to_vec(&LeaseRecord {
+            owner: "dead-node".into(),
+            endpoint: None,
+            epoch: 1,
+            expires_at_ms: u64::MAX,
+            released: false,
+        })
+        .unwrap(),
+    )
+    .unwrap();
+    let probe = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(key_dir.join(LOCK_FILE))
+        .unwrap();
+    probe.try_lock_exclusive().unwrap();
+    let release = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        FileExt::unlock(&probe).unwrap();
+    });
+
+    let grant = LocalLeases::new(dir.path(), "b").acquire("k", 0).await;
+    release.join().unwrap();
+    let grant = grant.expect("a probe-length lock must not refuse the acquire");
+    assert_eq!((grant.epoch, grant.previous_unclean), (2, true));
+}
