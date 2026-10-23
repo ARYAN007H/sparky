@@ -412,3 +412,46 @@ fn an_expired_session_is_skipped_without_broadcast_or_store_mutation() {
         );
     });
 }
+
+#[test]
+fn managed_inspection_catalog_maps_each_failure_status_to_its_variant() {
+    with_backend_env_test_lock(async {
+        let _registry = crate::registry_test_lock_async().await;
+        for (status, expected) in [
+            (StatusCode::FORBIDDEN, "AuthOrAccess"),
+            (StatusCode::NOT_FOUND, "NoCatalog"),
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failure"),
+            (StatusCode::BAD_GATEWAY, "Failure"),
+        ] {
+            let (base, server) = spawn_managed_backend(status).await;
+            let _env = BackendEnvSnapshot::set(&base);
+            let (_temp, config) = temporary_config(&base);
+            store_session(
+                &config,
+                "fixture-managed-session",
+                &base,
+                chrono::Utc::now() + chrono::Duration::hours(1),
+            );
+            let auth_file_before =
+                std::fs::read(auth_profiles_path(&config)).expect("session fixture");
+
+            let error = inspect_managed_catalog(config.clone())
+                .await
+                .expect_err("a non-2xx catalog answer is an error");
+
+            let variant = match error {
+                InspectionCatalogError::AuthOrAccess => "AuthOrAccess",
+                InspectionCatalogError::NoCatalog => "NoCatalog",
+                InspectionCatalogError::Failure => "Failure",
+                _ => "other",
+            };
+            assert_eq!(variant, expected, "status {status}");
+            assert_eq!(server.requests.load(Ordering::SeqCst), 1, "status {status}");
+            assert_eq!(
+                std::fs::read(auth_profiles_path(&config)).unwrap(),
+                auth_file_before,
+                "status {status}"
+            );
+        }
+    });
+}
