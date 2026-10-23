@@ -91,6 +91,7 @@ import {
   truncateMessagesFrom,
   updateThreadTitle,
 } from '../../store/threadSlice';
+import { userScopedStorage } from '../../store/userScopedStorage';
 import type { ConfirmationModal as ConfirmationModalType } from '../../types/intelligence';
 import type { ThreadMessage } from '../../types/thread';
 import { chatThreadPath } from '../../utils/chatRoutes';
@@ -110,7 +111,7 @@ import { StallWarning } from './aui/StallWarning';
 import { ThreadWorkspaceChip } from './aui/ThreadWorkspaceChip';
 import { useChatSurfaceRegistration } from './hooks/useChatSurfaceRegistration';
 import { useThreadArtifactsHydration } from './hooks/useThreadArtifactsHydration';
-import { useThreadDraft } from './hooks/useThreadDraft';
+import { draftStorageKey, useThreadDraft } from './hooks/useThreadDraft';
 import { ThreadList } from './threadList/ThreadList';
 import { useThreadPins } from './threadList/useThreadPins';
 import { useUnreadThreads } from './threadList/useUnreadThreads';
@@ -287,6 +288,10 @@ const Conversations = ({
   // Per-thread, reload-surviving draft (`useThreadDraft`): switching threads
   // swaps it instead of carrying half-typed text into the next conversation.
   const [inputValue, setInputValue] = useThreadDraft(selectedThreadId ?? null);
+  // The live selection, for async send paths that finish after the user may
+  // have switched threads.
+  const selectedThreadIdRef = useRef(selectedThreadId);
+  selectedThreadIdRef.current = selectedThreadId;
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   // Failed sends retain their attachments by originating thread. A send may
   // reject after the user has navigated elsewhere, so restoring into the
@@ -1306,13 +1311,6 @@ const Conversations = ({
         // A corrected retry must replace the already-persisted failed prompt;
         // appending it would leave both prompts in the transcript. The edit
         // operation truncates the failed tail and starts the corrected turn.
-        await editMessage({
-          threadId: sendingThreadId,
-          messageId: previousFailedMessage.id,
-          content: messageText,
-        });
-        // Only once the core accepted the edit: a failed edit leaves the
-        // failed prompt in the core, so the transcript must keep it too.
         dispatch(
           truncateMessagesFrom({
             threadId: sendingThreadId,
@@ -1320,6 +1318,11 @@ const Conversations = ({
             inclusive: true,
           })
         );
+        await editMessage({
+          threadId: sendingThreadId,
+          messageId: previousFailedMessage.id,
+          content: messageText,
+        });
         setInputValue('');
         setAttachments([]);
         attachmentsRef.current = [];
@@ -1350,14 +1353,17 @@ const Conversations = ({
       }
       const msg = error instanceof Error ? error.message : String(error);
       setSendError(chatSendError('cloud_send_failed', msg));
-      // assistant-ui already cleared the composer; restore the draft so a
-      // failed persist or edit doesn't lose what the user typed.
-      preserveSendErrorForRestoredDraftRef.current = true;
+      // assistant-ui already cleared the composer; give the draft back to its
+      // own thread so a failed persist doesn't lose what the user typed.
       failedAttachmentsByThreadRef.current.set(sendingThreadId, pendingAttachments);
-      setInputValue(normalized);
-      if (selectedThreadId === sendingThreadId) {
+      if (selectedThreadIdRef.current === sendingThreadId) {
+        preserveSendErrorForRestoredDraftRef.current = true;
+        setInputValue(normalized);
         attachmentsRef.current = pendingAttachments.slice();
         setAttachments(pendingAttachments);
+      } else {
+        // The user moved on: keep it as that thread's draft, not this one's.
+        void userScopedStorage.setItem(draftStorageKey(sendingThreadId), normalized);
       }
       pendingSendsRef.current.delete(sendingThreadId);
       removePendingSendingThread(sendingThreadId);
@@ -1367,6 +1373,7 @@ const Conversations = ({
     setAttachments([]);
     attachmentsRef.current = [];
     failedAttachmentsByThreadRef.current.delete(sendingThreadId);
+    persistedFailedMessageByThreadRef.current.delete(sendingThreadId);
     setSendError(null);
     setAttachError(null);
     // Silence watchdog: fires only if 120s pass without ANY inference signal
@@ -1400,10 +1407,6 @@ const Conversations = ({
         send_mode: 'standard',
         has_attachments: pendingAttachments.length > 0,
       });
-      // Only a send the core accepted retires the persisted prompt; after a
-      // failed send it stays, so a corrected retry replaces it (edit) instead
-      // of appending a second copy.
-      persistedFailedMessageByThreadRef.current.delete(sendingThreadId);
       // Backend accepted the send; lifecycle ('started' → 'streaming') now
       // owns the `isSending` UI lock. Release the pending guard so the next
       // user turn isn't blocked by a stale ref/state.
