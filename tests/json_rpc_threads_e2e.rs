@@ -908,6 +908,9 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
         .await
         .expect("load test config");
     assert_eq!(config.workspace_dir, workspace);
+    openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
+        &config.workspace_dir,
+    );
     let backend = openhuman_core::storage::local::backend_for(&config.workspace_dir)
         .expect("open test workspace storage");
     let reports = openhuman_core::storage::import::sessions::run_with(&backend, &config);
@@ -922,7 +925,7 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
         "import classic session transcripts: {reports:?}"
     );
     let imported = openhuman_core::storage::sessions::provider_for_workspace(&config.workspace_dir)
-        .for_agent("default");
+        .for_agent("orchestrator");
     let spend = tinyagents_session::transcript::spend::thread_spend_in(
         imported.transcripts.as_ref(),
         "thr-e2e",
