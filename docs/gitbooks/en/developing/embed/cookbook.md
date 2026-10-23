@@ -88,9 +88,9 @@ Run: `cargo run -p openhuman-embed --release --example linux_fleet --no-default-
 
 Connect an actual MCP protocol stub over loopback.
 
-[Source](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/examples/mcp.rs) · offline with loopback stubs; no live path. · feature: mcp
+[Source](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/examples/mcp.rs) · offline with loopback stubs; no live path. · feature: mcp,storage-sqlite
 
-Run: `cargo run -p openhuman-embed --example mcp --features mcp`
+Run: `cargo run -p openhuman-embed --example mcp --features mcp,storage-sqlite`
 
 ## Tenant scoped memory facade with an in-memory engine
 
