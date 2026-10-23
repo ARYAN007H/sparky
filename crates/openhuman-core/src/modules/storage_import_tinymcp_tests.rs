@@ -371,7 +371,7 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
         &current_turn,
         module_scope,
     )
-    .unwrap_or_else(|error| panic!("captured import claim failed: {error:#}"));
+    .unwrap();
     // The capture retains the profile object as long as its claim/payload
     // closure owns it. Its backend is the exact context's fence wrapper.
     let _scoped = captured.backend.for_scope(&captured.scope).unwrap();
@@ -506,6 +506,6 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
             })
         },
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("captured import claim failed: {error:#}"));
     assert_eq!(attempt, Some(()));
 }
