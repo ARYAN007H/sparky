@@ -79,7 +79,10 @@ fn lock_past_probes(file: &File, key: &str, node: &str) -> io::Result<()> {
         match file.try_lock_exclusive() {
             Err(error) if is_contended(&error) && retries + 1 < PROBE_ATTEMPTS => {
                 #[cfg(test)]
-                CONTENDED_ATTEMPTS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                CONTENDED_KEYS
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .push(key.to_string());
                 retries += 1;
                 std::thread::sleep(PROBE_WAIT);
             }
@@ -99,10 +102,10 @@ fn lock_past_probes(file: &File, key: &str, node: &str) -> io::Result<()> {
     result
 }
 
-/// Contended attempts `lock_past_probes` has retried, so a test can release
-/// its stand-in probe lock only once `acquire` has actually met it.
+/// Keys whose contended lock `lock_past_probes` retried, so a test can
+/// release its stand-in probe lock only once its own `acquire` has met it.
 #[cfg(test)]
-static CONTENDED_ATTEMPTS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static CONTENDED_KEYS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 impl LocalLeases {
     /// Leases under `root` for `node`.
