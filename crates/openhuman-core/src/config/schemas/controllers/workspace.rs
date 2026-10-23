@@ -162,7 +162,13 @@ async fn resolve_data_paths(
         user_id.is_some()
     );
     match user_id.as_deref() {
-        Some(id) => config_rpc::get_data_paths_for_user(id).await,
+        Some(id) => {
+            // The id picks the profile, but the loaded layout decides whether a
+            // per-user clear applies at all: a legacy root or a workspace
+            // outside `users/` is refused here too, not silently skipped.
+            config_rpc::get_data_paths_to_clear(ctx).await?;
+            config_rpc::get_data_paths_for_user(id).await
+        }
         None => config_rpc::get_data_paths_to_clear(ctx).await,
     }
 }

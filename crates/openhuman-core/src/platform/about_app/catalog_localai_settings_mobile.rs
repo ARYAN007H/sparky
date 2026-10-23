@@ -209,7 +209,7 @@ Capability {
         name: "Log Out and Clear App Data",
         domain: "settings",
         category: CapabilityCategory::Settings,
-        description: "Sign out and permanently clear local app data, including workflow data.",
+        description: "Sign out and permanently clear the signed-in account's local app data, including workflow data. Other accounts on the device are kept. Not available on the legacy single-folder data layout.",
         how_to: "Settings > Log Out & Clear App Data",
         status: CapabilityStatus::Stable,
         privacy: None,
