@@ -245,7 +245,17 @@ fn host(tmp: &tempfile::TempDir, max_open: usize, idle_secs: u64) -> ProfileHost
     let mut saas = SaasConfig::new(tmp.path());
     saas.max_profiles_open = max_open;
     saas.idle_evict_secs = idle_secs;
-    ProfileHost::new(saas, CoreContext::for_test(DomainSet::full(), None))
+    let backend_path = tmp.path().join("profile-storage");
+    let backend_url = format!("sqlite:{}", backend_path.display());
+    let backend =
+        crate::storage::block_on_anyhow(async { crate::storage::open(&backend_url).await })
+            .expect("profile test SQLite backend opens");
+    ProfileHost::with_backend(
+        saas,
+        CoreContext::for_test(DomainSet::full(), None),
+        Some(backend),
+    )
+    .expect("profile test host uses conditional SQLite leases")
 }
 
 fn profile(name: &str) -> ProfileId {

@@ -45,13 +45,6 @@ pub(super) async fn reconcile_cron_admission(
     id: &ProfileId,
     backend: Option<&Arc<dyn crate::storage::StorageBackend>>,
 ) -> Result<(), String> {
-    // A profile's fenced cron writes require atomic storage conditions. The
-    // default unit-test backend intentionally lacks them, so use the same
-    // persistent SQLite default as production when no host backend is set.
-    #[cfg(all(test, feature = "storage-sqlite"))]
-    if backend.is_none() && crate::storage::installed().is_none() {
-        crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
-    }
     let profile_scope = crate::storage::scope_for_profile(id.as_str());
     let scope = match backend {
         Some(backend) => crate::cron::documents_port::DocScope::on_backend(
