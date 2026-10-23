@@ -141,7 +141,7 @@ fn tinyjuice_reaches_only_its_blob_prefix() {
         &grant,
         Object::Blobs,
         "Get",
-        json!({"key": "tinyjuice_ccr/abc"})
+        json!({"key": "tinyjuice_ccr_private/abc"})
     ));
 }
 
