@@ -68,6 +68,8 @@ pub(crate) mod module_client;
 #[cfg(all(test, feature = "mcp"))]
 #[path = "test_module_port.rs"]
 mod test_module_port;
+#[cfg(all(test, feature = "mcp"))]
+pub(crate) use test_module_port::install as install_test_module_port;
 
 mod host_cleanup;
 
