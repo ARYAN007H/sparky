@@ -86,7 +86,10 @@ describe('<SystemDiagnostics /> doctor report', () => {
     callCoreRpc.mockResolvedValueOnce({
       result: {
         ...report,
-        findings: [{ ...report.findings[1], severity: 'critical', message: 'From a newer core.' }],
+        findings: [
+          { ...report.findings[1], severity: 'critical', message: 'From a newer core.' },
+          { ...report.findings[1], severity: 'constructor', message: 'Prototype-named severity.' },
+        ],
       },
       logs: [],
     });
@@ -96,6 +99,8 @@ describe('<SystemDiagnostics /> doctor report', () => {
 
     expect(await screen.findByText('From a newer core.')).toBeInTheDocument();
     expect(screen.getByText('critical')).toBeInTheDocument();
+    expect(screen.getByText('Prototype-named severity.')).toBeInTheDocument();
+    expect(screen.getByText('constructor')).toBeInTheDocument();
   });
 
   it('requests the live tier only after the user confirms the token warning', async () => {

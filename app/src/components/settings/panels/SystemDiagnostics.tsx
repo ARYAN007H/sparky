@@ -250,8 +250,15 @@ const DoctorRow = () => {
                     key={`${finding.check_id}:${finding.severity}:${index}`}
                     className="rounded-lg border border-line-subtle p-3">
                     <div className="flex flex-wrap items-start gap-2">
-                      <Badge variant={severityBadge[finding.severity] ?? 'neutral'}>
-                        {finding.severity in severityBadge
+                      {/* Own-property check: an unknown severity such as
+                          `constructor` must not hit Object.prototype. */}
+                      <Badge
+                        variant={
+                          Object.hasOwn(severityBadge, finding.severity)
+                            ? severityBadge[finding.severity]
+                            : 'neutral'
+                        }>
+                        {Object.hasOwn(severityBadge, finding.severity)
                           ? t(`${textKey}.severity.${finding.severity}`)
                           : String(finding.severity)}
                       </Badge>
