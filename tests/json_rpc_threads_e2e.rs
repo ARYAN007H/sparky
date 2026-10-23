@@ -840,7 +840,7 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
     let jsonl = format!(
         "{}\n{}\n{}\n{}\n{}\n",
         json!({"_meta": {
-            "agent": "main", "dispatcher": "native",
+            "agent": "orchestrator", "dispatcher": "native",
             "created": "2026-04-11T14:30:00Z", "updated": "2026-04-11T14:35:22Z",
             "turn_count": 2, "input_tokens": 0, "output_tokens": 0,
             "cached_input_tokens": 0, "charged_amount_usd": 0.0, "thread_id": "thr-e2e"
@@ -856,7 +856,9 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
             "usage": {"input": 350, "output": 80, "cached_input": 40, "cost_usd": 0.0009},
             "ts": "2026-04-11T14:35:22Z"}),
     );
-    std::fs::write(raw.join("1700000000_main.jsonl"), jsonl).expect("write transcript");
+    let root_stem = "thr-e2e.orchestrator";
+    std::fs::write(raw.join(format!("{root_stem}.jsonl")), jsonl)
+        .expect("write transcript");
 
     // A sub-agent transcript (stem contains `__`) for the SAME thread: a `coder`
     // archetype. Its message carries NO model (mirroring how sub-agent
@@ -894,7 +896,7 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
             "ts": "2026-04-11T14:34:00Z"}),
     );
     std::fs::write(
-        raw.join("1700000000_main__1700000050_coder.jsonl"),
+        raw.join(format!("{root_stem}__1700000050_coder.jsonl")),
         sub_jsonl,
     )
     .expect("write subagent transcript");
