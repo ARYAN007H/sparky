@@ -397,13 +397,6 @@ fn decode_display_message(
         message.parts = None;
         if row_version < TYPED_ROW_VERSION {
             message = message.normalized();
-            // Before typed rows, call declarations lived in the legacy
-            // `tool_calls` field and must be projected back onto the message
-            // so the paired tool result can be resumed. Keep the copy in
-            // TurnUsage below as well for usage and display projections.
-            if message.tool_calls.is_empty() {
-                message.tool_calls = usage_tool_calls.clone();
-            }
         }
     }
     if message.role.is_empty() {
