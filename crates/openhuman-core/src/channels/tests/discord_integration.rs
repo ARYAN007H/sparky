@@ -23,12 +23,12 @@
 //!      ever reverts to calling `run_tool_call_loop` directly, this test
 //!      starts failing.
 
-use super::super::Channel;
 use super::super::context::{
-    CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext, conversation_history_key,
+    conversation_history_key, ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
 use super::super::runtime::process_channel_message;
-use super::common::{HistoryCaptureModel, channel_envelope};
+use super::super::Channel;
+use super::common::{channel_envelope, HistoryCaptureModel};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};

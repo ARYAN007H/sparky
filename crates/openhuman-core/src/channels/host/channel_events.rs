@@ -1,12 +1,12 @@
 //! Host-owned approval routing and turn events over the channel module.
-use crate::channels::{Channel, outbound::text_message};
+use crate::channels::{outbound::text_message, Channel};
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tinybus::EventHandler;
 use tinybus::module::ModuleClient;
+use tinybus::EventHandler;
 
 #[derive(Clone)]
 struct ReplyContext {

@@ -23,12 +23,9 @@ pub(super) fn import_parent_epoch(
             .await?;
         let value = serde_json::to_value(ParentEpochRecord { parent_epoch })
             .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
-        crate::storage::documents::update_or_insert(
-            &documents,
-            EPOCHS,
-            &session_id,
-            move |_| Some(value.clone()),
-        )
+        crate::storage::documents::update_or_insert(&documents, EPOCHS, &session_id, move |_| {
+            Some(value.clone())
+        })
         .await?;
         Ok(())
     })

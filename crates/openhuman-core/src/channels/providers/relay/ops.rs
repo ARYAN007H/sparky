@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use super::channel::RelayChannel;
 use super::params::RelayInboundParams;
@@ -11,8 +11,8 @@ use super::store::{self, Recorded};
 use crate::channels::context::MAX_CHANNEL_HISTORY;
 use crate::channels::outbound::text_message;
 use crate::channels::runtime::{
-    PromptToolDescs, RuntimeChannelMessage, build_channel_turn_parts, prepare_runtime_limits,
-    process_channel_runtime_message, runtime_context,
+    build_channel_turn_parts, prepare_runtime_limits, process_channel_runtime_message,
+    runtime_context, PromptToolDescs, RuntimeChannelMessage,
 };
 use crate::config::Config;
 use crate::core::Outcome;

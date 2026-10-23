@@ -1,5 +1,5 @@
 use super::*;
-use crate::core::runtime::{ContextOverlay, DispatchCtx, DomainSet, context::CoreContext};
+use crate::core::runtime::{context::CoreContext, ContextOverlay, DispatchCtx, DomainSet};
 use serde_json::json;
 
 #[tokio::test]

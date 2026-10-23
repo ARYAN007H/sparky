@@ -78,13 +78,11 @@ async fn loader_records_legacy_inference_url_migration() {
         .await
         .unwrap();
 
-    assert!(
-        config
-            .load_diagnostics()
-            .migrated_keys
-            .iter()
-            .any(|key| key == "api_url")
-    );
+    assert!(config
+        .load_diagnostics()
+        .migrated_keys
+        .iter()
+        .any(|key| key == "api_url"));
     assert_eq!(
         config.inference_url.as_deref(),
         Some("https://example.test/v1/chat/completions")
@@ -99,10 +97,8 @@ fn default_config_has_empty_load_diagnostics() {
     assert!(config.load_diagnostics().parse_error.is_none());
     assert_eq!(config.load_diagnostics().fallback, ConfigLoadFallback::None);
     assert!(config.load_diagnostics().migrated_keys.is_empty());
-    assert!(
-        serde_json::to_value(&config)
-            .unwrap()
-            .get("load_diagnostics")
-            .is_none()
-    );
+    assert!(serde_json::to_value(&config)
+        .unwrap()
+        .get("load_diagnostics")
+        .is_none());
 }

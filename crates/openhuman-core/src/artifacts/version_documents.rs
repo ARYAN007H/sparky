@@ -29,10 +29,10 @@ use serde_json::Value;
 use tiny_artifacts::{ArtifactRecord, ArtifactStore};
 use tinystoragedrivers::{CollectionSpec, Precondition, Query, Sort};
 
-use super::storage_schema::{VERSIONS, version_body, version_record};
-use crate::storage::DocumentStoreExt;
+use super::storage_schema::{version_body, version_record, VERSIONS};
 use crate::storage::documents::Repo;
 use crate::storage::schema_support::key_of;
+use crate::storage::DocumentStoreExt;
 const DOMAIN: &str = "artifacts::versions";
 
 fn collections() -> Vec<CollectionSpec> {

@@ -6,7 +6,7 @@ use serde_json::{Map, Value};
 use crate::config::rpc as config_rpc;
 use crate::core::all::ControllerFuture;
 
-use super::super::helpers::{ComposioTriggerSettingsUpdate, deserialize_params, to_json};
+use super::super::helpers::{deserialize_params, to_json, ComposioTriggerSettingsUpdate};
 
 pub(super) fn handle_update_search_settings(
     ctx: DispatchCtx,

@@ -23,7 +23,7 @@ use std::sync::Arc;
 
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::store::Store;
-use tinyagents_harness_tools::scratchpad::{ClosedPlan, store as scratchpad_store};
+use tinyagents_harness_tools::scratchpad::{store as scratchpad_store, ClosedPlan};
 use tinyagents_harness_tools::state_block::StateBlockMiddleware;
 
 /// Whether a turn gets the run-state block.

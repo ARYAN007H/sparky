@@ -1,6 +1,6 @@
 //! Tests for the surrounding module.
 
-use super::{AuthStyle, builtin_cloud_providers, builtin_presets, is_slug_reserved};
+use super::{builtin_cloud_providers, builtin_presets, is_slug_reserved, AuthStyle};
 use tinyinference_providers::builtin::endpoint_host;
 
 #[test]
@@ -186,10 +186,8 @@ fn hosted_presets_and_classification_are_context_scoped() {
             "host additions must not replace a generic provider"
         );
         assert!(super::builtin_presets().host_is_builtin_cloud_provider("tenant.example"));
-        assert!(
-            super::builtin_presets()
-                .endpoint_host_is_chat_completions_only("https://tenant.example/v1")
-        );
+        assert!(super::builtin_presets()
+            .endpoint_host_is_chat_completions_only("https://tenant.example/v1"));
         assert!(super::builtin_cloud_provider("tenant-hosted").is_some());
         assert!(super::is_hosted_cloud_identity("tenant-hosted"));
         assert!(!super::is_hosted_auth_style(AuthStyle::Bearer));
@@ -285,10 +283,8 @@ fn host_is_builtin_cloud_provider_recognises_inference_hosts() {
 /// the slug is not builtin.
 #[test]
 fn nvidia_host_is_chat_completions_only_regardless_of_slug() {
-    assert!(
-        builtin_presets()
-            .endpoint_host_is_chat_completions_only("https://integrate.api.nvidia.com/v1")
-    );
+    assert!(builtin_presets()
+        .endpoint_host_is_chat_completions_only("https://integrate.api.nvidia.com/v1"));
     // Other chat-only built-in hosts too.
     for endpoint in [
         "https://api.deepseek.com/v1",
@@ -363,11 +359,9 @@ fn generated_provider_ids_sanitize_and_bound_the_slug_prefix() {
     assert!(id.starts_with("p_provider_with_spaces_"));
     let suffix = id.rsplit('_').next().expect("suffix");
     assert_eq!(suffix.len(), 5);
-    assert!(
-        suffix
-            .chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
-    );
+    assert!(suffix
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()));
 }
 
 #[test]

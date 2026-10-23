@@ -1,7 +1,7 @@
 //! Controller registry for the `config` namespace: schema list and handler wiring.
 
-use crate::core::ControllerSchema;
 use crate::core::all::RegisteredController;
+use crate::core::ControllerSchema;
 
 use super::super::schema_defs::schemas;
 use super::agent::{

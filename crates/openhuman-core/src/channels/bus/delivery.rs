@@ -8,7 +8,7 @@ use tinychannels_bus::module_progressive::{
     ProgressiveCommand, ProgressiveEvent, ProgressiveResult, ProgressiveTransportRequest,
     ProgressiveTransportResult,
 };
-use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult, methods};
+use tinychannels_bus::{methods, ChannelBackendRequest, ChannelBackendResult};
 
 fn request_channel(request: &ProgressiveTransportRequest) -> &str {
     match request {

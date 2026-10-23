@@ -121,10 +121,9 @@ impl TenantSessionStores {
         let tenant_for_conditioned_factory = tenant.clone();
         let conditioned_factory: ConditionedAgentStorageFactory =
             Arc::new(move |agent_id, condition| {
-                let owner_scope = crate::storage::scope::Scope::new(
-                    tenant_for_conditioned_factory.as_str(),
-                )?
-                .agent(agent_id)?;
+                let owner_scope =
+                    crate::storage::scope::Scope::new(tenant_for_conditioned_factory.as_str())?
+                        .agent(agent_id)?;
                 let scope = PortScope::new(owner_scope.as_str())?;
                 let storage = backend.for_scope_conditioned(&owner_scope, condition)?;
                 Ok(ScopedStorage::new(storage, scope))

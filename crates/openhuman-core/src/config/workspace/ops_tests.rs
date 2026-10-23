@@ -1,6 +1,6 @@
 use super::*;
-use crate::config::TEST_ENV_LOCK as ENV_LOCK;
 use crate::config::test_env::EnvVarGuard;
+use crate::config::TEST_ENV_LOCK as ENV_LOCK;
 use crate::core::runtime::DispatchCtx;
 use tempfile::tempdir;
 

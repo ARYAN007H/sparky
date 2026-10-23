@@ -51,10 +51,9 @@ use controllers::{
 };
 #[cfg(test)]
 use helpers::{
-    AutonomySettingsUpdate, DEFAULT_ONBOARDING_FLAG_NAME, LocalAiSettingsUpdate,
-    MemorySettingsUpdate, ModelSettingsUpdate, OnboardingCompletedSetParams,
-    SetBrowserAllowAllParams, WorkspaceOnboardingFlagParams, WorkspaceOnboardingFlagSetParams,
-    deserialize_params,
+    deserialize_params, AutonomySettingsUpdate, LocalAiSettingsUpdate, MemorySettingsUpdate,
+    ModelSettingsUpdate, OnboardingCompletedSetParams, SetBrowserAllowAllParams,
+    WorkspaceOnboardingFlagParams, WorkspaceOnboardingFlagSetParams, DEFAULT_ONBOARDING_FLAG_NAME,
 };
 #[cfg(test)]
 use serde_json::{Map, Value};

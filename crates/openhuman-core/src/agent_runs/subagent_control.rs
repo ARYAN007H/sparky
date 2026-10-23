@@ -15,12 +15,12 @@
 //! cancelled.
 
 use crate::core::runtime::DispatchCtx;
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 
 use crate::agent::orchestration::running_subagents::CancelledSubagent;
 use crate::agent::orchestration::{background_completions, running_subagents, subagent_sessions};
-use crate::core::Outcome;
 use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 /// Controller schemas exposed for detached sub-agent control.

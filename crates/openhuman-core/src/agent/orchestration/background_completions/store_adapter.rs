@@ -29,9 +29,7 @@ impl tinyagents_storage_kit::StorageBackend for CompletionBackend {
         condition: &tinyagents_storage_kit::WriteCondition,
     ) -> tinyagents_storage_kit::error::Result<tinyagents_storage_kit::ScopedStorage> {
         let host_scope = crate::storage::Scope::new(scope.as_str())?;
-        let storage = self
-            .0
-            .for_scope_conditioned(&host_scope, condition)?;
+        let storage = self.0.for_scope_conditioned(&host_scope, condition)?;
         Ok(tinyagents_storage_kit::ScopedStorage::new(
             storage,
             scope.clone(),
@@ -81,7 +79,7 @@ pub(in crate::agent::orchestration) fn open_driver_store(
             scope,
             fallback,
         )
-            .map_err(|error| anyhow::anyhow!("open the completion store: {error}"))
+        .map_err(|error| anyhow::anyhow!("open the completion store: {error}"))
     })
 }
 

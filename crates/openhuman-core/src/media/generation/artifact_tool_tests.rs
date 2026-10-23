@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::path::Path;
 use std::sync::Arc;
 use tinyagents_harness::media::MediaOutput;
@@ -8,7 +8,7 @@ use tinystoragedrivers_api::BlobStore;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolContent, ToolResult};
 
 use super::{
-    MediaArtifactTool, OpenHumanArtifactFiling, copy_blob_to_file, has_reusable_files_reference,
+    copy_blob_to_file, has_reusable_files_reference, MediaArtifactTool, OpenHumanArtifactFiling,
 };
 use crate::artifacts::{ArtifactKind, ArtifactStatus, FileRoots};
 
@@ -65,11 +65,10 @@ async fn artifact_history_refresh_failure_fails_closed_for_cached_files() {
     .with_reference_allowlist(Arc::clone(&allowed));
 
     assert!(allowed.lock().unwrap().contains(&replacement));
-    assert!(
-        tool.execute(json!({ "references": [replacement.to_string_lossy()] }))
-            .await
-            .is_err()
-    );
+    assert!(tool
+        .execute(json!({ "references": [replacement.to_string_lossy()] }))
+        .await
+        .is_err());
 }
 
 /// A minimal stand-in for `GenerateImageTool` / `GenerateVideoTool`: writes
@@ -211,13 +210,11 @@ async fn files_a_blob_backed_generated_artifact() {
         Some(format!("Saved image at {}\nCost: $0.01", canonical_file.display()).as_str())
     );
     assert_eq!(std::fs::read(&file).unwrap(), b"blob-media-bytes");
-    assert!(
-        blobs
-            .get("generated-media/stub-0.png")
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(blobs
+        .get("generated-media/stub-0.png")
+        .await
+        .unwrap()
+        .is_none());
 
     let (_, failed_file) = crate::artifacts::create_artifact_for_call(
         &workspace,
@@ -280,15 +277,13 @@ async fn files_a_blob_backed_generated_artifact() {
         "failed regeneration retains the previous non-empty file"
     );
     fresh.refresh_allowed_references().await.unwrap();
-    assert!(
-        !fresh
-            .allowed_references
-            .as_ref()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .contains(&canonical_file)
-    );
+    assert!(!fresh
+        .allowed_references
+        .as_ref()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .contains(&canonical_file));
 }
 
 #[tokio::test]
@@ -432,11 +427,10 @@ async fn files_every_artifact_when_n_greater_than_one() {
             .await
             .expect("artifact metadata is persisted");
         assert_eq!(meta.status, ArtifactStatus::Ready);
-        assert!(
-            meta.file
-                .as_deref()
-                .is_some_and(|file| std::path::Path::new(file).exists())
-        );
+        assert!(meta
+            .file
+            .as_deref()
+            .is_some_and(|file| std::path::Path::new(file).exists()));
     }
 }
 

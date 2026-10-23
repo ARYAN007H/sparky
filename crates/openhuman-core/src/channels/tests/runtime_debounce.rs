@@ -1,15 +1,15 @@
+use super::super::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
+use super::super::runtime::{run_message_dispatch_loop, RuntimeChannelMessage};
 use super::super::Channel;
-use super::super::context::{CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext};
-use super::super::runtime::{RuntimeChannelMessage, run_message_dispatch_loop};
-use super::common::{RecordingChannel, SlowModel, TelegramRecordingChannel, channel_envelope};
-use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, mock_agent_run_turn};
+use super::common::{channel_envelope, RecordingChannel, SlowModel, TelegramRecordingChannel};
+use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::config::InboundDebounceConfig;
 use crate::core::bus_testing::MockBusGuard;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::sync::{Notify, mpsc};
+use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinHandle;
 
 #[derive(Default)]
@@ -251,16 +251,12 @@ async fn messages_during_a_running_turn_become_one_follow_up_that_sees_its_histo
     assert_eq!(turns.peak.load(Ordering::SeqCst), 1);
     assert!(turns.last_user(1).ends_with("second\nthird"));
     let history = turns.history(1);
-    assert!(
-        history
-            .iter()
-            .any(|(role, content)| role == "assistant" && content == "reply 1")
-    );
-    assert!(
-        history
-            .iter()
-            .any(|(role, content)| role == "user" && content.ends_with("first"))
-    );
+    assert!(history
+        .iter()
+        .any(|(role, content)| role == "assistant" && content == "reply 1"));
+    assert!(history
+        .iter()
+        .any(|(role, content)| role == "user" && content.ends_with("first")));
     run.finish().await;
     assert_eq!(channel.sent_messages.lock().await.len(), 2);
 }

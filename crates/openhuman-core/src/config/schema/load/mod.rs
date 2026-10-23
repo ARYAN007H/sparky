@@ -27,10 +27,11 @@ mod diagnostics_tests;
 pub use active_workspace::active_workspace_dir_cached;
 pub(crate) use active_workspace::invalidate_active_workspace;
 pub use dirs::{
-    PRE_LOGIN_USER_ID, action_dir_env_override, active_user_marker_path, active_workspace_dir,
+    action_dir_env_override, active_user_marker_path, active_workspace_dir,
     active_workspace_snapshot, clear_active_user, default_action_dir, default_files_dir,
     default_projects_dir, default_root_openhuman_dir, pre_login_user_dir, read_active_user_id,
     resolve_action_dir, resolve_files_dir, user_openhuman_dir, write_active_user_id,
+    PRE_LOGIN_USER_ID,
 };
 
 // redact_url_for_log is pub(super) for the schema module; tests inside load
@@ -45,8 +46,8 @@ pub(super) use migrate::redact_url_for_log;
 pub(crate) use impl_load::CONFIG_OWNER_MISMATCH_MARKER;
 pub(crate) use migrate::apply_loaded_config_migrations;
 pub(crate) use provenance::{
-    ConfigProvenance, DotenvLoadProvenance, ProvenanceSource, ValueProvenance, current_dotenv_load,
-    dotenv_loaded_variable, set_current_dotenv_load,
+    current_dotenv_load, dotenv_loaded_variable, set_current_dotenv_load, ConfigProvenance,
+    DotenvLoadProvenance, ProvenanceSource, ValueProvenance,
 };
 
 // Items needed by load_tests.rs (loaded as `mod tests` below).
@@ -63,7 +64,7 @@ pub(crate) use dirs::read_active_user_id_checked;
 // holds `auth-profiles.json`.
 pub(crate) use dirs::resolve_config_dir_for_workspace;
 pub(crate) use dirs::{
-    ConfigResolutionSource, load_persisted_workspace_dirs, read_active_user_id_checked_async,
+    load_persisted_workspace_dirs, read_active_user_id_checked_async, ConfigResolutionSource,
 };
 #[cfg(test)]
 pub(crate) use dirs::{resolve_runtime_config_dirs, resolve_runtime_config_dirs_with};

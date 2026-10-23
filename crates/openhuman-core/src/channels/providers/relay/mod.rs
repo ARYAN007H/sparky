@@ -26,10 +26,10 @@ mod params;
 mod schemas;
 mod store;
 
-pub use channel::{CHANNEL_OUTBOUND_EVENT, RelayChannel};
+pub use channel::{RelayChannel, CHANNEL_OUTBOUND_EVENT};
 pub use ops::channel_relay_inbound;
 pub use params::{
-    DEFAULT_RELAY_CLIENT_ID, MAX_CHANNEL_LEN, MAX_ID_LEN, MAX_SENDER_NAME_CHARS, MAX_TEXT_BYTES,
-    RESERVED_CHANNELS, RelayInboundParams, validate_channel, validate_id,
+    validate_channel, validate_id, RelayInboundParams, DEFAULT_RELAY_CLIENT_ID, MAX_CHANNEL_LEN,
+    MAX_ID_LEN, MAX_SENDER_NAME_CHARS, MAX_TEXT_BYTES, RESERVED_CHANNELS,
 };
 pub use schemas::{all_relay_controller_schemas, all_relay_registered_controllers};

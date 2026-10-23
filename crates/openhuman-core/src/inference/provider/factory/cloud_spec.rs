@@ -9,8 +9,8 @@
 //! provider with a custom CA bundle.
 
 use super::*;
-use tinyinference_llm::providers::openai::AuthStyle as CompatAuthStyle;
 use tinyinference_llm::providers::openai::codex::OpenAiCodexRouting;
+use tinyinference_llm::providers::openai::AuthStyle as CompatAuthStyle;
 use tinyinference_llm::providers::registry::{ProviderBuildOptions, ProviderRegistry};
 use tinyinference_llm::{ProviderKind, ProviderSpec};
 

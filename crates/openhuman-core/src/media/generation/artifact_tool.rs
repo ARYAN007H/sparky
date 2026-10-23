@@ -9,7 +9,7 @@ use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
 use futures_util::StreamExt;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinyagents_harness_tools::media::{
     ArtifactFiling, FiledArtifact, GeneratedArtifact, MediaArtifactKind, MediaInnerFactory,
     MediaProgressFn,
@@ -20,8 +20,8 @@ use tinytools::{
 };
 use tokio::io::AsyncWriteExt;
 
-use crate::artifacts::ArtifactKind;
 use crate::artifacts::production::Production;
+use crate::artifacts::ArtifactKind;
 use tinystoragedrivers_api::BlobStore;
 
 /// A host adapter that retains OpenHuman artifact behavior while delegating
@@ -121,9 +121,9 @@ impl<T: Tool + 'static> MediaArtifactTool<T> {
     pub fn with_per_call_inner(
         self,
         build: impl for<'a> Fn(MediaProgressFn, Option<&'a dyn ToolRunContext>) -> T
-        + Send
-        + Sync
-        + 'static,
+            + Send
+            + Sync
+            + 'static,
     ) -> Self {
         let Self {
             inner,

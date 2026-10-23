@@ -110,7 +110,7 @@ async fn reachable_probe_false_when_no_server() {
 
 #[tokio::test]
 async fn reachable_probe_true_for_2xx_server() {
-    use axum::{Router, routing::get};
+    use axum::{routing::get, Router};
     use tokio::net::TcpListener;
 
     let app = Router::new().route("/api/tags", get(|| async { "{\"models\":[]}" }));

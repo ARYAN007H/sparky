@@ -1,5 +1,5 @@
-use serde::Deserialize;
 use serde::de::{DeserializeOwned, Deserializer};
+use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use crate::core::Outcome;

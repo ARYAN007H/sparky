@@ -11,7 +11,6 @@ use std::time::Instant;
 
 use crate::agent::prompts::render_subagent_system_prompt_with_format;
 use crate::agent::prompts::{PromptContext, SubagentRenderOptions};
-use crate::agent::subagent_host::ParentExecutionContext;
 use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::subagent_host::tool_prep::{
     dedup_owned_tool_specs, filter_definition_tool_indices, subagent_prompt_protocol,
@@ -19,12 +18,11 @@ use crate::agent::subagent_host::tool_prep::{
 use crate::agent::subagent_host::types::{
     SubagentMode, SubagentRunError, SubagentRunOptions, SubagentRunOutcome,
 };
+use crate::agent::subagent_host::ParentExecutionContext;
 use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
 use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use tinyagents_definition::{
-    AgentTier, IterationPolicy, PromptSource, validate_tier_transition,
-};
-use tinyagents_harness::context::{RunConfig, RunDepth, current_run_depth, with_run_depth};
+use tinyagents_definition::{validate_tier_transition, AgentTier, IterationPolicy, PromptSource};
+use tinyagents_harness::context::{current_run_depth, with_run_depth, RunConfig, RunDepth};
 use tinyagents_harness::turn_policy::AGENT_TURN_MAX_OUTPUT_TOKENS;
 use tinyagents_harness_tools::fs::file_state::with_file_state_agent_id;
 use tinytools::{Tool, ToolSpec};

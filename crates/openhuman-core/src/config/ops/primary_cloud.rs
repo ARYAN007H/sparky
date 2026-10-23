@@ -1,7 +1,7 @@
 //! Primary cloud-provider selection and legacy direct-inference compatibility.
 
-use crate::config::Config;
 use crate::config::schema::cloud_providers::CloudProviderCreds;
+use crate::config::Config;
 use crate::inference::provider::factory::{BYOK_INCOMPLETE_SENTINEL, PROVIDER_OPENHUMAN};
 
 /// Keep endpoint paths out of config diagnostics while using TinyInference's

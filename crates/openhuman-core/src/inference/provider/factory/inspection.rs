@@ -1,7 +1,6 @@
 //! Read-only provider preparation for doctor inspections.
 
 use super::{
-    InspectionOutputBudgetCapability, InspectionRequestIdentity, PreparedInspectionChatModel,
     chat_model::{
         resolves_to_managed_backend, unresolved_chat_model_error_for_access,
         with_default_temperature,
@@ -15,9 +14,10 @@ use super::{
         try_create_claude_agent_sdk_chat_model_for_inspection,
         try_create_claude_code_chat_model_for_inspection,
     },
+    InspectionOutputBudgetCapability, InspectionRequestIdentity, PreparedInspectionChatModel,
 };
-use crate::config::Config;
 use crate::config::resolve_primary_cloud_provider_string;
+use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use crate::security::egress::EgressLedger;
 use std::sync::Arc;

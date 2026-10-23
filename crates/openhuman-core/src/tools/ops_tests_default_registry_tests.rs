@@ -27,11 +27,9 @@ fn all_tools_registers_the_memory_tool_while_memory_is_on() {
     );
     // The search half of deferral is the harness's intrinsic bridge, never a
     // registered tool: a host `tool_search` would shadow it.
-    assert!(
-        !tools
-            .iter()
-            .any(|tool| { tool.name() == tinytools::TOOL_SEARCH_NAME })
-    );
+    assert!(!tools
+        .iter()
+        .any(|tool| { tool.name() == tinytools::TOOL_SEARCH_NAME }));
 }
 /// The three `whatsapp_data_*` agent tools are gone, in every build.
 ///
@@ -418,11 +416,9 @@ fn all_tools_default_registry_contains_expected_baseline_surface() {
         "image_info",
     ];
     assert_contains_all(&names, &expected);
-    assert!(
-        !names
-            .iter()
-            .any(|name| matches!(name.as_str(), "wait" | "wait_loop"))
-    );
+    assert!(!names
+        .iter()
+        .any(|name| matches!(name.as_str(), "wait" | "wait_loop")));
 }
 #[test]
 fn all_tools_default_registry_has_no_duplicate_tool_names() {

@@ -45,11 +45,9 @@ fn unknown_unattended_names_are_reported_and_never_allow_anything() {
     assert!(!config.allows_unattended("navigate"));
     assert!(!config.allows_unattended("hover"));
     assert!(!config.allows_unattended("*"));
-    assert!(
-        with_unattended(&["double_click", "select", "check"])
-            .unknown_unattended_actions()
-            .is_empty()
-    );
+    assert!(with_unattended(&["double_click", "select", "check"])
+        .unknown_unattended_actions()
+        .is_empty());
 }
 
 #[test]

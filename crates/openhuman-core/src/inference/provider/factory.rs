@@ -22,13 +22,13 @@ mod managed_backend;
 mod routing;
 mod subprocess_providers;
 
-pub(crate) use chat_model::{OpenHumanModelFactory, resolves_to_managed_backend};
 pub use chat_model::{
     create_chat_model_from_string, create_chat_model_from_string_with_model_id,
     create_chat_model_in, create_chat_model_with_model_id_in, probe_inference_readiness,
 };
+pub(crate) use chat_model::{resolves_to_managed_backend, OpenHumanModelFactory};
 pub(crate) use cloud_slug::resolve_cloud_slug_for;
-pub(crate) use cloud_spec::{CloudCredentialResolver, cloud_provider_spec};
+pub(crate) use cloud_spec::{cloud_provider_spec, CloudCredentialResolver};
 pub use credentials::{auth_key_for_slug, lookup_key_for_slug};
 pub(crate) use credentials::{
     openai_bearer_is_oauth, redact_endpoint_origin, resolve_codex_routing,
@@ -39,8 +39,8 @@ pub(crate) use inspection::{
 };
 pub(crate) use local_runtime::create_local_chat_model_from_string;
 pub(crate) use routing::fallback_diagnostics_for_role;
-pub(crate) use routing::{ConfigRouteSource, workload_router};
 pub use routing::{provider_for_role, role_bypasses_managed_credits};
+pub(crate) use routing::{workload_router, ConfigRouteSource};
 
 // Factory-internal helpers shared across the implementation modules.
 use access_gates::{emit_inference_egress, enforce_local_only_inference};
@@ -68,8 +68,8 @@ pub mod test_provider_override;
 #[path = "factory_tests.rs"]
 mod factory_tests;
 
-use crate::config::Config;
 use crate::config::schema::cloud_providers::AuthStyle;
+use crate::config::Config;
 use crate::security::egress::EgressLedger;
 use std::sync::Arc;
 use tinyinference_llm::model::ChatModel;

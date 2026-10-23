@@ -321,7 +321,7 @@ fn apply_env_overrides_shell_hide_window_parses_truthy_falsy() {
 
 #[test]
 fn classify_shell_hide_window_distinguishes_unset_from_unrecognized() {
-    use super::super::env_overlay::{ShellHideWindowParse as P, classify_shell_hide_window};
+    use super::super::env_overlay::{classify_shell_hide_window, ShellHideWindowParse as P};
     // The key distinction the change relies on: an empty / whitespace-only value
     // is `Unset` (silent no-op), NOT `Unrecognized` (which warns on every boot).
     // Testing the classifier directly proves this — the field-unchanged assertion
