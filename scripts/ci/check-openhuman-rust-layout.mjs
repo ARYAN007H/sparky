@@ -25,11 +25,6 @@ const LEGACY_LIMIT_ENTRIES = [
   // `spawn_subagent_tool_impl.rs` had its entry DELETED, not lowered: the
   // parameter schema moved to `spawn_subagent_parameters.rs` and the file is
   // under the general 750 limit, so it needs no exception at all.
-  // Session-host factory still assembles the product's deliberately coupled
-  // provider, security, memory, tool and prompt policy.  Generic session
-  // state moved to tinyagents-runtime; this remaining composition is split in
-  // a follow-up without reintroducing an old harness/session exception.
-  ["crates/openhuman-core/src/agent/session_host/builder/factory.rs", 868],
   ["crates/openhuman-core/src/agent/subagent_host/ops/runner.rs", 878],
   ["crates/openhuman-core/src/web_chat/progress_bridge.rs", 1061],
   // These established external test modules grew with upstream coverage. Pin
