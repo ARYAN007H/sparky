@@ -20,7 +20,8 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 use super::tenant_router::TenantSessionStores;
 use tinyagents_harness::multimodal::BlobAttachmentStash;
 use tinyagents_session::port::{
-    AgentStorageFactory, AgentStores, DriverSessionStores, SessionStoreProvider, TurnStates,
+    AgentStorageFactory, AgentStores, DriverSessionStores, SessionStoreLease,
+    SessionStoreLeaseError, SessionStoreProvider, TurnStates,
 };
 use tinyagents_session::run_ledger::{LedgerError, LedgerResult, RunLedgerStore};
 use tinyagents_storage_kit::ScopedStorage;
@@ -483,6 +484,13 @@ impl SessionStoreProvider for WorkspaceSessionStores {
         agent_id: &str,
     ) -> LedgerResult<Option<Arc<dyn RunLedgerStore>>> {
         Self::current().run_ledger_for_agent(agent_id)
+    }
+
+    fn lease_for_agent(
+        &self,
+        agent_id: &str,
+    ) -> Result<SessionStoreLease, SessionStoreLeaseError> {
+        Self::current().lease_for_agent(agent_id)
     }
 
     fn conversations_for_agent(

@@ -14,7 +14,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use tinyagents_harness::store::SchemaAdmission;
 use tinyagents_session::port::{
-    AgentStorageFactory, AgentStores, ConditionedAgentStorageFactory, SessionStoreProvider,
+    AgentStorageFactory, AgentStores, ConditionedAgentStorageFactory, SessionStoreLease,
+    SessionStoreLeaseError, SessionStoreProvider,
 };
 use tinyagents_session::DriverSessionStores;
 use tinyagents_storage_kit::{Blocking, Scope as PortScope, ScopedStorage};
@@ -165,6 +166,14 @@ impl SessionStoreProvider for TenantSessionStores {
     fn try_for_agent(&self, agent_id: &str) -> Result<AgentStores, StorageError> {
         let (provider, agent) = self.route(agent_id);
         provider.try_for_agent(&agent)
+    }
+
+    fn lease_for_agent(
+        &self,
+        agent_id: &str,
+    ) -> Result<SessionStoreLease, SessionStoreLeaseError> {
+        let (provider, agent) = self.route(agent_id);
+        provider.lease_for_agent(&agent)
     }
 
     fn bind_actor(

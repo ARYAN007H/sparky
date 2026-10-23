@@ -14,7 +14,10 @@
 use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock, Weak};
 
 use super::tenant_router::TenantSessionStores;
-use tinyagents_session::port::{AgentStorageFactory, AgentStores, SessionStoreProvider};
+use tinyagents_session::port::{
+    AgentStorageFactory, AgentStores, SessionStoreLease, SessionStoreLeaseError,
+    SessionStoreProvider,
+};
 use tinyagents_storage_kit::Blocking;
 use tinystoragedrivers::{StorageBackend, StorageError};
 
@@ -145,6 +148,13 @@ impl SessionStoreProvider for ReboundSessionStores {
 
     fn try_for_agent(&self, agent_id: &str) -> Result<AgentStores, StorageError> {
         SessionStoreProvider::try_for_agent(self.current().as_ref(), agent_id)
+    }
+
+    fn lease_for_agent(
+        &self,
+        agent_id: &str,
+    ) -> Result<SessionStoreLease, SessionStoreLeaseError> {
+        self.current().lease_for_agent(agent_id)
     }
 
     fn bind_actor(
