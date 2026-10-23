@@ -377,6 +377,19 @@ impl Rig {
         })
         .await
         .expect("the linked tinyeventqueues module claimed its name");
+        let module = modules
+            .list()
+            .into_iter()
+            .find(|info| info.name == "tinyeventqueues")
+            .expect("the linked tinyeventqueues module is registered");
+        assert!(
+            matches!(
+                module.state,
+                tinybus::module::ModuleState::Ready | tinybus::module::ModuleState::Serving
+            ),
+            "the linked tinyeventqueues module must be ready: {:?}",
+            module.state
+        );
         let proxy = host
             .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
             .unwrap();
