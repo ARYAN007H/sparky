@@ -252,7 +252,7 @@ async fn an_unreadable_file_writes_no_marker_so_the_next_start_retries() {
         &file,
         b"this is not a sqlite database at all, just text padding",
     )
-    .unwrap_or_else(|error| panic!("captured import claim failed: {error:#}"));
+    .unwrap();
     let rig = rig();
     assert!(import(&rig, dir.path()).await.is_err());
     let done = crate::storage::import_state::host_import_done(
@@ -371,7 +371,7 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
         &current_turn,
         module_scope,
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("captured import claim failed: {error:#}"));
     // The capture retains the profile object as long as its claim/payload
     // closure owns it. Its backend is the exact context's fence wrapper.
     let _scoped = captured.backend.for_scope(&captured.scope).unwrap();
