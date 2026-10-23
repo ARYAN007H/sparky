@@ -80,13 +80,15 @@ fn session_report_measures_the_visible_belt_not_the_registry() {
     crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .unwrap();
     let tmp = tempfile::TempDir::new().unwrap();
-    let config = crate::config::Config {
+    let mut config = crate::config::Config {
         workspace_dir: tmp.path().join("workspace"),
         action_dir: tmp.path().join("workspace"),
         config_path: tmp.path().join("config.toml"),
         ..crate::config::Config::default()
     };
+    config.default_model = Some("test/session-fixture".to_string());
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
