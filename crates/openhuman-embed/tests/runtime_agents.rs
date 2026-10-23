@@ -124,7 +124,7 @@ fn one_runtime_hosts_independently_configured_agents() {
             let runtime = std::sync::Arc::new(
                 Runtime::builder()
                     .config(offline_config())
-                    .workspace(Workspace::Stateless)
+                    .workspace(Workspace::Ephemeral)
                     .backend_url(backend.uri())
                     .api_key(API_KEY)
                     .session_store(session_store.clone())
