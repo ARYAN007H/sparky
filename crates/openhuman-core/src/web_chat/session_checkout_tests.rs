@@ -376,7 +376,7 @@ async fn a_thread_binds_one_stable_session_across_cold_boots() {
         CheckoutPolicy::Exact,
     )
     .await
-    .unwrap_or_else(|error| panic!("first checkout failed: {error}"));
+    .unwrap();
     // Nothing is checked back in, so the next checkout is a genuine cold boot.
     let second = checkout_session_agent(
         &DispatchCtx::ambient(),
