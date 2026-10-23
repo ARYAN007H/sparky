@@ -135,7 +135,8 @@ pub(super) async fn migrate_imported(ctx: &crate::core::runtime::DispatchCtx, mo
 pub(super) fn grant_for(module_id: &str) -> Option<StorageGrant> {
     let row = ROWS.iter().find(|row| row.module == module_id)?;
     let queues = row.queues.and_then(|source| source());
-    let collections = module_collections(row.owner);
+    let mut collections = module_collections(row.owner);
+    collections.extend(migration_collections(row.owner));
     let secret_prefixes: Vec<String> = row.secrets.iter().map(|s| (*s).to_owned()).collect();
     // Collection declarations are now the owner contracts' only published
     // storage inventory. Stream/blob/secret grants remain explicit below
@@ -155,9 +156,38 @@ pub(super) fn grant_for(module_id: &str) -> Option<StorageGrant> {
     })
 }
 
+/// What a module's own first-open migration reads and writes besides the
+/// collections it owns: the progress ledger every owner shares, and the v1
+/// source collections the steps move into the v2 names (the ones the legacy
+/// importers write). The module runs those steps itself over the bus, so a
+/// grant without them fails its startup at the first `EnsureCollection`.
+/// Scoped to the module's own storage scope, so no other module's data is
+/// reachable through them.
+fn migration_collections(owner: &str) -> Vec<CollectionSpec> {
+    match owner {
+        "mcp" => [
+            "tsd.migrations",
+            "mcp_servers",
+            "mcp_server_names",
+            "mcp_registry_cache",
+            "mcp_tool_cache",
+            "mcp_registry_index",
+            "mcp_registry_index_state",
+        ]
+        .into_iter()
+        .map(CollectionSpec::new)
+        .collect(),
+        _ => Vec::new(),
+    }
+}
+
 fn stream_prefixes(owner: &str) -> Vec<String> {
     match owner {
-        "mcp" => vec![tinymcp_bus::storage::AUDIT_STREAM.to_owned()],
+        // The v1 audit stream is read by the module's audit migration.
+        "mcp" => vec![
+            tinymcp_bus::storage::AUDIT_STREAM.to_owned(),
+            "mcp_audit".to_owned(),
+        ],
         "connectors" => tinyconnectors_bus::storage::storage_needs().stream_prefixes,
         // TinyWallet's module still reads and appends this released ledger
         // stream while its bus contract currently declares collections only.
