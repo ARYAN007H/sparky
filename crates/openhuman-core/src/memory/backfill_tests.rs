@@ -20,6 +20,13 @@ fn message(id: &str, sender: &str, content: &str, at: &str) -> ConversationMessa
 }
 
 async fn seed_thread(workspace: &Path, thread_id: &str, messages: &[(&str, &str)]) {
+    let backend = crate::storage::local::backend_for(workspace).expect("open test storage");
+    assert!(
+        backend
+            .capabilities()
+            .contains(tinystoragedrivers_types::Capability::ConditionalStreamAppend),
+        "backfill thread fixture needs conditional stream append"
+    );
     threads::ensure_thread(
         crate::core::runtime::DispatchCtx::ambient(),
         workspace.to_path_buf(),
