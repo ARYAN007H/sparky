@@ -313,6 +313,8 @@ fn decode_transcript(
         .with_context(|| format!("decode transcript {} as UTF-8", path.display()))?;
     let mut meta = None;
     let mut tools = None;
+    let mut records = Vec::new();
+    let mut sanitized_system = false;
     for (line_no, line) in text.lines().enumerate() {
         let line = line.trim();
         if line.is_empty() {
@@ -339,45 +341,145 @@ fn decode_transcript(
             tools = value.get("tools").cloned();
             continue;
         }
+        if value.get("kind").and_then(serde_json::Value::as_str) == Some("compaction") {
+            let replacement = value
+                .get("replacement")
+                .and_then(serde_json::Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|row| decode_display_message(row, &mut sanitized_system).ok())
+                .collect();
+            records.push(DisplayRecord::Compaction(
+                tinyagents_session::transcript::CompactionMarker {
+                    replacement,
+                    ts: value
+                        .get("ts")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned),
+                    request_id: value
+                        .get("request_id")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned),
+                },
+            ));
+            continue;
+        }
+        if let Ok(message) = decode_display_message(&value, &mut sanitized_system) {
+            records.push(DisplayRecord::Message(Box::new(message)));
+        }
     }
     let meta =
         meta.ok_or_else(|| anyhow::anyhow!("transcript {} has no _meta header", path.display()))?;
-    // Let TinyAgents decode its own transcript row versions. In particular,
-    // legacy text-dialect `tool_calls` belong to turn usage, not the typed
-    // native-call field. Re-deserializing the JSON as `TranscriptMessage`
-    // would make an old call list look like a second native call round on
-    // session-store replay.
-    let mut records = tinyagents_session::transcript::read_transcript_display(path)?.records;
-    let mut sanitized_system = false;
-    for record in &mut records {
-        match record {
-            DisplayRecord::Message(message) => {
-                sanitize_imported_system_message(message, &mut sanitized_system);
-            }
-            DisplayRecord::Compaction(marker) => {
-                for message in &mut marker.replacement {
-                    sanitize_imported_system_message(message, &mut sanitized_system);
-                }
-            }
-        }
-    }
     Ok((meta, tools, records))
 }
 
-fn sanitize_imported_system_message(
-    message: &mut DisplayMessage,
+fn decode_display_message(
+    value: &serde_json::Value,
     sanitized_system: &mut bool,
-) {
-    if message.message.role == "system" && !*sanitized_system {
+) -> Result<DisplayMessage> {
+    let mut message: TranscriptMessage = serde_json::from_value(value.clone())
+        .context("decode transcript message")?;
+    let row_version = value
+        .get("v")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or_default() as u32;
+    let usage_tool_calls = message.tool_calls.clone();
+    if row_version != tinyagents_session::transcript::TYPED_ROW_VERSION {
+        message.tool_calls.clear();
+        message.tool_call_id = None;
+        message.parts = None;
+        if row_version < tinyagents_session::transcript::TYPED_ROW_VERSION {
+            message = message.normalized();
+        }
+    }
+    if message.role.is_empty() {
+        anyhow::bail!("transcript message has no role");
+    }
+    if message.role == "system" && !*sanitized_system {
         *sanitized_system = true;
         if let Some(cleaned) =
             crate::config::migrations::phase_out_profile_md::strip_profile_md_block(
-                &message.message.content,
+                &message.content,
             )
         {
-            message.message.content = cleaned;
+            message.content = cleaned;
         }
     }
+    let turn_usage = match (
+        value.get("provider").and_then(serde_json::Value::as_str),
+        value.get("model").and_then(serde_json::Value::as_str),
+        value.get("usage"),
+        value.get("ts").and_then(serde_json::Value::as_str),
+    ) {
+        (Some(provider), Some(model), Some(usage), Some(ts)) if message.role == "assistant" => {
+            serde_json::from_value(usage.clone()).ok().map(|usage| {
+                tinyagents_session::transcript::TurnUsage {
+                    provider: provider.to_owned(),
+                    model: model.to_owned(),
+                    usage,
+                    ts: ts.to_owned(),
+                    reasoning_content: value
+                        .get("reasoning_content")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned),
+                    tool_calls: usage_tool_calls,
+                    iteration: value
+                        .get("iteration")
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or_default() as u32,
+                }
+            })
+        }
+        _ => None,
+    };
+    message.turn_usage = turn_usage.clone();
+    message.preserve_request_id = true;
+    let failed = value
+        .get("failure")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let failure_detail = value
+        .get("failure_detail")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned);
+    if failed {
+        message.tool_failure = Some(tinyagents_session::transcript::ToolFailure {
+            failed,
+            detail: failure_detail.clone(),
+        });
+    }
+    let reasoning_content = value
+        .get("reasoning_content")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
+        .or_else(|| turn_usage.as_ref().and_then(|usage| usage.reasoning_content.clone()));
+    Ok(DisplayMessage {
+        interrupted: value
+            .get("interrupted")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        request_id: value
+            .get("request_id")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned),
+        iteration: value
+            .get("iteration")
+            .and_then(serde_json::Value::as_u64)
+            .map(|iteration| iteration as u32),
+        ts: value
+            .get("ts")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned),
+        reasoning_content,
+        turn_usage,
+        failure: failed,
+        failure_detail,
+        background: value
+            .get("background")
+            .cloned()
+            .and_then(|origin| serde_json::from_value(origin).ok()),
+        message,
+    })
 }
 
 fn stored_transcript_row(display: &DisplayMessage) -> TranscriptMessage {
