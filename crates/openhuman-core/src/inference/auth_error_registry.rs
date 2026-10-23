@@ -214,10 +214,8 @@ pub fn snapshot_for_scope(
     let errors = registry()
         .snapshot()
         .into_iter()
-        .filter(|error| {
-            let Some(origin) = origins.get(&error.provider) else {
-                return false;
-            };
+        .filter_map(|error| {
+            let origin = origins.get(&error.provider)?;
             let partial_match = origin.scopes.keys().any(|recorded| {
                 recorded.config_path.is_none()
                     && recorded.workspace == scope.workspace
@@ -226,13 +224,8 @@ pub fn snapshot_for_scope(
             if partial_match {
                 has_unscoped = true;
             }
-            if origin.scopes.contains_key(&scope) {
-                return true;
-            }
-            if !partial_match {
-                return false;
-            }
-            false
+            // This scope's own status and time, not another scope's latest.
+            Some(origin.scopes.get(&scope)?.view(error))
         })
         .collect();
     (errors, has_unscoped)

@@ -305,3 +305,43 @@ fn auth_errors_stay_in_the_scope_that_recorded_them() {
         reset_for_tests();
     });
 }
+
+/// The doctor's scope read gets the status that scope recorded, not the one a
+/// later failure for the same provider in another config root left behind.
+#[test]
+fn a_scope_read_returns_that_scopes_own_status() {
+    with_test_lock(async {
+        reset_for_tests();
+        let workspace = tempfile::tempdir().expect("shared workspace");
+        let config_root_a = tempfile::tempdir().expect("config root A");
+        let config_root_b = tempfile::tempdir().expect("config root B");
+        let config_path_a = config_root_a.path().join("config.toml");
+        let config_path_b = config_root_b.path().join("config.toml");
+        let mut config = crate::config::Config::default();
+        config.workspace_dir = workspace.path().to_path_buf();
+        config.config_path = config_path_a.clone();
+        let context = crate::core::runtime::CoreContext::for_test_with_config(
+            crate::core::runtime::DomainSet::full(),
+            config,
+        );
+        crate::core::runtime::CoreContext::scope(context.clone(), async {
+            record("shared-provider", 401);
+        })
+        .await;
+        context
+            .rebind_workspace(workspace.path(), Some(&config_path_b))
+            .expect("rebind config origin");
+        crate::core::runtime::CoreContext::scope(context, async {
+            record("shared-provider", 403);
+        })
+        .await;
+
+        let status = |config_path: &std::path::Path| {
+            let (errors, _) = snapshot_for_scope(workspace.path(), config_path, None);
+            errors.iter().map(|error| error.status).collect::<Vec<_>>()
+        };
+        assert_eq!(status(&config_path_a), [401]);
+        assert_eq!(status(&config_path_b), [403]);
+        reset_for_tests();
+    });
+}
