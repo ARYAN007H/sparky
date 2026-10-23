@@ -128,7 +128,7 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
             Some(ctx.load_config().await)
         };
         let readable = config.as_ref().and_then(|config| config.as_ref().ok());
-        if let Some(reason) = triage_skip_reason(readable, &toolkit, env_disabled) {
+        if let Some(reason) = triage_skip_reason(readable, toolkit, env_disabled) {
             tracing::debug!(
                 toolkit = %toolkit,
                 trigger = %trigger,
