@@ -36,7 +36,7 @@ fn snapshot_tree(root: &std::path::Path) -> BTreeMap<std::path::PathBuf, Vec<u8>
 
 #[tokio::test]
 #[cfg(feature = "storage-sqlite")]
-async fn inspecting_an_unprovisioned_profile_does_not_run_storage_migrations() {
+async fn inspecting_an_unprovisioned_profile_does_not_provision_or_claim_it() {
     let tmp = tempfile::tempdir().unwrap();
     let fixture = sqlite_backend().unwrap();
     let backend = Arc::clone(&fixture.backend);
@@ -57,7 +57,9 @@ async fn inspecting_an_unprovisioned_profile_does_not_run_storage_migrations() {
     let layout = host.layout_of(&id);
     let default_context = CoreContext::default_context();
 
-    assert!(docs.validate_collection_spec(&registry_spec).await.is_err());
+    // The host declares its registry during construction. Inspection must
+    // still leave the profile absent and must not claim its lease.
+    assert!(docs.validate_collection_spec(&registry_spec).await.is_ok());
     assert!(docs.validate_collection_spec(&lease_spec).await.is_err());
     assert_eq!(
         host.inspect_for_doctor(&id).await,
@@ -93,12 +95,12 @@ async fn inspecting_an_unprovisioned_profile_does_not_run_storage_migrations() {
     );
 
     assert!(
-        docs.validate_collection_spec(&registry_spec).await.is_err(),
-        "a profile check must not create or migrate the registry schema"
+        docs.validate_collection_spec(&registry_spec).await.is_ok(),
+        "inspection leaves the host's registry schema available"
     );
     assert!(
         docs.validate_collection_spec(&lease_spec).await.is_err(),
-        "a profile check must not create or migrate the lease schema"
+        "inspection must not create or migrate the lease schema"
     );
 }
 
