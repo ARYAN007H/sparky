@@ -141,6 +141,19 @@ pub fn resolver(config: &Config) -> Resolver {
                     linked_factories.insert(record.id.to_string(), factory);
                 }
             }
+            ModuleSource::Release if record.id == "tinymcp" => {
+                // TinyMCP requires a host storage callback at initialization.
+                // Search-path loading has no config slot, so route a staged
+                // artifact through the resolver's configured local-file rung.
+                if let Some(path) = source::local_artifact(record.id) {
+                    sources.insert(
+                        record.id.to_string(),
+                        ResolverSource::LocalFile {
+                            path: path.to_string_lossy().into_owned(),
+                        },
+                    );
+                }
+            }
             ModuleSource::Release => {}
         }
     }
