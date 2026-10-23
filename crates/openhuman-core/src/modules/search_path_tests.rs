@@ -21,4 +21,13 @@ fn recognizes_source_and_release_artifacts_for_configured_modules() {
         assert!(is_skipped(&path, &stems));
         assert_eq!(module_id_for_artifact(&path), Some("tinymcp"));
     }
+    for artifact in [
+        "/modules/libtinyeventqueues.so",
+        "/modules/libtinyeventqueues_module.so",
+        "/modules/tinyeventqueues_module.dll",
+    ] {
+        let path = PathBuf::from(artifact);
+        assert!(is_skipped(&path, &stems));
+        assert_eq!(module_id_for_artifact(&path), Some("tinyeventqueues"));
+    }
 }
