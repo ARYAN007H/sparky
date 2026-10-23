@@ -129,10 +129,12 @@ pub(super) fn module_scope(
 /// payload writes and the completion marker. A lost claim therefore prevents
 /// late payload or completion writes.
 ///
-/// Returns `Ok(None)` at once when another holder's claim is live, so an
+/// `Ok(None)` means no storage backend is installed. When another holder's
+/// claim is live this returns [`ImportClaimHeld`] at once instead of waiting, so an
 /// import on the compaction path never blocks a runtime worker (or the
-/// once-per-process import lock) for the claim TTL; it is retried at the next
-/// call.
+/// once-per-process import lock) for the claim TTL. The error keeps the import
+/// unsettled and makes callers that gate on it (the x402 ledger) refuse for
+/// this call; it is retried at the next one.
 pub(super) fn with_module_claim<T>(
     ctx: &crate::core::runtime::DispatchCtx,
     module_id: &str,
@@ -178,8 +180,23 @@ where
             body(scoped)
         },
     )?;
-    Ok(claimed)
+    claimed
+        .map(Some)
+        .ok_or_else(|| anyhow::Error::new(ImportClaimHeld))
 }
+
+/// Another holder's live claim is importing this source. The import has not
+/// happened, so it must be retried, never read as "nothing to import".
+#[derive(Debug)]
+pub(crate) struct ImportClaimHeld;
+
+impl std::fmt::Display for ImportClaimHeld {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("another process holds this legacy import claim; retrying at the next call")
+    }
+}
+
+impl std::error::Error for ImportClaimHeld {}
 
 /// A stable marker id for one source path: `<prefix>@<16 hex of sha256(path)>`.
 pub(super) fn marker_id(prefix: &str, source: &Path) -> String {
