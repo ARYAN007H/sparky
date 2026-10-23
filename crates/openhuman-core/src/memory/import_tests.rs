@@ -126,6 +126,9 @@ async fn a_paused_scheduler_leaves_an_interrupted_import_for_later() {
     );
 }
 
+// Saves layout-migration state, which needs a backend that can claim imports
+// (see `memory/layout_migration/ops.rs`).
+#[cfg(feature = "storage-sqlite")]
 #[tokio::test]
 async fn a_live_import_blocks_migration_and_does_not_make_a_stale_migration_look_live() {
     use crate::memory::layout_migration::{self, state, test_host::FakeHost, Phase, Trigger};
