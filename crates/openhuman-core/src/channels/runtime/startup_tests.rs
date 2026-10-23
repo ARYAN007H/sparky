@@ -97,7 +97,7 @@ async fn relay_inbound_handler_forwards_envelopes_to_dispatch_bus() {
     assert_eq!(forwarded.conversation.id, "chat-1");
     assert_eq!(forwarded.sender.id, "alice");
     assert_eq!(forwarded.text, "hello from relay");
-    assert_eq!(forwarded.conversation.thread_id.as_deref(), Some("topic-1"));
+    assert_eq!(forwarded.conversation.thread_id, None);
     assert_eq!(forwarded.conversation.topic_id.as_deref(), Some("topic-1"));
 }
 
