@@ -22,7 +22,9 @@ use tinybus::{Connection, ObjectPath};
 use tinyeventqueues_bus::names;
 use tinyeventqueues_bus::storage::SHIPPED_PIPELINE_JSON;
 use tinystoragedrivers_api::StorageBackend;
-use tinystoragedrivers_busproxy::{serve, PerCallerEndpoint, StorageServer};
+use tinystoragedrivers_busproxy::{
+    prepare_storage_host_callbacks, serve_with_host_callbacks, PerCallerEndpoint, StorageServer,
+};
 use tinystoragedrivers_testkit::MemoryBackend;
 use tinystoragedrivers_types::Scope;
 
@@ -325,16 +327,20 @@ impl Rig {
         let bus = MemoryBus::new();
         let broker = Broker::new();
         broker.clone().spawn(bus.clone());
+        let modules = ModuleHost::new(broker);
         let host = Connection::connect(bus.connect().await.unwrap())
             .await
             .unwrap();
+        let binding = prepare_storage_host_callbacks(&modules).await.unwrap();
         let backend = Arc::new(MemoryBackend::new());
         let storage_backend = Arc::clone(&backend);
         let endpoint = PerCallerEndpoint::new(move |_sender| {
             let storage = storage_backend.for_scope(&Scope::new("local").ok()?).ok()?;
             Some(StorageServer::new(storage))
         });
-        let storage = serve(&host, Arc::new(endpoint)).await.unwrap();
+        let storage = serve_with_host_callbacks(binding.clone(), Arc::new(endpoint))
+            .await
+            .unwrap();
         let deliverer = Deliverer::new(
             triage.clone() as Arc<dyn TriageRunner>,
             DispatchCtx::host_default(),
@@ -357,12 +363,11 @@ impl Rig {
         .unwrap();
         host.request_name(names::host::INTERFACE).await.unwrap();
 
-        let modules = ModuleHost::new(broker);
         let mut module_config = json!({
             "pipeline": pipeline,
             "timer": { "min_interval_ms": 5, "max_interval_ms": 25 },
         });
-        module_config["storage_callback"] = json!(host.unique_name().unwrap().as_str());
+        module_config["storage_callback"] = json!(binding.unique_name().as_str());
         modules
             .attach_linked_with_config(tinyeventqueues::linked_module().unwrap(), module_config)
             .unwrap();
