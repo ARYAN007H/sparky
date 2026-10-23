@@ -146,6 +146,8 @@ pub fn resolver(config: &Config) -> Resolver {
     }
     let gate_config = Arc::clone(&shared);
     let module_config_source = Arc::clone(&shared);
+    let mut search_skip = disabled_lib_stems(config);
+    search_skip.extend(super::search_path::configured_module_lib_stems());
     Resolver::new(ResolverInputs {
         enabled: config.modules.enabled,
         install_dir: install_dir(config),
@@ -153,7 +155,7 @@ pub fn resolver(config: &Config) -> Resolver {
         bundled_dir: bundled_releases_dir(),
         sources,
         linked: linked_factories,
-        search_skip: disabled_lib_stems(config),
+        search_skip,
         gate: Some(Arc::new(move |id| disabled_component(&gate_config, id))),
         on_resolved: Some(Arc::new(on_resolved)),
         records: registry::release_records(),
@@ -300,7 +302,7 @@ pub fn state_of(id: &str) -> ModuleState {
 /// Credentials are intentionally absent. TinyMemory calls back into the host
 /// for embedding and chat compute, and TinyMCP receives the shared host
 /// storage service name; the other modules need no host config.
-fn module_config(config: &Config, id: &str) -> serde_json::Value {
+pub(super) fn module_config(config: &Config, id: &str) -> serde_json::Value {
     if id == "tinymcp" {
         return serde_json::json!({
             "storage_callback": tinystoragedrivers_bus::STORAGE_INTERFACE,

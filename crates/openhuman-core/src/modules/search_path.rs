@@ -9,6 +9,26 @@ use std::path::Path;
 
 use tinybus::module::{ModuleHost, ModuleInfo};
 
+/// Modules that need host-supplied configuration cannot be admitted by
+/// TinyBus's generic search-path loader, which initializes them with `{}`.
+/// Leave those artifacts for the configured load below.
+pub fn configured_module_lib_stems() -> Vec<String> {
+    let Some(record) = super::registry::find("tinymcp") else {
+        return Vec::new();
+    };
+    let stem = record.source.lib_name.to_string();
+    [format!("lib{stem}"), stem]
+}
+
+fn module_id_for_artifact(path: &Path) -> Option<&'static str> {
+    let stem = path.file_stem()?.to_str()?;
+    let stem = stem.strip_prefix("lib").unwrap_or(stem);
+    let stem = stem.strip_suffix("_module").unwrap_or(stem);
+    super::registry::ALL.iter().find_map(|record| {
+        (record.id == stem || record.source.lib_name.as_str() == stem).then_some(record.id)
+    })
+}
+
 /// Whether `path` is a library file whose stem is in `skip`.
 fn is_skipped(path: &Path, skip: &[String]) -> bool {
     path.file_stem()
@@ -21,7 +41,17 @@ fn is_skipped(path: &Path, skip: &[String]) -> bool {
 /// A directory with nothing to skip goes through `load_dir` unchanged, which
 /// keeps tinybus's dependency ordering. Only a directory holding a skipped
 /// artifact is loaded file by file.
-pub fn load_enabled(host: &ModuleHost, skip: &[String]) -> Vec<Result<ModuleInfo, tinybus::Error>> {
+pub fn load_enabled(
+    host: &ModuleHost,
+    skip: &[String],
+    module_config: impl Fn(&str) -> serde_json::Value,
+) -> Vec<Result<ModuleInfo, tinybus::Error>> {
+    let disabled = skip.to_vec();
+    let configured = configured_module_lib_stems();
+    let mut skip = disabled.clone();
+    skip.extend(configured.iter().cloned());
+    skip.sort();
+    skip.dedup();
     if skip.is_empty() {
         return host.load_search_paths();
     }
@@ -44,8 +74,16 @@ pub fn load_enabled(host: &ModuleHost, skip: &[String]) -> Vec<Result<ModuleInfo
             continue;
         }
         for file in files {
-            if is_skipped(&file, skip) {
+            if is_skipped(&file, &disabled) {
                 log::debug!("[modules] search-path artifact skipped: component disabled");
+                continue;
+            }
+            if is_skipped(&file, &configured) {
+                if let Some(id) = module_id_for_artifact(&file) {
+                    outcomes.push(host.load_file_with_config(&file, module_config(id)));
+                    continue;
+                }
+                log::debug!("[modules] configured module artifact has no registry entry");
                 continue;
             }
             if file
