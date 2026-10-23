@@ -7,8 +7,8 @@
 # Release archives come from the module registry (test-module-assets.mjs),
 # are cached by sha256 under $CI_CACHE_DIR/blobs when that is set, and are
 # verified against the registry digest on every use, cached or not.
-# All nine modules, tinyconnectors included, come from releases; nothing is
-# compiled from source here (#7618).
+# Every staged test module, including tinyconnectors and tinyeventqueues,
+# comes from its registry release; nothing is compiled from source here.
 #
 # tinybus refuses a module when any ancestor directory is owned by someone
 # other than root or the current user, so <dest-dir> must sit under a tree the
@@ -61,7 +61,7 @@ done <<< "${assets}"
 # Every staged directory goes on the search path the loader already honours
 # (release mode); each holds the released library.
 module_dirs=""
-for id in tinybox tinydocs tinywallet tinychannels tinymcp tinyjuice tinysearch tinyhosts tinyconnectors tinyflows; do
+for id in tinybox tinydocs tinywallet tinychannels tinymcp tinyeventqueues tinyjuice tinysearch tinyhosts tinyconnectors tinyflows; do
   module_dirs="${module_dirs:+${module_dirs}:}${dest}/${id}"
 done
 # mcp_registry_multi_server loads TinyMCP by file, not by search path, as

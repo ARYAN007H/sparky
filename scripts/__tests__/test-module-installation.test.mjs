@@ -532,7 +532,7 @@ test("the Rust E2E runner reuses container-staged module paths", () => {
   assert.match(runnerSource, /pre-staged native modules/);
 });
 
-test("the CI installer builds nothing: every module, tinyconnectors included, is a registry release", () => {
+test("the CI installer stages callback modules as registry releases", () => {
   const source = readFileSync(installer, "utf8");
   assert.doesNotMatch(source, /cargo build|cargo-cancel|--target-dir/);
   assert.doesNotMatch(source, /stage-connector-test-module|modules\.toml/);
@@ -541,10 +541,15 @@ test("the CI installer builds nothing: every module, tinyconnectors included, is
     "ubuntu-22.04-x86_64",
   );
   const connectors = assets.find((asset) => asset.id === "tinyconnectors");
+  const eventqueues = assets.find((asset) => asset.id === "tinyeventqueues");
   assert.ok(
     connectors,
     "the installer resolves tinyconnectors from the registry",
   );
   assert.match(connectors.sha256, /^[a-f0-9]{64}$/);
   assert.match(connectors.url, /\/releases\/download\/v\d+\.\d+\.\d+\//);
+  assert.ok(eventqueues, "the installer stages tinyeventqueues from the registry");
+  assert.match(eventqueues.sha256, /^[a-f0-9]{64}$/);
+  assert.match(eventqueues.url, /\/releases\/download\/v\d+\.\d+\.\d+\//);
+  assert.match(source, /tinymcp tinyeventqueues tinyjuice/);
 });
