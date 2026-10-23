@@ -347,14 +347,82 @@ pub(super) fn is_assignment(word: &str) -> bool {
 }
 
 /// Whether any assignment in the segment sets a variable that can redirect
-/// what runs (a pager, editor, loader override, `PATH`, …).
+/// what runs (a pager, editor, loader override, `PATH`, …). The
+/// `GIT_CONFIG_*` family (`GIT_CONFIG_COUNT`/`_KEY_<n>`/`_VALUE_<n>`,
+/// `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_GLOBAL`, …) is configuration git
+/// reads as its own, so it can name a `diff.external` or a pager to run.
 pub(super) fn has_dangerous_env_assignment(words: &[&str]) -> bool {
     words.iter().any(|word| {
         is_assignment(word)
             && word.split_once('=').is_some_and(|(name, _)| {
-                DANGEROUS_ENV_NAMES.contains(&name.to_ascii_uppercase().as_str())
+                let name = name.to_ascii_uppercase();
+                DANGEROUS_ENV_NAMES.contains(&name.as_str()) || name.starts_with("GIT_CONFIG")
             })
     })
+}
+
+/// `source` split into shell words, keeping quoted whitespace inside its word
+/// (`FOO="a b" curl u` is three words, not four). Quotes stay in the words,
+/// as `split_whitespace` left them; a backslash outside single quotes escapes
+/// the next character.
+pub(super) fn shell_words(source: &str) -> Vec<&str> {
+    let (mut words, mut start, mut quote, mut escaped) = (Vec::new(), None, None, false);
+    for (index, c) in source.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match (quote, c) {
+            (Some('\''), '\'') => quote = None,
+            (Some('\''), _) => {}
+            (_, '\\') => escaped = true,
+            (Some('"'), '"') => quote = None,
+            (Some(_), _) => {}
+            (None, '\'' | '"') => quote = Some(c),
+            (None, c) if c.is_whitespace() => {
+                if let Some(begin) = start.take() {
+                    words.push(&source[begin..index]);
+                }
+                continue;
+            }
+            (None, _) => {}
+        }
+        start.get_or_insert(index);
+    }
+    if let Some(begin) = start {
+        words.push(&source[begin..]);
+    }
+    words
+}
+
+/// The command line GNU `env -S`/`--split-string` runs, when the segment's
+/// `env` carries one: `env -S'curl u'` runs `curl u`.
+fn env_split_string(words: &[&str]) -> Option<String> {
+    let position = words
+        .iter()
+        .position(|word| !is_assignment(word))
+        .filter(|&index| normalized_command_name(words[index]) == "env")?;
+    let mut rest = words[position + 1..].iter();
+    while let Some(word) = rest.next() {
+        let unquoted = shell_unquote(word);
+        let split = if unquoted == "-S" || unquoted == "--split-string" {
+            rest.next().map(|value| shell_unquote(value))
+        } else if let Some(value) = unquoted.strip_prefix("--split-string=") {
+            Some(value.to_owned())
+        } else if let Some(value) = unquoted.strip_prefix("-S") {
+            Some(value.to_owned())
+        } else if launcher_value_options("env").is_some_and(|options| options.contains(word)) {
+            rest.next();
+            continue;
+        } else if unquoted.starts_with('-') || is_assignment(word) {
+            continue;
+        } else {
+            return None;
+        };
+        let tail = rest.copied().collect::<Vec<_>>().join(" ");
+        return split.map(|command| format!("{command} {tail}"));
+    }
+    None
 }
 
 /// Launchers that run their operand, with the options that take a separate
@@ -408,7 +476,12 @@ pub(super) fn effective_command<'a, 'w>(words: &'a [&'w str]) -> (String, &'a [&
 
 /// Classify one live shell segment (already split on `;`, `|`, `&&`, …).
 pub(super) fn classify_segment_source(source: &str) -> CommandClass {
-    let words = source.split_whitespace().collect::<Vec<_>>();
+    let words = shell_words(source);
+    if let Some(command) = env_split_string(&words) {
+        // `env` runs the split command line: classify that, and never below
+        // the executor class `env` has on its own.
+        return classify_segment_source(&command).max(CommandClass::Write);
+    }
     let (base, args) = effective_command(&words);
     let args = args
         .iter()

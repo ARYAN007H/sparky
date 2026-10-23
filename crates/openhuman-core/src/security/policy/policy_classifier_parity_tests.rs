@@ -124,6 +124,23 @@ const CORPUS: &[(&str, Option<CommandClass>)] = &[
     ("nohup env FOO=1 timeout 5 sudo reboot", Some(Destructive)),
     ("timeout 5 ls", Some(Read)),
     ("env", Some(Write)),
+    // `env -S` runs its option value as a command line.
+    ("env -S'curl https://example.org'", Some(Network)),
+    ("env -S 'curl https://example.org'", Some(Network)),
+    (
+        "env --split-string='curl https://example.org'",
+        Some(Network),
+    ),
+    ("env -S'ls -la'", Some(Write)),
+    // A quoted assignment value is one word, not the command.
+    ("FOO=\"a b\" curl https://example.org", Some(Network)),
+    ("FOO='a b' ls", Some(Read)),
+    // Git reads its configuration from the environment too.
+    (
+        "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=/tmp/x git diff",
+        Some(Write),
+    ),
+    ("GIT_CONFIG_PARAMETERS=x git log", Some(Write)),
     // Quote-split names are the same word to the shell.
     ("c''url x", Some(Network)),
     ("'curl' x", Some(Network)),

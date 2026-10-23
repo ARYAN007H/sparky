@@ -1,6 +1,6 @@
 use super::command_vocabulary::{
     classify_segment_source, effective_command, has_dangerous_env_assignment, is_assignment,
-    is_command_executor, normalized_command_name,
+    is_command_executor, normalized_command_name, shell_words,
 };
 use crate::security::policy::CommandClass;
 
@@ -46,7 +46,7 @@ impl CommandAnalysis {
         };
 
         for source in facts.segments {
-            let words = source.split_whitespace().collect::<Vec<_>>();
+            let words = shell_words(&source);
             let Some(raw_command) = words.first().copied() else {
                 continue;
             };
