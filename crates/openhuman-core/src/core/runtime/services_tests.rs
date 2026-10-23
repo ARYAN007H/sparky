@@ -12,6 +12,7 @@ async fn flows_boot_reconcile_uses_the_runtime_captured_config() {
         config_path: tmp.path().join("runtime-config.toml"),
         ..Config::default()
     };
+    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
     let core = crate::core::runtime::CoreContext::for_test_with_config(
         crate::core::runtime::DomainSet::full(),
         config,
@@ -52,7 +53,6 @@ async fn flows_boot_reconcile_uses_the_runtime_captured_config() {
         .expect("captured runtime configuration loads");
     assert_eq!(swept, 0);
     let warning = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
-    eprintln!("captured flow reconciliation warning: {warning:?}");
     assert!(
         warning.contains(&blocker.display().to_string()),
         "BootSweep must use the workspace captured by this runtime; got {warning:?}"

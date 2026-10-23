@@ -415,6 +415,7 @@ async fn boot_sweep_logs_storage_open_failure_and_continues_boot() {
         config_path: tmp.path().join("config.toml"),
         ..Config::default()
     };
+    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
 
     #[derive(Clone, Default)]
     struct Capture(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
@@ -453,7 +454,6 @@ async fn boot_sweep_logs_storage_open_failure_and_continues_boot() {
     assert_eq!(swept, 0);
 
     let warning = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
-    eprintln!("captured boot sweep warning: {warning:?}");
     assert!(
         warning.contains("boot sweep failed"),
         "the storage-open failure must be reported by the sweep, got {warning:?}"
