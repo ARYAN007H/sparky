@@ -252,7 +252,7 @@ async fn an_unreadable_file_writes_no_marker_so_the_next_start_retries() {
         &file,
         b"this is not a sqlite database at all, just text padding",
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("captured import claim failed: {error:#}"));
     let rig = rig();
     assert!(import(&rig, dir.path()).await.is_err());
     let done = crate::storage::import_state::host_import_done(
@@ -331,16 +331,20 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
 
     let old_profile = host.open(&id).await.unwrap();
     let old_context = Arc::clone(old_profile.context());
-    let old_turn = old_context.derive_with(crate::core::runtime::ContextOverlay::new(
-        crate::config::Config::default(),
-        DomainSet::full(),
-        Default::default(),
-    ));
     drop(old_profile);
     assert!(host.release(&id).await.unwrap());
     let current_profile = host.open(&id).await.unwrap();
     let current_context = Arc::clone(current_profile.context());
     assert!(!Arc::ptr_eq(&old_context, &current_context));
+
+    // A stale turn context cannot keep the profile lease alive while the test
+    // reopens the profile. Recreate it from the retired context to verify that
+    // import capture still cannot borrow the reopened profile's fence.
+    let old_turn = old_context.derive_with(crate::core::runtime::ContextOverlay::new(
+        crate::config::Config::default(),
+        DomainSet::full(),
+        Default::default(),
+    ));
 
     let module_scope = crate::storage::scope_for_module(Some(id.as_str()), MODULE_ID).unwrap();
     let stale = super::super::storage_import_support::capture_profile_module_storage(

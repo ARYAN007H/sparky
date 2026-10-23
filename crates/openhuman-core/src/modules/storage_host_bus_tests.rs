@@ -53,8 +53,8 @@ async fn a_module_write_under_a_stale_lease_is_fenced_by_the_host() {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::Duration;
 
-    let shared: Arc<dyn StorageBackend> =
-        Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
+    let shared_fixture = crate::storage::test_support::sqlite_backend().unwrap();
+    let shared: Arc<dyn StorageBackend> = Arc::clone(&shared_fixture.backend);
     let clock = Arc::new(AtomicU64::new(0));
     let reading = Arc::clone(&clock);
     let fences = Arc::new(FenceRegistry::new(move || reading.load(Ordering::SeqCst)));
