@@ -1144,6 +1144,7 @@ async fn run_managed_capture_turn(
         "managed-capture-thread",
     )
     .await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
     // Session transcript stores and their SQLite backend are also cached by
     // workspace path; release them before the next repetition removes it.
     openhuman_core::storage::sessions::release_workspace(&workspace_dir);
