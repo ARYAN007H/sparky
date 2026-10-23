@@ -112,8 +112,8 @@
   {
     "rule": "file-mutation",
     "path": "crates/openhuman-core/src/artifacts/tiny_store.rs",
-    "line": 146,
-    "text": "tokio::fs::copy(source, owned).await?",
+    "line": 164,
+    "text": "tokio::fs::write(owned, &bytes).await?",
     "occurrence": 1,
     "classification": "external-export",
     "reason": "Materializes versioned artifact bytes in the user-visible artifact file; the versioned record and native blob storage remain separate from this local deliverable.",
