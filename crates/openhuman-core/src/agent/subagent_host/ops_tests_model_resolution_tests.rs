@@ -79,6 +79,31 @@ async fn runner_rejects_spawn_beyond_max_depth() {
     );
 }
 
+#[test]
+fn a_team_depth_cap_below_the_product_limit_is_enforced() {
+    // The runner's depth gate is `checked_child_depth(parent, budget::depth(ctx))`.
+    // A team that caps its tree at one level admits a child and refuses a
+    // grandchild, and a cap above the product limit cannot widen it.
+    use crate::agent::tinyagents::budget::{depth, MAX_SPAWN_DEPTH};
+    use tinyagents_harness::context::RunConfig;
+
+    let mut team = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+    team.max_spawn_depth = Some(1);
+    assert_eq!(depth(&team), 1);
+    assert_eq!(
+        RunConfig::checked_child_depth(0, depth(&team)).ok(),
+        Some(1)
+    );
+    assert!(
+        RunConfig::checked_child_depth(1, depth(&team)).is_err(),
+        "a grandchild of a one-level team is refused"
+    );
+
+    let mut wide = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+    wide.max_spawn_depth = Some(MAX_SPAWN_DEPTH + 3);
+    assert_eq!(depth(&wide), MAX_SPAWN_DEPTH);
+}
+
 #[tokio::test]
 async fn typed_mode_model_override_pins_exact_model_for_spawn() {
     let provider = ScriptedProvider::new(vec![text_response("ok")]);
