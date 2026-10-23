@@ -180,11 +180,12 @@ export function checkEngineClosure(metadata, roots) {
       if (!node) continue;
 
       for (const dep of node.deps ?? []) {
-        // Only normal and build edges count.
-        // dep_kinds may be absent (defaults to normal per cargo convention).
+        // Only normal and build edges count. `cargo metadata` reports a normal
+        // edge as `kind: null` ("dev", "build", or null); dep_kinds may also be
+        // absent, which is a normal edge too.
         const dep_kinds = dep.dep_kinds ?? [{ kind: null }];
         const has_normal_or_build = dep_kinds.some(
-          dk => dk.kind === undefined || dk.kind === 'normal' || dk.kind === 'build'
+          dk => dk.kind == null || dk.kind === 'normal' || dk.kind === 'build'
         );
         if (!has_normal_or_build) continue;
 

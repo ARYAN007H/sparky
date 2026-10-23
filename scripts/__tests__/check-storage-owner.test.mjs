@@ -40,8 +40,8 @@ const regPkg = (name, version, manifest, deps = []) => ({
   dependencies: deps,
 });
 
-/** Normal dep_kinds entry. */
-const NORMAL = [{ kind: 'normal' }];
+/** Normal dep_kinds entry: `cargo metadata` reports a normal edge as `kind: null`. */
+const NORMAL = [{ kind: null }];
 
 /** Resolve node for a path crate. */
 const pathNode = (name, version, deps) => ({
@@ -64,24 +64,26 @@ const regNode = (name, version, deps) => ({
 });
 
 // ---------------------------------------------------------------------------
-// Fixture: transitive engine through tsd crate → must FAIL
-// tinyagents-session (path) -> tinystoragedrivers-sqlite (path) -> rusqlite (registry)
+// Fixture: transitive engine through a non-engine tsd crate → must FAIL
+// tinyagents-session (path) -> tinystoragedrivers-core (path) -> rusqlite (registry)
 // ---------------------------------------------------------------------------
+
+const TSD_CORE_MANIFEST = `${ROOT}/vendor/tinystoragedrivers/crates/tinystoragedrivers-core/Cargo.toml`;
 
 const transitive_engine_fixture = {
   packages: [
-    pathPkg('tinystoragedrivers-sqlite', '1.0.0', TSD_MANIFEST, [
+    pathPkg('tinystoragedrivers-core', '1.0.0', TSD_CORE_MANIFEST, [
       { name: 'rusqlite', pkg: `rusqlite 0.32.1 ${REGISTRY}` },
     ]),
     regPkg('rusqlite', '0.32.1', `${ROOT}/.cargo/registry/src/foo/rusqlite-0.32.1/Cargo.toml`),
     pathPkg('tinyagents-session', '0.1.0', `${ROOT}/crates/tinyagents-session/Cargo.toml`, [
-      { name: 'tinystoragedrivers-sqlite', pkg: 'tinystoragedrivers-sqlite 1.0.0' },
+      { name: 'tinystoragedrivers-core', pkg: 'tinystoragedrivers-core 1.0.0' },
     ]),
   ],
   resolve: {
     nodes: [
-      pathNode('tinyagents-session', '0.1.0', [['tinystoragedrivers-sqlite', '1.0.0', null]]),
-      pathNode('tinystoragedrivers-sqlite', '1.0.0', [['rusqlite', '0.32.1', REGISTRY]]),
+      pathNode('tinyagents-session', '0.1.0', [['tinystoragedrivers-core', '1.0.0', null]]),
+      pathNode('tinystoragedrivers-core', '1.0.0', [['rusqlite', '0.32.1', REGISTRY]]),
       regNode('rusqlite', '0.32.1', []),
     ],
   },
@@ -207,12 +209,16 @@ const aws_s3_fixture = {
 
 const { test, describe } = await import('node:test');
 
-describe('transitive engine through tsd crate → must FAIL', () => {
-  test('produces at least one engine-reach violation', () => {
+describe('transitive engine through a non-engine tsd crate → must FAIL', () => {
+  test('reports rusqlite and the path that reaches it', () => {
     const violations = checkMetadata(transitive_engine_fixture, ROOT);
     const engineViolations = violations.filter(v => v.kind === 'engine-reach');
-    if (engineViolations.length === 0) {
-      throw new Error(`Expected engine-reach violation, got: ${JSON.stringify(violations)}`);
+    if (
+      engineViolations.length !== 1 ||
+      engineViolations[0].engine !== 'rusqlite' ||
+      engineViolations[0].path.join(' -> ') !== 'tinyagents-session -> tinystoragedrivers-core -> rusqlite'
+    ) {
+      throw new Error(`Expected one rusqlite engine-reach via tinystoragedrivers-core, got: ${JSON.stringify(violations)}`);
     }
   });
 });
