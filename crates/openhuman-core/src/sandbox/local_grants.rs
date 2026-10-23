@@ -156,6 +156,13 @@ fn admit_grants_under(
             stores.extend(crate::security::policy::home_credential_stores(&resolved));
         }
     }
+    // A store that is itself a symlink (`~/.ssh` -> `~/dotfiles/ssh`) is also
+    // judged at its target: a grant of that target exposes the same files.
+    let targets: Vec<PathBuf> = stores
+        .iter()
+        .filter_map(|s| s.canonicalize().ok())
+        .collect();
+    stores.extend(targets);
     let admit = |raw: String| -> Option<PathBuf> {
         let path = PathBuf::from(raw);
         let lexical = path.has_root()
@@ -184,13 +191,18 @@ fn admit_grants_under(
             );
             return None;
         }
-        if stores
-            .iter()
-            .any(|store| store.starts_with(&path) || store.starts_with(&resolved))
-        {
+        // Containing a store exposes it; lying inside a store's target is
+        // reading it, whatever the path's own components are called.
+        let overlaps = |store: &PathBuf| {
+            store.starts_with(&path)
+                || store.starts_with(&resolved)
+                || path.starts_with(store)
+                || resolved.starts_with(store)
+        };
+        if stores.iter().any(overlaps) {
             tracing::warn!(
                 path = %path.display(),
-                "[sandbox:grants] refused module grant: it contains a credential store"
+                "[sandbox:grants] refused module grant: it overlaps a credential store"
             );
             return None;
         }
