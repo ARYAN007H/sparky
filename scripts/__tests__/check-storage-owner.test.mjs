@@ -394,6 +394,38 @@ describe('ENGINE_EXCEPTIONS', () => {
     assert.deepEqual([...used], ['tinytools-std -> fs2']);
   });
 
+  test('do not hide another edge into the same engine', () => {
+    // tinyflows -> tinytools-std -> fs2 (excepted) and tinyflows -> lockutil -> fs2 (not).
+    const reg = name => `${name} 1.0.0 ${REGISTRY}`;
+    const fixture = {
+      packages: [
+        pathPkg('tinyflows', '1.0.0', `${ROOT}/vendor/tinyflows/Cargo.toml`),
+        pathPkg('tinytools-std', '1.0.0', `${ROOT}/vendor/tinytools-std/Cargo.toml`),
+        regPkg('lockutil', '1.0.0', '/fake/.cargo/registry/src/x/lockutil-1.0.0/Cargo.toml'),
+        regPkg('fs2', '1.0.0', '/fake/.cargo/registry/src/x/fs2-1.0.0/Cargo.toml'),
+      ],
+      resolve: {
+        nodes: [
+          {
+            id: 'tinyflows 1.0.0',
+            deps: [
+              { name: 'tinytools-std', pkg: 'tinytools-std 1.0.0', dep_kinds: NORMAL },
+              { name: 'lockutil', pkg: reg('lockutil'), dep_kinds: NORMAL },
+            ],
+          },
+          { id: 'tinytools-std 1.0.0', deps: [{ name: 'fs2', pkg: reg('fs2'), dep_kinds: NORMAL }] },
+          { id: reg('lockutil'), deps: [{ name: 'fs2', pkg: reg('fs2'), dep_kinds: NORMAL }] },
+          { id: reg('fs2'), deps: [] },
+        ],
+      },
+    };
+    const v = checkMetadata(fixture, ROOT).filter(x => x.package === 'tinyflows');
+    assert.deepEqual(
+      v.map(x => x.path.join(' -> ')),
+      ['tinyflows -> lockutil -> fs2']
+    );
+  });
+
   test('do not excuse another engine or another package', () => {
     assert.equal(checkMetadata(chain('tinytools-std', 'rusqlite'), ROOT)[0]?.engine, 'rusqlite');
     assert.equal(checkMetadata(chain('tinytools-core', 'fs2'), ROOT)[0]?.engine, 'fs2');

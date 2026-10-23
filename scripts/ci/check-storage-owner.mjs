@@ -229,9 +229,6 @@ export function checkEngineClosure(metadata, roots, used = new Set()) {
         if (!has_normal_or_build) continue;
 
         const dep_id = dep.pkg;
-        if (seen.has(dep_id)) continue;
-        seen.add(dep_id);
-
         const dep_pkg = packages[dep_id];
         if (!dep_pkg) continue;
 
@@ -262,7 +259,11 @@ export function checkEngineClosure(metadata, roots, used = new Set()) {
         // Continue the walk through this dep, regardless of whether it's
         // first-party, owner-owned, or a registry crate.  The BFS always
         // continues so that we can trace a path all the way to a forbidden
-        // crate even when it passes through tsd engine crates.
+        // crate even when it passes through tsd engine crates. `seen` only
+        // stops re-walking a package: every edge into an engine is checked
+        // above, so an excepted edge never hides another path to it.
+        if (seen.has(dep_id)) continue;
+        seen.add(dep_id);
         queue.push([dep_id, dep_name, new_path]);
       }
     }
