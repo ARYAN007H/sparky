@@ -5909,6 +5909,7 @@ dependencies = [
  "tinyflows-module",
  "tinyinference-embeddings",
  "tinyinference-llm 0.5.0",
+ "tinymcp",
  "tinymcp-bus",
  "tinymemory-api",
  "tinymemory-tools",
