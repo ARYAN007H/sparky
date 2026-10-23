@@ -21,10 +21,9 @@ mod common;
 
 use common::gated_provider::GatedProvider;
 use common::{offline_config, runtime};
-use openhuman_embed::{
-    Access, Harness, InMemorySessionStores, Provider, SessionStoreProvider, Workspace,
-};
+use openhuman_embed::{Access, Harness, Provider, SessionStoreProvider, Workspace};
 use serde_json::json;
+use tinyagents_session::InMemorySessionStores;
 use wiremock::matchers::any;
 use wiremock::{Mock, MockServer, ResponseTemplate};
 

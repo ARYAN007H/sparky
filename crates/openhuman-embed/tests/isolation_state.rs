@@ -10,10 +10,11 @@ use common::{
     tool_call_completion, tool_results,
 };
 use openhuman_embed::{
-    Access, Agent, AgentDefinitionSpec, AgentSpec, InMemorySessionStores, Runtime,
-    SessionStoreProvider, ToolScopeSpec, Workspace,
+    Access, Agent, AgentDefinitionSpec, AgentSpec, Runtime, SessionStoreProvider, ToolScopeSpec,
+    Workspace,
 };
 use serde_json::json;
+use tinyagents_session::InMemorySessionStores;
 
 const SESSION: &str = "same-session";
 

@@ -13,10 +13,10 @@ mod common;
 
 use common::{chat_completion, offline_config, runtime, stub_backend};
 use openhuman_embed::{
-    Access, AgentDefinitionSpec, AgentError, AgentSpec, HostTurnTools, InMemorySessionStores,
-    MemoryBinding, Provider, Runtime, SandboxModeSpec, SessionStoreProvider, ToolScopeSpec,
-    Workspace,
+    Access, AgentDefinitionSpec, AgentError, AgentSpec, HostTurnTools, MemoryBinding, Provider,
+    Runtime, SandboxModeSpec, SessionStoreProvider, ToolScopeSpec, Workspace,
 };
+use tinyagents_session::InMemorySessionStores;
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, ResponseTemplate};
 
