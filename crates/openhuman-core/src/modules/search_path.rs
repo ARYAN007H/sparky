@@ -1,9 +1,10 @@
-//! Search-path loading that honours disabled `[components]`.
+//! Search-path loading that honours disabled `[components]` and host config.
 //!
 //! tinybus's `load_search_paths` admits every artifact in every directory, so a
 //! disabled component's library would be mapped (and never unloaded) just by
 //! sitting on the path. This walks the same directories but leaves out files
-//! named after a disabled module's library, without opening them.
+//! named after a disabled module's library, without opening them. TinyMCP is
+//! also loaded separately because it requires the host storage callback.
 
 use std::path::Path;
 
@@ -17,7 +18,12 @@ pub fn configured_module_lib_stems() -> Vec<String> {
         return Vec::new();
     };
     let stem = record.source.lib_name.to_string();
-    [format!("lib{stem}"), stem]
+    [
+        stem.clone(),
+        format!("lib{stem}"),
+        format!("{stem}_module"),
+        format!("lib{stem}_module"),
+    ]
 }
 
 fn module_id_for_artifact(path: &Path) -> Option<&'static str> {
@@ -36,11 +42,11 @@ fn is_skipped(path: &Path, skip: &[String]) -> bool {
         .is_some_and(|stem| skip.iter().any(|s| s == stem))
 }
 
-/// [`ModuleHost::load_search_paths`], minus artifacts named in `skip`.
+/// Load search-path modules, supplying host config to modules that need it.
 ///
-/// A directory with nothing to skip goes through `load_dir` unchanged, which
-/// keeps tinybus's dependency ordering. Only a directory holding a skipped
-/// artifact is loaded file by file.
+/// A directory with no disabled or configured modules goes through `load_dir`
+/// unchanged, which keeps tinybus's dependency ordering. A directory holding
+/// either is loaded file by file, with host config for configured modules.
 pub fn load_enabled(
     host: &ModuleHost,
     skip: &[String],
@@ -65,7 +71,7 @@ pub fn load_enabled(
             Err(_) => Vec::new(),
         };
         files.sort();
-        let has_skipped = files.iter().any(|f| is_skipped(f, skip));
+        let has_skipped = files.iter().any(|f| is_skipped(f, &skip));
         if !has_skipped {
             match host.load_dir(&dir) {
                 Ok(results) => outcomes.extend(results),
