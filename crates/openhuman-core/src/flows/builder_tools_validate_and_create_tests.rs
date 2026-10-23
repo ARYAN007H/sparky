@@ -5,6 +5,7 @@ async fn edit_workflow_rejects_a_result_that_is_structurally_invalid() {
     use tinyflows_bus::catalog::DraftOrigin;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
+    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
     let draft = ops::flows_draft_create(
         &config,
         None,
@@ -361,11 +362,8 @@ async fn edit_workflow_surfaces_draft_write_back_failure() {
 
     // Updating a draft document aborts; creating, reading and listing do not,
     // so the draft loads and only the write-back fails.
-    let database = config.workspace_dir.join("storage/storage.db");
-    let conn = crate::storage::rusqlite::Connection::open(&database).unwrap_or_else(|error| {
-        eprintln!("open {}: {error}; workspace entries: {:?}", database.display(), std::fs::read_dir(&config.workspace_dir).unwrap().map(|entry| entry.unwrap().path()).collect::<Vec<_>>());
-        panic!("open flow draft storage database");
-    });
+    let conn = crate::storage::rusqlite::Connection::open(config.workspace_dir.join("storage/storage.db"))
+        .unwrap();
     // Layout 2 keeps every scope's documents in the `docs` table.
     let docs_table: String = conn
         .query_row(
