@@ -427,7 +427,7 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
                     }),
                     None => Ok(Vec::new()),
                 },
-                Err(error) => Err(error.clone()),
+                Err(error) => Err(anyhow::anyhow!("{error}")),
             };
             eprintln!(
                 "scheduled child never reached its model (spawn calls: {}, child calls: {}, result: {result:?}, runs: {runs:?}, events: {events:?})",
