@@ -71,13 +71,20 @@ thread_local! {
 /// the file. A failure leaves the file untouched and is retried on the next
 /// call, so no stored preference is lost to a transient module error.
 async fn migrate_legacy(ctx: &crate::core::runtime::DispatchCtx, config: &Config) {
-    let _legacy = LEGACY.lock().await;
     let workspace = config.workspace_dir.clone();
-    if migrated()
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .contains(&workspace)
-    {
+    let done = || {
+        migrated()
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(&workspace)
+    };
+    // Fast path: a migrated workspace never waits on the lock. Re-checked
+    // under it, since another pass may have finished while this one waited.
+    if done() {
+        return;
+    }
+    let _legacy = LEGACY.lock().await;
+    if done() {
         return;
     }
     let rows = match file_store::load::<LegacyScopeFile>(ctx, config, USER_SCOPES_FILE).await {
