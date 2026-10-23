@@ -360,3 +360,34 @@ fn the_route_resolves_to_a_provider_the_factory_can_build() {
     .expect("the per-call route builds a chat model");
     assert_eq!(model_id, "x/y");
 }
+
+#[test]
+fn a_failed_lookup_keeps_only_its_expiry_signal() {
+    // The doctor reports "requires refresh" and chat routes a Codex expiry to
+    // the reconnect copy, both from these fixed phrases; the detail beside
+    // them (a refresh response's body) stays out.
+    use super::super::cloud_slug::lookup_failure;
+    let guidance = || "No usable credentials for 'openai'.".to_string();
+    for (error, signal) in [
+        (
+            anyhow::anyhow!("OpenAI OAuth credential requires refresh"),
+            "requires refresh",
+        ),
+        (
+            anyhow::anyhow!(
+                "Codex authentication token is expired — refresh failed: leak-marker. Please reconnect Codex."
+            ),
+            "Codex authentication token is expired",
+        ),
+    ] {
+        let message = lookup_failure(&error, guidance()).to_string();
+        assert!(message.contains(signal), "{message}");
+        assert!(message.contains("No usable credentials"), "{message}");
+        assert!(!message.contains("leak-marker"), "{message}");
+    }
+    let message = lookup_failure(
+        &anyhow::anyhow!("store read failed: leak-marker"),
+        guidance(),
+    );
+    assert_eq!(message.to_string(), guidance());
+}
