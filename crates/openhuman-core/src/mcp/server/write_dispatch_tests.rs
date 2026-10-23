@@ -60,12 +60,6 @@ async fn audit_write_rejection_records_failure_row() {
     config.workspace_dir = tmp.path().join("workspace");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
     crate::mcp::test_module_port::install(&config);
-    let ctx = crate::core::runtime::DispatchCtx::new(
-        crate::core::runtime::CoreContext::for_test_with_config(
-            crate::core::runtime::DomainSet::full(),
-            config.clone(),
-        ),
-    );
 
     let err = ToolCallError::InvalidParams("bad write request".into());
     audit_write_rejection(
@@ -167,6 +161,12 @@ async fn test_dispatch_write_tool_rpc_error_records_audit_and_returns_tool_error
     config.workspace_dir = tmp.path().join("workspace");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
     crate::mcp::test_module_port::install(&config);
+    let ctx = crate::core::runtime::DispatchCtx::new(
+        crate::core::runtime::CoreContext::for_test_with_config(
+            crate::core::runtime::DomainSet::full(),
+            config.clone(),
+        ),
+    );
 
     // Omit the required `text` so the handler (or the missing registration)
     // yields a failure instead of a stored item.
