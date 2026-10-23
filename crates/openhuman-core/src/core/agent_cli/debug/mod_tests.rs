@@ -11,6 +11,8 @@ async fn debug_dump_composes_each_flow_prompt_from_the_copilot_bus() {
         ..Config::default()
     };
     crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
+    #[cfg(feature = "mcp")]
+    crate::mcp::install_test_module_port(&config);
     AgentDefinitionRegistry::init_global(&config.workspace_dir)
         .expect("initialize builtin registry");
     let ctx = crate::core::runtime::DispatchCtx::host_default();
