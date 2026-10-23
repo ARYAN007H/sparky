@@ -112,7 +112,10 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
             "legacy question 2",
             "legacy answer 2",
         ] {
-            assert!(adopted_json.contains(message), "adopted transcript lost {message}");
+            assert!(
+                adopted_json.contains(message),
+                "adopted transcript lost {message}"
+            );
         }
 
         // A fresh process over the same workspace resumes without adopting again.
