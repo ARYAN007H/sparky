@@ -91,7 +91,12 @@ async fn a_new_artifact_shares_one_id_and_one_file_between_card_and_record() {
     production.complete().await.unwrap();
 
     let card = get_artifact(&workspace, &id).await.unwrap();
-    assert_eq!(card.status, CardStatus::Ready, "card error: {:?}", card.error);
+    assert_eq!(
+        card.status,
+        CardStatus::Ready,
+        "card error: {:?}",
+        card.error
+    );
     assert_eq!(card.size_bytes, 7);
     let record = versioned_store(&workspace).get(&id).await.unwrap().unwrap();
     assert_eq!(record.status, RecordStatus::Ready);
@@ -133,8 +138,14 @@ async fn a_revision_reuses_the_id_and_file_and_keeps_the_history() {
     // Each version still holds what it was.
     let file_v1 = record.version(1).unwrap().file.clone().unwrap();
     let file_v2 = record.version(2).unwrap().file.clone().unwrap();
-    assert_eq!(stored_file_bytes(&workspace, &file_v1.key).await, b"deck-v1");
-    assert_eq!(stored_file_bytes(&workspace, &file_v2.key).await, b"deck-v2!");
+    assert_eq!(
+        stored_file_bytes(&workspace, &file_v1.key).await,
+        b"deck-v1"
+    );
+    assert_eq!(
+        stored_file_bytes(&workspace, &file_v2.key).await,
+        b"deck-v2!"
+    );
 }
 
 #[tokio::test]

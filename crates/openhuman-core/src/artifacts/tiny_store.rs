@@ -326,8 +326,7 @@ pub fn artifacts_service(
     let file_store = artifact_file_store(workspace_dir);
     let mut service = Artifacts::new(Arc::new(versioned_store(workspace_dir)))
         .with_observer(Arc::new(
-            LegacyUiBridge::new(workspace_dir, files, chat)
-                .with_file_store(file_store.clone()),
+            LegacyUiBridge::new(workspace_dir, files, chat).with_file_store(file_store.clone()),
         ))
         .with_file_roots(guarded_roots(roots));
     if let Some(file_store) = file_store {
@@ -342,9 +341,7 @@ pub(crate) fn artifact_file_store(
     match crate::storage::local::open("artifacts::files", workspace_dir)
         .and_then(|opened| opened.scoped())
     {
-        Ok(scoped) => {
-            Some(Arc::new(tiny_artifacts::BlobFileStore::new(&scoped)))
-        }
+        Ok(scoped) => Some(Arc::new(tiny_artifacts::BlobFileStore::new(&scoped))),
         Err(error) => {
             log::warn!("[artifacts] file storage unavailable: {error:#}");
             None
