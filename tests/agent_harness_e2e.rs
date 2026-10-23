@@ -1121,11 +1121,11 @@ async fn run_managed_capture_turn(
         "orchestrator",
         &workspace_dir,
     );
+    let prior_transcript = transcript_locator.root_for_thread("managed-capture-thread");
     eprintln!(
-        "managed capture prior transcript present: {} destination: {:?}",
-        transcript_locator
-            .root_for_thread("managed-capture-thread")
-            .is_some(),
+        "managed capture prior transcript present: {} path: {:?} destination: {:?}",
+        prior_transcript.is_some(),
+        prior_transcript.as_ref().map(|transcript| transcript.path()),
         transcript_locator.destination_key()
     );
     let mut events = spawn_sse_collector(format!(
