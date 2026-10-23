@@ -37,6 +37,17 @@ impl wiremock::Respond for McpStub {
 
 #[test]
 fn an_embedded_runtime_calls_a_tool_through_the_tinymcp_module() {
+    // The turn's future is large; `block_on` polls it on this thread, which
+    // would otherwise have the default test stack.
+    std::thread::Builder::new()
+        .stack_size(openhuman_embed::process::AGENT_WORKER_STACK_BYTES)
+        .spawn(scenario)
+        .expect("spawn")
+        .join()
+        .expect("scenario");
+}
+
+fn scenario() {
     let _ = tracing_subscriber::fmt()
         .with_env_filter("debug,hyper=info,reqwest=info")
         .with_test_writer()
