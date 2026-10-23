@@ -12,6 +12,7 @@ fn temp_dirs() -> (PathBuf, PathBuf) {
     let (workspace, files) = (root.join("workspace"), root.join("Files"));
     std::fs::create_dir_all(&workspace).unwrap();
     std::fs::create_dir_all(&files).unwrap();
+    crate::storage::local::use_persistent_default_for_test(&workspace);
     (workspace, files)
 }
 
