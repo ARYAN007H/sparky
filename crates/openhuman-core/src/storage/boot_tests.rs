@@ -125,3 +125,25 @@ async fn prepare_scope_migrates_v1_graph_and_harness_rows() {
 
     assert_v1_rows_migrated(&storage).await;
 }
+
+#[tokio::test]
+async fn remigrate_owners_carries_v1_rows_copied_after_preparation() {
+    use tinyagents_graph::checkpoint::{Checkpointer, DriverCheckpointer};
+    let backend = tinystoragedrivers_testkit::MemoryBackend::new();
+    let scope = super::super::scope::scope_for_profile("profile-b");
+    let storage = backend.for_scope(&scope).unwrap();
+    // The scope move prepares the target (the owner steps finish on an empty
+    // scope) and only then copies the v1 rows in.
+    prepare_scope(&storage, &scope).await.unwrap();
+    put_v1_rows(&storage).await;
+
+    // A finished step is skipped, so preparing again does not carry them.
+    prepare_scope(&storage, &scope).await.unwrap();
+    let checkpointer =
+        DriverCheckpointer::<i32>::with_namespace(Arc::clone(storage.documents()), "delegation");
+    assert!(checkpointer.get("t", None).await.unwrap().is_none());
+
+    remigrate_owners(&storage, &scope).await.unwrap();
+
+    assert_v1_rows_migrated(&storage).await;
+}

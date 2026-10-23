@@ -92,9 +92,37 @@ pub async fn prepare_scope(storage: &Storage, scope: &Scope) -> Result<usize, St
 /// key-value stores move to their v2 names. Idempotent.
 async fn migrate_owners(storage: &Storage, scope: &Scope) -> Result<(), StorageError> {
     let scoped = tinyagents_storage_kit::ScopedStorage::new(storage.clone(), scope.clone());
-    tinyagents_graph::storage::open_storage(scoped.clone()).await?;
-    tinyagents_harness::storage::open_storage(scoped).await?;
-    Ok(())
+    // Each owner migrates independently: a graph failure must not hold back
+    // the harness records. The first error is returned after both ran.
+    let graph = tinyagents_graph::storage::open_storage(scoped.clone()).await;
+    let harness = tinyagents_harness::storage::open_storage(scoped).await;
+    graph.and(harness).map(|_| ())
+}
+
+/// Runs the graph and harness owner migrations on `scope` again after an
+/// importer copied v1 records into it (the scope move). Their steps already
+/// finished on the then-empty scope when it was prepared, and a finished step
+/// is skipped, so the two owners' progress records are cleared first. The
+/// steps write absent-only, so re-running over migrated records changes
+/// nothing.
+///
+/// # Errors
+///
+/// The first storage error; the cleared steps re-run on the next preparation.
+pub async fn remigrate_owners(storage: &Storage, scope: &Scope) -> Result<(), StorageError> {
+    use tinyagents_storage_kit::{DocumentStoreExt, MIGRATIONS_COLLECTION};
+    use tinystoragedrivers::{CollectionSpec, Precondition, Query};
+    let docs = storage.documents();
+    docs.ensure_collection(&CollectionSpec::new(MIGRATIONS_COLLECTION))
+        .await?;
+    for progress in docs.query_all(MIGRATIONS_COLLECTION, &Query::all()).await? {
+        let owner = progress.doc.get("owner").and_then(|value| value.as_str());
+        if matches!(owner, Some("graph" | "harness")) {
+            docs.delete(MIGRATIONS_COLLECTION, &progress.id, Precondition::None)
+                .await?;
+        }
+    }
+    migrate_owners(storage, scope).await
 }
 
 #[cfg(test)]
