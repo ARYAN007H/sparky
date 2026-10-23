@@ -227,7 +227,6 @@ impl OpenHumanSessionHost {
         self.turn_with_origin(user_message, None).await
     }
 
-
     /// Publish a caller-driven visibility/policy mutation into the live hook
     /// state. The runtime keeps generic snapshots immutable per request; this
     /// simply replaces the host composition from which the *next* snapshot,
