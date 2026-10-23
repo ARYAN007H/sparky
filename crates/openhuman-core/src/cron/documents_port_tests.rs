@@ -132,11 +132,13 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
 
     let migrated_job = docs.get("cron.jobs", "legacy-job").await.unwrap().unwrap();
     assert_eq!(
-        migrated_job.doc["created_ms"],
-        1772600767123_i64,
+        migrated_job.doc["created_ms"], 1772600767123_i64,
         "legacy creation time is preserved in the document body"
     );
-    assert!(migrated_job.meta.created_ms > 0, "backend owns record metadata");
+    assert!(
+        migrated_job.meta.created_ms > 0,
+        "backend owns record metadata"
+    );
     for (collection, id) in [
         ("cron_jobs", "legacy-job"),
         ("cron_runs", "00000000000000000007"),
@@ -152,8 +154,9 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
             .await
             .unwrap()
             .expect("the imported counter remains readable")
-            .doc["next"],
-        8
+            .doc["value"],
+        7,
+        "the shared counter stores the last allocated run number"
     );
     for progress in [
         "cron/cron.jobs/jobs_v2",
