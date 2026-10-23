@@ -224,7 +224,7 @@ fn tinybox_registry_matches_the_published_v020_release_manifest() {
 fn tinymcp_registry_matches_the_published_v0201_release_manifest() {
     let record = find("tinymcp").expect("compiled TinyMCP module");
     assert_eq!(record.version, "0.20.1");
-    assert_eq!(tinymcp_bus::CONTRACT_VERSION, (1, 27));
+    assert_eq!(tinymcp_bus::CONTRACT_VERSION, (1, 28));
     assert_eq!(
         record.release_url,
         "https://github.com/tinyhumansai/tinymcp/releases/tag/v0.20.1"
