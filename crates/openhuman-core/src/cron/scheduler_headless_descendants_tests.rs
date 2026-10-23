@@ -409,7 +409,12 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
         Ok(Ok(())) => {}
         Ok(Err(error)) => panic!("scheduled child exited before its model call: {error}"),
         Err(_) => {
-            let _ = tokio::time::timeout(std::time::Duration::from_secs(5), run).await;
+            let result = tokio::time::timeout(std::time::Duration::from_secs(5), run).await;
+            eprintln!(
+                "scheduled child never reached its model (spawn calls: {}, child calls: {}, result: {result:?})",
+                model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
+                model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
+            );
             panic!("scheduled child never reached its model");
         }
     }
