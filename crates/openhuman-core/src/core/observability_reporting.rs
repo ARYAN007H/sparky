@@ -46,6 +46,10 @@ pub fn report_error_or_expected<E: Display + ?Sized>(
 }
 
 fn report_expected_message(kind: ExpectedErrorKind, message: &str, domain: &str, operation: &str) {
+    // Same redaction as `report_error_message`: these lines reach the log
+    // sinks (and Sentry breadcrumbs) too. Classification ran on the raw text.
+    let scrubbed = crate::core::log_redaction::scrub_secrets(message);
+    let message = scrubbed.as_str();
     match kind {
         ExpectedErrorKind::LocalAiDisabled => {
             tracing::info!(
