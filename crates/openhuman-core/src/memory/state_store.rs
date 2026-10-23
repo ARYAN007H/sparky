@@ -102,7 +102,7 @@ fn workspace_scope(workspace_dir: &Path) -> Result<crate::storage::Scope> {
     )?)
 }
 
-fn open_workspace_quarantining<T: DeserializeOwned>(
+pub(crate) fn open_workspace_quarantining<T: DeserializeOwned>(
     workspace_dir: &Path,
     name: &str,
 ) -> Result<StateKv> {

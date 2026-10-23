@@ -59,10 +59,8 @@ impl ListStore<PendingDeletion> for FileStore {
             .map_err(|error| StoreError(error.to_string()));
         }
         let all = all.to_vec();
-        super::state_store::save_workspace(&self.workspace_dir, STATE, &all).map_err(|error| {
-            eprintln!("deletion queue save error: {error:#}");
-            StoreError(error.to_string())
-        })
+        super::state_store::save_workspace(&self.workspace_dir, STATE, &all)
+            .map_err(|error| StoreError(error.to_string()))
     }
 }
 
@@ -100,6 +98,33 @@ pub fn enqueue(workspace_dir: &Path, deletion: PendingDeletion) {
 #[must_use]
 pub fn pending(workspace_dir: &Path) -> Vec<PendingDeletion> {
     queue(workspace_dir).pending()
+}
+
+/// Opens the workspace queue before entering a storage callback, where
+/// synchronous storage calls would re-enter the storage bridge.
+pub(crate) fn open_state(
+    workspace_dir: &Path,
+) -> anyhow::Result<crate::storage::state_kv::StateKv> {
+    super::state_store::open_workspace_quarantining::<Vec<PendingDeletion>>(workspace_dir, STATE)
+}
+
+/// Queues one deletion from an async storage callback without re-entering the
+/// synchronous storage bridge.
+pub(crate) async fn enqueue_with_state(
+    state: &crate::storage::state_kv::StateKv,
+    deletion: PendingDeletion,
+) -> anyhow::Result<()> {
+    state
+        .update_async(STATE, move |all: &mut Vec<PendingDeletion>| {
+            if all.contains(&deletion) {
+                ((), false)
+            } else {
+                all.push(deletion.clone());
+                ((), true)
+            }
+        })
+        .await?;
+    Ok(())
 }
 
 /// Runs queued deletions against the engine.
