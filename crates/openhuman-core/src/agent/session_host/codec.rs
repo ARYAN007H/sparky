@@ -21,7 +21,9 @@ pub struct OpenHumanTranscriptCodec;
 impl TranscriptCodec<OpenHumanRunContext> for OpenHumanTranscriptCodec {
     fn decode_history(&self, transcript: &SessionTranscript) -> Result<Vec<Message>, RuntimeError> {
         let rows = replayable_host_rows(&transcript.messages);
-        tinyagents_runtime::transcript::native_transcript_to_messages(&rows)?;
+        tinyagents_runtime::transcript::native_transcript_to_messages(&native_validation_rows(
+            &rows,
+        ))?;
         Ok(message_convert::history_to_messages(&rows))
     }
 
@@ -326,6 +328,25 @@ fn replayable_host_rows(rows: &[TranscriptMessage]) -> std::borrow::Cow<'_, [Tra
                 .collect(),
         )
     }
+}
+
+/// Translate the host's legacy text-dialect result frames only for native
+/// sequence validation. Their durable rows remain user messages so replay
+/// preserves the exact text the XML and p-format dialects consumed.
+fn native_validation_rows(rows: &[TranscriptMessage]) -> Vec<TranscriptMessage> {
+    let mut validation = Vec::with_capacity(rows.len());
+    for row in rows {
+        if row.role == "user" {
+            if let Some(results) = parse_replayed_results(&row.content) {
+                validation.extend(results.into_iter().map(|result| {
+                    TranscriptMessage::tool_result(result.tool_call_id, result.content)
+                }));
+                continue;
+            }
+        }
+        validation.push(row.clone());
+    }
+    validation
 }
 
 #[cfg(test)]
