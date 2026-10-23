@@ -443,7 +443,7 @@ async fn boot_sweep_logs_storage_open_failure_and_continues_boot() {
         .with_writer(capture.clone())
         .with_ansi(false)
         .finish();
-    let _subscriber_guard = tracing::subscriber::set_default(subscriber);
+    tracing::subscriber::set_global_default(subscriber).expect("install test tracing subscriber");
 
     // Registration is lazy and does not open the workspace backend. The
     // module's BootSweep reaches the scoped callback, whose backend open must

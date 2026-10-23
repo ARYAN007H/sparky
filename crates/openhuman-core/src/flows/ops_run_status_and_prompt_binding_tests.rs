@@ -314,7 +314,7 @@ async fn flows_build_copilot_toolset_unhides_the_live_run_tools() {
         .with_writer(capture.clone())
         .with_ansi(false)
         .finish();
-    let _subscriber_guard = tracing::subscriber::set_default(subscriber);
+    tracing::subscriber::set_global_default(subscriber).expect("install test tracing subscriber");
 
     restrict_builder_toolset_for_copilot(&mut agent);
 

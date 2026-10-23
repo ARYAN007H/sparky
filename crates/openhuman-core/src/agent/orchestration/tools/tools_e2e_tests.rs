@@ -25,6 +25,7 @@ async fn spawn_subagent_tool_runs_child_agent_e2e() {
     // tests in this file initialise is not there for this one.
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
+    crate::storage::local::use_persistent_default_for_test(workspace.path());
     let provider = Arc::new(ScriptedModel::new(vec![(
         SPAWN_SUBAGENT_CANARY,
         "spawn-subagent-child-answer",
