@@ -200,6 +200,7 @@ async fn initialized_backend(
 ///
 /// In SaaS mode with no backend installed, or when the default cannot be
 /// opened.
+#[track_caller]
 pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
     if let Some(backend) = installed() {
         return Ok(backend);
@@ -210,14 +211,11 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
     let cell = workspace_backend(workspace_dir);
     if let Some(backend) = cell.get() {
         let backend = Arc::clone(backend);
-        if Arc::strong_count(&backend) == 5 {
-            let trace = format!("{:?}", std::backtrace::Backtrace::force_capture());
-            let trace = trace.lines().take(12).collect::<Vec<_>>().join("\n");
+        if Arc::strong_count(&backend) >= 4 {
             eprintln!(
-                "workspace backend clone reached {} refs at {}\n{}",
+                "workspace backend clone refs={} caller={}",
                 Arc::strong_count(&backend),
-                workspace_dir.display(),
-                trace
+                std::panic::Location::caller()
             );
         }
         return Ok(backend);
