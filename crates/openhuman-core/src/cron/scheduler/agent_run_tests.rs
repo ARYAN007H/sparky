@@ -21,8 +21,6 @@ mod corrective_turn {
     use crate::core::runtime::{CoreContext, DomainSet};
     use std::sync::Arc;
     use tinyflows_bus::schedule::types::{DeliveryConfig, JobType, Schedule};
-    use wiremock::matchers::{method, path};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     const AGENT_ID: &str = "cron-no-reply-agent";
 
@@ -43,44 +41,48 @@ mod corrective_turn {
             definition.system_prompt =
                 tinyagents_definition::PromptSource::Inline("CRON_NO_REPLY_AGENT".into());
             definition.tools = tinyagents_definition::ToolScope::Named(Vec::new());
+            let context = CoreContext::for_test_with_host_kind(
+                crate::core::types::HostKind::Library,
+                DomainSet::full(),
+                Some(self.0.workspace_dir.clone()),
+            );
             Some(HostAgent {
                 definition,
                 config: self.0.clone(),
                 host_tools: None,
                 hooks: Default::default(),
-                context: CoreContext::for_test_with_config(DomainSet::full(), self.0.clone()),
+                context,
             })
         }
     }
 
-    fn answer(text: &str) -> serde_json::Value {
-        serde_json::json!({
-            "id": "chatcmpl-1", "object": "chat.completion", "created": 1, "model": "fixture",
-            "choices": [{ "index": 0, "finish_reason": "stop",
-                "message": { "role": "assistant", "content": text } }],
-            "usage": { "prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2 }
-        })
+    struct ScriptedModel {
+        replies: std::sync::Mutex<std::collections::VecDeque<&'static str>>,
+        requests: Arc<std::sync::Mutex<Vec<serde_json::Value>>>,
     }
 
-    async fn provider(first: &str, then: &str) -> MockServer {
-        let server = MockServer::start().await;
-        Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(answer(first)))
-            .up_to_n_times(1)
-            .with_priority(1)
-            .mount(&server)
-            .await;
-        Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(answer(then)))
-            .with_priority(2)
-            .mount(&server)
-            .await;
-        server
+    #[async_trait::async_trait]
+    impl tinyinference_llm::model::ChatModel<()> for ScriptedModel {
+        async fn invoke(
+            &self,
+            _state: &(),
+            request: tinyinference_llm::model::ModelRequest,
+        ) -> tinyinference_llm::Result<tinyinference_llm::model::ModelResponse> {
+            self.requests
+                .lock()
+                .unwrap()
+                .push(serde_json::to_value(&request).unwrap());
+            let reply = self
+                .replies
+                .lock()
+                .unwrap()
+                .pop_front()
+                .unwrap_or("unexpected");
+            Ok(tinyinference_llm::model::ModelResponse::assistant(reply))
+        }
     }
 
-    fn config(tmp: &tempfile::TempDir, server: &MockServer) -> Config {
+    fn config(tmp: &tempfile::TempDir) -> Config {
         let workspace = tmp.path().join("workspace");
         std::fs::create_dir_all(&workspace).unwrap();
         let mut config = Config {
@@ -94,12 +96,6 @@ mod corrective_turn {
         config.agent.session_dual_write = false;
         config.agent.session_shadow_reads = false;
         config.default_model = Some("fixture".into());
-        let route = crate::config::schema::EphemeralRoute::from_params(
-            Some(format!("{}/v1", server.uri())),
-            Some("sk-fixture".into()),
-        )
-        .unwrap();
-        crate::config::schema::ephemeral_route::apply(&mut config, route);
         config
     }
 
@@ -134,26 +130,14 @@ mod corrective_turn {
         }
     }
 
-    async fn chat_bodies(server: &MockServer) -> Vec<String> {
-        server
-            .received_requests()
-            .await
-            .unwrap()
-            .iter()
-            .filter(|r| r.url.path().ends_with("/chat/completions"))
-            .map(|r| String::from_utf8_lossy(&r.body).to_string())
-            .collect()
-    }
-
-    fn last_user_message(body: &str) -> String {
-        let body: serde_json::Value = serde_json::from_str(body).unwrap();
-        body["messages"]
+    fn last_user_message(request: &serde_json::Value) -> String {
+        request["messages"]
             .as_array()
             .unwrap()
             .iter()
             .rev()
-            .find(|m| m["role"] == "user")
-            .map(|m| m["content"].as_str().unwrap_or_default().to_string())
+            .find_map(|message| message.get("user"))
+            .map(|user| user.to_string())
             .unwrap_or_default()
     }
 
@@ -161,27 +145,38 @@ mod corrective_turn {
         job: CronJob,
         first: &'static str,
         then: &'static str,
-    ) -> ((bool, String), Vec<String>) {
-        let server = provider(first, then).await;
+    ) -> ((bool, String), Vec<serde_json::Value>) {
         let tmp = tempfile::tempdir().unwrap();
         crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
             .unwrap();
-        let config = config(&tmp, &server);
+        let config = config(&tmp);
+        let requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+        crate::agent::session_host::test_support::install_scripted_model(Arc::new(ScriptedModel {
+            replies: std::sync::Mutex::new([first, then].into()),
+            requests: Arc::clone(&requests),
+        }));
         let resolver: Arc<dyn HostAgentResolver> = Arc::new(OneAgent(config.clone()));
         host_agents::install(Arc::clone(&resolver));
         let (success, output, error) = run_agent_job(&config, &job).await;
         host_agents::clear_if(&resolver);
         assert!(error.is_none(), "{error:?}");
-        ((success, output), chat_bodies(&server).await)
+        let requests = requests.lock().unwrap().clone();
+        ((success, output), requests)
     }
 
     fn on_agent_runtime(test: impl std::future::Future<Output = ()> + Send + 'static) {
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .thread_stack_size(crate::core::runtime::AGENT_WORKER_STACK_BYTES)
-            .build()
+        std::thread::Builder::new()
+            .stack_size(crate::core::runtime::AGENT_WORKER_STACK_BYTES)
+            .spawn(move || {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(test);
+            })
             .unwrap()
-            .block_on(async { tokio::spawn(test).await.unwrap() });
+            .join()
+            .unwrap();
     }
 
     #[test]
@@ -191,8 +186,10 @@ mod corrective_turn {
             let (outcome, chats) = run(reminder_job(), "NO_REPLY", "Time to drink water!").await;
             assert_eq!(outcome, (true, "Time to drink water!".to_string()));
             assert_eq!(chats.len(), 2, "{chats:#?}");
-            assert!(!chats[0].contains(NO_REPLY_CORRECTION));
-            assert_eq!(last_user_message(&chats[1]), NO_REPLY_CORRECTION);
+            assert!(!last_user_message(&chats[0]).contains(NO_REPLY_CORRECTION));
+            let corrective = last_user_message(&chats[1]);
+            assert!(corrective.contains(NO_REPLY_CORRECTION), "{corrective}");
+            assert!(!corrective.contains("drink water"), "{corrective}");
             assert!(last_user_message(&chats[0]).contains("drink water"));
         });
     }
