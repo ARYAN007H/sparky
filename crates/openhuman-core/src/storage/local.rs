@@ -209,7 +209,16 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
 
     let cell = workspace_backend(workspace_dir);
     if let Some(backend) = cell.get() {
-        return Ok(Arc::clone(backend));
+        let backend = Arc::clone(backend);
+        if Arc::strong_count(&backend) >= 5 {
+            eprintln!(
+                "workspace backend clone reached {} refs at {}\n{}",
+                Arc::strong_count(&backend),
+                workspace_dir.display(),
+                std::backtrace::Backtrace::force_capture()
+            );
+        }
+        return Ok(backend);
     }
     let workspace_dir = workspace_dir.to_path_buf();
     super::block_on_anyhow(async move { initialized_backend(cell, workspace_dir).await })
