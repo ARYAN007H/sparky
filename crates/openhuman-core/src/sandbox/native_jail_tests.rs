@@ -195,6 +195,22 @@ fn a_workspace_inside_a_credential_store_is_refused() {
 }
 
 #[test]
+fn a_workspace_not_yet_created_inside_a_credential_store_is_refused() {
+    let home = home_with(&[".aws/"]);
+
+    // The workspace folder doesn't exist yet; it still lands inside `~/.aws`.
+    let err = credential_denials(
+        crate::security::policy::home_credential_stores(home.path()),
+        &home.path().join(".aws/new-project"),
+        &[],
+    )
+    .unwrap_err()
+    .to_string();
+
+    assert!(err.contains("`.aws`"), "{err}");
+}
+
+#[test]
 fn a_writable_grant_inside_a_credential_store_is_refused() {
     let home = home_with(&[".kube/"]);
     let root = tempfile::tempdir().unwrap();

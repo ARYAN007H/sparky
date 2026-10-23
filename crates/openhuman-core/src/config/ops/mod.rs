@@ -2,6 +2,7 @@
 
 mod agent;
 mod agent_paths;
+pub(crate) use agent_paths::canonical_prefix;
 mod cloud_providers;
 mod loader;
 mod model;
