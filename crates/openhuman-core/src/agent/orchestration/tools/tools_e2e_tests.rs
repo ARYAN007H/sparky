@@ -281,6 +281,7 @@ async fn spawn_subagent_reports_a_stopped_child_as_incomplete_progress() {
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn failed_async_child_is_reported_to_the_parent_without_a_success_result() {
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
@@ -294,11 +295,20 @@ async fn failed_async_child_is_reported_to_the_parent_without_a_success_result()
         vec![],
     );
     parent.on_progress = Some(progress_tx);
-    let (live, _core) = continuation_tests::core_backed_live_parent(
+    let storage = crate::storage::test_support::sqlite_backend()
+        .expect("SQLite backend supports durable child claims");
+    let _storage_guard = crate::storage::test_support::install_for_test(
+        &storage.url,
+        Arc::clone(&storage.backend),
+    );
+    let mut config = crate::config::Config::default();
+    config.storage.url = Some(storage.url.clone());
+    let (live, _core) = continuation_tests::core_backed_live_parent_with_config(
         workspace.path(),
         parent,
         "failed-async-child-session",
         "failed-async-child-thread",
+        config,
     );
     let accepted = SpawnSubagentTool::new()
         .execute_with_live_parent_context(

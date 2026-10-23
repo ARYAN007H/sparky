@@ -667,6 +667,21 @@ pub(super) fn core_backed_live_parent(
     tinyagents_harness::context::RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
     Arc<crate::core::runtime::CoreContext>,
 ) {
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.to_path_buf();
+    core_backed_live_parent_with_config(workspace, parent, session_id, thread_id, config)
+}
+
+pub(super) fn core_backed_live_parent_with_config(
+    workspace: &std::path::Path,
+    parent: crate::agent::subagent_host::ParentExecutionContext,
+    session_id: &str,
+    thread_id: &str,
+    mut config: crate::config::Config,
+) -> (
+    tinyagents_harness::context::RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    Arc<crate::core::runtime::CoreContext>,
+) {
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
 
@@ -677,7 +692,6 @@ pub(super) fn core_backed_live_parent(
     definition.model = tinyagents_definition::ModelSpec::Inherit;
     let definitions =
         Arc::new(AgentDefinitionRegistry::builtins_only().with_definitions([definition]));
-    let mut config = crate::config::Config::default();
     config.workspace_dir = workspace.to_path_buf();
     config.components.juice = false;
     let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
