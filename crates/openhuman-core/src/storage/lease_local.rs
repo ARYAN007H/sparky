@@ -73,15 +73,36 @@ fn is_contended(error: &io::Error) -> bool {
 /// A blocking sleep: the caller holds the `held` std mutex, so it can't await.
 // ponytail: a bounded retry absorbs probes; a probe that takes no lock
 // (F_GETLK) would remove the race outright.
-fn lock_past_probes(file: &File) -> io::Result<()> {
-    for _ in 1..PROBE_ATTEMPTS {
+fn lock_past_probes(file: &File, key: &str, node: &str) -> io::Result<()> {
+    let mut retries = 0;
+    let result = loop {
         match file.try_lock_exclusive() {
-            Err(error) if is_contended(&error) => std::thread::sleep(PROBE_WAIT),
-            other => return other,
+            Err(error) if is_contended(&error) && retries + 1 < PROBE_ATTEMPTS => {
+                #[cfg(test)]
+                CONTENDED_ATTEMPTS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                retries += 1;
+                std::thread::sleep(PROBE_WAIT);
+            }
+            other => break other,
         }
+    };
+    if retries > 0 {
+        tracing::debug!(
+            target: "openhuman::storage::lease",
+            key,
+            node,
+            retries,
+            locked = result.is_ok(),
+            "[lease] local acquire retried a contended lock"
+        );
     }
-    file.try_lock_exclusive()
+    result
 }
+
+/// Contended attempts `lock_past_probes` has retried, so a test can release
+/// its stand-in probe lock only once `acquire` has actually met it.
+#[cfg(test)]
+static CONTENDED_ATTEMPTS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
 impl LocalLeases {
     /// Leases under `root` for `node`.
@@ -188,7 +209,7 @@ impl LeaseStore for LocalLeases {
             });
         }
         let file = self.open_lock(key)?;
-        if let Err(error) = lock_past_probes(&file) {
+        if let Err(error) = lock_past_probes(&file, key, &self.node) {
             if !is_contended(&error) {
                 let path = local_dir(&self.root, key).join(LOCK_FILE);
                 return Err(io_error("lock", &path, &error).into());

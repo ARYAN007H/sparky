@@ -187,8 +187,16 @@ async fn acquire_rides_out_a_transient_inspection_lock() {
         .open(key_dir.join(LOCK_FILE))
         .unwrap();
     probe.try_lock_exclusive().unwrap();
+    // Release the stand-in probe only after `acquire` has met it contended,
+    // so the test always exercises the retry rather than racing a timer.
+    let seen = CONTENDED_ATTEMPTS.load(std::sync::atomic::Ordering::SeqCst);
     let release = std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(2));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while CONTENDED_ATTEMPTS.load(std::sync::atomic::Ordering::SeqCst) == seen
+            && std::time::Instant::now() < deadline
+        {
+            std::thread::yield_now();
+        }
         FileExt::unlock(&probe).unwrap();
     });
 
@@ -196,4 +204,8 @@ async fn acquire_rides_out_a_transient_inspection_lock() {
     release.join().unwrap();
     let grant = grant.expect("a probe-length lock must not refuse the acquire");
     assert_eq!((grant.epoch, grant.previous_unclean), (2, true));
+    assert!(
+        CONTENDED_ATTEMPTS.load(std::sync::atomic::Ordering::SeqCst) > seen,
+        "the acquire never met the probe lock"
+    );
 }
