@@ -131,7 +131,12 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
     assert_eq!(runs[0].output.as_deref(), Some("legacy output"));
 
     let migrated_job = docs.get("cron.jobs", "legacy-job").await.unwrap().unwrap();
-    assert_eq!(migrated_job.meta.created_ms, 1772600767123_i64);
+    assert_eq!(
+        migrated_job.doc["created_ms"],
+        1772600767123_i64,
+        "legacy creation time is preserved in the document body"
+    );
+    assert!(migrated_job.meta.created_ms > 0, "backend owns record metadata");
     for (collection, id) in [
         ("cron_jobs", "legacy-job"),
         ("cron_runs", "00000000000000000007"),
