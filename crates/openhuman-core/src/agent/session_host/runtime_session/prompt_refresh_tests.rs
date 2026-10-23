@@ -28,6 +28,7 @@ fn host_with(
     let mut host = crate::agent::SessionHostBuilder::new()
         .with_session_history_locator(Arc::clone(locator))
         .chat_model(chat_model)
+        .model_name("test/session-fixture".to_string())
         .tools(Vec::new())
         .prompt_builder(prompt)
         .workspace_dir(root.join("workspace"))
