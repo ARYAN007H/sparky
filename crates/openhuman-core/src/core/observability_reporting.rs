@@ -453,6 +453,8 @@ fn report_expected_message(kind: ExpectedErrorKind, message: &str, domain: &str,
             let code = crate::inference::registry::classify_backend_error(None, raw)
                 .and_then(|classification| classification.token)
                 .unwrap_or_default();
+            // The token echoes the backend's errorCode verbatim; scrub it too.
+            let code = crate::core::log_redaction::scrub_secrets(&code);
             tracing::warn!(
                 domain = domain,
                 operation = operation,

@@ -202,4 +202,21 @@ fn a_backend_error_code_survives_a_secret_in_the_message() {
     let logs = captured_logs(|| report_error_or_expected(&body, "d", "o", &[]));
     assert!(logs.contains("errorCode=fixture-owned"), "{logs}");
     assert!(!logs.contains("sekrit"), "{logs}");
+
+    // An errorCode that is itself secret-shaped is scrubbed too.
+    let leaky = "OpenHuman API error (400): {\"error\":{\"errorCode\":\"code-x\"}}";
+    register_backend_classifier_fixture(
+        leaky,
+        BackendErrorClassification {
+            provider_owned: true,
+            backend_owned: true,
+            reportable: false,
+            token: Some("sk-proj-LEAKEDLEAKEDLEAKED".to_string()),
+            kind: Some(BackendErrorKind::Internal),
+            malformed_bad_request: false,
+        },
+    );
+    let logs = captured_logs(|| report_error_or_expected(&leaky, "d", "o", &[]));
+    assert!(logs.contains("errorCode=[REDACTED]"), "{logs}");
+    assert!(!logs.contains("LEAKED"), "{logs}");
 }
