@@ -140,10 +140,40 @@ pub(super) fn workspace_master_key(
     }
 }
 
+/// Reads the file named by [`MASTER_KEY_FILE_ENV`].
+///
+/// On Unix a key file must not be writable by other users. Read-only group or
+/// other permissions are supported for container secret mounts, where the
+/// runtime may add group-read access for a non-root core.
+pub(super) fn read_master_key_file(path: &Path) -> Result<String, String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let metadata = std::fs::metadata(path).map_err(|e| {
+            format!("cannot inspect master key file permissions ({MASTER_KEY_FILE_ENV}): {e}")
+        })?;
+        let mode = metadata.permissions().mode() & 0o777;
+        if key_file_mode_is_other_writable(mode) {
+            return Err(format!(
+                "master key file ({MASTER_KEY_FILE_ENV}) is writable by other users; \
+                 restrict it to a read-only secret mount"
+            ));
+        }
+    }
+    std::fs::read_to_string(path).map_err(|e| format!("cannot read master key file: {e}"))
+}
+
+#[cfg(unix)]
+pub(super) fn key_file_mode_is_other_writable(mode: u32) -> bool {
+    mode & 0o002 != 0
+}
+
 /// Resolves a key for a profile-scoped diagnostic read without creating or
 /// changing key state. Explicit operator key variables retain their normal
 /// precedence; otherwise only an existing key file beneath `workspace` is
 /// considered. Host key sources are excluded because they can prompt or mint.
+/// Only the encrypted-file backend reads profiles this way.
+#[cfg(feature = "secret-file")]
 pub(super) fn profile_master_key_read_only(
     workspace: &Path,
 ) -> Result<Option<Zeroizing<[u8; 32]>>, SecretStorageError> {
@@ -154,7 +184,7 @@ pub(super) fn profile_master_key_read_only(
     if let Some((key, _)) = master_key_from_env(
         inline.as_deref(),
         file.as_deref(),
-        super::read_master_key_file,
+        read_master_key_file,
     )
     .map_err(SecretStorageError::Backend)?
     {
