@@ -382,6 +382,10 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
 
 #[tokio::test]
 async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("debug")
+        .with_test_writer()
+        .try_init();
     let _inference = crate::inference::inference_test_guard_async().await;
     let model = std::sync::Arc::new(CronChildModel {
         spawn_calls: std::sync::atomic::AtomicUsize::new(0),
