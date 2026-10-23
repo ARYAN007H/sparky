@@ -81,11 +81,12 @@ fn contains_unquoted_single_ampersand(command: &str) -> bool {
 
 #[cfg(test)]
 fn has_hidden_execution(command: &str) -> bool {
+    let command = strip_quoted_heredoc_bodies(command);
     ["$(", "<(", ">("]
         .iter()
         .any(|needle| command.contains(needle))
-        || contains_unquoted_char(command, '`')
-        || contains_unquoted_single_ampersand(command)
+        || contains_unquoted_char(&command, '`')
+        || contains_unquoted_single_ampersand(&command)
 }
 
 #[cfg(test)]
@@ -312,7 +313,12 @@ impl SecurityPolicy {
                 continue;
             };
             let base = normalized_command_name(base_raw);
-            let args: Vec<String> = words.map(|w| w.to_ascii_lowercase()).collect();
+            let args: Vec<String> = words
+                .map(|word| {
+                    word.trim_matches(|character: char| matches!(character, '\'' | '"'))
+                        .to_ascii_lowercase()
+                })
+                .collect();
             let joined = cmd_part.to_ascii_lowercase();
             let segment_class = classify_segment(&base, &args, &joined);
             class = class.max(segment_class);

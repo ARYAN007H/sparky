@@ -228,7 +228,8 @@ pub(super) fn classify_host_command(base: &str, args: &[String], source: &str) -
 }
 
 pub(super) fn is_command_executor_name(name: &str) -> bool {
-    let name = name.strip_suffix(".exe").unwrap_or(name);
+    let name = name.to_ascii_lowercase();
+    let name = name.strip_suffix(".exe").unwrap_or(&name);
     let python = ["pythonw", "python"]
         .iter()
         .any(|prefix| is_versioned_executable(name, prefix));
