@@ -21,7 +21,9 @@ mod common;
 
 use common::gated_provider::GatedProvider;
 use common::{offline_config, runtime};
-use openhuman_embed::{Access, Harness, Provider, Workspace};
+use openhuman_embed::{
+    Access, Harness, InMemorySessionStores, Provider, SessionStoreProvider, Workspace,
+};
 use serde_json::json;
 use wiremock::matchers::any;
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -129,6 +131,7 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
 
             // Answers at once until the overlap proof arms its gate.
             let provider_server = GatedProvider::start(REPLY).await;
+            let session_store = std::sync::Arc::new(InMemorySessionStores::new());
 
             let harness = std::sync::Arc::new(
                 bounded(
@@ -137,6 +140,7 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
                         .config(config)
                         .workspace(Workspace::Ephemeral)
                         .backend_url(backend.uri())
+                        .session_store(session_store.clone())
                         .provider(
                             Provider::openai_compatible(
                                 format!("{}/v1", provider_server.uri()),
@@ -322,10 +326,7 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             // The first session's transcript landed in the harness agent's
             // own store under the workspace (the path-based transcript files
             // are gone). A harness session id is its thread id.
-            let transcripts =
-                tinyagents_session::port::WorkspaceStores::open(&workspace_dir, "harness")
-                    .expect("the harness agent's workspace store")
-                    .transcripts();
+            let transcripts = session_store.for_agent("harness").transcripts;
             assert!(
                 transcripts.root_for_thread(&first.session_id).is_some(),
                 "the first session's transcript was not persisted"

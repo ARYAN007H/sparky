@@ -104,6 +104,8 @@ uuid = { version = "1", features = ["v4"] }
 [dev-dependencies]
 async-trait = "0.1"
 tinymemory-api = { path = "../../vendor/tinymemory/crates/tinymemory-api", features = ["conformance"] }
+tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session", features = ["testkit"] }
+tinystoragedrivers-testkit = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-testkit" }
 dirs = "6"
 zeroize = "1"
 # `cron_tests` builds core `CronJob`s, whose schedule types live in the
