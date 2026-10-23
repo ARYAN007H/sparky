@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   retryServiceUnavailable,
-  serviceUnavailableUrls,
+  retryableFailureUrls,
 } from "../ci/retry-markdown-links.mjs";
 
 const unavailable =
@@ -110,7 +110,6 @@ test("404 or mixed failures are not retried", async () => {
     missing,
     unavailable + missing,
     "",
-    "* [TIMEOUT] <https://example.test/> | Timeout\n",
   ]) {
     const { calls, check } = checker([]);
     assert.equal(
@@ -139,7 +138,7 @@ test("a permanent error discovered on retry remains a failure", async () => {
 });
 
 test("retry inputs deduplicate repeated failures without dropping URL fragments", () => {
-  assert.deepEqual(serviceUnavailableUrls(unavailable.repeat(3)), [
+  assert.deepEqual(retryableFailureUrls(unavailable.repeat(3)), [
     "https://example.test/docs#anchor",
   ]);
 });
