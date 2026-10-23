@@ -4,7 +4,7 @@ use tinyagents_session::transcript::{session_stem, SessionRef};
 
 /// The agent definitions a stem may belong to, by the component their ids
 /// encode to in a stem.
-pub(super) fn known_agents() -> HashMap<String, String> {
+pub(crate) fn known_agents() -> HashMap<String, String> {
     let mut ids: Vec<String> =
         crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
             .list()
@@ -31,7 +31,7 @@ fn agent_component(id: &str) -> Option<String> {
 }
 
 /// The agent whose component `stem` carries, if it is one of `known`.
-pub(super) fn agent_of(stem: &str, known: &HashMap<String, String>) -> Option<String> {
+pub(crate) fn agent_of(stem: &str, known: &HashMap<String, String>) -> Option<String> {
     // Sub-agent transcripts (`parent__child`) belong to their root's agent.
     let root = stem.split("__").next().unwrap_or(stem);
     let mut parts: Vec<&str> = root.split('.').collect();
