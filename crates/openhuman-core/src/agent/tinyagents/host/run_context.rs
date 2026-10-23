@@ -312,6 +312,9 @@ pub struct OpenHumanRunContext {
     /// binding the compaction summarizer recalls under. A child run has its
     /// own and does not inherit it.
     pub(crate) memory_turn: Option<Arc<crate::memory::lifecycle::hooks::MemoryTurn>>,
+    /// Shell commands this turn left running past their yield point. Each run,
+    /// including child runs, has its own registry; dropping the last copy stops them.
+    pub(crate) shell_processes: Arc<crate::sandbox::shell_processes::ShellProcesses>,
 }
 
 /// The host callbacks and caps a turn's harness assembly installs, taken from
@@ -326,14 +329,15 @@ pub(crate) struct HarnessHostPolicy {
     pub(crate) tool_call_cap: Option<usize>,
 }
 
-#[cfg(test)]
-pub(crate) use super::operation_context::tool_context_with_approval;
 pub use super::operation_context::{approval_for_tool, OpenHumanRunExt};
 pub(crate) use super::operation_context::{
     command_environment_for_tool, dispatch_ctx_for_tool, memory_identity_for_tool,
     memory_in_prompt_for_tool, parent_agent_id_for_tool, sandbox_mode_for_tool,
-    task_recency_window_for_tool, turn_origin_for_tool, HostOperationContext,
+    shell_processes_for_tool, task_recency_window_for_tool, turn_origin_for_tool,
+    HostOperationContext,
 };
+#[cfg(test)]
+pub(crate) use super::operation_context::{test_turn_run, tool_context_with_approval};
 
 #[path = "run_context/behavior.rs"]
 mod behavior;

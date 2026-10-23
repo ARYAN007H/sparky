@@ -1,19 +1,22 @@
+use super::shell_description::{command_param_description, shell_description};
+use super::shell_run::{audit_once, run_in_policy, run_native, AuditOnce, YieldRequest};
 #[cfg(feature = "modules")]
 use super::shell_support::container_environment;
-use super::shell_support::{command_failure, exec_result, tool_timeout_message};
-use crate::agent::tinyagents::host::run_context::command_environment_for_tool;
+use super::shell_support::{command_failure, tool_timeout_message};
+use crate::agent::tinyagents::host::run_context::{
+    command_environment_for_tool, dispatch_ctx_for_tool,
+};
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use crate::modules::tinybox::host_runtime::RuntimeAdapter;
-use crate::security::{AuditLogger, SecurityPolicy};
-use serde_json::{json, Value};
+use crate::security::{AuditLogger, CommandExecutionLog, SecurityPolicy};
+use async_trait::async_trait;
+use serde_json::json;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::Duration;
-#[cfg(test)]
-use tinytools::Tool;
-use tinytools::ToolResult;
+use std::sync::{Arc, PoisonError};
+use std::time::{Duration, Instant};
 use tinytools::ToolRunContext;
+use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult, ToolTimeout};
 
 /// Maximum output size in bytes (1MB).
 const MAX_OUTPUT_BYTES: usize = 1_048_576;
@@ -59,15 +62,15 @@ fn docker_module_result(
 }
 
 /// Shell command execution tool with sandboxing
-pub(super) struct ShellHost {
-    pub(super) security: Arc<SecurityPolicy>,
-    pub(super) runtime: Arc<dyn RuntimeAdapter>,
-    pub(super) audit: Arc<AuditLogger>,
-    pub(super) analysis_config: Option<Arc<Config>>,
+pub struct ShellTool {
+    security: Arc<SecurityPolicy>,
+    runtime: Arc<dyn RuntimeAdapter>,
+    audit: Arc<AuditLogger>,
+    analysis_config: Option<Arc<Config>>,
 }
 
-impl ShellHost {
-    pub(super) fn new(
+impl ShellTool {
+    pub fn new(
         security: Arc<SecurityPolicy>,
         runtime: Arc<dyn RuntimeAdapter>,
         audit: Arc<AuditLogger>,
@@ -82,7 +85,7 @@ impl ShellHost {
 
     /// Builds a shell tool whose command facts come from the configured
     /// TinyBox module before host authorization and execution.
-    pub(super) fn with_config(
+    pub fn with_config(
         security: Arc<SecurityPolicy>,
         runtime: Arc<dyn RuntimeAdapter>,
         audit: Arc<AuditLogger>,
@@ -98,14 +101,15 @@ impl ShellHost {
 
     /// Resolve the working directory for this shell invocation.
     ///
-    /// Returns the root from a [`WorkspaceDescriptor`] threaded into this
-    /// call's [`ToolExecutionContext`](tinyagents_harness::tool::ToolExecutionContext).
-    /// Otherwise falls back to the shared `self.security.action_dir`.
-    /// See #3376, #4249 (08.5).
-    pub(super) fn effective_action_dir_for_context(
-        &self,
-        context: Option<&dyn ToolRunContext>,
-    ) -> PathBuf {
+    /// Returns the per-worker git-worktree checkout when the tinyagents harness
+    /// threaded a [`WorkspaceDescriptor`] into this call's
+    /// [`ToolExecutionContext`](tinyagents_harness::tool::ToolExecutionContext) — an edit-capable worker running with
+    /// `isolation = "worktree"`, whose isolated worktree root is carried on the
+    /// run context (`RunContext::with_workspace`) and surfaced per tool call via
+    /// `ToolExecutionContext::from_run_context`. Otherwise falls back to the
+    /// shared `self.security.action_dir`, which preserves the non-isolated
+    /// behaviour exactly. See #3376, #4249 (08.5).
+    fn effective_action_dir_for_context(&self, context: Option<&dyn ToolRunContext>) -> PathBuf {
         if let Some(workspace) = context.and_then(|ctx| ctx.workspace()) {
             tracing::debug!(
                 workspace_root = %workspace.root.display(),
@@ -125,8 +129,8 @@ impl ShellHost {
     /// deadline applies only when the caller passes `timeout_secs` (issue
     /// #4023). A `0` explicitly disables it. Any positive value is clamped to
     /// `1..=3600`. See
-    /// [`tinyagents_harness_tools::exec::timeout::explicit_call_timeout_duration`].
-    pub(super) fn explicit_timeout(&self, requested: Option<u64>) -> Option<Duration> {
+    /// `tinyagents_harness_tools::exec::timeout::explicit_call_timeout_duration`.
+    fn explicit_timeout(&self, requested: Option<u64>) -> Option<Duration> {
         tinyagents_harness_tools::exec::timeout::explicit_call_timeout_duration(
             requested,
             tinyagents_harness_tools::exec::timeout::MAX_TIMEOUT_SECS,
@@ -134,17 +138,82 @@ impl ShellHost {
     }
 }
 
-impl ShellHost {
-    pub(super) fn external_effect_with_args(&self, args: &Value) -> bool {
-        args.get("command")
-            .and_then(Value::as_str)
-            .is_some_and(|command| !command.is_empty())
+#[async_trait]
+impl Tool for ShellTool {
+    fn name(&self) -> &str {
+        "shell"
     }
 
-    pub(super) async fn prepare_authorization(
+    fn description(&self) -> &str {
+        shell_description(self.runtime.shell_flavor())
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": command_param_description(self.runtime.shell_flavor())
+                },
+                "category": {
+                    "type": "string",
+                    "enum": ["read", "write", "network", "install", "destructive"],
+                    "description": "Optional self-declared risk; can only raise the approval requirement."
+                },
+                "timeout_secs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3600,
+                    "description": "Optional: how long (seconds) to wait before coming back. A command still running then returns its output so far and keeps running as a process you follow with `shell_process`. Default 120, at most 600; 0 waits for the command to end. Only where a command cannot be left running (four already are, or a Docker sandbox) is it stopped at this time instead. To stop a command after a time, put `timeout N` in the command."
+                }
+            },
+            "required": ["command"]
+        })
+    }
+
+    /// Cap shell output at ~30k chars before threading into history.
+    /// Verbose commands (`find /`, dependency installs, log dumps)
+    /// can otherwise blow past 100k chars in one call. The agent
+    /// rarely needs the full firehose — a head/tail/grep follow-up is
+    /// the right move when it does.
+    fn max_result_size_chars(&self) -> Option<usize> {
+        Some(30_000)
+    }
+
+    /// Shell runs scripts that legitimately take a long time, so it runs
+    /// unbounded unless the caller passes an explicit `timeout_secs`. This
+    /// keeps the harness from hard-killing a long command at the global tool
+    /// timeout (issue #4023).
+    fn timeout_policy(&self, args: &serde_json::Value) -> ToolTimeout {
+        match args.get("timeout_secs").and_then(|v| v.as_u64()) {
+            // `0` (or absent) means "no deadline".
+            None | Some(0) => ToolTimeout::Unbounded,
+            Some(secs) => ToolTimeout::Millis(secs.saturating_mul(1000)),
+        }
+    }
+
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::Execute
+    }
+
+    /// Whether this shell call must be approved by the human before it runs.
+    /// True for any command the current tier prompts on (Write / Network /
+    /// Destructive in ask-before-edit; Network / Destructive in Full). The
+    /// harness routes these through the `ApprovalGate`; the read-only `Block`
+    /// and the structural guard are enforced in `run_with_security`.
+    fn external_effect_with_args(&self, args: &serde_json::Value) -> bool {
+        let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
+        // This synchronous declaration cannot consult TinyBox. Be
+        // conservative here; the host authorization gate uses the exact
+        // per-call TinyBox analysis and applies the configured tier.
+        !command.is_empty()
+    }
+
+    async fn prepare_authorization(
         &self,
-        args: &Value,
-    ) -> anyhow::Result<Option<Value>> {
+        args: &serde_json::Value,
+    ) -> anyhow::Result<Option<serde_json::Value>> {
         #[cfg(feature = "modules")]
         {
             let config = self
@@ -160,7 +229,7 @@ impl ShellHost {
                 .map_err(|_| anyhow::anyhow!("command analysis is unavailable"))?;
             let analysis = serde_json::to_value(analysis)
                 .map_err(|_| anyhow::anyhow!("command analysis is unavailable"))?;
-            Ok(Some(json!({ "analysis": analysis })))
+            return Ok(Some(json!({ "analysis": analysis })));
         }
         #[cfg(not(feature = "modules"))]
         {
@@ -168,9 +237,78 @@ impl ShellHost {
             Err(anyhow::anyhow!("command analysis is unavailable"))
         }
     }
+
+    async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        self.execute_in_context(&dispatch_ctx_for_tool(None), args, None)
+            .await
+    }
+
+    async fn execute_with_context(
+        &self,
+        args: serde_json::Value,
+        _options: ToolCallOptions,
+        context: Option<&dyn ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        self.execute_in_context(&dispatch_ctx_for_tool(context), args, context)
+            .await
+    }
 }
 
-impl ShellHost {
+impl ShellTool {
+    async fn execute_in_context(
+        &self,
+        ctx: &DispatchCtx,
+        args: serde_json::Value,
+        context: Option<&dyn ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        let command = args
+            .get("command")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'command' parameter"))?;
+
+        // The command's deadline: in a turn, what TinyAgents' turn-budget clamp
+        // wrote (the model's own `timeout_secs` is its yield point, moved to
+        // `YIELD_AFTER_ARG` by `middleware::shell_yield`); outside a turn, the
+        // caller's. `None`/`0` ⇒ unbounded (issue #4023).
+        let requested_timeout = args.get("timeout_secs").and_then(|v| v.as_u64());
+        let come_back = YieldRequest::from_args(&args);
+        // `approved` = the command is Prompt-class (required human approval) and
+        // thus went through the harness ApprovalGate to reach here. Reads and
+        // Full-mode writes run without a prompt, so they audit as approved=false
+        // rather than over-claiming a human approval that never happened. (The
+        // gate's exact yes/no isn't threaded into tools; this is the accurate
+        // "required approval" proxy.) A command left running is audited when it
+        // ends, with its real outcome.
+        let approved = self.external_effect_with_args(&args);
+        let audit = audit_once(self.audit.clone(), command.to_owned(), approved);
+        let start = Instant::now();
+        let (allowed, result) = crate::sandbox::shell_progress::with_shell_progress(
+            context,
+            crate::sandbox::shell_progress::HEARTBEAT_INTERVAL,
+            |meter| {
+                self.run_with_security_in_context(
+                    ctx,
+                    command,
+                    requested_timeout,
+                    come_back,
+                    context,
+                    meter,
+                    &audit,
+                )
+            },
+        )
+        .await;
+        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
+        // `allowed` = passed the in-tool security checks.
+        let hook = audit.lock().unwrap_or_else(PoisonError::into_inner).take();
+        if let Some(hook) = hook {
+            hook(allowed, !result.is_error, duration_ms);
+        }
+        Ok(result)
+    }
+}
+
+impl ShellTool {
     /// Run the command through the security policy and runtime. Returns
     /// `(allowed, result)` where `allowed=false` means the policy or rate
     /// limiter blocked execution before the command was launched.
@@ -179,23 +317,35 @@ impl ShellHost {
     /// same gated execution path as the `shell` tool — all security
     /// checks (rate limits, path guards, approval gate routing) apply
     /// identically to workflow-triggered commands.
-    pub(super) async fn run_with_security(
+    pub(crate) async fn run_with_security(
         &self,
         ctx: &DispatchCtx,
         command: &str,
         requested_timeout: Option<u64>,
     ) -> (bool, ToolResult) {
-        self.run_with_security_in_context(ctx, command, requested_timeout, None, None)
-            .await
+        let come_back = YieldRequest::default();
+        let audit = std::sync::Mutex::new(None);
+        self.run_with_security_in_context(
+            ctx,
+            command,
+            requested_timeout,
+            come_back,
+            None,
+            None,
+            &audit,
+        )
+        .await
     }
 
-    pub(super) async fn run_with_security_in_context(
+    async fn run_with_security_in_context(
         &self,
         ctx: &DispatchCtx,
         command: &str,
         requested_timeout: Option<u64>,
+        come_back: YieldRequest,
         context: Option<&dyn ToolRunContext>,
         meter: Option<crate::sandbox::shell_progress::ShellOutputMeter>,
+        audit: &AuditOnce,
     ) -> (bool, ToolResult) {
         let command_environment = command_environment_for_tool(context);
         // Revalidate facts immediately before execution. The authorization
@@ -267,14 +417,9 @@ impl ShellHost {
             let action_dir = saas_action_dir;
             return match resolved {
                 Ok(policy) => {
-                    self.run_in_policy(
-                        ctx,
-                        policy,
-                        command,
-                        requested_timeout,
-                        &action_dir,
-                        context,
-                        meter,
+                    let (timeout, dir) = (requested_timeout, &action_dir);
+                    run_in_policy(
+                        ctx, policy, command, timeout, come_back, dir, context, meter, audit,
                     )
                     .await
                 }
@@ -304,8 +449,18 @@ impl ShellHost {
         };
         if sandbox_required {
             let action_dir = self.effective_action_dir_for_context(context);
+            let timeout = requested_timeout;
             return self
-                .run_sandboxed(ctx, command, requested_timeout, &action_dir, context, meter)
+                .run_sandboxed(
+                    ctx,
+                    command,
+                    timeout,
+                    come_back,
+                    &action_dir,
+                    context,
+                    meter,
+                    audit,
+                )
                 .await;
         }
 
@@ -323,7 +478,10 @@ impl ShellHost {
                 );
             };
 
-            let explicit_timeout = self.explicit_timeout(requested_timeout);
+            // Docker cannot leave a command running: the model's come-back
+            // time stays its deadline here.
+            let explicit_timeout =
+                self.explicit_timeout(come_back.deadline_instead(requested_timeout));
             if let Some(timeout) = explicit_timeout {
                 let timeout_ms = timeout
                     .as_nanos()
@@ -438,25 +596,7 @@ impl ShellHost {
             env.insert(key, value);
         }
 
-        // Point the child's temp dir at the agent's granted scratch dir
-        // (`/tmp/openhuman`, a ReadWrite trusted root — see SecurityPolicy
-        // `from_config`) so `python3 tempfile` / `mktemp` / `$TMPDIR` writes land
-        // in a sandboxed, readable location instead of the world-shared /tmp.
-        let scratch_dir = crate::security::openhuman_scratch_dir();
-        if let (true, Some(scratch)) = (scratch_dir.is_dir(), scratch_dir.to_str()) {
-            tracing::debug!(
-                scratch_dir = %scratch_dir.display(),
-                "[shell] overriding TMPDIR/TMP/TEMP to the openhuman scratch dir"
-            );
-            for name in ["TMPDIR", "TMP", "TEMP"] {
-                env.insert(name.to_owned(), scratch.to_owned());
-            }
-        } else {
-            tracing::debug!(
-                scratch_dir = %scratch_dir.display(),
-                "[shell] scratch dir missing — leaving TMPDIR/TMP/TEMP to the module"
-            );
-        }
+        super::shell_support::use_scratch_tmp(&mut env);
 
         // No default deadline — only a caller-supplied `timeout_secs` bounds the
         // run (issue #4023). TinyBox needs a finite budget, so an unbounded call
@@ -493,8 +633,10 @@ impl ShellHost {
         run.python_utf8 = true;
         run.hide_window = self.runtime.hide_window();
         run.meter = meter;
-        let result = crate::sandbox::shell_exec::run(ctx, &config, run).await;
-        (true, exec_result(result, effective))
+        (
+            true,
+            run_native(ctx, &config, run, come_back, context, audit).await,
+        )
     }
 
     /// Execute a command through the sandbox backend. Called when the
@@ -504,9 +646,11 @@ impl ShellHost {
         ctx: &DispatchCtx,
         command: &str,
         requested_timeout: Option<u64>,
+        come_back: YieldRequest,
         action_dir: &Path,
         context: Option<&dyn ToolRunContext>,
         meter: Option<crate::sandbox::shell_progress::ShellOutputMeter>,
+        audit: &AuditOnce,
     ) -> (bool, ToolResult) {
         let config = crate::config::RuntimeConfig::default();
         let policy = crate::sandbox::resolve_sandbox_policy(
@@ -517,80 +661,39 @@ impl ShellHost {
             &config,
             false,
         );
-        self.run_in_policy(
-            ctx,
-            policy,
-            command,
-            requested_timeout,
-            action_dir,
-            context,
-            meter,
+        let timeout = requested_timeout;
+        run_in_policy(
+            ctx, policy, command, timeout, come_back, action_dir, context, meter, audit,
         )
         .await
     }
+}
 
-    /// Execute a command under a resolved sandbox `policy`.
-    async fn run_in_policy(
-        &self,
-        ctx: &DispatchCtx,
-        policy: crate::sandbox::SandboxPolicy,
-        command: &str,
-        requested_timeout: Option<u64>,
-        action_dir: &Path,
-        context: Option<&dyn ToolRunContext>,
-        meter: Option<crate::sandbox::shell_progress::ShellOutputMeter>,
-    ) -> (bool, ToolResult) {
-        use crate::sandbox;
-
-        tracing::debug!(
-            backend = ?policy.backend,
-            command = command,
-            "[shell] routing to sandbox backend"
+/// Emit a single `CommandExecution` audit event. A write failure is logged as
+/// a structured warning but not propagated — audit must never block or fail a
+/// tool call, yet a silently broken audit trail must not go unnoticed.
+pub(super) fn record_audit(
+    audit: &AuditLogger,
+    command: &str,
+    approved: bool,
+    allowed: bool,
+    success: bool,
+    duration_ms: u64,
+) {
+    if let Err(error) = audit.log_command_event(CommandExecutionLog {
+        channel: "tool:shell",
+        command,
+        risk_level: "unknown",
+        approved,
+        allowed,
+        success,
+        duration_ms,
+    }) {
+        tracing::warn!(
+            error = %error,
+            channel = "tool:shell",
+            "[shell] failed to persist command execution audit event"
         );
-
-        let mut extra_env =
-            std::collections::HashMap::<std::ffi::OsString, std::ffi::OsString>::new();
-        let command_environment = command_environment_for_tool(context);
-        super::shell_support::extend_explicit_environment(
-            &mut extra_env,
-            command_environment.as_deref(),
-        );
-        // Apply the same Git config hardening to local and sandboxed shells.
-        extra_env.extend(tinyagents_harness_tools::fs::filesystem::shell_git_env());
-        // And the same Python defaults the native path sets.
-        for (var, val) in super::shell_support::python_env_defaults(|name| {
-            command_environment
-                .as_ref()
-                .and_then(|overrides| overrides.get(name).map(std::ffi::OsString::from))
-                .or_else(|| {
-                    command_environment
-                        .is_none()
-                        .then(|| std::env::var_os(name))
-                        .flatten()
-                })
-        }) {
-            extra_env.insert(var.into(), val);
-        }
-
-        // Sandbox backends require a finite deadline. Without an explicit
-        // `timeout_secs`, substitute the generous effective-unbounded cap so a
-        // long command isn't killed while still bounding a wedged sandbox.
-        let explicit_timeout = self.explicit_timeout(requested_timeout);
-        let effective = explicit_timeout.unwrap_or_else(|| {
-            Duration::from_secs(tinyagents_harness_tools::exec::timeout::SANDBOX_UNBOUNDED_CAP_SECS)
-        });
-        tracing::debug!(
-            timeout_secs = effective.as_secs(),
-            requested_timeout_secs = ?requested_timeout,
-            unbounded = explicit_timeout.is_none(),
-            "[shell] starting sandboxed command"
-        );
-
-        let result = sandbox::ops::execute_in_sandbox_metered(
-            ctx, &policy, command, action_dir, extra_env, effective, meter,
-        )
-        .await;
-        (true, exec_result(result, effective))
     }
 }
 

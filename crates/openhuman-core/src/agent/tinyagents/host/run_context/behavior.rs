@@ -60,6 +60,7 @@ impl OpenHumanRunContext {
             required_output: None,
             tool_dialect: tinyagents_harness::config::ToolDispatcher::Auto,
             memory_turn: None,
+            shell_processes: crate::sandbox::shell_processes::ShellProcesses::new(),
         }
     }
 
@@ -224,6 +225,7 @@ impl OpenHumanRunContext {
         child.resolved_route = Arc::new(Mutex::new(None));
         child.memory_turn = None;
         child.response_shape = None;
+        child.shell_processes = crate::sandbox::shell_processes::ShellProcesses::new();
         child
     }
 

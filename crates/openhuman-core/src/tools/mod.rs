@@ -6,6 +6,7 @@ pub(crate) mod per_call;
 pub(crate) mod policy_session;
 pub mod registry;
 pub mod rules;
+pub(crate) mod schema_cache;
 mod schemas;
 pub mod sources;
 pub mod timeout;

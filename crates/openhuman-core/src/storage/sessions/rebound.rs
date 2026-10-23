@@ -150,10 +150,7 @@ impl SessionStoreProvider for ReboundSessionStores {
         SessionStoreProvider::try_for_agent(self.current().as_ref(), agent_id)
     }
 
-    fn lease_for_agent(
-        &self,
-        agent_id: &str,
-    ) -> Result<SessionStoreLease, SessionStoreLeaseError> {
+    fn lease_for_agent(&self, agent_id: &str) -> Result<SessionStoreLease, SessionStoreLeaseError> {
         self.current().lease_for_agent(agent_id)
     }
 

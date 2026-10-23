@@ -31,6 +31,7 @@ pub(crate) mod fetched_site;
 pub(crate) mod memory_pack;
 pub(crate) mod packed_tool_route;
 pub(crate) mod repeated_failure;
+pub(crate) mod shell_yield;
 pub(crate) mod tool_outcome_capture;
 pub(crate) mod tool_output;
 pub(crate) mod tool_policy;

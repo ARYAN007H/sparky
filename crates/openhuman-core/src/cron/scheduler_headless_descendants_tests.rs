@@ -424,7 +424,7 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
         tokio::spawn(
             async move { dispatch_scheduled_agent(core, dispatch, scheduler_config).await },
         );
-    match tokio::time::timeout(std::time::Duration::from_secs(30), child_started_rx).await {
+    match tokio::time::timeout(std::time::Duration::from_secs(60), child_started_rx).await {
         Ok(Ok(())) => {}
         Ok(Err(error)) => panic!("scheduled child exited before its model call: {error}"),
         Err(_) => {

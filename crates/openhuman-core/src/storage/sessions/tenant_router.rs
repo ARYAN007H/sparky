@@ -168,10 +168,7 @@ impl SessionStoreProvider for TenantSessionStores {
         provider.try_for_agent(&agent)
     }
 
-    fn lease_for_agent(
-        &self,
-        agent_id: &str,
-    ) -> Result<SessionStoreLease, SessionStoreLeaseError> {
+    fn lease_for_agent(&self, agent_id: &str) -> Result<SessionStoreLease, SessionStoreLeaseError> {
         let (provider, agent) = self.route(agent_id);
         provider.lease_for_agent(&agent)
     }
