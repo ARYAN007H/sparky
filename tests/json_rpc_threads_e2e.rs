@@ -902,12 +902,12 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
     // The host imports classic workspace transcripts during runtime boot.
     // This test builds the router directly, so run the same importer before
     // asking the storage-backed thread API to read the seeded records.
-    let config = openhuman::config::Config::load_or_init()
+    let config = openhuman_core::config::Config::load_or_init()
         .await
         .expect("load test config");
-    let backend = openhuman::storage::local::backend_for(&config.workspace_dir)
+    let backend = openhuman_core::storage::local::backend_for(&config.workspace_dir)
         .expect("open test workspace storage");
-    let reports = openhuman::storage::import::sessions::run_with(&backend, &config);
+    let reports = openhuman_core::storage::import::sessions::run_with(&backend, &config);
     assert!(
         reports.iter().all(|report| report.outcome.is_ok()),
         "import classic session transcripts: {reports:?}"
