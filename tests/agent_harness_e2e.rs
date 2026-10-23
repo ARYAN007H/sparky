@@ -1300,6 +1300,12 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
             std::fs::remove_dir_all(&home).expect("reset only the managed capture profile");
         }
         std::fs::create_dir_all(&home).expect("create managed capture profile");
+        let workspace_storage = home.join("workspace/storage");
+        eprintln!(
+            "managed capture storage path before locator read: {} exists: {}",
+            workspace_storage.display(),
+            workspace_storage.exists()
+        );
         let reset_locator = openhuman_core::storage::sessions::workspace_transcripts(
             "orchestrator",
             &home.join("workspace"),
