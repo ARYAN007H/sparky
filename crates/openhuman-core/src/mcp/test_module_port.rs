@@ -108,22 +108,24 @@ impl McpModulePort for Port {
                     }
                 }
                 ServerArgumentRule::RequiredNonEmptyStringArray { key } => {
-                    let valid = args.get(&key).and_then(Value::as_array).is_some_and(|values| {
-                        !values.is_empty()
-                            && values.iter().all(|value| {
-                                value.as_str().is_some_and(|text| !text.trim().is_empty())
-                            })
-                    });
+                    let valid = args
+                        .get(&key)
+                        .and_then(Value::as_array)
+                        .is_some_and(|values| {
+                            !values.is_empty()
+                                && values.iter().all(|value| {
+                                    value.as_str().is_some_and(|text| !text.trim().is_empty())
+                                })
+                        });
                     if !valid {
-                        return Ok(invalid(&format!("`{key}` must be a non-empty string array")));
+                        return Ok(invalid(&format!(
+                            "`{key}` must be a non-empty string array"
+                        )));
                     }
                 }
                 ServerArgumentRule::OptionalNonEmptyString { key } => {
                     if args.get(&key).is_some_and(|value| {
-                        !value.is_null()
-                            && value
-                                .as_str()
-                                .is_none_or(|text| text.trim().is_empty())
+                        !value.is_null() && value.as_str().is_none_or(|text| text.trim().is_empty())
                     }) {
                         return Ok(invalid(&format!("`{key}` must be a non-empty string")));
                     }

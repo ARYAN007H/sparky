@@ -18,14 +18,9 @@ async fn call_tool_records_write_argument_rejection() {
         ),
     );
 
-    let err = call_tool(
-        &ctx,
-        "memory.learn",
-        json!({ "kind": "fact" }),
-        "mcp:test",
-    )
-    .await
-    .expect_err("missing text should reject");
+    let err = call_tool(&ctx, "memory.learn", json!({ "kind": "fact" }), "mcp:test")
+        .await
+        .expect_err("missing text should reject");
     assert!(
         err.message().contains("missing required argument `text`"),
         "got: {}",
@@ -98,14 +93,9 @@ async fn call_tool_validates_memory_arguments_before_dispatch() {
             config.clone(),
         ),
     );
-    let err = call_tool(
-        &ctx,
-        "memory.forget",
-        json!({ "ids": [] }),
-        "mcp:test",
-    )
-    .await
-    .expect_err("empty ids rejected before any RPC");
+    let err = call_tool(&ctx, "memory.forget", json!({ "ids": [] }), "mcp:test")
+        .await
+        .expect_err("empty ids rejected before any RPC");
     assert!(err.message().contains("`ids`"), "got: {}", err.message());
     let err = call_tool(
         &ctx,
@@ -122,7 +112,6 @@ async fn call_tool_validates_memory_arguments_before_dispatch() {
 }
 
 /// The policy a tool call is judged by comes from the context handed to
-/// `call_tool`, not from whichever context the task happens to be scoped to,
 /// and two sessions running side by side never see each other's.
 #[tokio::test]
 async fn call_tool_judges_the_policy_of_the_explicit_context_across_scopes() {
