@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use tiny_artifacts::{ArtifactKind, ArtifactStatus as RecordStatus, ArtifactStore};
+use tiny_artifacts::{ArtifactKind, ArtifactStatus as RecordStatus, ArtifactStore, FileStore};
 
 use super::*;
 use crate::artifacts::store::get_artifact;
@@ -23,6 +23,17 @@ fn files_in(dir: &PathBuf) -> Vec<String> {
         .collect();
     names.sort();
     names
+}
+
+async fn stored_file_bytes(workspace: &std::path::Path, key: &str) -> Vec<u8> {
+    let storage = crate::storage::local::open("artifacts::files", workspace)
+        .unwrap()
+        .scoped()
+        .unwrap();
+    tiny_artifacts::BlobFileStore::new(&storage)
+        .read(key)
+        .await
+        .unwrap()
 }
 
 async fn produce(
@@ -92,11 +103,7 @@ async fn a_new_artifact_shares_one_id_and_one_file_between_card_and_record() {
     let file = record.latest().unwrap().file.clone().unwrap();
     let expected_key = format!("artifacts/files/{id}/v1.pptx");
     assert_eq!(file.key, expected_key);
-    let kept = crate::artifacts::tiny_store::stored_file_path(&workspace, &file);
-    assert_eq!(
-        kept,
-        crate::artifacts::tiny_store::version_files_dir(&workspace).join(&expected_key)
-    );
+    assert_eq!(stored_file_bytes(&workspace, &file.key).await, b"deck-v1");
     assert_eq!(
         files_in(&files),
         vec!["quarterly-deck.pptx"],
@@ -124,14 +131,10 @@ async fn a_revision_reuses_the_id_and_file_and_keeps_the_history() {
         b"deck-v2!"
     );
     // Each version still holds what it was.
-    let bytes_of = |n: u32| {
-        let file = record.version(n).unwrap().file.clone().unwrap();
-        std::fs::read(crate::artifacts::tiny_store::stored_file_path(
-            &workspace, &file,
-        ))
-    };
-    assert_eq!(bytes_of(1).unwrap(), b"deck-v1");
-    assert_eq!(bytes_of(2).unwrap(), b"deck-v2!");
+    let file_v1 = record.version(1).unwrap().file.clone().unwrap();
+    let file_v2 = record.version(2).unwrap().file.clone().unwrap();
+    assert_eq!(stored_file_bytes(&workspace, &file_v1.key).await, b"deck-v1");
+    assert_eq!(stored_file_bytes(&workspace, &file_v2.key).await, b"deck-v2!");
 }
 
 #[tokio::test]
