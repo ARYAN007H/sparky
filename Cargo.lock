@@ -10014,7 +10014,7 @@ dependencies = [
 
 [[package]]
 name = "tinyjuice-module"
-version = "0.11.0"
+version = "0.11.3"
 dependencies = [
  "log",
  "serde_json",
