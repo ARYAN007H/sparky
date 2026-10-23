@@ -180,3 +180,26 @@ fn expected_and_reported_errors_are_logged_scrubbed() {
         "{reported}"
     );
 }
+
+#[test]
+fn a_backend_error_code_survives_a_secret_in_the_message() {
+    let body = "OpenHuman API error (400): {\"error\":{\"message\":\"bad Bearer sekrit-value\",\"errorCode\":\"x\"}}";
+    register_backend_classifier_fixture(
+        body,
+        BackendErrorClassification {
+            provider_owned: true,
+            backend_owned: true,
+            reportable: false,
+            token: Some("fixture-owned".to_string()),
+            kind: Some(BackendErrorKind::Internal),
+            malformed_bad_request: false,
+        },
+    );
+    assert_eq!(
+        expected_error_kind(body),
+        Some(ExpectedErrorKind::BackendErrorCodeOwned)
+    );
+    let logs = captured_logs(|| report_error_or_expected(&body, "d", "o", &[]));
+    assert!(logs.contains("errorCode=fixture-owned"), "{logs}");
+    assert!(!logs.contains("sekrit"), "{logs}");
+}
