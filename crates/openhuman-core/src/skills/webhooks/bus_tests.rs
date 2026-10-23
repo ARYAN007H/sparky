@@ -148,7 +148,7 @@ mod inbound {
     use std::sync::Arc;
     use std::time::{Duration, Instant};
 
-    use super::super::{route_agent_trigger, triage_agent_directly};
+    use super::super::triage_agent_directly;
     use crate::core::runtime::DispatchCtx;
     use crate::inbound::fixture::{active_config, decision, deferred, Rig, ScriptedTriage};
     use crate::triage::{TriageAction, TriggerEnvelope};
@@ -167,12 +167,11 @@ mod inbound {
     async fn route(rig: &Rig, config: Option<crate::config::Config>, correlation_id: &str) {
         let queues_active = config.as_ref().is_some_and(crate::inbound::active);
         let envelope = request();
-        let queued =
-            route_agent_trigger(config, &envelope, correlation_id, Some(rig.client.clone())).await;
-        assert_eq!(
-            queued, queues_active,
-            "webhook queue handoff did not match config"
-        );
+        let event = crate::inbound::events::webhook(&envelope, correlation_id).unwrap();
+        let handoff =
+            crate::inbound::route::offer(config.as_ref().unwrap(), &rig.client, event).await;
+        let queued = handoff.is_queued();
+        assert_eq!(queued, queues_active, "webhook queue handoff: {handoff:?}");
         if !queued {
             triage_agent_directly(
                 DispatchCtx::host_default(),
