@@ -12,7 +12,7 @@ use futures_util::StreamExt;
 use serde_json::{Value, json};
 use tinyagents_harness_tools::media::{
     ArtifactFiling, FiledArtifact, GeneratedArtifact, MediaArtifactKind, MediaInnerFactory,
-    MediaJobProgress, MediaProgressFn,
+    MediaProgressFn,
 };
 use tinytools::{
     PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolPolicy, ToolResult, ToolRunContext,
@@ -22,9 +22,6 @@ use tokio::io::AsyncWriteExt;
 
 use crate::artifacts::ArtifactKind;
 use crate::artifacts::production::Production;
-use crate::security::approval::ApprovalChatContext;
-use crate::tools::host_extensions::tool_call_id;
-use tinyagents_harness::tinyinference_video::ProgressFn;
 use tinystoragedrivers_api::BlobStore;
 
 /// A host adapter that retains OpenHuman artifact behavior while delegating

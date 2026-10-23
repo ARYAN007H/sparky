@@ -16,8 +16,6 @@
 //! locale table can replace [`StopReasonKind::copy`] without touching the
 //! classification.
 
-use std::fmt::Write as _;
-
 use tinyagents_harness::close::CloseToolResult as CheckpointToolResult;
 use tinyagents_harness::turn_stop::{CopyRequest, TurnStop, TurnStopCopyKey};
 
