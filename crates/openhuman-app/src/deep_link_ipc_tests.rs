@@ -146,3 +146,23 @@ fn round_trip_bind_connect_forward() {
     assert_eq!(got.len(), 1);
     assert_eq!(got[0], "openhuman://auth?token=testtoken123");
 }
+
+#[test]
+fn a_socket_owned_by_another_user_receives_nothing() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let sock_path = tmp.path().join("squatted-deeplink.sock");
+    let listener = UnixListener::bind(&sock_path).unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let me = nix::unistd::getuid().as_raw();
+    assert!(socket_owned_by(&sock_path, me));
+
+    // Forwarding as a different user: our socket is "foreign" to them.
+    let urls = vec!["openhuman://auth?token=secret".to_string()];
+    let result = try_forward_urls_as(&urls, &sock_path, me.wrapping_add(1));
+
+    assert!(matches!(result, ForwardResult::NoPrimary));
+    assert!(
+        listener.accept().is_err(),
+        "nothing may connect to a socket owned by someone else"
+    );
+}
