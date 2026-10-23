@@ -83,7 +83,7 @@ async fn scenario() {
         .mount(&inference)
         .await;
     PointedInference::install(&inference.uri());
-    let _storage = common::install_sqlite_storage().await;
+    openhuman_core::storage::install(Arc::new(tinystoragedrivers_testkit::MemoryBackend::new()));
 
     let root = tempfile::tempdir().unwrap();
     let runtime = ProfileRuntime::builder(SaasConfig::new(root.path()))

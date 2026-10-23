@@ -105,7 +105,7 @@ async fn scenario() {
         .mount(&managed)
         .await;
     PointedInference::install(&managed.uri());
-    let _storage = common::install_sqlite_storage().await;
+    openhuman_core::storage::install(Arc::new(tinystoragedrivers_testkit::MemoryBackend::new()));
 
     let root = tempfile::tempdir().unwrap();
     let store = Arc::new(InMemorySessionStores::new());
