@@ -318,8 +318,10 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
     let fixture = crate::storage::test_support::sqlite_backend().unwrap();
     let backend: Arc<dyn StorageBackend> = Arc::clone(&fixture.backend);
     let id = ProfileId::for_user("import-takeover", ProfileIdMode::Raw).unwrap();
+    let mut saas = SaasConfig::new(root.path());
+    saas.node_id = Some("import-first-node".to_owned());
     let host = ProfileHost::with_backend(
-        SaasConfig::new(root.path()),
+        saas,
         CoreContext::for_test(DomainSet::full(), None),
         Some(Arc::clone(&backend)),
     )
@@ -331,15 +333,36 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
 
     let old_profile = host.open(&id).await.unwrap();
     let old_context = Arc::clone(old_profile.context());
-    let old_context_weak = Arc::downgrade(&old_context);
-    drop(old_context);
     drop(old_profile);
-    assert!(host.release(&id).await.unwrap());
-    let current_profile = host.open(&id).await.unwrap();
+    let lease_ttl = host.saas().lease_ttl();
+    let lease_store = crate::storage::lease::DocumentLeases::cluster(
+        backend.as_ref(),
+        "import-takeover-probe",
+        None,
+        lease_ttl,
+    )
+    .unwrap();
+    let takeover_at = crate::profiles::lease::now_ms().saturating_add(
+        u64::try_from(lease_ttl.as_millis())
+            .unwrap_or(u64::MAX)
+            .saturating_mul(2),
+    );
+    let stolen = lease_store.acquire(id.as_str(), takeover_at).await.unwrap();
+    lease_store.release(stolen).await.unwrap();
+
+    let mut reopened_saas = SaasConfig::new(root.path());
+    reopened_saas.node_id = Some("import-second-node".to_owned());
+    let reopened_host = ProfileHost::with_backend(
+        reopened_saas,
+        CoreContext::for_test(DomainSet::full(), None),
+        Some(Arc::clone(&backend)),
+    )
+    .unwrap()
+    .with_fences(Arc::new(crate::storage::fence::FenceRegistry::new(
+        crate::profiles::lease::now_ms,
+    )));
+    let current_profile = reopened_host.open(&id).await.unwrap();
     let current_context = Arc::clone(current_profile.context());
-    let old_context = old_context_weak
-        .upgrade()
-        .expect("the host retains the retired context for stale-work checks");
     assert!(!Arc::ptr_eq(&old_context, &current_context));
 
     // A stale turn context cannot keep the profile lease alive while the test
@@ -353,7 +376,7 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
 
     let module_scope = crate::storage::scope_for_module(Some(id.as_str()), MODULE_ID).unwrap();
     let stale = super::super::storage_import_support::capture_profile_module_storage(
-        &host,
+        &reopened_host,
         &id,
         id.as_str(),
         &old_turn,
@@ -370,7 +393,7 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
         Default::default(),
     ));
     let captured = super::super::storage_import_support::capture_profile_module_storage(
-        &host,
+        &reopened_host,
         &id,
         id.as_str(),
         &current_turn,

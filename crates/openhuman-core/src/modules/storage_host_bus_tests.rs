@@ -63,13 +63,14 @@ async fn a_module_write_under_a_stale_lease_is_fenced_by_the_host() {
         .ensure_collection(&CollectionSpec::new("notes"))
         .await
         .unwrap();
-    let clock = Arc::new(AtomicU64::new(0));
+    let start_ms = crate::storage::fence::system_now_ms();
+    let clock = Arc::new(AtomicU64::new(start_ms));
     let reading = Arc::clone(&clock);
     let fences = Arc::new(FenceRegistry::new(move || reading.load(Ordering::SeqCst)));
     let ttl = Duration::from_secs(30);
     let leases: Arc<dyn LeaseStore> =
         Arc::new(DocumentLeases::cluster(shared.as_ref(), "node-a", None, ttl).unwrap());
-    let grant_a = leases.acquire("acme", 0).await.unwrap();
+    let grant_a = leases.acquire("acme", start_ms).await.unwrap();
     fences.register(Arc::new(LeaseFence::new(
         Arc::clone(&leases),
         "acme",
