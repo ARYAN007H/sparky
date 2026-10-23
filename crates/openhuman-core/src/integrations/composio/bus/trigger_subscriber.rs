@@ -119,10 +119,16 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
         }
 
         // The env var is a global kill-switch that works even when the config
-        // file is corrupt; an unreadable config otherwise fails open to triage.
-        let config = ctx.load_config().await;
-        if let Some(reason) = triage_skip_reason(config.as_ref().ok(), &toolkit, triage_disabled())
-        {
+        // file is corrupt, so it is checked before (and instead of) a config
+        // read; an unreadable config otherwise fails open to triage.
+        let env_disabled = triage_disabled();
+        let config = if env_disabled {
+            None
+        } else {
+            Some(ctx.load_config().await)
+        };
+        let readable = config.as_ref().and_then(|config| config.as_ref().ok());
+        if let Some(reason) = triage_skip_reason(readable, &toolkit, env_disabled) {
             tracing::debug!(
                 toolkit = %toolkit,
                 trigger = %trigger,
@@ -130,7 +136,7 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
             );
             return;
         }
-        if let Err(e) = &config {
+        if let Some(Err(e)) = &config {
             tracing::warn!(
                 toolkit = %toolkit,
                 trigger = %trigger,
