@@ -410,11 +410,29 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
         Ok(Err(error)) => panic!("scheduled child exited before its model call: {error}"),
         Err(_) => {
             let result = tokio::time::timeout(std::time::Duration::from_secs(5), run).await;
+            let runs = crate::cron::list_runs(&config, &job.id, 10);
+            let events = match &runs {
+                Ok(runs) => match runs.first().and_then(|run| run.run_id.as_deref()) {
+                    Some(run_id) => crate::agent::tinyagents::journal::read_run_events(
+                        &inspect_dispatch,
+                        run_id,
+                        0,
+                    )
+                    .await
+                    .map(|events| {
+                        events
+                            .into_iter()
+                            .map(|event| event.event)
+                            .collect::<Vec<_>>()
+                    }),
+                    None => Ok(Vec::new()),
+                },
+                Err(error) => Err(error.clone()),
+            };
             eprintln!(
-                "scheduled child never reached its model (spawn calls: {}, child calls: {}, result: {result:?}, runs: {:?})",
+                "scheduled child never reached its model (spawn calls: {}, child calls: {}, result: {result:?}, runs: {runs:?}, events: {events:?})",
                 model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
                 model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
-                crate::cron::list_runs(&config, &job.id, 10),
             );
             panic!("scheduled child never reached its model");
         }
