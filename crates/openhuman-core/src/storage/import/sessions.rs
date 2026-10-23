@@ -495,8 +495,9 @@ fn replay_transcript(
     meta: &TranscriptMeta,
     tools: Option<&serde_json::Value>,
     records: Vec<DisplayRecord>,
+    existing: Vec<TranscriptMessage>,
 ) -> Result<usize> {
-    let mut logical = Vec::<TranscriptMessage>::new();
+    let mut logical = existing;
     let mut group = Vec::<DisplayMessage>::new();
     let mut replayed = 0usize;
     let flush = |logical: &mut Vec<TranscriptMessage>,
@@ -734,10 +735,11 @@ pub(crate) fn import_transcript_groups(
             let history = stores
                 .transcripts
                 .open_stem(&destination_stem, meta.clone())?;
-            if history.read_session()?.is_some() {
-                continue;
-            }
-            replay_transcript(history.as_ref(), &meta, tools.as_ref(), records)
+            let existing = history
+                .read_session()?
+                .map(|session| session.messages)
+                .unwrap_or_default();
+            replay_transcript(history.as_ref(), &meta, tools.as_ref(), records, existing)
                 .with_context(|| format!("[sessions] replay transcript {}", path.display()))?;
             written += 1;
         }

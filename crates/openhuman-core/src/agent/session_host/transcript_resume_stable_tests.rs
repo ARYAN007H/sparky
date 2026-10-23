@@ -65,10 +65,12 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
             .collect();
         let legacy_bytes;
         let after_first;
+        let canonical_stem;
         {
             let next = model(vec![ModelResponse::assistant("unused")], scenario.native);
             let mut host = build_host(root.path(), next, scenario.native, &thread);
             let stem = host.session_id().expect("bound session id");
+            canonical_stem = stem.clone();
             let import = place_fixture(root.path(), scenario, &stem, "");
             assert_eq!(import, (2, 2, 0), "legacy fixture import counts");
             legacy_bytes = legacy_files
@@ -94,6 +96,24 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
                 .any(|stem| !legacy_stems.contains(&stem.as_str())),
             "adopted transcript written"
         );
+        let adopted = after_first
+            .get(&canonical_stem)
+            .expect("legacy roots are adopted into the session's canonical stem");
+        assert_eq!(
+            adopted["messages"].as_array().unwrap().len(),
+            5,
+            "both timestamped roots are preserved in the adopted conversation"
+        );
+        let adopted_json = serde_json::to_string(adopted).unwrap();
+        for message in [
+            "legacy system prompt",
+            "legacy question 1",
+            "legacy answer 1",
+            "legacy question 2",
+            "legacy answer 2",
+        ] {
+            assert!(adopted_json.contains(message), "adopted transcript lost {message}");
+        }
 
         // A fresh process over the same workspace resumes without adopting again.
         let next = model(vec![ModelResponse::assistant("unused")], scenario.native);
