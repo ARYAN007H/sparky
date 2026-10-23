@@ -302,6 +302,7 @@ async fn continue_subagent_resumes_idle_durable_session_e2e() {
         .get("task_manager_agent")
         .expect("task_manager_agent definition");
     let workspace = tempfile::TempDir::new().expect("workspace");
+    crate::storage::local::use_persistent_default_for_test(workspace.path());
     let provider = Arc::new(ScriptedModel::new(vec![(
         "continue-durable-canary",
         "resumed-child-answer",
