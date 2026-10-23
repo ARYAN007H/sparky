@@ -239,7 +239,10 @@ pub(super) async fn run_in_policy(
         meter,
     )
     .await;
-    let result = finish(outcome, slot, command, started, effective, audit);
+    // Docker stops the command at the model's time; a native run holding a
+    // slot yields before its deadline, so a timeout here is that bound.
+    let applied = deadline_instead.map_or(effective, |deadline| effective.min(deadline));
+    let result = finish(outcome, slot, command, started, applied, audit);
     (true, result)
 }
 

@@ -166,8 +166,10 @@ impl FixtureLive {
         .await;
         let state = match finished {
             Ok(status) => {
+                // Ended only once the wait itself succeeded.
+                let code = status?.code().unwrap_or(-1);
                 self.ended = true;
-                LiveState::Exited(status?.code().unwrap_or(-1))
+                LiveState::Exited(code)
             }
             Err(_) if tokio::time::Instant::now() >= self.deadline => {
                 self.stop().await;

@@ -229,15 +229,18 @@ impl ShellProcesses {
         let entry = self.entry(id)?;
         let mut entry = entry.lock().await;
         if entry.ended.is_none() {
+            let read = match entry.handle.read(Duration::ZERO).await {
+                Ok(read) => read,
+                Err(error) => {
+                    let message = format!("Could not read process {id}: {error}");
+                    return Err(self.failed(&mut entry, message));
+                }
+            };
             let LiveRead {
                 stdout,
                 stderr,
                 state,
-            } = entry
-                .handle
-                .read(Duration::ZERO)
-                .await
-                .map_err(|error| format!("Could not read process {id}: {error}"))?;
+            } = read;
             entry.pending_stdout.push_str(&stdout);
             entry.pending_stderr.push_str(&stderr);
             self.settle(&mut entry, state);
