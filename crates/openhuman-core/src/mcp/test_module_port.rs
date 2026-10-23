@@ -12,8 +12,9 @@ use crate::config::Config;
 use crate::mcp::module_client::{McpConfiguredClient, McpModulePort};
 use tinybus::module::ModuleCallError;
 use tinymcp_bus::{
-    McpWriteRecord, NewMcpWriteRecord, OpenConfiguredResponse, ServerArgumentRule,
-    ServerArgumentsValidation, TransitionStatus, ValidateServerArgumentsRequest,
+    McpToolPresentation, McpWriteRecord, NewMcpWriteRecord, OpenConfiguredResponse,
+    PrepareAgentToolsRequest, ServerArgumentRule, ServerArgumentsValidation, TransitionStatus,
+    ValidateServerArgumentsRequest,
 };
 
 #[derive(Default)]
@@ -81,6 +82,13 @@ impl McpModulePort for Port {
             }
             _ => Err(ModuleCallError::ModuleFault),
         }
+    }
+
+    async fn prepare_agent_tools(
+        &self,
+        _request: PrepareAgentToolsRequest,
+    ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
+        Ok(Vec::new())
     }
 
     async fn validate_server_arguments(
