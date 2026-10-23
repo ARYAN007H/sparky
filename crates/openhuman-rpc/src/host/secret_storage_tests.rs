@@ -12,6 +12,7 @@ fn product_hosts_persist_secrets_in_the_workspace_registered_after_preflight() {
         let backend = installed_secret_backend().expect("persistent host default");
         assert_eq!(backend.name(), "encrypted_file");
         if stage == "write" {
+            eprintln!("secret workspace={} exists={} metadata={:?} resolved={}", dir.display(), dir.exists(), std::fs::metadata(&dir), crate::core_host::security::secret_storage::workspace_dir_for_file_backend().display());
             backend.set("user:token", "first-value").unwrap();
             backend.set("user:token", "saved-value").unwrap();
         } else {
