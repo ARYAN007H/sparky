@@ -193,6 +193,9 @@ pub(super) fn classify_host_command(base: &str, args: &[String], source: &str) -
             | "printf"
             | "whoami"
             | "date"
+            | "dir"
+            | "type"
+            | "get-content"
     ) || base == "git" && matches!(first, "status" | "diff" | "log" | "show" | "branch")
         || base == "cargo" && matches!(first, "check" | "test" | "tree" | "metadata")
         || matches!(base, "npm" | "pnpm" | "yarn") && matches!(first, "ls" | "list")
