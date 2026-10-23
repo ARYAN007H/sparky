@@ -12,8 +12,6 @@ fn isolated_test_config() -> (tempfile::TempDir, Config) {
     config.workspace_dir = tmp.path().join("workspace");
     config.config_path = tmp.path().join("config.toml");
     std::fs::create_dir_all(&config.workspace_dir).expect("failed to create workspace dir");
-    #[cfg(feature = "storage-sqlite")]
-    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
     (tmp, config)
 }
 

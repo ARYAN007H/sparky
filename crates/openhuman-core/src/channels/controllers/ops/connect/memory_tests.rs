@@ -386,8 +386,6 @@ async fn offline_snapshot_scans_every_thread_and_message_page() {
     let mut config = Config::default();
     config.workspace_dir = tmp.path().to_path_buf();
     config.memory.engine.clear();
-    #[cfg(feature = "storage-sqlite")]
-    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
     use_linked_channel_module(&mut config).await;
     let workspace = config.workspace_dir.clone();
     let ctx = DispatchCtx::ambient();
