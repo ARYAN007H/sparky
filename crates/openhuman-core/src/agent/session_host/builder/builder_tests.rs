@@ -343,13 +343,12 @@ async fn an_empty_named_scope_advertises_no_tools_at_all() {
 
     let tmp = tempfile::TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let result = OpenHumanSessionHost::from_config_for_agent(
+    let agent = OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         "summarizer",
-    );
-    eprintln!("from_config_for_agent error: {:?}", result.as_ref().err());
-    let agent = result.expect("summarizer is a shipped agent definition");
+    )
+    .expect("summarizer is a shipped agent definition");
 
     let visible = &agent.visible_tool_names;
     let real: Vec<&String> = visible
