@@ -85,8 +85,8 @@ fn has_hidden_execution(command: &str) -> bool {
     ["$(", "<(", ">("]
         .iter()
         .any(|needle| command.contains(needle))
-        || contains_unquoted_char(command, '`')
-        || contains_unquoted_single_ampersand(command)
+        || contains_unquoted_char(&command, '`')
+        || contains_unquoted_single_ampersand(&command)
 }
 
 #[cfg(test)]
