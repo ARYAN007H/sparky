@@ -24,6 +24,7 @@ fn test_config(tmp: &TempDir) -> Config {
         ..Config::default()
     };
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
     config
 }
 
@@ -38,6 +39,7 @@ fn remove_job_does_not_write_to_stdout() {
             action_dir: std::env::temp_dir(),
             ..Config::default()
         };
+        crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
         println!("BEGIN_CRON_REMOVE_CAPTURE");
         use std::io::Write;
         std::io::stdout().flush().unwrap();
