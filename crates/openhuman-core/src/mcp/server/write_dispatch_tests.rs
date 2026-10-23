@@ -59,14 +59,7 @@ async fn audit_write_rejection_records_failure_row() {
     let mut config = Config::default();
     config.workspace_dir = tmp.path().join("workspace");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
-    config.modules.source = crate::config::schema::ModuleSourceMode::Source;
-    let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
-    let _storage = crate::storage::test_support::install_backend_for_test(std::sync::Arc::clone(
-        &backend.backend,
-    ));
-    crate::modules::ops::ensure_loaded(&config, "tinymcp")
-        .await
-        .expect("load the staged TinyMCP test module");
+    crate::mcp::test_module_port::install(&config);
 
     let err = ToolCallError::InvalidParams("bad write request".into());
     audit_write_rejection(
@@ -167,14 +160,7 @@ async fn test_dispatch_write_tool_rpc_error_records_audit_and_returns_tool_error
     let mut config = Config::default();
     config.workspace_dir = tmp.path().join("workspace");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
-    config.modules.source = crate::config::schema::ModuleSourceMode::Source;
-    let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
-    let _storage = crate::storage::test_support::install_backend_for_test(std::sync::Arc::clone(
-        &backend.backend,
-    ));
-    crate::modules::ops::ensure_loaded(&config, "tinymcp")
-        .await
-        .expect("load the staged TinyMCP test module");
+    crate::mcp::test_module_port::install(&config);
 
     // Omit the required `text` so the handler (or the missing registration)
     // yields a failure instead of a stored item.
@@ -223,14 +209,7 @@ async fn test_audit_write_success_path() {
     let mut config = Config::default();
     config.workspace_dir = tmp.path().join("workspace");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
-    config.modules.source = crate::config::schema::ModuleSourceMode::Source;
-    let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
-    let _storage = crate::storage::test_support::install_backend_for_test(std::sync::Arc::clone(
-        &backend.backend,
-    ));
-    crate::modules::ops::ensure_loaded(&config, "tinymcp")
-        .await
-        .expect("load the staged TinyMCP test module");
+    crate::mcp::test_module_port::install(&config);
 
     audit_write(
         &config,
