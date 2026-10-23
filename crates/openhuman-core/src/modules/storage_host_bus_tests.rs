@@ -163,7 +163,7 @@ async fn the_bus_hands_the_host_the_brokers_sender_and_nothing_else() {
         .call("Get", get("notes", "a"))
         .await
         .unwrap();
-    assert_eq!(found["document_id"], "a");
+    assert_eq!(found["id"], "a");
 
     // ...a peer that is not a module is refused with the denial name, not data.
     let refused = documents(&outsider)
