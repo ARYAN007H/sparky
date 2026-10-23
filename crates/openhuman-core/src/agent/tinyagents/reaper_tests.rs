@@ -79,6 +79,7 @@ async fn a_build_only_runtime_is_swept_before_it_can_be_invoked() {
     // `OPENHUMAN_WORKSPACE` names the root; the resolved workspace is the
     // `workspace` directory under it, which is what the sweep will read.
     let workspace = tmp.join("workspace");
+    crate::storage::local::use_persistent_default_for_test(&workspace);
     let store = crate::storage::sessions::status_store_for(&workspace).expect("status store");
     let orphan = seed_status(&store, ExecutionStatus::Running).await;
     assert_eq!(store.list_active().await.unwrap().len(), 1);
@@ -140,6 +141,7 @@ async fn boot_child() {
     let root = std::path::PathBuf::from(
         std::env::var_os("OPENHUMAN_WORKSPACE").expect("parent exports OPENHUMAN_WORKSPACE"),
     );
+    crate::storage::local::use_persistent_default_for_test(&root.join("workspace"));
     let built = CoreBuilder::new(HostKind::Cli)
         .services(ServiceSet::none())
         .domains(DomainSet::harness())
