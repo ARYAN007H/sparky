@@ -184,3 +184,18 @@ fn another_users_socket_is_neither_bound_over_nor_unlinked() {
     let _client = UnixStream::connect(&sock_path).unwrap();
     listener.accept().unwrap();
 }
+
+#[test]
+fn our_own_live_primary_is_left_bound() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let sock_path = tmp.path().join("live-deeplink.sock");
+    let listener = UnixListener::bind(&sock_path).unwrap();
+    let me = nix::unistd::getuid().as_raw();
+
+    // Same user, live listener: a secondary instance must not take over.
+    assert!(bind_and_listen_as(sock_path.clone(), me).is_none());
+
+    assert!(sock_path.exists());
+    let _client = UnixStream::connect(&sock_path).unwrap();
+    listener.accept().unwrap();
+}
