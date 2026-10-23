@@ -146,13 +146,15 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
             "successful migration retires {collection}/{id}"
         );
     }
+    // v1 kept the next run number to hand out; the v2 counter (`{value}`)
+    // holds the last one issued, so the next run is still number 8.
     assert_eq!(
         docs.get("tsd.counters", "cron/runs")
             .await
             .unwrap()
             .expect("the imported counter remains readable")
-            .doc["next"],
-        8
+            .doc["value"],
+        7
     );
     for progress in [
         "cron/cron.jobs/jobs_v2",
