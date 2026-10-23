@@ -116,6 +116,7 @@ fn is_command_executor(command: &str) -> bool {
             | "lua"
             | "awk"
             | "xargs"
+            | "env"
     )
 }
 
