@@ -377,6 +377,10 @@ fn decode_display_message(
     value: &serde_json::Value,
     sanitized_system: &mut bool,
 ) -> Result<DisplayMessage> {
+    // The typed transcript row shape was introduced in row version 2.
+    // Keep this importer compatible with older TinyAgents pins that do not
+    // expose the format version constant publicly.
+    const TYPED_ROW_VERSION: u32 = 2;
     let mut message: TranscriptMessage =
         serde_json::from_value(value.clone()).context("decode transcript message")?;
     let row_version = value
@@ -384,11 +388,11 @@ fn decode_display_message(
         .and_then(serde_json::Value::as_u64)
         .unwrap_or_default() as u32;
     let usage_tool_calls = message.tool_calls.clone();
-    if row_version != tinyagents_session::transcript::TYPED_ROW_VERSION {
+    if row_version != TYPED_ROW_VERSION {
         message.tool_calls.clear();
         message.tool_call_id = None;
         message.parts = None;
-        if row_version < tinyagents_session::transcript::TYPED_ROW_VERSION {
+        if row_version < TYPED_ROW_VERSION {
             message = message.normalized();
         }
     }
