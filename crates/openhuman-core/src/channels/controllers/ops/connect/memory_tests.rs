@@ -48,6 +48,8 @@ async fn store_channel_thread(
     channel: &str,
     message_id: &str,
 ) -> String {
+    #[cfg(feature = "storage-sqlite")]
+    crate::storage::local::use_persistent_default_for_test(workspace);
     let params = crate::channels::providers::relay::RelayInboundParams::new(
         channel,
         format!("chat-{message_id}"),
