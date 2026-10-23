@@ -100,3 +100,55 @@ async fn a_workspace_with_no_legacy_file_is_marked_migrated() {
     migrate_legacy(&crate::core::runtime::DispatchCtx::ambient(), &config).await;
     assert!(migrated().lock().unwrap().contains(&config.workspace_dir));
 }
+
+/// A save made while the legacy migration is still deferred (another row keeps
+/// failing) must not be undone by the next migration pass re-pushing the
+/// toolkit's stale legacy row.
+#[tokio::test]
+async fn a_saved_pref_survives_a_deferred_legacy_migration() {
+    use crate::integrations::composio::module_client::module_guard;
+    let _serialised = module_guard().await;
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config_in(&tmp);
+    config.workspace_dir = tmp.path().join("workspace");
+    config.config_path = tmp.path().join("config.toml");
+    file_store::save(
+        &ctx,
+        &config,
+        USER_SCOPES_FILE,
+        &serde_json::json!({
+            "gmail": {"read": true, "write": true, "admin": true},
+            "slack": {"read": true, "write": true, "admin": false},
+        }),
+    )
+    .await
+    .unwrap();
+    FAIL_MIGRATING.with(|fail| *fail.borrow_mut() = Some("slack".into()));
+
+    let revoked = UserScopePref {
+        read: true,
+        write: true,
+        admin: false,
+    };
+    let saved = save(&ctx, &config, "gmail", revoked).await;
+    let pref = load_or_default(&ctx, &config, "gmail").await;
+    let left: LegacyScopeFile = file_store::load(&ctx, &config, USER_SCOPES_FILE)
+        .await
+        .unwrap();
+
+    FAIL_MIGRATING.with(|fail| *fail.borrow_mut() = None);
+    let _ = save(&ctx, &config, "gmail", UserScopePref::default()).await;
+    let _ = save(&ctx, &config, "slack", UserScopePref::default()).await;
+
+    saved.expect("the module stores the row");
+    assert_eq!(pref, revoked, "a revoked admin scope came back");
+    assert!(
+        !left.contains_key("gmail"),
+        "the saved toolkit's legacy row stays"
+    );
+    assert!(
+        left.contains_key("slack"),
+        "an unmigrated row is kept for retry"
+    );
+}
