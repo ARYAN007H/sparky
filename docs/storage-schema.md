@@ -28,18 +28,11 @@ Record shapes and migrations stay with their owners.
 | `notifications.settings` |  |  |  |
 | `openhuman.journal_backfill` |  |  |  |
 | `profiles.registry` |  |  |  |
+| `subagents.session_epochs` |  |  |  |
 | `subagents.sessions` |  |  |  |
 | `task_sources.ingested` | `by_source` (`source_id`, `ingested_ms`) |  |  |
 | `task_sources.sources` | `by_created` (`created_ms`) |  |  |
 | `threads.transcript_keys` |  |  |  |
-
-## tinyagents-graph
-
-| Collection | Indexes | Expiry field | Search fields |
-| --- | --- | --- | --- |
-| `graph.checkpoints` | `by_thread_id` (`ns`, `thread`, `checkpoint_id`)<br>`by_thread_seq` (`ns`, `thread`, `seq`)<br>`by_thread_subgraph` (`ns`, `thread`, `subgraph`, `seq`) |  |  |
-| `graph.threads` | `by_ns` (`ns`) |  |  |
-| `graph.writes` | `by_thread` (`ns`, `thread`) |  |  |
 
 ## tinyagents-harness
 
