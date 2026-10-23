@@ -56,6 +56,7 @@ fn an_embedded_runtime_calls_a_tool_through_the_tinymcp_module() {
 }
 
 fn scenario() {
+    let _ = tracing_subscriber::fmt().with_env_filter("debug,hyper=info,reqwest=info").with_test_writer().try_init();
     let rt = runtime();
     openhuman_embed::modules::register_linked("tinymcp", tinymcp::linked_module);
     rt.block_on(async {
