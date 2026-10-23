@@ -59,6 +59,7 @@ async fn audit_write_rejection_records_failure_row() {
     let mut config = Config::default();
     config.workspace_dir = tmp.path().join("workspace");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    crate::modules::boot::load_declared_modules(&config).await;
 
     let err = ToolCallError::InvalidParams("bad write request".into());
     audit_write_rejection(
@@ -159,6 +160,7 @@ async fn test_dispatch_write_tool_rpc_error_records_audit_and_returns_tool_error
     let mut config = Config::default();
     config.workspace_dir = tmp.path().join("workspace");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    crate::modules::boot::load_declared_modules(&config).await;
 
     // Omit the required `text` so the handler (or the missing registration)
     // yields a failure instead of a stored item.
@@ -207,6 +209,7 @@ async fn test_audit_write_success_path() {
     let mut config = Config::default();
     config.workspace_dir = tmp.path().join("workspace");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    crate::modules::boot::load_declared_modules(&config).await;
 
     audit_write(
         &config,
