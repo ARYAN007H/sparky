@@ -859,8 +859,7 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
     let root_stem = tinyagents_session::transcript::session_stem(
         &tinyagents_session::transcript::SessionRef::scoped("thr-e2e", "orchestrator"),
     );
-    std::fs::write(raw.join(format!("{root_stem}.jsonl")), jsonl)
-        .expect("write transcript");
+    std::fs::write(raw.join(format!("{root_stem}.jsonl")), jsonl).expect("write transcript");
 
     // A sub-agent transcript (stem contains `__`) for the SAME thread: a `coder`
     // archetype. Its message carries NO model (mirroring how sub-agent
@@ -910,8 +909,9 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
         .await
         .expect("load test config");
     assert_eq!(config.workspace_dir, workspace);
-    openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
-        .expect("initialize built-in agent definitions");
+    openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins(
+    )
+    .expect("initialize built-in agent definitions");
     let backend = openhuman_core::storage::local::backend_for(&config.workspace_dir)
         .expect("open test workspace storage");
     let reports = openhuman_core::storage::import::sessions::run_with(&backend, &config);
@@ -931,7 +931,10 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
         imported.transcripts.as_ref(),
         "thr-e2e",
     );
-    assert_eq!(spend.root.input_tokens, 4200, "imported root spend: {spend:?}");
+    assert_eq!(
+        spend.root.input_tokens, 4200,
+        "imported root spend: {spend:?}"
+    );
 
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
