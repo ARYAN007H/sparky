@@ -269,11 +269,10 @@ pub fn release_all() {
 /// Forgets the default opened for `workspace_dir`, so the next call opens it
 /// afresh; also how a test models a restart.
 pub fn forget(workspace_dir: &Path) {
-    let removed = WORKSPACES
+    WORKSPACES
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .remove(workspace_dir);
-    eprintln!("storage_local_forget path={} removed={}", workspace_dir.display(), removed.is_some());
 }
 
 #[cfg(test)]

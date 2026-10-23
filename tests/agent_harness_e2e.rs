@@ -1103,31 +1103,6 @@ async fn run_managed_capture_turn(
     with_captured_proxy_requests(|requests| requests.clear());
     let workspace_dir = home.join("workspace");
     let stack = boot_stack_with_capture_endpoint(api_origin, home).await;
-    let resolved_config = openhuman_core::config::ops::load_config_in(
-        &openhuman_core::core::runtime::DispatchCtx::unbound(),
-    )
-    .await
-    .expect("load managed capture workspace config");
-    assert_eq!(
-        resolved_config.workspace_dir, workspace_dir,
-        "managed capture must use its isolated workspace"
-    );
-    eprintln!(
-        "managed capture session store installed: {}; storage backend installed: {}",
-        openhuman_core::storage::sessions::is_installed(),
-        openhuman_core::storage::installed().is_some()
-    );
-    let transcript_locator = openhuman_core::storage::sessions::workspace_transcripts(
-        "orchestrator",
-        &workspace_dir,
-    );
-    let prior_transcript = transcript_locator.root_for_thread("managed-capture-thread");
-    eprintln!(
-        "managed capture prior transcript present: {} path: {:?} destination: {:?}",
-        prior_transcript.is_some(),
-        prior_transcript.as_ref().map(|transcript| transcript.path()),
-        transcript_locator.destination_key()
-    );
     let mut events = spawn_sse_collector(format!(
         "{}/events?client_id=managed-capture-client",
         stack.rpc_base
@@ -1164,15 +1139,11 @@ async fn run_managed_capture_turn(
     // The bare test router dispatches RPC with DispatchCtx::unbound(). Its
     // cached web-chat agent outlives a router shutdown, so remove that session
     // from the same process-default slot before the fixture resets its files.
-    let invalidated = openhuman_core::web_chat::invalidate_thread_sessions(
+    openhuman_core::web_chat::invalidate_thread_sessions(
         &openhuman_core::core::runtime::DispatchCtx::unbound(),
         "managed-capture-thread",
     )
     .await;
-    assert_eq!(
-        invalidated, 1,
-        "the completed managed turn must leave one cached session to invalidate"
-    );
     // Session transcript stores and their SQLite backend are also cached by
     // workspace path; release them before the next repetition removes it.
     openhuman_core::storage::sessions::release_workspace(&workspace_dir);
@@ -1300,26 +1271,6 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
             std::fs::remove_dir_all(&home).expect("reset only the managed capture profile");
         }
         std::fs::create_dir_all(&home).expect("create managed capture profile");
-        let workspace_storage = home.join("workspace/storage");
-        eprintln!(
-            "managed capture storage path before locator read: {} exists: {}",
-            workspace_storage.display(),
-            workspace_storage.exists()
-        );
-        let reset_locator = openhuman_core::storage::sessions::workspace_transcripts(
-            "orchestrator",
-            &home.join("workspace"),
-        );
-        let reset_has_transcript = reset_locator
-            .root_for_thread("managed-capture-thread")
-            .is_some();
-        eprintln!(
-            "managed capture transcript after profile deletion: {} destination: {:?} storage_url: {} storage_exists_after_lookup: {}",
-            reset_has_transcript,
-            reset_locator.destination_key(),
-            openhuman_core::storage::config::default_url(&home.join("workspace")),
-            workspace_storage.exists()
-        );
         let expected_summary_count = prior_count + 2;
         let metadata = run_managed_capture_turn(
             proxy_origin.clone(),

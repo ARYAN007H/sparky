@@ -50,11 +50,10 @@ pub fn release_workspace_defaults() {
 /// workspace keeps its live handles. A restart of one workspace, not of the
 /// process; [`release_workspace_defaults`] is the process-wide reset.
 pub fn release_workspace(workspace_dir: &Path) {
-    let fallback_removed = FALLBACKS
+    FALLBACKS
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .remove(workspace_dir);
-    eprintln!("release_workspace path={} fallback_removed={}", workspace_dir.display(), fallback_removed.is_some());
     crate::storage::local::forget(workspace_dir);
 }
 
@@ -96,7 +95,6 @@ pub(super) fn fallback_provider(workspace_dir: &Path) -> Arc<dyn SessionStorePro
             return existing.provider.clone();
         }
     }
-    eprintln!("fallback_provider new path={} backend_ptr={:p}", workspace_dir.display(), Arc::as_ptr(&backend));
     match TenantSessionStores::new(Arc::clone(&backend), false) {
         Ok(provider) => {
             let provider = Arc::new(provider);
