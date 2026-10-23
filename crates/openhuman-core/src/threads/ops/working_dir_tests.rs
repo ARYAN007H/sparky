@@ -80,46 +80,43 @@ async fn a_bound_folder_that_disappears_fails_closed() {
 async fn the_working_folder_is_fixed_after_the_first_message() {
     let _lock = crate::config::TEST_ENV_LOCK.lock().await;
     let home = tempfile::tempdir().unwrap();
-    unsafe { std::env::set_var("OPENHUMAN_WORKSPACE", home.path()) };
-    let result = async {
-        let ctx = DispatchCtx::ambient();
-        let workspace = workspace_dir().await.unwrap();
-        conversations::blocking::ensure_thread(ctx.clone(), workspace.clone(), thread("t", None))
-            .await
-            .unwrap();
-        let folder = home.path().join("project");
-        std::fs::create_dir(&folder).unwrap();
-        let request = |dir: &Path| UpdateConversationThreadWorkingDirRequest {
-            thread_id: "t".into(),
-            action_dir: dir.display().to_string(),
-        };
-        // Before any message the folder can be bound.
-        thread_update_working_dir(&ctx, request(&folder))
-            .await
-            .unwrap();
-
-        conversations::blocking::append_message(
-            ctx.clone(),
-            workspace,
-            "t".into(),
-            conversations::ConversationMessage {
-                id: "m1".into(),
-                content: "hi".into(),
-                message_type: "text".into(),
-                extra_metadata: serde_json::json!({}),
-                sender: "user".into(),
-                created_at: "2026-10-23T00:00:01Z".into(),
-            },
-        )
+    // Cleared on drop, even if an assertion below panics.
+    let _workspace = crate::config::test_env::EnvVarGuard::workspace_unlocked(home.path());
+    let ctx = DispatchCtx::ambient();
+    let workspace = workspace_dir().await.unwrap();
+    conversations::blocking::ensure_thread(ctx.clone(), workspace.clone(), thread("t", None))
         .await
         .unwrap();
-        thread_update_working_dir(&ctx, request(home.path()))
-            .await
-            .map(|_| ())
-    }
-    .await;
-    unsafe { std::env::remove_var("OPENHUMAN_WORKSPACE") };
-    let error = result.expect_err("rebinding after the first message");
+    let folder = home.path().join("project");
+    std::fs::create_dir(&folder).unwrap();
+    let request = |dir: &Path| UpdateConversationThreadWorkingDirRequest {
+        thread_id: "t".into(),
+        action_dir: dir.display().to_string(),
+    };
+    // Before any message the folder can be bound.
+    thread_update_working_dir(&ctx, request(&folder))
+        .await
+        .unwrap();
+
+    conversations::blocking::append_message(
+        ctx.clone(),
+        workspace,
+        "t".into(),
+        conversations::ConversationMessage {
+            id: "m1".into(),
+            content: "hi".into(),
+            message_type: "text".into(),
+            extra_metadata: serde_json::json!({}),
+            sender: "user".into(),
+            created_at: "2026-10-23T00:00:01Z".into(),
+        },
+    )
+    .await
+    .unwrap();
+    let error = thread_update_working_dir(&ctx, request(home.path()))
+        .await
+        .map(|_| ())
+        .expect_err("rebinding after the first message");
     assert!(
         error
             .to_string()
