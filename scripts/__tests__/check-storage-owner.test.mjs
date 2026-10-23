@@ -9,7 +9,7 @@
  *   - Dev dep:    { kind: "dev" }
  */
 
-import { checkMetadata, formatReport } from '../ci/check-storage-owner.mjs';
+import { ENGINE_EXCEPTIONS, checkMetadata, formatReport, staleExceptions } from '../ci/check-storage-owner.mjs';
 
 const ROOT = '/fake/repo';
 const TSD_MANIFEST = `${ROOT}/vendor/tinystoragedrivers/crates/tinystoragedrivers-sqlite/Cargo.toml`;
@@ -345,5 +345,70 @@ describe('the CLI', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Normal edges, composition roots and engine exceptions
+// ---------------------------------------------------------------------------
+
+/** A one-path chain fixture: names[0] -> names[1] -> ... ; the last is a registry crate. */
+const chain = (...names) => {
+  const last = names.length - 1;
+  const id = (name, i) => (i === last ? `${name} 1.0.0 ${REGISTRY}` : `${name} 1.0.0`);
+  return {
+    packages: names.map((name, i) =>
+      i === last
+        ? regPkg(name, '1.0.0', `/fake/.cargo/registry/src/x/${name}-1.0.0/Cargo.toml`)
+        : pathPkg(name, '1.0.0', `${ROOT}/vendor/${name}/Cargo.toml`, [
+            { name: names[i + 1], pkg: id(names[i + 1], i + 1) },
+          ])
+    ),
+    resolve: {
+      nodes: names.map((name, i) => ({
+        id: id(name, i),
+        deps: i === last ? [] : [{ name: names[i + 1], pkg: id(names[i + 1], i + 1), dep_kinds: NORMAL }],
+      })),
+    },
+  };
+};
+
+describe('a normal edge, as cargo reports it (kind: null)', () => {
+  test('is followed to the engine', () => {
+    const v = checkMetadata(chain('tinyflows', 'rusqlite'), ROOT);
+    assert.equal(v.length, 1);
+    assert.equal(v[0].engine, 'rusqlite');
+  });
+});
+
+describe('a composition root', () => {
+  test('stops the walk: what the root reaches is its own', () => {
+    assert.deepEqual(checkMetadata(chain('openhuman-embed', 'openhuman', 'rusqlite'), ROOT), []);
+  });
+});
+
+describe('ENGINE_EXCEPTIONS', () => {
+  test('excuse exactly their edge, wherever the walk starts, and record the match', () => {
+    const used = new Set();
+    assert.deepEqual(checkMetadata(chain('tinyagents-harness', 'tinytools-std', 'fs2'), ROOT, used), []);
+    assert.deepEqual([...used], ['tinytools-std -> fs2']);
+  });
+
+  test('do not excuse another engine or another package', () => {
+    assert.equal(checkMetadata(chain('tinytools-std', 'rusqlite'), ROOT)[0]?.engine, 'rusqlite');
+    assert.equal(checkMetadata(chain('tinytools-core', 'fs2'), ROOT)[0]?.engine, 'fs2');
+  });
+
+  test('every entry names its edge, a reason and a follow-up', () => {
+    for (const e of ENGINE_EXCEPTIONS) {
+      assert.ok(e.package && e.engine && e.reason.length > 10 && e.followUp.length > 10, JSON.stringify(e));
+    }
+  });
+
+  test('an entry nothing matched is reported as stale', () => {
+    assert.equal(staleExceptions(new Set()).length, ENGINE_EXCEPTIONS.length);
+    assert.equal(staleExceptions(new Set()).every(v => v.kind === 'stale-exception'), true);
+    const all = new Set(ENGINE_EXCEPTIONS.map(e => `${e.package} -> ${e.engine}`));
+    assert.deepEqual(staleExceptions(all), []);
   });
 });
