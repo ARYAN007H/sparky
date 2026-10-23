@@ -312,6 +312,7 @@ async fn a_peer_driver_blocks_backfill_without_claiming_its_slot_or_state() {
     for (index, peer) in [Peer::Import, Peer::Migration].into_iter().enumerate() {
         let tmp = tempfile::tempdir().unwrap();
         let config = config_in(&tmp);
+        crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
         bind_reference(&config);
         seed_thread(
             &config.workspace_dir,
