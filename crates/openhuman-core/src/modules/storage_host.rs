@@ -599,7 +599,16 @@ impl CallerDirectory for Live {
 #[async_trait]
 impl Environment for Live {
     fn backend(&self) -> Option<Arc<dyn StorageBackend>> {
-        crate::storage::installed()
+        // A host that installed a backend (the app, or an embedder that passed
+        // one) wins. An embedder that did not gets the workspace default every
+        // other store already opens for itself ([`crate::storage::backend_for`]),
+        // so a module is not the one consumer left with no storage.
+        crate::storage::installed().or_else(|| {
+            let workspace = crate::core::runtime::DispatchCtx::ambient()
+                .workspace_dir()
+                .ok()?;
+            crate::storage::backend_for(&workspace).ok()
+        })
     }
 
     fn module_scope(&self, module_id: &str) -> Result<Scope, StorageError> {
