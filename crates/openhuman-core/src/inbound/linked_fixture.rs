@@ -369,7 +369,12 @@ impl Rig {
         modules
             .load_file_with_host_callbacks(&artifact, config, &binding)
             .await
-            .unwrap();
+            .unwrap_or_else(|error| {
+                panic!(
+                    "event queue module failed to load: {error:?}; modules: {:#?}",
+                    modules.list()
+                )
+            });
         tokio::time::timeout(Duration::from_secs(10), async {
             loop {
                 let names = host.list_names().await.unwrap();
