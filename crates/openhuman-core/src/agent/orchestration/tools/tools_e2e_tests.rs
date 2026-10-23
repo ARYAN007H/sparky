@@ -332,11 +332,15 @@ async fn failed_async_child_is_reported_to_the_parent_without_a_success_result()
         }
     })
     .await;
-    let invocation_count = invocations.load(std::sync::atomic::Ordering::SeqCst);
-    assert!(invocation_count > 0, "the injected provider must be called");
     let failure = failure_result.unwrap_or_else(|elapsed| {
+        let invocation_count = invocations.load(std::sync::atomic::Ordering::SeqCst);
         panic!("asynchronous child failure reaches the parent after {elapsed}; provider calls={invocation_count}")
     });
+    let invocation_count = invocations.load(std::sync::atomic::Ordering::SeqCst);
+    assert!(
+        invocation_count > 0,
+        "the injected provider must be called before reporting a child failure: {failure}"
+    );
     assert!(
         failure.starts_with("spawn_subagent failed and did not complete"),
         "failure copy remains recognizable to the parent: {failure}"
