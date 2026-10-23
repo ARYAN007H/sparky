@@ -102,22 +102,23 @@ fn is_command_executor(command: &str) -> bool {
                     .chars()
                     .all(|character| character.is_ascii_digit() || character == '.')
         });
-    python_executor || matches!(
-        command,
-        "sh" | "bash"
-            | "zsh"
-            | "fish"
-            | "python"
-            | "python2"
-            | "node"
-            | "ruby"
-            | "perl"
-            | "php"
-            | "lua"
-            | "awk"
-            | "xargs"
-            | "env"
-    )
+    python_executor
+        || matches!(
+            command,
+            "sh" | "bash"
+                | "zsh"
+                | "fish"
+                | "python"
+                | "python2"
+                | "node"
+                | "ruby"
+                | "perl"
+                | "php"
+                | "lua"
+                | "awk"
+                | "xargs"
+                | "env"
+        )
 }
 
 impl SecurityPolicy {
