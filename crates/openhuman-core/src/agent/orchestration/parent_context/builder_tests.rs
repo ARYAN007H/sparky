@@ -2,10 +2,14 @@ use super::*;
 
 fn test_config() -> (tempfile::TempDir, Config) {
     let dir = tempfile::tempdir().expect("tempdir");
-    let config = Config {
+    let mut config = Config {
         workspace_dir: dir.path().to_path_buf(),
         ..Config::default()
     };
+    crate::agent::session_host::test_support::install_model_fixture();
+    config.default_model = Some("test/session-fixture".into());
+    crate::security::credentials::api_key::store_api_key(&config, "test-session-fixture-key")
+        .expect("store the managed inference fixture credential");
     (dir, config)
 }
 
