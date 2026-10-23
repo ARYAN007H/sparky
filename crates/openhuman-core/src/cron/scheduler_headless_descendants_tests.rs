@@ -233,6 +233,11 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
         Err(_) => {
             model.child_release.notify_one();
             let result = tokio::time::timeout(std::time::Duration::from_secs(5), run).await;
+            eprintln!(
+                "scheduled child start timeout diagnostics: spawn calls {}, followups {}, run result {result:?}",
+                model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
+                model.accepted_followups.load(std::sync::atomic::Ordering::SeqCst),
+            );
             panic!(
             "scheduled child never reached its model (spawn calls: {}, followups: {}); run result: {result:?}",
             model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
