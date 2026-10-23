@@ -523,9 +523,11 @@ fn a_key_echoed_in_provider_detail_never_reaches_the_copy() {
         "key leaked into the message: {}",
         got.message
     );
-    let params = got.copy_params.map(|p| p.to_string()).unwrap_or_default();
+    let params = got.copy_params.expect("provider and detail copy params");
+    let detail = params["detail"].as_str().expect("a detail copy param");
+    assert!(detail.contains("bad parameter"), "{detail}");
     assert!(
-        !params.contains("AbCdEf0123456789"),
+        !params.to_string().contains("AbCdEf0123456789"),
         "key leaked into the copy params: {params}"
     );
 }
