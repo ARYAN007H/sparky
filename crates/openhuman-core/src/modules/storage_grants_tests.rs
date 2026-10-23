@@ -624,3 +624,15 @@ fn the_selectors_added_to_the_wire_keep_the_grants_prefixes_and_read_only_rule()
     )
     .is_ok());
 }
+
+#[test]
+fn only_the_migration_ledger_may_be_granted_from_the_storage_layers_namespace() {
+    let with = |name: &str| StorageGrant {
+        collections: vec![CollectionSpec::new(name)],
+        ..grant()
+    };
+    assert!(with("tsd.migrations").validate().is_ok());
+    for reserved in ["tsd.queue", "tsd.leases", "tsd.kv", "tsd.migrations2"] {
+        assert!(with(reserved).validate().is_err(), "{reserved}");
+    }
+}

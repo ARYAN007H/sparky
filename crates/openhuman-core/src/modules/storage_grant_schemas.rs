@@ -168,7 +168,7 @@ pub(super) fn grant_for(module_id: &str) -> Option<StorageGrant> {
 fn migration_collections(owner: &str) -> Vec<CollectionSpec> {
     match owner {
         "mcp" => [
-            "tsd.migrations",
+            super::storage_grants::MIGRATION_LEDGER,
             "mcp_servers",
             "mcp_server_names",
             "mcp_registry_cache",
