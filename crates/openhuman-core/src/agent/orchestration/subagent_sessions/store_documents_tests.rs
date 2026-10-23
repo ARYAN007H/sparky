@@ -8,18 +8,9 @@ fn docs_in(storage: &dyn StorageBackend, scope: &str) -> Docs {
     Docs::over(&storage.for_scope(&Scope::new(scope).unwrap()).unwrap())
 }
 
-fn opened_docs_in(
-    storage: &std::sync::Arc<dyn StorageBackend>,
-    scope: &str,
-) -> Docs {
+fn opened_docs_in(storage: &std::sync::Arc<dyn StorageBackend>, scope: &str) -> Docs {
     let scope = Scope::new(scope).unwrap();
-    Docs(crate::storage::documents::Repo::on(
-        storage,
-        &scope,
-        DOMAIN,
-        collections,
-    )
-    .unwrap())
+    Docs(crate::storage::documents::Repo::on(storage, &scope, DOMAIN, collections).unwrap())
 }
 
 fn session(id: &str) -> DurableSubagentSession {

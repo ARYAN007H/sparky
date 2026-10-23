@@ -165,9 +165,7 @@ async fn provider_for_url_returns_the_store_without_installing_it() {
     crate::core_host::agent::session_store::restore(previous);
 
     assert!(
-        backed_key
-            .as_deref()
-            .is_some_and(|key| !key.is_empty()),
+        backed_key.as_deref().is_some_and(|key| !key.is_empty()),
         "{backed_key:?}"
     );
     assert_eq!(
@@ -205,10 +203,6 @@ async fn provider_for_host_reads_the_storage_url_from_the_environment() {
     restore_backend(previous_backend);
 
     let key = booted.unwrap();
-    assert!(
-        key.as_deref()
-            .is_some_and(|key| !key.is_empty()),
-        "{key:?}"
-    );
+    assert!(key.as_deref().is_some_and(|key| !key.is_empty()), "{key:?}");
     assert!(refused.is_err(), "an unusable env URL fails the TUI boot");
 }

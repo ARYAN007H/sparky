@@ -342,11 +342,12 @@ async fn cron_agent_job_uses_agent_definition_tool_scope() {
     job.name = Some("morning_briefing".into());
     job.agent_id = Some("morning_briefing".into());
 
-    let built = build_agent_for_cron_job(&crate::core::runtime::DispatchCtx::ambient(), &config, &job)
-        .unwrap_or_else(|error| {
-            eprintln!("failed to build cron agent: {error:#}");
-            panic!("build cron agent")
-        });
+    let built =
+        build_agent_for_cron_job(&crate::core::runtime::DispatchCtx::ambient(), &config, &job)
+            .unwrap_or_else(|error| {
+                eprintln!("failed to build cron agent: {error:#}");
+                panic!("build cron agent")
+            });
     let visible = built.agent.visible_tool_specs_arc();
 
     assert!(
