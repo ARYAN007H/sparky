@@ -111,21 +111,22 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
                 if !clients.exists() && !audit.exists() {
                     return Ok(Outcome::NoSource);
                 }
-                let (legacy_servers, legacy_audit) = tokio::task::spawn_blocking(move || {
-                    let servers = if clients.exists() {
-                        read_servers(&clients)?
-                    } else {
-                        Vec::new()
-                    };
-                    let audit_rows = if audit.exists() {
-                        read_audit(&audit)?
-                    } else {
-                        Vec::new()
-                    };
-                    Ok::<_, anyhow::Error>((servers, audit_rows))
-                })
-                .await
-                .context("the legacy reader panicked")??;
+                let (legacy_servers, legacy_audit) = ctx
+                    .spawn_blocking(move || {
+                        let servers = if clients.exists() {
+                            read_servers(&clients)?
+                        } else {
+                            Vec::new()
+                        };
+                        let audit_rows = if audit.exists() {
+                            read_audit(&audit)?
+                        } else {
+                            Vec::new()
+                        };
+                        Ok::<_, anyhow::Error>((servers, audit_rows))
+                    })
+                    .await
+                    .context("the legacy reader panicked")??;
                 let outcome =
                     import_payload(&scoped, &scope, legacy_servers, legacy_audit, None).await?;
                 super::storage_import_support::mark_imported(&scoped, MARKER_COLLECTION, &marker)
@@ -192,21 +193,16 @@ async fn import_into(
                 {
                     return Ok(Outcome::AlreadyDone);
                 }
-                let (legacy_servers, legacy_audit) = tokio::task::spawn_blocking(move || {
-                    let servers = if clients.exists() {
-                        read_servers(&clients)?
-                    } else {
-                        Vec::new()
-                    };
-                    let audit_rows = if audit.exists() {
-                        read_audit(&audit)?
-                    } else {
-                        Vec::new()
-                    };
-                    Ok::<_, anyhow::Error>((servers, audit_rows))
-                })
-                .await
-                .context("the legacy reader panicked")??;
+                let legacy_servers = if clients.exists() {
+                    read_servers(&clients)?
+                } else {
+                    Vec::new()
+                };
+                let legacy_audit = if audit.exists() {
+                    read_audit(&audit)?
+                } else {
+                    Vec::new()
+                };
                 let result = import_payload(
                     &claimed_scoped,
                     &scope,

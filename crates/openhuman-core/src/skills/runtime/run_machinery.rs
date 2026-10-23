@@ -163,7 +163,8 @@ pub async fn spawn_workflow_run_background(
         let workspace = workspace.clone();
         let inherited_origin = inherited_origin.clone();
         let ctx = ctx.clone();
-        tokio::spawn(async move {
+        let task_ctx = ctx.clone();
+        task_ctx.spawn(async move {
             if let Err(e) = run_log::write_header(
                 &workspace,
                 &log_path,
@@ -232,6 +233,8 @@ pub async fn spawn_workflow_run_background(
             ));
             let (tx, rx) = tokio::sync::mpsc::channel(256);
             agent.set_on_progress(Some(tx));
+            // The bridge only drains events into this run's captured log file;
+            // it does not read or write tenant state.
             let bridge = tokio::spawn(run_log::drain_to_log(
                 rx,
                 workspace.clone(),
