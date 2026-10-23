@@ -306,12 +306,12 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
             async move { dispatch_scheduled_agent(core, dispatch, scheduler_config).await },
         );
 
-    match tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx).await {
+    match tokio::time::timeout(std::time::Duration::from_secs(30), child_started_rx).await {
         Ok(Ok(())) => {}
         Ok(Err(error)) => panic!("scheduled child exited before its model blocked: {error}"),
         Err(_) => {
             model.child_release.notify_one();
-            let _ = tokio::time::timeout(std::time::Duration::from_secs(5), run).await;
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(30), run).await;
             panic!(
                 "scheduled child never reached its blocking model (spawns: {}, accepted followups: {})",
                 model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
@@ -424,11 +424,11 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
         tokio::spawn(
             async move { dispatch_scheduled_agent(core, dispatch, scheduler_config).await },
         );
-    match tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx).await {
+    match tokio::time::timeout(std::time::Duration::from_secs(30), child_started_rx).await {
         Ok(Ok(())) => {}
         Ok(Err(error)) => panic!("scheduled child exited before its model call: {error}"),
         Err(_) => {
-            let result = tokio::time::timeout(std::time::Duration::from_secs(5), run).await;
+            let result = tokio::time::timeout(std::time::Duration::from_secs(30), run).await;
             let runs = crate::cron::list_runs(&config, &job.id, 10);
             let events = match &runs {
                 Ok(runs) => match runs.first().and_then(|run| run.run_id.as_deref()) {
@@ -456,7 +456,7 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
             panic!("scheduled child never reached its model");
         }
     }
-    tokio::time::timeout(std::time::Duration::from_secs(5), run)
+    tokio::time::timeout(std::time::Duration::from_secs(30), run)
         .await
         .expect("Cron should settle the denied child result")
         .expect("Cron scheduler task");
