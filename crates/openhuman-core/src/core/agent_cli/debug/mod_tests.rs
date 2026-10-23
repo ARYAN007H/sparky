@@ -4,14 +4,12 @@ use super::*;
 #[tokio::test]
 async fn debug_dump_composes_each_flow_prompt_from_the_copilot_bus() {
     let temp = tempfile::tempdir().expect("workspace");
-    let mut config = Config {
+    let config = Config {
         workspace_dir: temp.path().join("workspace"),
         action_dir: temp.path().join("action"),
         config_path: temp.path().join("config.toml"),
         ..Config::default()
     };
-    config.components.mcp = false;
-    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
     AgentDefinitionRegistry::init_global(&config.workspace_dir)
         .expect("initialize builtin registry");
     let ctx = crate::core::runtime::DispatchCtx::host_default();

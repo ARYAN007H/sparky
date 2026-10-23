@@ -15,9 +15,7 @@ fn test_config(tmp: &TempDir) -> Config {
     // manifest tests pass vacuously — a disabled policy answers `Allow` for
     // every class, so nothing is ever `blocked`.
     config.autonomy.enabled = true;
-    config.components.mcp = false;
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
-    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
     config
 }
 
