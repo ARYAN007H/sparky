@@ -90,14 +90,23 @@ fn has_hidden_execution(command: &str) -> bool {
 
 #[cfg(test)]
 fn is_command_executor(command: &str) -> bool {
-    matches!(
+    let command = command.strip_suffix(".exe").unwrap_or(command);
+    let python_executor = command
+        .strip_prefix("python")
+        .or_else(|| command.strip_prefix("pythonw"))
+        .is_some_and(|version| {
+            version.is_empty()
+                || version
+                    .chars()
+                    .all(|character| character.is_ascii_digit() || character == '.')
+        });
+    python_executor || matches!(
         command,
         "sh" | "bash"
             | "zsh"
             | "fish"
             | "python"
             | "python2"
-            | "python3"
             | "node"
             | "ruby"
             | "perl"
