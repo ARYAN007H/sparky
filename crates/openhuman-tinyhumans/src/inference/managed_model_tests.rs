@@ -406,9 +406,7 @@ async fn a_late_api_key_401_after_a_session_request_keeps_the_session() {
     use axum::http::{HeaderMap, StatusCode};
     use axum::response::IntoResponse;
     use openhuman_embed::__host::core::events::DomainEvent;
-    use openhuman_embed::__host::security::credentials::{
-        api_key::API_KEY_PROVIDER, AuthService, DEFAULT_AUTH_PROFILE_NAME,
-    };
+    use openhuman_embed::__host::security::credentials::AuthService;
     use std::sync::Arc;
     use tokio::sync::Notify;
 
@@ -421,7 +419,7 @@ async fn a_late_api_key_401_after_a_session_request_keeps_the_session() {
         .receiver();
     let tmp = tempfile::TempDir::new().expect("temporary credentials");
     seed_app_session(tmp.path(), Some("2999-01-01T00:00:00Z"));
-    openhuman_embed::__host::security::credentials::api_key::store_api_key_in(
+    let api_key_profile = openhuman_embed::__host::security::credentials::api_key::store_api_key_in(
         tmp.path(),
         false,
         "test-managed-key",
@@ -485,9 +483,9 @@ async fn a_late_api_key_401_after_a_session_request_keeps_the_session() {
         key_request_arrived.notified().await;
 
         // The stored credential switches to the session mid-flight.
-        AuthService::new(tmp.path(), false)
-            .remove_profile(API_KEY_PROVIDER, DEFAULT_AUTH_PROFILE_NAME)
-            .expect("remove test API key");
+        assert!(AuthService::new(tmp.path(), false)
+            .remove_profile(&api_key_profile.provider, &api_key_profile.profile_name)
+            .expect("remove test API key"));
         assert!(model
             .invoke(&(), ModelRequest::new(vec![Message::user("ping")]))
             .await
