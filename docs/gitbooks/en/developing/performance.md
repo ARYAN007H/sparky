@@ -156,7 +156,7 @@ sizing a production fleet.
 To reproduce from the OpenHuman repository root:
 
 ```sh
-cargo build -p openhuman-embed --locked --release --no-default-features --example linux_fleet
+cargo build -p openhuman-embed --locked --release --no-default-features --features storage-sqlite --example linux_fleet
 systemd-run --user --scope -p MemoryMax=2G -p CPUQuota=200% --quiet \
   python3 crates/openhuman-embed/examples/linux_fleet_cgroup.py 500
 ```
