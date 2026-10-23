@@ -922,7 +922,7 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
         "import classic session transcripts: {reports:?}"
     );
     let imported = openhuman_core::storage::sessions::provider_for_workspace(&config.workspace_dir)
-        .for_agent("orchestrator");
+        .for_agent("default");
     let spend = tinyagents_session::transcript::spend::thread_spend_in(
         imported.transcripts.as_ref(),
         "thr-e2e",
