@@ -662,7 +662,12 @@ impl SecurityPolicy {
 
             // Validate arguments for the command
             let args: Vec<String> = words.map(|w| w.to_ascii_lowercase()).collect();
-            if is_command_executor(base_cmd) || !self.is_args_safe(base_cmd, &args) {
+            let launches_executor =
+                base_cmd == "env" && args.iter().any(|arg| is_command_executor(arg));
+            if is_command_executor(base_cmd)
+                || launches_executor
+                || !self.is_args_safe(base_cmd, &args)
+            {
                 return false;
             }
         }
