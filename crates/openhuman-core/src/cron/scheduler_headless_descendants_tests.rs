@@ -102,7 +102,9 @@ async fn dispatch_scheduled_agent(
         Box::pin(async move {
             let dispatched = dispatcher.tick(&config).await.expect("scheduler tick");
             assert_eq!(dispatched, 1, "the persisted due job is dispatched");
+            eprintln!("scheduled test job tick returned {dispatched}");
             dispatcher.drain().await;
+            eprintln!("scheduled test job drain returned");
         }),
     )
     .await;
@@ -124,6 +126,11 @@ impl ChatModel<()> for CronChildModel {
         _state: &(),
         request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelResponse> {
+        eprintln!(
+            "scheduled test model invoked with {} messages and {} tools",
+            request.messages.len(),
+            request.tools.len(),
+        );
         if request.messages.iter().any(|message| {
             matches!(message, tinyinference_llm::message::Message::User(_))
                 && message.text().contains(CHILD_PROMPT)
