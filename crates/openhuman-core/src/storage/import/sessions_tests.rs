@@ -135,7 +135,7 @@ fn transcript_replay_keeps_background_provenance_for_messages_and_compaction() {
         .transcripts
         .open_stem("thread.orchestrator", meta.clone())
         .unwrap();
-    super::replay_transcript(history.as_ref(), &meta, tools.as_ref(), records).unwrap();
+    super::replay_transcript(history.as_ref(), &meta, tools.as_ref(), records, Vec::new()).unwrap();
 
     let display = history.read_display().unwrap().unwrap();
     let DisplayRecord::Message(first) = &display.records[0] else {

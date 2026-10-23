@@ -9,8 +9,7 @@ use serde_json::Value;
 use tinyinference_llm::model::ModelResponse;
 
 use super::transcript_compat_tests::{
-    build_host, model, place_fixture, run_async, store_locator, store_tree, thread_id, Layout,
-    SCENARIOS,
+    build_host, model, place_fixture, run_async, store_tree, thread_id, Layout, SCENARIOS,
 };
 
 fn tree(
