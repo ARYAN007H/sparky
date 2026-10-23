@@ -366,29 +366,35 @@ impl Rig {
         modules
             .attach_linked_with_config(tinyeventqueues::linked_module().unwrap(), module_config)
             .unwrap();
-        tokio::time::timeout(Duration::from_secs(10), async {
+        let state = tokio::time::timeout(Duration::from_secs(10), async {
             loop {
-                let names = host.list_names().await.unwrap();
-                if names.iter().any(|name| name.as_str() == names::INTERFACE) {
-                    break;
+                if let Some(info) = modules
+                    .list()
+                    .into_iter()
+                    .find(|info| info.name == "tinyeventqueues")
+                {
+                    if matches!(
+                        info.state,
+                        tinybus::module::ModuleState::Ready
+                            | tinybus::module::ModuleState::Serving
+                            | tinybus::module::ModuleState::Failed { .. }
+                            | tinybus::module::ModuleState::Faulted { .. }
+                    ) {
+                        break info.state;
+                    }
                 }
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
         })
         .await
-        .expect("the linked tinyeventqueues module claimed its name");
-        let module = modules
-            .list()
-            .into_iter()
-            .find(|info| info.name == "tinyeventqueues")
-            .expect("the linked tinyeventqueues module is registered");
+        .expect("the linked tinyeventqueues module reaches a terminal setup state");
         assert!(
             matches!(
-                module.state,
+                state,
                 tinybus::module::ModuleState::Ready | tinybus::module::ModuleState::Serving
             ),
             "the linked tinyeventqueues module must be ready: {:?}",
-            module.state
+            state
         );
         let proxy = host
             .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
