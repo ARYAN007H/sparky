@@ -19,6 +19,8 @@
 
 use std::sync::Arc;
 
+use tinystoragedrivers::CollectionSpec;
+
 use super::storage_grants::StorageGrant;
 use super::storage_queue_manifest::QueueManifest;
 use crate::storage::schema::module_collections;

@@ -24,7 +24,12 @@ fn every_row_has_a_valid_generated_grant() {
             .unwrap_or_else(|why| panic!("{}: {why}", row.module));
         assert!(grant.writable);
         let items = module_collections(row.owner);
-        assert_eq!(grant.collections.len(), items.len(), "{}", row.module);
+        assert_eq!(
+            grant.collections.len(),
+            items.len() + migration_collections(row.owner).len(),
+            "{}",
+            row.module
+        );
     }
     assert!(declared("not-a-module").is_none());
 }
@@ -186,4 +191,45 @@ fn non_document_grants_match_the_owner_contracts_without_broad_prefixes() {
         ),
         Err(Denied::Target)
     );
+}
+
+#[test]
+fn tinymcp_may_run_its_own_migration_over_the_bus() {
+    // The module migrates its v1 records itself on first open: it declares the
+    // shared progress ledger and the v1 source collections, and reads the v1
+    // audit stream. A grant without them fails the module's startup.
+    let grant = declared("tinymcp").expect("tinymcp declares storage");
+    for name in ["tsd.migrations", "mcp_servers", "mcp_registry_index_state"] {
+        assert!(
+            allowed(
+                &grant,
+                Object::Documents,
+                "Get",
+                json!({"collection": name, "id": "x"})
+            ),
+            "{name}"
+        );
+    }
+    assert!(allowed(
+        &grant,
+        Object::Streams,
+        "ReadWindow",
+        json!({"stream": "mcp_audit/2026"})
+    ));
+}
+
+#[test]
+fn no_other_module_gets_the_migration_ledger_or_tinymcp_legacy_names() {
+    for module in ["tinychannels", "tinyconnectors", "tinybox", "tinyjuice"] {
+        let grant = declared(module).expect("declares storage");
+        assert!(
+            !allowed(
+                &grant,
+                Object::Documents,
+                "Get",
+                json!({"collection": "tsd.migrations", "id": "x"})
+            ),
+            "{module}"
+        );
+    }
 }
