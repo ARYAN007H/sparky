@@ -332,7 +332,7 @@ fn module_config(config: &Config, id: &str) -> serde_json::Value {
     // storage host's interface, attached before any module loads
     // ([`super::storage_host::install`]); the host still derives the scope and
     // grant from the authenticated caller, never from this value.
-    if id == storage_grant_schemas::tinymcp::MODULE_ID {
+    if id == super::storage_grant_schemas::tinymcp::MODULE_ID {
         return serde_json::json!({
             "storage_callback": tinystoragedrivers_bus::STORAGE_INTERFACE.to_string()
         });
