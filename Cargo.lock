@@ -5911,6 +5911,7 @@ dependencies = [
  "tinymcp-bus",
  "tinymemory-api",
  "tinymemory-tools",
+ "tinystoragedrivers-testkit",
  "tinytools 0.6.0",
  "tinytools-std",
  "tokio",
