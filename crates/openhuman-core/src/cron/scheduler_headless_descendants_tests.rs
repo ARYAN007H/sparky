@@ -24,10 +24,13 @@ struct CronChildModel {
     child_release: tokio::sync::Notify,
 }
 
+#[cfg(feature = "storage-sqlite")]
 fn scheduled_agent_fixture(
     timeout_secs: u64,
 ) -> (
     TempDir,
+    crate::storage::test_support::SqliteBackend,
+    crate::storage::test_support::InstalledBackendGuard,
     Config,
     std::sync::Arc<crate::core::runtime::CoreContext>,
     crate::core::runtime::DispatchCtx,
@@ -37,10 +40,10 @@ fn scheduled_agent_fixture(
     let mut config = Config::default();
     config.workspace_dir = temp.path().join("workspace");
     config.action_dir = config.workspace_dir.clone();
-    config.storage.url = Some(format!(
-        "sqlite:{}",
-        temp.path().join("storage.sqlite").display()
-    ));
+    let storage = crate::storage::test_support::sqlite_backend().expect("SQLite test backend");
+    config.storage.url = Some(storage.url.clone());
+    let storage_guard =
+        crate::storage::test_support::install_for_test(&storage.url, Arc::clone(&storage.backend));
     config.default_model = Some("test-model".into());
     config.chat_provider = Some("omlx:test-model".into());
     config.agent.agent_timeout_secs = timeout_secs;
@@ -80,7 +83,7 @@ fn scheduled_agent_fixture(
         chrono::Utc::now() - chrono::Duration::seconds(1),
     )
     .expect("make the job due");
-    (temp, config, core, dispatch, job)
+    (temp, storage, storage_guard, config, core, dispatch, job)
 }
 
 async fn dispatch_scheduled_agent(
@@ -198,6 +201,7 @@ impl ChatModel<()> for CronChildModel {
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn scheduled_agent_history_includes_its_spawned_child_result() {
     let _inference = crate::inference::inference_test_guard_async().await;
     let model = std::sync::Arc::new(CronChildModel {
@@ -213,7 +217,8 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
     });
     let _model =
         crate::inference::provider::factory::test_provider_override::install_model(model.clone());
-    let (_temp, config, core, dispatch, job) = scheduled_agent_fixture(900);
+    let (_temp, _storage, _storage_guard, config, core, dispatch, job) =
+        scheduled_agent_fixture(900);
 
     let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
     *model.child_started.lock().unwrap() = Some(child_started_tx);
@@ -268,6 +273,7 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settles() {
     let _inference = crate::inference::inference_test_guard_async().await;
     let model = std::sync::Arc::new(CronChildModel {
@@ -283,7 +289,7 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
     });
     let _model =
         crate::inference::provider::factory::test_provider_override::install_model(model.clone());
-    let (_temp, config, core, dispatch, job) = scheduled_agent_fixture(5);
+    let (_temp, _storage, _storage_guard, config, core, dispatch, job) = scheduled_agent_fixture(5);
     let inspect_dispatch = dispatch.clone();
     let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
     *model.child_started.lock().unwrap() = Some(child_started_tx);
@@ -385,11 +391,8 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter("debug")
-        .with_test_writer()
-        .try_init();
     let _inference = crate::inference::inference_test_guard_async().await;
     let model = std::sync::Arc::new(CronChildModel {
         spawn_calls: std::sync::atomic::AtomicUsize::new(0),
@@ -404,7 +407,8 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
     });
     let _model =
         crate::inference::provider::factory::test_provider_override::install_model(model.clone());
-    let (_temp, config, core, dispatch, job) = scheduled_agent_fixture(900);
+    let (_temp, _storage, _storage_guard, config, core, dispatch, job) =
+        scheduled_agent_fixture(900);
     let inspect_dispatch = dispatch.clone();
     let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
     *model.child_started.lock().unwrap() = Some(child_started_tx);
