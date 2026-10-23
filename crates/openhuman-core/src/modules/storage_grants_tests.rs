@@ -526,10 +526,12 @@ fn the_write_selectors_track_the_contract_selector_sets() {
             "Queues.Redrive",
             "Secrets.Delete",
             "Secrets.Set",
+            "Secrets.SetIf",
             "Streams.Append",
             "Streams.AppendBatch",
             "Streams.AppendBatchIfOffset",
             "Streams.DeleteStream",
+            "Streams.Seal",
             "Streams.TruncateBefore",
         ]
     );
