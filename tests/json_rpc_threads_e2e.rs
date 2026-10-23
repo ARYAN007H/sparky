@@ -905,11 +905,18 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
     let config = openhuman_core::config::Config::load_or_init()
         .await
         .expect("load test config");
+    assert_eq!(config.workspace_dir, workspace);
     let backend = openhuman_core::storage::local::backend_for(&config.workspace_dir)
         .expect("open test workspace storage");
     let reports = openhuman_core::storage::import::sessions::run_with(&backend, &config);
     assert!(
-        reports.iter().all(|report| report.outcome.is_ok()),
+        matches!(
+            reports.first().map(|report| &report.outcome),
+            Some(Ok(openhuman_core::storage::import::Outcome::Imported {
+                found: 2,
+                written: 2
+            }))
+        ),
         "import classic session transcripts: {reports:?}"
     );
 
