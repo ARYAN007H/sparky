@@ -7,6 +7,7 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
 
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
+    crate::storage::local::use_persistent_default_for_test(workspace.path());
     let provider = Arc::new(PauseThenAnswerModel {
         calls: std::sync::atomic::AtomicUsize::new(0),
         seen: Mutex::new(Vec::new()),
@@ -337,6 +338,8 @@ async fn delegate_graph_runs_every_stage_through_shared_driver_jobs() {
 
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
+    crate::storage::local::use_persistent_default_for_test(workspace.path());
+    crate::storage::local::use_persistent_default_for_test(workspace.path());
     let provider = Arc::new(ScriptedModel::new(vec![
         ("Produce a short, concrete", "1. inspect the fixture"),
         ("Carry out the plan below", "graph-stage-execution-canary"),

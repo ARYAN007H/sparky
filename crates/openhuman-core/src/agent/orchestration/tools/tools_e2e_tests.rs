@@ -466,6 +466,7 @@ async fn continue_subagent_without_checkpoint_or_durable_session_names_the_roste
 async fn spawn_worker_thread_tool_persists_worker_thread_e2e() {
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
+    crate::storage::local::use_persistent_default_for_test(workspace.path());
     let provider = Arc::new(ScriptedModel::new(vec![(
         WORKER_THREAD_CANARY,
         "worker-thread-child-answer",

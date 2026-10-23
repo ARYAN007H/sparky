@@ -35,6 +35,8 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     let workspace_b = scratch.path().join("workspace-b");
     std::fs::create_dir_all(&workspace_a).expect("create workspace A");
     std::fs::create_dir_all(&workspace_b).expect("create workspace B");
+    crate::storage::local::use_persistent_default_for_test(&workspace_a);
+    crate::storage::local::use_persistent_default_for_test(&workspace_b);
     let mut base_config = crate::config::Config::default();
     base_config.workspace_dir = workspace_a.clone();
     base_config.components.juice = false;
