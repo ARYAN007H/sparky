@@ -143,7 +143,7 @@ async fn checkout_cold_boots_from_the_thread_transcript_and_checkin_keeps_it_war
         CheckoutPolicy::AdoptCached,
     )
     .await
-    .unwrap();
+    .unwrap_or_else(|error| panic!("first checkout failed: {error}"));
     // Checkout binds the thread's durable session identity; the history loads
     // when the session resumes, which every turn does for itself. The
     // conversation the transcript holds must come back either way.
