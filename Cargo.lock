@@ -8436,7 +8436,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-definition"
-version = "2.2.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8449,7 +8449,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-harness"
-version = "2.2.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8488,7 +8488,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-harness-tools"
-version = "2.2.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8520,7 +8520,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-hooks"
-version = "2.2.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8537,7 +8537,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-live"
-version = "2.2.0"
+version = "3.0.0"
 dependencies = [
  "serde_json",
  "tinyagents-harness",
@@ -8548,7 +8548,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-orchestration"
-version = "2.2.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8573,7 +8573,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-registry"
-version = "2.2.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -8587,7 +8587,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-runtime"
-version = "2.2.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8607,7 +8607,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-session"
-version = "2.2.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8631,7 +8631,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-tasks"
-version = "2.2.0"
+version = "3.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -11453,7 +11453,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
