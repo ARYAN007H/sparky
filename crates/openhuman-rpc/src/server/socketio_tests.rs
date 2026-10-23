@@ -249,8 +249,8 @@ async fn polling_handshake(base: &str, auth: serde_json::Value) -> String {
         .await
         .expect("socket.io connect");
     let mut received = String::new();
-    for _ in 0..5 {
-        let batch = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+    for _ in 0..3 {
+        let batch = tokio::time::timeout(std::time::Duration::from_secs(2), async {
             http.get(&url).send().await.ok()?.text().await.ok()
         })
         .await
@@ -271,6 +271,14 @@ async fn polling_handshake(base: &str, auth: serde_json::Value) -> String {
 /// disconnected before any event reaches the client.
 #[tokio::test]
 async fn only_the_core_bearer_completes_the_socketio_handshake() {
+    // Loopback-only fixture; bounded so a stalled poll fails fast instead of
+    // waiting out every retry.
+    tokio::time::timeout(std::time::Duration::from_secs(30), handshake_bearer_gate())
+        .await
+        .expect("socket.io handshake test timed out");
+}
+
+async fn handshake_bearer_gate() {
     let token = ensure_rpc_token();
     let (layer, _io) = super::attach_socketio();
     let app = axum::Router::new().layer(layer);
