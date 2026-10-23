@@ -65,7 +65,7 @@ pub fn start(config: &crate::config::Config) {
 #[cfg(feature = "mcp")]
 pub(crate) mod module_client;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mcp"))]
 #[path = "test_module_port.rs"]
 mod test_module_port;
 
