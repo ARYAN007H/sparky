@@ -97,7 +97,7 @@ fn mock_parent(model: Arc<dyn ChatModel<()>>) -> ParentExecutionContext {
         subagent_tool_ceiling_names: std::collections::HashSet::new(),
         model_name: "test-model".to_string(),
         temperature: 0.0,
-        workspace_dir: std::env::temp_dir(),
+        workspace_dir: crate::storage::test_support::isolated_workspace(),
         agent_config: AgentConfig::default(),
         workflows: Arc::new(Vec::new()),
         memory_context: Arc::new(None),
