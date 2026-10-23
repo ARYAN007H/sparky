@@ -35,9 +35,9 @@ async fn handle_list_returns_persisted_audit_records() {
         .await
         .expect("config");
     let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
-    let _storage = crate::storage::test_support::install_backend_for_test(
-        std::sync::Arc::clone(&backend.backend),
-    );
+    let _storage = crate::storage::test_support::install_backend_for_test(std::sync::Arc::clone(
+        &backend.backend,
+    ));
     crate::modules::ops::ensure_loaded(&config, "tinymcp")
         .await
         .expect("load the staged TinyMCP test module");

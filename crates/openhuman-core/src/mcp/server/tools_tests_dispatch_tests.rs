@@ -11,9 +11,9 @@ async fn call_tool_records_write_argument_rejection() {
         .await
         .expect("config");
     let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
-    let _storage = crate::storage::test_support::install_backend_for_test(
-        std::sync::Arc::clone(&backend.backend),
-    );
+    let _storage = crate::storage::test_support::install_backend_for_test(std::sync::Arc::clone(
+        &backend.backend,
+    ));
     crate::modules::ops::ensure_loaded(&config, "tinymcp")
         .await
         .expect("load the staged TinyMCP test module");
@@ -92,9 +92,9 @@ async fn call_tool_validates_memory_arguments_before_dispatch() {
         .await
         .expect("config");
     let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
-    let _storage = crate::storage::test_support::install_backend_for_test(
-        std::sync::Arc::clone(&backend.backend),
-    );
+    let _storage = crate::storage::test_support::install_backend_for_test(std::sync::Arc::clone(
+        &backend.backend,
+    ));
     crate::modules::ops::ensure_loaded(&config, "tinymcp")
         .await
         .expect("load the staged TinyMCP test module");
@@ -141,9 +141,9 @@ async fn call_tool_judges_the_policy_of_the_explicit_context_across_scopes() {
     allowing.workspace_dir = tmp_allow.path().to_path_buf();
     allowing.action_dir = tmp_allow.path().to_path_buf();
     let backend = crate::storage::test_support::sqlite_backend().expect("test storage");
-    let _storage = crate::storage::test_support::install_backend_for_test(
-        std::sync::Arc::clone(&backend.backend),
-    );
+    let _storage = crate::storage::test_support::install_backend_for_test(std::sync::Arc::clone(
+        &backend.backend,
+    ));
     crate::modules::ops::ensure_loaded(&allowing, "tinymcp")
         .await
         .expect("load the staged TinyMCP test module");
