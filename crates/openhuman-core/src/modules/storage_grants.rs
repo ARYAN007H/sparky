@@ -426,7 +426,11 @@ fn streams(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Plan
             StorageGrant::prefixed(&grant.stream_prefixes, name)?;
             Ok(forward(name))
         }
-        "Append" | "AppendBatch" | "AppendBatchIfOffset" | "TruncateBefore" | "DeleteStream"
+        "Append"
+        | "AppendBatch"
+        | "AppendBatchIfOffset"
+        | "TruncateBefore"
+        | "DeleteStream"
         | "Seal" => {
             let name = text(request, "stream")?;
             StorageGrant::prefixed(&grant.stream_prefixes, name)?;

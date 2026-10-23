@@ -8,7 +8,9 @@ mod common;
 
 use common::{chat_completion, offline_config, route, runtime, scripted_provider, stub_backend};
 use openhuman_core::config::schema::{ModuleOverride, ModuleSourceMode};
-use openhuman_embed::{Access, AgentSpec, McpServer, Runtime, RuntimeModule, ServiceSet, Workspace};
+use openhuman_embed::{
+    Access, AgentSpec, McpServer, Runtime, RuntimeModule, ServiceSet, Workspace,
+};
 
 struct McpStub;
 
@@ -30,8 +32,9 @@ impl wiremock::Respond for McpStub {
             "tools/call" => serde_json::json!({ "content": [{ "type": "text", "text": "sunny" }] }),
             _ => serde_json::json!({}),
         };
-        wiremock::ResponseTemplate::new(200)
-            .set_body_json(serde_json::json!({ "jsonrpc": "2.0", "id": body["id"], "result": result }))
+        wiremock::ResponseTemplate::new(200).set_body_json(
+            serde_json::json!({ "jsonrpc": "2.0", "id": body["id"], "result": result }),
+        )
     }
 }
 
@@ -111,10 +114,20 @@ fn scenario() {
             .await
             .expect("recorded")
             .iter()
-            .filter_map(|r| serde_json::from_slice::<serde_json::Value>(&r.body).ok()?["method"].as_str().map(str::to_string))
+            .filter_map(|r| {
+                serde_json::from_slice::<serde_json::Value>(&r.body).ok()?["method"]
+                    .as_str()
+                    .map(str::to_string)
+            })
             .collect();
-        eprintln!("REPLY={} RESULTS={results} METHODS={methods:?}", reply.reply);
-        assert!(methods.iter().any(|m| m == "tools/call"), "{methods:?} / {results}");
+        eprintln!(
+            "REPLY={} RESULTS={results} METHODS={methods:?}",
+            reply.reply
+        );
+        assert!(
+            methods.iter().any(|m| m == "tools/call"),
+            "{methods:?} / {results}"
+        );
         assert!(results.contains("sunny"), "{results}");
         let _ = chat_completion;
     });

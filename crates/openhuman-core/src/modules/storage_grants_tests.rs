@@ -581,20 +581,46 @@ fn every_selector_of_a_granted_object_is_decided_rather_than_refused_as_malforme
 #[test]
 fn the_selectors_added_to_the_wire_keep_the_grants_prefixes_and_read_only_rule() {
     assert_eq!(
-        authorize(&grant(), Object::Streams, "Seal", &json!({"stream": "audit/a"})),
+        authorize(
+            &grant(),
+            Object::Streams,
+            "Seal",
+            &json!({"stream": "audit/a"})
+        ),
         Err(Denied::Target)
     );
     assert_eq!(
-        authorize(&grant(), Object::Secrets, "SetIf", &json!({"name": "other.a"})),
+        authorize(
+            &grant(),
+            Object::Secrets,
+            "SetIf",
+            &json!({"name": "other.a"})
+        ),
         Err(Denied::Target)
     );
     assert_eq!(
-        authorize(&read_only(), Object::Streams, "Seal", &json!({"stream": "log/a"})),
+        authorize(
+            &read_only(),
+            Object::Streams,
+            "Seal",
+            &json!({"stream": "log/a"})
+        ),
         Err(Denied::ReadOnly)
     );
     assert_eq!(
-        authorize(&read_only(), Object::Secrets, "SetIf", &json!({"name": "token.a"})),
+        authorize(
+            &read_only(),
+            Object::Secrets,
+            "SetIf",
+            &json!({"name": "token.a"})
+        ),
         Err(Denied::ReadOnly)
     );
-    assert!(authorize(&read_only(), Object::Streams, "Info", &json!({"stream": "log/a"})).is_ok());
+    assert!(authorize(
+        &read_only(),
+        Object::Streams,
+        "Info",
+        &json!({"stream": "log/a"})
+    )
+    .is_ok());
 }
