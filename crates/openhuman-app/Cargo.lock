@@ -8488,7 +8488,7 @@ dependencies = [
 
 [[package]]
 name = "tinywallet-bus"
-version = "0.24.1"
+version = "0.26.0"
 dependencies = [
  "serde",
  "serde_json",
