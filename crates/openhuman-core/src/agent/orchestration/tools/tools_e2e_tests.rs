@@ -200,6 +200,7 @@ async fn archetype_delegation_defaults_to_async_with_durable_session_e2e() {
     // for background delivery as a new chat turn.
     let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
+    crate::storage::local::use_persistent_default_for_test(workspace.path());
     let provider = Arc::new(ScriptedModel::new(vec![(
         ARCHETYPE_DELEGATION_CANARY,
         "async-delegation-child-answer",
