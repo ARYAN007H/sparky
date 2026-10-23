@@ -32,16 +32,15 @@ fn workflow_origin(job_id: &str, require_approval: bool) -> AgentTurnOrigin {
 }
 
 fn agent_test_config(tmp: &tempfile::TempDir) -> Config {
-    let config = Config {
+    let mut config = Config {
         workspace_dir: tmp.path().join("workspace"),
         action_dir: tmp.path().join("workspace"),
         config_path: tmp.path().join("config.toml"),
         ..Config::default()
     };
+    config.components.mcp = false;
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
     crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
-    #[cfg(feature = "mcp")]
-    crate::mcp::install_test_module_port(&config);
     config
 }
 
