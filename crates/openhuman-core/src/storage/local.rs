@@ -210,12 +210,14 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
     let cell = workspace_backend(workspace_dir);
     if let Some(backend) = cell.get() {
         let backend = Arc::clone(backend);
-        if Arc::strong_count(&backend) >= 5 {
+        if Arc::strong_count(&backend) == 5 {
+            let trace = format!("{:?}", std::backtrace::Backtrace::force_capture());
+            let trace = trace.lines().take(12).collect::<Vec<_>>().join("\n");
             eprintln!(
                 "workspace backend clone reached {} refs at {}\n{}",
                 Arc::strong_count(&backend),
                 workspace_dir.display(),
-                std::backtrace::Backtrace::force_capture()
+                trace
             );
         }
         return Ok(backend);
