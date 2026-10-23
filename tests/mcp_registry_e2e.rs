@@ -23,11 +23,12 @@ async fn fresh_workspace_config() -> (tempfile::TempDir, Config) {
         std::env::remove_var("OPENHUMAN_KEYRING_MASTER_KEY_FILE");
     });
     env_guard::init_keyring_workspace();
-    let backend = openhuman_core::storage::open("memory")
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let storage_url = format!("sqlite:{}", tmp.path().join("storage").display());
+    let backend = openhuman_core::storage::open(&storage_url)
         .await
         .expect("open isolated module storage backend");
     openhuman_core::storage::install(backend);
-    let tmp = tempfile::tempdir().expect("tempdir");
     let artifact = openhuman_core::modules::local_artifact("tinymcp")
         .expect("build tinymcp with scripts/modules/build.mjs and set OPENHUMAN_MODULE_SOURCE_DIR");
     let artifact = artifact
