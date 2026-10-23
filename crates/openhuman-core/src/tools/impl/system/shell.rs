@@ -273,10 +273,10 @@ impl ShellTool {
         let requested_timeout = args.get("timeout_secs").and_then(|v| v.as_u64());
         let come_back = YieldRequest::from_args(&args);
         // Whether a human approved the call is the harness ApprovalGate's
-        // decision, kept in its own approval record; that yes/no is not threaded
-        // into tools, so this row never claims an approval (`approved=false`).
-        // Read the gate's record for the human decision. A command left running
-        // is audited when it ends, with its real outcome.
+        // decision, which the gate records separately; that yes/no is not
+        // threaded into tools, so this row never claims an approval
+        // (`approved=false`). A command left running is audited when it ends,
+        // with its real outcome.
         let approved = false;
         let audit = audit_once(self.audit.clone(), command.to_owned(), approved);
         let start = Instant::now();
