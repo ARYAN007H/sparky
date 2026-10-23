@@ -8,7 +8,7 @@ use super::*;
 pub fn cancel_driver_jobs_for_thread(
     store: &SubagentSessionStore,
     workspace_dir: &Path,
-    jobs: &tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
     thread_id: &str,
 ) -> Vec<String> {
     let sessions = match store.load() {
@@ -66,7 +66,7 @@ pub fn cancel_driver_jobs_for_thread(
 pub fn cancel_driver_job_for_observed_session(
     store: &SubagentSessionStore,
     checkpoint_dir: &Path,
-    jobs: &tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
     session: &DurableSubagentSession,
     parent_session: &str,
     parent_thread_id: Option<&str>,
@@ -127,7 +127,7 @@ pub struct DriverTaskCancellation {
 pub fn cancel_driver_job_by_task(
     store: &SubagentSessionStore,
     checkpoint_dir: &Path,
-    jobs: &tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
     task_id: &str,
     reason: Option<&str>,
 ) -> Result<Option<DriverTaskCancellation>, String> {

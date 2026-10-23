@@ -320,7 +320,7 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
         None,
     );
     let registry = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&inspect_dispatch);
     let jobs = registry
         .try_list_owned(owner.as_str())
@@ -439,7 +439,7 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
         None,
     );
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&inspect_dispatch)
     .try_list_owned(owner)
     .expect("inspect the exact Cron session owner");

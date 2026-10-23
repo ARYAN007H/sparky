@@ -95,7 +95,7 @@ impl OpenHumanSessionHost {
         let descendant_lease = if headless {
             let dispatch = context.dispatch_ctx();
             let jobs = crate::core::runtime::slot_for::<
-                tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+                tinyagents_orchestration::subagent::SubAgentJobRegistry,
             >(&dispatch);
             let owner = headless_owner.expect("headless settlement has a root owner scope");
             Some(

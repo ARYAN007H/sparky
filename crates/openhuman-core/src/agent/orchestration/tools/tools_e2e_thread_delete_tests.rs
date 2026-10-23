@@ -8,7 +8,7 @@ async fn deleting_parent_thread_cancels_driver_child_before_discarding_completio
     use crate::threads::store::{blocking, CreateConversationThread};
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness::context::RunContext;
-    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
     struct GatedModel {
@@ -515,7 +515,7 @@ async fn purging_threads_cancels_driver_children_and_discards_completions() {
     use crate::threads::store::{blocking, CreateConversationThread};
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness::context::RunContext;
-    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
     struct GatedModel {

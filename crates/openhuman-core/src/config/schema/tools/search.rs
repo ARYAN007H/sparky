@@ -202,11 +202,7 @@ impl SearchEngineCredentials {
     pub fn key(&self) -> Option<&str> {
         self.api_key.as_deref().and_then(|s| {
             let t = s.trim();
-            if t.is_empty() {
-                None
-            } else {
-                Some(t)
-            }
+            if t.is_empty() { None } else { Some(t) }
         })
     }
 }

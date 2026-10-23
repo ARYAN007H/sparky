@@ -6,8 +6,8 @@
 //! immediately, without a core restart.
 
 use crate::config::{Config, PrivacyMode};
-use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
+use crate::core::runtime::DispatchCtx;
 
 /// Partial update for the `[privacy]` block. `None` leaves the mode unchanged.
 #[derive(Debug, Clone, Default)]

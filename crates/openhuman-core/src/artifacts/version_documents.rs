@@ -29,12 +29,10 @@ use serde_json::Value;
 use tiny_artifacts::{ArtifactRecord, ArtifactStore};
 use tinystoragedrivers::{CollectionSpec, Precondition, Query, Sort};
 
-use super::storage_schema::{version_body, version_record, VERSIONS};
+use super::storage_schema::{VERSIONS, version_body, version_record};
+use crate::storage::DocumentStoreExt;
 use crate::storage::documents::Repo;
 use crate::storage::schema_support::key_of;
-use crate::storage::DocumentStoreExt;
-use crate::storage::ScopedStorage;
-
 const DOMAIN: &str = "artifacts::versions";
 
 fn collections() -> Vec<CollectionSpec> {
@@ -45,7 +43,7 @@ fn collections() -> Vec<CollectionSpec> {
 #[derive(Clone, Debug)]
 pub struct DocumentArtifactStore {
     workspace_dir: PathBuf,
-    scoped: Option<ScopedStorage>,
+    scoped: Option<crate::storage::Storage>,
 }
 
 impl DocumentArtifactStore {
@@ -59,7 +57,7 @@ impl DocumentArtifactStore {
 
     /// The version records over the same explicit tenant scope as this
     /// artifact service's file store.
-    pub fn over(workspace_dir: impl Into<PathBuf>, scoped: &ScopedStorage) -> Self {
+    pub fn over(workspace_dir: impl Into<PathBuf>, scoped: &crate::storage::Storage) -> Self {
         Self {
             workspace_dir: workspace_dir.into(),
             scoped: Some(scoped.clone()),

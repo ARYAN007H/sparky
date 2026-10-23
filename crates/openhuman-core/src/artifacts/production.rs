@@ -240,7 +240,8 @@ impl Production {
         let ctx = crate::core::runtime::DispatchCtx::ambient();
         let scoped = crate::storage::sessions::artifact_scoped_for_in(&self.workspace_dir, &ctx);
         let file_store = scoped.as_ref().map(|scoped| {
-            Arc::new(tiny_artifacts::BlobFileStore::new(scoped))
+            let storage = super::tiny_store::storage_bundle(scoped);
+            Arc::new(tiny_artifacts::BlobFileStore::new(&storage))
                 as Arc<dyn tiny_artifacts::FileStore>
         });
         let bridge = super::tiny_store::LegacyUiBridge::new(

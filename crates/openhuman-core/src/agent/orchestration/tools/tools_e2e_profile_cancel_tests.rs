@@ -138,7 +138,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
         .expect("child start notification");
     let alice_ctx = live.data.dispatch_ctx();
     let alice_jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&alice_ctx);
     let row_before = super::driver_sessions_for_parent(
         &alice_ctx,
@@ -178,7 +178,7 @@ async fn profile_scope_cannot_cancel_another_profiles_driver_child() {
 
     let bob_ctx = DispatchCtx::new(Arc::clone(&bob));
     let bob_job_registry = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&bob_ctx);
     assert!(
         bob_job_registry.list().is_empty(),

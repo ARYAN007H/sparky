@@ -15,8 +15,8 @@ use std::sync::Arc;
 
 use crate::core::slots::HookSlot;
 use tinyinference_providers::builtin::{
-    BuiltinAuthStyle, BuiltinCloudProvider as UpstreamBuiltinCloudProvider, BuiltinPresets,
-    BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS,
+    BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS, BuiltinAuthStyle,
+    BuiltinCloudProvider as UpstreamBuiltinCloudProvider, BuiltinPresets,
 };
 
 static HOSTED_PRESETS: HookSlot<BuiltinCloudProvider> =

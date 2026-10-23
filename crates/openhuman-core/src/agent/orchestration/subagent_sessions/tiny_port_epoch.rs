@@ -21,10 +21,14 @@ pub(super) fn import_parent_epoch(
         documents
             .ensure_collection(&tinystoragedrivers::CollectionSpec::new(EPOCHS))
             .await?;
-        let repo = tinystoragedrivers::Repo::<ParentEpochRecord>::new(&documents, EPOCHS)?;
-        repo.update(&session_id, move |_| {
-            Ok(Some(ParentEpochRecord { parent_epoch }))
-        })
+        let value = serde_json::to_value(ParentEpochRecord { parent_epoch })
+            .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
+        crate::storage::documents::update_or_insert(
+            &documents,
+            EPOCHS,
+            &session_id,
+            move |_| Some(value.clone()),
+        )
         .await?;
         Ok(())
     })
@@ -39,11 +43,12 @@ pub(crate) fn parent_epoch_from_sidecar(
         documents
             .ensure_collection(&tinystoragedrivers::CollectionSpec::new(EPOCHS))
             .await?;
-        let repo = tinystoragedrivers::Repo::<ParentEpochRecord>::new(&documents, EPOCHS)?;
-        Ok(repo
-            .get(&session_id)
-            .await?
-            .and_then(|record| record.doc.parent_epoch))
+        let Some(record) = documents.get(EPOCHS, &session_id).await? else {
+            return Ok(None);
+        };
+        let record = serde_json::from_value::<ParentEpochRecord>(record.doc)
+            .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
+        Ok(record.parent_epoch)
     })
     .map_err(|error| SubagentError::Persistence(format!("read parent epoch: {error}")))
 }

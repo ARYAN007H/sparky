@@ -266,7 +266,13 @@ pub fn artifact_scoped_for_in(
         }
     };
     match backend.for_scope(&scope) {
-        Ok(scoped) => Some(scoped),
+        Ok(scoped) => match tinyagents_storage_kit::Scope::new(scope.as_str()) {
+            Ok(port_scope) => Some(ScopedStorage::new(scoped, port_scope)),
+            Err(error) => {
+                log::warn!("[session_store] artifact scope invalid: {error}");
+                None
+            }
+        },
         Err(error) => {
             log::warn!(
                 "[session_store] artifact scope refused scope={}: {error}",

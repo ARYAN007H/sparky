@@ -63,8 +63,8 @@ async fn event_sink_rejects_non_object_payload() {
 #[tokio::test]
 async fn event_sink_routes_channel_reactions_to_domain_bus() {
     let sink = OpenHumanEventSink;
-    assert!(sink
-        .publish(
+    assert!(
+        sink.publish(
             "channel",
             "reaction_received",
             serde_json::json!({
@@ -73,9 +73,10 @@ async fn event_sink_routes_channel_reactions_to_domain_bus() {
             }),
         )
         .await
-        .is_ok());
-    assert!(sink
-        .publish(
+        .is_ok()
+    );
+    assert!(
+        sink.publish(
             "channel",
             "reaction_sent",
             serde_json::json!({
@@ -84,16 +85,19 @@ async fn event_sink_routes_channel_reactions_to_domain_bus() {
             }),
         )
         .await
-        .is_ok());
+        .is_ok()
+    );
     // Unknown domain/kind is a benign no-op.
-    assert!(sink
-        .publish("mystery", "x", serde_json::json!({}))
-        .await
-        .is_ok());
-    assert!(sink
-        .publish("channel", "unknown", serde_json::json!({}))
-        .await
-        .is_ok());
+    assert!(
+        sink.publish("mystery", "x", serde_json::json!({}))
+            .await
+            .is_ok()
+    );
+    assert!(
+        sink.publish("channel", "unknown", serde_json::json!({}))
+            .await
+            .is_ok()
+    );
 }
 
 // --- ConversationHistoryStore --------------------------------------------

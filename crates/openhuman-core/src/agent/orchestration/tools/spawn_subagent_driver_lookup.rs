@@ -140,7 +140,7 @@ async fn close_reusable_driver_session(
     parent_thread_id: Option<&str>,
 ) -> Result<(), String> {
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(ctx);
     let cancelled = subagent_sessions::cancel_driver_job_for_observed_session(
         host_store,

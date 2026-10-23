@@ -7,7 +7,7 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
     };
     use crate::agent::orchestration::subagent_sessions::DurableSubagentStatus;
     use crate::agent::orchestration::tools::SpawnSubagentTool;
-    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
     use tinyagents_tasks::CompletionStatus;
 
@@ -276,7 +276,7 @@ async fn cancelling_a_paused_driver_settles_once_with_its_reason() {
 #[tokio::test]
 async fn stopping_a_paused_driver_releases_its_active_owner() {
     use crate::agent::orchestration::tools::SpawnSubagentTool;
-    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
     let _lock = crate::config::TEST_ENV_LOCK.lock().await;

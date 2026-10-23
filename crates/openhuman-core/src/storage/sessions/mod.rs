@@ -19,6 +19,7 @@ use std::sync::{Arc, LazyLock, PoisonError, RwLock};
 use tinyagents_session::port::{AgentStores, SessionStoreProvider};
 
 mod host_stores;
+mod rebound;
 mod tenant_router;
 
 pub use host_stores::{
@@ -28,7 +29,8 @@ pub use host_stores::{
     stores_for, stores_or_ephemeral, turn_states_for, with_ledger, with_ledger_async,
     WorkspaceSessionStores,
 };
-pub use tenant_router::{rebind_all, TenantSessionStores};
+pub use rebound::{rebind_all, ReboundSessionStores, StoreRegistry};
+pub use tenant_router::TenantSessionStores;
 
 static PROVIDER: LazyLock<RwLock<Option<Arc<dyn SessionStoreProvider>>>> =
     LazyLock::new(|| RwLock::new(None));
@@ -185,7 +187,7 @@ pub fn workspace_transcripts(
     agent_id: &str,
     workspace_dir: &std::path::Path,
 ) -> Arc<dyn tinyagents_session::transcript::TranscriptLocator> {
-    workspace::provider_for_workspace(workspace_dir)
+    host_stores::provider_for_workspace(workspace_dir)
         .for_agent(agent_id)
         .transcripts
 }

@@ -5,6 +5,10 @@ fn scratch() -> tempfile::TempDir {
     tempfile::tempdir().expect("tempdir")
 }
 
+fn port_scope(scope: crate::storage::Scope) -> tinyagents_storage_kit::Scope {
+    tinyagents_storage_kit::Scope::new(scope.as_str()).expect("valid storage scope")
+}
+
 #[test]
 fn the_calling_tenants_stores_open_on_the_workspace_default() {
     let ws = scratch();
@@ -74,7 +78,7 @@ async fn artifact_scope_uses_the_carried_profile_when_ambient_profile_differs() 
             .expect("the explicit artifact owner has a storage scope");
         assert_eq!(
             scoped.scope(),
-            &crate::storage::scope_for_profile("artifact-owner"),
+            &port_scope(crate::storage::scope_for_profile("artifact-owner")),
             "artifacts share the profile scope and follow the carried context"
         );
     })
@@ -102,12 +106,12 @@ fn artifact_scope_uses_agent_scope_only_for_unprofiled_named_agents() {
         .expect("an unprofiled named agent has a local scope");
     assert_eq!(
         named_agent.scope(),
-        &crate::storage::scope_for_agent("writer")
+        &port_scope(crate::storage::scope_for_agent("writer"))
     );
 
     let default_agent = artifact_scoped_for_in(ws.path(), &context_for(None))
         .expect("the default agent has the local scope");
-    assert!(default_agent.scope().is_local());
+    assert_eq!(default_agent.scope().as_str(), "local");
 
     let explicitly_named_default = artifact_scoped_for_in(
         ws.path(),
@@ -116,7 +120,9 @@ fn artifact_scope_uses_agent_scope_only_for_unprofiled_named_agents() {
     .expect("an explicitly named agent uses the agent scope");
     assert_eq!(
         explicitly_named_default.scope(),
-        &crate::storage::scope_for_agent(crate::storage::sessions::DEFAULT_AGENT)
+        &port_scope(crate::storage::scope_for_agent(
+            crate::storage::sessions::DEFAULT_AGENT,
+        ))
     );
 }
 

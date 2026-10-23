@@ -113,7 +113,8 @@ async fn steer_reusable_session(
     message: String,
 ) -> Result<(), String> {
     use tinyagents_harness::tool::ToolDispatch;
-    use tinyagents_harness_tools::subagents::{SubAgentJobRegistry, SubAgentMessageTool};
+    use tinyagents_harness_tools::subagents::SubAgentMessageTool;
+    use tinyagents_orchestration::subagent::SubAgentJobRegistry;
     use tinytools::{ToolCallOptions, ToolTimeout};
 
     let context = &parent.data;

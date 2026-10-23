@@ -11,10 +11,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-use crate::config::workspace::{ops, rpc};
 use crate::config::Config;
+use crate::config::workspace::{ops, rpc};
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
 fn req_str(args: &serde_json::Value, key: &str) -> anyhow::Result<String> {

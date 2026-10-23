@@ -179,12 +179,16 @@ async fn clears_stamped_and_legacy_channel_conversations_without_mutating_legacy
         .await
         .unwrap()
         .items;
-    assert!(remaining
-        .iter()
-        .any(|item| { item.kind == ItemKind::Learning && item.text == "durable preference" }));
-    assert!(remaining
-        .iter()
-        .any(|item| { item.kind == ItemKind::Document && item.text == "durable brain document" }));
+    assert!(
+        remaining
+            .iter()
+            .any(|item| { item.kind == ItemKind::Learning && item.text == "durable preference" })
+    );
+    assert!(
+        remaining.iter().any(|item| {
+            item.kind == ItemKind::Document && item.text == "durable brain document"
+        })
+    );
     assert!(remaining.iter().any(|item| {
         item.kind == ItemKind::Conversation
             && item.meta.thread_id.as_deref() == Some("telegram-current")
@@ -478,9 +482,11 @@ async fn offline_snapshot_scans_every_thread_and_message_page() {
         .await
         .unwrap();
     assert_eq!(threads.len(), 66);
-    assert!(threads[..64]
-        .iter()
-        .all(|thread| thread.id != target_thread));
+    assert!(
+        threads[..64]
+            .iter()
+            .all(|thread| thread.id != target_thread)
+    );
     assert!(
         threads
             .iter()
@@ -497,9 +503,11 @@ async fn offline_snapshot_scans_every_thread_and_message_page() {
     .await
     .unwrap();
     assert_eq!(messages.len(), 66);
-    assert!(messages[..64]
-        .iter()
-        .all(|message| message.extra_metadata.get("channel").is_none()));
+    assert!(
+        messages[..64]
+            .iter()
+            .all(|message| message.extra_metadata.get("channel").is_none())
+    );
     assert_eq!(messages[64].extra_metadata["channel"], "discord");
     assert!(messages[65].extra_metadata.get("channel").is_none());
     assert!(

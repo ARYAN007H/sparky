@@ -282,6 +282,7 @@ pub struct Config {
     /// session-memory extraction cadence. Consumed by
     /// the agent context middleware configuration.
     #[serde(default)]
+    #[schemars(with = "super::super::context::ContextConfigSchema")]
     pub context: ContextConfig,
 
     #[serde(default)]

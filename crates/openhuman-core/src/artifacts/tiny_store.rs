@@ -36,7 +36,7 @@ use tiny_artifacts::{
 use super::files::FileRoots;
 use super::types::ArtifactKind as LegacyArtifactKind;
 use crate::security::approval::ApprovalChatContext;
-use crate::tools::per_call::{context as per_call_context, PerCallTool};
+use crate::tools::per_call::{PerCallTool, context as per_call_context};
 
 /// Subdirectory under the artifacts root holding versioned records.
 const VERSIONED_SUBDIR: &str = "versioned";
@@ -91,6 +91,21 @@ pub fn versioned_store(workspace_dir: &Path) -> super::version_documents::Docume
     super::version_documents::DocumentArtifactStore::new(workspace_dir)
 }
 
+/// Build the storage bundle expected by OpenHuman and TinyArtifacts from the
+/// scope-bound handles supplied by TinyAgents.
+pub(super) fn storage_bundle(
+    scoped: &tinyagents_storage_kit::ScopedStorage,
+) -> crate::storage::Storage {
+    crate::storage::Storage::new(
+        scoped.documents().clone(),
+        scoped.streams().clone(),
+        scoped.kv().clone(),
+        scoped.blobs().clone(),
+        scoped.queues().clone(),
+        scoped.secrets().clone(),
+    )
+}
+
 struct UnavailableArtifactStore;
 
 #[async_trait]
@@ -136,8 +151,7 @@ impl LegacyFileImportStore {
                 .unwrap_or("bin");
             let key = format!("artifacts/files/{}/v{}.{}", record.id, version.version, ext);
             let imported =
-                tiny_artifacts::import_legacy_file(self.files.as_ref(), &self.roots, &legacy, &key)
-                    .await?;
+                import_legacy_file(self.files.as_ref(), &self.roots, &legacy, &key).await?;
             version.body = imported.key.clone();
             version.file = Some(imported);
             changed = true;
@@ -147,6 +161,28 @@ impl LegacyFileImportStore {
         }
         Ok(record)
     }
+}
+
+/// Copies a legacy path-backed file into the current artifact file store after
+/// applying the same host path-root checks used for new artifact references.
+async fn import_legacy_file(
+    files: &dyn FileStore,
+    roots: &tiny_artifacts::FileRoots,
+    legacy: &FileRef,
+    key: &str,
+) -> anyhow::Result<FileRef> {
+    let source = roots.resolve(&legacy.key).await?;
+    let bytes = tokio::fs::read(&source.path).await?;
+    let media_type = legacy
+        .media_type
+        .as_deref()
+        .or(source.media_type.as_deref());
+    let metadata = files.put(key, &bytes, media_type).await?;
+    Ok(FileRef {
+        key: key.to_owned(),
+        size_bytes: metadata.size_bytes,
+        media_type: metadata.media_type,
+    })
 }
 
 #[async_trait]
@@ -498,24 +534,38 @@ pub(super) fn build_artifacts_service_with_scope(
     action_dir: Option<&Path>,
     chat: Option<&ApprovalChatContext>,
     ctx: &crate::core::runtime::DispatchCtx,
-    scoped: Option<crate::storage::ScopedStorage>,
+    scoped: Option<tinyagents_storage_kit::ScopedStorage>,
     publisher: Option<&super::ArtifactPublisherBinder>,
 ) -> (Artifacts, Option<Arc<dyn FileStore>>) {
-    let roots = file_roots(workspace_dir, &files, action_dir);
-    let service = Artifacts::new(Arc::new(versioned_store(workspace_dir)))
-        .with_observer(Arc::new(LegacyUiBridge::new(workspace_dir, files, chat)))
-        .with_file_roots(guarded_roots(roots));
-    match crate::storage::local::open("artifacts::files", workspace_dir)
-        .and_then(|opened| opened.scoped())
-    {
-        Ok(scoped) => {
-            service.with_file_store(Arc::new(tiny_artifacts::BlobFileStore::new(&scoped)))
-        }
-        Err(error) => {
-            log::warn!("[artifacts] file storage unavailable: {error:#}");
-            service
+    let source_roots = guarded_roots(file_roots(workspace_dir, &files, action_dir));
+    let storage = scoped.as_ref().map(storage_bundle);
+    let record_store: Arc<dyn ArtifactStore> = match storage.as_ref() {
+        Some(storage) => Arc::new(super::version_documents::DocumentArtifactStore::over(
+            workspace_dir,
+            storage,
+        )),
+        None => Arc::new(versioned_store(workspace_dir)),
+    };
+    let file_store = storage
+        .as_ref()
+        .map(|storage| Arc::new(tiny_artifacts::BlobFileStore::new(storage)) as Arc<dyn FileStore>);
+    let mut service = Artifacts::new(record_store)
+        .with_observer(Arc::new(LegacyUiBridge::new(
+            workspace_dir,
+            files,
+            source_roots.clone(),
+            file_store.clone(),
+            chat,
+            ctx,
+        )))
+        .with_file_roots(source_roots);
+    if let Some(file_store) = &file_store {
+        service = service.with_file_store(Arc::clone(file_store));
+        if let Some(publisher) = publisher {
+            service = service.with_publisher(publisher(Arc::clone(file_store)));
         }
     }
+    (service, file_store)
 }
 
 /// Where each file version keeps its own copy:

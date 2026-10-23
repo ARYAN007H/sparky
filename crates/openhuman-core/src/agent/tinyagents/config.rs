@@ -14,7 +14,7 @@ use tinyagents_harness::config::{
     RequiredOutput, SessionConfig, ToolConfig, ToolDispatcher, TurnConfig,
 };
 
-use crate::config::{AgentConfig, Config, DelegateAgentConfig, RequiredOutputContract};
+use crate::config::{AgentConfig, Config, RequiredOutputContract};
 
 /// Translates OpenHuman's free-form `agent.tool_dispatcher` string into the
 /// crate enum.
@@ -47,10 +47,7 @@ fn dispatcher_from(raw: &str) -> ToolDispatcher {
 /// Builds the globally-applicable [`SessionConfig`] from `config`.
 ///
 /// Leaves [`SessionConfig::lead_model`] and [`SessionConfig::subagent_model`]
-/// unset — those are per-team pins; see [`apply_team_models`]. `max_depth` is
-/// left at `0` (delegation disabled) because depth is a per-delegate setting;
-/// see [`apply_delegate`]. A caller that wants the plain single-agent case gets
-/// exactly that, with no delegation implied by accident.
+/// unset — those are per-team pins; see [`apply_team_models`].
 pub fn session_config_from(config: &Config) -> anyhow::Result<SessionConfig> {
     let model = config
         .default_model

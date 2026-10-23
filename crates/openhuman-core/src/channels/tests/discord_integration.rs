@@ -23,12 +23,12 @@
 //!      ever reverts to calling `run_tool_call_loop` directly, this test
 //!      starts failing.
 
+use super::super::Channel;
 use super::super::context::{
-    conversation_history_key, ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS,
+    CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext, conversation_history_key,
 };
 use super::super::runtime::process_channel_message;
-use super::super::Channel;
-use super::common::{channel_envelope, HistoryCaptureModel};
+use super::common::{HistoryCaptureModel, channel_envelope};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -136,7 +136,6 @@ fn make_discord_ctx(
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),

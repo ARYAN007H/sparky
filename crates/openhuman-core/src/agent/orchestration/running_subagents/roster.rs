@@ -128,7 +128,7 @@ pub(crate) async fn active_subagents_context_block(
         parent_session,
     )?;
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(ctx);
     let sessions = match crate::agent::orchestration::subagent_sessions::open_for_context(
         ctx,

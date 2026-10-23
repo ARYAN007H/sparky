@@ -126,7 +126,8 @@ async fn a_revision_reuses_the_id_and_file_and_keeps_the_history() {
     let context = crate::core::runtime::DispatchCtx::ambient();
     let scoped = crate::storage::sessions::artifact_scoped_for_in(&workspace, &context)
         .expect("production's artifact scope is available");
-    let blobs = tiny_artifacts::BlobFileStore::new(&scoped);
+    let storage = crate::artifacts::tiny_store::storage_bundle(&scoped);
+    let blobs = tiny_artifacts::BlobFileStore::new(&storage);
     for (version, expected) in [(1, b"deck-v1".as_slice()), (2, b"deck-v2!".as_slice())] {
         let file = record.version(version).unwrap().file.as_ref().unwrap();
         assert_eq!(blobs.read(&file.key).await.unwrap(), expected);

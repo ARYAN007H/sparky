@@ -58,33 +58,18 @@ fn tinyjuice_ccr_blobs_stay_inside_the_juice_owner_namespace() {
 }
 
 #[test]
-fn tiny_artifacts_blob_namespace_composes_with_host_artifact_collections() {
-    let registry = registry().expect("the owners compose");
-    assert_eq!(
-        registry
-            .owners()
-            .filter(|owner| *owner == "artifacts")
-            .count(),
-        1
-    );
-
-    let artifacts = owner_schemas()
-        .into_iter()
-        .find(|schema| schema.owner.as_str() == "artifacts")
-        .expect("the artifact owners are composed");
-    assert!(artifacts.items.iter().any(|item| matches!(
-        item,
-        Item::Collection { name, .. } if name == "artifacts.records"
-    )));
-    assert!(artifacts.items.iter().any(|item| matches!(
-        item,
-        Item::Blobs {
-            prefix,
-            scope: ScopeClass::Tenant,
-        } if prefix == "artifacts/files/"
-    )));
-    assert!(!module_items("artifacts")
-        .blobs
+fn tiny_artifacts_collections_compose_with_host_artifact_collections() {
+    let owners = collection_owners().expect("the owners compose");
+    let host = owners
         .iter()
-        .any(|prefix| prefix == "artifacts/files/"));
+        .find(|owner| owner.crate_name == "openhuman-core")
+        .expect("the host collection owner is present");
+    for name in ["artifacts.records", "artifacts.args", "artifacts.versions"] {
+        assert!(
+            host.collections
+                .iter()
+                .any(|collection| collection.name == name),
+            "missing host artifact collection {name}"
+        );
+    }
 }

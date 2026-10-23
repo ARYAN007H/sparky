@@ -82,10 +82,12 @@ fn an_unusable_source_is_refused_and_left_out() {
     );
     assert!(inbound.source("x:dms").unwrap_err().contains("agent_id"));
     assert!(inbound.source("x:zero").unwrap_err().contains("max_batch"));
-    assert!(inbound
-        .source("composio:gmail")
-        .unwrap_err()
-        .contains("reserved"));
+    assert!(
+        inbound
+            .source("composio:gmail")
+            .unwrap_err()
+            .contains("reserved")
+    );
     let usable: Vec<&str> = inbound.usable_sources().map(|(name, _)| name).collect();
     assert_eq!(usable, ["x:mentions"]);
     assert!(inbound.is_pinned("x:mentions"));

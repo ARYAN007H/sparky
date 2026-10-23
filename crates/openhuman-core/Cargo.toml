@@ -105,6 +105,11 @@ tinyagents-harness-tools = { path = "../../vendor/tinyagents/crates/tinyagents-h
     "state-block",
     "subagents",
     "todos",
+    "fs",
+    "net",
+    "exec",
+    "media",
+    "plan-review",
 ] }
 tinybox-bus = { path = "../../vendor/tinybox/crates/tinybox-bus", features = ["storage"] }
 tiny-artifacts = { path = "../../vendor/tiny-artifacts/crates/tiny-artifacts" }

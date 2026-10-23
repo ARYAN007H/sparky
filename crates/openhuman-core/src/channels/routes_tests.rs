@@ -1,6 +1,6 @@
 use super::*;
 use crate::channels::context::{
-    conversation_history_key, ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap,
+    ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap, conversation_history_key,
 };
 use crate::channels::host::ChannelTurnStateSubscriber;
 use crate::core::events::DomainEvent;
@@ -170,7 +170,6 @@ pub(super) fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(workspace_dir),
         message_timeout_secs: 60,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -481,12 +480,13 @@ async fn handle_runtime_command_set_model_clears_sender_history_and_persists_rou
     .await;
     assert!(handled);
 
-    assert!(ctx
-        .conversation_histories
-        .lock()
-        .unwrap()
-        .get(key)
-        .is_none());
+    assert!(
+        ctx.conversation_histories
+            .lock()
+            .unwrap()
+            .get(key)
+            .is_none()
+    );
     assert_eq!(
         get_route_selection(&ctx, key),
         ChannelRouteSelection {
@@ -608,7 +608,9 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(sent_text(&sent[0]).contains("No conversation threads yet. Send `/new` to create one."));
+    assert!(
+        sent_text(&sent[0]).contains("No conversation threads yet. Send `/new` to create one.")
+    );
     assert_eq!(sent[0].thread_id.as_deref(), Some("42"));
 }
 
@@ -643,12 +645,13 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         )
         .await
     );
-    assert!(ctx
-        .conversation_histories
-        .lock()
-        .unwrap()
-        .get(sender_key)
-        .is_none());
+    assert!(
+        ctx.conversation_histories
+            .lock()
+            .unwrap()
+            .get(sender_key)
+            .is_none()
+    );
 
     ctx.conversation_histories
         .lock()
@@ -727,9 +730,10 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 
     assert!(sent_text(&sent[2]).contains("**Recent sessions**"));
     assert!(sent_text(&sent[2]).contains("→ `Telegram"));
-    assert!(sent
-        .iter()
-        .all(|message| message.thread_id.as_deref() == Some("42")));
+    assert!(
+        sent.iter()
+            .all(|message| message.thread_id.as_deref() == Some("42"))
+    );
 }
 
 #[tokio::test]

@@ -6,6 +6,39 @@ use tinyagents_tasks::{
     CompletionStoreReplaceOutcome, InMemoryCompletionStore, DEFAULT_MAX_ATTEMPTS,
 };
 
+/// Presents OpenHuman's configured backend through TinyAgents' storage-kit
+/// adapter while preserving native conditional writes.
+struct CompletionBackend(Arc<dyn crate::storage::StorageBackend>);
+
+impl tinyagents_storage_kit::StorageBackend for CompletionBackend {
+    fn for_scope(
+        &self,
+        scope: &tinyagents_storage_kit::Scope,
+    ) -> tinyagents_storage_kit::error::Result<tinyagents_storage_kit::ScopedStorage> {
+        let host_scope = crate::storage::Scope::new(scope.as_str())?;
+        let storage = self.0.for_scope(&host_scope)?;
+        Ok(tinyagents_storage_kit::ScopedStorage::new(
+            storage,
+            scope.clone(),
+        ))
+    }
+
+    fn for_scope_conditioned(
+        &self,
+        scope: &tinyagents_storage_kit::Scope,
+        condition: &tinyagents_storage_kit::WriteCondition,
+    ) -> tinyagents_storage_kit::error::Result<tinyagents_storage_kit::ScopedStorage> {
+        let host_scope = crate::storage::Scope::new(scope.as_str())?;
+        let storage = self
+            .0
+            .for_scope_conditioned(&host_scope, condition)?;
+        Ok(tinyagents_storage_kit::ScopedStorage::new(
+            storage,
+            scope.clone(),
+        ))
+    }
+}
+
 pub(in crate::agent::orchestration) fn router_scope_for(
     ctx: &DispatchCtx,
     workspace_dir: &Path,
@@ -42,7 +75,12 @@ pub(in crate::agent::orchestration) fn open_driver_store(
         } else {
             CompletionStoreFallback::LocalMemory
         };
-        open_driver_completion_store_or_memory(opened.backend, opened.scope, fallback)
+        let scope = tinyagents_storage_kit::Scope::new(opened.scope.as_str())?;
+        open_driver_completion_store_or_memory(
+            Arc::new(CompletionBackend(opened.backend)),
+            scope,
+            fallback,
+        )
             .map_err(|error| anyhow::anyhow!("open the completion store: {error}"))
     })
 }

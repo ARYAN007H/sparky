@@ -1,12 +1,12 @@
+use super::super::Channel;
 use super::super::context::{
-    conversation_history_key, ChannelRouteSelection, ChannelRuntimeContext,
-    CHANNEL_MESSAGE_TIMEOUT_SECS,
+    CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRouteSelection, ChannelRuntimeContext,
+    conversation_history_key,
 };
 use super::super::runtime::process_channel_message;
-use super::super::Channel;
 use super::common::{
-    channel_envelope, IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
-    TelegramRecordingChannel, ToolCallingModel,
+    IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
+    TelegramRecordingChannel, ToolCallingModel, channel_envelope,
 };
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
@@ -41,7 +41,6 @@ async fn process_channel_message_executes_native_tool_calls() {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -127,7 +126,6 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -229,7 +227,6 @@ async fn process_channel_message_uses_route_override_provider_and_model() {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -281,7 +278,6 @@ async fn process_channel_message_respects_configured_max_tool_iterations_above_d
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -341,7 +337,6 @@ async fn process_channel_message_reports_configured_max_tool_iterations_limit() 
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),

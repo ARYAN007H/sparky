@@ -1,8 +1,8 @@
 //! Tests for migration 5 → 6 (`reconcile_orphaned_providers`).
 
 use super::*;
-use crate::config::schema::cloud_providers::CloudProviderCreds;
 use crate::config::Config;
+use crate::config::schema::cloud_providers::CloudProviderCreds;
 
 /// Minimal cloud-provider entry for tests — only `id` and `slug` matter here.
 fn provider(id: &str, slug: &str) -> CloudProviderCreds {

@@ -1,8 +1,8 @@
 //! Env overrides for inbound message batching (`[inbound_debounce]`).
 
-use crate::config::schema::load::env::parse_env_bool;
-use crate::config::schema::load::env::EnvLookup;
 use crate::config::schema::Config;
+use crate::config::schema::load::env::EnvLookup;
+use crate::config::schema::load::env::parse_env_bool;
 
 fn parse_ms(name: &str, raw: &str) -> Option<u64> {
     let trimmed = raw.trim();

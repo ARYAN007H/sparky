@@ -81,7 +81,7 @@ async fn failed_steer_of_running_reused_session_does_not_create_second_child() {
         .expect("detached child context")
         .with_cancellation(detached_data.cancellation.clone());
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&live.data.dispatch_ctx());
     let jobs_before = jobs.list().len();
     let result = crate::agent::orchestration::tools::SpawnSubagentTool::new()

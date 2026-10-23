@@ -1,4 +1,4 @@
-use crate::agent::tools::{plan_exit::plan_exit_tool, PLAN_EXIT_MARKER};
+use crate::agent::tools::{PLAN_EXIT_MARKER, plan_exit::plan_exit_tool};
 use serde_json::json;
 use tinyagents_harness_tools::plan_review::{PlanReviewRequest, PlanReviewResolution};
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolRunContext};
@@ -82,14 +82,16 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
 
     // Resolve the parked review so the spawned task and the gate's
     // bookkeeping don't leak past this test.
-    assert!(crate::plan_review::host::global().decide_by_thread(
-        &crate::core::runtime::DispatchCtx::ambient()
-            .tenant()
-            .unwrap()
-            .profile_only(),
-        thread_id,
-        PlanReviewResolution::Approve,
-    ));
+    assert!(
+        crate::plan_review::host::global().decide_by_thread(
+            &crate::core::runtime::DispatchCtx::ambient()
+                .tenant()
+                .unwrap()
+                .profile_only(),
+            thread_id,
+            PlanReviewResolution::Approve,
+        )
+    );
     let resolution = parked.await.unwrap();
     assert_eq!(resolution, PlanReviewResolution::Approve);
 

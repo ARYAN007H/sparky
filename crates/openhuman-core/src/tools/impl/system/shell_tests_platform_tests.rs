@@ -2,6 +2,7 @@
 //! Python encoding defaults used by OpenHuman's runtime adapter.
 
 use super::*;
+use crate::tools::ShellTool;
 use crate::modules::tinybox::host_runtime::{host_shell_flavor, ShellFlavor};
 #[cfg(feature = "modules")]
 use crate::tools::system::shell_support::{python_env_defaults, PYTHON_ENV_DEFAULTS};

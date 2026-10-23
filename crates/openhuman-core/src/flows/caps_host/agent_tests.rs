@@ -242,7 +242,7 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
     let output = run.await.expect("flow runner task");
     let output = output.expect("headless flow agent should settle its child");
     let snapshots = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&crate::core::runtime::DispatchCtx::new(jobs_core))
     .list();
 
@@ -560,7 +560,7 @@ async fn headless_child_at_depth_cap_gets_readable_spawn_refusal() {
         tokio::time::timeout(std::time::Duration::from_secs(15), child_started_rx).await;
     if child_started.is_err() {
         let jobs = crate::core::runtime::slot_for::<
-            tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+            tinyagents_orchestration::subagent::SubAgentJobRegistry,
         >(&dispatch)
         .list();
         eprintln!(
@@ -602,7 +602,7 @@ async fn headless_child_at_depth_cap_gets_readable_spawn_refusal() {
         .expect("headless root task")
         .expect("root completion");
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&dispatch)
     .list();
     let worker_job = jobs

@@ -24,14 +24,14 @@ use crate::config::MultimodalConfig;
 use crate::core::bus::BUS;
 use crate::progress::AgentProgress;
 use crate::security::prompt_injection::{
-    enforce_prompt_input, PromptEnforcementAction, PromptEnforcementContext,
+    PromptEnforcementAction, PromptEnforcementContext, enforce_prompt_input,
 };
 use crate::security::turn_origin::{self, AgentTurnOrigin};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinytools::Tool;
 
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
-use crate::channels::runtime::turn_driver::run_channel_turn;
+use crate::channels::run_channel_turn;
 use tinyagents_definition::SandboxMode;
 use tinyagents_harness_tools::fs::file_state::with_file_state_agent_id;
 

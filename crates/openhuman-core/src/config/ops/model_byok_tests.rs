@@ -17,8 +17,8 @@ fn provider_ca_updates_validate_bundles_and_normalize_slugs() {
     let certs = collect_provider_ca_certs([(" team ", Some(""))]).unwrap();
     assert_eq!(certs.get("team").map(String::as_str), Some(""));
 }
-use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 use crate::config::Config;
+use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 
 fn config_with(inference_url: Option<&str>, api_key: Option<&str>, model: Option<&str>) -> Config {
     let mut config = Config::default();

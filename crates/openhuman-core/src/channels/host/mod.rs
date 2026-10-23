@@ -18,9 +18,9 @@ pub use channel_events::{ChannelApprovalSurfaceSubscriber, ChannelTurnStateSubsc
 use std::sync::Arc;
 
 #[cfg(test)]
-use tinychannels::host::ChannelHostBuilder;
-#[cfg(test)]
 use tinychannels::ChannelHost;
+#[cfg(test)]
+use tinychannels::host::ChannelHostBuilder;
 
 #[cfg(test)]
 use crate::config::Config;

@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 use tiny_artifacts::{
     ArtifactAuthor, ArtifactKind, ArtifactRecord, ArtifactStore, ArtifactVersion, Author, Content,
@@ -8,6 +10,32 @@ use tiny_artifacts::{
 use super::*;
 
 struct UnusedPublisher;
+
+#[derive(Default)]
+struct MemoryArtifactStore(Mutex<HashMap<String, ArtifactRecord>>);
+
+#[async_trait::async_trait]
+impl ArtifactStore for MemoryArtifactStore {
+    async fn list(&self) -> anyhow::Result<Vec<ArtifactRecord>> {
+        Ok(self.0.lock().unwrap().values().cloned().collect())
+    }
+
+    async fn get(&self, id: &str) -> anyhow::Result<Option<ArtifactRecord>> {
+        Ok(self.0.lock().unwrap().get(id).cloned())
+    }
+
+    async fn upsert(&self, artifact: &ArtifactRecord) -> anyhow::Result<()> {
+        self.0
+            .lock()
+            .unwrap()
+            .insert(artifact.id.clone(), artifact.clone());
+        Ok(())
+    }
+
+    async fn delete(&self, id: &str) -> anyhow::Result<bool> {
+        Ok(self.0.lock().unwrap().remove(id).is_some())
+    }
+}
 
 #[async_trait::async_trait]
 impl tiny_artifacts::ArtifactPublisher for UnusedPublisher {
@@ -50,13 +78,12 @@ async fn seeded(
 async fn legacy_path_refs_are_guarded_and_imported_as_opaque_file_keys() {
     let dir = tempfile::tempdir().unwrap();
     let source_root = dir.path().join("Files");
-    let records_root = dir.path().join("records");
     let blobs_root = dir.path().join("blobs");
     std::fs::create_dir_all(&source_root).unwrap();
     let source = source_root.join("report.txt");
     std::fs::write(&source, "legacy bytes").unwrap();
 
-    let records = Arc::new(tiny_artifacts::FsArtifactStore::new(&records_root));
+    let records = Arc::new(MemoryArtifactStore::default());
     let base: Arc<dyn ArtifactStore> = records.clone();
     let blobs: Arc<dyn FileStore> = Arc::new(tiny_artifacts::FsFileStore::new(&blobs_root));
     let importing = LegacyFileImportStore {
@@ -128,12 +155,16 @@ async fn explicit_artifact_context_binds_records_and_blobs_to_the_same_profile()
     let context_b = DispatchCtx::new(core_b.clone());
 
     CoreContext::scope(context_for("ambient-b"), async {
-        let (artifacts_a, files_a) = artifacts_service_with_file_store(
+        let scoped_a = crate::storage::sessions::artifact_scoped_for_in(&workspace, &context_a)
+            .expect("profile A scope");
+        let (artifacts_a, files_a) = build_artifacts_service_with_scope(
             &workspace,
             FileRoots::new(&files),
             None,
             None,
             &context_a,
+            Some(scoped_a),
+            None,
         );
         let created = artifacts_a
             .create(
@@ -152,21 +183,27 @@ async fn explicit_artifact_context_binds_records_and_blobs_to_the_same_profile()
             b"profile-a-bytes"
         );
 
-        let (artifacts_b, files_b) = artifacts_service_with_file_store(
+        let scoped_b = crate::storage::sessions::artifact_scoped_for_in(&workspace, &context_b)
+            .expect("profile B scope");
+        let (artifacts_b, files_b) = build_artifacts_service_with_scope(
             &workspace,
             FileRoots::new(&files),
             None,
             None,
             &context_b,
+            Some(scoped_b),
+            None,
         );
         assert!(artifacts_b.get(&id).await.unwrap().is_none());
-        assert!(files_b
-            .as_ref()
-            .unwrap()
-            .metadata(&file.key)
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            files_b
+                .as_ref()
+                .unwrap()
+                .metadata(&file.key)
+                .await
+                .unwrap()
+                .is_none()
+        );
 
         let card_a = CoreContext::scope(core_a.clone(), async {
             super::super::store::get_artifact(&workspace, &id).await
@@ -242,8 +279,7 @@ async fn missing_artifact_storage_binding_does_not_fall_back_to_ambient_records(
 async fn legacy_bridge_does_not_overwrite_an_existing_card_file_outside_trusted_roots() {
     let (workspace, files) = temp_dirs();
     let root = files.parent().unwrap();
-    let records: Arc<dyn ArtifactStore> =
-        Arc::new(tiny_artifacts::FsArtifactStore::new(root.join("records")));
+    let records: Arc<dyn ArtifactStore> = Arc::new(MemoryArtifactStore::default());
     let file_store: Arc<dyn FileStore> =
         Arc::new(tiny_artifacts::FsFileStore::new(root.join("blobs")));
     let ctx = crate::core::runtime::DispatchCtx::unbound();
@@ -440,16 +476,20 @@ async fn deleting_an_artifact_removes_its_card() {
         .await
         .unwrap();
     let id = saved.record.id;
-    assert!(super::super::store::get_artifact(&workspace, &id)
-        .await
-        .is_ok());
+    assert!(
+        super::super::store::get_artifact(&workspace, &id)
+            .await
+            .is_ok()
+    );
 
     let (removed, notice) = artifacts.delete(&id).await.unwrap();
     assert!(removed);
     assert!(notice.is_none(), "{notice:?}");
-    assert!(super::super::store::get_artifact(&workspace, &id)
-        .await
-        .is_err());
+    assert!(
+        super::super::store::get_artifact(&workspace, &id)
+            .await
+            .is_err()
+    );
 }
 
 #[test]

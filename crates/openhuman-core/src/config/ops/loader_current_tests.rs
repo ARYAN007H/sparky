@@ -1,7 +1,7 @@
 use super::*;
-use crate::config::schema::{EphemeralRoute, EPHEMERAL_ROUTE_SLUG};
+use crate::config::schema::{EPHEMERAL_ROUTE_SLUG, EphemeralRoute};
 use crate::core::runtime::DispatchCtx;
-use crate::core::runtime::{context::CoreContext, DomainSet};
+use crate::core::runtime::{DomainSet, context::CoreContext};
 
 fn context_with(config: Config) -> std::sync::Arc<CoreContext> {
     CoreContext::for_test_with_config(DomainSet::full(), config)
@@ -47,10 +47,12 @@ async fn a_context_without_a_route_loads_unchanged_providers() {
         .expect("context config loads");
 
     assert!(loaded.ephemeral_route.is_none());
-    assert!(loaded
-        .cloud_providers
-        .iter()
-        .all(|entry| entry.slug != EPHEMERAL_ROUTE_SLUG));
+    assert!(
+        loaded
+            .cloud_providers
+            .iter()
+            .all(|entry| entry.slug != EPHEMERAL_ROUTE_SLUG)
+    );
     assert_ne!(
         loaded.chat_provider.as_deref(),
         Some(format!("{EPHEMERAL_ROUTE_SLUG}:ctx-model").as_str())

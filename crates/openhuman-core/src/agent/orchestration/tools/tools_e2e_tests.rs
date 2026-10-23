@@ -140,7 +140,7 @@ async fn spawn_subagent_returns_async_reference_and_runs_child_e2e() {
     assert!(provider.saw(SPAWN_SUBAGENT_CANARY));
     assert!(provider.saw("parent supplied context"));
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&live.data.dispatch_ctx());
     let job = jobs
         .list()

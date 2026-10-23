@@ -337,7 +337,7 @@ async fn headless_spawn_is_async_and_reports_its_result_to_the_run_log() {
     .expect("headless result is projected to the run log");
     assert_eq!(output, "done");
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&live.data.dispatch_ctx());
     let job = jobs
         .list()

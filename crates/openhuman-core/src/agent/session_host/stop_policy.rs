@@ -18,7 +18,7 @@
 
 use std::fmt::Write as _;
 
-use super::turn_checkpoint::CheckpointToolResult;
+use tinyagents_harness::close::CloseToolResult as CheckpointToolResult;
 use tinyagents_harness::turn_stop::{CopyRequest, TurnStop, TurnStopCopyKey};
 
 /// Longest error line shown for one tool, in characters.
@@ -300,7 +300,7 @@ pub(crate) fn render_stop_summary_with_cause(
         short_error_line(content)
     });
     tinyagents_harness::turn_stop::render_stop_summary_with_copy(
-        kind.copy(),
+        &kind.copy(),
         &groups,
         &super::product_copy::OPENHUMAN_STOP_COPY,
     )

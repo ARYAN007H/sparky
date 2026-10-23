@@ -248,8 +248,9 @@ impl OpenHumanTurnPrelude {
         let active_goal = if turn.overrides.suppress_active_goal {
             None
         } else {
-            crate::agent::goals::runtime::load_for_thread(
+            crate::agent::goals::load_for_thread(
                 &self.workspace_dir,
+                &self.dispatch_ctx(),
                 self.thread_id.as_deref(),
             )
             .await
@@ -351,6 +352,7 @@ impl OpenHumanTurnPrelude {
         let finished_plan = crate::agent::tinyagents::state_block::close_finished_plan(
             &self.workspace_dir,
             self.thread_id.as_deref(),
+            &self.dispatch_ctx(),
         )
         .await;
         self.memory_post_turn(receipt, finished_plan);
@@ -373,7 +375,7 @@ fn granted_tool_specs(
     deferred: &std::collections::HashSet<String>,
     has_thread: bool,
 ) -> Vec<tinytools::ToolSpec> {
-    let specs = visible
+    let specs: Vec<tinytools::ToolSpec> = visible
         .iter()
         .chain(
             registered
@@ -386,7 +388,10 @@ fn granted_tool_specs(
         })
         .map(|spec| spec.as_ref().clone())
         .collect();
-    super::super::builder::dedup_visible_tool_specs(specs)
+    tinyagents_runtime::dedup_visible_tool_specs(specs.into_iter().map(Arc::new).collect())
+        .into_iter()
+        .map(|spec| spec.as_ref().clone())
+        .collect()
 }
 
 #[cfg(test)]

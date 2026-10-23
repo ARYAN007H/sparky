@@ -7,7 +7,7 @@ async fn generic_spawn_jobs_are_owned_by_their_workspace() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness::context::{RunConfig, RunContext};
-    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobRegistry;
 
     const PROMPT_A: &str = "workspace-owner-child-a-canary";
     const PROMPT_B: &str = "workspace-owner-child-b-canary";

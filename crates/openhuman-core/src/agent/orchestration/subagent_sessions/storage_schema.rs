@@ -44,7 +44,7 @@ pub(super) fn legacy_collections() -> Vec<CollectionSpec> {
 }
 
 /// The camelCase v1 field and its snake_case v2 name, for the plain copies.
-const COPIES: [(&str, &str); 18] = [
+const COPIES: [(&str, &str); 19] = [
     ("subagentSessionId", "subagent_session_id"),
     ("parentSession", "parent_session"),
     ("parentThreadId", "parent_thread_id"),

@@ -96,7 +96,7 @@ pub async fn apply_autonomy_settings(
             other => {
                 return Err(format!(
                     "invalid autonomy level '{other}' (expected readonly | supervised | full)"
-                ))
+                ));
             }
         };
     }

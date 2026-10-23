@@ -1,6 +1,6 @@
 use super::*;
 use crate::agent::orchestration::subagent_sessions::types::SubagentSessionUpsert;
-use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+use tinyagents_orchestration::subagent::SubAgentJobRegistry;
 use tinyagents_orchestration::subagent::{FinishedOutcome, SubagentTaskKey};
 
 fn selector(task_key: &str) -> SubagentSessionSelector {

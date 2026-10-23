@@ -45,7 +45,6 @@ fn runtime_context() -> ChannelRuntimeContext {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(PathBuf::from("/tmp")),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -119,22 +118,22 @@ fn clear_and_compact_sender_history_update_cached_messages() {
     }
 
     clear_sender_history(&ctx.conversation_histories, sender);
-    assert!(!ctx
-        .conversation_histories
-        .lock()
-        .unwrap()
-        .contains_key(sender));
+    assert!(
+        !ctx.conversation_histories
+            .lock()
+            .unwrap()
+            .contains_key(sender)
+    );
 }
 
 #[tokio::test]
 async fn overflow_detection_covers_edge_cases() {
     let ctx = runtime_context();
-    assert!(is_context_window_overflow_error(
-        &ctx,
-        &anyhow::anyhow!("Maximum context length exceeded")
-    )
-    .await
-    .unwrap());
+    assert!(
+        is_context_window_overflow_error(&ctx, &anyhow::anyhow!("Maximum context length exceeded"))
+            .await
+            .unwrap()
+    );
     assert!(
         !is_context_window_overflow_error(&ctx, &anyhow::anyhow!("network timeout"))
             .await

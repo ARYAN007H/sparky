@@ -19,11 +19,11 @@
 //! (step 1). This avoids double-delivering to a channel that doesn't
 //! exist.
 
-use crate::channels::outbound::text_message;
 use crate::channels::Channel;
+use crate::channels::outbound::text_message;
 use crate::core::events::DomainEvent;
-use crate::web_chat::publish_web_channel_event;
 use crate::web_chat::WebChannelEvent;
+use crate::web_chat::publish_web_channel_event;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};

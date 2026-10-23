@@ -19,7 +19,7 @@ mod processor;
 mod routing;
 
 pub(crate) use processor::{
-    process_channel_runtime_message, run_message_dispatch_loop, RuntimeChannelMessage,
+    RuntimeChannelMessage, process_channel_runtime_message, run_message_dispatch_loop,
 };
 
 #[cfg(test)]
@@ -38,7 +38,7 @@ use helpers::build_channel_context_block;
 use helpers::select_acknowledgment_reaction;
 
 #[cfg(test)]
-use routing::{build_visible_tool_set, AgentScoping};
+use routing::{AgentScoping, build_visible_tool_set};
 
 #[cfg(any(test, debug_assertions))]
 #[path = "mod_test_support_tests.rs"]

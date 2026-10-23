@@ -7,8 +7,8 @@ use crate::config::rpc as config_rpc;
 use crate::core::all::ControllerFuture;
 
 use super::super::helpers::{
-    deserialize_params, to_json, LocalAiSettingsUpdate, MemorySettingsUpdate, ModelSettingsUpdate,
-    RuntimeSettingsUpdate,
+    LocalAiSettingsUpdate, MemorySettingsUpdate, ModelSettingsUpdate, RuntimeSettingsUpdate,
+    deserialize_params, to_json,
 };
 
 pub(super) fn handle_get_config(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {

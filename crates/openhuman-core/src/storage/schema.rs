@@ -37,8 +37,10 @@ fn declared_collections() -> Vec<CollectionOwner> {
             "tinyagents-session",
             tinyagents_session::port::collections(),
         ),
-        owner("tinyagents-graph", tinyagents_graph::storage::collections()),
-        owner("tinyagents-tasks", tinyagents_tasks::collections()),
+        owner(
+            "tinyagents-tasks",
+            tinyagents_tasks::storage_schema().collections(),
+        ),
         owner("openhuman-core", host_collections()),
     ];
 

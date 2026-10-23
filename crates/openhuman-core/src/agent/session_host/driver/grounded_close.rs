@@ -16,11 +16,7 @@ use tinytools_agent::dialect::ToolDialect;
 use tinyagents_harness::middleware::wrap_harness_instruction;
 
 use crate::agent::{
-    session_host::turn_checkpoint::{
-        self, build_deterministic_checkpoint, build_deterministic_final_summary_with_cause,
-        close_verification_prompt, final_answer_instruction, harness_instruction_needles,
-        render_tool_results, results_from_tool_outcomes,
-    },
+    session_host::{product_copy, stop_policy},
     tinyagents::{SupplementalTrace, TinyagentsTurnOutcome, TurnModelSource},
 };
 use tinyagents_harness::turn_policy::AGENT_TURN_MAX_OUTPUT_TOKENS;
@@ -239,6 +235,27 @@ pub(super) struct GroundedClose {
 /// A classified halt has enough evidence for a deterministic partial result.
 /// Keeping this separate from the model-driven repair path guarantees zero
 /// additional provider calls once its recovery budget is exhausted.
+
+fn deterministic_final_summary_with_cause(
+    results: &[tinyagents_harness::close::CloseToolResult],
+    stop_reason: Option<&str>,
+    failure_cause: Option<&tinyagents_harness::no_progress::ClassifiedStopCause>,
+) -> String {
+    if failure_cause.is_some() || stop_reason.is_some() {
+        return stop_policy::render_stop_summary_with_cause(
+            results,
+            stop_reason.unwrap_or_default(),
+            failure_cause,
+        );
+    }
+    let rendered = product_copy::render_close_results(results, 4_000);
+    tinyagents_harness::close::final_summary_with_copy(
+        &product_copy::OPENHUMAN_CLOSE_COPY,
+        &rendered,
+        !results.is_empty(),
+    )
+}
+
 fn classified_halt_close(outcome: &TinyagentsTurnOutcome) -> Option<GroundedClose> {
     let reason = outcome.breaker_halt.as_deref().unwrap_or_default();
     if outcome.failure_cause.is_none() && !reason.starts_with("Stopping after ") {
@@ -246,7 +263,7 @@ fn classified_halt_close(outcome: &TinyagentsTurnOutcome) -> Option<GroundedClos
     }
     let records = product_copy::close_results(&outcome.tool_outcomes);
     Some(GroundedClose {
-        output: build_deterministic_final_summary_with_cause(
+        output: deterministic_final_summary_with_cause(
             &records,
             Some(reason),
             outcome.failure_cause.as_ref(),
@@ -425,7 +442,7 @@ pub(super) async fn close_if_needed(
                 !records.is_empty(),
             )
         } else {
-            build_deterministic_final_summary_with_cause(
+            deterministic_final_summary_with_cause(
                 &records,
                 stop_reason,
                 outcome.failure_cause.as_ref(),

@@ -7,7 +7,7 @@ use serde_json::Value;
 #[cfg(test)]
 use crate::channels::bus::derive_inbound_thread_id;
 use tinychannels_bus::{
-    channel::ContentPart, ChannelInboundEnvelope, ChannelRef, ConversationRef, SenderRef,
+    ChannelInboundEnvelope, ChannelRef, ConversationRef, SenderRef, channel::ContentPart,
 };
 
 /// Longest channel name: `telegram`, `imessage`, `discord`, ...

@@ -1,7 +1,7 @@
 //! RPC input conversion for cloud-provider settings.
 
 use crate::config::schema::cloud_providers::{
-    builtin_cloud_provider, generate_provider_id, is_slug_reserved, AuthStyle, CloudProviderCreds,
+    AuthStyle, CloudProviderCreds, builtin_cloud_provider, generate_provider_id, is_slug_reserved,
 };
 use serde::Deserialize;
 

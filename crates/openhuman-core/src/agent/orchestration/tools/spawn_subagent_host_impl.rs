@@ -61,7 +61,7 @@ impl SpawnSubagentTool {
                 }
             };
         let jobs = crate::core::runtime::slot_for::<
-            tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+            tinyagents_orchestration::subagent::SubAgentJobRegistry,
         >(&dispatch);
         let driver_store = match subagent_sessions::open_for_context(
             &dispatch,
@@ -85,10 +85,12 @@ impl SpawnSubagentTool {
             .unwrap_or_else(|| tinytools::WorkspaceDescriptor::new(parent.workspace_dir.clone()));
         let resolved_model = definition.model.resolve(parent.model_name.as_str());
         let target_model = model_override.as_deref().unwrap_or(&resolved_model);
+        let model_supports_vision = run_context.hosted_base.as_ref().is_some_and(|base| {
+            crate::inference::model_context::model_supports_vision(target_model, &base.config)
+        });
         if crate::attachments::should_forward_parent_images(&prompt)
             && !run_context.attachment_placeholders.is_empty()
-            && (definition.id == "vision_agent"
-                || crate::inference::provider::factory::oh_tier_supports_vision(target_model))
+            && (definition.id == "vision_agent" || model_supports_vision)
         {
             prompt = format!(
                 "{}\n\n{}",
@@ -341,7 +343,9 @@ impl SpawnSubagentTool {
                 completion_target
                     .failed(task_id, &definition.id, &message)
                     .await;
-                crate::agent::orchestration::completion_owners::finish_driver_task(&dispatch, task_id);
+                crate::agent::orchestration::completion_owners::finish_driver_task(
+                    &dispatch, task_id,
+                );
                 return Ok(ToolResult::error(format!("spawn_subagent: {message}")));
             }
             if let Err(error) = crate::agent::subagent_host::resume_async_via_driver_tool(
@@ -366,7 +370,9 @@ impl SpawnSubagentTool {
                 completion_target
                     .failed(task_id, &definition.id, &message)
                     .await;
-                crate::agent::orchestration::completion_owners::finish_driver_task(&dispatch, task_id);
+                crate::agent::orchestration::completion_owners::finish_driver_task(
+                    &dispatch, task_id,
+                );
                 crate::agent::orchestration::subagent_events::publish_subagent_failed(
                     parent_session,
                     task_id.to_owned(),

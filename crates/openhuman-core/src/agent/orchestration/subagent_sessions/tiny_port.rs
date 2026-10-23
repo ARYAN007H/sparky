@@ -63,7 +63,7 @@ pub(crate) fn open_for_context(
     workspace_dir: PathBuf,
     parent_session: impl Into<String>,
     parent_thread_id: Option<String>,
-    jobs: Option<tinyagents_harness_tools::subagents::SubAgentJobRegistry>,
+    jobs: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
 ) -> Result<Arc<dyn TinySessionStore>, SubagentError> {
     let documents = documents_for_context(ctx, &workspace_dir)?;
     let driver = Arc::new(DriverSubagentSessionStore::new(Arc::clone(&documents))?);
@@ -393,7 +393,7 @@ pub(crate) struct OpenHumanTinySubagentSessionStore {
     checkpoint_dir: PathBuf,
     parent_session: String,
     parent_thread_id: Option<String>,
-    jobs: Option<tinyagents_harness_tools::subagents::SubAgentJobRegistry>,
+    jobs: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
 }
 
 impl OpenHumanTinySubagentSessionStore {
@@ -413,7 +413,7 @@ impl OpenHumanTinySubagentSessionStore {
 
     pub(crate) fn with_jobs(
         mut self,
-        jobs: tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        jobs: tinyagents_orchestration::subagent::SubAgentJobRegistry,
     ) -> Self {
         self.jobs = Some(jobs);
         self

@@ -1,9 +1,9 @@
 use super::tests_support::ForcedDocumentSource;
 use super::*;
 use crate::config::Config;
-use crate::storage::{test_support::memory_backend, Scope, Storage, StorageBackend};
+use crate::storage::{Scope, Storage, StorageBackend, test_support::memory_backend};
 use std::sync::Arc;
-use tinystoragedrivers::secrets::{crypto, DerivedKeys, KeyProvider};
+use tinystoragedrivers::secrets::{DerivedKeys, KeyProvider, crypto};
 use zeroize::Zeroizing;
 
 fn keys(byte: u8) -> Arc<dyn KeyProvider> {

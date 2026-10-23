@@ -541,7 +541,7 @@ async fn thread_delete_inner(
                 }
             };
         let jobs = crate::core::runtime::slot_for::<
-            tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+            tinyagents_orchestration::subagent::SubAgentJobRegistry,
         >(&ctx);
         let cancelled_driver =
             crate::agent::orchestration::subagent_sessions::cancel_driver_jobs_for_thread(

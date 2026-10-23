@@ -1,7 +1,7 @@
 use super::*;
 use crate::config::{BrowserConfig, Config};
-use crate::security::credentials::{AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME};
 use crate::security::AuditLogger;
+use crate::security::credentials::{APP_SESSION_PROVIDER, AuthService, DEFAULT_AUTH_PROFILE_NAME};
 use crate::tools::ops::{all_tools, tool_group};
 use tempfile::TempDir;
 use tinytools::ToolContent;

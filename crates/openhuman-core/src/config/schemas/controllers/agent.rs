@@ -7,9 +7,9 @@ use crate::config::rpc as config_rpc;
 use crate::core::all::ControllerFuture;
 
 use super::super::helpers::{
-    deserialize_params, to_json, AgentSettingsUpdate, AutonomySettingsUpdate,
-    BrowserSettingsUpdate, ComputerSettingsUpdate, PrivacyModeUpdate, SandboxSettingsUpdate,
-    SetBrowserAllowAllParams,
+    AgentSettingsUpdate, AutonomySettingsUpdate, BrowserSettingsUpdate, ComputerSettingsUpdate,
+    PrivacyModeUpdate, SandboxSettingsUpdate, SetBrowserAllowAllParams, deserialize_params,
+    to_json,
 };
 
 pub(crate) fn handle_get_autonomy_settings(

@@ -7,7 +7,7 @@
 
 use tinystoragedrivers::CollectionSpec;
 
-use crate::storage::schema_support::{key_of, map_legacy_collection, LegacyTargetRecord};
+use crate::storage::schema_support::{LegacyTargetRecord, key_of, map_legacy_collection};
 
 /// The v2 collection holding one config document per scope.
 pub(crate) const CONFIG_COLLECTION: &str = "config.documents";

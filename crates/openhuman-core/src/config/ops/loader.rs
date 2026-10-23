@@ -20,13 +20,13 @@ pub(crate) use reset_local_data::reset_local_data_for_paths;
 #[cfg(all(test, windows))]
 pub(crate) use reset_local_data::reset_local_data_remove_error;
 pub use reset_local_data::{get_data_paths, get_data_paths_for_user, reset_local_data};
-pub use runtime_flags::{
-    agent_server_status, core_rpc_url_from_env, get_runtime_flags, set_browser_allow_all,
-    RuntimeFlagsOut,
-};
 #[cfg(test)]
 pub(crate) use runtime_flags::{
-    env_flag_enabled, BROWSER_ALLOW_ALL_ENV, BROWSER_ALLOW_ALL_RPC_ENABLE_ENV,
+    BROWSER_ALLOW_ALL_ENV, BROWSER_ALLOW_ALL_RPC_ENABLE_ENV, env_flag_enabled,
+};
+pub use runtime_flags::{
+    RuntimeFlagsOut, agent_server_status, core_rpc_url_from_env, get_runtime_flags,
+    set_browser_allow_all,
 };
 pub use snapshot::{
     client_config_json, get_config_snapshot, get_dashboard_settings,

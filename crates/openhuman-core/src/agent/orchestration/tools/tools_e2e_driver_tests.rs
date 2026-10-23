@@ -8,8 +8,10 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness::context::RunContext;
     use tinyagents_harness::tool::ToolDispatch;
-    use tinyagents_harness_tools::subagents::{SubAgentJobRegistry, SubAgentJobsTool};
-    use tinyagents_orchestration::subagent::{DurableSubagentStatus, SubAgentJobStatus};
+    use tinyagents_harness_tools::subagents::SubAgentJobsTool;
+    use tinyagents_orchestration::subagent::{
+        DurableSubagentStatus, SubAgentJobRegistry, SubAgentJobStatus,
+    };
 
     struct GatedModel {
         calls: std::sync::atomic::AtomicUsize,
@@ -389,7 +391,7 @@ async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
         "refusal must not publish spawn progress"
     );
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&dispatch);
     assert!(
         jobs.list().is_empty(),
@@ -531,7 +533,7 @@ async fn deleted_thread_marker_survives_router_restart_and_refuses_async_spawn()
         "refusal writes no durable child session"
     );
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&restarted.data.dispatch_ctx());
     assert!(jobs.list().is_empty(), "refusal registers no shared job");
 
@@ -640,7 +642,7 @@ async fn detached_registration_failure_finishes_the_announced_product_card() {
         "registration error must not dispatch the model"
     );
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&live.data.dispatch_ctx());
     assert!(
         jobs.list().is_empty(),

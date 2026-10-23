@@ -7,9 +7,9 @@ use crate::config::rpc as config_rpc;
 use crate::core::all::ControllerFuture;
 
 use super::super::helpers::{
-    deserialize_params, to_json, AgentPathsUpdate, AnalyticsSettingsUpdate,
+    AgentPathsUpdate, AnalyticsSettingsUpdate, DEFAULT_ONBOARDING_FLAG_NAME,
     OnboardingCompletedSetParams, UserTimezoneUpdate, WorkspaceOnboardingFlagParams,
-    WorkspaceOnboardingFlagSetParams, DEFAULT_ONBOARDING_FLAG_NAME,
+    WorkspaceOnboardingFlagSetParams, deserialize_params, to_json,
 };
 
 pub(super) fn handle_workspace_onboarding_flag_exists(

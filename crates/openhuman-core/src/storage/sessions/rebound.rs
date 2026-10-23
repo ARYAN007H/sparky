@@ -134,8 +134,8 @@ impl ReboundSessionStores {
 
 /// Rebinds every live [`ReboundSessionStores`] of the process to `backend`;
 /// returns how many.
-pub fn rebind_all(backend: &Arc<dyn StorageBackend>) -> usize {
-    PROCESS.rebind(backend)
+pub fn rebind_all(backend: &Arc<dyn StorageBackend>) -> Result<usize, StorageError> {
+    Ok(PROCESS.rebind(backend))
 }
 
 impl SessionStoreProvider for ReboundSessionStores {

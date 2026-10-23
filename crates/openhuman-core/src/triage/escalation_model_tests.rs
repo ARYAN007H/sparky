@@ -5,6 +5,9 @@ use std::sync::{Arc, Mutex};
 use tinyinference_llm::model::{
     ChatModel, ModelProfile, ModelRequest, ModelResponse, ModelStream, ModelStreamItem,
 };
+use tinyinference_llm::providers::overrides::ChatModelEntry;
+
+const TEST_MANAGED_MODEL: &str = "hint:chat";
 
 struct TriageReplyModel {
     requests: Arc<Mutex<Vec<(String, String, ModelRequest)>>>,
@@ -62,8 +65,8 @@ fn triage_test_model(
     requests: Arc<Mutex<Vec<(String, String, ModelRequest)>>>,
     builds: Arc<Mutex<Vec<(String, String)>>>,
     failing_role: Option<&'static str>,
-) -> crate::inference::registry::ChatModelEntry {
-    crate::inference::registry::ChatModelEntry {
+) -> ChatModelEntry<crate::inference::registry::ProviderContext> {
+    ChatModelEntry {
         build: Arc::new(move |build_request| {
             let role = build_request.role.to_string();
             let model = build_request
@@ -73,7 +76,9 @@ fn triage_test_model(
                 .to_string();
             builds.lock().unwrap().push((role.clone(), model.clone()));
             if failing_role == Some(build_request.role) {
-                anyhow::bail!("test provider has no model for role {role}");
+                return Err(tinyinference_llm::Error::Model(format!(
+                    "test provider has no model for role {role}"
+                )));
             }
             Ok((
                 Arc::new(TriageReplyModel {
@@ -85,6 +90,7 @@ fn triage_test_model(
             ))
         }),
         probe: None,
+        models: None,
     }
 }
 
@@ -99,7 +105,7 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
         action_dir: temp.path().join("actions"),
         ..Config::default()
     };
-    config.default_model = Some(crate::config::MODEL_MANAGED_DEFAULT.to_string());
+    config.default_model = Some(TEST_MANAGED_MODEL.to_string());
 
     let requests = Arc::new(Mutex::new(Vec::new()));
     let builds = Arc::new(Mutex::new(Vec::new()));
@@ -153,8 +159,7 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
             "the trigger reactor should use its configured model role"
         );
         assert_eq!(
-            requests[0].1,
-            crate::config::MODEL_MANAGED_DEFAULT,
+            requests[0].1, TEST_MANAGED_MODEL,
             "the configured managed model pin should reach the actual turn model"
         );
         assert!(
@@ -172,9 +177,11 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
             .map(|tool| tool.name.as_str())
             .collect();
         assert!(tool_names.contains(&"read_workspace_state"));
-        assert!(!tool_names
-            .iter()
-            .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") }));
+        assert!(
+            !tool_names
+                .iter()
+                .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") })
+        );
         assert!(!tool_names.contains(&"shell"));
         assert!(!tool_names.contains(&"file_write"));
     }
@@ -261,7 +268,7 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
             Arc::clone(runtime.context()),
             crate::security::turn_origin::with_origin(
                 crate::triage::local_trigger_origin(),
-                crate::inference::host_runtime::ops::agent_chat_for_with_turn_model_source(
+                crate::agent_runs::agent_chat::agent_chat_for_with_turn_model_source(
                     &mut config,
                     crate::inference::host_runtime::ops::AgentChatTarget::Definition {
                         definition: &definition,
@@ -295,11 +302,13 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
             requests[0].1, model_marker,
             "the expected model served the turn"
         );
-        assert!(requests[0]
-            .2
-            .messages
-            .iter()
-            .any(|message| { message.text().contains("send this trigger reply") }));
+        assert!(
+            requests[0]
+                .2
+                .messages
+                .iter()
+                .any(|message| { message.text().contains("send this trigger reply") })
+        );
     }
     let sentinel = "triage-direct-source-egress-sentinel";
     BUS.publish(crate::core::events::DomainEvent::ExternalTransferPending {
@@ -355,7 +364,7 @@ async fn react_dispatch_falls_back_to_parent_model_when_hint_route_cannot_build(
         action_dir: temp.path().join("actions"),
         ..Config::default()
     };
-    config.default_model = Some(crate::config::MODEL_MANAGED_DEFAULT.to_string());
+    config.default_model = Some(TEST_MANAGED_MODEL.to_string());
 
     let requests = Arc::new(Mutex::new(Vec::new()));
     let builds = Arc::new(Mutex::new(Vec::new()));
@@ -410,7 +419,7 @@ async fn react_dispatch_falls_back_to_parent_model_when_hint_route_cannot_build(
         requests[0].0, "chat",
         "fallback must retain the parent model workload role"
     );
-    assert_eq!(requests[0].1, crate::config::MODEL_MANAGED_DEFAULT);
+    assert_eq!(requests[0].1, TEST_MANAGED_MODEL);
     assert!(requests[0].2.messages.iter().any(|message| {
         message
             .text()
@@ -483,7 +492,7 @@ async fn escalate_dispatch_preserves_orchestrator_tools_without_child_delegation
         requests[0].0, "coding",
         "an inherited target must keep its parent's workload role"
     );
-    assert_eq!(requests[0].1, crate::config::MODEL_MANAGED_DEFAULT);
+    assert_eq!(requests[0].1, TEST_MANAGED_MODEL);
     assert!(requests[0].2.messages.iter().any(|message| {
         message
             .text()
@@ -499,9 +508,11 @@ async fn escalate_dispatch_preserves_orchestrator_tools_without_child_delegation
         tool_names.contains(&"grep"),
         "the orchestrator keeps its advertised coding tool"
     );
-    assert!(!tool_names
-        .iter()
-        .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") }));
+    assert!(
+        !tool_names
+            .iter()
+            .any(|name| { *name == "spawn_subagent" || name.starts_with("delegate_") })
+    );
 }
 
 #[tokio::test]
@@ -584,7 +595,7 @@ async fn react_dispatch_inherits_the_parent_workload_for_inherit_targets() {
         requests[0].0, "coding",
         "an Inherit target must retain its parent's workload role"
     );
-    assert_eq!(requests[0].1, crate::config::MODEL_MANAGED_DEFAULT);
+    assert_eq!(requests[0].1, TEST_MANAGED_MODEL);
     assert!(requests[0].2.messages.iter().any(|message| {
         message
             .text()

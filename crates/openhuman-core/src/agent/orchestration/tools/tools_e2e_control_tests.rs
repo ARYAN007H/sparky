@@ -102,7 +102,7 @@ async fn unscoped_web_stop_cancels_a_running_driver_subagent() {
         "stop uses the live core context"
     );
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&dispatch);
     let before_scoped = super::driver_sessions_for_parent(
         &dispatch,

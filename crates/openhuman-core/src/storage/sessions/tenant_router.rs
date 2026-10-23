@@ -1,6 +1,6 @@
-//! [`TenantSessionStores`]: one upstream rebindable provider per tenant.
+//! [`TenantSessionStores`]: one [`DriverSessionStores`] per tenant.
 //!
-//! TinyAgents' rebindable provider serves one tenant and derives
+//! TinyAgents' `DriverSessionStores` serves one tenant and derives
 //! `tenant.agent(id)` itself. The host keeps its flat session keys
 //! ([`crate::core::runtime::session_key`]: the agent id for the desktop
 //! operator, `<profile>~<agent>` for a SaaS profile), so this provider decodes
@@ -10,10 +10,12 @@
 //! `u:<profile>/agent:<id>`, inside the tenant fence.
 
 use std::collections::HashMap;
-use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock, Weak};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use tinyagents_harness::store::SchemaAdmission;
-use tinyagents_session::port::{AgentStorageFactory, AgentStores, SessionStoreProvider};
+use tinyagents_session::port::{
+    AgentStorageFactory, AgentStores, ConditionedAgentStorageFactory, SessionStoreProvider,
+};
 use tinyagents_session::DriverSessionStores;
 use tinyagents_storage_kit::{Blocking, Scope as PortScope, ScopedStorage};
 use tinystoragedrivers::{StorageBackend, StorageError};
@@ -22,11 +24,11 @@ use crate::storage::Scope;
 
 /// Session stores over one backend, routed to a per-tenant provider.
 pub struct TenantSessionStores {
-    backend: Arc<RwLock<Arc<dyn StorageBackend>>>,
+    backend: Arc<dyn StorageBackend>,
+    bridge: Blocking,
     recover_on_open: bool,
     admission: SchemaAdmission,
-    tenants: Arc<TenantProviders>,
-    registry: Arc<TenantStoreRegistry>,
+    tenants: Mutex<HashMap<Scope, Arc<DriverSessionStores>>>,
     /// Names this router in [`SessionStoreProvider::destination_key`].
     id: uuid::Uuid,
 }
@@ -34,7 +36,6 @@ pub struct TenantSessionStores {
 impl std::fmt::Debug for TenantSessionStores {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let tenants = self.tenants.lock().unwrap_or_else(PoisonError::into_inner);
-        let backend = self.backend.read().unwrap_or_else(PoisonError::into_inner);
         f.debug_struct("TenantSessionStores")
             .field("tenants", &tenants.len())
             .finish_non_exhaustive()
@@ -42,59 +43,58 @@ impl std::fmt::Debug for TenantSessionStores {
 }
 
 impl TenantSessionStores {
-    fn with_registry(
+    /// Stores over `backend` on a shared `bridge`.
+    pub fn with_bridge(
         backend: Arc<dyn StorageBackend>,
+        bridge: Blocking,
+        recover_on_open: bool,
+    ) -> Self {
+        Self::with_admission(backend, bridge, recover_on_open, SchemaAdmission::Declare)
+    }
+
+    fn with_admission(
+        backend: Arc<dyn StorageBackend>,
+        bridge: Blocking,
         recover_on_open: bool,
         admission: SchemaAdmission,
-        registry: Arc<TenantStoreRegistry>,
     ) -> Self {
         Self {
-            backend: Arc::new(RwLock::new(backend)),
+            backend,
+            bridge,
             recover_on_open,
             admission,
-            tenants: Arc::new(Mutex::new(HashMap::new())),
-            registry,
+            tenants: Mutex::new(HashMap::new()),
             id: uuid::Uuid::new_v4(),
         }
     }
 
-    /// Stores over `backend`, registered for workspace rebinds.
+    /// Stores over `backend` with a bridge of their own.
     ///
     /// # Errors
     ///
-    /// When the TinyAgents session provider cannot start.
+    /// When the blocking bridge cannot start.
     pub fn new(
         backend: Arc<dyn StorageBackend>,
         recover_on_open: bool,
     ) -> Result<Self, StorageError> {
-        let router = Self::with_registry(
+        Ok(Self::with_bridge(
             backend,
+            Blocking::new()?,
             recover_on_open,
-            SchemaAdmission::Declare,
-            Arc::clone(&PROCESS_SESSION_STORES),
-        );
-        router
-            .registry
-            .register_backend(&router.backend, &router.tenants);
-        Ok(router)
+        ))
     }
 
-    /// Workspace fallback stores are tied to a fixed workspace backend and
-    /// therefore must not join the process-wide workspace-rebind registry.
+    /// Stores over a fixed workspace backend without joining any process-wide
+    /// rebind registry. The workspace fallback owns this provider directly.
     pub(super) fn new_workspace_local(
         backend: Arc<dyn StorageBackend>,
         recover_on_open: bool,
     ) -> Result<Self, StorageError> {
-        Ok(Self::with_registry(
-            backend,
-            recover_on_open,
-            SchemaAdmission::Declare,
-            Arc::new(TenantStoreRegistry::default()),
-        ))
+        Self::new(backend, recover_on_open)
     }
 
     /// The provider of the tenant `key` belongs to, and the agent id within it.
-    fn route(&self, key: &str) -> (Arc<RebindableSessionStores>, String) {
+    fn route(&self, key: &str) -> (Arc<DriverSessionStores>, String) {
         let (profile, mut agent) = crate::core::runtime::split_session_key(key);
         if agent.is_empty() {
             agent = crate::storage::scope::DEFAULT_AGENT.to_owned();
@@ -117,12 +117,25 @@ impl TenantSessionStores {
             })?;
             Ok(ScopedStorage::new(storage, scope))
         });
+        let backend = Arc::clone(&self.backend);
+        let tenant_for_conditioned_factory = tenant.clone();
+        let conditioned_factory: ConditionedAgentStorageFactory =
+            Arc::new(move |agent_id, condition| {
+                let owner_scope = crate::storage::scope::Scope::new(
+                    tenant_for_conditioned_factory.as_str(),
+                )?
+                .agent(agent_id)?;
+                let scope = PortScope::new(owner_scope.as_str())?;
+                let storage = backend.for_scope_conditioned(&owner_scope, condition)?;
+                Ok(ScopedStorage::new(storage, scope))
+            });
         let provider = Arc::new(
             DriverSessionStores::with_bridge_and_schema_admission(
                 factory,
                 self.bridge.clone(),
                 self.admission,
             )
+            .with_conditioned_storage_factory(conditioned_factory)
             .recover_on_open(self.recover_on_open),
         );
         tracing::debug!(
@@ -134,7 +147,7 @@ impl TenantSessionStores {
         (provider, agent)
     }
 
-    fn providers(&self) -> Vec<Arc<RebindableSessionStores>> {
+    fn providers(&self) -> Vec<Arc<DriverSessionStores>> {
         self.tenants
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -153,11 +166,6 @@ impl SessionStoreProvider for TenantSessionStores {
     fn try_for_agent(&self, agent_id: &str) -> Result<AgentStores, StorageError> {
         let (provider, agent) = self.route(agent_id);
         provider.try_for_agent(&agent)
-    }
-
-    fn lease_for_agent(&self, agent_id: &str) -> Result<SessionStoreLease, SessionStoreLeaseError> {
-        let (provider, agent) = self.route(agent_id);
-        provider.lease_for_agent(&agent)
     }
 
     fn bind_actor(

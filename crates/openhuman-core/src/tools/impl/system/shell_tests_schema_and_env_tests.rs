@@ -1,4 +1,5 @@
 use super::*;
+use crate::tools::ShellTool;
 use tinytools::ToolTimeout;
 
 #[tokio::test]

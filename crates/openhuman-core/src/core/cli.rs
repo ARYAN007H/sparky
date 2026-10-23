@@ -480,7 +480,7 @@ fn run_call_command(args: &[String]) -> Result<()> {
     let value = rt
         .block_on(async {
             let headless_agent_chat = crate::core::legacy_aliases::resolve_legacy(&method)
-                == crate::inference::INFERENCE_AGENT_CHAT;
+                == crate::agent_runs::INFERENCE_AGENT_CHAT;
             if headless_agent_chat {
                 let config = crate::config::Config::load_or_init()
                     .await

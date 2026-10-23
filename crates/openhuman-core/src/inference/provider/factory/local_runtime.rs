@@ -3,8 +3,8 @@
 
 use super::*;
 use crate::inference::provider::factory::access_gates::verify_provider_session;
-use tinyinference_llm::providers::openai::build_local_runtime_chat_model;
 use tinyinference_llm::providers::openai::AuthStyle as CompatAuthStyle;
+use tinyinference_llm::providers::openai::build_local_runtime_chat_model;
 
 /// Local OpenAI-compatible runtimes (Ollama / LM Studio / MLX / OMLX /
 /// local-openai) as a crate-native [`ChatModel`] (issue #4727).
@@ -79,7 +79,7 @@ fn try_create_local_runtime_chat_model_from_string_with_identity(
     inspection_identity: Option<&mut Option<(String, String, String)>>,
 ) -> OptionalChatModelResult {
     use tinyinference_local::local_runtime::{
-        resolve_local_runtime, LocalRuntimeAuth, LocalRuntimeInputs,
+        LocalRuntimeAuth, LocalRuntimeInputs, resolve_local_runtime,
     };
 
     // Use the same classifier as privacy and session policy. Canonicalize only

@@ -279,7 +279,7 @@ async fn dispatch_target_agent(
         "[triage::escalation] dispatching direct agent turn"
     );
 
-    let outcome = crate::inference::host_runtime::ops::agent_chat_for_with_turn_model_source(
+    let outcome = crate::agent_runs::agent_chat::agent_chat_for_with_turn_model_source(
         &mut config,
         crate::inference::host_runtime::ops::AgentChatTarget::Definition {
             definition: &direct_definition,

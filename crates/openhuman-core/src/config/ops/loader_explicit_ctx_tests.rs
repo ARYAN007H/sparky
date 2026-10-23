@@ -1,7 +1,7 @@
 //! `load_config_in` reads the context it is handed, not the one the task has.
 
 use super::*;
-use crate::core::runtime::{context::CoreContext, DispatchCtx, DomainSet};
+use crate::core::runtime::{DispatchCtx, DomainSet, context::CoreContext};
 use std::sync::Arc;
 
 fn tenant(model: &str) -> Arc<CoreContext> {

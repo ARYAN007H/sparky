@@ -39,8 +39,8 @@
 //! - Migrates `inference_url` into a `Custom` cloud provider entry when the
 //!   URL doesn't look like a registered managed backend.
 
-use crate::config::schema::cloud_providers::{generate_provider_id, AuthStyle, CloudProviderCreds};
 use crate::config::Config;
+use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds, generate_provider_id};
 
 /// Counters returned by [`run`] for diagnostics. Logged at INFO once per
 /// successful migration run.

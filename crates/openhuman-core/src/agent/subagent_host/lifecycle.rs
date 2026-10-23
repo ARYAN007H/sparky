@@ -26,8 +26,8 @@ mod checkpoint;
 #[path = "lifecycle_outcome.rs"]
 mod outcome;
 use checkpoint::absolute_checkpoint_dir;
-pub(super) use driver_adapter::outcome_to_host;
 use driver_adapter::HostInvocation;
+pub(super) use driver_adapter::outcome_to_host;
 
 #[path = "lifecycle/driver_result.rs"]
 mod driver_result;
@@ -103,13 +103,13 @@ pub(crate) async fn spawn_async_via_driver_tool(
     input: String,
     options: SubagentRunOptions,
     completion: impl Fn(
-            String,
-            Result<SubagentRunOutcome, String>,
-            bool,
-        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-        + Send
-        + Sync
-        + 'static,
+        String,
+        Result<SubagentRunOutcome, String>,
+        bool,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+    + Send
+    + Sync
+    + 'static,
 ) -> Result<String, SubagentRunError> {
     spawn_async_via_driver_tool_using_jobs(
         parent, definition, input, options, None, None, completion,
@@ -127,13 +127,13 @@ pub(crate) async fn resume_async_via_driver_tool(
     input: String,
     options: SubagentRunOptions,
     completion: impl Fn(
-            String,
-            Result<SubagentRunOutcome, String>,
-            bool,
-        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-        + Send
-        + Sync
-        + 'static,
+        String,
+        Result<SubagentRunOutcome, String>,
+        bool,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+    + Send
+    + Sync
+    + 'static,
 ) -> Result<String, SubagentRunError> {
     spawn_async_via_driver_tool_using_jobs(
         parent,
@@ -153,15 +153,15 @@ pub(crate) async fn spawn_async_via_driver_tool_with_jobs(
     definition: crate::agent_registry::host_definition::AgentDefinition,
     input: String,
     options: SubagentRunOptions,
-    jobs: tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+    jobs: tinyagents_orchestration::subagent::SubAgentJobRegistry,
     completion: impl Fn(
-            String,
-            Result<SubagentRunOutcome, String>,
-            bool,
-        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-        + Send
-        + Sync
-        + 'static,
+        String,
+        Result<SubagentRunOutcome, String>,
+        bool,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+    + Send
+    + Sync
+    + 'static,
 ) -> Result<String, SubagentRunError> {
     spawn_async_via_driver_tool_using_jobs(
         parent,
@@ -180,16 +180,16 @@ async fn spawn_async_via_driver_tool_using_jobs(
     definition: crate::agent_registry::host_definition::AgentDefinition,
     input: String,
     options: SubagentRunOptions,
-    jobs: Option<tinyagents_harness_tools::subagents::SubAgentJobRegistry>,
+    jobs: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
     continuation: Option<(SubagentTaskKey, SubagentResume)>,
     completion: impl Fn(
-            String,
-            Result<SubagentRunOutcome, String>,
-            bool,
-        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-        + Send
-        + Sync
-        + 'static,
+        String,
+        Result<SubagentRunOutcome, String>,
+        bool,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+    + Send
+    + Sync
+    + 'static,
 ) -> Result<String, SubagentRunError> {
     let task_id = continuation
         .as_ref()
@@ -233,7 +233,7 @@ async fn invoke_async_spawn_driver_tool(
     options: SubagentRunOptions,
     mode: &str,
     completion: Option<HostCompletion>,
-    jobs_override: Option<tinyagents_harness_tools::subagents::SubAgentJobRegistry>,
+    jobs_override: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
     continuation: Option<(SubagentTaskKey, SubagentResume)>,
 ) -> Result<(tinytools::ToolResult, OpenHumanDriverBundle), SubagentRunError> {
     invoke_driver_tool_with_request(
@@ -257,11 +257,12 @@ async fn invoke_driver_tool_with_request(
     input: String,
     mode: &str,
     completion: Option<HostCompletion>,
-    jobs_override: Option<tinyagents_harness_tools::subagents::SubAgentJobRegistry>,
+    jobs_override: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
     continuation: Option<(SubagentTaskKey, SubagentResume)>,
 ) -> Result<(tinytools::ToolResult, OpenHumanDriverBundle), SubagentRunError> {
     use tinyagents_harness::tool::ToolDispatch;
-    use tinyagents_harness_tools::subagents::{DriverSubAgentTool, SubAgentJobRegistry};
+    use tinyagents_harness_tools::subagents::DriverSubAgentTool;
+    use tinyagents_orchestration::subagent::SubAgentJobRegistry;
     use tinytools::{PermissionLevel, ToolCallOptions, ToolCategory, ToolScope, ToolTimeout};
 
     let task_id = host_request

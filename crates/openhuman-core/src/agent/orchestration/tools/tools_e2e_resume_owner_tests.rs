@@ -42,7 +42,7 @@ impl ChatModel<()> for PauseThenHoldResumeModel {
 async fn resuming_after_owner_cache_loss_registers_live_task_before_launch() {
     use crate::agent::orchestration::subagent_sessions::DurableSubagentStatus;
     use crate::agent::orchestration::tools::SpawnSubagentTool;
-    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
     let _lock = crate::config::TEST_ENV_LOCK.lock().await;
@@ -203,7 +203,7 @@ async fn resuming_after_owner_cache_loss_registers_live_task_before_launch() {
 async fn failed_driver_resume_marks_paused_session_failed_and_releases_owner() {
     use crate::agent::orchestration::subagent_sessions::DurableSubagentStatus;
     use crate::agent::orchestration::tools::SpawnSubagentTool;
-    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
     let _lock = crate::config::TEST_ENV_LOCK.lock().await;

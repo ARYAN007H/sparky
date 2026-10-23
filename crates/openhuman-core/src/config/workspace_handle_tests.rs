@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use super::{workspace_handle, HANDLE_HEX_LEN, HANDLE_PREFIX};
+use super::{HANDLE_HEX_LEN, HANDLE_PREFIX, workspace_handle};
 
 #[test]
 fn handle_is_stable_for_the_same_directory() {

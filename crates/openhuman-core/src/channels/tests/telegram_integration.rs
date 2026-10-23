@@ -5,12 +5,12 @@
 //! captures every `SendMessage` — including `thread_ts` — so assertions can be made
 //! about exactly what the channel receives, without needing a real Telegram HTTP server.
 
+use super::super::Channel;
 use super::super::context::{
-    conversation_history_key, ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS,
+    CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext, conversation_history_key,
 };
 use super::super::runtime::process_channel_message;
-use super::super::Channel;
-use super::common::{channel_envelope, SlowModel};
+use super::common::{SlowModel, channel_envelope};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -112,7 +112,6 @@ fn make_test_context(
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),

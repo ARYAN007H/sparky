@@ -74,7 +74,7 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         make_def_named_tools(&[]),
         "answer without exposing the private sentinel".into(),
         options,
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry::new(),
+        tinyagents_orchestration::subagent::SubAgentJobRegistry::new(),
         move |_target, result, effects| {
             let completion_tx = Arc::clone(&completion_tx);
             Box::pin(async move {

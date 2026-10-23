@@ -9,15 +9,19 @@ use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
 use futures_util::StreamExt;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
+use tinyagents_harness_tools::media::{
+    ArtifactFiling, FiledArtifact, GeneratedArtifact, MediaArtifactKind, MediaInnerFactory,
+    MediaJobProgress, MediaProgressFn,
+};
 use tinytools::{
     PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolPolicy, ToolResult, ToolRunContext,
     ToolScope, ToolTimeout,
 };
 use tokio::io::AsyncWriteExt;
 
-use crate::artifacts::production::Production;
 use crate::artifacts::ArtifactKind;
+use crate::artifacts::production::Production;
 use crate::security::approval::ApprovalChatContext;
 use crate::tools::host_extensions::tool_call_id;
 use tinyagents_harness::tinyinference_video::ProgressFn;
@@ -83,8 +87,11 @@ impl<T: Tool + 'static> MediaArtifactTool<T> {
     /// Reads generated outputs addressed by blob key from the media tool's
     /// backing store.
     #[must_use]
-    pub fn with_blobs(mut self, blobs: Arc<dyn BlobStore>) -> Self {
-        self.blobs = Some(blobs);
+    pub fn with_blobs(self, blobs: Arc<dyn BlobStore>) -> Self {
+        self.policy
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .blobs = Some(blobs);
         self
     }
 
@@ -111,25 +118,15 @@ impl<T: Tool + 'static> MediaArtifactTool<T> {
         refresh_allowed_references(&policy).await
     }
 
-    async fn complete_and_discard_blob(
-        &self,
-        production: &Production,
-        source: &Path,
-    ) -> Result<u64, String> {
-        OpenHumanArtifactFiling(Arc::clone(&self.policy))
-            .complete_and_discard_blob(production, source)
-            .await
-    }
-
     /// Builds the inner generator for one call around its provider progress
     /// observer and the call's own host context.
     #[must_use]
     pub fn with_per_call_inner(
         self,
         build: impl for<'a> Fn(MediaProgressFn, Option<&'a dyn ToolRunContext>) -> T
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
     ) -> Self {
         let Self {
             inner,
@@ -151,69 +148,6 @@ impl<T: Tool + 'static> MediaArtifactTool<T> {
             allowed_references,
         }
     }
-
-    async fn file_blob(&self, key: &Path, dest: &Path) -> Result<u64, String> {
-        let key = key
-            .to_str()
-            .ok_or_else(|| "generated media blob key is not valid UTF-8".to_string())?;
-        let blobs = self.blobs.as_ref().ok_or_else(|| {
-            format!("generated media returned blob key {key:?} without a blob store")
-        })?;
-        let mut blob = blobs
-            .get_stream(key)
-            .await
-            .map_err(|error| format!("failed to read generated media blob {key:?}: {error}"))?
-            .ok_or_else(|| format!("generated media blob {key:?} was not found"))?;
-        copy_blob_to_file(&mut blob.reader, dest, key).await
-    }
-}
-
-async fn copy_blob_to_file(
-    reader: &mut tinyagents_storage_kit::blob::BlobReader,
-    dest: &Path,
-    key: &str,
-) -> Result<u64, String> {
-    let mut file = tokio::fs::OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open(dest)
-        .await
-        .map_err(|error| {
-            format!(
-                "failed to open artifact destination {}: {error}",
-                dest.display()
-            )
-        })?;
-    let mut size = 0_u64;
-    while let Some(chunk) = reader.next().await {
-        let chunk = match chunk {
-            Ok(chunk) => chunk,
-            Err(error) => {
-                drop(file);
-                let _ = tokio::fs::remove_file(dest).await;
-                return Err(format!(
-                    "failed to copy generated media blob {key:?}: {error}"
-                ));
-            }
-        };
-        if let Err(error) = file.write_all(&chunk).await {
-            drop(file);
-            let _ = tokio::fs::remove_file(dest).await;
-            return Err(format!(
-                "failed to write generated media blob {key:?}: {error}"
-            ));
-        }
-        size = size.saturating_add(chunk.len() as u64);
-    }
-    if let Err(error) = file.flush().await {
-        drop(file);
-        let _ = tokio::fs::remove_file(dest).await;
-        return Err(format!(
-            "failed to flush artifact destination {}: {error}",
-            dest.display()
-        ));
-    }
-    Ok(size)
 }
 
 fn set_artifact_error(entry: &mut Value, message: &str) {
@@ -460,8 +394,56 @@ impl OpenHumanArtifactFiling {
             .await
             .map_err(|error| format!("failed to read generated media blob {key:?}: {error}"))?
             .ok_or_else(|| format!("generated media blob {key:?} was not found"))?;
-        copy_blob_to_file(&mut *blob.reader, destination, key).await
+        copy_blob_to_file(&mut blob.reader, destination, key).await
     }
+}
+
+async fn copy_blob_to_file(
+    reader: &mut tinyagents_storage_kit::blob::BlobReader,
+    destination: &Path,
+    key: &str,
+) -> Result<u64, String> {
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(destination)
+        .await
+        .map_err(|error| {
+            format!(
+                "failed to open artifact destination {}: {error}",
+                destination.display()
+            )
+        })?;
+    let mut size = 0_u64;
+    while let Some(chunk) = reader.next().await {
+        let chunk = match chunk {
+            Ok(chunk) => chunk,
+            Err(error) => {
+                drop(file);
+                let _ = tokio::fs::remove_file(destination).await;
+                return Err(format!(
+                    "failed to copy generated media blob {key:?}: {error}"
+                ));
+            }
+        };
+        if let Err(error) = file.write_all(&chunk).await {
+            drop(file);
+            let _ = tokio::fs::remove_file(destination).await;
+            return Err(format!(
+                "failed to write generated media blob {key:?}: {error}"
+            ));
+        }
+        size = size.saturating_add(chunk.len() as u64);
+    }
+    if let Err(error) = file.flush().await {
+        drop(file);
+        let _ = tokio::fs::remove_file(destination).await;
+        return Err(format!(
+            "failed to flush artifact destination {}: {error}",
+            destination.display()
+        ));
+    }
+    Ok(size)
 }
 
 /// Host policy wrapper that refreshes the allowlist before a generated-media
@@ -648,62 +630,6 @@ fn has_reusable_files_reference(args: &Value, files: &crate::artifacts::FileRoot
             path.is_absolute() && files.contains_path(path)
         })
     })
-}
-
-async fn copy_blob_to_file<R>(reader: &mut R, destination: &Path, key: &str) -> Result<u64, String>
-where
-    R: tokio::io::AsyncRead + Unpin + ?Sized,
-{
-    let mut file = tokio::fs::OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open(destination)
-        .await
-        .map_err(|error| {
-            format!(
-                "failed to open artifact destination {}: {error}",
-                destination.display()
-            )
-        })?;
-    let size = match tokio::io::copy(reader, &mut file).await {
-        Ok(size) => size,
-        Err(error) => {
-            drop(file);
-            let _ = tokio::fs::remove_file(destination).await;
-            return Err(format!(
-                "failed to copy generated media blob {key:?}: {error}"
-            ));
-        }
-    };
-    if let Err(error) = file.flush().await {
-        drop(file);
-        let _ = tokio::fs::remove_file(destination).await;
-        return Err(format!(
-            "failed to flush artifact destination {}: {error}",
-            destination.display()
-        ));
-    }
-    Ok(size)
-}
-
-/// Moves a generated file into the Files folder, copying across mounts.
-async fn move_or_copy(source: &Path, destination: &Path) -> Result<u64, String> {
-    if tokio::fs::rename(source, destination).await.is_err() {
-        tokio::fs::copy(source, destination)
-            .await
-            .map_err(|error| {
-                format!(
-                    "failed to copy {} -> {}: {error}",
-                    source.display(),
-                    destination.display()
-                )
-            })?;
-        let _ = tokio::fs::remove_file(source).await;
-    }
-    let stat = tokio::fs::metadata(destination)
-        .await
-        .map_err(|error| format!("failed to stat {}: {error}", destination.display()))?;
-    Ok(stat.len())
 }
 
 #[cfg(test)]

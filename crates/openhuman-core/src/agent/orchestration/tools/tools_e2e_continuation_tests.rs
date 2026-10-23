@@ -4,7 +4,7 @@ use super::*;
 async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_driver() {
     use crate::agent::orchestration::subagent_sessions::DurableSubagentStatus;
     use crate::agent::orchestration::tools::SpawnSubagentTool;
-    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::SubAgentJobStatus;
 
     let _lock = crate::config::TEST_ENV_LOCK.lock().await;
@@ -426,7 +426,7 @@ async fn spawn_subagent_with_same_task_key_resumes_paused_job_through_shared_dri
 async fn spawn_subagent_reuses_idle_task_key_with_the_saved_history() {
     use crate::agent::orchestration::subagent_sessions::open_for_context;
     use crate::agent::orchestration::tools::SpawnSubagentTool;
-    use tinyagents_harness_tools::subagents::SubAgentJobRegistry;
+    use tinyagents_orchestration::subagent::SubAgentJobRegistry;
     use tinyagents_orchestration::subagent::{DurableSubagentStatus, SubAgentJobStatus};
 
     let _lock = crate::config::TEST_ENV_LOCK.lock().await;

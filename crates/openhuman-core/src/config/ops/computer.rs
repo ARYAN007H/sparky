@@ -2,8 +2,8 @@
 //! rescue models the module runs a task with.
 
 use crate::config::{ComputerConfig, Config, DecisionModel};
-use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
+use crate::core::runtime::DispatchCtx;
 
 use super::loader::snapshot_config_json;
 

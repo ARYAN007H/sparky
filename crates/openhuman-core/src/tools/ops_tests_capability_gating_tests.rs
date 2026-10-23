@@ -354,8 +354,8 @@ fn memory_tool_classifies_as_memory_family() {
 /// A narrowed DomainSet axis still keeps the ordinary platform tools.
 #[tokio::test]
 async fn full_domain_set_keeps_platform_tools() {
-    use crate::core::runtime::context::CoreContext;
     use crate::core::runtime::DomainSet;
+    use crate::core::runtime::context::CoreContext;
 
     let tmp = TempDir::new().unwrap();
     let ctx = CoreContext::for_test(DomainSet::full(), None);

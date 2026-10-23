@@ -6,7 +6,7 @@
 //! the caller's own config and policy, so a relayed turn never runs with the
 //! operator's tools or workspace.
 
-use super::chat_workload::{resolve_chat_workload, ChatWorkloadResolution};
+use super::chat_workload::{ChatWorkloadResolution, resolve_chat_workload};
 use super::prompt::format_access_context;
 use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::system_prompt::{ChannelPromptInputs, ChannelSystemPrompt};
@@ -26,7 +26,6 @@ use tinytools::Tool;
 pub(crate) struct ChannelTurnParts {
     pub(crate) model: String,
     pub(crate) provider_name: String,
-    pub(crate) provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions,
     pub(crate) tools_registry: Arc<Vec<Box<dyn Tool>>>,
     pub(crate) system_prompt: ChannelSystemPrompt,
     pub(crate) skills: Vec<Workflow>,
@@ -92,12 +91,6 @@ pub(crate) fn build_channel_turn_parts(
     security: &Arc<SecurityPolicy>,
     descs: PromptToolDescs,
 ) -> Result<ChannelTurnParts> {
-    let provider_runtime_options = crate::tools::delegate::ProviderRuntimeOptions {
-        auth_profile_override: None,
-        openhuman_dir: config.config_path.parent().map(std::path::PathBuf::from),
-        secrets_encrypt: config.secrets.encrypt,
-        reasoning_enabled: config.runtime.reasoning_enabled,
-    };
     let (model, provider_name) = match resolve_chat_workload(config) {
         ChatWorkloadResolution::Cloud => {
             let (_chat, model) = provider::create_chat_model_with_model_id_in(

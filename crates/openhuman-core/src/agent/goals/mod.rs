@@ -61,11 +61,28 @@ pub fn goal_store(
 /// A lost-scope caller gets isolated state, without permission to publish
 /// goal changes into the host's thread or web-channel event streams.
 fn isolated_goal_store() -> Arc<GoalStore> {
-    Arc::new(GoalStore::new(
-        tinyagents_session::port::InMemorySessionStores::new()
-            .for_agent("ephemeral")
-            .kv,
-    ))
+    Arc::new(GoalStore::new(Arc::new(
+        tinyagents_harness::store::InMemoryStore::new(),
+    )))
+}
+
+/// Loads a thread goal from the session store bound to this dispatch context.
+///
+/// Keeping the context explicit prevents a caller from reading the operator's
+/// default store when it is serving a tenant or embedded agent.
+pub async fn load_for_thread(
+    workspace_dir: &Path,
+    context: &crate::core::runtime::DispatchCtx,
+    thread_id: Option<&str>,
+) -> Option<ThreadGoal> {
+    let thread_id = thread_id.map(str::trim).filter(|id| !id.is_empty())?;
+    match goal_store(workspace_dir, context).get(thread_id).await {
+        Ok(goal) => goal,
+        Err(error) => {
+            tracing::debug!(thread_id, %error, "[thread_goals] load_for_thread failed");
+            None
+        }
+    }
 }
 
 struct OpenHumanGoalObserver;
@@ -103,9 +120,7 @@ struct OpenHumanGoalTool {
 
 impl OpenHumanGoalTool {
     fn new(kind: GoalToolKind, workspace_dir: &Path) -> Self {
-        let metadata_store = tinyagents_session::port::InMemorySessionStores::new()
-            .for_agent("metadata")
-            .kv;
+        let metadata_store = Arc::new(tinyagents_harness::store::InMemoryStore::new());
         Self {
             kind,
             workspace_dir: workspace_dir.to_path_buf(),

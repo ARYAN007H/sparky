@@ -67,7 +67,7 @@ pub(crate) async fn cancel_by_task_with_workspace_reason(
     );
     let scope = ParentJobScope::new(owner_scope.workspace.clone(), parent_thread_id);
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(ctx);
     let job = jobs
         .list_for_parent_scope(&owner, &scope)
@@ -309,7 +309,7 @@ pub(crate) async fn cancel_for_thread(
         thread_id,
     );
     let jobs = crate::core::runtime::slot_for::<
-        tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(ctx);
     let mut cancelled = 0;
     let mut failures = Vec::new();
@@ -439,7 +439,7 @@ pub(crate) fn stop_for_thread(
     if let Some(core_context) = ctx.resolved() {
         if let Ok(workspace_dir) = core_context.workspace_dir() {
             let jobs = crate::core::runtime::slot_for::<
-                tinyagents_harness_tools::subagents::SubAgentJobRegistry,
+                tinyagents_orchestration::subagent::SubAgentJobRegistry,
             >(ctx);
             let scopes = crate::agent::orchestration::completion_owners::driver_tasks_for_thread(
                 ctx,

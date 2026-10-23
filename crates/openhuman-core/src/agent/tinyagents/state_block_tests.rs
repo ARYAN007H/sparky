@@ -61,7 +61,7 @@ fn a_turn_that_suppresses_the_goal_gets_no_block() {
 #[tokio::test]
 async fn a_finished_plan_hands_its_notes_over_at_the_end_of_the_turn() {
     use tinyagents_harness_tools::scratchpad::ScratchpadUpdate;
-    use tinyagents_harness_tools::todos::{store as todo_store, TodoItem};
+    use tinyagents_harness_tools::todos::{TodoItem, store as todo_store};
 
     let workspace = tempfile::tempdir().unwrap();
     let store = crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv;
@@ -79,21 +79,26 @@ async fn a_finished_plan_hands_its_notes_over_at_the_end_of_the_turn() {
     .await
     .unwrap();
 
-    assert!(close_finished_plan(workspace.path(), None).await.is_none());
+    let dispatch = crate::core::runtime::DispatchCtx::ambient();
     assert!(
-        close_finished_plan(workspace.path(), Some("t"))
+        close_finished_plan(workspace.path(), None, &dispatch)
+            .await
+            .is_none()
+    );
+    assert!(
+        close_finished_plan(workspace.path(), Some("t"), &dispatch)
             .await
             .is_none(),
         "the plan is still open"
     );
     todo_store::complete(&store, "t", 1).await.unwrap();
-    let finished = close_finished_plan(workspace.path(), Some("t"))
+    let finished = close_finished_plan(workspace.path(), Some("t"), &dispatch)
         .await
         .expect("the plan finished with notes");
     assert_eq!(finished.plan.notes.facts, ["the table is auth_users"]);
     assert_eq!(finished.goal, None, "the thread has no goal");
     assert!(
-        close_finished_plan(workspace.path(), Some("t"))
+        close_finished_plan(workspace.path(), Some("t"), &dispatch)
             .await
             .is_none(),
         "handed over once"
