@@ -132,6 +132,7 @@ fn clearing_progress_releases_warm_prelude_sender() {
         config_path: tmp.path().join("config.toml"),
         ..Default::default()
     };
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -224,6 +225,7 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
         config_path: tmp.path().join("config.toml"),
         ..Default::default()
     };
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -294,6 +296,7 @@ async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec(
         config_path: tmp.path().join("config.toml"),
         ..Default::default()
     };
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -398,6 +401,7 @@ async fn desktop_browser_setting_keeps_deferred_tools_in_fresh_and_resumed_surfa
     };
     config.browser.enabled = true;
     config.http_request.allowed_domains = vec!["example.com".into()];
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
