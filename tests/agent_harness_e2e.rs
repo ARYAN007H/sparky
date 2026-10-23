@@ -1103,6 +1103,15 @@ async fn run_managed_capture_turn(
     with_captured_proxy_requests(|requests| requests.clear());
     let workspace_dir = home.join("workspace");
     let stack = boot_stack_with_capture_endpoint(api_origin, home).await;
+    let resolved_config = openhuman_core::config::ops::load_config_in(
+        &openhuman_core::core::runtime::DispatchCtx::unbound(),
+    )
+    .await
+    .expect("load managed capture workspace config");
+    assert_eq!(
+        resolved_config.workspace_dir, workspace_dir,
+        "managed capture must use its isolated workspace"
+    );
     let mut events = spawn_sse_collector(format!(
         "{}/events?client_id=managed-capture-client",
         stack.rpc_base
