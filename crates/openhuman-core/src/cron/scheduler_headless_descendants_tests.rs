@@ -102,9 +102,7 @@ async fn dispatch_scheduled_agent(
         Box::pin(async move {
             let dispatched = dispatcher.tick(&config).await.expect("scheduler tick");
             assert_eq!(dispatched, 1, "the persisted due job is dispatched");
-            eprintln!("scheduled test job tick returned {dispatched}");
             dispatcher.drain().await;
-            eprintln!("scheduled test job drain returned");
         }),
     )
     .await;
@@ -126,11 +124,6 @@ impl ChatModel<()> for CronChildModel {
         _state: &(),
         request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelResponse> {
-        eprintln!(
-            "scheduled test model invoked with {} messages and {} tools",
-            request.messages.len(),
-            request.tools.len(),
-        );
         if request.messages.iter().any(|message| {
             matches!(message, tinyinference_llm::message::Message::User(_))
                 && message.text().contains(CHILD_PROMPT)
@@ -234,12 +227,14 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
         tokio::spawn(
             async move { dispatch_scheduled_agent(core, dispatch, scheduler_config).await },
         );
-    match tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx).await {
+    // These deadlines are watchdogs, not timing assertions. Give loaded CI
+    // workers enough room to start the isolated scheduler task.
+    match tokio::time::timeout(std::time::Duration::from_secs(30), child_started_rx).await {
         Ok(Ok(())) => {}
         Ok(Err(error)) => panic!("child-start observation disconnected: {error}"),
         Err(_) => {
             model.child_release.notify_one();
-            let result = tokio::time::timeout(std::time::Duration::from_secs(5), run).await;
+            let result = tokio::time::timeout(std::time::Duration::from_secs(30), run).await;
             eprintln!(
                 "scheduled child start timeout diagnostics: spawn calls {}, followups {}, run result {result:?}",
                 model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
