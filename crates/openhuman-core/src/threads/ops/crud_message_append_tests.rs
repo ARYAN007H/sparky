@@ -392,7 +392,16 @@ async fn an_image_is_refused_when_images_are_disabled() {
 /// conditional_stream_append".
 #[cfg(feature = "storage-sqlite")]
 #[tokio::test]
+#[allow(clippy::await_holding_lock)] // Serializes the process-wide storage slot.
 async fn a_message_appends_on_a_sqlite_workspace() {
+    // `backend_for` prefers a process-installed backend over the workspace
+    // default; hold the slot so no other test installs one (an in-memory
+    // backend lists every capability and would hide the bug), and prove it.
+    let _storage_slot = crate::storage::test_support::lock_storage_slot();
+    assert!(
+        crate::storage::installed().is_none(),
+        "the append must run on the workspace's SQLite default, not an installed backend"
+    );
     let temp = tempfile::tempdir().unwrap();
     let mut config = crate::config::Config::default();
     config.workspace_dir = temp.path().join("internal");
