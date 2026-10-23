@@ -126,13 +126,20 @@ pub(crate) fn grant_request(
     }
 }
 
-/// Second gate: drop every returned path the host floor forbids. `/proc` is
-/// the one sanctioned exception, and only when `allow_proc` is set.
+/// Second gate: drop every returned path the host floor forbids, and every
+/// path that contains one of the operator's credential stores (a grant of
+/// `$HOME` or `/` reaches `~/.ssh`, and Landlock cannot carve it back out).
+/// `/proc` is the one sanctioned exception to the floor, and only when
+/// `allow_proc` is set.
 #[cfg(feature = "modules")]
 pub(crate) fn admit_module_grants(
     reply: crate::modules::tinybox::contract::LocalGrants,
     allow_proc: bool,
 ) -> JailGrants {
+    let stores = grant_home(crate::core::runtime::is_saas(), dirs::home_dir)
+        .as_deref()
+        .map(crate::security::policy::home_credential_stores)
+        .unwrap_or_default();
     let admit = |raw: String| -> Option<PathBuf> {
         let path = PathBuf::from(raw);
         let sanctioned_proc = allow_proc && path == std::path::Path::new("/proc");
@@ -140,6 +147,13 @@ pub(crate) fn admit_module_grants(
             tracing::warn!(
                 path = %path.display(),
                 "[sandbox:grants] refused module grant: host floor forbids it"
+            );
+            return None;
+        }
+        if stores.iter().any(|store| store.starts_with(&path)) {
+            tracing::warn!(
+                path = %path.display(),
+                "[sandbox:grants] refused module grant: it contains a credential store"
             );
             return None;
         }

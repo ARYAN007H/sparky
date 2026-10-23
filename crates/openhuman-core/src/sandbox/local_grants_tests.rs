@@ -42,6 +42,23 @@ mod with_module {
     }
 
     #[test]
+    fn a_grant_containing_a_credential_store_is_refused() {
+        let home = dirs::home_dir().expect("a home directory");
+        let project = home.join("project");
+        let reply = LocalGrants {
+            read_only: vec![
+                home.display().to_string(),
+                "/".into(),
+                project.display().to_string(),
+            ],
+            read_write: vec![home.display().to_string()],
+        };
+        let grants = admit_module_grants(reply, false);
+        assert_eq!(grants.read_only, [project]);
+        assert!(grants.read_write.is_empty(), "{:?}", grants.read_write);
+    }
+
+    #[test]
     fn proc_is_admitted_only_through_allow_proc() {
         let reply = || LocalGrants {
             read_only: vec!["/proc".into(), "/proc/1/environ".into()],
