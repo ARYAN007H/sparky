@@ -368,6 +368,7 @@ async fn disabled_tinybox_module_never_falls_back_to_host_execution() -> anyhow:
         Duration::from_secs(5),
         false,
         None,
+        None,
     )
     .await;
 
@@ -481,8 +482,10 @@ async fn released_tinybox_runs_a_native_jail_through_the_pinned_loader() -> anyh
         Duration::from_secs(10),
         false,
         None,
+        None,
     )
     .await?;
+    let output = finished(output);
     assert!(output.success());
     assert_eq!(output.stdout, "tinybox-jailed-ok");
     assert_eq!(output.stderr, "safe-error");
@@ -497,8 +500,10 @@ async fn released_tinybox_runs_a_native_jail_through_the_pinned_loader() -> anyh
         Duration::from_secs(10),
         false,
         None,
+        None,
     )
     .await?;
+    let output = finished(output);
     assert!(output.success());
     assert_eq!(
         output.stdout.len(),
@@ -550,4 +555,16 @@ async fn released_tinybox_runs_a_native_jail_through_the_pinned_loader() -> anyh
     .await?;
     assert!(output.timed_out, "cron timeout is acknowledged by TinyBox");
     Ok(())
+}
+
+/// The result of a jailed run that was not asked to yield.
+fn finished(
+    outcome: super::super::shell_exec::ShellRunOutcome,
+) -> super::super::types::SandboxExecResult {
+    match outcome {
+        super::super::shell_exec::ShellRunOutcome::Finished(result) => result,
+        super::super::shell_exec::ShellRunOutcome::Running(_) => {
+            panic!("a run without a yield point came back while running")
+        }
+    }
 }

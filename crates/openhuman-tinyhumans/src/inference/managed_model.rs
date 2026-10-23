@@ -61,6 +61,7 @@ impl ManagedOptions {
             return Ok((key, true));
         }
         resolve_session_bearer(
+            endpoint,
             &self.state_dir(),
             self.secrets_encrypt,
             self.auth_profile_override.as_deref(),

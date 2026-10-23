@@ -31,12 +31,15 @@ config/schema/load/source/revision_loader_tests.rs
 cron/bus_host.rs
 cron/bus_host_tests.rs
 core/all.rs
+core/all_bound_controller_tests.rs
+core/all_schema_contract_tests.rs
 core/all_tests.rs
 core/cli_tests.rs
 core/dispatch_tests.rs
 core/invoke_tests.rs
 core/legacy_aliases_tests.rs
 core/runtime/services.rs
+core/schema_test_support_tests.rs
 core/runtime/subscribers.rs
 mcp/server/resources.rs
 mcp/ui/tools.rs
@@ -96,6 +99,7 @@ core/agent_cli/debug/mod.rs
 core/agent_cli/debug/mod_tests.rs
 core/runtime/services_tests.rs
 integrations/composio/ops/mod.rs
+integrations/composio/client.rs
 mcp/server/resources_tests.rs
 modules/tinyflows.rs
 doctor/checks/channels.rs
