@@ -40,14 +40,12 @@ impl SpawnSubagentTool {
         }
 
         spawn_subagent_definition!(definition, run_context, agent_id, parent);
-
         let parent_session = parent.session_id.clone();
         let progress_sink = parent.on_progress.clone();
         let parent_thread_id = tool_context
             .and_then(ToolRunContext::thread_id)
             .or(run_context.thread_id.as_deref())
             .map(str::to_owned);
-
         let store =
             match SubagentSessionStore::new_in_context(&dispatch, parent.workspace_dir.clone()) {
                 Ok(store) => store,
