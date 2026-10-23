@@ -50,18 +50,11 @@ pub fn release_workspace_defaults() {
 /// workspace keeps its live handles. A restart of one workspace, not of the
 /// process; [`release_workspace_defaults`] is the process-wide reset.
 pub fn release_workspace(workspace_dir: &Path) {
-    let fallback_removed = FALLBACKS
+    FALLBACKS
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .remove(workspace_dir);
     crate::storage::local::forget(workspace_dir);
-    if let Some(fallback) = fallback_removed.as_ref() {
-        eprintln!(
-            "release refs after local forget: backend={} provider={}",
-            Arc::strong_count(&fallback.backend),
-            Arc::strong_count(&fallback.provider)
-        );
-    }
 }
 
 /// The provider for `workspace_dir`: the installed one, else a
