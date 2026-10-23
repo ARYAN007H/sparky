@@ -278,15 +278,12 @@ fn one_runtime_hosts_independently_configured_agents() {
                 )
                 .expect("budget agent instantiates");
 
-            if let Err(error) = withholding_agent
+            withholding_agent
                 .turn("hide the configured tool")
                 .session("hidden-turn")
                 .send()
                 .await
-            {
-                eprintln!("hidden turn failed: {error:#}");
-                panic!("hidden turn runs");
-            }
+                .expect("hidden turn runs");
             withholding_agent
                 .turn("restore the configured tool")
                 .session("visible-turn")
@@ -485,13 +482,7 @@ fn one_runtime_hosts_independently_configured_agents() {
             );
 
             // Managed inference authenticates with the runtime's API key.
-            let g1 = match gamma.run("hello from gamma").await {
-                Ok(outcome) => outcome,
-                Err(error) => {
-                    eprintln!("gamma turn failed: {error:#}");
-                    panic!("gamma turn");
-                }
-            };
+            let g1 = gamma.run("hello from gamma").await.expect("gamma turn");
             assert!(g1.reply.contains("managed-ok"), "{:?}", g1.reply);
             let managed: Vec<_> = backend
                 .received_requests()
