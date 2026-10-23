@@ -700,7 +700,7 @@ pub(super) async fn prepare_module_callbacks(
 }
 
 /// Prepare a callback storage endpoint for a module host on `connection`.
-pub(super) async fn prepare_callbacks(
+pub(crate) async fn prepare_callbacks(
     connection: &tinybus::Connection,
     modules: &tinybus::module::ModuleHost,
 ) -> tinybus::Result<(
