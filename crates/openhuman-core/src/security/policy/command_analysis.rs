@@ -81,22 +81,7 @@ impl CommandAnalysis {
                                 | "PATH"
                         )
                     });
-            let executor = matches!(
-                normalized_name.as_str(),
-                "sh" | "bash"
-                    | "zsh"
-                    | "fish"
-                    | "python"
-                    | "python2"
-                    | "python3"
-                    | "node"
-                    | "ruby"
-                    | "perl"
-                    | "php"
-                    | "lua"
-                    | "awk"
-                    | "xargs"
-            );
+            let executor = is_command_executor_name(&normalized_name);
             let class = classify_host_command(&normalized_name, &arguments, &lower);
             analysis.hidden_execution |= lower.contains("$(")
                 || lower.contains("<(")
@@ -211,4 +196,37 @@ pub(super) fn classify_host_command(base: &str, args: &[String], source: &str) -
         return CommandClass::Read;
     }
     CommandClass::Write
+}
+
+pub(super) fn is_command_executor_name(name: &str) -> bool {
+    let name = name.strip_suffix(".exe").unwrap_or(name);
+    let python = ["pythonw", "python"]
+        .iter()
+        .any(|prefix| is_versioned_executable(name, prefix));
+    python
+        || matches!(
+            name,
+            "sh" | "bash"
+                | "zsh"
+                | "fish"
+                | "node"
+                | "ruby"
+                | "perl"
+                | "php"
+                | "lua"
+                | "awk"
+                | "xargs"
+        )
+}
+
+fn is_versioned_executable(name: &str, prefix: &str) -> bool {
+    let Some(suffix) = name.strip_prefix(prefix) else {
+        return false;
+    };
+    suffix.is_empty()
+        || (suffix.starts_with(|character: char| character.is_ascii_digit())
+            && suffix
+                .chars()
+                .all(|character| character.is_ascii_digit() || character == '.')
+            && !suffix.ends_with('.'))
 }

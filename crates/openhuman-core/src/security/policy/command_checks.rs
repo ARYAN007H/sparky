@@ -90,22 +90,7 @@ fn has_hidden_execution(command: &str) -> bool {
 
 #[cfg(test)]
 fn is_command_executor(command: &str) -> bool {
-    matches!(
-        command,
-        "sh" | "bash"
-            | "zsh"
-            | "fish"
-            | "python"
-            | "python2"
-            | "python3"
-            | "node"
-            | "ruby"
-            | "perl"
-            | "php"
-            | "lua"
-            | "awk"
-            | "xargs"
-    )
+    super::command_analysis::is_command_executor_name(command)
 }
 
 #[cfg(test)]
