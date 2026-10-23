@@ -148,21 +148,23 @@ fn round_trip_bind_connect_forward() {
 }
 
 #[test]
-fn a_socket_owned_by_another_user_receives_nothing() {
+fn a_socket_held_by_another_user_receives_nothing() {
+    use std::io::Read;
     let tmp = tempfile::TempDir::new().unwrap();
     let sock_path = tmp.path().join("squatted-deeplink.sock");
     let listener = UnixListener::bind(&sock_path).unwrap();
-    listener.set_nonblocking(true).unwrap();
     let me = nix::unistd::getuid().as_raw();
-    assert!(socket_owned_by(&sock_path, me));
+    assert_eq!(socket_owner(&sock_path), Some(me));
+    assert_eq!(socket_owner(&tmp.path().join("missing.sock")), None);
 
-    // Forwarding as a different user: our socket is "foreign" to them.
+    // Forwarding as a different user: our listener is "foreign" to them.
     let urls = vec!["openhuman://auth?token=secret".to_string()];
     let result = try_forward_urls_as(&urls, &sock_path, me.wrapping_add(1));
 
     assert!(matches!(result, ForwardResult::NoPrimary));
-    assert!(
-        listener.accept().is_err(),
-        "nothing may connect to a socket owned by someone else"
-    );
+    // The peer check ran on the connected stream, so nothing was written.
+    let (mut accepted, _) = listener.accept().unwrap();
+    let mut received = String::new();
+    accepted.read_to_string(&mut received).unwrap();
+    assert!(received.is_empty(), "token leaked: {received:?}");
 }

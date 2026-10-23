@@ -110,24 +110,24 @@ fn try_forward_urls(urls: &[String], path: &Path) -> ForwardResult {
     try_forward_urls_as(urls, path, nix::unistd::getuid().as_raw())
 }
 
-/// Whether the socket file at `path` belongs to `uid`. The /tmp fallback path
-/// is in a shared directory, so another local user can pre-create it to
-/// receive forwarded `openhuman://auth?token=…` links; only our own socket is
-/// trusted.
-fn socket_owned_by(path: &Path, uid: u32) -> bool {
+/// The owner uid of the socket file at `path`, or `None` when it does not
+/// exist. The /tmp fallback path is in a shared directory, so another local
+/// user can pre-create it.
+fn socket_owner(path: &Path) -> Option<u32> {
     use std::os::unix::fs::MetadataExt;
-    std::fs::symlink_metadata(path).is_ok_and(|meta| meta.uid() == uid)
+    std::fs::symlink_metadata(path).ok().map(|meta| meta.uid())
+}
+
+/// The uid of the process on the other end of a connected socket
+/// (`SO_PEERCRED`). Checked on the stream itself, so a socket swapped in at the
+/// path between any file check and `connect` cannot receive the URLs.
+fn peer_uid(stream: &UnixStream) -> Option<u32> {
+    nix::sys::socket::getsockopt(stream, nix::sys::socket::sockopt::PeerCredentials)
+        .ok()
+        .map(|credentials| credentials.uid())
 }
 
 fn try_forward_urls_as(urls: &[String], path: &Path, uid: u32) -> ForwardResult {
-    if path.exists() && !socket_owned_by(path, uid) {
-        log::warn!(
-            "[deep-link-ipc] secondary: socket at {} is owned by another user; \
-             not forwarding deep links to it",
-            path.display()
-        );
-        return ForwardResult::NoPrimary;
-    }
     log::info!(
         "[deep-link-ipc] secondary: found {} deep-link URL(s), trying socket at {}",
         urls.len(),
@@ -136,6 +136,15 @@ fn try_forward_urls_as(urls: &[String], path: &Path, uid: u32) -> ForwardResult 
 
     match UnixStream::connect(path) {
         Ok(mut stream) => {
+            // Only our own primary may receive `openhuman://auth?token=…`.
+            if peer_uid(&stream) != Some(uid) {
+                log::warn!(
+                    "[deep-link-ipc] secondary: socket at {} is held by another user; \
+                     not forwarding deep links to it",
+                    path.display()
+                );
+                return ForwardResult::NoPrimary;
+            }
             stream.set_write_timeout(Some(Duration::from_secs(2))).ok();
             let result = forward_connected_stream(&mut stream, urls);
             if matches!(result, ForwardResult::Forwarded) {
@@ -231,7 +240,9 @@ pub(crate) fn bind_and_listen() -> Option<DeepLinkSocketGuard> {
         Ok(l) => l,
         Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
             // Another user's socket is neither our primary nor ours to unlink.
-            if !socket_owned_by(&path, nix::unistd::getuid().as_raw()) {
+            // One that vanished since `bind` (an old instance exiting) falls
+            // through to the rebind below.
+            if socket_owner(&path).is_some_and(|owner| owner != nix::unistd::getuid().as_raw()) {
                 log::warn!(
                     "[deep-link-ipc] socket {} is owned by another user; \
                      deep-link forwarding disabled for this session",
