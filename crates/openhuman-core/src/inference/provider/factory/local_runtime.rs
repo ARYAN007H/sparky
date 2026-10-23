@@ -167,11 +167,14 @@ fn try_create_local_runtime_chat_model_from_string_with_identity(
         resolved.temperature,
         resolved.num_ctx,
     );
-    let chat: Arc<dyn ChatModel<()>> = if resolved.kind.as_str() == "ollama" {
-        Arc::new(LocalOnlyRequestGuard { inner: chat })
-    } else {
-        chat
-    };
+    let chat: Arc<dyn ChatModel<()>> = Arc::new(LocalOnlyRequestGuard {
+        inner: chat,
+        role: role.to_string(),
+        slug: resolved.kind.as_str().to_string(),
+        endpoint: resolved.endpoint.clone(),
+        model: resolved.model.clone(),
+        egress: egress.clone(),
+    });
     Some(Ok((chat, resolved.model)))
 }
 

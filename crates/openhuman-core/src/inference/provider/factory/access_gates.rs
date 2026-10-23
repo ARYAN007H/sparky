@@ -98,11 +98,24 @@ pub(super) fn is_loopback_endpoint(endpoint: &str) -> bool {
     }
 }
 
-/// Local-only for the model a request actually names. A caller may override
-/// the route's model per request (a flow node's pinned model, for one), so an
-/// Ollama route built for `llama3` can still be asked for a `*-cloud` tag.
+/// Privacy at request time for every local runtime. The construction-time
+/// checks see only the route as built, and two things can change after that:
+/// - the privacy mode is live, so a model built under `Standard` must still
+///   stop at a non-loopback endpoint once the mode is local-only;
+/// - a caller may override the route's model per request (a flow node's pinned
+///   model, for one), so an Ollama route built for `llama3` can still be asked
+///   for a `*-cloud` tag, which local-only refuses and every other mode
+///   discloses as external egress.
 pub(super) struct LocalOnlyRequestGuard {
     pub(super) inner: std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>>,
+    pub(super) role: String,
+    /// The runtime's slug (`ollama`, `lmstudio`, ...), resolved endpoint, and
+    /// the model the route was built (and disclosed) for.
+    pub(super) slug: String,
+    pub(super) endpoint: String,
+    pub(super) model: String,
+    /// The turn's ledger, so a per-request model is disclosed once per turn.
+    pub(super) egress: EgressLedger,
 }
 
 impl LocalOnlyRequestGuard {
@@ -110,15 +123,27 @@ impl LocalOnlyRequestGuard {
         &self,
         request: &tinyinference_llm::model::ModelRequest,
     ) -> tinyinference_llm::Result<()> {
-        let Some(model) = request
-            .model
-            .as_deref()
-            .filter(|m| is_ollama_cloud_model(&format!("ollama:{m}")))
-        else {
-            return Ok(());
-        };
-        enforce_local_only_inference("request", &format!("ollama:{model}"))
-            .map_err(|e| tinyinference_llm::Error::Validation(e.to_string()))
+        let refuse = |e: anyhow::Error| tinyinference_llm::Error::Validation(e.to_string());
+        enforce_local_only_endpoint(&self.role, &self.endpoint).map_err(refuse)?;
+        let model = request.model.as_deref().unwrap_or(&self.model);
+        let route = format!("{}:{model}", self.slug);
+        let cloud = is_ollama_cloud_model(&route);
+        if cloud {
+            enforce_local_only_inference(&self.role, &route).map_err(refuse)?;
+        }
+        if model != self.model {
+            // Construction disclosed the route's own model; an override is a
+            // different destination, disclosed where the request makes it.
+            crate::security::egress::emit_external_transfer_in(
+                &self.egress,
+                crate::security::egress::EgressDescriptor::inference(
+                    self.slug.clone(),
+                    model.to_string(),
+                    cloud || !is_loopback_endpoint(&self.endpoint),
+                ),
+            );
+        }
+        Ok(())
     }
 }
 
