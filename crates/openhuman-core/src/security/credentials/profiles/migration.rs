@@ -307,6 +307,15 @@ impl AuthProfilesStore {
                 AuthProfileKind::OAuth => {
                     let access = match access_token {
                         Some(a) => a,
+                        None if !self.use_keychain && keychain_held_oauth(p) => {
+                            log::warn!(
+                                "[auth] keeping OAuth profile whose secrets are only in the \
+                                 unavailable OS keychain: provider={}. It resolves once the \
+                                 keychain reads again.",
+                                p.provider
+                            );
+                            continue;
+                        }
                         None => {
                             log::warn!(
                                 "[auth] dropping OAuth profile with missing access_token: \
@@ -475,6 +484,10 @@ impl AuthProfilesStore {
                     new_profiles.insert(final_id.clone(), ap);
                     new_persisted_profiles.insert(final_id, p);
                 }
+            } else {
+                // Neither resolved nor dropped: carried untouched because its
+                // secrets are only in the unavailable keychain.
+                new_persisted_profiles.insert(id, p);
             }
         }
         for profile_id in persisted.active_profiles.values_mut() {
@@ -512,4 +525,15 @@ impl AuthProfilesStore {
             profiles,
         })
     }
+}
+
+/// An OAuth entry whose secrets are only in the OS keychain: its JSON holds
+/// none of them. While the keychain is unavailable it cannot be resolved, so
+/// it is carried untouched (neither handed out nor purged) until it reads again.
+pub(super) fn keychain_held_oauth(p: &PersistedAuthProfile) -> bool {
+    p.access_token.is_none()
+        && p.refresh_token.is_none()
+        && p.id_token.is_none()
+        && p.token.is_none()
+        && matches!(parse_profile_kind(&p.kind), Ok(AuthProfileKind::OAuth))
 }
