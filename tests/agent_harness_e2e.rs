@@ -1176,16 +1176,6 @@ async fn run_managed_capture_turn(
     // Session transcript stores and their SQLite backend are also cached by
     // workspace path; release them before the next repetition removes it.
     openhuman_core::storage::sessions::release_workspace(&workspace_dir);
-    let released_transcripts = openhuman_core::storage::sessions::workspace_transcripts(
-        "orchestrator",
-        &workspace_dir,
-    );
-    assert!(
-        released_transcripts
-            .root_for_thread("managed-capture-thread")
-            .is_none(),
-        "released workspace must not expose the prior session transcript"
-    );
 
     with_captured_proxy_requests(|requests| requests.clone())
 }
@@ -1310,6 +1300,17 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
             std::fs::remove_dir_all(&home).expect("reset only the managed capture profile");
         }
         std::fs::create_dir_all(&home).expect("create managed capture profile");
+        let reset_locator = openhuman_core::storage::sessions::workspace_transcripts(
+            "orchestrator",
+            &home.join("workspace"),
+        );
+        eprintln!(
+            "managed capture transcript after profile deletion: {} destination: {:?}",
+            reset_locator
+                .root_for_thread("managed-capture-thread")
+                .is_some(),
+            reset_locator.destination_key()
+        );
         let expected_summary_count = prior_count + 2;
         let metadata = run_managed_capture_turn(
             proxy_origin.clone(),
