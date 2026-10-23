@@ -227,3 +227,51 @@ fn fleet_cors_headers_echo_allowed_origin_only() {
         .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
         .is_none());
 }
+
+/// Tenant isolation at the edge: alice's token on `/bob/rpc` is refused before
+/// anything is dialed. The tenants' cores sit on an unbound port, so a request
+/// that reached the upstream would come back as a gateway failure instead.
+#[tokio::test]
+async fn rpc_proxy_refuses_one_tenants_token_on_another_tenants_core() {
+    let root = PathBuf::from("/tmp/ws");
+    let users = vec!["alice".to_string(), "bob".to_string()];
+    // Port 1 is privileged and unbound: dialing it fails.
+    let (instances, edge_auth, minted) = provision(&users, &root, 1).unwrap();
+    let token = |user: &str| {
+        minted
+            .iter()
+            .find(|(id, _)| id == user)
+            .map(|(_, token)| token.as_str().to_owned())
+            .unwrap()
+    };
+    let fleet = Arc::new(RwLock::new(Fleet {
+        instances,
+        edge_auth,
+        http: reqwest::Client::new(),
+    }));
+    let call = |bearer: Option<String>, tenant: &str| {
+        let mut headers = HeaderMap::new();
+        if let Some(bearer) = bearer {
+            headers.insert(
+                header::AUTHORIZATION,
+                HeaderValue::from_str(&format!("Bearer {bearer}")).unwrap(),
+            );
+        }
+        rpc_proxy(
+            State(fleet.clone()),
+            AxumPath(tenant.to_owned()),
+            headers,
+            Bytes::from_static(b"{}"),
+        )
+    };
+
+    assert_eq!(
+        call(Some(token("alice")), "bob").await.status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(call(None, "bob").await.status(), StatusCode::UNAUTHORIZED);
+    // Bob's own token passes the edge and reaches the (dead) upstream.
+    let own = call(Some(token("bob")), "bob").await.status();
+    assert_ne!(own, StatusCode::FORBIDDEN);
+    assert_ne!(own, StatusCode::UNAUTHORIZED);
+}
