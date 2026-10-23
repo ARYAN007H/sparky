@@ -224,17 +224,13 @@ pub(super) fn resolve_cloud_slug_with_access<'a>(
         // invoke. Its hosted construction callback is config-only and offline.
         (String::new(), false, None)
     } else if credential_access == CredentialAccess::Inspection {
-        let credential =
-            super::credentials::lookup_key_for_slug_read_only(slug, config).map_err(|error| {
-                anyhow::anyhow!("{} (underlying error: {error})", missing_credentials())
-            })?;
+        let credential = super::credentials::lookup_key_for_slug_read_only(slug, config)
+            .map_err(|_| anyhow::anyhow!("{}", missing_credentials()))?;
         (credential.key, credential.is_oauth, credential.account_id)
     } else {
         let key = credential_access
             .lookup_key_for_slug(slug, config)
-            .map_err(|error| {
-                anyhow::anyhow!("{} (underlying error: {error})", missing_credentials())
-            })?;
+            .map_err(|_| anyhow::anyhow!("{}", missing_credentials()))?;
         let is_oauth = slug == "openai" && credential_access.openai_bearer_is_oauth(config);
         (key, is_oauth, None)
     };

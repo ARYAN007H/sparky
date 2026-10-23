@@ -215,6 +215,41 @@ fn a_readable_profile_with_no_stored_key_is_treated_as_missing_credentials() {
 }
 
 #[test]
+fn a_failed_credential_lookup_does_not_echo_its_underlying_error() {
+    // The lookup error can carry stored-credential content, so the user-facing
+    // error is the guidance alone; the routing shape goes to the log. The
+    // read-only (doctor) lookup fails on an unreadable profile store.
+    let _guard = crate::inference::inference_test_guard();
+    let tmp = TempDir::new().expect("tempdir");
+    let mut config = config_with_providers_in_tempdir(&tmp, vec![openai_entry("p_oai", "openai")]);
+    config.chat_provider = Some("openai:gpt-4o".to_string());
+    std::fs::write(
+        tmp.path().join("auth-profiles.json"),
+        "{ not json sk-leak-marker",
+    )
+    .expect("corrupt profile store");
+
+    let err = match super::super::inspection::create_chat_model_with_model_id_in_for_inspection(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "chat",
+        &config,
+        0.0,
+    ) {
+        Ok(_) => panic!("an unreadable credential store must not build a client"),
+        Err(err) => err,
+    };
+    let message = err.to_string();
+    assert!(
+        message.contains("No usable credentials for 'openai'"),
+        "expected the actionable guidance, got: {message}"
+    );
+    assert!(
+        !message.contains("underlying error") && !message.contains("leak-marker"),
+        "the lookup error leaked into the user-facing message: {message}"
+    );
+}
+
+#[test]
 fn implicit_cloud_fallback_is_claimed_only_when_the_role_has_no_route_of_its_own() {
     let mut config = Config::default();
     config.chat_provider = Some("ollama:gemma3:1b".to_string());
