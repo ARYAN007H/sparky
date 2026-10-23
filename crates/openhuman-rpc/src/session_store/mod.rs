@@ -43,7 +43,9 @@ use std::sync::Arc;
 use anyhow::Context as _;
 use tinyagents_session::port::SessionStoreProvider;
 
-use crate::core_host::agent::session_store::{TenantSessionStores, WorkspaceSessionStores};
+use crate::core_host::agent::session_store::{
+    ReboundSessionStores, TenantSessionStores, WorkspaceSessionStores,
+};
 
 /// Installs the session store the host's configuration asks for, before the
 /// core boots.
