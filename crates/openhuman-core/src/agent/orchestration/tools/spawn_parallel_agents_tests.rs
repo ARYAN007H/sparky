@@ -499,6 +499,7 @@ async fn agent_turn_runs_long_parallel_subagent_flow_with_many_nested_tool_calls
     ];
 
     let mut agent = OpenHumanSessionHost::builder()
+        .model_name("test/session-fixture".to_string())
         .chat_model(Arc::new(provider.clone()))
         .tools(tools)
         .tool_dispatcher(Box::new(NativeDialect))

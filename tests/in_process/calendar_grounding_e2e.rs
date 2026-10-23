@@ -117,6 +117,7 @@ async fn test_orchestrator_has_current_date_context() -> Result<()> {
         openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
 
     let mut agent = OpenHumanSessionHost::builder()
+        .model_name("test/session-fixture".to_string())
         .chat_model(model)
         .tools(vec![Box::new(MockCalendarTool)])
         .tool_dispatcher(Box::new(NativeDialect))
