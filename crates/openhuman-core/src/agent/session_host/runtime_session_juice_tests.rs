@@ -55,6 +55,11 @@ async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_
     current_config.tokenjuice.router_enabled = false;
     current_config.tokenjuice.ccr_enabled = false;
     current_config.tokenjuice.repl_handle_enabled = false;
+    crate::security::credentials::api_key::store_api_key(
+        &current_config,
+        "test-session-fixture-key",
+    )
+    .expect("store the managed inference fixture credential");
     assert!(repl_tools_for(&current_config).is_empty());
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
