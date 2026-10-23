@@ -235,7 +235,6 @@ pub(super) struct GroundedClose {
 /// A classified halt has enough evidence for a deterministic partial result.
 /// Keeping this separate from the model-driven repair path guarantees zero
 /// additional provider calls once its recovery budget is exhausted.
-
 fn deterministic_final_summary_with_cause(
     results: &[tinyagents_harness::close::CloseToolResult],
     stop_reason: Option<&str>,
