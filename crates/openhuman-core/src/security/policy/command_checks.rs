@@ -90,10 +90,12 @@ fn has_hidden_execution(command: &str) -> bool {
 
 #[cfg(test)]
 fn is_command_executor(command: &str) -> bool {
-    let command = command.strip_suffix(".exe").unwrap_or(command);
+    let command = command_basename(command.trim_matches(|c: char| matches!(c, '\'' | '"')))
+        .to_ascii_lowercase();
+    let command = command.strip_suffix(".exe").unwrap_or(&command);
     let python_executor = command
-        .strip_prefix("python")
-        .or_else(|| command.strip_prefix("pythonw"))
+        .strip_prefix("pythonw")
+        .or_else(|| command.strip_prefix("python"))
         .is_some_and(|version| {
             version.is_empty()
                 || version
