@@ -298,8 +298,14 @@ pub fn state_of(id: &str) -> ModuleState {
 /// Configuration crossing into a first-party compiled module.
 ///
 /// Credentials are intentionally absent. TinyMemory calls back into the host
-/// for embedding and chat compute; the other modules need no host config.
+/// for embedding and chat compute, and TinyMCP receives the shared host
+/// storage service name; the other modules need no host config.
 fn module_config(config: &Config, id: &str) -> serde_json::Value {
+    if id == "tinymcp" {
+        return serde_json::json!({
+            "storage_callback": tinystoragedrivers_bus::STORAGE_INTERFACE,
+        });
+    }
     if id == super::search::MODULE_ID {
         return super::search::load_configuration(config);
     }
