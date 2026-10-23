@@ -331,10 +331,15 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
 
     let old_profile = host.open(&id).await.unwrap();
     let old_context = Arc::clone(old_profile.context());
+    let old_context_weak = Arc::downgrade(&old_context);
+    drop(old_context);
     drop(old_profile);
     assert!(host.release(&id).await.unwrap());
     let current_profile = host.open(&id).await.unwrap();
     let current_context = Arc::clone(current_profile.context());
+    let old_context = old_context_weak
+        .upgrade()
+        .expect("the host retains the retired context for stale-work checks");
     assert!(!Arc::ptr_eq(&old_context, &current_context));
 
     // A stale turn context cannot keep the profile lease alive while the test
@@ -434,6 +439,8 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
     )
     .unwrap();
 
+    let body_completed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let completed_in_body = Arc::clone(&body_completed);
     let attempt = import_state::with_claim(
         &repo,
         import_state::HOST_OWNER,
@@ -502,10 +509,15 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                     )
                     .await;
                 assert!(current_write.is_ok(), "the current lease remains writable");
+                completed_in_body.store(true, std::sync::atomic::Ordering::SeqCst);
                 Ok::<_, anyhow::Error>(())
             })
         },
     )
-    .unwrap_or_else(|error| panic!("captured import claim failed: {error:#}"));
-    assert_eq!(attempt, Some(()));
+    .expect_err("the retired lease must prevent releasing the import claim");
+    assert!(
+        body_completed.load(std::sync::atomic::Ordering::SeqCst),
+        "the stale and current writes should be checked before claim release"
+    );
+    assert!(!attempt.to_string().is_empty());
 }

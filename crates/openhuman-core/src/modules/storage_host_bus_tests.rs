@@ -55,6 +55,14 @@ async fn a_module_write_under_a_stale_lease_is_fenced_by_the_host() {
 
     let shared_fixture = crate::storage::test_support::sqlite_backend().unwrap();
     let shared: Arc<dyn StorageBackend> = Arc::clone(&shared_fixture.backend);
+    let notes_scope = Scope::new("u:acme/module:alpha").unwrap();
+    shared
+        .for_scope(&notes_scope)
+        .unwrap()
+        .documents()
+        .ensure_collection(&CollectionSpec::new("notes"))
+        .await
+        .unwrap();
     let clock = Arc::new(AtomicU64::new(0));
     let reading = Arc::clone(&clock);
     let fences = Arc::new(FenceRegistry::new(move || reading.load(Ordering::SeqCst)));
