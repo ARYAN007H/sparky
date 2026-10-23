@@ -73,7 +73,10 @@ async fn run() -> anyhow::Result<()> {
     if let Ok(url) = std::env::var("OPENHUMAN_EXAMPLE_MONGODB_URL") {
         let live = RuntimeBuilder::library().storage(url).build().await?;
         assert!(live.storage().is_some(), "MongoDB backend");
-        assert_eq!(live.capabilities().storage.driver.as_deref(), Some("mongodb"));
+        assert_eq!(
+            live.capabilities().storage.driver.as_deref(),
+            Some("mongodb")
+        );
     }
     // ANCHOR_END: storage_mongodb
     println!("SQLite put/get/delete and credential-safe MongoDB configuration verified");
