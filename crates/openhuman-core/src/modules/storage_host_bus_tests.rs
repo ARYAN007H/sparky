@@ -99,7 +99,7 @@ async fn a_module_write_under_a_stale_lease_is_fenced_by_the_host() {
 
     // The lease runs out; the module's next write is refused by the host's fence,
     // and a read is not.
-    clock.store(10 * 60 * 1000, Ordering::SeqCst);
+    clock.store(start_ms + 10 * 60 * 1000, Ordering::SeqCst);
     let result = call(
         &rig,
         &alpha(),
