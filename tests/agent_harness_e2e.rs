@@ -1113,8 +1113,9 @@ async fn run_managed_capture_turn(
         "managed capture must use its isolated workspace"
     );
     eprintln!(
-        "managed capture session store installed: {}",
-        openhuman_core::storage::sessions::is_installed()
+        "managed capture session store installed: {}; storage backend installed: {}",
+        openhuman_core::storage::sessions::is_installed(),
+        openhuman_core::storage::installed().is_some()
     );
     let mut events = spawn_sse_collector(format!(
         "{}/events?client_id=managed-capture-client",
