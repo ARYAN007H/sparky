@@ -298,6 +298,7 @@ pub(crate) struct Rig {
     pub(crate) triage: Arc<ScriptedTriage>,
     _host: Connection,
     _modules: ModuleHost,
+    _storage: crate::storage::test_support::InstalledBackendGuard,
 }
 
 impl Rig {
@@ -323,6 +324,9 @@ impl Rig {
         let host = Connection::connect(bus.connect().await.unwrap())
             .await
             .unwrap();
+        let storage = crate::storage::test_support::install_backend_for_test(
+            crate::storage::test_support::memory_backend(),
+        );
         let deliverer = Deliverer::new(
             triage.clone() as Arc<dyn TriageRunner>,
             DispatchCtx::host_default(),
@@ -346,12 +350,16 @@ impl Rig {
         host.request_name(names::host::INTERFACE).await.unwrap();
 
         let modules = ModuleHost::new(broker);
+        crate::modules::storage_host::install(&host, &modules)
+            .await
+            .unwrap();
         modules
             .attach_linked_with_config(
                 tinyeventqueues::linked_module().unwrap(),
                 json!({
                     "pipeline": pipeline,
                     "timer": { "min_interval_ms": 5, "max_interval_ms": 25 },
+                    "storage_callback": tinystoragedrivers_bus::STORAGE_INTERFACE,
                 }),
             )
             .unwrap();
@@ -374,6 +382,7 @@ impl Rig {
             triage,
             _host: host,
             _modules: modules,
+            _storage: storage,
         }
     }
 }

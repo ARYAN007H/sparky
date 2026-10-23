@@ -653,7 +653,7 @@ pub(super) async fn serve_objects(
 /// ([`super::storage_host_linked`]). If that cannot be attached the objects
 /// are served from the host connection as before, with Secrets unreachable,
 /// and the failure is logged.
-pub(super) async fn install(
+pub(crate) async fn install(
     connection: &tinybus::Connection,
     modules: &tinybus::module::ModuleHost,
 ) -> tinybus::Result<()> {
