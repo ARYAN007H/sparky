@@ -495,12 +495,46 @@ async fn a_clean_reopen_does_not_recover_but_a_takeover_does() {
     );
 
     // A second host on the same root (a restarted process) finds the lease
-    // never released once the first is gone, and recovers.
+    // never released once the first is gone. Expire the persisted lease
+    // explicitly so takeover does not depend on waiting for the TTL.
     let holder = host;
     let second = self::host(&tmp, 4, 0);
     let refused = second.open(&id).await.unwrap_err();
     assert!(matches!(refused, OpenError::HeldElsewhere(_)), "{refused}");
     drop(holder);
+
+    let backend = second
+        .backend
+        .as_ref()
+        .expect("test host has shared storage");
+    let cluster = backend
+        .for_scope(&Scope::new(crate::storage::lease::CLUSTER_SCOPE).unwrap())
+        .unwrap();
+    let lease_id = tinystoragedrivers::Key::new(format!(
+        "{}/{}",
+        crate::storage::lease::LEASE_OWNER,
+        id.as_str()
+    ))
+    .unwrap();
+    let lease = cluster
+        .documents()
+        .get(crate::storage::lease::LEASE_COLLECTION, lease_id.as_str())
+        .await
+        .unwrap()
+        .expect("the crashed holder's lease remains recorded");
+    let mut expired = lease.doc.clone();
+    expired["expires_ms"] = 0.into();
+    cluster
+        .documents()
+        .put(
+            crate::storage::lease::LEASE_COLLECTION,
+            lease_id.as_str(),
+            expired,
+            tinystoragedrivers::Precondition::Version(lease.version),
+        )
+        .await
+        .unwrap();
+
     drop(second.open(&id).await.unwrap());
     assert_eq!(
         lifecycle("t1"),
@@ -565,7 +599,10 @@ async fn opening_an_open_profile_sweeps_the_idle_ones() {
 #[tokio::test]
 async fn one_unreadable_profile_does_not_hide_the_rest() {
     let tmp = tempfile::tempdir().unwrap();
-    let host = host(&tmp, 4, 60);
+    let host = ProfileHost::new(
+        SaasConfig::new(tmp.path()),
+        CoreContext::for_test(DomainSet::full(), None),
+    );
     let (a, b) = (profile("alice"), profile("bob"));
     host.provision(&a).await.unwrap();
     host.provision(&b).await.unwrap();
