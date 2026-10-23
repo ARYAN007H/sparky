@@ -43,17 +43,31 @@ mod with_module {
 
     #[test]
     fn a_grant_containing_a_credential_store_is_refused() {
-        let home = dirs::home_dir().expect("a home directory");
+        // A synthetic home under a temp dir: the process home can sit under a
+        // floor-forbidden root (`/root`), which would refuse every grant.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let home = tmp.path().join("home");
         let project = home.join("project");
+        std::fs::create_dir_all(&project).expect("project dir");
+        let mut read_only = vec![
+            home.display().to_string(),
+            "/".into(),
+            project.display().to_string(),
+            // Resolves to `home`; a lexical check alone would admit it.
+            format!("{}/..", project.display()),
+            "relative/project".into(),
+        ];
+        #[cfg(unix)]
+        {
+            let link = tmp.path().join("link-to-home");
+            std::os::unix::fs::symlink(&home, &link).expect("symlink");
+            read_only.push(link.display().to_string());
+        }
         let reply = LocalGrants {
-            read_only: vec![
-                home.display().to_string(),
-                "/".into(),
-                project.display().to_string(),
-            ],
+            read_only,
             read_write: vec![home.display().to_string()],
         };
-        let grants = admit_module_grants(reply, false);
+        let grants = admit_grants_under(reply, false, Some(&home));
         assert_eq!(grants.read_only, [project]);
         assert!(grants.read_write.is_empty(), "{:?}", grants.read_write);
     }

@@ -129,6 +129,8 @@ pub(crate) fn grant_request(
 /// Second gate: drop every returned path the host floor forbids, and every
 /// path that contains one of the operator's credential stores (a grant of
 /// `$HOME` or `/` reaches `~/.ssh`, and Landlock cannot carve it back out).
+/// A path is judged as the OS resolves it: one with `.`/`..` segments or a
+/// rootless one is refused outright, and a symlink is checked at its target.
 /// `/proc` is the one sanctioned exception to the floor, and only when
 /// `allow_proc` is set.
 #[cfg(feature = "modules")]
@@ -136,21 +138,56 @@ pub(crate) fn admit_module_grants(
     reply: crate::modules::tinybox::contract::LocalGrants,
     allow_proc: bool,
 ) -> JailGrants {
-    let stores = grant_home(crate::core::runtime::is_saas(), dirs::home_dir)
-        .as_deref()
-        .map(crate::security::policy::home_credential_stores)
-        .unwrap_or_default();
+    let home = grant_home(crate::core::runtime::is_saas(), dirs::home_dir);
+    admit_grants_under(reply, allow_proc, home.as_deref())
+}
+
+#[cfg(feature = "modules")]
+fn admit_grants_under(
+    reply: crate::modules::tinybox::contract::LocalGrants,
+    allow_proc: bool,
+    home: Option<&std::path::Path>,
+) -> JailGrants {
+    use std::path::Component;
+    let mut stores = Vec::new();
+    if let Some(home) = home {
+        stores.extend(crate::security::policy::home_credential_stores(home));
+        if let Ok(resolved) = home.canonicalize() {
+            stores.extend(crate::security::policy::home_credential_stores(&resolved));
+        }
+    }
     let admit = |raw: String| -> Option<PathBuf> {
         let path = PathBuf::from(raw);
+        let lexical = path.has_root()
+            && path.components().all(|c| {
+                matches!(
+                    c,
+                    Component::Prefix(_) | Component::RootDir | Component::Normal(_)
+                )
+            });
+        if !lexical {
+            tracing::warn!(
+                path = %path.display(),
+                "[sandbox:grants] refused module grant: not a plain absolute path"
+            );
+            return None;
+        }
+        let resolved = path.canonicalize().unwrap_or_else(|_| path.clone());
         let sanctioned_proc = allow_proc && path == std::path::Path::new("/proc");
-        if !sanctioned_proc && SecurityPolicy::is_always_forbidden(&path) {
+        if !sanctioned_proc
+            && (SecurityPolicy::is_always_forbidden(&path)
+                || SecurityPolicy::is_always_forbidden(&resolved))
+        {
             tracing::warn!(
                 path = %path.display(),
                 "[sandbox:grants] refused module grant: host floor forbids it"
             );
             return None;
         }
-        if stores.iter().any(|store| store.starts_with(&path)) {
+        if stores
+            .iter()
+            .any(|store| store.starts_with(&path) || store.starts_with(&resolved))
+        {
             tracing::warn!(
                 path = %path.display(),
                 "[sandbox:grants] refused module grant: it contains a credential store"
