@@ -59,8 +59,10 @@ impl ListStore<PendingDeletion> for FileStore {
             .map_err(|error| StoreError(error.to_string()));
         }
         let all = all.to_vec();
-        super::state_store::save_workspace(&self.workspace_dir, STATE, &all)
-            .map_err(|error| StoreError(error.to_string()))
+        super::state_store::save_workspace(&self.workspace_dir, STATE, &all).map_err(|error| {
+            eprintln!("deletion queue save error: {error:#}");
+            StoreError(error.to_string())
+        })
     }
 }
 
