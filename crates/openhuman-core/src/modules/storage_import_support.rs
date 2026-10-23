@@ -128,6 +128,11 @@ pub(super) fn module_scope(
 /// storage handle bound to the same claim condition and must use it for both
 /// payload writes and the completion marker. A lost claim therefore prevents
 /// late payload or completion writes.
+///
+/// Returns `Ok(None)` at once when another holder's claim is live, so an
+/// import on the compaction path never blocks a runtime worker (or the
+/// once-per-process import lock) for the claim TTL; it is retried at the next
+/// call.
 pub(super) fn with_module_claim<T>(
     ctx: &crate::core::runtime::DispatchCtx,
     module_id: &str,
@@ -154,7 +159,7 @@ where
     )?;
     let claim_backend = Arc::clone(&backend);
     let claim_scope = scope.clone();
-    let claimed = crate::storage::import_state::with_claim(
+    let claimed = crate::storage::import_state::try_claim(
         &repo,
         crate::storage::import_state::HOST_OWNER,
         &crate::storage::import_state::step_id(marker_kind, marker_id),
