@@ -9115,7 +9115,6 @@ dependencies = [
 name = "tinyagents-orchestration"
 version = "3.0.0"
 dependencies = [
- "anyhow",
  "async-trait",
  "chrono",
  "parking_lot",
