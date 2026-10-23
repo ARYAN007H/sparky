@@ -377,8 +377,8 @@ fn decode_display_message(
     value: &serde_json::Value,
     sanitized_system: &mut bool,
 ) -> Result<DisplayMessage> {
-    let mut message: TranscriptMessage = serde_json::from_value(value.clone())
-        .context("decode transcript message")?;
+    let mut message: TranscriptMessage =
+        serde_json::from_value(value.clone()).context("decode transcript message")?;
     let row_version = value
         .get("v")
         .and_then(serde_json::Value::as_u64)
@@ -452,7 +452,11 @@ fn decode_display_message(
         .get("reasoning_content")
         .and_then(serde_json::Value::as_str)
         .map(str::to_owned)
-        .or_else(|| turn_usage.as_ref().and_then(|usage| usage.reasoning_content.clone()));
+        .or_else(|| {
+            turn_usage
+                .as_ref()
+                .and_then(|usage| usage.reasoning_content.clone())
+        });
     Ok(DisplayMessage {
         interrupted: value
             .get("interrupted")
