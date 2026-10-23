@@ -65,6 +65,8 @@ impl LiveHandle {
             Self::TinyBox(live) => live.read(wait).await,
             #[cfg(test)]
             Self::Fixture(live) => live.read(wait).await,
+            #[cfg(not(any(feature = "modules", test)))]
+            _ => anyhow::bail!("live process support requires the modules feature"),
         }
     }
 
@@ -76,6 +78,8 @@ impl LiveHandle {
             Self::TinyBox(live) => live.released,
             #[cfg(test)]
             Self::Fixture(live) => live.finished(),
+            #[cfg(not(any(feature = "modules", test)))]
+            _ => true,
         }
     }
 
@@ -86,6 +90,8 @@ impl LiveHandle {
             Self::TinyBox(live) => live.kill().await,
             #[cfg(test)]
             Self::Fixture(live) => live.kill().await,
+            #[cfg(not(any(feature = "modules", test)))]
+            _ => anyhow::bail!("live process support requires the modules feature"),
         }
     }
 }
