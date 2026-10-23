@@ -509,7 +509,7 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
 }
 
 #[tokio::test]
-async fn handle_runtime_command_without_target_channel_still_consumes_command() {
+async fn handle_runtime_command_without_target_or_capabilities_is_not_consumed() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let msg = inbound(
         "1".into(),
@@ -522,7 +522,9 @@ async fn handle_runtime_command_without_target_channel_still_consumes_command() 
 
     let handled =
         handle_runtime_command_if_needed(&ctx, &msg, None, &conversation_history_key(&msg)).await;
-    assert!(handled);
+    // This fixture has neither a target channel nor a configured module
+    // provider, so the module cannot verify that remote control is enabled.
+    assert!(!handled);
 }
 
 #[tokio::test]
