@@ -107,6 +107,7 @@ describe('validateAndReadFile', () => {
         );
         const encoded = result.attachment.dataUri.split(',')[1];
         const bytes = Uint8Array.from(atob(encoded), char => char.charCodeAt(0));
+        console.error('gzip probe', encoded.slice(0, 24), Array.from(bytes.slice(0, 8)));
         const stream = new ReadableStream({
           start(controller) {
             controller.enqueue(bytes);
