@@ -4,7 +4,6 @@ use super::*;
 
 #[tokio::test]
 async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_off() {
-    crate::agent::session_host::test_support::install_model_fixture();
     use crate::inference::tokenjuice::repl_tools_for;
 
     crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
@@ -55,11 +54,7 @@ async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_
     current_config.tokenjuice.router_enabled = false;
     current_config.tokenjuice.ccr_enabled = false;
     current_config.tokenjuice.repl_handle_enabled = false;
-    crate::security::credentials::api_key::store_api_key(
-        &current_config,
-        "test-session-fixture-key",
-    )
-    .expect("store the managed inference fixture credential");
+    crate::agent::session_host::test_support::install_managed_model_fixture(&current_config);
     assert!(repl_tools_for(&current_config).is_empty());
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -161,7 +156,6 @@ async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_
 
 #[tokio::test]
 async fn resumed_juice_snapshot_does_not_add_live_repl_declarations() {
-    crate::agent::session_host::test_support::install_model_fixture();
     use crate::inference::tokenjuice::repl_tools_for;
 
     crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
@@ -253,7 +247,6 @@ async fn resumed_juice_snapshot_does_not_add_live_repl_declarations() {
 /// tool result enters the transcript uncompressed.
 #[tokio::test]
 async fn juice_off_turn_loads_no_module_and_passes_tool_output_through() {
-    crate::agent::session_host::test_support::install_model_fixture();
     use crate::agent::tinyagents::middleware::tool_output::ToolOutputMiddleware;
     use tinyagents_harness::context::{RunConfig, RunContext};
     use tinyagents_harness::middleware::{Middleware, ToolInvocationIdentity};
