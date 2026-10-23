@@ -139,12 +139,6 @@ const RESERVED_COLLECTIONS: [&str; 1] = [tinystoragedrivers::secrets::DEFAULT_CO
 /// A module reaches the queue collections only through the `Queues` object.
 const RESERVED_COLLECTION_PREFIX: &str = "tsd.";
 
-/// The one `tsd.` collection a module may hold: the progress ledger its own
-/// first-open migration keeps, one row per owner, item and step. It sits in the
-/// module's own scope, so it exposes no other module's data, and a forged row
-/// can only skip a step of that module's own migration.
-pub(super) const MIGRATION_LEDGER: &str = "tsd.migrations";
-
 impl StorageGrant {
     /// The schema the host ensures when it binds the module.
     pub fn specs(&self) -> &[CollectionSpec] {
@@ -162,8 +156,7 @@ impl StorageGrant {
         for spec in &self.collections {
             if spec.name.is_empty()
                 || spec.name.starts_with('_')
-                || (spec.name.starts_with(RESERVED_COLLECTION_PREFIX)
-                    && spec.name != MIGRATION_LEDGER)
+                || spec.name.starts_with(RESERVED_COLLECTION_PREFIX)
                 || RESERVED_COLLECTIONS.contains(&spec.name.as_str())
             {
                 return Err("a granted collection name is empty or reserved".into());
