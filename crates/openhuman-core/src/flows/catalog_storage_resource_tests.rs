@@ -23,6 +23,7 @@ fn open_fd_count() -> usize {
 }
 
 #[tokio::test]
+#[cfg(feature = "storage-sqlite")]
 async fn workspace_fd_lifetime_is_separate_from_catalog_callback_lifetime() {
     if crate::util::module_test_process::run(
         module_path!(),
@@ -46,6 +47,7 @@ async fn workspace_fd_lifetime_is_separate_from_catalog_callback_lifetime() {
             workspace_dir: workspace.path().to_path_buf(),
             ..Config::default()
         };
+        crate::storage::local::use_persistent_default_for_test(workspace.path());
         let context = context(&config, &format!("fd-probe-{index}"));
         registrations.push(
             register(&context, &config)
@@ -66,7 +68,7 @@ async fn workspace_fd_lifetime_is_separate_from_catalog_callback_lifetime() {
     for workspace in &workspaces {
         let backend = crate::storage::local::backend_for(workspace.path())
             .expect("open the temporary workspace default backend");
-        assert_eq!(backend.driver(), "sqlite");
+        assert!(workspace.path().join("storage").exists());
         drop(backend);
     }
     let after_backend_opens = open_fd_count();

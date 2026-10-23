@@ -16,6 +16,7 @@
 
 use crate::core::runtime::DispatchCtx;
 use serde_json::{json, Map, Value};
+use tinyagents_orchestration::steering::SteerError;
 
 use crate::agent::orchestration::running_subagents::CancelledSubagent;
 use crate::agent::orchestration::{background_completions, running_subagents, subagent_sessions};
@@ -250,6 +251,53 @@ async fn settle_paused_driver_cancel(
         .await;
     }
     Ok(transitioned)
+}
+
+fn handle_subagent_steer(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
+        let cid = new_correlation_id();
+        let task_id = require_str(&params, "taskId")?;
+        let message = require_str(&params, "message")?;
+        let (lane, mode) = match opt_str(&params, "mode").as_deref() {
+            Some("collect") => (QueueLane::Collect, "collect"),
+            _ => (QueueLane::Steer, "steer"),
+        };
+        log::debug!(
+            target: "subagent_control_rpc",
+            "[subagent_control_rpc][{cid}] steer.entry task_id={task_id} mode={mode} chars={}",
+            message.chars().count()
+        );
+
+        match running_subagents::steer_control(&ctx, &task_id, message, lane).await {
+            Ok(()) => {
+                log::debug!(
+                    target: "subagent_control_rpc",
+                    "[subagent_control_rpc][{cid}] steer.done task_id={task_id} mode={mode} steered=true"
+                );
+                to_json(json!({ "steered": true, "taskId": task_id, "mode": mode }))
+            }
+            Err(err) => {
+                let reason = match err {
+                    SteerError::Unknown => "unknown",
+                    // SaaS user controls check the captured worker profile,
+                    // independently of the caller-supplied task ID.
+                    SteerError::NotOwned => "not_owned",
+                    SteerError::UnsupportedLane => "unsupported_lane",
+                    _ => "steer_failed",
+                };
+                log::debug!(
+                    target: "subagent_control_rpc",
+                    "[subagent_control_rpc][{cid}] steer.done task_id={task_id} mode={mode} steered=false reason={reason}"
+                );
+                to_json(json!({
+                    "steered": false,
+                    "taskId": task_id,
+                    "mode": mode,
+                    "reason": reason,
+                }))
+            }
+        }
+    })
 }
 
 fn to_json<T: serde::Serialize>(value: T) -> Result<Value, String> {

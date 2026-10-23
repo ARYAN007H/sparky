@@ -1,7 +1,9 @@
 #[cfg(feature = "modules")]
 use super::shell_support::container_environment;
-use super::shell_support::{command_failure, exec_result, python_utf8_env, tool_timeout_message};
-use crate::agent::tinyagents::host::run_context::command_environment_for_tool;
+use super::shell_support::{command_failure, exec_result, tool_timeout_message};
+use crate::agent::tinyagents::host::run_context::{
+    command_environment_for_tool, dispatch_ctx_for_tool,
+};
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use crate::modules::tinybox::host_runtime::RuntimeAdapter;
@@ -489,7 +491,7 @@ impl ShellHost {
             &self.security.workspace_dir,
             effective,
         );
-        run.env = env;
+        run.env = super::shell_support::with_unbuffered_python(env, command_environment.is_some());
         run.python_utf8 = true;
         run.hide_window = self.runtime.hide_window();
         run.meter = meter;
@@ -557,8 +559,8 @@ impl ShellHost {
         );
         // Apply the same Git config hardening to local and sandboxed shells.
         extra_env.extend(tinyagents_harness_tools::fs::filesystem::shell_git_env());
-        // And the same Python UTF-8 defaults the native path sets.
-        for (var, val) in python_utf8_env(|name| {
+        // And the same Python defaults the native path sets.
+        for (var, val) in super::shell_support::python_env_defaults(|name| {
             command_environment
                 .as_ref()
                 .and_then(|overrides| overrides.get(name).map(std::ffi::OsString::from))

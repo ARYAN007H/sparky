@@ -19,9 +19,8 @@
 //! domain registrations and applies the runtime capability filters.
 pub(crate) mod plan_exit;
 mod todo;
-mod wait;
 
 pub const PLAN_EXIT_MARKER: &str = tinyagents_harness_tools::PLAN_EXIT_MARKER;
+pub use tinyagents_harness_tools::{WaitLoopTool, WaitTool};
 pub use todo::TodoTool;
 pub(crate) use todo::TodoToolDispatch;
-pub use wait::{WaitLoopTool, WaitTool};

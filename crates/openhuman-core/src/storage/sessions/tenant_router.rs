@@ -13,124 +13,12 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock, Weak};
 
 use tinyagents_harness::store::SchemaAdmission;
-use tinyagents_session::port::{
-    AgentStores, SessionStoreLease, SessionStoreLeaseError, SessionStoreProvider,
-};
-use tinyagents_session::{RebindableSessionStores, SessionStoreRegistry};
-use tinystoragedrivers::{Scope, StorageBackend, StorageError};
+use tinyagents_session::port::{AgentStorageFactory, AgentStores, SessionStoreProvider};
+use tinyagents_session::DriverSessionStores;
+use tinyagents_storage_kit::{Blocking, Scope as PortScope, ScopedStorage};
+use tinystoragedrivers::{StorageBackend, StorageError};
 
-type TenantProviders = Mutex<HashMap<Scope, Arc<RebindableSessionStores>>>;
-
-#[derive(Default)]
-struct TenantStoreRegistry {
-    providers: Arc<SessionStoreRegistry>,
-    state: Mutex<TenantStoreRegistryState>,
-}
-
-#[derive(Default)]
-struct TenantStoreRegistryState {
-    backends: Vec<Weak<RwLock<Arc<dyn StorageBackend>>>>,
-    tenants: Vec<Weak<TenantProviders>>,
-    current_backend: Option<Arc<dyn StorageBackend>>,
-}
-
-impl TenantStoreRegistry {
-    fn rebind(&self, backend: &Arc<dyn StorageBackend>) -> Result<usize, StorageError> {
-        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        let backends = state
-            .backends
-            .iter()
-            .filter_map(Weak::upgrade)
-            .collect::<Vec<_>>();
-        let tenant_maps = state
-            .tenants
-            .iter()
-            .filter_map(Weak::upgrade)
-            .collect::<Vec<_>>();
-        // `route` locks tenants before reading the backend. Keep that lock
-        // order while preventing new providers from appearing during rebind.
-        let tenant_maps = tenant_maps
-            .iter()
-            .map(|tenants| tenants.lock().unwrap_or_else(PoisonError::into_inner))
-            .collect::<Vec<_>>();
-        let mut bindings = backends
-            .iter()
-            .map(|backend| backend.write().unwrap_or_else(PoisonError::into_inner))
-            .collect::<Vec<_>>();
-
-        let mut providers = tenant_maps
-            .iter()
-            .zip(&bindings)
-            .flat_map(|(tenants, current_backend)| {
-                tenants.iter().map(move |(tenant, provider)| {
-                    (
-                        tenant.as_str().to_owned(),
-                        Arc::clone(provider),
-                        Arc::clone(current_backend),
-                    )
-                })
-            })
-            .collect::<Vec<_>>();
-        // A stable order makes a later-provider failure deterministic and
-        // keeps rollback behavior predictable across runs.
-        providers.sort_by(|left, right| left.0.cmp(&right.0));
-
-        let mut moved: Vec<(Arc<RebindableSessionStores>, Arc<dyn StorageBackend>)> =
-            Vec::with_capacity(providers.len());
-        for (_, provider, old_backend) in &providers {
-            if let Err(error) = provider.rebind(Arc::clone(backend)) {
-                let mut rollback_failures = Vec::new();
-                for (moved_provider, moved_backend) in moved.iter().rev() {
-                    if let Err(rollback_error) = moved_provider.rebind(Arc::clone(moved_backend)) {
-                        rollback_failures.push(rollback_error.to_string());
-                    }
-                }
-                if rollback_failures.is_empty() {
-                    tracing::error!(target: "openhuman::storage", %error, "[session_store] tenant provider rebind failed; prior providers were restored");
-                    return Err(error);
-                }
-                tracing::error!(target: "openhuman::storage", %error, rollback_errors = ?rollback_failures, restored = moved.len() - rollback_failures.len(), "[session_store] tenant provider rebind and rollback failed; providers may remain split across backends");
-                return Err(StorageError::invalid_input(format!(
-                    "tenant session-store rebind failed ({error}); rollback failed for {} provider(s): {}",
-                    rollback_failures.len(),
-                    rollback_failures.join("; ")
-                )));
-            }
-            moved.push((Arc::clone(provider), Arc::clone(old_backend)));
-        }
-
-        for current in &mut bindings {
-            **current = Arc::clone(backend);
-        }
-        state.backends.retain(|weak| weak.strong_count() > 0);
-        state.tenants.retain(|weak| weak.strong_count() > 0);
-        state.current_backend = Some(Arc::clone(backend));
-        Ok(moved.len())
-    }
-
-    fn register_backend(
-        &self,
-        backend: &Arc<RwLock<Arc<dyn StorageBackend>>>,
-        tenants: &Arc<TenantProviders>,
-    ) {
-        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(current) = &state.current_backend {
-            *backend.write().unwrap_or_else(PoisonError::into_inner) = Arc::clone(current);
-        }
-        state.backends.retain(|weak| weak.strong_count() > 0);
-        state.backends.push(Arc::downgrade(backend));
-        state.tenants.retain(|weak| weak.strong_count() > 0);
-        state.tenants.push(Arc::downgrade(tenants));
-    }
-}
-
-static PROCESS_SESSION_STORES: LazyLock<Arc<TenantStoreRegistry>> =
-    LazyLock::new(|| Arc::new(TenantStoreRegistry::default()));
-
-/// Rebinds the host's live tenant routers to `backend`.
-pub fn rebind_all(backend: &Arc<dyn StorageBackend>) -> Result<usize, StorageError> {
-    PROCESS_SESSION_STORES.rebind(backend)
-}
+use crate::storage::Scope;
 
 /// Session stores over one backend, routed to a per-tenant provider.
 pub struct TenantSessionStores {
@@ -148,7 +36,6 @@ impl std::fmt::Debug for TenantSessionStores {
         let tenants = self.tenants.lock().unwrap_or_else(PoisonError::into_inner);
         let backend = self.backend.read().unwrap_or_else(PoisonError::into_inner);
         f.debug_struct("TenantSessionStores")
-            .field("driver", &backend.driver())
             .field("tenants", &tenants.len())
             .finish_non_exhaustive()
     }
@@ -217,30 +104,27 @@ impl TenantSessionStores {
         if let Some(provider) = tenants.get(&tenant) {
             return (Arc::clone(provider), agent);
         }
-        let provider = match RebindableSessionStores::new_in_tenant(
-            &self.registry.providers,
-            Arc::clone(&self.backend.read().unwrap_or_else(PoisonError::into_inner)),
-            tenant.clone(),
-            self.recover_on_open,
-        ) {
-            Ok(provider) => provider,
-            Err(error) => {
-                tracing::error!(target: "openhuman::storage", tenant = tenant.as_str(), %error, "[session_store] could not open tenant session provider");
-                // Storage is unavailable, so keep this tenant isolated in a
-                // temporary in-memory provider rather than redirecting its
-                // session data into another tenant's store.
-                return (
-                    RebindableSessionStores::new_in_tenant(
-                        &self.registry.providers,
-                        Arc::new(crate::storage::MemoryStorage::new()),
-                        tenant.clone(),
-                        false,
-                    )
-                    .expect("in-memory session store provider must initialize"),
-                    agent,
-                );
-            }
-        };
+        let backend = Arc::clone(&self.backend);
+        let tenant_for_factory = tenant.clone();
+        let factory: AgentStorageFactory = Arc::new(move |agent_id| {
+            let owner_scope =
+                crate::storage::scope::Scope::new(tenant_for_factory.as_str())?.agent(agent_id)?;
+            let scope = PortScope::new(owner_scope.as_str())?;
+            let storage = backend.for_scope(&owner_scope)?;
+            let prepare_storage = storage.clone();
+            super::super::block_on(async move {
+                crate::storage::boot::prepare_scope(&prepare_storage).await
+            })?;
+            Ok(ScopedStorage::new(storage, scope))
+        });
+        let provider = Arc::new(
+            DriverSessionStores::with_bridge_and_schema_admission(
+                factory,
+                self.bridge.clone(),
+                self.admission,
+            )
+            .recover_on_open(self.recover_on_open),
+        );
         tracing::debug!(
             target: "openhuman::storage",
             tenant = tenant.as_str(),
@@ -278,23 +162,24 @@ impl SessionStoreProvider for TenantSessionStores {
 
     fn bind_actor(
         &self,
-        backend: Arc<dyn StorageBackend>,
+        factory: AgentStorageFactory,
     ) -> Result<Option<Arc<dyn SessionStoreProvider>>, StorageError> {
-        self.bind_actor_with_schema_admission(backend, self.admission)
+        self.bind_actor_with_schema_admission(factory, self.admission)
     }
 
     fn bind_actor_with_schema_admission(
         &self,
-        backend: Arc<dyn StorageBackend>,
+        factory: AgentStorageFactory,
         admission: SchemaAdmission,
     ) -> Result<Option<Arc<dyn SessionStoreProvider>>, StorageError> {
-        let actor = Self::with_registry(
-            backend,
-            self.recover_on_open,
-            admission,
-            Arc::new(TenantStoreRegistry::default()),
-        );
-        Ok(Some(Arc::new(actor)))
+        Ok(Some(Arc::new(
+            DriverSessionStores::with_bridge_and_schema_admission(
+                factory,
+                self.bridge.clone(),
+                admission,
+            )
+            .recover_on_open(self.recover_on_open),
+        )))
     }
 
     fn run_ledger_for_agent(
@@ -325,14 +210,7 @@ impl SessionStoreProvider for TenantSessionStores {
     }
 
     fn destination_key(&self) -> Option<String> {
-        Some(format!(
-            "{}://{}",
-            self.backend
-                .read()
-                .unwrap_or_else(PoisonError::into_inner)
-                .driver(),
-            self.id
-        ))
+        Some(format!("openhuman-storage://{}", self.id))
     }
 }
 

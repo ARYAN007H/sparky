@@ -287,7 +287,9 @@ pub fn all_tools_with_runtime_and_pack_handle(
     if crate::inference::tokenjuice::enabled(root_config) {
         tools.push(Box::new(retrieve_tool_output_tool()));
         tools.push(Box::new(
-            crate::inference::tokenjuice::TokenjuiceRetrieveTool::new(),
+            tinyjuice_host::retrieve_tool::RetrieveToolOutputTool::new(Arc::new(|token, range| {
+                Box::pin(async move { crate::inference::tokenjuice::retrieve(token, range).await })
+            })),
         ));
     } else {
         tracing::debug!("[tools::ops] juice component off; recovery tools not registered");
@@ -504,8 +506,29 @@ pub fn all_tools_with_runtime_and_pack_handle(
     // Image metadata is always available for user-provided images.
     tools.push(Box::new(ImageInfoTool::new(security.clone())));
 
-    // Keep hosted tools using the former post-delegate slot in their stable
-    // catalogue position after image metadata and before Composio.
+    // Add delegation tool when agents are configured
+    if !agents.is_empty() {
+        let delegate_agents: HashMap<String, DelegateAgentConfig> = agents
+            .iter()
+            .map(|(name, cfg)| (name.clone(), cfg.clone()))
+            .collect();
+        tools.push(Box::new(DelegateTool::new_with_options(
+            delegate_agents,
+            security.clone(),
+            crate::tools::delegate::ProviderRuntimeOptions {
+                auth_profile_override: None,
+                openhuman_dir: root_config
+                    .config_path
+                    .parent()
+                    .map(std::path::PathBuf::from),
+                secrets_encrypt: root_config.secrets.encrypt,
+                reasoning_enabled: root_config.runtime.reasoning_enabled,
+            },
+        )));
+    }
+
+    // Sources placed after the delegation tool (a host's place and market-data
+    // tools), ahead of the Composio tools.
     tools.extend(crate::tools::sources::build_registered_tool_sources(
         &source_ctx,
         Some(crate::tools::sources::ANCHOR_AFTER_DELEGATE),

@@ -60,14 +60,9 @@ impl Interface for MockTinyBox {
                 spawn_backends: vec!["docker".to_owned()],
             })
             .map_err(tinybus::Error::from),
-            ANALYZE_COMMAND => serde_json::to_value(contract::CommandAnalysis {
-                segments: Vec::new(),
-                hidden_execution: false,
+            ANALYZE_SHELL => serde_json::to_value(contract::ShellAnalysis {
+                segments: vec!["printf 'hello'".to_owned()],
                 redirection: false,
-                expansion: false,
-                tee: false,
-                background: false,
-                literal_words: vec!["printf".to_owned(), "hello".to_owned()],
             })
             .map_err(tinybus::Error::from),
             DOCKER_STATUS => serde_json::to_value(contract::DockerStatus { available: true })
@@ -154,20 +149,21 @@ fn host_and_module_contract_versions_must_cover_the_full_host_surface() {
 }
 
 #[tokio::test]
-async fn command_facts_use_contract_member_and_positional_arguments() {
+async fn command_facts_use_shell_contract_and_host_policy_facts() {
     let (_service, client, calls) = mock_client().await;
     let command = "printf 'hello'".to_owned();
-    let facts: contract::CommandAnalysis =
-        call_with_client(&client, ANALYZE_COMMAND, (command.clone(),), false)
+    let raw: contract::ShellAnalysis =
+        call_with_client(&client, ANALYZE_SHELL, (command.clone(),), false)
             .await
-            .expect("typed command facts");
+            .expect("typed shell facts");
+    let facts = crate::security::policy::CommandAnalysis::from_shell_analysis(raw);
 
     assert_eq!(facts.literal_words, ["printf", "hello"]);
     assert_eq!(
         calls.lock().expect("call log lock").as_slice(),
         [
             (CAPABILITIES.to_owned(), json!([])),
-            (ANALYZE_COMMAND.to_owned(), json!([command]))
+            (ANALYZE_SHELL.to_owned(), json!([command]))
         ]
     );
 }
@@ -456,7 +452,6 @@ fn every_host_operation_is_a_member_of_the_canonical_contract() {
         FORWARD,
         CLOSE_FORWARD,
         JAIL_STATUS,
-        ANALYZE_COMMAND,
         BEGIN_FILE_READ,
         READ_FILE_CHUNK,
         FINISH_FILE_READ,
@@ -496,7 +491,6 @@ fn every_member_the_host_calls_is_named_in_the_pinned_contract() {
         FORWARD,
         CLOSE_FORWARD,
         JAIL_STATUS,
-        ANALYZE_COMMAND,
         BEGIN_FILE_READ,
         READ_FILE_CHUNK,
         FINISH_FILE_READ,

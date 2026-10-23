@@ -449,7 +449,7 @@ impl ApprovalGate {
             }
         }
 
-        let request_id = tinystoragedrivers::Key::ulid().as_str().to_owned();
+        let request_id = crate::storage::schema_support::fresh_key();
         let now = chrono::Utc::now();
         // Routes key on the tenant (profile and agent), so two SaaS profiles'
         // default agents, which carry no agent id, never share one.
@@ -621,7 +621,9 @@ impl ApprovalGate {
             Err(resolution) => {
                 return (
                     GateOutcome::Deny {
-                        reason: format!("{POLICY_DENIED_MARKER} Agent approval registration closed: {resolution}"),
+                        reason: format!(
+                            "{POLICY_DENIED_MARKER} Agent approval registration closed: {resolution}"
+                        ),
                     },
                     None,
                 );
@@ -633,7 +635,9 @@ impl ApprovalGate {
                 tracing::error!(error = %err, tool = tool_name, "[approval::gate] failed to persist pending row — failing closed");
                 return (
                     GateOutcome::Deny {
-                        reason: format!("{POLICY_DENIED_MARKER} Approval gate could not persist the request — denying for safety: {err}"),
+                        reason: format!(
+                            "{POLICY_DENIED_MARKER} Approval gate could not persist the request — denying for safety: {err}"
+                        ),
                     },
                     None,
                 );
@@ -735,7 +739,6 @@ pub(crate) fn saas_outcome_with(
         ctx, tool_name,
     )))
 }
-
 /// Maps a SaaS gate verdict to a [`GateOutcome`].
 pub(crate) fn saas_outcome(verdict: Result<(), String>) -> GateOutcome {
     match verdict {

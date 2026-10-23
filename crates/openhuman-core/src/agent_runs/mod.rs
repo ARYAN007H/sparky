@@ -1,11 +1,29 @@
 //! Product-facing RPC surfaces for agent runs, workflows, replay, and tools.
 
+pub mod agent_chat;
+pub(crate) mod agent_teams;
+pub(crate) mod command_center;
 pub(crate) mod context_breakdown;
 pub(crate) mod replay;
 mod schemas;
 pub(crate) mod subagent_control;
 mod subagent_finalize;
 
+pub(crate) use agent_chat::all_inference_agent_chat_registered_controllers;
+pub(crate) use agent_teams::{
+    all_agent_team_controller_schemas, all_agent_team_registered_controllers,
+};
+/// The canonical RPC method name for `inference.agent_chat`.
+///
+/// The controller's `namespace` + `function` combine into the wire method
+/// `openhuman.inference_agent_chat` ([`rpc_method_name`](crate::core::ControllerSchema)).
+/// Host facades (the embed library) reference this constant rather than
+/// spelling the string out, so a rename upstream cannot silently drift an
+/// embedder's dispatch string away from the registered controller.
+pub const INFERENCE_AGENT_CHAT: &str = "openhuman.inference_agent_chat";
+pub(crate) use command_center::{
+    all_command_center_controller_schemas, all_command_center_registered_controllers,
+};
 pub(crate) use schemas::all_registered_controllers as all_agent_registered_controllers;
 pub(crate) use subagent_control::{
     all_controller_schemas as all_subagent_control_controller_schemas,

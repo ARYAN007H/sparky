@@ -49,6 +49,10 @@ mod runtime_session;
 pub(crate) mod stop_policy;
 mod types;
 
+#[cfg(test)]
+#[path = "test_support.rs"]
+pub(crate) mod test_support;
+
 pub use codec::OpenHumanTranscriptCodec;
 pub type OpenHumanSessionHooks =
     tinyagents_runtime::FnSessionHooks<crate::agent::tinyagents::host::OpenHumanRunContext>;

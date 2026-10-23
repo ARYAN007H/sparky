@@ -18,6 +18,7 @@ langfuse = ["openhuman-core/langfuse", "tinyagents-harness/langfuse"]
 # `channels` is in core's default set already; enabling it here too compiles
 # the `Runtime::channels` facade in a default build.
 default = ["openhuman-core/default", "channels", "modules"]
+testkit = ["tinyagents-session/testkit"]
 http-server = ["openhuman-core/http-server"]
 inference = ["openhuman-core/inference"]
 documents = ["openhuman-core/documents"]
@@ -32,6 +33,9 @@ storage-sqlite = ["openhuman-core/storage-sqlite"]
 storage-mongodb = ["openhuman-core/storage-mongodb"]
 storage-s3 = ["openhuman-core/storage-s3"]
 storage-file = ["openhuman-core/storage-file"]
+storage-rabbitmq = ["openhuman-core/storage-rabbitmq"]
+secret-file = ["openhuman-core/secret-file"]
+legacy-import = ["openhuman-core/legacy-import"]
 media = ["openhuman-core/media"]
 flows = ["openhuman-core/flows"]
 skills = ["openhuman-core/skills"]
@@ -78,7 +82,7 @@ tinymcp-bus = { path = "../../vendor/tinymcp/crates/tinymcp-bus" }
 # conversations in its own database, and the in-memory provider; same path as
 # the core's so one copy resolves.
 tinyagents-hooks = { workspace = true }
-tinyagents-harness-tools = { workspace = true, default-features = false, features = ["todos", "exec"] }
+tinyagents-harness-tools = { workspace = true, default-features = false, features = ["todos"] }
 tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", default-features = false }
 tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session" }

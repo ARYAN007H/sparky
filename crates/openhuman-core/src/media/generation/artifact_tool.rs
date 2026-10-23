@@ -8,11 +8,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
-use serde_json::Value;
-use tinyagents_harness_tools::media::{
-    ArtifactFiling, FiledArtifact, GeneratedArtifact, MediaArtifactKind, MediaInnerFactory,
-    MediaProgressFn,
-};
+use futures_util::StreamExt;
+use serde_json::{json, Value};
 use tinytools::{
     PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolPolicy, ToolResult, ToolRunContext,
     ToolScope, ToolTimeout,
@@ -21,6 +18,10 @@ use tokio::io::AsyncWriteExt;
 
 use crate::artifacts::production::Production;
 use crate::artifacts::ArtifactKind;
+use crate::security::approval::ApprovalChatContext;
+use crate::tools::host_extensions::tool_call_id;
+use tinyagents_harness::tinyinference_video::ProgressFn;
+use tinystoragedrivers_api::BlobStore;
 
 /// A host adapter that retains OpenHuman artifact behavior while delegating
 /// generic media result handling to TinyAgents' harness-tools crate.
@@ -37,7 +38,7 @@ struct MediaArtifactPolicy {
     kind: ArtifactKind,
     workspace_dir: PathBuf,
     files_dir: crate::artifacts::FileRoots,
-    blobs: Option<Arc<dyn tinystoragedrivers::BlobStore>>,
+    blobs: Option<Arc<dyn BlobStore>>,
     allowed_references: Option<super::tools::MediaReferenceAllowlist>,
 }
 
@@ -82,11 +83,8 @@ impl<T: Tool + 'static> MediaArtifactTool<T> {
     /// Reads generated outputs addressed by blob key from the media tool's
     /// backing store.
     #[must_use]
-    pub fn with_blobs(self, blobs: Arc<dyn tinystoragedrivers::BlobStore>) -> Self {
-        self.policy
-            .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .blobs = Some(blobs);
+    pub fn with_blobs(mut self, blobs: Arc<dyn BlobStore>) -> Self {
+        self.blobs = Some(blobs);
         self
     }
 
@@ -153,6 +151,95 @@ impl<T: Tool + 'static> MediaArtifactTool<T> {
             allowed_references,
         }
     }
+
+    async fn file_blob(&self, key: &Path, dest: &Path) -> Result<u64, String> {
+        let key = key
+            .to_str()
+            .ok_or_else(|| "generated media blob key is not valid UTF-8".to_string())?;
+        let blobs = self.blobs.as_ref().ok_or_else(|| {
+            format!("generated media returned blob key {key:?} without a blob store")
+        })?;
+        let mut blob = blobs
+            .get_stream(key)
+            .await
+            .map_err(|error| format!("failed to read generated media blob {key:?}: {error}"))?
+            .ok_or_else(|| format!("generated media blob {key:?} was not found"))?;
+        copy_blob_to_file(&mut blob.reader, dest, key).await
+    }
+}
+
+async fn copy_blob_to_file(
+    reader: &mut tinyagents_storage_kit::blob::BlobReader,
+    dest: &Path,
+    key: &str,
+) -> Result<u64, String> {
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(dest)
+        .await
+        .map_err(|error| {
+            format!(
+                "failed to open artifact destination {}: {error}",
+                dest.display()
+            )
+        })?;
+    let mut size = 0_u64;
+    while let Some(chunk) = reader.next().await {
+        let chunk = match chunk {
+            Ok(chunk) => chunk,
+            Err(error) => {
+                drop(file);
+                let _ = tokio::fs::remove_file(dest).await;
+                return Err(format!(
+                    "failed to copy generated media blob {key:?}: {error}"
+                ));
+            }
+        };
+        if let Err(error) = file.write_all(&chunk).await {
+            drop(file);
+            let _ = tokio::fs::remove_file(dest).await;
+            return Err(format!(
+                "failed to write generated media blob {key:?}: {error}"
+            ));
+        }
+        size = size.saturating_add(chunk.len() as u64);
+    }
+    if let Err(error) = file.flush().await {
+        drop(file);
+        let _ = tokio::fs::remove_file(dest).await;
+        return Err(format!(
+            "failed to flush artifact destination {}: {error}",
+            dest.display()
+        ));
+    }
+    Ok(size)
+}
+
+fn set_artifact_error(entry: &mut Value, message: &str) {
+    if let Some(obj) = entry.as_object_mut() {
+        obj.insert("artifact_error".into(), json!(message));
+    }
+}
+
+/// Moves `src` to `dest`, falling back to copy + remove across filesystem
+/// boundaries (`rename` fails with `EXDEV` when the files folder and the
+/// media output dir are on different mounts). Returns the final file size.
+async fn move_or_copy(src: &Path, dest: &Path) -> Result<u64, String> {
+    if tokio::fs::rename(src, dest).await.is_err() {
+        tokio::fs::copy(src, dest).await.map_err(|e| {
+            format!(
+                "failed to copy {} -> {}: {e}",
+                src.display(),
+                dest.display()
+            )
+        })?;
+        let _ = tokio::fs::remove_file(src).await;
+    }
+    let stat = tokio::fs::metadata(dest)
+        .await
+        .map_err(|e| format!("failed to stat {}: {e}", dest.display()))?;
+    Ok(stat.len())
 }
 
 #[async_trait]

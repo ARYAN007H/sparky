@@ -284,8 +284,8 @@ impl OpenHumanSessionHost {
         let context_mw = TurnContextMiddleware {
             tool_result_budget_bytes,
             payload_summarizer: self.payload_summarizer.clone().filter(|_| juice_on),
-            // Rooted outside the project; see `tool_result_artifacts` (#6408, #6483).
-            artifact_store: Some(artifact_store),
+            // Rooted outside the project; see `artifact_wiring` (#6408, #6483).
+            artifact_store,
             tokenjuice_compaction_enabled: tokenjuice_compaction_enabled && juice_on,
             tokenjuice_compression: self.tokenjuice_compression,
             runtime_config: self.runtime_config.clone(),
@@ -619,6 +619,10 @@ pub(super) mod tool_surface;
 #[cfg(test)]
 #[path = "runtime_session_juice_tests.rs"]
 mod juice_tests;
+
+#[cfg(test)]
+#[path = "runtime_session_goal_tests.rs"]
+mod goal_tests;
 
 mod parent_snapshot;
 #[path = "../../integrations/prelude_integrations.rs"]

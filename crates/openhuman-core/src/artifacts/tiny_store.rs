@@ -502,52 +502,20 @@ pub(super) fn build_artifacts_service_with_scope(
     publisher: Option<&super::ArtifactPublisherBinder>,
 ) -> (Artifacts, Option<Arc<dyn FileStore>>) {
     let roots = file_roots(workspace_dir, &files, action_dir);
-    let file_store = scoped
-        .as_ref()
-        .map(|scoped| Arc::new(tiny_artifacts::BlobFileStore::new(scoped)) as Arc<dyn FileStore>);
-    let mut records: Arc<dyn ArtifactStore> = match scoped.as_ref() {
-        Some(scoped) => Arc::new(super::version_documents::DocumentArtifactStore::over(
-            workspace_dir,
-            scoped,
-        )),
-        None => Arc::new(UnavailableArtifactStore),
-    };
-    if let Some(store) = file_store.as_ref() {
-        records = Arc::new(LegacyFileImportStore {
-            records,
-            files: store.clone(),
-            roots: guarded_roots(roots.clone()),
-        });
-    }
-    let mut artifacts = Artifacts::new(records)
-        .with_observer(Arc::new(LegacyUiBridge::new(
-            workspace_dir,
-            files,
-            guarded_roots(roots.clone()),
-            file_store.clone(),
-            chat,
-            ctx,
-        )))
-        .with_file_roots(guarded_roots(roots))
-        .with_version_files(version_files_dir(workspace_dir));
-    if let Some(file_store) = file_store.as_ref() {
-        if let Some(publisher) = publisher {
-            artifacts = artifacts.with_publisher(publisher(file_store.clone()));
+    let service = Artifacts::new(Arc::new(versioned_store(workspace_dir)))
+        .with_observer(Arc::new(LegacyUiBridge::new(workspace_dir, files, chat)))
+        .with_file_roots(guarded_roots(roots));
+    match crate::storage::local::open("artifacts::files", workspace_dir)
+        .and_then(|opened| opened.scoped())
+    {
+        Ok(scoped) => {
+            service.with_file_store(Arc::new(tiny_artifacts::BlobFileStore::new(&scoped)))
         }
-        artifacts = artifacts.with_file_store(file_store.clone());
+        Err(error) => {
+            log::warn!("[artifacts] file storage unavailable: {error:#}");
+            service
+        }
     }
-    (artifacts, file_store)
-}
-
-pub(crate) fn artifacts_service_with_file_store(
-    workspace_dir: &Path,
-    files: FileRoots,
-    action_dir: Option<&Path>,
-    chat: Option<&ApprovalChatContext>,
-    ctx: &crate::core::runtime::DispatchCtx,
-) -> (Artifacts, Option<Arc<dyn FileStore>>) {
-    let scoped = crate::storage::sessions::artifact_scoped_for_in(workspace_dir, ctx);
-    build_artifacts_service_with_scope(workspace_dir, files, action_dir, chat, ctx, scoped, None)
 }
 
 /// Where each file version keeps its own copy:
