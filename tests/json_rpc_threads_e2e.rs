@@ -856,7 +856,9 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
             "usage": {"input": 350, "output": 80, "cached_input": 40, "cost_usd": 0.0009},
             "ts": "2026-04-11T14:35:22Z"}),
     );
-    let root_stem = "thr-e2e.orchestrator";
+    let root_stem = tinyagents_session::transcript::session_stem(
+        &tinyagents_session::transcript::SessionRef::scoped("thr-e2e", "orchestrator"),
+    );
     std::fs::write(raw.join(format!("{root_stem}.jsonl")), jsonl)
         .expect("write transcript");
 
