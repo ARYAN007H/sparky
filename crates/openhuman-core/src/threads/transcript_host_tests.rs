@@ -321,6 +321,23 @@ fn calls_recorded_after_their_results_project_as_settled() {
         .transcripts;
     crate::storage::import::sessions::import_transcript_groups(provider.as_ref(), dir.path())
         .unwrap();
+    let listed = locator.thread_transcripts(thread, None).expect("imported roots");
+    eprintln!("roots: {}", listed.roots.len());
+    for root in &listed.roots {
+        let display = root.transcript.read_display().unwrap().unwrap();
+        for record in &display.records {
+            if let tinyagents_session::transcript::DisplayRecord::Message(message) = record {
+                eprintln!(
+                    "record role={} request={:?} iteration={:?} calls={:?} content={:?}",
+                    message.message.role,
+                    message.request_id,
+                    message.iteration,
+                    message.turn_usage.as_ref().map(|usage| &usage.tool_calls),
+                    message.message.content
+                );
+            }
+        }
+    }
     let items = project_thread_in(locator.as_ref(), thread, None, None)
         .expect("transcript")
         .items;
