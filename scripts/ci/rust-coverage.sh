@@ -371,7 +371,7 @@ if [ "${OH_COV_RUNNER:-cargo}" != "nextest" ]; then
   suite "openhuman-embed" llvm_cov_embed --no-report --no-fail-fast -p openhuman-embed --all-targets
 fi
 suite "openhuman-rpc" llvm_cov_package --no-report --no-fail-fast -p openhuman-rpc --all-targets \
-  --features storage-sqlite
+  --features storage-sqlite,secret-file
 if [ "${OH_COV_RUNNER:-cargo}" != "nextest" ]; then
   suite "openhuman-tinyhumans" llvm_cov_product_facade --no-report --no-fail-fast -p openhuman-tinyhumans --all-targets
 fi

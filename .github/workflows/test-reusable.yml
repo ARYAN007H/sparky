@@ -105,6 +105,13 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git submodule update --init vendor/tinychannels
+      # The i18n scanner and frontend RPC drift guard read schemas and source
+      # from TinyInference and TinyAgents during tests. Initialize only those
+      # nested inputs rather than checking out every nested vendor dependency.
+      - name: Init TinyAgents inference sources (frontend test scanners read them)
+        run: |
+          git submodule update --init vendor/tinyagents
+          git -C vendor/tinyagents submodule update --init vendor/tinyinference
       - name: Cache pnpm store
         uses: actions/cache@v6
         with:
