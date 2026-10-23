@@ -707,24 +707,10 @@
     "occurrence": 1
   },
   {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/skills/runtime/run_machinery.rs",
-    "line": 162,
-    "text": "tokio::spawn(async move {",
-    "occurrence": 1
-  },
-  {
     "rule": "ambient-config",
     "path": "crates/openhuman-core/src/skills/runtime/run_machinery.rs",
     "line": 168,
     "text": "let mut config = match Config::load_or_init().await {",
-    "occurrence": 1
-  },
-  {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/skills/runtime/run_machinery.rs",
-    "line": 222,
-    "text": "let bridge = tokio::spawn(run_log::drain_to_log(rx, log_path.clone()));",
     "occurrence": 1
   },
   {
