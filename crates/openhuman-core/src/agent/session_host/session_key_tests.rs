@@ -113,6 +113,7 @@ fn transcript_text(locator: &Arc<dyn TranscriptLocator>, stem: &str) -> String {
 
 async fn overlapping_unthreaded_runs() {
     let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    crate::agent::session_host::test_support::install_model_fixture();
     let root = tempfile::tempdir().expect("tempdir");
     let locator = memory_locator();
     let new_host = |replies: Vec<String>| {
