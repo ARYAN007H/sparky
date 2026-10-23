@@ -7,10 +7,14 @@
 
 #![cfg(feature = "mcp")]
 
+#[path = "support/env_guard.rs"]
+mod env_guard;
+
 use openhuman_core::config::{schema::ModuleOverride, Config};
 use serde_json::{json, Map, Value};
 
 fn fresh_workspace_config() -> (tempfile::TempDir, Config) {
+    env_guard::init_keyring_workspace();
     let tmp = tempfile::tempdir().expect("tempdir");
     let artifact = openhuman_core::modules::local_artifact("tinymcp")
         .expect("build tinymcp with scripts/modules/build.mjs and set OPENHUMAN_MODULE_SOURCE_DIR");
