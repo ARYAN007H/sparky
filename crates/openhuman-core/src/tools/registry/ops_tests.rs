@@ -358,7 +358,6 @@ fn capability_provider(
 #[tokio::test]
 async fn the_write_audit_probe_reads_the_store_the_writer_wrote_to() {
     let workspace = tempfile::tempdir().expect("tempdir");
-    crate::storage::local::use_persistent_default_for_test(workspace.path());
     let config = Config {
         workspace_dir: workspace.path().to_path_buf(),
         ..Config::default()
