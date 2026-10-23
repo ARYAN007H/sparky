@@ -10,6 +10,7 @@ async fn call_tool_records_write_argument_rejection() {
     let config = config_rpc::load_config_with_timeout()
         .await
         .expect("config");
+    crate::modules::boot::load_declared_modules(&config).await;
 
     let err = call_tool(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -81,6 +82,10 @@ async fn call_tool_validates_memory_arguments_before_dispatch() {
     unsafe {
         std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path());
     }
+    let config = config_rpc::load_config_with_timeout()
+        .await
+        .expect("config");
+    crate::modules::boot::load_declared_modules(&config).await;
     let err = call_tool(
         &crate::core::runtime::DispatchCtx::ambient(),
         "memory.forget",
@@ -125,6 +130,7 @@ async fn call_tool_judges_the_policy_of_the_explicit_context_across_scopes() {
     allowing.action_dir = tmp_allow.path().to_path_buf();
     let deny_core = CoreContext::for_test_with_config(DomainSet::full(), denying);
     let allow_core = CoreContext::for_test_with_config(DomainSet::full(), allowing);
+    crate::modules::boot::load_declared_modules(allow_core.config()).await;
 
     let args = json!({ "agent_id": "no-such-agent", "prompt": "hello" });
     // Each call runs scoped to the *other* context, so an ambient read would
