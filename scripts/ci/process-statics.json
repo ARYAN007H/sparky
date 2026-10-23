@@ -650,6 +650,16 @@
     "verification": "core/observability_reporting.rs: was_recently_reported"
   },
   {
+    "file": "crates/openhuman-core/src/storage/mod.rs",
+    "scope": "",
+    "name": "RUNTIME",
+    "type": "OnceLock<Result<tokio::runtime::Runtime,String>>",
+    "count": 1,
+    "category": "A",
+    "reason": "The dedicated two-thread tokio runtime that storage drivers connect on, so their background tasks never share threads with callers parked on the blocking bridge. It is built once per process, holds no tenant, profile or per-agent state, and carries no data beyond the drivers' connection tasks.",
+    "verification": "storage/mod_tests.rs: bridged_calls_do_not_starve_a_capped_host_runtime; storage/mod_tests.rs: open_connects_on_the_storage_runtime"
+  },
+  {
     "file": "crates/openhuman-core/src/web_chat/ops/test_hooks.rs",
     "scope": "",
     "name": "TEST_PARK_AFTER_RUN",
