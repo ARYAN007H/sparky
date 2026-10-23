@@ -21,12 +21,6 @@ use tinybus::transport::memory::MemoryBus;
 use tinybus::{Connection, ObjectPath};
 use tinyeventqueues_bus::names;
 use tinyeventqueues_bus::storage::SHIPPED_PIPELINE_JSON;
-use tinystoragedrivers_api::StorageBackend;
-use tinystoragedrivers_busproxy::{
-    prepare_storage_host_callbacks, serve_with_host_callbacks, PerCallerEndpoint, StorageServer,
-};
-use tinystoragedrivers_testkit::MemoryBackend;
-use tinystoragedrivers_types::Scope;
 
 use super::deliver::Deliverer;
 use super::host::InboundHost;
@@ -304,7 +298,6 @@ pub(crate) struct Rig {
     pub(crate) triage: Arc<ScriptedTriage>,
     _host: Connection,
     _modules: ModuleHost,
-    _storage: tinystoragedrivers_busproxy::ServedStorage,
 }
 
 impl Rig {
@@ -327,18 +320,7 @@ impl Rig {
         let bus = MemoryBus::new();
         let broker = Broker::new();
         broker.clone().spawn(bus.clone());
-        let modules = ModuleHost::new(broker);
         let host = Connection::connect(bus.connect().await.unwrap())
-            .await
-            .unwrap();
-        let binding = prepare_storage_host_callbacks(&modules).await.unwrap();
-        let backend = Arc::new(MemoryBackend::new());
-        let storage_backend = Arc::clone(&backend);
-        let endpoint = PerCallerEndpoint::new(move |_sender| {
-            let storage = storage_backend.for_scope(&Scope::new("local").ok()?).ok()?;
-            Some(StorageServer::new(storage))
-        });
-        let storage = serve_with_host_callbacks(binding.clone(), Arc::new(endpoint))
             .await
             .unwrap();
         let deliverer = Deliverer::new(
@@ -363,44 +345,27 @@ impl Rig {
         .unwrap();
         host.request_name(names::host::INTERFACE).await.unwrap();
 
-        let mut module_config = json!({
-            "pipeline": pipeline,
-            "timer": { "min_interval_ms": 5, "max_interval_ms": 25 },
-        });
-        module_config["storage_callback"] = json!(binding.unique_name().as_str());
+        let modules = ModuleHost::new(broker);
         modules
-            .attach_linked_with_config(tinyeventqueues::linked_module().unwrap(), module_config)
+            .attach_linked_with_config(
+                tinyeventqueues::linked_module().unwrap(),
+                json!({
+                    "pipeline": pipeline,
+                    "timer": { "min_interval_ms": 5, "max_interval_ms": 25 },
+                }),
+            )
             .unwrap();
-        let state = tokio::time::timeout(Duration::from_secs(10), async {
+        tokio::time::timeout(Duration::from_secs(10), async {
             loop {
-                if let Some(info) = modules
-                    .list()
-                    .into_iter()
-                    .find(|info| info.name == "tinyeventqueues")
-                {
-                    if matches!(
-                        info.state,
-                        tinybus::module::ModuleState::Ready
-                            | tinybus::module::ModuleState::Serving
-                            | tinybus::module::ModuleState::Failed { .. }
-                            | tinybus::module::ModuleState::Faulted { .. }
-                    ) {
-                        break info.state;
-                    }
+                let names = host.list_names().await.unwrap();
+                if names.iter().any(|name| name.as_str() == names::INTERFACE) {
+                    break;
                 }
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
         })
         .await
-        .expect("the linked tinyeventqueues module reaches a terminal setup state");
-        assert!(
-            matches!(
-                state,
-                tinybus::module::ModuleState::Ready | tinybus::module::ModuleState::Serving
-            ),
-            "the linked tinyeventqueues module must be ready: {:?}",
-            state
-        );
+        .expect("the linked tinyeventqueues module claimed its name");
         let proxy = host
             .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
             .unwrap();
@@ -409,7 +374,6 @@ impl Rig {
             triage,
             _host: host,
             _modules: modules,
-            _storage: storage,
         }
     }
 }

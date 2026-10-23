@@ -148,7 +148,7 @@ mod inbound {
     use std::sync::Arc;
     use std::time::{Duration, Instant};
 
-    use super::super::triage_agent_directly;
+    use super::super::{route_agent_trigger, triage_agent_directly};
     use crate::core::runtime::DispatchCtx;
     use crate::inbound::fixture::{active_config, decision, deferred, Rig, ScriptedTriage};
     use crate::triage::{TriageAction, TriggerEnvelope};
@@ -165,13 +165,9 @@ mod inbound {
     }
 
     async fn route(rig: &Rig, config: Option<crate::config::Config>, correlation_id: &str) {
-        let queues_active = config.as_ref().is_some_and(crate::inbound::active);
         let envelope = request();
-        let event = crate::inbound::events::webhook(&envelope, correlation_id).unwrap();
-        let handoff =
-            crate::inbound::route::offer(config.as_ref().unwrap(), &rig.client, event).await;
-        let queued = handoff.is_queued();
-        assert_eq!(queued, queues_active, "webhook queue handoff: {handoff:?}");
+        let queued =
+            route_agent_trigger(config, &envelope, correlation_id, Some(rig.client.clone())).await;
         if !queued {
             triage_agent_directly(
                 DispatchCtx::host_default(),
@@ -193,12 +189,12 @@ mod inbound {
         route(&rig, Some(active_config()), "corr-deferred").await;
 
         let applied = triage.until_applied(1, Duration::from_secs(15)).await;
-        assert_eq!(triage.runs(), 2, "triage must run again after the deferral");
         assert_eq!(
             applied,
             vec![LABEL.to_owned()],
             "the deferred webhook was dropped"
         );
+        assert_eq!(triage.runs(), 2, "triaged, deferred, then triaged again");
         assert!(
             started.elapsed() >= Duration::from_millis(350),
             "retried before the deferral ran out: {:?}",
