@@ -908,9 +908,8 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
         .await
         .expect("load test config");
     assert_eq!(config.workspace_dir, workspace);
-    openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
-        &config.workspace_dir,
-    );
+    openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
+        .expect("initialize built-in agent definitions");
     let backend = openhuman_core::storage::local::backend_for(&config.workspace_dir)
         .expect("open test workspace storage");
     let reports = openhuman_core::storage::import::sessions::run_with(&backend, &config);
