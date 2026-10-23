@@ -5,7 +5,6 @@ async fn edit_workflow_rejects_a_result_that_is_structurally_invalid() {
     use tinyflows_bus::catalog::DraftOrigin;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
     let draft = ops::flows_draft_create(
         &config,
         None,
@@ -349,6 +348,7 @@ async fn edit_workflow_surfaces_draft_write_back_failure() {
 
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
+    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
 
     let draft = ops::flows_draft_create(
         &config,
