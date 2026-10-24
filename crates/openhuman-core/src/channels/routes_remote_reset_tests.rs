@@ -101,8 +101,6 @@ fn tenant_runtime(
         config_path: workspace.join("config.toml"),
         ..Default::default()
     };
-    crate::security::credentials::api_key::store_api_key(&config, "test-session-fixture-key")
-        .expect("store reset test credential");
     config.cloud_providers = vec![crate::config::schema::CloudProviderCreds {
         id: "p_openai_reset_test".into(),
         slug: "openai".into(),
@@ -114,6 +112,12 @@ fn tenant_runtime(
     let core = CoreContext::for_test(DomainSet::none(), Some(workspace.clone())).derive_with(
         ContextOverlay::new(config.clone(), DomainSet::full(), Default::default()).profile(profile),
     );
+    // Store a standing credential in the tenant's own scope so a storage-backed
+    // secret store records it where the host agent later reads it.
+    CoreContext::sync_scope(Arc::clone(&core), || {
+        crate::security::credentials::api_key::store_api_key(&config, "test-session-fixture-key")
+    })
+    .expect("store reset test credential");
     let mut runtime = runtime_context(workspace);
     runtime.config = Some(Arc::new(config));
     runtime.core = Some(Arc::downgrade(&core));
