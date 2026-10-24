@@ -1199,6 +1199,7 @@ async fn run_managed_capture_turn(
     // workspace path; release them before the next repetition removes it.
     openhuman_core::storage::sessions::release_workspace(&workspace_dir);
     openhuman_core::storage::clear();
+    for e in walkdir::WalkDir::new(&workspace_dir).max_depth(6) { let e = e.unwrap(); eprintln!("DBGW {}", e.path().display()); }
     with_captured_proxy_requests(|requests| requests.clone())
 }
 
