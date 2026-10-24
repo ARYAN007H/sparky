@@ -33,7 +33,8 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         },
     );
 
-    let subscriber = ChannelTurnStateSubscriber::with_objects(workspace.clone(), linked.module_objects());
+    let subscriber =
+        ChannelTurnStateSubscriber::with_objects(workspace.clone(), linked.module_objects());
     let event_core = ctx
         .core
         .as_ref()

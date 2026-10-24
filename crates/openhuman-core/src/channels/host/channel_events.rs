@@ -239,7 +239,11 @@ impl ChannelTurnStateSubscriber {
                     {
                         crate::channels::module_fixture::client()
                             .await
-                            .call_confidential("tinychannels", tinychannels_bus::methods::EXECUTE_REMOTE, args)
+                            .call_confidential(
+                                "tinychannels",
+                                tinychannels_bus::methods::EXECUTE_REMOTE,
+                                args,
+                            )
                             .await
                     }
                     #[cfg(not(test))]
