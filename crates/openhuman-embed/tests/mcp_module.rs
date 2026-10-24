@@ -87,7 +87,7 @@ fn scenario() {
         let storage_dir = tempfile::tempdir().expect("SQLite storage directory");
         let storage_url = openhuman_core::storage::config::default_url(storage_dir.path());
         let runtime = Runtime::builder()
-            .config(config)
+            .config(config.clone())
             .workspace(Workspace::Ephemeral)
             .storage(storage_url)
             .backend_url(backend.uri())
@@ -103,6 +103,9 @@ fn scenario() {
             .build()
             .await
             .expect("runtime builds");
+        if let Err(error) = openhuman_core::modules::ensure_loaded(&config, "tinymcp").await {
+            eprintln!("TinyMCP module load failed: {error}");
+        }
         let agent = runtime
             .agent(
                 AgentSpec::new("mcp-client")
