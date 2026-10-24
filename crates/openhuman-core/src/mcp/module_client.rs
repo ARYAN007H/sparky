@@ -395,6 +395,9 @@ impl McpConfiguredClient {
                         return Err(ModuleCallError::Unavailable);
                     }
                     let reply = self.port.open_configured(&self.data_dir, &config).await;
+                    if let Err(error) = &reply {
+                        tracing::debug!(?error, "[mcp] OpenConfigured returned an error");
+                    }
                     state.open_replied(reply.clone().map_err(|_| ()));
                     reply?;
                 }
