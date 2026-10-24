@@ -496,7 +496,9 @@ impl ProfileHost {
         };
         // Retire the fence before the lease goes back, as `release_all` does.
         self.fences.retire(id.as_str(), grant.epoch);
-        self.leases.release(grant).await.map_err(|error| {
+        let released = self.leases.release(grant).await;
+        profile_lease::release_profile_stores(self, id);
+        released.map_err(|error| {
             log::warn!("[profiles] releasing profile={id} failed: {error}");
             format!("releasing profile {id}: {error}")
         })?;
@@ -579,6 +581,7 @@ impl ProfileHost {
             ))),
         )
         .await;
+        profile_lease::release_profile_stores(self, id);
         log::info!("[profiles] fenced profile={id}: stopped {stopped} thread(s)");
     }
 
