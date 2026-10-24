@@ -23,7 +23,6 @@ http-server = ["openhuman-embed/http-server"]
 inference = ["openhuman-embed/inference"]
 documents = ["openhuman-embed/documents"]
 hosting = ["openhuman-embed/hosting"]
-tinymemes = ["openhuman-embed/tinymemes"]
 inbound-queues = ["openhuman-embed/inbound-queues"]
 modules = ["openhuman-embed/modules"]
 voice = ["openhuman-embed/voice", "dep:tinyagents-live"]
@@ -117,8 +116,8 @@ url = "2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "native-tls"] }
 
 [dev-dependencies]
-# Runtime tests use the in-memory session store supplied by embed's testkit.
-openhuman-embed = { path = "../openhuman-embed", default-features = false, features = ["testkit"] }
+# Library-runtime tests use the embed facade's in-memory session provider.
+openhuman-embed = { path = "../openhuman-embed", features = ["testkit", "storage-sqlite"] }
 # The core's own axum feature set: axum's defaults would switch on extra axum,
 # tower and tracing features and force a separate core build (see below).
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "query", "ws", "macros"] }

@@ -491,7 +491,6 @@
       "storage-mongodb": false,
       "storage-s3": false,
       "storage-sqlite": false,
-      "tinymemes": true,
       "voice": false,
       "web3": false
     },
@@ -523,7 +522,6 @@
       "skills": "withheld",
       "storage": "withheld",
       "system": "withheld",
-      "tasks": "withheld",
       "web3": "withheld",
       "workflows": "withheld"
     },

@@ -1,6 +1,6 @@
 //! `SessionHostBuilder::build` — validates and assembles the final [`OpenHumanSessionHost`].
 
-use super::{dedup_visible_tool_specs, visible_tool_specs_for_policy};
+use super::visible_tool_specs_for_policy;
 use crate::agent::session_host::types::{OpenHumanSessionHost, SessionHostBuilder};
 use anyhow::Result;
 use std::sync::Arc;
@@ -32,7 +32,7 @@ impl SessionHostBuilder {
             pack_registry_handle = Some(crate::tools::toolpacks::append_pack_tools(&mut tools));
         }
         // Advertise only the spawnable ids on the wire: see
-        // `SpawnAsyncSubagentTool::scoped` for why the spec-view narrowing
+        // `SpawnSubagentTool::scoped` for why the spec-view narrowing
         // alone did not reach a native-tool-calling provider.
         let spawn_scope_id = self
             .session_definition
@@ -44,15 +44,15 @@ impl SessionHostBuilder {
             if !allowed.is_empty() {
                 if let Some(slot) = tools
                     .iter_mut()
-                    .find(|tool| tool.name() == "spawn_async_subagent")
+                    .find(|tool| tool.name() == "spawn_subagent")
                 {
                     tracing::debug!(
                         agent = %agent_id,
                         ids = allowed.len(),
-                        "[tools] scoping spawn_async_subagent schema to the subagent allowlist"
+                        "[tools] scoping spawn_subagent schema to the subagent allowlist"
                     );
                     *slot = Box::new(
-                        crate::agent::orchestration::tools::SpawnAsyncSubagentTool::scoped(allowed),
+                        crate::agent::orchestration::tools::SpawnSubagentTool::scoped(allowed),
                     );
                 }
             }
@@ -292,7 +292,7 @@ impl SessionHostBuilder {
         // accept duplicates, which hid this bug until #1710's per-role
         // routing started sending the same tool list to Anthropic.
         let visible_tool_specs: Vec<Arc<ToolSpec>> =
-            dedup_visible_tool_specs(visible_tool_specs_unfiltered);
+            tinyagents_runtime::dedup_visible_tool_specs(visible_tool_specs_unfiltered);
 
         let visible_names_list: Vec<&str> =
             visible_tool_specs.iter().map(|s| s.name.as_str()).collect();
@@ -460,6 +460,7 @@ impl SessionHostBuilder {
             task_recency_window: None,
             autonomous_iter_cap: None,
             host_env: crate::agent::turn_env::HostTurnEnv::default(),
+            settle_headless_descendants: false,
             thread_id: None,
             agent_definition_name: agent_definition_name.clone(),
             // Canonical registry id — captured here at build time

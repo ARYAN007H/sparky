@@ -8,7 +8,6 @@ use openhuman_embed::__host::channel_callback::ChannelCallbackCtx;
 use openhuman_embed::__host::security::credentials::session_support::{
     get_session_token, is_local_session_token, BackendCredential,
 };
-use reqwest::Method;
 use serde_json::{json, Map, Value};
 use tinychannels_bus::module_progressive::{
     ProgressiveTransportRequest, ProgressiveTransportResult,
@@ -243,22 +242,10 @@ async fn send(
                 receipt,
                 None,
             );
-            if context.is_empty() {
-                client
-                    .send_channel_delete(&channel, &message_id, credential.clone())
-                    .await
-            } else {
-                let channel = urlencoding::encode(channel.trim().trim_matches('/'));
-                let message_id = urlencoding::encode(&message_id);
-                client
-                    .authed_json(
-                        credential.clone(),
-                        Method::DELETE,
-                        &format!("channels/{channel}/messages/{message_id}"),
-                        Some(json!({"transportContext": context})),
-                    )
-                    .await
-            }
+            let body = (!context.is_empty()).then(|| json!({"transportContext": context}));
+            client
+                .send_channel_delete(&channel, &message_id, credential.clone(), body)
+                .await
         }
         ProgressiveTransportRequest::Typing {
             channel,
@@ -268,21 +255,14 @@ async fn send(
         } => {
             let context =
                 transport_context(turn_id, channel_ref, conversation, None, None, None, None);
-            if context.is_empty() {
-                client
-                    .send_channel_typing(&channel, credential.clone())
-                    .await
+            let body = if context.is_empty() {
+                json!({})
             } else {
-                let channel = urlencoding::encode(channel.trim().trim_matches('/'));
-                client
-                    .authed_json(
-                        credential.clone(),
-                        Method::POST,
-                        &format!("channels/{channel}/typing"),
-                        Some(json!({"transportContext": context})),
-                    )
-                    .await
-            }
+                json!({"transportContext": context})
+            };
+            client
+                .send_channel_typing(&channel, credential.clone(), body)
+                .await
         }
     };
     match result {

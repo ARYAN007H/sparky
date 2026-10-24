@@ -43,12 +43,10 @@ pub use routing::{provider_for_role, role_bypasses_managed_credits};
 pub(crate) use routing::{workload_router, ConfigRouteSource};
 
 // Factory-internal helpers shared across the implementation modules.
-use access_gates::{emit_inference_egress, enforce_local_only_inference};
+use access_gates::enforce_local_only_inference;
 #[cfg(test)]
 use cloud_slug::try_create_cloud_slug_chat_model;
-pub(crate) use managed_backend::{
-    make_openhuman_backend_model_for_options, make_openhuman_backend_model_for_thread_in,
-};
+pub(crate) use managed_backend::make_openhuman_backend_model_for_thread_in;
 use tinyinference_providers::route::split_model_and_temperature;
 
 /// Test-only seam: inject a mock [`ChatModel`] so e2e tests can drive the

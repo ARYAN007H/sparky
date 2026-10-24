@@ -64,11 +64,11 @@ async fn steer_prefers_registered_tinyagents_handle() {
     assert_eq!(commands.len(), 1);
     match &commands[0] {
         SteeringCommand::InjectMessage(message) => {
+            // TinyAgents frames a parent's steer to a running subagent as coming
+            // from the parent agent, with the text escaped inside a tagged block.
             assert_eq!(
                 message.text(),
-                r#"[Steering message from the parent agent, not the user]: <parent_agent_message>
-"refocus"
-</parent_agent_message>"#
+                "[Steering message from the parent agent, not the user]: <parent_agent_message>\n\"refocus\"\n</parent_agent_message>"
             );
         }
         other => panic!("expected injected steering message, got {other:?}"),

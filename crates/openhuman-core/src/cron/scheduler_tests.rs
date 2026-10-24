@@ -118,6 +118,8 @@ mod dispatch_tests;
 mod frequency_tests;
 #[path = "scheduler_halt_and_persist_tests.rs"]
 mod halt_and_persist_tests;
+#[path = "scheduler_headless_descendants_tests.rs"]
+mod headless_descendants_tests;
 #[path = "scheduler_host_agent_tests.rs"]
 mod host_agent_tests;
 #[path = "scheduler_transcript_isolation_tests.rs"]

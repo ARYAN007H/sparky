@@ -106,7 +106,6 @@ pub fn build_runtime_tools_with_security(
         &config.browser,
         &config.http_request,
         &config.action_dir,
-        &config.agents,
         config,
         None,
     );

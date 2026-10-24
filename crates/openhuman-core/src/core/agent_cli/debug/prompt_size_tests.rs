@@ -80,23 +80,29 @@ fn session_report_measures_the_visible_belt_not_the_registry() {
     crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .unwrap();
     let tmp = tempfile::TempDir::new().unwrap();
-    let mut config = crate::config::Config {
+    let config = crate::config::Config {
         workspace_dir: tmp.path().join("workspace"),
         action_dir: tmp.path().join("workspace"),
         config_path: tmp.path().join("config.toml"),
         ..crate::config::Config::default()
     };
-    config.default_model = Some("test/session-fixture".to_string());
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
-    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
-    let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
+    let mut definition =
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
+            .get("orchestrator")
+            .expect("built-in orchestrator")
+            .clone();
+    definition.id = "prompt_size_probe".to_string();
+    definition.tools = tinyagents_definition::ToolScope::Named(vec!["file_read".to_string()]);
+    let agent = crate::agent::OpenHumanSessionHost::from_config_with_definition(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
-        "critic",
+        &definition,
     )
-    .expect("critic session build");
+    .expect("test-owned prompt-size session build");
 
-    let dumped = crate::core::agent_cli::debug::session_dump(&agent, "critic", String::new());
+    let dumped =
+        crate::core::agent_cli::debug::session_dump(&agent, "prompt_size_probe", String::new());
     let report = PromptSizeReport::from_dump(&dumped);
 
     let mut visible: Vec<String> = agent
@@ -113,7 +119,7 @@ fn session_report_measures_the_visible_belt_not_the_registry() {
     );
     assert!(
         report.tool_count < dumped.tool_names.len(),
-        "critic's belt ({}) must be narrower than its registry ({}), or this test \
+        "the test-owned named belt ({}) must be narrower than its registry ({}), or this test \
          cannot tell the two apart",
         report.tool_count,
         dumped.tool_names.len()

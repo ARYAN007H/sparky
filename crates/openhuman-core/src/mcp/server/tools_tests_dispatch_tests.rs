@@ -10,17 +10,15 @@ async fn call_tool_records_write_argument_rejection() {
     let config = config_rpc::load_config_with_timeout()
         .await
         .expect("config");
-    crate::mcp::test_module_port::install(&config);
-    let ctx = crate::core::runtime::DispatchCtx::new(
-        crate::core::runtime::CoreContext::for_test_with_config(
-            crate::core::runtime::DomainSet::full(),
-            config.clone(),
-        ),
-    );
 
-    let err = call_tool(&ctx, "memory.learn", json!({ "kind": "fact" }), "mcp:test")
-        .await
-        .expect_err("missing text should reject");
+    let err = call_tool(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "memory.learn",
+        json!({ "kind": "fact" }),
+        "mcp:test",
+    )
+    .await
+    .expect_err("missing text should reject");
     assert!(
         err.message().contains("missing required argument `text`"),
         "got: {}",
@@ -83,22 +81,17 @@ async fn call_tool_validates_memory_arguments_before_dispatch() {
     unsafe {
         std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path());
     }
-    let config = config_rpc::load_config_with_timeout()
-        .await
-        .expect("config");
-    crate::mcp::test_module_port::install(&config);
-    let ctx = crate::core::runtime::DispatchCtx::new(
-        crate::core::runtime::CoreContext::for_test_with_config(
-            crate::core::runtime::DomainSet::full(),
-            config.clone(),
-        ),
-    );
-    let err = call_tool(&ctx, "memory.forget", json!({ "ids": [] }), "mcp:test")
-        .await
-        .expect_err("empty ids rejected before any RPC");
+    let err = call_tool(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "memory.forget",
+        json!({ "ids": [] }),
+        "mcp:test",
+    )
+    .await
+    .expect_err("empty ids rejected before any RPC");
     assert!(err.message().contains("`ids`"), "got: {}", err.message());
     let err = call_tool(
-        &ctx,
+        &crate::core::runtime::DispatchCtx::ambient(),
         "memory.recall",
         json!({ "question": "q", "filter": { "x": 1 } }),
         "mcp:test",
@@ -112,6 +105,7 @@ async fn call_tool_validates_memory_arguments_before_dispatch() {
 }
 
 /// The policy a tool call is judged by comes from the context handed to
+/// `call_tool`, not from whichever context the task happens to be scoped to,
 /// and two sessions running side by side never see each other's.
 #[tokio::test]
 async fn call_tool_judges_the_policy_of_the_explicit_context_across_scopes() {
@@ -129,8 +123,13 @@ async fn call_tool_judges_the_policy_of_the_explicit_context_across_scopes() {
     let mut allowing = crate::config::Config::default();
     allowing.workspace_dir = tmp_allow.path().to_path_buf();
     allowing.action_dir = tmp_allow.path().to_path_buf();
-    crate::mcp::test_module_port::install(&denying);
-    crate::mcp::test_module_port::install(&allowing);
+    // Validating tool arguments calls the tinymcp module, which reaches the
+    // host's installed storage.
+    let storage = crate::storage::test_support::sqlite_backend().expect("SQLite test backend");
+    let _storage_guard =
+        crate::storage::test_support::install_for_test(&storage.url, Arc::clone(&storage.backend));
+    denying.storage.url = Some(storage.url.clone());
+    allowing.storage.url = Some(storage.url.clone());
     let deny_core = CoreContext::for_test_with_config(DomainSet::full(), denying);
     let allow_core = CoreContext::for_test_with_config(DomainSet::full(), allowing);
 

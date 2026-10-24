@@ -260,6 +260,36 @@ impl TurnModelSource {
         (self.crate_native.as_ref()).map_or_else(DispatchCtx::ambient, CrateNativeSource::ctx)
     }
 
+    /// Whether the selected primary accepts native tool calls, without building
+    /// models or publishing the per-turn egress disclosures that model
+    /// construction owns. Session assembly needs this before the actual turn
+    /// is built; using `build` here would create a second per-turn ledger.
+    pub(crate) fn supports_native_tool_calling(&self) -> bool {
+        if let Some(source) = &self.crate_native {
+            if let Some(custom) = source
+                .ctx()
+                .host_overrides()
+                .and_then(|local| local.model_for(&source.role))
+            {
+                return custom.profile().cloned().unwrap_or_default().tool_calling;
+            }
+        }
+        if let Some(direct) = &self.direct_model {
+            return direct.profile().cloned().unwrap_or_default().tool_calling;
+        }
+        if let Some(source) = &self.crate_native {
+            let provider_string = source
+                .primary_override
+                .as_deref()
+                .map(str::to_owned)
+                .unwrap_or_else(|| {
+                    crate::inference::provider::provider_for_role(&source.role, &source.config)
+                });
+            return !tinyinference_local::profile::is_local_provider_string(&provider_string);
+        }
+        false
+    }
+
     /// Use an already-constructed TinyAgents model as the complete turn model
     /// source. Intended for deterministic tests and embedding callers that do
     /// not need role/config-based route construction.

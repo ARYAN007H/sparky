@@ -59,6 +59,7 @@ fn save_upserts_sessions_and_keeps_the_others() {
     assert_eq!(loaded[0].parent_session, "parent");
     assert_eq!(loaded[0].current_task_id.as_deref(), Some("sub-legacy"));
     assert_eq!(loaded[0].lifecycle_key, None);
+    assert_eq!(loaded[0].parent_epoch, None);
     // A save from a stale snapshot never removes a session it does not know.
     docs.save(&[session("c")]).unwrap();
     let ids: Vec<_> = docs
@@ -233,7 +234,9 @@ fn a_durable_session_keeps_its_scoped_lifecycle_key_after_document_reopen() {
         task_id: "task".into(),
     };
     saved.lifecycle_key = Some(key.clone());
+    saved.parent_epoch = Some(7);
     docs_in(storage.as_ref(), "local").save(&[saved]).unwrap();
     let loaded = docs_in(storage.as_ref(), "local").load().unwrap();
     assert_eq!(loaded[0].lifecycle_key, Some(key));
+    assert_eq!(loaded[0].parent_epoch, Some(7));
 }

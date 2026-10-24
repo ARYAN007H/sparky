@@ -46,8 +46,12 @@ fn test_bundled_record() -> &'static crate::modules::types::ModuleRecord {
     }))
 }
 
+/// The record pins the empty-input digest, so the staged empty archive passes
+/// the digest check and fails to unpack. Digest rejection itself is tinybus's
+/// to test; this pins only that the host reports it and never falls back to
+/// the user cache.
 #[tokio::test]
-async fn invalid_installer_bundle_is_reported_without_falling_back_to_the_cache() {
+async fn an_unreadable_installer_bundle_is_reported_without_falling_back_to_the_cache() {
     let record = test_bundled_record();
     let bundled = tempfile::tempdir().unwrap();
     let user_cache = tempfile::tempdir().unwrap();

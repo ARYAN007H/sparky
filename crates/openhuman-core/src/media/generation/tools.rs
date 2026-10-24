@@ -16,6 +16,7 @@ use serde_json::{json, Value};
 use tinyagents_harness::media::{GenerateImageTool, GenerateVideoTool, MediaOutput};
 use tinyagents_harness::tinyinference_image::ImageGenerator;
 use tinyagents_harness::tinyinference_video::{VideoGenerator, WaitPolicy};
+use tinyagents_harness_tools::media::MediaJobProgress;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolResult};
 
 use super::artifact_tool::MediaArtifactTool;
@@ -136,8 +137,10 @@ fn media_tools_from_with_allowlist(
             .with_per_call_inner({
                 let generators = Arc::clone(&generators);
                 let output = output.clone();
-                move |_observer, chat| {
-                    let routed = generators.routed(chat);
+                move |_observer, context| {
+                    let approval =
+                        crate::agent::tinyagents::host::run_context::approval_for_tool(context);
+                    let routed = generators.routed(approval.chat.as_ref());
                     GenerateImageTool::new(routed.image, output.clone())
                         .with_name(IMAGE_TOOL_NAME)
                         .with_description(IMAGE_DESCRIPTION)
@@ -158,8 +161,22 @@ fn media_tools_from_with_allowlist(
             .with_per_call_inner({
                 let generators = Arc::clone(&generators);
                 let output = output.clone();
-                move |observer, chat| {
-                    let routed = generators.routed(chat);
+                move |progress, context| {
+                    let approval =
+                        crate::agent::tinyagents::host::run_context::approval_for_tool(context);
+                    let routed = generators.routed(approval.chat.as_ref());
+                    let observer = Arc::new(
+                        move |status: &tinyagents_harness::tinyinference_video::VideoJobStatus| {
+                            progress(&MediaJobProgress {
+                                id: status.id.clone(),
+                                state: status.state.to_string(),
+                                outputs: status.outputs,
+                                output_indices: status.output_indices.clone(),
+                                cost_usd: status.cost_usd,
+                                error: status.error.clone(),
+                            });
+                        },
+                    );
                     video_tool(
                         &routed.video,
                         &output,

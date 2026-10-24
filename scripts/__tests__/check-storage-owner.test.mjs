@@ -390,17 +390,17 @@ describe('a composition root', () => {
 describe('ENGINE_EXCEPTIONS', () => {
   test('excuse exactly their edge, wherever the walk starts, and record the match', () => {
     const used = new Set();
-    assert.deepEqual(checkMetadata(chain('tinyagents-harness', 'tinytools-std', 'fs2'), ROOT, used), []);
-    assert.deepEqual([...used], ['tinytools-std -> fs2']);
+    assert.deepEqual(checkMetadata(chain('tinyagents-harness', 'tinyagents-harness-tools', 'fs2'), ROOT, used), []);
+    assert.deepEqual([...used], ['tinyagents-harness-tools -> fs2']);
   });
 
   test('do not hide another edge into the same engine', () => {
-    // tinyflows -> tinytools-std -> fs2 (excepted) and tinyflows -> lockutil -> fs2 (not).
+    // tinyflows -> tinyagents-harness-tools -> fs2 (excepted) and tinyflows -> lockutil -> fs2 (not).
     const reg = name => `${name} 1.0.0 ${REGISTRY}`;
     const fixture = {
       packages: [
         pathPkg('tinyflows', '1.0.0', `${ROOT}/vendor/tinyflows/Cargo.toml`),
-        pathPkg('tinytools-std', '1.0.0', `${ROOT}/vendor/tinytools-std/Cargo.toml`),
+        pathPkg('tinyagents-harness-tools', '1.0.0', `${ROOT}/vendor/tinyagents-harness-tools/Cargo.toml`),
         regPkg('lockutil', '1.0.0', '/fake/.cargo/registry/src/x/lockutil-1.0.0/Cargo.toml'),
         regPkg('fs2', '1.0.0', '/fake/.cargo/registry/src/x/fs2-1.0.0/Cargo.toml'),
       ],
@@ -409,11 +409,11 @@ describe('ENGINE_EXCEPTIONS', () => {
           {
             id: 'tinyflows 1.0.0',
             deps: [
-              { name: 'tinytools-std', pkg: 'tinytools-std 1.0.0', dep_kinds: NORMAL },
+              { name: 'tinyagents-harness-tools', pkg: 'tinyagents-harness-tools 1.0.0', dep_kinds: NORMAL },
               { name: 'lockutil', pkg: reg('lockutil'), dep_kinds: NORMAL },
             ],
           },
-          { id: 'tinytools-std 1.0.0', deps: [{ name: 'fs2', pkg: reg('fs2'), dep_kinds: NORMAL }] },
+          { id: 'tinyagents-harness-tools 1.0.0', deps: [{ name: 'fs2', pkg: reg('fs2'), dep_kinds: NORMAL }] },
           { id: reg('lockutil'), deps: [{ name: 'fs2', pkg: reg('fs2'), dep_kinds: NORMAL }] },
           { id: reg('fs2'), deps: [] },
         ],
@@ -427,7 +427,7 @@ describe('ENGINE_EXCEPTIONS', () => {
   });
 
   test('do not excuse another engine or another package', () => {
-    assert.equal(checkMetadata(chain('tinytools-std', 'rusqlite'), ROOT)[0]?.engine, 'rusqlite');
+    assert.equal(checkMetadata(chain('tinyagents-harness-tools', 'rusqlite'), ROOT)[0]?.engine, 'rusqlite');
     assert.equal(checkMetadata(chain('tinytools-core', 'fs2'), ROOT)[0]?.engine, 'fs2');
   });
 

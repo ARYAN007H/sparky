@@ -155,9 +155,9 @@ async fn tts_output_path_allows_workspace_and_local_ai_models_roots() {
     config.action_dir = tmp.path().join("action");
     std::fs::create_dir_all(&config.action_dir).unwrap();
     let runtime = crate::inference::local_runtime_config(&config);
-    let model_root = tinyinference_local::service::paths::config_root_dir(&runtime)
-        .join("models")
-        .join("local-ai");
+    // `enabled_config` anchors `config_path` inside this fixture, so the host
+    // resolves its local-AI models under the fixture root.
+    let model_root = tmp.path().join("models").join("local-ai");
 
     for output in [
         config.workspace_dir.join("speech.wav"),

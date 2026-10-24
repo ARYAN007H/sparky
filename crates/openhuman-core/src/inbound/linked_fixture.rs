@@ -1,8 +1,8 @@
-//! The staged `tinyeventqueues` artifact on a private bus, with the host
-//! callbacks served by a scripted triage runner.
+//! The `tinyeventqueues` module linked into the test binary on a private bus,
+//! with the host callbacks served by a scripted triage runner.
 //!
-//! Each [`Rig`] is its own broker and module host: the verified release module
-//! is loaded with fast timers and a per-module storage callback, the host's
+//! Each [`Rig`] is its own broker and module host: the real module (its
+//! `static-link` build) is attached with fast timers, the host's
 //! `ai.tinyhumans.tinyeventqueues.Host` is served by an [`InboundHost`] whose
 //! [`Deliverer`] triages with a [`ScriptedTriage`], and [`Rig::client`] is a
 //! module client bound to the module's object, as `route::offer` takes it.
@@ -21,6 +21,9 @@ use tinybus::transport::memory::MemoryBus;
 use tinybus::{Connection, ObjectPath};
 use tinyeventqueues_bus::names;
 use tinyeventqueues_bus::storage::SHIPPED_PIPELINE_JSON;
+use tinystoragedrivers_api::StorageBackend;
+use tinystoragedrivers_busproxy::{PerCallerEndpoint, ServedStorage, StorageServer};
+use tinystoragedrivers_testkit::MemoryBackend;
 
 use super::deliver::Deliverer;
 use super::host::InboundHost;
@@ -297,10 +300,8 @@ pub(crate) struct Rig {
     /// The triage the host callbacks run.
     pub(crate) triage: Arc<ScriptedTriage>,
     _host: Connection,
+    _storage: ServedStorage,
     _modules: ModuleHost,
-    _storage: crate::storage::test_support::InstalledBackendGuard,
-    _callback_binding: Arc<tinybus::module::HostCallbackBinding>,
-    _callback_storage: tinystoragedrivers_busproxy::ServedStorage,
 }
 
 impl Rig {
@@ -326,9 +327,6 @@ impl Rig {
         let host = Connection::connect(bus.connect().await.unwrap())
             .await
             .unwrap();
-        let storage = crate::storage::test_support::install_backend_for_test(
-            crate::storage::test_support::memory_backend(),
-        );
         let deliverer = Deliverer::new(
             triage.clone() as Arc<dyn TriageRunner>,
             DispatchCtx::host_default(),
@@ -350,37 +348,30 @@ impl Rig {
         .await
         .unwrap();
         host.request_name(names::host::INTERFACE).await.unwrap();
+        // The module keeps its queues in host storage and refuses to set up
+        // without it, so the rig serves the Storage service from memory.
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = tinystoragedrivers_busproxy::serve(
+            &host,
+            Arc::new(PerCallerEndpoint::new(move |_caller| {
+                let storage = backend.for_scope(&crate::storage::Scope::local()).ok()?;
+                Some(StorageServer::new(storage))
+            })),
+        )
+        .await
+        .unwrap();
 
         let modules = ModuleHost::new(broker);
-        crate::modules::storage_host::install(&host, &modules)
-            .await
-            .unwrap();
-        let artifact = crate::modules::ops::local_artifact_for_test("tinyeventqueues")
-            .expect("the staged tinyeventqueues artifact is required for callback tests");
-        let (binding, callback_storage) =
-            crate::modules::storage_host::prepare_callbacks(&host, &modules)
-                .await
-                .unwrap();
-        let config = json!({
-            "pipeline": pipeline,
-            "timer": { "min_interval_ms": 5, "max_interval_ms": 25 },
-            "storage_callback": binding.unique_name().as_str(),
-        });
-        if std::env::var_os("OPENHUMAN_TEST_MODULE_TRACE").is_some() {
-            let _ = tracing_subscriber::fmt()
-                .with_max_level(tracing::Level::TRACE)
-                .with_test_writer()
-                .try_init();
-        }
         modules
-            .load_file_with_host_callbacks(&artifact, config, &binding)
-            .await
-            .unwrap_or_else(|error| {
-                panic!(
-                    "event queue module failed to load: {error:?}; modules: {:#?}",
-                    modules.list()
-                )
-            });
+            .attach_linked_with_config(
+                tinyeventqueues::linked_module().unwrap(),
+                json!({
+                    "storage_callback": tinystoragedrivers_bus::STORAGE_INTERFACE,
+                    "pipeline": pipeline,
+                    "timer": { "min_interval_ms": 5, "max_interval_ms": 25 },
+                }),
+            )
+            .unwrap();
         tokio::time::timeout(Duration::from_secs(10), async {
             loop {
                 let names = host.list_names().await.unwrap();
@@ -399,10 +390,8 @@ impl Rig {
             client: crate::modules::ops::fixture_client(proxy),
             triage,
             _host: host,
-            _modules: modules,
             _storage: storage,
-            _callback_binding: binding,
-            _callback_storage: callback_storage,
+            _modules: modules,
         }
     }
 }

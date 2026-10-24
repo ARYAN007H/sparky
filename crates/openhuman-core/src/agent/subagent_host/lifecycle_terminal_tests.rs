@@ -51,6 +51,7 @@ async fn driver_cancel_uses_the_typed_terminal_for_lossy_idle_sessions() {
                 worker_thread_id: None,
                 task_id: task_id.into(),
                 lifecycle_key: Some(key.clone()),
+                parent_epoch: None,
             },
             None,
         )

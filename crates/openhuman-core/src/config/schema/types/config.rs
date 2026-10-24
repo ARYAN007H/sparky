@@ -282,6 +282,7 @@ pub struct Config {
     /// session-memory extraction cadence. Consumed by
     /// the agent context middleware configuration.
     #[serde(default)]
+    #[schemars(with = "super::super::context::ContextConfigSchema")]
     pub context: ContextConfig,
 
     #[serde(default)]
@@ -375,9 +376,6 @@ pub struct Config {
     /// custom agents and persisted enable/disable/tool-policy overrides.
     #[serde(default)]
     pub agent_registry: crate::agent_registry::types::AgentRegistryConfig,
-
-    #[serde(default)]
-    pub agents: HashMap<String, DelegateAgentConfig>,
 
     #[serde(default)]
     pub local_ai: LocalAiConfig,
@@ -474,10 +472,6 @@ pub struct Config {
     /// TokenJuice content-router / compaction configuration.
     #[serde(default)]
     pub tokenjuice: TokenjuiceConfig,
-
-    /// TinyMemes remix tuning (`[memes]`); the switch is `[components] memes`.
-    #[serde(default)]
-    pub memes: MemesConfig,
 
     /// Inbound event queues (`[inbound]`); the switch is
     /// `[components] eventqueues`.

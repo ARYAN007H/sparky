@@ -71,6 +71,27 @@ impl ToolPolicyMiddleware {
         tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
         channel: String,
     ) -> Self {
+        Self::build(policy, session, tool_sets, channel, true)
+    }
+
+    /// Builds the agent-configured policy middleware when the hosted security
+    /// gate already enforces the same channel session ceiling.
+    pub(crate) fn new_without_session_ceiling(
+        policy: Arc<dyn ToolCallPolicy<OpenHumanRunContext>>,
+        session: tinytools::ToolPolicySession,
+        tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
+        channel: String,
+    ) -> Self {
+        Self::build(policy, session, tool_sets, channel, false)
+    }
+
+    fn build(
+        policy: Arc<dyn ToolCallPolicy<OpenHumanRunContext>>,
+        session: tinytools::ToolPolicySession,
+        tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
+        channel: String,
+        enforce_session_ceiling: bool,
+    ) -> Self {
         let host = Arc::new(ToolPolicyHostState {
             session,
             tool_sets,
@@ -110,8 +131,11 @@ impl ToolPolicyMiddleware {
             }
         });
         let post_host = host.clone();
-        let gate = ToolPolicyGateMiddleware::new(desktop_policy)
-            .with_session_ceiling(session_ceiling)
+        let mut gate = ToolPolicyGateMiddleware::new(desktop_policy);
+        if enforce_session_ceiling {
+            gate = gate.with_session_ceiling(session_ceiling);
+        }
+        let gate = gate
             .with_denial_renderer(denial)
             .with_post_gate(Arc::new(move |_ctx, call| {
                 post_host.render_skill_for_session(call)
@@ -167,55 +191,31 @@ impl ToolPolicyHostState {
             .find(|t| t.name() == name)
     }
 
-    /// The delegation tools this session can actually call that reach one of
-    /// `owners`, as tool names.
-    ///
-    /// Derived from the session's own tool set — every synthesised `delegate_*`
-    /// tool publishes its target agent on the erased host-extension slot
-    /// (`traits::delegation_target`). That is deliberately the only source: a
-    /// static owner-to-tool table would duplicate each agent's `delegate_name`
-    /// and could name a tool this session was never built with, sending the
-    /// model from one dead end into another. Asking the tool set cannot.
+    /// Return the single spawn route when it can dispatch any owner in this
+    /// pack. The registered schema carries the actual allowed agent ids.
     fn callable_delegates_for(&self, owners: &[&str]) -> Vec<String> {
-        let mut found: Vec<String> = Vec::new();
-        for tool in self.tool_sets.iter().flat_map(|set| set.iter()) {
-            let Some(target) = crate::tools::host_extensions::delegation_target(tool.as_ref())
-            else {
-                continue;
-            };
-            if !owners.contains(&target) {
-                continue;
-            }
-            let name = tool.name().to_string();
-            // Uses `is_denied()`, and that is deliberate — it is the same
-            // predicate as the gate this hint points at.
-            //
-            // Spelled out, because two predicates live in this file and a
-            // sentence that does not name one has been misread three times:
-            //
-            //   * This hint names a tool for the model to call DIRECTLY.
-            //   * The direct-call gate is `channel_permission_block`'s first
-            //     check, `if decision.is_denied()` (this file, top of the fn).
-            //   * `is_denied()` is `!matches!(action, Allow)`, so it is TRUE for
-            //     `HideFromPrompt` — that check is what refuses a prompt-hidden
-            //     tool called by name.
-            //   * Therefore a prompt-hidden delegate is not a route, and
-            //     `is_denied()` here is exactly what keeps it out.
-            //
-            // `blocks_execution()` would be wrong here: it deliberately admits
-            // `HideFromPrompt` for the `use_skill` path below, where hiding is
-            // the disclosure mechanism rather than a refusal. Same tool, two
-            // call paths, two answers. A hint must use the predicate of the gate
-            // it points at — the hint and the gate disagreeing is how this whole
-            // class of bug started.
-            //
-            // Pinned by `a_prompt_hidden_delegate_is_not_offered_as_a_direct_route`.
-            if self.session.decision_for(&name).is_denied() || found.contains(&name) {
-                continue;
-            }
-            found.push(name);
+        let Some(spawn) = self.resolve_tool("spawn_subagent") else {
+            return Vec::new();
+        };
+        if self.session.decision_for("spawn_subagent").is_denied() {
+            return Vec::new();
         }
-        found
+        let parameters = spawn.parameters_schema();
+        let allowed = parameters
+            .pointer("/properties/agent_id/enum")
+            .and_then(serde_json::Value::as_array);
+        let can_reach_owner = allowed
+            .map(|ids| {
+                owners
+                    .iter()
+                    .any(|owner| ids.iter().any(|id| id.as_str() == Some(owner)))
+            })
+            .unwrap_or(true);
+        if can_reach_owner {
+            vec!["spawn_subagent".to_string()]
+        } else {
+            Vec::new()
+        }
     }
 
     /// The answer to a `use_skill` call naming a tool `pack` does not contain:

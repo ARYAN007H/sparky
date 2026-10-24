@@ -14,3 +14,4 @@ pub use session_turn::{
 };
 
 pub(crate) use controllers::all_registered_controllers as all_inference_agent_chat_registered_controllers;
+pub(crate) use session_turn::agent_chat_for_with_turn_model_source;

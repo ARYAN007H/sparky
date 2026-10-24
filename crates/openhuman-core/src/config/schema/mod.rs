@@ -95,7 +95,6 @@ pub use claude_agent_sdk::ClaudeAgentSdkConfig;
 mod inbound;
 mod inbound_sources;
 mod local_ai;
-mod memes;
 pub(crate) mod memory;
 mod modules;
 mod observability;
@@ -112,8 +111,7 @@ mod update;
 mod web_chat_config;
 
 pub use agent::{
-    AgentConfig, DelegateAgentConfig, OrchestratorModelConfig, RequiredOutputContract,
-    TeamModelConfig, ToolSearchConfig,
+    AgentConfig, OrchestratorModelConfig, RequiredOutputContract, TeamModelConfig, ToolSearchConfig,
 };
 pub use autonomy::AutonomyConfig;
 pub use capability_providers::{CapabilityProviderConfig, CapabilityProviderTrustState};
@@ -133,7 +131,6 @@ pub use identity_cost::{
 pub use inbound::{InboundConfig, InboundSourceConfig};
 pub use inbound_debounce::{InboundDebounceConfig, InboundDebounceOverride};
 pub use local_ai::{LocalAiConfig, LocalAiUsage};
-pub use memes::MemesConfig;
 pub use memory::{
     migrate_legacy_source, MemoryAgentConfig, MemoryConfig, MemoryConversationsConfig,
     MemoryEngineSettings, MemoryLayoutMode, MemorySourceConfig, MemorySourceKind, RecallSettings,

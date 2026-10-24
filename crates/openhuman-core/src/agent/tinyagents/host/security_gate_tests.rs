@@ -47,6 +47,7 @@ fn registry() -> Vec<Arc<Vec<Box<dyn Tool>>>> {
     vec![Arc::new(vec![
         tool("read_file", PermissionLevel::ReadOnly, false),
         tool("write_file", PermissionLevel::Write, false),
+        tool("spawn_subagent", PermissionLevel::Execute, false),
         tool(SHELL_TOOL, PermissionLevel::Execute, false),
     ])]
 }
@@ -177,6 +178,75 @@ async fn a_read_only_tool_is_allowed_in_every_tier() {
             .unwrap();
         assert_eq!(decision, GateDecision::Allow, "tier {tier:?}");
     }
+}
+
+async fn cron_decision(gate: OpenHumanSecurityGate, tool_name: &str) -> GateDecision {
+    let core =
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
+    let origin = crate::security::turn_origin::AgentTurnOrigin::TrustedAutomation {
+        job_id: "cron-security-test".into(),
+        source: crate::security::turn_origin::TrustedAutomationSource::Cron,
+    };
+    crate::core::runtime::CoreContext::scope_with_turn_origin(
+        core,
+        Some(origin),
+        gate.authorize_tool(&req(tool_name, json!({}))),
+    )
+    .await
+    .expect("authorization")
+}
+
+#[tokio::test]
+async fn cron_headless_settlement_allows_only_spawn_control() {
+    let ordinary = cron_decision(gate(AutonomyLevel::Full), "spawn_subagent").await;
+    assert!(!ordinary.is_allowed(), "ordinary Cron remains read-only");
+
+    let opted_in = cron_decision(
+        gate(AutonomyLevel::Full).with_headless_descendant_settlement(true),
+        "spawn_subagent",
+    )
+    .await;
+    assert_eq!(opted_in, GateDecision::Allow);
+
+    let read_only = cron_decision(
+        OpenHumanSecurityGate::new(policy(AutonomyLevel::ReadOnly), registry())
+            .with_headless_descendant_settlement(true),
+        "spawn_subagent",
+    )
+    .await;
+    assert!(
+        !read_only.is_allowed(),
+        "headless settlement must not override the agent's autonomy tier"
+    );
+
+    let write = cron_decision(
+        gate(AutonomyLevel::Full).with_headless_descendant_settlement(true),
+        "write_file",
+    )
+    .await;
+    assert!(!write.is_allowed(), "child action tools remain read-only");
+
+    let shell = cron_decision(
+        gate(AutonomyLevel::Full).with_headless_descendant_settlement(true),
+        SHELL_TOOL,
+    )
+    .await;
+    assert!(!shell.is_allowed(), "shell stays denied for opted-in Cron");
+}
+
+#[tokio::test]
+async fn cron_headless_settlement_does_not_allow_effectful_spawn_aliases() {
+    let effectful = Arc::new(vec![tool("spawn_subagent", PermissionLevel::Execute, true)]);
+    let decision = cron_decision(
+        OpenHumanSecurityGate::new(policy(AutonomyLevel::Full), vec![effectful])
+            .with_headless_descendant_settlement(true),
+        "spawn_subagent",
+    )
+    .await;
+    assert!(
+        !decision.is_allowed(),
+        "external-effect classification wins"
+    );
 }
 
 #[tokio::test]
