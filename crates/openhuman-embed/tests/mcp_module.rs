@@ -124,6 +124,7 @@ fn scenario() {
                     .map(str::to_string)
             })
             .collect();
+        eprintln!("TinyMCP methods={methods:?}; tool results={results}");
         assert_eq!(reply.reply, "done");
         assert!(
             methods.iter().any(|m| m == "tools/call"),
