@@ -1315,8 +1315,15 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
 
     let mut batches = Vec::new();
     let mut prior_count = 0;
-    for _ in 0..2 {
-        let home = capture_root.join("state/home");
+    for repetition in 0..2 {
+        // Each repetition boots a profile of its own. One process keeps its
+        // first runtime context, its storage-module host and the sqlite
+        // connection to every workspace it has opened (shared per path, even
+        // after the files are deleted), so wiping and reusing one path would
+        // resume the previous repetition's transcript (5 messages instead of 3)
+        // and could never model a restart. A fresh path under the same
+        // deterministic name is the profile a restarted host would start from.
+        let home = capture_root.join(format!("state/home-{repetition}"));
         if home.exists() {
             std::fs::remove_dir_all(&home).expect("reset only the managed capture profile");
         }
@@ -1861,25 +1868,32 @@ async fn subagent_delegation_happy_path_inner() {
 
 // ─── Task 4: Delegated clarification flow ─────────────────────────────────────
 //
-// `manage_tasks` is task_manager_agent's synthesised delegate (its `agent.toml`
-// `delegate_name`), and `ask_user_clarification` IS in that agent's named tools.
-// So a blocking delegation that needs a detail pauses the *child*, and
-// `dispatch_subagent` hands the parent a `[SUBAGENT_AWAITING_USER]` envelope as
-// the `manage_tasks` tool result (#4291). That envelope is an ordinary tool
-// result to the orchestrator — `manage_tasks` is not in its `early_exit_tools`
-// — so the orchestrator relays the question in its OWN next reply, and turn 1
-// ends on that text.
+// The blocking `manage_tasks` delegate aliases were retired when specialist
+// hand-offs moved onto `spawn_subagent` (da9d535c6d "route specialist hand-offs
+// through spawn_subagent", 4bcc2f6773 "assert retired specialist aliases are
+// unpacked"), so the old flow — a blocking delegate whose pause came back as the
+// `manage_tasks` tool result — no longer exists. The contract now is:
 //
-// Actual LLM request ordering (4 upstream calls total):
-//   request[0] = orchestrator turn 1 → manage_tasks (blocking) tool call
-//   request[1] = task_manager_agent → ask_user_clarification pauses the child
-//   request[2] = orchestrator, with the awaiting-user envelope in context →
-//                relays the question as text; turn 1 ends (chat_done)
-//   request[3] = orchestrator turn 2 with "version 2" user reply in full context →
-//                synthesis; turn 2 ends (chat_done with ANSWER_CANARY_V2)
+//   * `spawn_subagent` is asynchronous: the parent gets a task id back and ends
+//     its turn on an acknowledgement (turn 1);
+//   * a child that calls `ask_user_clarification` pauses (it is checkpointed,
+//     not failed) and the pause is delivered back to the parent's thread as a
+//     host-authored `[SUBAGENT_AWAITING_USER]` envelope, which the orchestrator
+//     relays in its own reply;
+//   * the user's next message resumes the thread with that relay in context.
+//
+// Deterministic request ordering (`serialize_children_after_parent(2)` holds the
+// child's first model call until the parent has answered twice):
+//   request[0] = orchestrator turn 1 → spawn_subagent(task_manager_agent)
+//   request[1] = orchestrator, acknowledges; turn 1 ends (chat_done)
+//   request[2] = task_manager_agent → ask_user_clarification pauses the child
+//   request[3] = orchestrator delivery turn with the awaiting-user envelope →
+//                relays the question as text
+//   request[4] = orchestrator turn 2 ("version 2") → synthesis (chat_done)
 
-/// A delegated request whose specialist needs clarification surfaces its question in turn 1,
-/// then preserves that question in the context used to answer turn 2.
+/// A delegated request whose specialist needs clarification surfaces its question
+/// to the parent, then preserves that question in the context used to answer the
+/// user's reply.
 #[test]
 fn delegated_clarification_flow() {
     run_on_agent_stack(
@@ -1890,29 +1904,38 @@ fn delegated_clarification_flow() {
 
 async fn delegated_clarification_flow_inner() {
     let _lock = env_lock();
+    serialize_children_after_parent(2);
     reset_script(vec![
-        // ── turn 1 ──
-        // request[0]: Orchestrator delegates to task_manager_agent via manage_tasks.
         tool_call_completion(
-            "manage_tasks",
-            json!({ "prompt": "Add my GitHub issues as a task source", "blocking": true }),
+            "spawn_subagent",
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "Add my GitHub issues as a task source"
+            }),
         ),
-        // request[1]: task_manager_agent asks for the missing detail. This pauses
-        //   the child; the question comes back to the orchestrator inside the
-        //   `[SUBAGENT_AWAITING_USER]` envelope as the manage_tasks result.
+        text_completion("Handed that to the task manager."),
         tool_call_completion(
             "ask_user_clarification",
             json!({ "question": "WHICH_VERSION_CANARY?" }),
         ),
-        // request[2]: Orchestrator relays the sub-agent's question to the user,
-        //   as the envelope instructs; turn 1 ends on this text.
         text_completion("The task manager needs one detail: WHICH_VERSION_CANARY?"),
-        // ── turn 2 (user replied "version 2") ──
-        // request[3]: Orchestrator processes user reply with full turn-1 context →
-        //   synthesizes final answer; turn 2 ends here.
         text_completion("Final: ANSWER_CANARY_V2"),
     ]);
     let stack = boot_stack().await;
+    // The delivery turn persists its reply on the thread, so the thread must
+    // exist (the UI creates it before the first message).
+    let created = post_json_rpc(
+        &stack.rpc_base,
+        399,
+        "openhuman.threads_upsert",
+        json!({
+            "id": "thread-clarify",
+            "title": "thread-clarify",
+            "created_at": "2026-01-01T00:00:00Z"
+        }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&created, "upsert clarification test thread");
 
     let mut events = spawn_sse_collector(format!(
         "{}/events?client_id=harness-clarify",
@@ -1920,7 +1943,7 @@ async fn delegated_clarification_flow_inner() {
     ))
     .await;
 
-    // ── turn 1: clarification question must reach the user ──
+    // ── turn 1: the parent acknowledges the hand-off ──
     let request_id = send_web_chat(
         &stack.rpc_base,
         400,
@@ -1936,16 +1959,28 @@ async fn delegated_clarification_flow_inner() {
         Some("chat_done"),
         "turn-1 expected chat_done: {first}"
     );
-    let first_response = first
-        .get("full_response")
-        .and_then(Value::as_str)
-        .unwrap_or_else(|| panic!("turn-1 chat_done missing 'full_response': {first}"));
-    assert!(
-        first_response.contains("WHICH_VERSION_CANARY"),
-        "clarification question not surfaced to user; full_response: {first_response}\nevent: {first}"
-    );
 
-    // ── turn 2: resume with answer → final response must reach the user ──
+    // ── the child's pause reaches the parent, which relays it ──
+    // The delivery turn is host-authored (no web client waits on it), so wait for
+    // the script to drain: the relay is the fourth completion consumed.
+    let deadline = std::time::Instant::now() + Duration::from_secs(120);
+    loop {
+        let consumed_all_but_last = with_scripted(|q| q.len()) <= 1;
+        if consumed_all_but_last || std::time::Instant::now() >= deadline {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let dump = || serde_json::to_string_pretty(&with_captured(|c| c.clone())).unwrap_or_default();
+    assert!(
+        with_scripted(|q| q.len()) <= 1,
+        "the child's clarification was never delivered to the parent; requests: {}",
+        dump()
+    );
+    // Let the relay turn commit to the thread before the user replies.
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    // ── turn 2: the user's answer resumes the thread ──
     let request_id = send_web_chat(
         &stack.rpc_base,
         401,
@@ -1971,88 +2006,52 @@ async fn delegated_clarification_flow_inner() {
     );
 
     let requests = with_captured(|c| c.clone());
-
-    // ── No unknown-tool result in any captured request ──
-    // Proves manage_tasks was recognised by the orchestrator. This is the guard
-    // that let the 3-completion version of this test pass vacuously: with the
-    // delegate unresolved, the engine's lowercase "unknown tool `manage_tasks`"
-    // result never matched the old `"Unknown tool:"` literal, and the
-    // orchestrator consumed the child's clarification completion itself.
     assert!(
         !captured_requests_mention_unknown_tool(&requests),
         "found an unknown-tool result in captured requests — delegation was broken; \
          requests: {}",
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
-
-    // ── Both turns traversed the expected four upstream requests ──
-    // request[0] = orchestrator (manage_tasks call),
-    // request[1] = task_manager_agent (ask_user_clarification pause),
-    // request[2] = orchestrator (relays the question; turn-1 end),
-    // request[3] = orchestrator turn-2 synthesis (turn-2 end).
     assert!(
-        requests.len() >= 4,
-        "expected ≥4 upstream requests (delegation + child clarification + relay + \
-         turn-2 synthesis), got {};\nall requests: {}",
+        requests.len() >= 5,
+        "expected ≥5 upstream requests (spawn, ack, child pause, relay, turn-2), got {};\n\
+         all requests: {}",
         requests.len(),
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
 
-    // ── request[1] went to task_manager_agent, not the orchestrator ──
-    // Proves the blocking delegate really ran (the child's system prompt is
-    // task-manager-specific; both agents share the project-context prefix, so
-    // message 0 alone cannot tell them apart). Without this the flow degrades
-    // to "orchestrator asks the user itself", which never exercises the pause.
-    let child_request = requests.get(1).map(Value::to_string).unwrap_or_default();
+    // request[2] went to task_manager_agent, not the orchestrator: its system
+    // prompt is task-manager-specific. Without this the flow degrades to the
+    // orchestrator asking the user itself, which never exercises the pause.
+    let child_request = requests.get(2).map(Value::to_string).unwrap_or_default();
     assert!(
         child_request.contains("You own the user's task-source feeds and artifacts"),
-        "request[1] did not carry the task_manager_agent prompt — manage_tasks did not \
-         delegate; request: {child_request}"
+        "request[2] did not carry the task_manager_agent prompt — spawn_subagent did not \
+         run the specialist; request: {child_request}"
     );
 
-    // ── request[2] saw the child's pause as a `[SUBAGENT_AWAITING_USER]` envelope ──
-    // Proves `dispatch_subagent` surfaced the pause the #4291 way (structured
-    // envelope carrying the question, as the manage_tasks tool result) rather
-    // than as a plain success the model could read as "answered".
-    let relay_request = requests.get(2).map(Value::to_string).unwrap_or_default();
+    // request[3] saw the pause as a `[SUBAGENT_AWAITING_USER]` envelope carrying
+    // the child's question, not a plain success the model could read as "answered".
+    let relay_request = requests.get(3).map(Value::to_string).unwrap_or_default();
     assert!(
         relay_request.contains("[SUBAGENT_AWAITING_USER]")
             && relay_request.contains("WHICH_VERSION_CANARY"),
-        "request[2] did not carry the awaiting-user envelope with the child's question; \
+        "request[3] did not carry the awaiting-user envelope with the child's question; \
          request: {relay_request}"
     );
 
-    // ── The turn-2 request's messages must contain the clarification question ──
-    // Proves the relayed question was persisted in thread history and appears in
-    // turn-2 context. Scoped to the turn-2 request on purpose: request[2]
-    // trivially contains the canary via the envelope, so an `any()` over every
-    // request would pass without persistence.
-    let turn2_messages_contain_question = requests.iter().skip(3).any(|req| {
-        req.pointer("/body/messages")
-            .and_then(Value::as_array)
-            .map(|msgs| {
-                msgs.iter().any(|m| {
-                    let content = match m.get("content") {
-                        Some(Value::String(s)) => s.as_str().to_string(),
-                        Some(Value::Array(arr)) => arr
-                            .iter()
-                            .filter_map(|part| {
-                                part.get("text").and_then(Value::as_str).map(str::to_string)
-                            })
-                            .collect::<Vec<_>>()
-                            .join(" "),
-                        _ => String::new(),
-                    };
-                    content.contains("WHICH_VERSION_CANARY")
-                })
-            })
-            .unwrap_or(false)
-    });
+    // The turn-2 request must still hold the question: the relay was persisted in
+    // thread history. Scoped to the last request because request[3] carries the
+    // canary through the envelope, so an `any()` over all requests would pass
+    // without persistence.
+    let turn2_contains_question = requests
+        .last()
+        .map(|request| request.to_string().contains("WHICH_VERSION_CANARY"))
+        .unwrap_or(false);
     assert!(
-        turn2_messages_contain_question,
-        "WHICH_VERSION_CANARY not found in the turn-2 request messages — \
-         turn-1 clarification question was not persisted in thread history; \
-         requests: {}",
+        turn2_contains_question,
+        "WHICH_VERSION_CANARY not found in the turn-2 request — the clarification \
+         question was not persisted in thread history; requests: {}",
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
 
