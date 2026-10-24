@@ -623,6 +623,18 @@ pub(super) fn child_tool_policy(
         ) {
             continue;
         }
+        // A denial whose required level fits the channel's ceiling is not the
+        // channel's doing: it is the parent closing a pack it hands off to this
+        // very child (`close_handed_off_packs`), and inheriting it would strip
+        // the specialist of its own belt (`skill_setup` could neither search nor
+        // install). Only a denial above the channel ceiling narrows the child.
+        if decision.action == tinytools::ToolPolicyAction::Deny
+            && decision
+                .required_permission
+                .is_some_and(|required| required <= decision.allowed_permission)
+        {
+            continue;
+        }
         session.decisions.insert(name.clone(), decision.clone());
         session.allowed_tool_names.remove(name);
         session.blocked_tool_names.insert(name.clone());
