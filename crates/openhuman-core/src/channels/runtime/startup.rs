@@ -145,13 +145,10 @@ impl ChannelHandle {
 
     pub(crate) async fn start_typing(&self, recipient: &str) -> anyhow::Result<()> {
         match self {
-            Self::Module(channel) => {
-                channel
-                    .interact(tinychannels_bus::ChannelInteraction::StartTyping {
-                        recipient: recipient.to_owned(),
-                    })
-                    .await
-            }
+            // The module owns typing through the progressive output it opens
+            // for the turn; its adapters have no separate `StartTyping`
+            // interaction, so a host-side call would only fault.
+            Self::Module(_) => Ok(()),
             Self::Relay(_) => Ok(()),
             #[cfg(test)]
             Self::Test(channel) => {
@@ -166,13 +163,10 @@ impl ChannelHandle {
 
     pub(crate) async fn stop_typing(&self, recipient: &str) -> anyhow::Result<()> {
         match self {
-            Self::Module(channel) => {
-                channel
-                    .interact(tinychannels_bus::ChannelInteraction::StopTyping {
-                        recipient: recipient.to_owned(),
-                    })
-                    .await
-            }
+            // The module owns typing through the progressive output it opens
+            // for the turn; its adapters have no separate `StopTyping`
+            // interaction, so a host-side call would only fault.
+            Self::Module(_) => Ok(()),
             Self::Relay(_) => Ok(()),
             #[cfg(test)]
             Self::Test(channel) => {
@@ -191,7 +185,8 @@ impl ChannelHandle {
         interval_secs: u64,
     ) -> anyhow::Result<Option<String>> {
         match self {
-            Self::Module(channel) => channel.begin_typing_refresh(recipient, interval_secs).await,
+            // Typing refresh runs inside the module's progressive worker.
+            Self::Module(_) => Ok(None),
             Self::Relay(_) => Ok(None),
             #[cfg(test)]
             Self::Test(channel) => match &channel.begin_typing_refresh {
@@ -203,7 +198,7 @@ impl ChannelHandle {
 
     pub(crate) async fn end_typing_refresh(&self, handle: &str) -> anyhow::Result<()> {
         match self {
-            Self::Module(channel) => channel.end_typing_refresh(handle).await,
+            Self::Module(_) => Ok(()),
             Self::Relay(_) => Ok(()),
             #[cfg(test)]
             Self::Test(channel) => match &channel.end_typing_refresh {
