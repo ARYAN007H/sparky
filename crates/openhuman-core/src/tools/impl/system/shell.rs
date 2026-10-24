@@ -272,14 +272,12 @@ impl ShellTool {
         // caller's. `None`/`0` ⇒ unbounded (issue #4023).
         let requested_timeout = args.get("timeout_secs").and_then(|v| v.as_u64());
         let come_back = YieldRequest::from_args(&args);
-        // `approved` = the command is Prompt-class (required human approval) and
-        // thus went through the harness ApprovalGate to reach here. Reads and
-        // Full-mode writes run without a prompt, so they audit as approved=false
-        // rather than over-claiming a human approval that never happened. (The
-        // gate's exact yes/no isn't threaded into tools; this is the accurate
-        // "required approval" proxy.) A command left running is audited when it
-        // ends, with its real outcome.
-        let approved = self.external_effect_with_args(&args);
+        // Whether a human approved the call is the harness ApprovalGate's
+        // decision, which the gate records separately; that yes/no is not
+        // threaded into tools, so this row never claims an approval
+        // (`approved=false`). A command left running is audited when it ends,
+        // with its real outcome.
+        let approved = false;
         let audit = audit_once(self.audit.clone(), command.to_owned(), approved);
         let start = Instant::now();
         let (allowed, result) = crate::sandbox::shell_progress::with_shell_progress(
