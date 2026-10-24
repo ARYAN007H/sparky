@@ -81,5 +81,7 @@ fn store_live_session(user_id: &str) -> Config {
 
 #[path = "ops_credential_tests.rs"]
 mod credential_tests;
+#[path = "ops_credential_local_session_tests.rs"]
+mod credential_local_session_tests;
 #[path = "ops_provider_oauth_tests.rs"]
 mod provider_oauth_tests;
