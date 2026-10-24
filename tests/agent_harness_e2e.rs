@@ -57,6 +57,8 @@ const MANAGED_CAPTURE_PROMPT_CLOCK: &str = "2024-01-15T12:00:00Z";
 // ─── Env serialization (same rationale as json_rpc_e2e.rs:61-79) ───────────
 
 static AGENT_HARNESS_E2E_ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+static AGENT_HARNESS_CORE: OnceLock<Arc<openhuman_core::core::runtime::CoreContext>> =
+    OnceLock::new();
 
 /// Initialise the global `AgentDefinitionRegistry` with built-ins exactly once
 /// across all tests in this binary. Guard with OnceLock so repeated `boot_stack`
@@ -856,11 +858,57 @@ async fn boot_stack_with_options(
         extra_config,
     );
 
+    // The in-process router does not boot the host runtime. Give each request
+    // an explicit context anyway: delegated tools open owner-scoped durable
+    // session stores, and a bare transport dispatch has no owner to resolve.
+    let mut config: openhuman_core::config::Config = toml::from_str(
+        &std::fs::read_to_string(openhuman_home.join("config.toml"))
+            .expect("read test config"),
+    )
+    .expect("parse test config");
+    config.workspace_dir = home.join("workspace");
+    config.config_path = openhuman_home.join("config.toml");
+    let base = match AGENT_HARNESS_CORE.get() {
+        Some(core) => Arc::clone(core),
+        None => {
+            let (core, _, _) = openhuman_core::core::runtime::CoreContext::init_with_config(
+                openhuman_core::core::runtime::HostKind::Cli,
+                &openhuman_core::core::runtime::TokenSource::Fixed(Arc::new(
+                    TEST_RPC_TOKEN.to_string(),
+                )),
+                openhuman_core::core::runtime::DomainSet::full(),
+                openhuman_core::tools::toolpacks::ToolGroups::advertised(),
+                Some(config.clone()),
+            )
+            .await
+            .expect("initialize the agent harness test context");
+            let _ = AGENT_HARNESS_CORE.set(Arc::clone(&core));
+            AGENT_HARNESS_CORE
+                .get()
+                .cloned()
+                .unwrap_or(core)
+        }
+    };
+    let request_context = base.derive_with(openhuman_core::core::runtime::ContextOverlay::new(
+        config,
+        openhuman_core::core::runtime::DomainSet::full(),
+        openhuman_core::tools::toolpacks::ToolGroups::advertised(),
+    ));
+
     // The transport-only router does not create a Core runtime context. Install
     // the explicit tinymemory host seams before handlers service memory-backed
     // agent turns, matching normal startup wiring.
 
-    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let app = build_core_http_router(false).layer(axum::middleware::from_fn(
+        move |request, next| {
+            let context = Arc::clone(&request_context);
+            async move {
+                openhuman_core::core::runtime::CoreContext::scope(context, next.run(request))
+                    .await
+            }
+        },
+    ));
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(app).await;
     let rpc_base = format!("http://{rpc_addr}");
     tokio::time::sleep(Duration::from_millis(100)).await;
 
