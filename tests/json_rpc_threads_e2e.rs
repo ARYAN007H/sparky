@@ -1037,7 +1037,13 @@ async fn json_rpc_threads_transcript_get_projects_and_paginates() {
     let _api_url_guard = EnvVarGuard::unset("OPENHUMAN_API_URL");
 
     let thread_id = "thr_transcript_e2e";
-    let root_stem = "1000_orchestrator";
+    // The importer files a transcript by the session key and agent component
+    // its stem carries (`<session>.<agent>`); a bare legacy stem lands in the
+    // default agent, which is not where the thread API looks.
+    let root_stem = tinyagents_session::transcript::session_stem(
+        &tinyagents_session::transcript::SessionRef::scoped(thread_id, "orchestrator"),
+    );
+    let root_stem = root_stem.as_str();
     // A full turn: system scaffolding (dropped), user with injected datetime
     // prefix, assistant tool-calling step (reasoning + tool_calls), tool result,
     // final assistant answer.
