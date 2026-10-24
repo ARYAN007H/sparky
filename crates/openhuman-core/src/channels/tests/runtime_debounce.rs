@@ -282,6 +282,7 @@ async fn disabled_config_runs_one_turn_per_message_in_order() {
     run.finish().await;
 
     assert_eq!(turns.count(), 2);
+    eprintln!("DBGUSERS {:?}", turns.users.lock().unwrap());
     assert!(turns.user(0).ends_with("one"));
     assert!(turns.user(1).ends_with("two"));
 }
