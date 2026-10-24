@@ -1199,7 +1199,7 @@ async fn run_managed_capture_turn(
     // workspace path; release them before the next repetition removes it.
     openhuman_core::storage::sessions::release_workspace(&workspace_dir);
     openhuman_core::storage::clear();
-    let _ = std::process::Command::new("find").arg(&workspace_dir).arg("-maxdepth").arg("6").status();
+    openhuman_core::storage::local::forget(&workspace_dir);
     with_captured_proxy_requests(|requests| requests.clone())
 }
 
