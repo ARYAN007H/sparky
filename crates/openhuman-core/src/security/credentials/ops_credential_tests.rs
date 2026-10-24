@@ -749,6 +749,68 @@ async fn store_session_local_token_succeeds_without_network_and_forces_local_use
     assert_eq!(user["name"], "Local User");
 }
 
+/// Installs a SQLite backend (as the desktop boot does) for one test and
+/// removes it on drop. Hold `lock_storage_slot()` for as long as it lives.
+#[cfg(feature = "storage-sqlite")]
+struct StorageBackendForTest(crate::storage::test_support::SqliteBackend);
+
+#[cfg(feature = "storage-sqlite")]
+impl StorageBackendForTest {
+    fn install() -> Self {
+        let fixture = crate::storage::test_support::sqlite_backend().unwrap();
+        assert!(
+            crate::storage::install(std::sync::Arc::clone(&fixture.backend)).is_none(),
+            "no storage backend may be left installed by another test"
+        );
+        assert!(
+            matches!(crate::storage::secrets::current(), Ok(Some(_))),
+            "the auth profiles must be served from storage secrets in this test"
+        );
+        Self(fixture)
+    }
+}
+
+#[cfg(feature = "storage-sqlite")]
+impl Drop for StorageBackendForTest {
+    fn drop(&mut self) {
+        crate::storage::clear();
+    }
+}
+
+/// Signs `user-42` in and stores `key` against the user-scoped config it
+/// activates; returns that config.
+#[cfg(feature = "storage-sqlite")]
+async fn signed_in_with_api_key(
+    config: &crate::config::Config,
+    key: &str,
+) -> crate::config::Config {
+    let exp = chrono::Utc::now() + chrono::Duration::hours(1);
+    let token = jwt_with_payload(json!({ "sub": "user-42", "exp": exp.timestamp() }));
+    store_session(
+        &DispatchCtx::process_default(),
+        config,
+        &token,
+        None,
+        Some(json!({ "id": "user-42" })),
+    )
+    .await
+    .unwrap();
+    let user_scoped = crate::config::load_config_with_timeout().await.unwrap();
+    set_credential(
+        &DispatchCtx::process_default(),
+        &user_scoped,
+        SetCredentialRequest {
+            token: key.into(),
+            kind: Some("api-key".into()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert!(api_key::has_api_key(&user_scoped));
+    user_scoped
+}
+
 // #6318 on the desktop's storage: the host boot installs a SQLite backend
 // (`session_store::install_for_host`), and with one installed the auth
 // profiles are a single secret in the acting scope rather than a file per
@@ -761,51 +823,12 @@ async fn clearing_the_session_keeps_the_api_key_on_a_storage_backend() {
     let _module = crate::integrations::composio::module_client::module_guard().await;
     let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let _slot = crate::storage::test_support::lock_storage_slot();
-    let fixture = crate::storage::test_support::sqlite_backend().unwrap();
-    assert!(
-        crate::storage::install(std::sync::Arc::clone(&fixture.backend)).is_none(),
-        "no storage backend may be left installed by another test"
-    );
-    struct Uninstall;
-    impl Drop for Uninstall {
-        fn drop(&mut self) {
-            crate::storage::clear();
-        }
-    }
-    let _uninstall = Uninstall;
+    let _backend = StorageBackendForTest::install();
     let tmp = TempDir::new().unwrap();
     std::fs::create_dir_all(tmp.path().join("workspace")).unwrap();
     let _home = EnvVarGuard::set("HOME", tmp.path());
     let config = test_config(&tmp);
-    assert!(
-        matches!(crate::storage::secrets::current(), Ok(Some(_))),
-        "the auth profiles must be served from storage secrets in this test"
-    );
-
-    let exp = chrono::Utc::now() + chrono::Duration::hours(1);
-    let token = jwt_with_payload(json!({ "sub": "user-42", "exp": exp.timestamp() }));
-    store_session(
-        &DispatchCtx::process_default(),
-        &config,
-        &token,
-        None,
-        Some(json!({ "id": "user-42" })),
-    )
-    .await
-    .unwrap();
-    let user_scoped = crate::config::load_config_with_timeout().await.unwrap();
-    set_credential(
-        &DispatchCtx::process_default(),
-        &user_scoped,
-        SetCredentialRequest {
-            token: "sk-live".into(),
-            kind: Some("api-key".into()),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-    assert!(api_key::has_api_key(&user_scoped));
+    let user_scoped = signed_in_with_api_key(&config, "sk-live").await;
 
     let cleared = clear_credential(
         &DispatchCtx::process_default(),
@@ -828,4 +851,35 @@ async fn clearing_the_session_keeps_the_api_key_on_a_storage_backend() {
     let state = auth_get_state(&signed_out).await.unwrap().value;
     assert!(state.is_authenticated);
     assert_eq!(state.credential.as_deref(), Some("api-key"));
+}
+
+// The other side of the same rule: signing out of everything (no kind) on a
+// storage backend still removes the API key, so keeping it on a session-only
+// sign-out cannot leave a key behind after a full sign-out.
+#[cfg(feature = "storage-sqlite")]
+#[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::await_holding_lock)] // Serializes the process-wide storage slot.
+async fn clearing_everything_removes_the_api_key_on_a_storage_backend() {
+    let _module = crate::integrations::composio::module_client::module_guard().await;
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let _slot = crate::storage::test_support::lock_storage_slot();
+    let _backend = StorageBackendForTest::install();
+    let tmp = TempDir::new().unwrap();
+    std::fs::create_dir_all(tmp.path().join("workspace")).unwrap();
+    let _home = EnvVarGuard::set("HOME", tmp.path());
+    let config = test_config(&tmp);
+    let user_scoped = signed_in_with_api_key(&config, "sk-live").await;
+
+    let cleared = clear_credential(&DispatchCtx::process_default(), &user_scoped, None)
+        .await
+        .unwrap()
+        .value;
+    assert_eq!(cleared["removedSession"], true);
+    assert_eq!(cleared["removedApiKey"], true);
+
+    let signed_out = crate::config::load_config_with_timeout().await.unwrap();
+    assert_eq!(api_key::get_api_key(&signed_out).unwrap(), None);
+    assert_eq!(api_key::get_api_key(&user_scoped).unwrap(), None);
+    let state = auth_get_state(&signed_out).await.unwrap().value;
+    assert!(!state.is_authenticated);
 }
