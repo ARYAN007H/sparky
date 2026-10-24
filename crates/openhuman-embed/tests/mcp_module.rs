@@ -113,6 +113,11 @@ fn scenario() {
                     .access(Access::full()),
             )
             .expect("agent");
+        eprintln!(
+            "MCP fixture config servers={} module_overrides={:?}",
+            agent.config().mcp_client.servers.len(),
+            agent.config().modules.overrides.iter().map(|item| item.id.as_str()).collect::<Vec<_>>()
+        );
         let reply = agent.run("call forecast").await.unwrap_or_else(|error| {
             eprintln!("TinyMCP embed turn failed: {error:#}");
             panic!("turn failed")
