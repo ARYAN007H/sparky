@@ -900,7 +900,7 @@ async fn boot_stack_with_options(
     // agent turns, matching normal startup wiring.
 
     let app = build_core_http_router(false).layer(axum::middleware::from_fn(
-        move |request, next| {
+        move |request: axum::extract::Request, next: axum::middleware::Next| {
             let context = Arc::clone(&request_context);
             async move {
                 openhuman_core::core::runtime::CoreContext::scope(context, next.run(request))
