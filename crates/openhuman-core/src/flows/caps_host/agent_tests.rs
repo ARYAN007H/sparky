@@ -165,7 +165,14 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
     let _model =
         crate::inference::provider::factory::test_provider_override::install_model(model.clone());
     let workspace = tempfile::tempdir().expect("flow workspace");
+    // The agent's tool belt loads the tinymcp module, which reaches the host's
+    // installed storage; a real (SQLite) backend also serves the conditioned
+    // session-transcript writes.
+    let storage = crate::storage::test_support::sqlite_backend().expect("SQLite test backend");
+    let _storage_guard =
+        crate::storage::test_support::install_for_test(&storage.url, std::sync::Arc::clone(&storage.backend));
     let mut config = crate::config::Config::default();
+    config.storage.url = Some(storage.url.clone());
     config.workspace_dir = workspace.path().to_path_buf();
     config.action_dir = workspace.path().to_path_buf();
     config.default_model = Some("test-model".into());
@@ -490,7 +497,14 @@ async fn headless_child_at_depth_cap_gets_readable_spawn_refusal() {
     let _model =
         crate::inference::provider::factory::test_provider_override::install_model(model.clone());
     let workspace = tempfile::tempdir().expect("depth-cap workspace");
+    // The agent's tool belt loads the tinymcp module, which reaches the host's
+    // installed storage; a real (SQLite) backend also serves the conditioned
+    // session-transcript writes.
+    let storage = crate::storage::test_support::sqlite_backend().expect("SQLite test backend");
+    let _storage_guard =
+        crate::storage::test_support::install_for_test(&storage.url, std::sync::Arc::clone(&storage.backend));
     let mut config = crate::config::Config::default();
+    config.storage.url = Some(storage.url.clone());
     config.workspace_dir = workspace.path().to_path_buf();
     config.action_dir = workspace.path().to_path_buf();
     config.default_model = Some("test-model".into());
