@@ -526,6 +526,7 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                 .for_scope(&scope)
                 .map_err(anyhow::Error::from)?;
             crate::storage::block_on_anyhow(async move {
+                eprintln!("takeover test: prepare stale profile collection");
                 stale_storage
                     .documents()
                     .ensure_collection(&CollectionSpec::new(SERVERS))
@@ -535,6 +536,7 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                 let ttl_ms: u64 = lease_ttl.as_millis().try_into().unwrap_or(u64::MAX);
                 let takeover_at =
                     crate::profiles::lease::now_ms().saturating_add(ttl_ms.saturating_mul(2));
+                eprintln!("takeover test: acquire and release lease");
                 let stolen = lease_store
                     .acquire(id.as_str(), takeover_at)
                     .await
@@ -546,6 +548,7 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
 
                 // A second host now acquires the same profile on the shared
                 // backend. The old captured handle must keep refusing writes.
+                eprintln!("takeover test: open profile on second host");
                 let profile_b = second
                     .open(&id)
                     .await
@@ -560,6 +563,7 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                     .map_err(anyhow::Error::from)
                     .context("bind current profile storage")?;
 
+                eprintln!("takeover test: verify stale writes");
                 let stale_write = stale_storage
                     .documents()
                     .put(
@@ -584,6 +588,7 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                     "the old epoch must reject completion writes"
                 );
 
+                eprintln!("takeover test: verify current write");
                 let current_write = current_storage
                     .documents()
                     .put(
