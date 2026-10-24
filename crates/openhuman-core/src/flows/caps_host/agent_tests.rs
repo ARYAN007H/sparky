@@ -29,7 +29,7 @@ async fn production_harness_ceiling_is_open_and_reusable() {
     assert!(!super::HARNESS_AGENT_SLOTS.is_closed());
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test]
 async fn headless_flow_agent_includes_nested_grandchild_result() {
     use async_trait::async_trait;
     use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
