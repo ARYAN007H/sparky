@@ -179,7 +179,10 @@ impl Tool for McpListToolsTool {
         let server = client
             .normalize_identifier(&server)
             .await
-            .map_err(|error| anyhow::anyhow!(input_module_error_message(error)))?;
+            .map_err(|error| {
+                eprintln!("debug MCP normalize server failed: {error:?}");
+                anyhow::anyhow!(input_module_error_message(error))
+            })?;
         let client_config = host::client_config(&self.config);
         let remote: Vec<tinymcp_bus::McpRemoteTool> = match client
             .call(
@@ -338,7 +341,10 @@ impl Tool for McpCallTool {
         let tool = client
             .normalize_identifier(&tool)
             .await
-            .map_err(|error| anyhow::anyhow!(input_module_error_message(error)))?;
+            .map_err(|error| {
+                eprintln!("debug MCP normalize tool failed: {error:?}");
+                anyhow::anyhow!(input_module_error_message(error))
+            })?;
         let prepared = client
             .prepare_agent_tools(tinymcp_bus::PrepareAgentToolsRequest {
                 sources: vec![tinymcp_bus::McpToolSourceSpec {
@@ -406,6 +412,7 @@ impl Tool for McpCallTool {
         let server = match client.normalize_identifier(&server).await {
             Ok(server) => server,
             Err(error) => {
+                eprintln!("debug MCP normalize server failed: {error:?}");
                 let outcome = tinymcp_bus::McpCallOutcome::failed(
                     &server,
                     &tool,
@@ -420,6 +427,7 @@ impl Tool for McpCallTool {
         let tool = match client.normalize_identifier(&tool).await {
             Ok(tool) => tool,
             Err(error) => {
+                eprintln!("debug MCP normalize tool failed: {error:?}");
                 let outcome = tinymcp_bus::McpCallOutcome::failed(
                     &server,
                     &tool,
