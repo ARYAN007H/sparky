@@ -447,6 +447,7 @@ async fn import_modules(workspace: &Path) {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
+    let _ = env_logger::builder().is_test(true).try_init();
     let case = Case::open();
     std::env::set_var("OPENHUMAN_KEYRING_BACKEND", "file");
     std::env::set_var("OPENHUMAN_KEYRING_MASTER_KEY", "33".repeat(32));
