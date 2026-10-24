@@ -201,7 +201,6 @@ pub(super) async fn finalize_committed_turn(
         "[session-runtime] post-commit: durable commit done; finalizing turn"
     );
     let usage = super::holistic_last_turn_usage(&sidecar);
-    let interrupted = sidecar.hit_cap || receipt.outcome.interrupted;
     // This hook runs only after the runtime durably appended the turn. Emit
     // OpenHuman's classified stop before the terminal journal flush, so native
     // completion cannot overwrite a cancellation/timeout/stop or hide commit
@@ -216,7 +215,10 @@ pub(super) async fn finalize_committed_turn(
         let mut state = state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        state.last_turn_hit_cap = interrupted;
+        // Only the cap: a turn that ended on an early-exit tool
+        // (`ask_user_clarification`) is also `interrupted`, but it is waiting on
+        // the user's answer, not paused at its iteration limit.
+        state.last_turn_hit_cap = sidecar.hit_cap;
         state.last_turn_usage = Some(usage.clone());
         state.last_turn_iterations = iterations;
         state.prelude.clone()
