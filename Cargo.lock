@@ -5860,6 +5860,7 @@ dependencies = [
  "tinysearch-bus",
  "tinystoragedrivers",
  "tinystoragedrivers-api",
+ "tinystoragedrivers-testkit",
  "tinytools 0.6.0",
  "tinytools-agent 0.6.0",
  "tinytools-std",
