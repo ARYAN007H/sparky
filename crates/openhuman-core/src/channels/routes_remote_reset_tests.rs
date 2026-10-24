@@ -131,6 +131,7 @@ fn tenant_runtime(
 async fn remote_clear_resets_only_the_captured_tenant_session() {
     use tinychannels_bus::module_remote::{RemoteHostRequest, RemoteHostResult};
 
+    let _storage = crate::channels::module_fixture::install_memory_storage();
     let tmp = tempfile::TempDir::new().unwrap();
     let workspace = tmp.path();
     let (alice_core, alice_runtime) = tenant_runtime("remote-reset-alice", workspace);
