@@ -138,6 +138,10 @@ pub(crate) fn release_profile_stores(host: &ProfileHost, id: &ProfileId) {
     crate::storage::sessions::release_profile(id.as_str());
     let workspace = host.layout_of(id).workspace_dir;
     crate::storage::sessions::release_workspace(&workspace);
+    crate::agent::orchestration::background_completions::release_profile_workspace(
+        id.as_str(),
+        &workspace,
+    );
 }
 
 /// What one renewal pass did.
