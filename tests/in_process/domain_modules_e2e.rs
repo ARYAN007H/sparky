@@ -299,7 +299,10 @@ async fn config_agent_tools_and_threads_mutation_paths_round_trip() {
         &harness.rpc_base,
         30_011,
         "openhuman.config_get_data_paths",
-        json!({}),
+        // A caller with an identity gets paths for its user-scoped directory.
+        // The shared legacy root is intentionally not clearable because it
+        // contains every account's data.
+        json!({ "user_id": "domain-e2e-user" }),
     )
     .await;
     assert!(
