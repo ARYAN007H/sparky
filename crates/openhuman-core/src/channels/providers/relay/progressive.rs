@@ -79,21 +79,15 @@ impl RelayProgressiveTransport {
                     channel_ref.as_ref(),
                     conversation.as_ref(),
                 )?;
-                // The final message is the hosted delivery: the gateway owns
-                // the provider send, so the callback accepts it (no receipt)
-                // and the module does not resend it as a plain text reply.
-                let delivery = match event.as_ref() {
-                    tinychannels_bus::module_progressive::ChannelOutputEvent::FinalMessage {
-                        text,
-                        parts,
-                        ..
-                    } => Some((text.clone(), parts.clone())),
-                    _ => None,
-                };
+                // Typed deliveries (final message, media, voice note) are the
+                // hosted delivery: the gateway owns the provider send, so the
+                // callback accepts each one (no provider receipt) and the
+                // module does not resend it.
+                let delivery = outbound_delivery(event.as_ref());
                 // Project canonical events through the same compiled web
                 // adapter used by desktop and TUI turns.
                 self.projection.output(*event).await;
-                if let Some((text, parts)) = delivery {
+                if let Some((parts, text)) = delivery {
                     self.channel.publish_typed_reply(
                         &self.ctx,
                         &self.channel_ref,
@@ -166,5 +160,61 @@ impl RelayProgressiveTransport {
         Ok(ChannelBackendResult::ProgressiveTransport(Box::new(
             self.dispatch(*request).await?,
         )))
+    }
+}
+
+/// The ordered provider parts and plain text a delivery-bearing output event
+/// carries, mirroring the module's own typed projection. Other events carry no
+/// provider delivery.
+fn outbound_delivery(
+    event: &tinychannels_bus::module_progressive::ChannelOutputEvent,
+) -> Option<(Vec<tinychannels_bus::OutboundContentPart>, String)> {
+    use tinychannels_bus::module_progressive::ChannelOutputEvent as Event;
+    use tinychannels_bus::{ContentPart, OutboundContentPart, OutboundVoice};
+    let text_part = |text: &str| OutboundContentPart::Content {
+        part: ContentPart::Text {
+            text: text.to_owned(),
+            markdown_dialect: None,
+        },
+    };
+    match event {
+        Event::FinalMessage { text, parts, .. } => {
+            let parts = if parts.is_empty() {
+                vec![text_part(text)]
+            } else {
+                parts.clone()
+            };
+            Some((parts, text.clone()))
+        }
+        Event::Media { text, parts } => {
+            let mut outbound: Vec<OutboundContentPart> =
+                text.iter().map(|text| text_part(text)).collect();
+            outbound.extend(
+                parts
+                    .iter()
+                    .cloned()
+                    .map(|part| OutboundContentPart::Content { part }),
+            );
+            Some((outbound, text.clone().unwrap_or_default()))
+        }
+        Event::VoiceNote { text, voice } => {
+            let text = text.clone().or_else(|| {
+                voice
+                    .transcript
+                    .as_ref()
+                    .map(|transcript| transcript.text.clone())
+            });
+            let mut outbound: Vec<OutboundContentPart> =
+                text.iter().map(|text| text_part(text)).collect();
+            outbound.push(OutboundContentPart::Voice {
+                voice: OutboundVoice::Media {
+                    media: voice.media.clone(),
+                    codec: voice.codec.clone(),
+                    duration_ms: voice.duration_ms,
+                },
+            });
+            Some((outbound, text.unwrap_or_default()))
+        }
+        _ => None,
     }
 }
