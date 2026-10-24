@@ -254,6 +254,7 @@ fn invalid_dynamic_prompt_fails_before_the_host_tool_factory_runs() {
         .err()
         .expect("a dynamic prompt without a builder must be rejected");
 
+    eprintln!("DBGERR {error:#}");
     assert!(
         format!("{error:#}").contains("dynamic prompt but has no builder"),
         "unexpected error: {error:#}"
