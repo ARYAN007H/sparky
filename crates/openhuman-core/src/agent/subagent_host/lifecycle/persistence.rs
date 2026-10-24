@@ -108,6 +108,7 @@ impl OpenHumanPersistence {
     ) -> Result<tinyagents_orchestration::subagent::DocumentSubagentPersistence, SubagentError>
     {
         let open = || {
+            eprintln!("DBGS terminal={terminal} scope={:?}", crate::storage::current_scope());
             let legacy = if terminal {
                 super::store::LifecycleStore::before_terminal(&self.checkpoint_dir)?
             } else {
