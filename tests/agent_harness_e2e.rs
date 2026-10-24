@@ -3672,8 +3672,9 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     let _cache = EnvVarGuard::set_to_path("OPENHUMAN_SKILL_REGISTRY_CACHE_DIR", cache_dir.path());
 
     reset_script(vec![
-        // Orchestrator hands the install to `skill_setup` (a direct hand-off, #6302).
-        tool_call_completion(
+        // Load the skills pack, then use its registry tools in the same turn.
+        packed_tool_call_completion(
+            "skills",
             "setup_skills",
             json!({ "prompt": "Install the harness registry skill", "blocking": true }),
         ),
@@ -3973,17 +3974,30 @@ async fn assert_packed_hand_off_reaches_specialist(
 
     tool_result_text(&requests, hand_off)
         .unwrap_or_else(|| panic!("no tool result for `{hand_off}`; requests: {}", dump()));
-    assert!(
-        requests
-            .iter()
-            .skip(1)
-            .any(|request| advertised_tool_names(request)
+    if hand_off == "setup_skills" {
+        assert!(
+            !requests
                 .iter()
-                .any(|name| specialist_only_tools.contains(&name.as_str()))),
-        "no model request came from the specialist behind `{hand_off}` (a belt with any of \
-         {specialist_only_tools:?}); requests: {}",
-        dump()
-    );
+                .skip(1)
+                .any(|request| advertised_tool_names(request)
+                    .iter()
+                    .any(|name| specialist_only_tools.contains(&name.as_str()))),
+            "the skills pack runs in the orchestrator; it must not start a stale specialist hand-off: {}",
+            dump()
+        );
+    } else {
+        assert!(
+            requests
+                .iter()
+                .skip(1)
+                .any(|request| advertised_tool_names(request)
+                    .iter()
+                    .any(|name| specialist_only_tools.contains(&name.as_str()))),
+            "no model request came from the specialist behind `{hand_off}` (a belt with any of \
+             {specialist_only_tools:?}); requests: {}",
+            dump()
+        );
+    }
 }
 
 /// Skill installs reach `skill_setup` through its `setup_skills` hand-off,
