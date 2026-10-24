@@ -11,7 +11,6 @@ use harness::*;
 )]
 async fn mcp_clients_lifecycle() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
-    tinyhumans_boot::boot();
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
     let openhuman_home = home.join(".openhuman");
@@ -159,7 +158,6 @@ async fn mcp_clients_lifecycle() {
 )]
 async fn mcp_clients_declare_connect_tool_call_happy_path() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
-    tinyhumans_boot::boot();
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
     let openhuman_home = home.join(".openhuman");
@@ -336,7 +334,6 @@ async fn mcp_clients_declare_connect_tool_call_happy_path() {
 #[tokio::test]
 async fn mcp_clients_reconfigure_then_retire_over_rpc() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
-    tinyhumans_boot::boot();
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
     let openhuman_home = home.join(".openhuman");
@@ -477,7 +474,6 @@ async fn mcp_clients_reconfigure_then_retire_over_rpc() {
 #[tokio::test]
 async fn mcp_clients_set_enabled_smoke() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
-    tinyhumans_boot::boot();
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
     let openhuman_home = home.join(".openhuman");
@@ -563,7 +559,6 @@ async fn mcp_clients_set_enabled_smoke() {
 #[tokio::test]
 async fn mcp_clients_config_round_trip_merges_credentials_and_removes_absent_servers() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
-    tinyhumans_boot::boot();
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
     let openhuman_home = home.join(".openhuman");
@@ -763,7 +758,6 @@ async fn installed_server_id(rpc_base: &str, id: i64, name: &str) -> String {
 #[tokio::test]
 async fn mcp_clients_registry_settings_roundtrip() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
-    tinyhumans_boot::boot();
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
     let openhuman_home = home.join(".openhuman");
@@ -782,9 +776,6 @@ async fn mcp_clients_registry_settings_roundtrip() {
     let rpc_base = format!("http://{}", rpc_addr);
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let modules = post_json_rpc(&rpc_base, 9929, "openhuman.modules_list", json!({})).await;
-    eprintln!("modules.list diagnostic: {modules}");
-
     // Initially nothing is set.
     let get1 = post_json_rpc(
         &rpc_base,
@@ -793,10 +784,6 @@ async fn mcp_clients_registry_settings_roundtrip() {
         json!({}),
     )
     .await;
-    if get1.get("error").is_some() {
-        let modules = post_json_rpc(&rpc_base, 9931, "openhuman.modules_list", json!({})).await;
-        eprintln!("modules.list after failure: {modules}");
-    }
     let get1_result = assert_no_jsonrpc_error(&get1, "registry_settings_get (initial)");
     let get1_body = peel_logs_envelope(get1_result);
     assert_eq!(get1_body.get("smithery_api_key_set"), Some(&json!(false)));
