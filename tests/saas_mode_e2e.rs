@@ -696,6 +696,7 @@ fn a_profile_holds_web_and_relayed_channel_threads() {
             .pointer("/result/data/count")
             .and_then(Value::as_u64)
             .is_some_and(|count| count >= 2);
+        eprintln!("DBG idle={idle} replied={replied} queue={queue} messages={messages}");
         if matches!(lifecycle, Some("completed" | "interrupted")) || (idle && replied) {
             settled = true;
             break;
