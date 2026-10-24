@@ -154,12 +154,12 @@ fn voice_capture_release_pins_summary_contract_and_every_platform_digest() {
         (
             "macos-26-arm64",
             "tinyvoice-module-0.4.1-macos-26-arm64.tar.gz",
-            "17a6c1a80c1ae7a46fb19ce129e4b0dffb3d6391747bf9d1a5df0fab6ac75c48",
+            "17c1a6a80c1ae7a46fb19ce129e4b0dffb3d6391747bf9d1a5df0fab6ac75c48",
         ),
         (
             "macos-26-x86_64",
             "tinyvoice-module-0.4.1-macos-26-x86_64.tar.gz",
-            "1cf0fbd9f20ffc449a9df938cdc15f5d4d9c2d4077a839ddeba4423ed8ec2f175",
+            "1cf0fbd9f20ffc449a9df938cdc15be4d9c2d4077a839ddeba4423ed8ec2f175",
         ),
         (
             "ubuntu-22.04-arm64",

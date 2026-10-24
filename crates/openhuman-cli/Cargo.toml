@@ -87,9 +87,9 @@ path = "../../tests/tinydocs_linked_e2e.rs"
 required-features = ["linked-modules", "documents"]
 
 [[test]]
-name = "inbound_linked_e2e"
-path = "../../tests/inbound_linked_e2e.rs"
-required-features = ["linked-modules", "inbound-queues"]
+name = "inbound_module_e2e"
+path = "../../tests/inbound_module_e2e.rs"
+required-features = ["modules", "inbound-queues", "e2e-test-support"]
 
 [[test]]
 name = "tinysearch_module_e2e"
@@ -473,7 +473,8 @@ tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness
 tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session", features = ["testkit"] }
 tinydocs-bus = { path = "../../vendor/tinydocs/crates/tinydocs-bus" }
-# `inbound_linked_e2e` names the ingest dispositions from the contract.
+# `inbound_module_e2e` loads the staged TinyEventQueues release and names its
+# ingest dispositions from the contract.
 tinyeventqueues-bus = { path = "../../vendor/tinyeventqueues/crates/tinyeventqueues-bus" }
 tinysearch-bus = { path = "../../vendor/tinysearch/crates/tinysearch-bus" }
 tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false, features = ["macros", "uds"] }
