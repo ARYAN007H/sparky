@@ -33,6 +33,12 @@ fn dump_published_prompt(
         .env("HOME", home)
         .env("OPENHUMAN_WORKSPACE", workspace)
         .env("OPENHUMAN_MODULE_PATH", module_search_path)
+        // Building the session agent resolves its model credentials through
+        // the host master key; give the child a file-backed keyring so the
+        // result does not depend on an OS keychain being present.
+        .env("OPENHUMAN_KEYRING_BACKEND", "file")
+        .env_remove("OPENHUMAN_KEYRING_MASTER_KEY_FILE")
+        .env("OPENHUMAN_KEYRING_MASTER_KEY", "33".repeat(32))
         .env_remove("BACKEND_URL")
         .env_remove("VITE_BACKEND_URL")
         .env_remove("OPENHUMAN_BACKEND_API_KEY")
