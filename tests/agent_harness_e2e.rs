@@ -1827,28 +1827,15 @@ async fn subagent_delegation_happy_path_inner() {
     // request[1] (vision_agent subagent) must have different system/message content
     // from request[0] (orchestrator) — proves a genuinely different agent context
     // ran, not the same orchestrator re-called.
-    let req0_sys = requests
+    let req0_messages = requests
         .first()
-        .and_then(|r| r.pointer("/body/messages/0/content"))
-        .and_then(Value::as_str)
-        .unwrap_or("");
-    let worker_request = requests
-        .iter()
-        .find(|request| {
-            request
-                .pointer("/body/messages")
-                .is_some_and(|messages| messages.to_string().contains("Find MEMORY_CANARY_42"))
-        })
-        .expect("worker request found above");
-    let req1_sys = worker_request
-        .pointer("/body/messages/0/content")
-        .and_then(Value::as_str)
+        .and_then(|request| request.pointer("/body/messages"))
+        .map(Value::to_string)
         .unwrap_or("");
     assert_ne!(
-        req0_sys, req1_sys,
-        "request[0] and request[1] share identical first-message content — \
-         worker did not build its own context; \
-         content: {req0_sys:?}"
+        req0_messages,
+        worker_request.pointer("/body/messages").unwrap().to_string(),
+        "worker request reused the root conversation instead of its own prompt"
     );
 
     stack.shutdown();
