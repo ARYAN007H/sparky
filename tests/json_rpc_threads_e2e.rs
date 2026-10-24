@@ -1064,6 +1064,32 @@ async fn json_rpc_threads_transcript_get_projects_and_paginates() {
         ],
     );
 
+    // The host imports classic workspace transcripts during runtime boot.
+    // This test builds the router directly, so import the seeded records before
+    // asking the storage-backed thread API to read them.
+    let config = openhuman_core::config::Config::load_or_init()
+        .await
+        .expect("load test config");
+    assert_eq!(config.workspace_dir, workspace);
+    let mut config = config;
+    config.agent.chat_agent_id = Some("orchestrator".into());
+    config.save().await.expect("save test chat agent");
+    openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
+        .expect("initialize built-in agent definitions");
+    let backend = openhuman_core::storage::local::backend_for(&config.workspace_dir)
+        .expect("open test workspace storage");
+    let reports = openhuman_core::storage::import::sessions::run_with(&backend, &config);
+    assert!(
+        matches!(
+            reports.first().map(|report| &report.outcome),
+            Some(Ok(openhuman_core::storage::import::Outcome::Imported {
+                found: 2,
+                written: 2
+            }))
+        ),
+        "import classic session transcripts: {reports:?}"
+    );
+
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
 
