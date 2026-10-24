@@ -1151,11 +1151,12 @@ async fn run_managed_capture_turn(
     );
     drop(events);
     stack.shutdown_and_wait().await;
-    // The bare test router dispatches RPC with DispatchCtx::unbound(). Its
-    // cached web-chat agent outlives a router shutdown, so remove that session
-    // from the same process-default slot before the fixture resets its files.
+    // The bare test router dispatches RPC under the process default context
+    // that `boot_stack` initialized. Its cached web-chat agent outlives a router
+    // shutdown, so remove that session from the same slot before the fixture
+    // resets its files.
     openhuman_core::web_chat::invalidate_thread_sessions(
-        &openhuman_core::core::runtime::DispatchCtx::unbound(),
+        &openhuman_core::core::runtime::DispatchCtx::process_default(),
         "managed-capture-thread",
     )
     .await;
