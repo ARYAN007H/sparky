@@ -3672,18 +3672,15 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     let _cache = EnvVarGuard::set_to_path("OPENHUMAN_SKILL_REGISTRY_CACHE_DIR", cache_dir.path());
 
     reset_script(vec![
-        // Load the skills pack, then use its registry tools in the same turn.
+        // The skills pack exposes registry tools directly; installing parks at
+        // the approval gate until the test approves it.
         packed_tool_call_completion(
             "skills",
-            "setup_skills",
-            json!({ "prompt": "Install the harness registry skill", "blocking": true }),
-        ),
-        // skill_setup finds the entry, then installs it (the gate parks here).
-        tool_call_completion(
             "skill_registry_search",
             json!({ "query": "harness-registry" }),
         ),
-        tool_call_completion(
+        packed_tool_call_completion(
+            "skills",
             "skill_registry_install",
             json!({ "entry_id": REGISTRY_SKILL_ID }),
         ),
