@@ -270,13 +270,6 @@ tokio = { version = "1", features = ["full"] }
 once_cell = "1.19"
 parking_lot = "0.12"
 log = "0.4"
-# Final-reply slang + meme remix (runtime flag OPENHUMAN_TINYMEMES, off by
-# default). The engine runs in the `tinymemes` module; the host links only its
-# `*-bus` contract (vendored submodule: vendor/tinymemes).
-tinymemes-bus = { path = "../../vendor/tinymemes/crates/tinymemes-bus", features = ["storage"], optional = true }
-# The Jev client the host serves to the module's `Evaluate` callback (managed
-# Jev over the backend's System One proxy). Not a module implementation.
-tinyinference-decisions = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-decisions", optional = true }
 # Inbound event queues: the `tinyeventqueues` module durably queues and filters
 # inbound events (Composio triggers, agent webhooks) before they reach an agent.
 # The host links only its `*-bus` contract (vendored submodule:
@@ -605,7 +598,7 @@ secret-file = ["tinystoragedrivers-secrets/file"]
 # costs no new native builds. It matches `scripts/ci/product-features.txt`. This
 # does NOT move the kernel floor: that profile is
 # `--no-default-features --features flows` and never reads this list.
-default = ["media", "skills", "flows", "mcp", "channels", "http-server", "scheduler-gate", "file-logging", "modules", "tinymemes", "inbound-queues", "secret-file", "legacy-import"]
+default = ["media", "skills", "flows", "mcp", "channels", "http-server", "scheduler-gate", "file-logging", "modules", "inbound-queues", "secret-file", "legacy-import"]
 # The core's domain-owned HTTP surfaces (#5048): the `/v1` OpenAI-compatible
 # router (`inference::http`), the `openhuman text-input run` dev server, and the MCP
 # Streamable-HTTP transport (`mcp::server::http`, additionally gated by `mcp`).
@@ -658,12 +651,6 @@ documents = ["modules", "dep:tinydocs-bus"]
 # `[hosting].api_key` or the provider's environment variable — because a tool
 # that cannot work is worse than a tool that is not there.
 hosting = ["modules", "dep:tinyhosts-bus"]
-# TinyMemes: remixes the final reply with the user's register, regional slang
-# and, sometimes, a reaction meme. Compiled into product builds; at runtime it
-# is still off until `OPENHUMAN_TINYMEMES` (or a build-time
-# `OPENHUMAN_TINYMEMES_DEFAULT`) turns it on. Off in the minimal kernel
-# profiles, so they stay free of its dependencies.
-tinymemes = ["modules", "dep:tinymemes-bus", "dep:tinyinference-decisions"]
 # Inbound event queues (`inbound` domain): Composio triggers and agent webhooks
 # are ingested into the `tinyeventqueues` module, which persists, filters and
 # paces them and calls the host back (`Deliver`, `ClassifySalience`) to run

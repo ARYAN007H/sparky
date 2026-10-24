@@ -217,3 +217,66 @@ custom_dictionary = ["OpenHuman"]
         "retired dictation data must be dropped on save"
     );
 }
+
+/// TinyMemes left OpenHuman: a config written while it was here still carries
+/// `[components] memes` and a `[memes]` section. Both must load as ignored
+/// keys (never a parse failure or a fallback to defaults) and be dropped on
+/// the next save.
+#[tokio::test]
+async fn retired_memes_settings_load_as_ignored_keys_and_are_dropped_on_save() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("config.toml");
+    let workspace = dir.path().join("workspace");
+    std::fs::create_dir(&workspace).unwrap();
+    std::fs::write(
+        &config_path,
+        r#"
+default_model = "memes-retired-model"
+
+[components]
+memes = false
+search = false
+
+[memes]
+timeout_ms = 5000
+meme_cooldown = 7
+"#,
+    )
+    .unwrap();
+
+    let config = Config::load_from_config_path(&config_path, &workspace)
+        .await
+        .unwrap();
+    assert_eq!(config.default_model.as_deref(), Some("memes-retired-model"));
+    assert!(
+        !config.components.search,
+        "known component keys still apply"
+    );
+    assert!(
+        config.components.flows,
+        "unnamed components keep their default"
+    );
+    let diagnostics = config.load_diagnostics();
+    assert_eq!(
+        diagnostics.fallback,
+        super::super::diagnostics::ConfigLoadFallback::None
+    );
+    // An unknown section is reported once, as the section itself.
+    for key in ["components.memes", "memes"] {
+        assert!(
+            diagnostics.unknown_keys.iter().any(|k| k == key),
+            "{key} should be reported as ignored: {:?}",
+            diagnostics.unknown_keys
+        );
+    }
+
+    config.save().await.unwrap();
+    let saved: toml::Value =
+        toml::from_str(&std::fs::read_to_string(config_path).unwrap()).unwrap();
+    assert!(saved.get("memes").is_none(), "[memes] is dropped on save");
+    assert!(
+        saved["components"].get("memes").is_none(),
+        "components.memes is dropped on save"
+    );
+    assert_eq!(saved["components"]["search"].as_bool(), Some(false));
+}
