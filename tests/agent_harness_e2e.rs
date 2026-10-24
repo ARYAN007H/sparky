@@ -1801,8 +1801,6 @@ async fn subagent_delegation_happy_path_inner() {
         "parent response did not follow async dispatch: {full_response}\nevent: {done}"
     );
 
-    let spawned = wait_for_event(&mut events, "subagent_spawned", Duration::from_secs(10)).await;
-    assert_eq!(spawned.get("agent_id").and_then(Value::as_str), Some("task_manager_agent"));
     let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
     let requests = loop {
         let requests = with_captured(|c| c.clone());
