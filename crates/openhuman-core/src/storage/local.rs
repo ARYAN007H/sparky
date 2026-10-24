@@ -188,7 +188,7 @@ async fn open_default_backend(_workspace_dir: PathBuf) -> Result<Arc<dyn Storage
     #[cfg(test)]
     {
         let backend: Arc<dyn StorageBackend> =
-            Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
+            Arc::new(super::test_support::UnfencedMemoryBackend::new());
         super::boot::prepare_and_migrate(&backend).await?;
         Ok(super::fenced_backend::wrap(backend))
     }
