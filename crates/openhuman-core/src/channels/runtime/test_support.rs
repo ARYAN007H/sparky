@@ -311,6 +311,10 @@ pub(crate) fn bind_test_core_context_with_provider_endpoint(
     config.workspace_dir = workspace.clone();
     config.action_dir = workspace.clone();
     config.config_path = workspace.join("config.toml");
+    // A standing API-key credential satisfies the backend session gate that
+    // building the host agent's model checks, without a signed-in user.
+    crate::security::credentials::api_key::store_api_key(&config, "test-session-fixture-key")
+        .expect("store channel test credential");
     config.cloud_providers = ["openai", "test-provider"]
         .into_iter()
         .map(|slug| crate::config::schema::CloudProviderCreds {
