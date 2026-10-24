@@ -144,7 +144,6 @@ async fn sent_texts(server: &MockServer) -> Vec<String> {
 
 #[test]
 fn a_telegram_message_is_answered_by_the_bound_runtime_agent() {
-    let _ = tracing_subscriber::fmt().with_env_filter("openhuman=debug,tinychannels=debug,warn").with_writer(std::io::stderr).try_init();
     runtime().block_on(async {
         tokio::spawn(async {
             let backend = stub_backend().await;

@@ -371,7 +371,7 @@ fn documents(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Pl
                 .ok_or(Denied::Malformed)?;
             match grant.spec(&wanted.name) {
                 Some(declared) if *declared == wanted => Ok(Plan::Answer(Value::Null)),
-                _ => Err(Denied::Schema),
+                other => { eprintln!("DBGG wanted={wanted:?} declared={other:?}"); Err(Denied::Schema) }
             }
         }
         "DropCollection" => Err(Denied::Schema),
