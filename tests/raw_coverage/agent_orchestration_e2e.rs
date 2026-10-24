@@ -210,7 +210,7 @@ async fn setup() -> Harness {
     // to build it (nextest runs each test in its own process).
     openhuman_core::core::bus::init().await.expect("init event bus");
     openhuman_core::core::runtime::CoreContext::init_with_config(
-        openhuman_core::core::runtime::HostKind::Library,
+        openhuman_core::core::types::HostKind::Library,
         &openhuman_core::core::runtime::TokenSource::Fixed(std::sync::Arc::new(
             TEST_RPC_TOKEN.to_string(),
         )),
