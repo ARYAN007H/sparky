@@ -667,42 +667,28 @@ fn a_profile_holds_web_and_relayed_channel_threads() {
     // web turn finish before queuing the channel turn; this test covers
     // profile/thread isolation, not same-profile turn scheduling. The backend
     // is a closed port, so the turn fails before any progress event and leaves
-    // no turn snapshot behind: it is over once the thread's queue is idle and
-    // the failure is stored as its reply (or a terminal snapshot exists).
-    let deadline = Instant::now() + Duration::from_secs(90);
-    let mut settled = false;
-    while Instant::now() < deadline {
-        let (_, state) = call(
-            "alice",
-            "openhuman.threads_turn_state_get",
-            json!({ "thread_id": "web-1" }),
-        );
-        let lifecycle = state
-            .pointer("/result/data/turnState/lifecycle")
-            .or_else(|| state.pointer("/result/result/data/turnState/lifecycle"))
-            .and_then(Value::as_str);
+    // neither a turn snapshot nor a stored reply: it is over once the thread's
+    // queue has been idle for several consecutive polls.
+    let sent = Instant::now();
+    let deadline = sent + Duration::from_secs(90);
+    let mut idle_polls = 0;
+    while Instant::now() < deadline && idle_polls < 5 {
         let (_, queue) = call(
             "alice",
             "openhuman.channel_web_queue_status",
             json!({ "thread_id": "web-1" }),
         );
-        let idle = !queue.to_string().contains("\"active\":true");
-        let (_, messages) = call(
-            "alice",
-            "openhuman.threads_messages_list",
-            json!({ "thread_id": "web-1" }),
-        );
-        let replied = messages
-            .pointer("/result/data/count")
-            .and_then(Value::as_u64)
-            .is_some_and(|count| count >= 2);
-        if matches!(lifecycle, Some("completed" | "interrupted")) || (idle && replied) {
-            settled = true;
-            break;
+        if queue.to_string().contains("\"active\":true") {
+            idle_polls = 0;
+        } else if sent.elapsed() > Duration::from_secs(1) {
+            idle_polls += 1;
         }
         std::thread::sleep(Duration::from_millis(200));
     }
-    assert!(settled, "Alice's web turn did not settle before relay");
+    assert!(
+        idle_polls >= 5,
+        "Alice's web turn did not settle before relay"
+    );
 
     // ...and the gateway relays a Telegram message of hers.
     let relayed = json!({
