@@ -110,6 +110,10 @@ impl Channel for RecordingChannel {
         "recording"
     }
 
+    fn supports_remote_control(&self) -> bool {
+        true
+    }
+
     #[allow(
         deprecated,
         reason = "TinyChannels v22 still requires the legacy send trait method"
