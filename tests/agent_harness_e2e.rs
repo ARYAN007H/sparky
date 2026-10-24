@@ -1368,6 +1368,9 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
         prior_count = files.len();
         batches.push(batch);
     }
+    for (i, (a, b)) in batches[0].iter().zip(batches[1].iter()).enumerate() {
+        if a != b { std::fs::write(format!("/tmp/claude-1000/dbg_a{i}.json"), a).unwrap(); std::fs::write(format!("/tmp/claude-1000/dbg_b{i}.json"), b).unwrap(); }
+    }
     assert!(
         batches[0] == batches[1],
         "raw request bytes changed between restored identical turns"
