@@ -342,6 +342,10 @@ async fn mcp_clients_declare_connect_tool_call_happy_path() {
 /// and prove neither the install nor a call to it is left behind.
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "registry stdio MCP servers need network; TinyBox refuses a network-sharing jail for untrusted code until it has isolated networking (https://github.com/tinyhumansai/tinybox/issues/109)"
+)]
 async fn mcp_clients_reconfigure_then_retire_over_rpc() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
@@ -381,10 +385,6 @@ async fn mcp_clients_reconfigure_then_retire_over_rpc() {
         json!({ "server_id": server_id }),
     )
     .await;
-    if connect.get("error").is_some() {
-        let status = post_json_rpc(&rpc_base, 9952, "openhuman.mcp_clients_status", json!({})).await;
-        panic!("mcp_clients_connect failed for {server_id}; status: {status}; response: {connect}");
-    }
     assert_no_jsonrpc_error(&connect, "mcp_clients_connect");
     let listed = post_json_rpc(
         &rpc_base,
