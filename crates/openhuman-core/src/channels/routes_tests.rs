@@ -207,7 +207,11 @@ async fn module_route_help_response(
 
     let request = ChannelControlRequest::Route {
         workspace_dir: workspace_dir.to_string_lossy().into_owned(),
-        capabilities: None,
+        capabilities: Some(Box::new({
+            let mut capabilities = tinychannels_bus::ChannelCapabilities::unknown();
+            capabilities.remote_control = true;
+            capabilities
+        })),
         message: Box::new(ChannelMessage {
             reply_to_id: None,
             topic_id: None,

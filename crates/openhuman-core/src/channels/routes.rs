@@ -236,7 +236,13 @@ where
                 (ChannelControlRequest::Route {
                     workspace_dir: ctx.workspace_dir.to_string_lossy().into_owned(),
                     message: Box::new(msg.clone()),
-                    capabilities: target_channel.map(|channel| Box::new(channel.capabilities())),
+                    capabilities: target_channel
+                        .map(|channel| Box::new(channel.capabilities()))
+                        .or_else(|| {
+                            configured_channel
+                                .as_ref()
+                                .map(|configured| Box::new(configured.capabilities.clone()))
+                        }),
                     route: tinychannels_bus::module_remote::RemoteRoute {
                         provider: current.provider,
                         model: current.model,
