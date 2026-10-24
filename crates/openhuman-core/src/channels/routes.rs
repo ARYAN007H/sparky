@@ -244,7 +244,9 @@ pub(crate) async fn handle_runtime_command_if_needed(
             crate::modules::report::malformed_reply("tinychannels");
             return true;
         }
-        Err(_) => {
+        Err(error) => {
+            #[cfg(test)]
+            eprintln!("channel runtime command failed: {error:?}");
             if let Some(channel) = target_channel {
                 let _ = channel
                     .send_typed(&text_message(
