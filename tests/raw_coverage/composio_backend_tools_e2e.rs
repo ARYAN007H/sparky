@@ -94,6 +94,7 @@ async fn setup_config() -> Harness {
     config.secrets.encrypt = false;
     config.observability.analytics_enabled = false;
     config.save().await.expect("save config");
+    crate::tinyhumans_boot::boot_default_context(config.clone()).await;
 
     Harness {
         _tmp: tmp,
