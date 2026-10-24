@@ -288,6 +288,8 @@ fn truncate_transcript_for_regenerate_returns_none_when_thread_has_no_transcript
 #[test]
 fn a_profile_prefixed_key_round_trips_through_edit_and_regenerate() {
     let dir = TempDir::new().expect("tempdir");
+    #[cfg(feature = "storage-sqlite")]
+    crate::storage::local::use_persistent_default_for_test(dir.path());
     let config = crate::config::Config {
         workspace_dir: dir.path().to_path_buf(),
         ..crate::config::Config::default()
@@ -398,6 +400,8 @@ async fn edit_and_regenerate_use_the_threads_recorded_key_after_a_chat_agent_cha
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
     let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let dir = TempDir::new().expect("tempdir");
+    #[cfg(feature = "storage-sqlite")]
+    crate::storage::local::use_persistent_default_for_test(dir.path());
     let ctx_with = |chat_agent: Option<&str>| {
         let mut config = crate::config::Config {
             workspace_dir: dir.path().to_path_buf(),
