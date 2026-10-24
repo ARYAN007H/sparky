@@ -17,6 +17,29 @@ fn a_curated_write_action_follows_the_write_flag() {
     ));
 }
 
+/// What `evaluate_tool_visibility` applies when the module cannot answer: an
+/// unreadable preference must not widen a user's `write=false` to the default
+/// `read+write`. Nothing is allowed, curated or not, read or write.
+#[test]
+fn an_unreadable_preference_allows_nothing() {
+    assert!(matches!(
+        decide_visibility("gmail", "GMAIL_SEND_EMAIL", NOTHING_ALLOWED),
+        ToolDecision::BlockedByScope {
+            scope: ToolScope::Write
+        }
+    ));
+    assert!(matches!(
+        decide_visibility("flowstestkit", "FLOWSTESTKIT_SEND_THING", NOTHING_ALLOWED),
+        ToolDecision::BlockedByScope {
+            scope: ToolScope::Write
+        }
+    ));
+    assert!(matches!(
+        decide_visibility("flowstestkit", "FLOWSTESTKIT_GET_THING", NOTHING_ALLOWED),
+        ToolDecision::BlockedByScope { .. }
+    ));
+}
+
 #[test]
 fn an_action_outside_a_curated_catalog_is_not_curated() {
     let decision = decide_visibility("gmail", "GMAIL_NOT_A_REAL_ACTION", UserScopePref::default());
@@ -55,10 +78,14 @@ fn the_scope_error_names_the_toolkit_and_the_unlock_path() {
     let message = scope_error_message(
         "GMAIL_SEND_EMAIL",
         ToolScope::Write,
-        only(true, false, false),
+        Some(only(true, false, false)),
     );
     assert!(message.contains("Connections → gmail → write"), "{message}");
     assert!(message.contains("write=false"), "{message}");
+
+    let unread = scope_error_message("GMAIL_SEND_EMAIL", ToolScope::Write, None);
+    assert!(unread.contains("could not be read"), "{unread}");
+    assert!(!unread.contains("write="), "{unread}");
 }
 
 fn visible(
