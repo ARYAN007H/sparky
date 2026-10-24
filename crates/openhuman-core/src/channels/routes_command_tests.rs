@@ -160,9 +160,16 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 }
 
 #[tokio::test]
-#[ignore = "the linked tinychannels-module cannot persist the chat binding from this unit fixture; requires a runtime-backed storage fixture"]
 async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     let tempdir = tempfile::tempdir().unwrap();
+    let _storage = crate::channels::module_fixture::install_memory_storage();
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = tempdir.path().to_path_buf();
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config,
+    );
+    crate::core::runtime::CoreContext::scope(core, async {
     let ctx = runtime_context(tempdir.path().to_path_buf());
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
@@ -277,6 +284,8 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     assert!(sent
         .iter()
         .all(|message| message.thread_id.as_deref() == Some("42")));
+    })
+    .await;
 }
 
 #[tokio::test]
