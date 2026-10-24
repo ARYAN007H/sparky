@@ -1824,9 +1824,16 @@ async fn subagent_delegation_happy_path_inner() {
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
 
-    // request[1] (vision_agent subagent) must have different system/message content
-    // from request[0] (orchestrator) — proves a genuinely different agent context
-    // ran, not the same orchestrator re-called.
+    let worker_request = requests
+        .iter()
+        .find(|request| {
+            request
+                .pointer("/body/messages")
+                .is_some_and(|messages| messages.to_string().contains("Find MEMORY_CANARY_42"))
+        })
+        .expect("worker request found above");
+    // The root and worker can share the orchestrator's system prompt, but the
+    // worker must receive its self-contained task as its own conversation.
     let req0_messages = requests
         .first()
         .and_then(|request| request.pointer("/body/messages"))
