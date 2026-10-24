@@ -42,6 +42,16 @@ impl DebounceItem for QueuedInbound {
     }
 }
 
+/// Whether a message contributes anything to a merged turn: some non-blank
+/// text or a non-text part (an image or voice note with no caption still counts).
+fn has_substance(inbound: &AdmittedInbound) -> bool {
+    !inbound.msg.content.trim().is_empty()
+        || inbound.envelope.parts.iter().any(|part| match part {
+            ContentPart::Text { text, .. } => !text.trim().is_empty(),
+            _ => true,
+        })
+}
+
 /// Merge a batch into one message: ordered by (timestamp, receive order),
 /// addressed like the newest message, with the non-blank bodies joined by
 /// newlines and the typed content parts concatenated in the same order.
@@ -70,7 +80,7 @@ pub(crate) fn merge_channel_batch(mut batch: Vec<QueuedInbound>) -> Option<Admit
     let mut parts = Vec::new();
     let mut has_content = false;
     for item in &batch {
-        if item.inbound.msg.content.trim().is_empty() && item.inbound.envelope.parts.is_empty() {
+        if !has_substance(&item.inbound) {
             continue;
         }
         if has_content {

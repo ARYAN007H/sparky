@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::{mpsc, Semaphore};
 use tokio::task::JoinHandle;
 
 #[derive(Default)]
@@ -36,8 +36,37 @@ impl Turns {
     }
 }
 
-/// Stub the turn handler. With a `gate`, the first turn parks until notified.
-async fn install_handler(turns: Arc<Turns>, gate: Option<Arc<Notify>>) -> MockBusGuard {
+/// How a stubbed turn waits before it answers.
+#[derive(Clone)]
+struct Gate {
+    permits: Arc<Semaphore>,
+    /// Park every turn, not just the first.
+    all_turns: bool,
+}
+
+impl Gate {
+    fn first_turn() -> Self {
+        Self {
+            permits: Arc::new(Semaphore::new(0)),
+            all_turns: false,
+        }
+    }
+
+    fn every_turn() -> Self {
+        Self {
+            permits: Arc::new(Semaphore::new(0)),
+            all_turns: true,
+        }
+    }
+
+    fn open(&self) {
+        self.permits.add_permits(10_000);
+    }
+}
+
+/// Stub the turn handler. A `gate` parks the first (or every) turn until it
+/// is opened.
+async fn install_handler(turns: Arc<Turns>, gate: Option<Gate>) -> MockBusGuard {
     mock_agent_run_turn(move |req: AgentTurnRequest| {
         let turns = Arc::clone(&turns);
         let gate = gate.clone();
@@ -56,10 +85,8 @@ async fn install_handler(turns: Arc<Turns>, gate: Option<Arc<Notify>>) -> MockBu
             };
             let active = turns.active.fetch_add(1, Ordering::SeqCst) + 1;
             turns.peak.fetch_max(active, Ordering::SeqCst);
-            if index == 1 {
-                if let Some(gate) = gate {
-                    gate.notified().await;
-                }
+            if let Some(gate) = gate.filter(|gate| gate.all_turns || index == 1) {
+                gate.permits.acquire().await.expect("gate stays open").forget();
             }
             turns.active.fetch_sub(1, Ordering::SeqCst);
             Ok(AgentTurnResponse::new(format!("reply {index}")))
@@ -220,8 +247,8 @@ async fn text_after_an_image_joins_it_through_the_media_window() {
 #[tokio::test(start_paused = true)]
 async fn messages_during_a_running_turn_are_not_held_behind_it() {
     let turns = Arc::new(Turns::default());
-    let gate = Arc::new(Notify::new());
-    let _guard = install_handler(Arc::clone(&turns), Some(Arc::clone(&gate))).await;
+    let gate = Gate::first_turn();
+    let _guard = install_handler(Arc::clone(&turns), Some(gate.clone())).await;
     let (_channel, ctx) = runtime();
     let mut run = Running::start(ctx, InboundDebounceConfig::default());
 
@@ -239,7 +266,7 @@ async fn messages_during_a_running_turn_are_not_held_behind_it() {
     assert_eq!(turns.count(), 2);
     assert!(turns.user(1).ends_with("second\nthird"), "{}", turns.user(1));
 
-    gate.notify_one();
+    gate.open();
     run.finish().await;
     assert_eq!(turns.count(), 2);
 }
@@ -282,7 +309,6 @@ async fn disabled_config_runs_one_turn_per_message_in_order() {
     run.finish().await;
 
     assert_eq!(turns.count(), 2);
-    eprintln!("DBGUSERS {:?}", turns.users.lock().unwrap());
     assert!(turns.user(0).ends_with("one"));
     assert!(turns.user(1).ends_with("two"));
 }
@@ -325,8 +351,8 @@ async fn closing_the_queue_flushes_buffered_messages() {
 #[tokio::test(start_paused = true)]
 async fn a_full_intake_budget_stops_receiving_until_turns_drain() {
     let turns = Arc::new(Turns::default());
-    let gate = Arc::new(Notify::new());
-    let _guard = install_handler(Arc::clone(&turns), Some(Arc::clone(&gate))).await;
+    let gate = Gate::every_turn();
+    let _guard = install_handler(Arc::clone(&turns), Some(gate.clone())).await;
     let (_channel, ctx) = runtime();
     let config = InboundDebounceConfig {
         max_batch_messages: 1,
@@ -352,7 +378,7 @@ async fn a_full_intake_budget_stops_receiving_until_turns_drain() {
         "the loop stops receiving once its intake budget is full"
     );
 
-    gate.notify_one();
+    gate.open();
     run.finish().await;
     assert_eq!(turns.count(), 1 + accepted);
 }
