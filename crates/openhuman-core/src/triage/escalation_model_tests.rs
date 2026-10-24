@@ -182,7 +182,7 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
             ),
         )
         .await
-        .inspect_err(|e| eprintln!("DBGERR {e:?}")).expect("react escalation should complete");
+        .expect("react escalation should complete");
 
     // Prove that the requested route reached the model before checking the
     // lifecycle boundary below, so a skipped dispatch cannot satisfy it.
@@ -336,7 +336,7 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
             ),
         )
         .await
-        .inspect_err(|e| eprintln!("DBGERR {e:?}")).expect("direct target turn should complete");
+        .expect("direct target turn should complete");
 
     {
         let requests = requests.lock().unwrap();
@@ -444,7 +444,7 @@ async fn react_dispatch_falls_back_to_parent_model_when_hint_route_cannot_build(
             ),
         )
         .await
-        .inspect_err(|e| eprintln!("DBGERR {e:?}")).expect("react escalation should complete");
+        .expect("react escalation should complete");
 
     let builds = builds.lock().unwrap();
     assert!(builds.iter().any(|(role, _)| role == "chat"));
@@ -521,7 +521,7 @@ async fn escalate_dispatch_preserves_orchestrator_tools_without_child_delegation
             ),
         )
         .await
-        .inspect_err(|e| eprintln!("DBGERR {e:?}")).expect("escalation should complete");
+        .expect("escalation should complete");
 
     let requests = requests.lock().unwrap();
     assert_eq!(
@@ -622,7 +622,7 @@ async fn react_dispatch_inherits_the_parent_workload_for_inherit_targets() {
             ),
         )
         .await
-        .inspect_err(|e| eprintln!("DBGERR {e:?}")).expect("escalation should complete");
+        .expect("escalation should complete");
 
     let requests = requests.lock().unwrap();
     assert_eq!(
