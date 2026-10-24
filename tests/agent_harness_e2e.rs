@@ -33,7 +33,7 @@ use std::io::{BufRead, BufReader};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 /// Process-stable tempdir for the approval gate's audit store.
@@ -872,7 +872,7 @@ async fn boot_stack_with_options(
         Some(core) => Arc::clone(core),
         None => {
             let (core, _, _) = openhuman_core::core::runtime::CoreContext::init_with_config(
-                openhuman_core::core::runtime::HostKind::Cli,
+                openhuman_core::HostKind::Cli,
                 &openhuman_core::core::runtime::TokenSource::Fixed(Arc::new(
                     TEST_RPC_TOKEN.to_string(),
                 )),
