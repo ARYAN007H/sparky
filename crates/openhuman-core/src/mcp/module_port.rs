@@ -181,7 +181,7 @@ impl McpModulePort for TinyMcpPort {
         &self,
         request: tinymcp_bus::TransformTextRequest,
     ) -> Result<String, ModuleCallError> {
-        self.root_call(names::methods::TRANSFORM_TEXT, (request,), false)
+        self.root_call(names::methods::TRANSFORM_TEXT, (request,), true)
             .await
     }
 }

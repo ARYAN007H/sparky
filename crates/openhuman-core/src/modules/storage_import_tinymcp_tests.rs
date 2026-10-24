@@ -546,9 +546,7 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                     .storage_backend_for(&profile_b)
                     .map_err(anyhow::Error::from)?
                     .expect("the takeover host uses shared storage");
-                let current_storage = new_backend
-                    .for_scope(&scope)
-                    .map_err(anyhow::Error::from)?;
+                let current_storage = new_backend.for_scope(&scope).map_err(anyhow::Error::from)?;
 
                 let stale_write = stale_storage
                     .documents()
