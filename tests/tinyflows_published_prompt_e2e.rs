@@ -182,6 +182,13 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
             openhuman_core::config::Config::load_from_config_path(&config_path, &workspace)
                 .await
                 .expect("load the same scoped Config used by the prompt dump");
+        // The in-process host session resolves its credential from this config's
+        // own state directory, not the one the child processes used.
+        openhuman_core::security::credentials::api_key::store_api_key(
+            &config,
+            "th_test_local_only",
+        )
+        .expect("store a local test credential for the in-process host session");
         let ctx = openhuman_core::core::runtime::DispatchCtx::host_default();
         tinyhumans_boot::boot();
         prewarm_flow_authoring_in_parent(&ctx, &config).await;
