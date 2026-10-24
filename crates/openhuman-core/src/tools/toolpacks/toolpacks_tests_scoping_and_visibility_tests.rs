@@ -238,7 +238,7 @@ fn rebinding_a_pack_handle_repoints_it_at_the_new_registry() {
 /// not mention a tool that gate will refuse.
 #[test]
 fn a_non_owner_listing_omits_the_tools_the_gate_will_refuse() {
-    let (_tools, handle) = registry_with_all(&["build_workflow", "propose_workflow"]);
+    let (_tools, handle) = registry_with_all(&["run_workflow", "propose_workflow"]);
 
     let rendered = tinyagents_harness_tools::skills::render_pack_filtered(
         &CATALOG,
@@ -250,7 +250,7 @@ fn a_non_owner_listing_omits_the_tools_the_gate_will_refuse() {
     .expect("the pack still has a callable tool");
 
     assert!(
-        rendered.contains("build_workflow"),
+        rendered.contains("run_workflow"),
         "a tool the session CAN call must still be listed: {rendered}"
     );
     assert!(
