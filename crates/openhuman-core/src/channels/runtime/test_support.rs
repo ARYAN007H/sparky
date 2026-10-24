@@ -311,10 +311,6 @@ pub(crate) fn bind_test_core_context_with_provider_endpoint(
     config.workspace_dir = workspace.clone();
     config.action_dir = workspace.clone();
     config.config_path = workspace.join("config.toml");
-    // A standing API-key credential satisfies the backend session gate that
-    // building the host agent's model checks, without a signed-in user.
-    crate::security::credentials::api_key::store_api_key(&config, "test-session-fixture-key")
-        .expect("store channel test credential");
     config.cloud_providers = ["openai", "test-provider"]
         .into_iter()
         .map(|slug| crate::config::schema::CloudProviderCreds {
@@ -327,11 +323,24 @@ pub(crate) fn bind_test_core_context_with_provider_endpoint(
         })
         .collect();
     context.config = Some(Arc::new(config.clone()));
+    let config_for_credential = config.clone();
     let core = CoreContext::for_test(DomainSet::none(), Some(workspace)).derive_with(
         ContextOverlay::new(config, DomainSet::full(), Default::default())
             .profile("channel-handle-test"),
     );
     context.core = Some(Arc::downgrade(&core));
+    // A standing API-key credential satisfies the backend session gate that
+    // building the host agent's model checks, without a signed-in user. Store
+    // it inside the context so a storage-backed secret store (installed by the
+    // module fixture) records it under the scope the turn later reads.
+    let stored_config = config_for_credential;
+    CoreContext::sync_scope(Arc::clone(&core), || {
+        crate::security::credentials::api_key::store_api_key(
+            &stored_config,
+            "test-session-fixture-key",
+        )
+    })
+    .expect("store channel test credential");
     core
 }
 
