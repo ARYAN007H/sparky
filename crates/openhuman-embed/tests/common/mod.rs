@@ -44,6 +44,10 @@ pub fn chat_completion(content: &str) -> serde_json::Value {
 /// which is the recipe already proven against real turns.
 pub fn offline_config() -> Config {
     let mut config = Config::default();
+    // These fixtures use explicit local providers and no signed-in session.
+    // The production scheduler gate intentionally parks LLM work while the
+    // host is signed out, so keep it out of unrelated embed behavior tests.
+    config.scheduler_gate.mode = openhuman_core::config::schema::SchedulerGateMode::Off;
     config.local_ai.runtime_enabled = false;
     // Conversation memory ingest is intentionally fire-and-forget. It can
     // still be buffering after a turn returns, which is useful in the product
