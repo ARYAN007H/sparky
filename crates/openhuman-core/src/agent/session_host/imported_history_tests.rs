@@ -42,6 +42,7 @@ async fn run_imported_history_prefix_regression() {
     let mut first = SessionHostBuilder::new()
         .with_session_history_locator(Arc::clone(&locator))
         .chat_model(first_chat_model)
+        .model_name("test-model")
         .tools(vec![tool()])
         .prompt_builder(crate::agent::prompts::SystemPromptBuilder::verbatim(
             "You are the relay assistant. Preserve this exact system prefix.".to_owned(),
@@ -142,6 +143,7 @@ async fn run_imported_history_prefix_regression() {
     let mut second = SessionHostBuilder::new()
         .with_session_history_locator(locator)
         .chat_model(second_chat_model)
+        .model_name("test-model")
         .tools(vec![tool()])
         .prompt_builder(crate::agent::prompts::SystemPromptBuilder::verbatim(
             "This replacement prompt must not change an existing session.".to_owned(),
@@ -205,6 +207,7 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
     let mut host = SessionHostBuilder::new()
         .with_session_history_locator(Arc::clone(&locator))
         .chat_model(chat_model)
+        .model_name("test-model")
         .tools(vec![tool()])
         .workspace_dir(root.path().join("workspace"))
         .action_dir(root.path().to_path_buf())
@@ -305,6 +308,7 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
     let mut resumed = SessionHostBuilder::new()
         .with_session_history_locator(locator.clone())
         .chat_model(second_chat_model)
+        .model_name("test-model")
         .tools(vec![tool()])
         .workspace_dir(second_root.path().join("workspace"))
         .action_dir(second_root.path().to_path_buf())
