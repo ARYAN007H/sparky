@@ -851,6 +851,9 @@ async fn inference_claude_code_auth_status_prefers_the_env_key_then_reads_the_cl
 #[tokio::test]
 async fn inference_claude_code_full_access_toggle_round_trips_through_the_workspace() {
     let _lock = env_lock_async().await;
+    // A host installs its storage backend; the toggle and the Claude provider
+    // both read it from there.
+    let _storage = crate::HostStorage::install(&_lock);
     let harness = setup("").await;
 
     // The safe posture is the default, and it must be the default on a fresh
