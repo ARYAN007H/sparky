@@ -32,6 +32,7 @@ async fn production_harness_ceiling_is_open_and_reusable() {
 #[tokio::test]
 async fn headless_flow_agent_includes_nested_grandchild_result() {
     use async_trait::async_trait;
+    let _ = tracing_subscriber::fmt().with_env_filter("debug").with_writer(std::io::stderr).try_init();
     use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 
     const CHILD_PROMPT: &str = "headless-flow-child-result-marker";
