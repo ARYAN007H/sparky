@@ -262,11 +262,6 @@ fn parse_master_key_hex(hex: &str) -> Result<[u8; KEY_LEN], String> {
     if got != expected {
         return Err(format!("expected {expected} hex characters, got {got}"));
     }
-    // `hex_decode` slices by byte; a non-ASCII value of the right character
-    // count would panic there instead of being rejected.
-    if !hex.is_ascii() {
-        return Err("value is not valid hex".to_string());
-    }
     let bytes = crypto::hex_decode(hex).map_err(|_| "value is not valid hex".to_string())?;
     let mut key = [0u8; KEY_LEN];
     key.copy_from_slice(&bytes);
