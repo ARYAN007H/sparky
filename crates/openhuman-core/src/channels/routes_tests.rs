@@ -176,6 +176,7 @@ async fn handle_linked_runtime_command(
         )
         .await
         .expect("linked TinyChannels should prepare the command's trusted scope");
+        eprintln!("DIAG prepared reply_target={:?} history_key={:?} topic={:?}", prepared.message.reply_target, prepared.history_key, prepared.message.topic_id);
         let session_key = prepared.session_key.clone();
         let scope = RemoteSessionScope {
             channel: prepared.envelope.channel,
