@@ -598,7 +598,10 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
             })
         },
     )
-    .unwrap_or_else(|error| panic!("claim attempt failed: {error:#}"));
+    .unwrap_or_else(|error| {
+        eprintln!("claim attempt failed: {error:#}");
+        panic!("claim attempt failed");
+    });
     assert_eq!(attempt, Some(()));
 }
 
