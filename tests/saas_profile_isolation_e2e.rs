@@ -379,11 +379,8 @@ fn random_cross_profile_calls_never_leak() {
         per_user.iter().all(|&n| n > 0),
         "every user reached inference: {per_user:?}"
     );
-    let (violations, own) = scan::scan_files(
-        &d.root,
-        d.tmp.path(),
-        &d.tmp.path().join("saas-storage.db"),
-    );
+    let (violations, own) =
+        scan::scan_files(&d.root, d.tmp.path(), &d.tmp.path().join("saas-storage.db"));
     if !violations.is_empty() {
         w.fail(&format!(
             "files hold other profiles' canaries:\n{}",

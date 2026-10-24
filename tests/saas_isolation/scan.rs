@@ -51,11 +51,7 @@ fn owner_of(root: &Path, path: &Path) -> Option<usize> {
 /// tree, any user's outside every user's tree (the operator plane, shared
 /// state, the child's `$HOME`). Returns the violations and, per user, how
 /// many of their own files carry their canaries (proof the scan saw data).
-pub fn scan_files(
-    root: &Path,
-    home: &Path,
-    shared_storage: &Path,
-) -> (Vec<String>, [usize; 3]) {
+pub fn scan_files(root: &Path, home: &Path, shared_storage: &Path) -> (Vec<String>, [usize; 3]) {
     let mut violations = Vec::new();
     let mut own = [0usize; 3];
     for base in [root, home] {
