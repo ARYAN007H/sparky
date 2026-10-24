@@ -308,7 +308,9 @@ impl CoreContext {
             profile_admission,
             agent,
             bare: self.bare,
-        })
+        });
+        if dbg_shares { DBG_DERIVED.lock().unwrap().push((Arc::downgrade(&dbg_new), std::backtrace::Backtrace::force_capture().to_string())); }
+        dbg_new
     }
 
     /// The agent a host session store scopes work under this context to, if
@@ -511,3 +513,5 @@ mod test_support;
 #[cfg(test)]
 #[path = "context_tests.rs"]
 mod tests;
+
+pub static DBG_DERIVED: std::sync::Mutex<Vec<(std::sync::Weak<CoreContext>, String)>> = std::sync::Mutex::new(Vec::new());

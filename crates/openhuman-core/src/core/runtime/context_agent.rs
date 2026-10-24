@@ -90,7 +90,7 @@ impl CoreContext {
     ///
     /// A host must not close or evict a tenant while this is `true`: its
     /// in-flight tables (turns, queues, caches) live in those slots.
-    pub fn debug_counts(self: &Arc<Self>) -> usize { Arc::strong_count(&self.agent.state) }
+    pub fn debug_counts(self: &Arc<Self>) -> usize { let n = Arc::strong_count(&self.agent.state); if n > 1 { for (w, bt) in super::DBG_DERIVED.lock().unwrap().iter() { if let Some(c) = w.upgrade() { if Arc::ptr_eq(&c.agent.state, &self.agent.state) && !Arc::ptr_eq(&c, self) { log::warn!("DBGLEAK {}", bt.lines().filter(|l| l.contains("openhuman")).take(14).collect::<Vec<_>>().join(" | ")); } } } } n }
 
     pub fn tenant_in_use(self: &Arc<Self>) -> bool {
         Arc::strong_count(self) > 1 || Arc::strong_count(&self.agent.state) > 1
