@@ -394,6 +394,7 @@ pub(crate) async fn run_admitted_turn(
     }
     let native_delivery_succeeded = execution.delivery_succeeded.unwrap_or(false);
     let llm_result = execution.result.map_err(anyhow::Error::msg);
+    if let Err(e) = &llm_result { eprintln!("DBGLLM {e}"); }
 
     if let Some(token) = typing_cancellation.as_ref() {
         token.cancel();
