@@ -210,7 +210,10 @@ fn local_inference_controllers_pin_their_registered_wire_method_names() {
     }
     assert!(
         local_controllers.iter().all(|registered| {
-            !matches!(registered.schema.function, "agent_chat" | "agent_chat_simple")
+            !matches!(
+                registered.schema.function,
+                "agent_chat" | "agent_chat_simple"
+            )
         }),
         "agent chat controllers belong to agent_runs, not inference's local runtime"
     );
