@@ -62,6 +62,7 @@ fn agents_on_one_workspace_keep_their_own_state() {
                 .config(offline_config())
                 .workspace(Workspace::Ephemeral)
                 .backend_url(backend.uri())
+                .api_key("offline-test-key")
                 .access(Access::full())
                 .build()
                 .await
