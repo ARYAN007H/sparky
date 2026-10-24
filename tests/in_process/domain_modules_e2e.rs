@@ -820,12 +820,10 @@ async fn mcp_audit_list_dispatches_internally_and_stays_out_of_the_schema_dump()
         json!({ "limit": 5 }),
     )
     .await;
-    let error = err(&listed, "mcp_audit_list");
+    let records = payload(&listed, "mcp_audit_list");
     assert!(
-        error["message"]
-            .as_str()
-            .is_some_and(|message| message.contains("module unavailable")),
-        "the route must reach the unbooted module store: {listed}"
+        records.is_object() || records.is_array(),
+        "mcp_audit_list must answer with a payload, not unknown-method: {listed}"
     );
 
     // Internal-only: callable, but never advertised.
@@ -844,8 +842,7 @@ async fn mcp_audit_list_dispatches_internally_and_stays_out_of_the_schema_dump()
     harness.join.abort();
 }
 
-/// The four `mcp_clients` read paths must validate required params before
-/// asking the unavailable module client to make an outward call.
+/// The four `mcp_clients` read paths must refuse clearly, each in its own words.
 ///
 /// `list_tools`, `detect_auth`, `oauth_begin` and `registry_get` all take a
 /// caller-supplied identifier and all reach outward — to a connected MCP
@@ -855,8 +852,8 @@ async fn mcp_audit_list_dispatches_internally_and_stays_out_of_the_schema_dump()
 /// **schema validation happens before any outward call, and a refusal names the
 /// remedy rather than leaking a generic transport error.**
 ///
-/// Installed-server behavior belongs in `mcp_registry_e2e.rs`, which owns the
-/// module stub; this in-process router does not boot TinyMCP.
+/// An uninstalled server's tools must refuse clearly, and installed-server
+/// behavior is tested in `mcp_registry_e2e.rs`, which owns the module stub.
 #[tokio::test]
 async fn mcp_clients_read_paths_validate_before_reaching_outward() {
     let _lock = env_lock_async().await;
@@ -884,6 +881,27 @@ async fn mcp_clients_read_paths_validate_before_reaching_outward() {
             "{method} must refuse a missing `{missing}` by name before any outward call, got: {message}"
         );
     }
+
+    let disconnected = rpc(
+        &harness.rpc_base,
+        45_110,
+        "openhuman.mcp_clients_list_tools",
+        json!({ "server_id": "never-connected-server" }),
+    )
+    .await;
+    let message = err(&disconnected, "mcp_clients_list_tools (disconnected)")
+        .get("message")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+    assert!(
+        message.contains("no installed MCP server"),
+        "list_tools on an uninstalled server must say it is not installed, got: {message}"
+    );
+    assert!(
+        message.contains("mcp_clients_status"),
+        "the refusal must name the RPC remedy so a caller can act on it, got: {message}"
+    );
 
     harness.join.abort();
 }
