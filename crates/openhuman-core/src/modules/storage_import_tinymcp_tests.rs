@@ -459,7 +459,6 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
 
 #[tokio::test]
 async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
-    use anyhow::Context as _;
     use crate::core::runtime::{CoreContext, DomainSet, SaasConfig};
     use crate::profiles::{ProfileHost, ProfileId, ProfileIdMode};
     use crate::storage::import_state::{self, backend_with_condition};
@@ -526,51 +525,31 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                 .for_scope(&scope)
                 .map_err(anyhow::Error::from)?;
             crate::storage::block_on_anyhow(async move {
-                eprintln!("takeover test: prepare stale profile collection");
                 stale_storage
                     .documents()
                     .ensure_collection(&CollectionSpec::new(SERVERS))
-                    .await
-                    .context("prepare stale profile collection")?;
+                    .await?;
 
                 let ttl_ms: u64 = lease_ttl.as_millis().try_into().unwrap_or(u64::MAX);
                 let takeover_at =
                     crate::profiles::lease::now_ms().saturating_add(ttl_ms.saturating_mul(2));
-                eprintln!("takeover test: acquire and release lease");
-                let stolen = lease_store
-                    .acquire(id.as_str(), takeover_at)
-                    .await
-                    .context("acquire takeover lease")?;
-                lease_store
-                    .release(stolen)
-                    .await
-                    .context("release takeover lease")?;
+                let stolen = lease_store.acquire(id.as_str(), takeover_at).await?;
+                lease_store.release(stolen).await?;
 
                 // A second host now acquires the same profile on the shared
                 // backend. The old captured handle must keep refusing writes.
-                eprintln!("takeover test: open profile on second host");
                 let profile_b = second
                     .open(&id)
                     .await
                     .map_err(|error| anyhow::anyhow!("open profile on takeover node: {error}"))?;
                 let new_backend = second
                     .storage_backend_for(&profile_b)
-                    .map_err(anyhow::Error::from)
-                    .context("resolve takeover host storage")?
+                    .map_err(anyhow::Error::from)?
                     .expect("the takeover host uses shared storage");
                 let current_storage = new_backend
                     .for_scope(&scope)
-                    .map_err(anyhow::Error::from)
-                    .context("bind current profile storage")?;
-                let current_fence = profile_b.lease_fence();
-                eprintln!(
-                    "takeover test: current profile fence epoch={} check={:?} registry={:?}",
-                    current_fence.epoch(),
-                    current_fence.check(crate::profiles::lease::now_ms()).await,
-                    second.fences().lookup(id.as_str()).map(|fence| fence.epoch()),
-                );
+                    .map_err(anyhow::Error::from)?;
 
-                eprintln!("takeover test: verify stale writes");
                 let stale_write = stale_storage
                     .documents()
                     .put(
@@ -595,7 +574,6 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                     "the old epoch must reject completion writes"
                 );
 
-                eprintln!("takeover test: verify current write");
                 let current_write = current_storage
                     .documents()
                     .put(
@@ -605,16 +583,13 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                         Precondition::Absent,
                     )
                     .await;
-                current_write.context("write through current profile lease")?;
+                current_write.expect("the current lease remains writable");
                 Ok::<_, anyhow::Error>(())
             })
         },
-    )
-    .unwrap_or_else(|error| {
-        eprintln!("claim attempt failed: {error:#}");
-        panic!("claim attempt failed");
-    });
-    assert_eq!(attempt, Some(()));
+    );
+    let error = attempt.expect_err("the old claim cannot be released after profile takeover");
+    assert!(error.to_string().contains("lease fence"), "{error:#}");
 }
 
 /// Another process holding the import claim is reported as `ClaimHeld`, so the
