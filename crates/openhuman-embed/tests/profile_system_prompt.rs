@@ -55,7 +55,7 @@ async fn scenario() {
         .build()
         .await
         .unwrap();
-    let provisioned = runtime.provision("alice").await.expect("DBGPROV");
+    let provisioned = runtime.provision("alice").await.unwrap();
     runtime
         .set_credential(
             &provisioned.profile_id,
