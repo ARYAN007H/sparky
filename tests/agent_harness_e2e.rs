@@ -2888,30 +2888,26 @@ async fn multi_hop_delegation_chain_inner() {
     std::fs::create_dir_all(image_path.parent().expect("action directory"))
         .expect("create action directory");
     std::fs::copy(&fixture_path, &image_path).expect("copy vision fixture");
+    // The spawn is asynchronous (see `subagent_delegation_happy_path`): the
+    // parent's acknowledgement and the child's first model call race for the
+    // next scripted completion, so the canary rides in every text entry.
     reset_script(vec![
-        // request[0]: Orchestrator delegates to vision_agent via
-        // `analyze_image` (its delegate_name, agent_registry/agents/vision_agent/agent.toml:3).
         tool_call_completion(
-            "analyze_image",
+            "spawn_subagent",
             json!({
+                "agent_id": "vision_agent",
                 "prompt": "deep question",
-                "image_paths": [image_path.to_string_lossy()],
-                "blocking": true
+                "image_paths": [image_path.to_string_lossy()]
             }),
         ),
-        // request[1]: vision_agent first inner LLM call → scripts file_write.
-        // file_write is NOT in vision_agent's read-only named tools
-        // (`[tools] named`), so SubagentToolSource returns a blocked/error
-        // result (tool_source.rs:36). The subagent loop continues to a second
-        // LLM call.
+        text_completion("Delegated. DEPTH2_CANARY will be reported."),
+        // The child's first inner call scripts `file_write`, which is not on
+        // vision_agent's read-only belt, so it is refused and the loop goes on.
         tool_call_completion(
             "file_write",
             json!({ "path": "depth-2.txt", "content": "depth-2 write?" }),
         ),
-        // request[2]: vision_agent second inner LLM call → text result.
-        // This becomes the `analyze_image` tool result forwarded by dispatch_subagent.
         text_completion("DEPTH2_CANARY"),
-        // request[3]: Orchestrator receives the analyze_image result and synthesizes.
         text_completion("Final answer: DEPTH2_CANARY"),
     ]);
     let mut events = spawn_sse_collector(format!(
@@ -2943,28 +2939,31 @@ async fn multi_hop_delegation_chain_inner() {
         "synthesis must contain DEPTH2_CANARY; full_response: {full_response}"
     );
 
-    // ≥4 upstream requests prove the full delegation path ran (≥3 would
-    // false-pass if the subagent inner loop early-exited):
-    //   request[0] = orchestrator (analyze_image call),
-    //   request[1] = vision_agent first iter (file_write → blocked),
-    //   request[2] = vision_agent second iter (DEPTH2_CANARY text),
-    //   request[3] = orchestrator synthesis.
-    let requests = with_captured(|c| c.clone());
-    assert!(
-        requests.len() >= 4,
-        "expected ≥4 upstream requests (orchestrator + vision_agent x2 + synthesis), got {};\
-        \nrequests: {}",
-        requests.len(),
-        serde_json::to_string_pretty(&requests).unwrap_or_default()
-    );
+    // ≥4 upstream requests prove the child's inner loop ran past its refused
+    // `file_write`: the orchestrator's spawn, its acknowledgement, the child's
+    // two calls and the delivery. Poll: the detached child may still be running
+    // when the parent's turn ends.
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    let requests = loop {
+        let requests = with_captured(|c| c.clone());
+        if requests.len() >= 4 {
+            break requests;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "expected ≥4 upstream requests (orchestrator, acknowledgement, child x2), got {};\
+            \nrequests: {}",
+            requests.len(),
+            serde_json::to_string_pretty(&requests).unwrap_or_default()
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
 
-    // No unknown-tool result for `analyze_image` — delegation was synthesised correctly.
-    // Scoped to `analyze_image`: the subagent's `file_write` call IS
-    // rejected as unknown by design (see the ordering note above), so a blanket
-    // check would fail on the very mechanic this test exercises.
+    // `spawn_subagent` itself must never be rejected as unknown. Scoped to it:
+    // the child's `file_write` IS refused as unknown by design.
     assert!(
-        !captured_requests_reject_tool_as_unknown(&requests, "analyze_image"),
-        "found an unknown-tool result — `analyze_image` delegation was not synthesised; requests: {}",
+        !captured_requests_reject_tool_as_unknown(&requests, "spawn_subagent"),
+        "found an unknown-tool result — `spawn_subagent` was not offered; requests: {}",
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
 
