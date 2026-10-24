@@ -306,6 +306,7 @@ const DESKTOP_ALWAYS_ON: &[&str] = &[
 const REPRESENTATIVE: &[(&str, crate::core::all::DomainGroup)] = {
     use crate::core::all::DomainGroup as G;
     &[
+        ("spawn_subagent", G::Agent),
         ("memory", G::Memory),
         ("goal_get", G::Threads),
         ("mcp_list_servers", G::Mcp),
