@@ -566,6 +566,16 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
 
     // The agent editor's tool picker is fed by available_tools — every entry is
     // a {name, description} pair whose name is a valid tool_allowlist value.
+    // The tools catalog builds a real session agent, which needs a backend session.
+    let store = post_json_rpc(
+        &rpc_base,
+        286199,
+        "openhuman.auth_store_session",
+        json!({ "token": "e2e-test-jwt", "user_id": "e2e-user" }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&store, "auth_store_session");
+
     let available_tools = post_json_rpc(
         &rpc_base,
         286_224,
@@ -1915,6 +1925,16 @@ async fn json_rpc_agent_context_breakdown_default_agent_returns_sections() {
 
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
+
+    // The report builds a real session agent, which needs a backend session.
+    let store = post_json_rpc(
+        &rpc_base,
+        9500,
+        "openhuman.auth_store_session",
+        json!({ "token": "e2e-test-jwt", "user_id": "e2e-user" }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&store, "auth_store_session");
 
     let breakdown = post_json_rpc(
         &rpc_base,
