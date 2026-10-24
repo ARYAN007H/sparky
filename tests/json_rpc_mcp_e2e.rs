@@ -782,6 +782,9 @@ async fn mcp_clients_registry_settings_roundtrip() {
     let rpc_base = format!("http://{}", rpc_addr);
     tokio::time::sleep(Duration::from_millis(100)).await;
 
+    let modules = post_json_rpc(&rpc_base, 9929, "openhuman.modules_list", json!({})).await;
+    eprintln!("modules.list diagnostic: {modules}");
+
     // Initially nothing is set.
     let get1 = post_json_rpc(
         &rpc_base,
