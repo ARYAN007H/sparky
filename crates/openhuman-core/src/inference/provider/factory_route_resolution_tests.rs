@@ -579,3 +579,33 @@ fn standard_mode_permits_external() {
         "Sensitive mode has no egress enforcement in S1"
     );
 }
+
+#[test]
+fn claude_agent_sdk_inspection_reads_the_model_as_the_runtime_does() {
+    let _guard = crate::inference::inference_test_guard();
+    let _env = crate::config::test_env::EnvVarGuard::locked()
+        .with("ANTHROPIC_API_KEY", "dummy-inspection-key")
+        .without("ANTHROPIC_AUTH_TOKEN")
+        .without("ANTHROPIC_BASE_URL");
+    let inspect = |provider: &str| {
+        let mut config = Config::default();
+        config.chat_provider = Some(provider.to_string());
+        crate::inference::provider::factory::create_chat_model_with_model_id_in_for_inspection(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            "chat",
+            &config,
+            0.0,
+        )
+    };
+
+    let (_, model) = inspect("claude_agent_sdk:sonnet@0.7").expect("an SDK route builds");
+    assert_eq!(
+        model, "sonnet",
+        "the temperature suffix is not part of the model"
+    );
+    let error = match inspect("claude_agent_sdk:") {
+        Ok(_) => panic!("an empty SDK model must not be probed"),
+        Err(error) => error.to_string(),
+    };
+    assert!(error.contains("empty model"), "{error}");
+}
