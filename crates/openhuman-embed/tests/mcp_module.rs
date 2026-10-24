@@ -84,10 +84,12 @@ fn scenario() {
             "tinymcp",
             ModuleSourceMode::Linked,
         ));
+        let storage_dir = tempfile::tempdir().expect("SQLite storage directory");
+        let storage_url = openhuman_core::storage::config::default_url(storage_dir.path());
         let runtime = Runtime::builder()
             .config(config)
             .workspace(Workspace::Ephemeral)
-            .storage("memory")
+            .storage(storage_url)
             .backend_url(backend.uri())
             .provider(route(&model, "fixture"))
             .services(ServiceSet::none())
