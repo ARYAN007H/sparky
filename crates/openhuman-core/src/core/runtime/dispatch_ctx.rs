@@ -21,10 +21,18 @@ use super::CoreContext;
 /// Cheap to clone (one `Arc`). It is `unbound` only when no [`CoreContext`]
 /// exists at all: a unit test that never booted the core, or a call made
 /// before boot. A booted host always dispatches with a bound context.
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct DispatchCtx {
     core: Option<Arc<CoreContext>>,
     headless_agent_chat: bool,
+    track: Option<Arc<()>>,
+}
+pub static DBG_TRACK: std::sync::Mutex<Vec<(std::sync::Weak<()>, std::sync::Weak<CoreContext>, String)>> = std::sync::Mutex::new(Vec::new());
+impl Clone for DispatchCtx {
+    fn clone(&self) -> Self {
+        let track = self.core.as_ref().map(|c| { let t = Arc::new(()); DBG_TRACK.lock().unwrap().push((Arc::downgrade(&t), Arc::downgrade(c), std::backtrace::Backtrace::force_capture().to_string())); t });
+        Self { core: self.core.clone(), headless_agent_chat: self.headless_agent_chat, track }
+    }
 }
 
 impl DispatchCtx {
@@ -34,6 +42,7 @@ impl DispatchCtx {
         Self {
             core: Some(core),
             headless_agent_chat: false,
+            track: None,
         }
     }
 
@@ -51,6 +60,7 @@ impl DispatchCtx {
         Self {
             core: None,
             headless_agent_chat: false,
+            track: None,
         }
     }
 
@@ -61,6 +71,7 @@ impl DispatchCtx {
         Self {
             core: CoreContext::default_context(),
             headless_agent_chat: false,
+            track: None,
         }
     }
 
@@ -81,6 +92,7 @@ impl DispatchCtx {
         Self {
             core,
             headless_agent_chat: false,
+            track: None,
         }
     }
 
@@ -153,6 +165,7 @@ impl DispatchCtx {
         Self {
             core: CoreContext::scoped_for_turn(),
             headless_agent_chat: false,
+            track: None,
         }
     }
 
