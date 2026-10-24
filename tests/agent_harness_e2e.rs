@@ -4662,7 +4662,7 @@ mod tool_policy_boundary_placement {
             .channel_permissions
             .insert("internal".to_string(), "read".to_string());
 
-        let agent = OpenHumanSessionHost::builder()
+        let mut agent = OpenHumanSessionHost::builder()
             .model_name("test/session-fixture".to_string())
             .chat_model(provider)
             .tools(vec![
@@ -4682,6 +4682,7 @@ mod tool_policy_boundary_placement {
             .config(config)
             .build()
             .expect("complete builder should succeed");
+        agent.set_visible_tool_names(std::collections::HashSet::from(["boundary_read".to_string()]));
 
         agent
             .render_current_turn_prompt()
