@@ -110,3 +110,111 @@ async fn a_workspace_with_no_legacy_file_is_marked_migrated() {
     migrate_legacy(&crate::core::runtime::DispatchCtx::ambient(), &config).await;
     assert!(migrated().lock().unwrap().contains(&config.workspace_dir));
 }
+
+/// A save made while the legacy migration is still deferred (another row keeps
+/// failing) must not be undone by the next migration pass re-pushing the
+/// toolkit's stale legacy row.
+#[tokio::test]
+async fn a_saved_pref_survives_a_deferred_legacy_migration() {
+    use crate::integrations::composio::module_client::module_guard;
+    let _serialised = module_guard().await;
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config_in(&tmp);
+    config.workspace_dir = tmp.path().join("workspace");
+    config.config_path = tmp.path().join("config.toml");
+    file_store::save(
+        &ctx,
+        &config,
+        USER_SCOPES_FILE,
+        &serde_json::json!({
+            "gmail": {"read": true, "write": true, "admin": true},
+            "slack": {"read": true, "write": true, "admin": false},
+        }),
+    )
+    .await
+    .unwrap();
+    FAIL_MIGRATING.with(|fail| *fail.borrow_mut() = Some("slack".into()));
+
+    let revoked = UserScopePref {
+        read: true,
+        write: true,
+        admin: false,
+    };
+    let saved = save(&ctx, &config, "gmail", revoked).await;
+    let pref = load_or_default(&ctx, &config, "gmail").await;
+    let left: LegacyScopeFile = file_store::load(&ctx, &config, USER_SCOPES_FILE)
+        .await
+        .unwrap();
+
+    FAIL_MIGRATING.with(|fail| *fail.borrow_mut() = None);
+    let _ = save(&ctx, &config, "gmail", UserScopePref::default()).await;
+    let _ = save(&ctx, &config, "slack", UserScopePref::default()).await;
+
+    saved.expect("the module stores the row");
+    assert_eq!(pref, revoked, "a revoked admin scope came back");
+    assert!(
+        !left.contains_key("gmail"),
+        "the saved toolkit's legacy row stays"
+    );
+    assert!(
+        left.contains_key("slack"),
+        "an unmigrated row is kept for retry"
+    );
+}
+
+/// When the legacy row can't be dropped (an unreadable legacy file), the save
+/// reports failure, so the module must keep the row it enforced before rather
+/// than the one the UI is about to roll back.
+#[tokio::test]
+async fn a_save_whose_legacy_cleanup_fails_leaves_the_prior_row() {
+    use crate::integrations::composio::module_client::module_guard;
+    let _serialised = module_guard().await;
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config_in(&tmp);
+    config.workspace_dir = tmp.path().join("workspace");
+    config.config_path = tmp.path().join("config.toml");
+    let granted = UserScopePref {
+        read: true,
+        write: true,
+        admin: true,
+    };
+    connectors::call::<_, ComposioUserScopesResponse>(
+        &config,
+        methods::SET_USER_SCOPES,
+        ComposioSetUserScopesRequest {
+            toolkit: "gmail".into(),
+            scopes: to_wire(granted),
+        },
+    )
+    .await
+    .unwrap();
+    file_store::save(
+        &ctx,
+        &config,
+        USER_SCOPES_FILE,
+        &serde_json::json!({"gmail": "not a pref"}),
+    )
+    .await
+    .unwrap();
+
+    let saved = save(&ctx, &config, "gmail", UserScopePref::default()).await;
+    let enforced = connectors::call::<_, ComposioUserScopesResponse>(
+        &config,
+        methods::GET_USER_SCOPES,
+        ComposioGetUserScopesRequest {
+            toolkit: "gmail".into(),
+        },
+    )
+    .await
+    .map(|reply| from_wire(reply.scopes));
+
+    file_store::save(&ctx, &config, USER_SCOPES_FILE, &serde_json::json!({}))
+        .await
+        .unwrap();
+    let _ = save(&ctx, &config, "gmail", UserScopePref::default()).await;
+
+    assert!(saved.is_err(), "the save must report the failed cleanup");
+    assert_eq!(enforced.unwrap(), granted, "the module keeps the prior row");
+}
