@@ -187,7 +187,7 @@ fn the_flows_record_pins_every_host_of_one_release() {
     assert_eq!(record.assets.len(), 11);
     for asset in record.assets {
         assert!(
-            asset.archive.starts_with("tinyflows-module-0.8.23-"),
+            asset.archive.starts_with("tinyflows-module-0.8.27-"),
             "{}",
             asset.archive
         );
