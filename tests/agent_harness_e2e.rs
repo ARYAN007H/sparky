@@ -1198,6 +1198,7 @@ async fn run_managed_capture_turn(
     // Session transcript stores and their SQLite backend are also cached by
     // workspace path; release them before the next repetition removes it.
     openhuman_core::storage::sessions::release_workspace(&workspace_dir);
+    openhuman_core::storage::clear();
     with_captured_proxy_requests(|requests| requests.clone())
 }
 
@@ -1367,9 +1368,6 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
         );
         prior_count = files.len();
         batches.push(batch);
-    }
-    for (i, (a, b)) in batches[0].iter().zip(batches[1].iter()).enumerate() {
-        if a != b { std::fs::write(format!("/tmp/claude-1000/dbg_a{i}.json"), a).unwrap(); std::fs::write(format!("/tmp/claude-1000/dbg_b{i}.json"), b).unwrap(); }
     }
     assert!(
         batches[0] == batches[1],
