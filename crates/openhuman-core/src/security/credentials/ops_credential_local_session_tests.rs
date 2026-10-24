@@ -1,5 +1,6 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
+use crate::security::credentials::api_key;
 
 // ── set_credential (local session) ─────────────────────────────
 
