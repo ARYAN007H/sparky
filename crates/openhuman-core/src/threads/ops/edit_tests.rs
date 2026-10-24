@@ -19,6 +19,10 @@ const AGENT_ID: &str = "test-agent";
 const STORE_KEY: &str = "orchestrator";
 
 fn store(workspace: &Path) -> TranscriptStore {
+    // Sealing a generation writes under a lease condition the in-memory test
+    // backend cannot enforce, so the workspace opens its durable default.
+    #[cfg(feature = "storage-sqlite")]
+    crate::storage::local::use_persistent_default_for_test(workspace);
     TranscriptStore {
         workspace_dir: workspace.to_path_buf(),
         key: STORE_KEY.to_string(),
