@@ -118,6 +118,17 @@ fn scenario() {
             agent.config().mcp_client.servers.len(),
             agent.config().modules.overrides.iter().map(|item| item.id.as_str()).collect::<Vec<_>>()
         );
+        let module_client = openhuman_core::modules::client(agent.config().clone());
+        eprintln!(
+            "MCP direct static list result: {:?}",
+            module_client
+                .call::<Vec<String>>(
+                    "tinymcp",
+                    tinymcp_bus::names::methods::STATIC_LIST,
+                    (),
+                )
+                .await
+        );
         let reply = agent.run("call forecast").await.unwrap_or_else(|error| {
             eprintln!("TinyMCP embed turn failed: {error:#}");
             panic!("turn failed")
