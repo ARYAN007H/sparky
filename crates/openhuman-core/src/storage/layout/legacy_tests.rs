@@ -27,10 +27,14 @@ async fn the_import_brings_legacy_files_into_the_v1_database() {
 #[tokio::test(flavor = "multi_thread")]
 async fn importing_twice_changes_nothing() {
     let fx = v1_profile();
-    import(&fx.target, &fx.config).await.unwrap();
+    import(&fx.target, &fx.config)
+        .await
+        .unwrap_or_else(|error| panic!("first legacy import failed: {error:#?}"));
     migrate(&fx.target).await.unwrap();
     let first = super::super::db::table_counts(&v1_db(&fx.target)).unwrap();
-    import(&fx.target, &fx.config).await.unwrap();
+    import(&fx.target, &fx.config)
+        .await
+        .unwrap_or_else(|error| panic!("second legacy import failed: {error:#?}"));
     migrate(&fx.target).await.unwrap();
     assert_eq!(
         super::super::db::table_counts(&v1_db(&fx.target)).unwrap(),
