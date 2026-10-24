@@ -459,6 +459,7 @@ async fn an_import_cannot_recapture_a_reopened_profiles_new_fence() {
 
 #[tokio::test]
 async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
+    use anyhow::Context as _;
     use crate::core::runtime::{CoreContext, DomainSet, SaasConfig};
     use crate::profiles::{ProfileHost, ProfileId, ProfileIdMode};
     use crate::storage::import_state::{self, backend_with_condition};
@@ -528,13 +529,20 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                 stale_storage
                     .documents()
                     .ensure_collection(&CollectionSpec::new(SERVERS))
-                    .await?;
+                    .await
+                    .context("prepare stale profile collection")?;
 
                 let ttl_ms: u64 = lease_ttl.as_millis().try_into().unwrap_or(u64::MAX);
                 let takeover_at =
                     crate::profiles::lease::now_ms().saturating_add(ttl_ms.saturating_mul(2));
-                let stolen = lease_store.acquire(id.as_str(), takeover_at).await?;
-                lease_store.release(stolen).await?;
+                let stolen = lease_store
+                    .acquire(id.as_str(), takeover_at)
+                    .await
+                    .context("acquire takeover lease")?;
+                lease_store
+                    .release(stolen)
+                    .await
+                    .context("release takeover lease")?;
 
                 // A second host now acquires the same profile on the shared
                 // backend. The old captured handle must keep refusing writes.
@@ -544,9 +552,13 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                     .map_err(|error| anyhow::anyhow!("open profile on takeover node: {error}"))?;
                 let new_backend = second
                     .storage_backend_for(&profile_b)
-                    .map_err(anyhow::Error::from)?
+                    .map_err(anyhow::Error::from)
+                    .context("resolve takeover host storage")?
                     .expect("the takeover host uses shared storage");
-                let current_storage = new_backend.for_scope(&scope).map_err(anyhow::Error::from)?;
+                let current_storage = new_backend
+                    .for_scope(&scope)
+                    .map_err(anyhow::Error::from)
+                    .context("bind current profile storage")?;
 
                 let stale_write = stale_storage
                     .documents()
@@ -581,12 +593,12 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                         Precondition::Absent,
                     )
                     .await;
-                assert!(current_write.is_ok(), "the current lease remains writable");
+                current_write.context("write through current profile lease")?;
                 Ok::<_, anyhow::Error>(())
             })
         },
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("claim attempt failed: {error:#}"));
     assert_eq!(attempt, Some(()));
 }
 
