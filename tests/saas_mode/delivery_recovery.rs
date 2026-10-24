@@ -18,7 +18,7 @@
 
 use std::sync::Arc;
 
-use openhuman_core::profiles::{ProfileId, ProfileIdMode, ProfileLayout};
+use openhuman_core::profiles::{ProfileId, ProfileIdMode};
 use tinyagents_tasks::{
     CompletionRecord, CompletionResult, CompletionStatus, CompletionStore, DriverCompletionStore,
     NotifyMode,
@@ -125,7 +125,6 @@ fn leave_undelivered_result(d: &Deployment, user: &str) {
     // installs the configured `storage_url` process-wide, so that is where the
     // running core keeps (and looks for) every profile's completion queue.
     let url = format!("sqlite:{}/saas-storage.db", d.tmp.path().display());
-    let _ = ProfileLayout::new(&d.root, &id);
     let backend = openhuman_core::storage::block_on_anyhow(async move {
         Ok(openhuman_core::storage::open(&url).await?)
     })
