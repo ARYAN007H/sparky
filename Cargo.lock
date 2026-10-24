@@ -8915,7 +8915,7 @@ dependencies = [
  "toml 1.1.6+spec-1.1.0",
  "tracing",
  "ureq",
- "zip 9.0.5",
+ "zip 2.4.2",
 ]
 
 [[package]]
@@ -9746,7 +9746,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemes-bus"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -9925,7 +9925,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 2.0.20",
+ "tinystoragedrivers-schema",
  "tokio",
  "ulid",
  "zstd 0.13.3",
@@ -9965,10 +9965,22 @@ dependencies = [
  "futures-util",
  "http",
  "object_store",
+ "quick-xml 0.41.0",
+ "reqwest 0.13.5",
+ "serde",
  "tinystoragedrivers-core",
  "tokio",
  "tokio-util",
  "url",
+]
+
+[[package]]
+name = "tinystoragedrivers-schema"
+version = "1.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -12356,20 +12368,6 @@ dependencies = [
  "memchr",
  "typed-path",
  "zopfli",
-]
-
-[[package]]
-name = "zip"
-version = "9.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e04976da629d3b04204ba8105b396a193af8ad2583b2c79bfb3ab8af580a11e"
-dependencies = [
- "crc32fast",
- "flate2",
- "indexmap",
- "memchr",
- "nix 0.31.3",
- "typed-path",
 ]
 
 [[package]]

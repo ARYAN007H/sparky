@@ -301,9 +301,7 @@ fn configured_control_channel(
     ctx: &ChannelRuntimeContext,
     scope: Option<&tinychannels_bus::module_remote::RemoteSessionScope>,
 ) -> Option<Box<tinychannels_bus::module_control::ConfiguredControlChannel>> {
-    let Some(scope) = scope else {
-        return None;
-    };
+    let scope = scope?;
     let account = scope.channel.account_id.as_deref()?;
     let channel = ctx.channels_by_name.get(account)?;
     if tinychannels_bus::provider_id(channel.name()) != scope.channel.id {

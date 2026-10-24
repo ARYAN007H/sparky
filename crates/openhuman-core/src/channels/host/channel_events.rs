@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tinybus::module::ModuleClient;
+use tinybus::module::{ModuleClient, ModuleObjectClient};
 use tinybus::EventHandler;
 use tinychannels_bus::{approvals::ReplyContext, ChannelMessage};
 
@@ -175,16 +175,24 @@ impl EventHandler<DomainEvent> for ChannelApprovalSurfaceSubscriber {
 }
 
 /// Projects host turn lifecycle facts into module-owned remote status storage.
+///
+/// Turn state is written through the configured module object that owns the
+/// running providers. A process-wide client reaches a callback-only runtime
+/// with no running provider state, which would not report `remote_control` and
+/// so would silently drop every mark.
 pub struct ChannelTurnStateSubscriber {
     workspace_dir: PathBuf,
-    config: Option<Arc<crate::config::Config>>,
+    objects: Option<Arc<HashMap<String, ModuleObjectClient>>>,
     cancellation: tokio_util::sync::CancellationToken,
 }
 impl ChannelTurnStateSubscriber {
-    pub fn with_config(config: Arc<crate::config::Config>) -> Self {
+    pub fn with_objects(
+        workspace_dir: PathBuf,
+        objects: Arc<HashMap<String, ModuleObjectClient>>,
+    ) -> Self {
         Self {
-            workspace_dir: config.workspace_dir.clone(),
-            config: Some(config),
+            workspace_dir,
+            objects: Some(objects),
             cancellation: super::super::runtime::session::channel_session(),
         }
     }
@@ -192,50 +200,58 @@ impl ChannelTurnStateSubscriber {
     pub fn new(workspace_dir: PathBuf) -> Self {
         Self {
             workspace_dir,
-            config: None,
+            objects: None,
             cancellation: tokio_util::sync::CancellationToken::new(),
         }
     }
     async fn mark(&self, channel: &str, reply_target: &str, event_ws: &PathBuf, busy: bool) {
-        #[cfg(test)]
-        eprintln!(
-            "turn-state mark begin busy={busy} channel={channel:?} target={reply_target:?} cancelled={} remote={} event_ws={:?} subscriber_ws={:?} config={}",
-            self.cancellation.is_cancelled(),
-            capabilities_for(channel).remote_control,
-            event_ws,
-            self.workspace_dir,
-            self.config.is_some(),
-        );
         if self.cancellation.is_cancelled()
             || !capabilities_for(channel).remote_control
             || *event_ws != self.workspace_dir
         {
-            #[cfg(test)]
-            eprintln!("turn-state mark skipped");
             return;
         }
-        #[cfg(test)]
-        let client = if self.config.is_none() {
-            crate::channels::module_fixture::client().await
-        } else {
-            crate::modules::client(self.config.as_deref().cloned().unwrap_or_default())
-        };
-        #[cfg(not(test))]
-        let client = crate::modules::client(self.config.as_deref().cloned().unwrap_or_default());
-        let result: Result<tinychannels_bus::module_remote::RemoteOperationResult, _> = client
-            .call_confidential(
-                "tinychannels",
-                tinychannels_bus::methods::EXECUTE_REMOTE,
-                (tinychannels_bus::module_remote::RemoteOperation::MarkTurn {
-                    workspace_dir: self.workspace_dir.to_string_lossy().into_owned(),
-                    channel: channel.into(),
-                    reply_target: reply_target.into(),
-                    busy,
-                },),
-            )
-            .await;
-        #[cfg(test)]
-        eprintln!("turn-state mark result: {result:?}");
+        let args = (tinychannels_bus::module_remote::RemoteOperation::MarkTurn {
+            workspace_dir: self.workspace_dir.to_string_lossy().into_owned(),
+            channel: channel.into(),
+            reply_target: reply_target.into(),
+            busy,
+        },);
+        let result: Result<tinychannels_bus::module_remote::RemoteOperationResult, _> =
+            match &self.objects {
+                Some(objects) => {
+                    let Some(object) = objects
+                        .get(channel)
+                        .or_else(|| objects.get(tinychannels_bus::provider_id(channel)))
+                    else {
+                        tracing::debug!(
+                            channel,
+                            "[channels] turn state skipped: no configured module object"
+                        );
+                        return;
+                    };
+                    object
+                        .call_confidential(tinychannels_bus::methods::EXECUTE_REMOTE, args)
+                        .await
+                }
+                None => {
+                    #[cfg(test)]
+                    {
+                        crate::channels::module_fixture::client()
+                            .await
+                            .call_confidential(
+                                "tinychannels",
+                                tinychannels_bus::methods::EXECUTE_REMOTE,
+                                args,
+                            )
+                            .await
+                    }
+                    #[cfg(not(test))]
+                    {
+                        return;
+                    }
+                }
+            };
         if result.is_err() {
             tracing::debug!("channel turn status unavailable");
         }
