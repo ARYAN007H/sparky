@@ -362,17 +362,22 @@ async fn compiled_module_hosted_progressive_callback_is_scoped_and_typed() {
         "typed hosted relay reply",
     )
     .await;
-    let ProgressiveResult::DeliveryOutcome { outcome } = delivered else {
-        panic!("compiled hosted send should return its typed receipt: {delivered:?}");
+    // A hosted callback accepts delivery without a provider receipt: the
+    // gateway reports receipts separately, so the module answers with the
+    // distinct `hosted_accepted` result rather than an empty outcome.
+    let ProgressiveResult::DeliveryBatch {
+        outcomes,
+        unsupported,
+        failure: None,
+        hosted_accepted: true,
+    } = &delivered
+    else {
+        panic!("compiled hosted send should be accepted by the callback: {delivered:?}");
     };
-    assert!(outcome.error.is_none());
-    assert!(outcome.receipt.idempotency_key.as_deref().is_some());
-    assert!(outcome.receipt.primary_platform_message_id.is_none());
-    assert!(outcome.receipt.platform_message_ids.is_empty());
-    assert!(outcome.receipt.parts.is_empty());
-    assert_eq!(outcome.receipt.channel.as_ref(), Some(&channel));
-    assert_eq!(outcome.receipt.conversation.as_ref(), Some(&conversation));
-    assert_eq!(outcome.receipt.thread_id.as_deref(), Some("topic-3"));
+    assert!(outcomes.is_empty() && unsupported.is_empty());
+    assert!(crate::channels::runtime::dispatch::delivery_succeeded(
+        &delivered
+    ));
     assert_eq!(relay.sent(), vec!["typed hosted relay reply".to_owned()]);
     let mut projected = None;
     let mut terminal = None;
