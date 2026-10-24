@@ -702,8 +702,17 @@ fn try_create_cloud_slug_chat_model_from_string_with_native_tools_and_access(
             key.clone()
         };
         let output_budget = inspection_output_budget_capability(&codex);
+        // Doctor's live probe deduplicates on this identity, so it carries
+        // everything else that shapes the request: two aliases with the same
+        // endpoint, key and model but another auth style, header or CA bundle
+        // are two different requests.
+        let transport = format!(
+            "{:?}\u{1f}{extra_headers:?}\u{1f}{extra_query_params:?}\u{1f}{user_agent:?}\u{1f}{:?}",
+            entry.auth_style,
+            config.cloud_provider_ca_certs.get(&slug),
+        );
         *identity = Some((
-            codex.endpoint.clone(),
+            format!("{}\u{1f}{transport}", codex.endpoint),
             credential,
             effective_model.clone(),
             output_budget,
