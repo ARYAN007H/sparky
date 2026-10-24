@@ -113,32 +113,6 @@ fn scenario() {
                     .access(Access::full()),
             )
             .expect("agent");
-        eprintln!(
-            "MCP fixture config servers={} module_overrides={:?}",
-            agent.config().mcp_client.servers.len(),
-            agent.config().modules.overrides.iter().map(|item| item.id.as_str()).collect::<Vec<_>>()
-        );
-        let module_client = openhuman_core::modules::client(agent.config().clone());
-        let object_client = module_client
-            .object_client("tinymcp", tinymcp_bus::names::OBJECT_PATH)
-            .await;
-        eprintln!("MCP object client result: {:?}", object_client.as_ref().map(|_| ()));
-        if let Ok(object_client) = object_client {
-            eprintln!(
-                "MCP pin owner result: {:?}",
-                object_client.pin_owner().await.as_ref().map(|_| ())
-            );
-        }
-        eprintln!(
-            "MCP direct static list result: {:?}",
-            module_client
-                .call::<Vec<String>>(
-                    "tinymcp",
-                    tinymcp_bus::names::methods::STATIC_LIST,
-                    (),
-                )
-                .await
-        );
         let reply = agent.run("call forecast").await.unwrap_or_else(|error| {
             eprintln!("TinyMCP embed turn failed: {error:#}");
             panic!("turn failed")
