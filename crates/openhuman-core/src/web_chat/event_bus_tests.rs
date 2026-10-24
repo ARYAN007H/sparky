@@ -327,12 +327,9 @@ async fn goal_resume_and_account_updates_reach_the_web_channel() {
         store.pause(thread_id).await.expect("pause goal");
         let _ = find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id).await;
 
-        // Preparing a turn keeps a paused goal paused; resume explicitly.
         let prepared = store.prepare_turn(thread_id).await.expect("prepare turn");
-        assert_eq!(
-            prepared.goal.map(|goal| goal.status),
-            Some(tinyagents_harness_tools::goals::ThreadGoalStatus::Paused)
-        );
+        let paused = tinyagents_harness_tools::goals::ThreadGoalStatus::Paused;
+        assert_eq!(prepared.goal.map(|goal| goal.status), Some(paused));
         store.resume(thread_id).await.expect("resume goal");
         let resumed = find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id).await;
         assert_eq!(
