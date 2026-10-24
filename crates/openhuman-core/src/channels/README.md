@@ -26,6 +26,12 @@ its account authorization and session policy. Host callbacks handle only
 capabilities the module cannot own, such as scoped media access, voice, and
 event publication.
 
+The TinyChannels v2 bus is also the source of the typed channel and web-event
+wire contracts. OpenHuman passes those values across the module boundary and
+keeps only host-specific routing, authorization, and lifecycle data around
+them. It does not maintain a parallel provider API or re-map canonical web
+output events in the host.
+
 ## Hosted and relay paths
 
 Hosted-channel messages arrive through the backend socket and are handled by
@@ -33,6 +39,11 @@ Hosted-channel messages arrive through the backend socket and are handled by
 private module runtime for progressive delivery. The module owns drafts,
 typing, retries, and idempotent final delivery; the host callback provides the
 captured managed REST transport.
+
+Agent execution uses the shared TinyAgents turn runner. OpenHuman selects the
+agent, applies account and approval policy, binds the session, and supplies
+host capabilities. TinyAgents owns generic admission, queueing, and turn-run
+mechanics; TinyChannels owns provider transport and delivery behavior.
 
 Gateway-relayed inbound messages use [`providers/relay/`](./providers/relay/README.md).
 The host preserves authenticated relay provenance outside serialized message

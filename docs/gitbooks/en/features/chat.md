@@ -86,6 +86,11 @@ image, audio, video, or file content to the model route. Voice notes retain
 typed audio and transcript metadata in the conversation, so they can be
 replayed after reload; dictation sends text only.
 
+The chat host owns its RPC and socket surface, input and approval policy,
+session checkout, and durable reply delivery. TinyAgents supplies generic turn
+admission and queue mechanics. TinyChannels supplies the canonical typed web
+event contract and output projection shared with TUI and relayed web progress.
+
 ## Keyboard
 
 | Shortcut    | Action                    |

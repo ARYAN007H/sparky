@@ -11,8 +11,15 @@ alone can supply:
 
 | Owner | Owns | OpenHuman's host seam |
 | --- | --- | --- |
-| TinyAgents harness | Generic turn admission and run-queue mechanics, exposed to the host through `tinyagents_harness::turn_runner` | [`QueuedPayload`](../agent/queued_turn.rs) carries product metadata; [`runner.rs`](./runner.rs) and [`turn_host.rs`](./turn_host.rs) adapt web-chat policy and ports. |
-| TinyChannels module | Projection of canonical output events onto typed web events, with per-turn `seq` | [`surface.rs`](./surface.rs) calls the compiled module through `tinychannels-bus`; the host keeps routing and process-wide event publication. |
+| TinyAgents harness | Generic turn admission, run-queue mechanics, and work tracking through `tinyagents_harness::turn_runner` | [`QueuedPayload`](../agent/queued_turn.rs) carries product metadata; [`runner.rs`](./runner.rs) and [`turn_host.rs`](./turn_host.rs) supply web-chat policy and host ports. |
+| TinyChannels v2 module and bus | Canonical typed web-event wire contract, generated/shared event types, and projection of output events with per-turn `seq` | [`surface.rs`](./surface.rs) adapts the host to the compiled module through `tinychannels-bus`; OpenHuman retains routing stamps and process-wide event publication. |
+
+OpenHuman owns the product boundary around those engines: the `channel.web_*`
+RPC and socket handlers, input validation and attachment trust, approvals,
+session checkout, reply persistence, terminal policy, and host event delivery.
+It does not own a second turn queue or a web-output event mapper. The host
+adapter translates the module's canonical event type into the process bus
+envelope without changing its wire payload.
 
 Hosted channel domain events are dispatched through this module's `start_chat`
 via `channels/bus/subscriber.rs`; those turns share the web-chat runner. Relay
@@ -119,10 +126,11 @@ SSE stream, the TUI and the hosted channel subscriber.
    idle record and tells the runner when model or tool work opens and closes
    (`WorkStarted` / `WorkFinished`, TinyAgents' `turn_runner::WorkTracker`), then
    hands it to the runner, which calls `WebEvents::progress` in order. That is
-   `ProgressProjection::on_event` (`progress.rs`), the one consumer: it maps the
-   event to the canonical output vocabulary (`progress_map.rs`), publishes it
-   through the compiled TinyChannels module over TinyBus (`surface.rs`), and does the host's side effects in
-   the same pass: the run ledger (`progress_ledger.rs`), the `TurnStates`
+   `ProgressProjection::on_event` (`progress.rs`), the one host consumer: it
+   adapts `AgentProgress` to TinyChannels' typed `ChannelOutputEvent` inputs
+   (`progress_map.rs`) and asks the compiled module to project them onto the
+   web wire (`surface.rs`). It also does host side effects in the same pass:
+   the run ledger (`progress_ledger.rs`), the `TurnStates`
    mirror, the tracing export (`progress_trace.rs`, `journal_shadow.rs`),
    first-token timing and the throttled live `turn_cost`. An
    `inference_heartbeat` every `INFERENCE_HEARTBEAT_SECS` (20 s) keeps a long

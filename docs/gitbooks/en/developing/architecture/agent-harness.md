@@ -7,10 +7,13 @@ icon: layer-group
 
 # Agent harness
 
-`crates/openhuman-core/src/agent/` is the host side of an agent turn: the
-tool-call loop and its dialects, sub-agent dispatch and archetypes, sessions
-and resume, triage, hooks, interrupts and cost accounting, all wrapped around
-the TinyAgents harness rather than reimplementing it.
+`crates/openhuman-core/src/agent/` is the host side of an agent turn. TinyAgents
+owns the generic tool-call loop, call parsing, session identity and transcript
+replay, and reusable turn-runner mechanics. OpenHuman adapts those primitives
+to product policy and host ports: provider selection, access and approvals,
+session persistence, sub-agent product behavior, interruption policy, and cost
+accounting. TinyChannels owns provider implementations and the canonical typed
+channel and web-event contracts.
 
 ## Embedding OpenHuman as a library
 
@@ -93,7 +96,7 @@ Some settings remain runtime-wide for every agent (the live autonomy policy's
 config sub-agents re-read); the crate README lists them under "Still
 runtime-wide".
 
-Every agent turn runs through the published [`tinyagents`](https://crates.io/crates/tinyagents) harness. There are three entry points: `Agent::turn`, the channel and CLI bus path, and `run_subagent`. All of them go through the adapter seam in [`crates/openhuman-core/src/agent/tinyagents/`](https://github.com/tinyhumansai/openhuman/tree/main/crates/openhuman-core/src/agent/tinyagents) (`TurnSpec::run`). Context trimming is `MessageTrimMiddleware`, and cancellation is the tinyagents steering channel. Policy stop hooks (budget, thread-goal and iteration caps) fire through a `StopHookMiddleware` ([`tinyagents/stop_hooks.rs`](https://github.com/senamakel/openhuman/blob/epic/7964-channel-v2/crates/openhuman-core/src/agent/tinyagents/stop_hooks.rs)) that pauses the run on the first stop vote. The channel route forwards live `AgentProgress` like the chat route. The shared `TurnProgress` seam lives in `agent/session_host/tool_progress.rs`.
+Every agent turn runs through the published [`tinyagents`](https://crates.io/crates/tinyagents) harness. There are three entry points: `Agent::turn`, the channel and CLI bus path, and `run_subagent`. All of them go through the adapter seam in [`crates/openhuman-core/src/agent/tinyagents/`](https://github.com/tinyhumansai/openhuman/tree/main/crates/openhuman-core/src/agent/tinyagents) (`TurnSpec::run`). Context trimming is `MessageTrimMiddleware`, and cancellation is the TinyAgents steering channel. Product policy stop hooks (budget, thread-goal and iteration caps) are installed by OpenHuman through `StopHookMiddleware` ([`tinyagents/stop_hooks.rs`](https://github.com/senamakel/openhuman/blob/epic/7964-channel-v2/crates/openhuman-core/src/agent/tinyagents/stop_hooks.rs)). Web chat admission and queue mechanics use TinyAgents' `TurnRunner`; OpenHuman's `web_chat` host supplies ingress, session checkout, approvals, persistence, and terminal-event policy. Channel provider transport and the typed web-event schema/projection are supplied by the TinyChannels v2 module over TinyBus. OpenHuman publishes those canonical events on its process event bus and retains only host routing metadata. The shared `TurnProgress` seam lives in `agent/session_host/tool_progress.rs`.
 
 Multi-agent orchestration runs on the tinyagents graph layer, through `tinyagents-orchestration`'s `parallel` module, the host `spawn_parallel` adapter and the shared `graph::orchestration` `TaskStore` lifecycle primitives re-exported from [`orchestration/mod.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/agent/orchestration/mod.rs):
 
@@ -113,7 +116,7 @@ OpenHuman depends on the split TinyAgents 2.1 crate family by path into the vend
 - No scripting runtime. There is no `repl` or Rhai scripting feature and no `rhai_workflows` tool. Rhai still appears as a dependency of `tinyflows` for its own JSON-query stack, unrelated to the agent harness.
 - Ownership map: model construction → `inference::provider::create_chat_model*`; durable graph checkpoints → TinyAgents' `SqliteCheckpointer`; generic detached executor state → `DetachedTaskRegistry`; controller-facing durability → OpenHuman SQL/JSON run ledgers (`running_subagents`, `workflow_runs`, `agent_teams`, `command_center`). The generic harness/graph/middleware/event primitives are used as-is.
 
-The agent harness is the runtime that turns a user message (or a webhook fire, or a cron tick) into a complete, tool-using LLM interaction. It owns the tool-call loop, sub-agent dispatch, the trigger-triage pipeline, and the hook surface around them. It does not own provider HTTP transport, tool implementations, prompt-section assembly or memory storage. Those are separate domains the harness composes.
+The agent harness turns a user message, webhook event, or cron tick into a complete, tool-using interaction. TinyAgents owns the generic loop and reusable execution primitives. OpenHuman supplies the product-specific sub-agent and trigger workflows, policy hooks, and host capabilities. Provider transport and channel normalization belong to TinyChannels; tool implementations, prompt assembly, and memory storage belong to their respective domains.
 
 This page walks through what happens in one turn, then zooms in on each of the moving parts.
 
@@ -121,13 +124,14 @@ This page walks through what happens in one turn, then zooms in on each of the m
 
 Every turn goes through the same lifecycle, whether the user just typed a message, a Telegram webhook fired or a 9am cron ticked:
 
-Messaging-channel ingress is prepared by the configured TinyChannels module
-through typed bus operations. OpenHuman applies account authorization and
-host policy, then supplies the persistence ports used by TinyAgents' session
-and transcript machinery. TinyAgents owns generic turn execution, session
-identity, and transcript replay. Provider transport and normalization stay in
-TinyChannels; OpenHuman owns account authorization, approvals, and the host
-adapters and persistence implementations.
+Messaging-channel ingress is prepared by the configured TinyChannels v2 module
+through typed bus operations and shared wire types. OpenHuman applies account
+authorization and host policy, then supplies the persistence ports used by
+TinyAgents' session and transcript machinery. TinyAgents owns generic turn
+execution, session identity, transcript replay, and the reusable turn runner.
+Provider transport, normalization, and canonical web-output projection stay in
+TinyChannels; OpenHuman owns account authorization, approvals, session and
+delivery policy, and the host adapters and persistence implementations.
 
 ```text
 ┌─ inbound ─────────────────────────────────────────────────────────┐

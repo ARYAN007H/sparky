@@ -12,11 +12,13 @@ A channel is a messaging app the agent uses to talk to you. You message the agen
 Channel providers normalize platform messages into typed envelopes and send
 typed replies through the configured provider. OpenHuman keeps account policy,
 authorization, agent execution, and durable conversation sessions in the host;
-provider transport runs in the TinyChannels module behind its bus contract.
+provider transport runs in the TinyChannels v2 module behind its bus contract.
 The host communicates with the module through typed TinyBus requests and
 callbacks: it does not link provider implementations. The module prepares
-provider identity and ordered message parts; OpenHuman checks access, selects
-the agent, and binds the message to its durable session before running a turn.
+provider identity and ordered message parts and owns the canonical typed
+channel and web-event contracts; OpenHuman checks access, selects the agent,
+and binds the message to its durable session before running a turn. Generic
+turn admission and queue mechanics come from TinyAgents.
 
 ## What a channel does
 
