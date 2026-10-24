@@ -234,6 +234,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
         Ok::<_, tinybus::module::ModuleCallError>(response)
     }
     .await;
+    eprintln!("DBG op={:?}", operation.as_ref().map(|_| ()).map_err(|e| format!("{e:?}")));
     let (reply, next_route, clear_history) = match operation {
         Ok(ChannelControlResult::Route {
             reply,
