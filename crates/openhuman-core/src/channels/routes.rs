@@ -377,7 +377,10 @@ async fn durable_channel_history_len(
         &store_agent_id,
         &ctx.workspace_dir,
     );
-    let session = tinyagents_session::transcript::SessionRef::scoped(session_key, &agent_id);
+    // The runtime session addresses its transcript by the tenant-scoped store
+    // key (the session identity resolver's agent), not the bare definition id.
+    let session =
+        tinyagents_session::transcript::SessionRef::scoped(session_key, &store_agent_id);
     let head = locator.head_generation(&session);
     let Some(read) = locator.read_session_transcript(&head) else {
         return 0;
