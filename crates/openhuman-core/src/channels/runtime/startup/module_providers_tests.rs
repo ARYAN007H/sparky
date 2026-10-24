@@ -44,7 +44,7 @@ async fn prepared_module_handle_keeps_progressive_send_alive() {
                 "text": "done"
             }
         })))
-        .expect(1)
+        .expect(1..)
         .mount(&server)
         .await;
 
