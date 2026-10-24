@@ -264,10 +264,12 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("hosted authority definitions should be initialized");
     let tmp = tempfile::tempdir().unwrap();
+    // The credential lands in the file-backed secret store, so write it before
+    // the module fixture replaces the installed storage backend.
+    let mut config = config(&tmp);
     let _module_storage = crate::channels::module_fixture::install_memory_storage();
     let channel_module = crate::channels::module_fixture::client().await;
     let server = relay_provider().await;
-    let mut config = config(&tmp);
     config.modules.allow_download = false;
     config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
     config
