@@ -244,11 +244,12 @@ async fn a_detached_driver_uses_its_carried_actor_for_lifecycle_commits() {
     )
     .await
     .unwrap();
-    tokio::time::timeout(std::time::Duration::from_secs(10), receiver.recv())
+    let res = tokio::time::timeout(std::time::Duration::from_secs(10), receiver.recv())
         .await
         .unwrap()
-        .unwrap()
         .unwrap();
+    eprintln!("DBGA {res:?}");
+    res.unwrap();
     let alice_dispatch = CoreContext::scope(alice, async {
         crate::core::runtime::DispatchCtx::ambient()
     })
