@@ -51,9 +51,9 @@ impl SpawnSubagentTool {
                 Ok(store) => store,
                 Err(error) => {
                     log::debug!(
-                        run_context_core_bound = run_context.core.is_some(),
-                        dispatch_resolved = dispatch.resolved().is_some(),
-                        "[spawn_subagent] caller owner context unavailable"
+                        "[spawn_subagent] caller owner context unavailable: run_core_bound={} dispatch_resolved={}",
+                        run_context.core.is_some(),
+                        dispatch.resolved().is_some()
                     );
                     return Ok(ToolResult::error(format!(
                         "spawn_subagent: failed to open the caller-scoped session store: {error}"
