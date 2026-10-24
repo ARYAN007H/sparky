@@ -55,7 +55,7 @@ async fn scenario() {
         .build()
         .await
         .unwrap();
-    let provisioned = runtime.provision("alice").await.unwrap_or_else(|e| { eprintln!("BUILDERR {e:#?}"); std::process::exit(3) });
+    let provisioned = runtime.provision("alice").await.unwrap();
     runtime
         .set_credential(
             &provisioned.profile_id,
