@@ -220,7 +220,13 @@ async fn run_owned(
             },
         )
         .await
-        .map_err(|_| anyhow::anyhow!("TinyBox could not create a command resource"))?;
+        .map_err(|error| {
+            tracing::warn!(
+                error = ?error,
+                "[sandbox:shell] TinyBox refused to create a command resource"
+            );
+            anyhow::anyhow!("TinyBox could not create a command resource")
+        })?;
         let process = tinybox::reserve(config, contract::ReserveRequest::Process(resource.clone()))
             .await
             .map_err(|_| anyhow::anyhow!("TinyBox could not reserve a command process"))?;
