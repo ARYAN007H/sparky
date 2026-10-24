@@ -4487,6 +4487,9 @@ async fn orchestrator_calls_an_operator_trusted_mcp_tool_directly_inner() {
     .await;
 
     let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
+    // The same approval can reach this subscription more than once (a replay on
+    // the stream); decide each request id a single time.
+    let mut decided = std::collections::HashSet::new();
     let done = loop {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
         let event = tokio::time::timeout(remaining, events.recv())
@@ -4500,6 +4503,9 @@ async fn orchestrator_calls_an_operator_trusted_mcp_tool_directly_inner() {
                     .or_else(|| event.get("request_id"))
                     .and_then(Value::as_str)
                     .expect("MCP approval request id");
+                if !decided.insert(request_id.to_string()) {
+                    continue;
+                }
                 let decision = post_json_rpc(
                     &stack.rpc_base,
                     944,
