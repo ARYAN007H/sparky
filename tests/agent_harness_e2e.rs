@@ -3768,7 +3768,9 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     let requests = loop {
         let requests = with_captured(|c| c.clone());
         let delivered = requests.iter().any(|request| {
-            request.to_string().contains("background sub-agent finished")
+            request
+                .to_string()
+                .contains("background sub-agent finished")
                 && request.to_string().contains("Installed the skill.")
         });
         if delivered || std::time::Instant::now() >= deadline {
