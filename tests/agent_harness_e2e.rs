@@ -285,6 +285,28 @@ async fn hold_for_canary_peer(canary: String) {
     lock_or_recover(canary_in_flight()).remove(&canary);
 }
 
+/// How many orchestrator requests must have been answered before any other
+/// agent's request is. `spawn_subagent` is asynchronous, so a child's first
+/// model call races the parent's acknowledgement for the next scripted
+/// completion; arming this makes the order deterministic (`0` = off).
+static PARENT_FIRST_LIMIT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static PARENT_ANSWERED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+fn serialize_children_after_parent(parent_requests: usize) {
+    PARENT_ANSWERED.store(0, std::sync::atomic::Ordering::SeqCst);
+    PARENT_FIRST_LIMIT.store(parent_requests, std::sync::atomic::Ordering::SeqCst);
+}
+
+fn body_is_orchestrator(body: &Value) -> bool {
+    body.get("messages")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|message| message.get("role").and_then(Value::as_str) == Some("system"))
+        .filter_map(|message| message.get("content").and_then(Value::as_str))
+        .any(|content| content.contains(ORCHESTRATOR_PROMPT_MARKER))
+}
+
 async fn scripted_chat_completions(
     uri: Uri,
     headers: HeaderMap,
@@ -334,7 +356,20 @@ async fn scripted_chat_completions(
         }
     }
 
+    let parent_first = PARENT_FIRST_LIMIT.load(std::sync::atomic::Ordering::SeqCst);
+    let is_orchestrator = parent_first > 0 && body_is_orchestrator(&body);
+    if parent_first > 0 && !is_orchestrator {
+        let deadline = std::time::Instant::now() + Duration::from_secs(15);
+        while PARENT_ANSWERED.load(std::sync::atomic::Ordering::SeqCst) < parent_first
+            && std::time::Instant::now() < deadline
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
     let next = with_scripted(|q| q.pop_front());
+    if is_orchestrator {
+        PARENT_ANSWERED.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
     let Some(mut entry) = next else {
         let message = json!({ "role": "assistant", "content": "default scripted completion" });
         return completion_response(streaming, message);
@@ -3643,12 +3678,16 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     let _local_http = EnvVarGuard::set("OPENHUMAN_SKILL_INSTALL_ALLOW_LOCAL_HTTP", "1");
     let _cache = EnvVarGuard::set_to_path("OPENHUMAN_SKILL_REGISTRY_CACHE_DIR", cache_dir.path());
 
+    // The hand-off is a `spawn_subagent` (asynchronous): the parent's
+    // acknowledgement is answered before the child's first call, and the child's
+    // result is delivered to a later parent turn that loads the skill.
+    serialize_children_after_parent(2);
     reset_script(vec![
-        // Orchestrator hands the install to `skill_setup` (a direct hand-off, #6302).
         tool_call_completion(
-            "setup_skills",
-            json!({ "prompt": "Install the harness registry skill", "blocking": true }),
+            "spawn_subagent",
+            json!({ "agent_id": "skill_setup", "prompt": "Install the harness registry skill" }),
         ),
+        text_completion("Handed the install to the skill specialist."),
         // skill_setup finds the entry, then installs it (the gate parks here).
         tool_call_completion(
             "skill_registry_search",
@@ -3659,8 +3698,8 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
             json!({ "entry_id": REGISTRY_SKILL_ID }),
         ),
         text_completion("Installed the skill."),
-        // The orchestrator loads the installed skill itself — there is no
-        // skill-executor hand-off; running one is its own `run_workflow`.
+        // The delivery turn: the orchestrator loads the installed skill itself;
+        // running one is its own `run_workflow`.
         tool_call_completion(
             "describe_workflow",
             json!({ "workflow_id": REGISTRY_SKILL_ID }),
@@ -3697,7 +3736,9 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
         };
         match event.get("event").and_then(Value::as_str) {
             Some("approval_request") => break event,
-            Some("chat_done") | Some("chat_error") => panic!(
+            // The acknowledgement turn ends before the detached child asks.
+            Some("chat_done") => {}
+            Some("chat_error") => panic!(
                 "turn ended before skill_registry_install asked for approval: {event}\nrequests: {}",
                 serde_json::to_string_pretty(&with_captured(|c| c.clone())).unwrap_or_default()
             ),
