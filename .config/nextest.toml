@@ -30,6 +30,7 @@ final-status-level = "slow"
 agent-harness-e2e = { max-threads = 1 }
 json-rpc-e2e = { max-threads = 1 }
 mcp-registry = { max-threads = 1 }
+doctor-e2e = { max-threads = 1 }
 
 [[profile.ci.overrides]]
 filter = 'binary(/^agent_harness_e2e$/)'
@@ -44,3 +45,15 @@ test-group = 'json-rpc-e2e'
 [[profile.ci.overrides]]
 filter = 'binary(/^mcp_registry_multi_server$/)'
 test-group = 'mcp-registry'
+
+# doctor_e2e shares one mock backend when the lane supplies BACKEND_URL
+# (scripts/test-rust-with-mock.sh), and every case resets that mock's state and
+# asserts on its request log. Run in separate processes in parallel they reset
+# each other mid-test, so keep the binary serial.
+[[profile.ci.overrides]]
+filter = 'binary(/^doctor_e2e$/)'
+test-group = 'doctor-e2e'
+
+[[profile.default.overrides]]
+filter = 'binary(/^doctor_e2e$/)'
+test-group = 'doctor-e2e'
