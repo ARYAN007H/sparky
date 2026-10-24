@@ -302,9 +302,15 @@ async fn config_agent_tools_and_threads_mutation_paths_round_trip() {
         json!({}),
     )
     .await;
+    // The harness runs on the legacy single-user layout (the config dir is the
+    // shared root), where the controller refuses rather than hand a caller a
+    // folder that holds every account's data to delete.
     assert!(
-        payload(&data_paths, "get_data_paths").is_object(),
-        "data paths should return an object: {data_paths}"
+        data_paths
+            .pointer("/error/message")
+            .and_then(Value::as_str)
+            .is_some_and(|message| message.contains("legacy data layout")),
+        "data paths on the legacy layout must be refused: {data_paths}"
     );
 
     let diagnostics = rpc(
