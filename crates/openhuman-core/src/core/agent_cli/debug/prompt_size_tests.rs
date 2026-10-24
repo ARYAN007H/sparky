@@ -99,7 +99,7 @@ fn session_report_measures_the_visible_belt_not_the_registry() {
         &config,
         &definition,
     )
-    .expect("test-owned prompt-size session build");
+    .unwrap_or_else(|e| panic!("DBG build: {e:#}"));
 
     let dumped =
         crate::core::agent_cli::debug::session_dump(&agent, "prompt_size_probe", String::new());
