@@ -48,8 +48,9 @@ impl RelayProgressiveTransport {
         channel_ref: Option<&tinychannels_bus::ChannelRef>,
         conversation: Option<&tinychannels_bus::ConversationRef>,
     ) -> tinybus::Result<()> {
-        let expected_route = format!("{}:{}", self.channel_ref.id, self.conversation.id);
-        if route != expected_route
+        // The module keys a scoped output by the provider id; the conversation
+        // is verified separately through the full scope below.
+        if route != self.channel_ref.id
             || turn_id != Some(self.turn_id.as_str())
             || channel_ref != Some(&self.channel_ref)
             || conversation != Some(&self.conversation)
