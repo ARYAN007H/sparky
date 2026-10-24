@@ -138,7 +138,7 @@ fn handle_agent_chat(
             Some(id) if !id.is_empty() => super::AgentChatTarget::AgentId(id),
             _ => super::AgentChatTarget::Orchestrator,
         };
-        super::agent_chat_reply_for_with_headless(
+        super::session_turn::agent_chat_reply_for_with_headless(
             &mut config,
             target,
             &params.common.message,
