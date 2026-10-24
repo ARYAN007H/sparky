@@ -869,7 +869,7 @@ async fn boot_stack_with_options(
             "agent-harness-e2e-token".to_owned(),
         )),
         openhuman_core::core::runtime::DomainSet::full(),
-        openhuman_core::tools::toolpacks::ToolGroups::none(),
+        openhuman_core::tools::toolpacks::ToolGroups::packed(),
         None,
     )
     .await
