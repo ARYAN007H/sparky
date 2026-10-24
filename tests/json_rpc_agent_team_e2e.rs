@@ -1899,6 +1899,7 @@ async fn json_rpc_agent_context_breakdown_default_agent_returns_sections() {
     // params it must default `agent_id` to "orchestrator" and still work
     // against a bare `write_min_config` setup (no thread bootstrap needed).
     let _env_lock = json_rpc_e2e_env_lock_async().await;
+    tinyhumans_boot::boot();
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
     let openhuman_home = home.join(".openhuman");
