@@ -11,6 +11,7 @@ fn attribution_headers_are_scoped_to_each_agent_and_turn_route() {
 }
 
 async fn scenario() {
+    eprintln!("route-headers: starting backend/runtime");
     let backend = stub_backend().await;
     let (a_provider, b_provider) = tokio::join!(provider("a"), provider("b"));
     let runtime = Runtime::builder()
@@ -20,6 +21,7 @@ async fn scenario() {
         .build()
         .await
         .unwrap();
+    eprintln!("route-headers: runtime built");
     let a_route = Route::openai_compatible(format!("{}/v1", a_provider.uri()), "a-key")
         .header("x-medulla-agent-id", "worker-a")
         .header("x-medulla-run-id", "a-run")
@@ -35,6 +37,7 @@ async fn scenario() {
     let a = runtime
         .agent(AgentSpec::new("worker-a").provider(route(&a_provider, "fixture")))
         .unwrap();
+    eprintln!("route-headers: agents instantiated");
     let b = runtime
         .agent(
             AgentSpec::new("worker-b").provider(
@@ -55,8 +58,10 @@ async fn scenario() {
     );
     a_result.unwrap();
     b_result.unwrap();
+    eprintln!("route-headers: first pair sent");
     // The next turn inherits the agent provider, not the previous turn's headers.
     a.run("next a").await.unwrap();
+    eprintln!("route-headers: final turn sent");
     let a_requests = chat_requests(&a_provider).await;
     let b_requests = chat_requests(&b_provider).await;
     assert_eq!(a_requests.len(), 2);
