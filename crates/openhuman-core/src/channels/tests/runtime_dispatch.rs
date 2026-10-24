@@ -130,9 +130,8 @@ async fn message_dispatch_processes_messages_in_parallel() {
 async fn process_channel_message_sends_typing_before_the_provider_reply() {
     let _bus_guard = use_real_agent_handler().await;
     crate::core::bus::init().await.expect("bus init");
-    let _builtins =
-        crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
-            .expect("built-in host agent definitions should load");
+    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+        .expect("built-in host agent definitions should load");
     let linked = linked_telegram_runtime().await;
     let channels_by_name = linked.channels();
 
