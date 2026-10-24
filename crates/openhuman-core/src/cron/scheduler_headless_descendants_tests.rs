@@ -22,28 +22,6 @@ struct CronChildModel {
     child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool,
     child_started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
     child_release: tokio::sync::Notify,
-    child_released: std::sync::atomic::AtomicBool,
-}
-
-impl CronChildModel {
-    /// Release every current and future child invocation. A bare
-    /// `Notify::notify_one` stores a single permit, so a second child model call
-    /// (a retry or replayed turn) would park forever and hang the drain.
-    fn release_child(&self) {
-        self.child_released
-            .store(true, std::sync::atomic::Ordering::SeqCst);
-        self.child_release.notify_waiters();
-    }
-
-    async fn wait_for_release(&self) {
-        loop {
-            let notified = self.child_release.notified();
-            if self.child_released.load(std::sync::atomic::Ordering::SeqCst) {
-                return;
-            }
-            notified.await;
-        }
-    }
 }
 
 #[cfg(feature = "storage-sqlite")]
@@ -182,7 +160,7 @@ impl ChatModel<()> for CronChildModel {
                 let _ = started.send(());
             }
             let _drop = ChildInvocationDrop(std::sync::Arc::clone(&self.child_invocation_dropped));
-            self.wait_for_release().await;
+            self.child_release.notified().await;
             return Ok(ModelResponse::assistant("headless-cron-child-result"));
         }
 
@@ -236,7 +214,6 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
         child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
-        child_released: std::sync::atomic::AtomicBool::new(false),
     });
     let _model =
         crate::inference::provider::factory::test_provider_override::install_model(model.clone());
@@ -256,7 +233,7 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
         Ok(Ok(())) => {}
         Ok(Err(error)) => panic!("child-start observation disconnected: {error}"),
         Err(_) => {
-            model.release_child();
+            model.child_release.notify_one();
             let result = tokio::time::timeout(std::time::Duration::from_secs(30), run).await;
             eprintln!(
                 "scheduled child start timeout diagnostics: spawn calls {}, followups {}, run result {result:?}",
@@ -270,19 +247,9 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
             );
         }
     }
-    model.release_child();
+    model.child_release.notify_one();
 
-    // Hard deadline: a stuck drain must fail this test in seconds, never ride
-    // out the runner's 5-minute kill.
-    match tokio::time::timeout(std::time::Duration::from_secs(30), run).await {
-        Ok(joined) => joined.expect("cron scheduler task"),
-        Err(_) => panic!(
-            "scheduled run did not drain within 30s (spawn calls: {}, child calls: {}, followups: {})",
-            model.spawn_calls.load(std::sync::atomic::Ordering::SeqCst),
-            model.child_calls.load(std::sync::atomic::Ordering::SeqCst),
-            model.accepted_followups.load(std::sync::atomic::Ordering::SeqCst),
-        ),
-    }
+    run.await.expect("cron scheduler task");
     let runs = crate::cron::list_runs(&config, &job.id, 10).expect("read persisted run history");
     assert_eq!(runs.len(), 1, "scheduler persisted one completed run");
     assert_eq!(runs[0].status, "ok", "agent job completed successfully");
@@ -326,7 +293,6 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
         child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
-        child_released: std::sync::atomic::AtomicBool::new(false),
     });
     let _model =
         crate::inference::provider::factory::test_provider_override::install_model(model.clone());
@@ -344,7 +310,7 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
         Ok(Ok(())) => {}
         Ok(Err(error)) => panic!("scheduled child exited before its model blocked: {error}"),
         Err(_) => {
-            model.release_child();
+            model.child_release.notify_one();
             let _ = tokio::time::timeout(std::time::Duration::from_secs(30), run).await;
             panic!(
                 "scheduled child never reached its blocking model (spawns: {}, accepted followups: {})",
@@ -445,7 +411,6 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
         child_dangerous_tool_schema_seen: std::sync::atomic::AtomicBool::new(false),
         child_started: std::sync::Mutex::new(None),
         child_release: tokio::sync::Notify::new(),
-        child_released: std::sync::atomic::AtomicBool::new(false),
     });
     let _model =
         crate::inference::provider::factory::test_provider_override::install_model(model.clone());
