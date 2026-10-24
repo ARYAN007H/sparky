@@ -107,7 +107,10 @@ fn scenario() {
                     .access(Access::full()),
             )
             .expect("agent");
-        let reply = agent.run("call forecast").await.expect("turn");
+        let reply = agent.run("call forecast").await.unwrap_or_else(|error| {
+            eprintln!("TinyMCP embed turn failed: {error:#}");
+            panic!("turn failed")
+        });
         let requests = common::chat_requests(&model).await;
         let results = common::tool_results(requests.last().expect("a follow-up request"));
         let methods: Vec<String> = mcp
