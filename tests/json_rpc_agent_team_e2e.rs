@@ -69,8 +69,10 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
     );
     let memory_agent = definitions
         .iter()
-        .find(|definition| definition.get("id").and_then(Value::as_str) == Some("task_manager_agent"))
-        .expect("safe agent library should include critic");
+        .find(|definition| {
+            definition.get("id").and_then(Value::as_str) == Some("task_manager_agent")
+        })
+        .expect("safe agent library should include task_manager_agent");
     assert!(memory_agent
         .get("display_name")
         .and_then(Value::as_str)
@@ -1066,7 +1068,14 @@ async fn json_rpc_agent_run_mode_set_and_get_round_trip() {
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
 
-    let thread_id = "thread-run-mode-e2e";
+    // The run mode is owned by a persisted thread: the RPC refuses an id that
+    // is not one of the caller's threads.
+    let create = post_json_rpc(&rpc_base, 9400, "openhuman.threads_create_new", json!({})).await;
+    let thread_id = assert_no_jsonrpc_error(&create, "threads_create_new")["data"]["id"]
+        .as_str()
+        .expect("id in created thread")
+        .to_string();
+    let thread_id = thread_id.as_str();
 
     // Defaults to build.
     let initial = post_json_rpc(
@@ -1149,6 +1158,16 @@ async fn json_rpc_agent_context_breakdown_default_agent_returns_sections() {
 
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
+
+    // The report builds the real session agent, which needs a backend session.
+    let store = post_json_rpc(
+        &rpc_base,
+        9500,
+        "openhuman.auth_store_session",
+        json!({ "token": "e2e-test-jwt", "user_id": "e2e-user" }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&store, "auth_store_session");
 
     let breakdown = post_json_rpc(
         &rpc_base,
