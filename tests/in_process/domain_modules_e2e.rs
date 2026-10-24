@@ -19,6 +19,9 @@ use std::sync::Arc;
 use tempfile::{tempdir, TempDir};
 
 struct TestHarness {
+    /// The MCP audit and registry reads run in the TinyMCP module, which
+    /// reaches the host's installed storage backend.
+    _storage: crate::storage_case::Case,
     _tmp: TempDir,
     _guards: Vec<EnvVarGuard>,
     rpc_base: String,
@@ -51,8 +54,11 @@ async fn setup_with_config(memory_config: Option<&str>) -> TestHarness {
         EnvVarGuard::set("OPENHUMAN_MEMORY_EMBED_MODEL", ""),
     ];
 
+    let storage = crate::storage_case::Case::open();
+    storage.install();
     let (addr, join) = serve_rpc().await;
     TestHarness {
+        _storage: storage,
         _tmp: tmp,
         _guards: guards,
         rpc_base: format!("http://{addr}"),
