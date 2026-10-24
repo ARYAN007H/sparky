@@ -704,13 +704,16 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
                 serde_json::json!(host.elapsed.as_nanos().min(u64::MAX as u128) as u64),
             );
         }
+        eprintln!("DBGR record_terminal {key:?}");
         let disposition = tinyagents_orchestration::subagent::SubagentPersistence::record_terminal(
             &self.open_store(true)?,
             key,
             &durable_outcome,
             replaces,
         )
-        .await?;
+        .await;
+        eprintln!("DBGR result {disposition:?}");
+        let disposition = disposition?;
         let host_disposition = match disposition {
             SubagentTerminalPersistenceDisposition::Inserted => {
                 tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalInserted
