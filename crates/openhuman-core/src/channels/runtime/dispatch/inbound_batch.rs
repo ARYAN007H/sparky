@@ -33,8 +33,9 @@ impl DebounceItem for QueuedInbound {
         let inbound = &self.inbound;
         let trimmed = inbound.msg.content.trim_start();
         // Imported history and hosted-relay callback targets belong to exactly
-        // one message, so such a message always runs as its own batch.
-        !trimmed.is_empty()
+        // one message, so such a message always runs as its own batch. A
+        // captionless image or voice note still merges with the text around it.
+        has_substance(inbound)
             && !trimmed.starts_with('/')
             && inbound.imported_history.is_empty()
             && inbound.legacy_history.is_none()

@@ -139,3 +139,15 @@ fn item_traits_classify_media_commands_blanks_and_owned_state() {
         "imported history belongs to one message"
     );
 }
+
+#[test]
+fn a_captionless_typed_part_is_mergeable_but_a_blank_text_is_not() {
+    let mut voice = queued(1, "m1", 1, "");
+    voice.inbound.envelope.parts = vec![ContentPart::Image {
+        media: Default::default(),
+        caption: None,
+        alt_text: None,
+    }];
+    assert!(voice.mergeable(), "an image with no caption still merges");
+    assert!(!queued(1, "m2", 2, "   ").mergeable());
+}
