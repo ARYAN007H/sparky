@@ -623,15 +623,14 @@ pub(super) fn child_tool_policy(
         ) {
             continue;
         }
-        // A denial whose required level fits the channel's ceiling is not the
-        // channel's doing: it is the parent closing a pack it hands off to this
-        // very child (`close_handed_off_packs`), and inheriting it would strip
-        // the specialist of its own belt (`skill_setup` could neither search nor
-        // install). Only a denial above the channel ceiling narrows the child.
+        // The parent closes the packs of the specialists it can hand off to
+        // (`close_handed_off_packs`) so it uses the hand-off instead of the raw
+        // tools. That denial is the parent's own route policy: inheriting it
+        // would strip the specialist of its own belt (`skill_setup` could neither
+        // search nor install). Every other denial narrows the child.
         if decision.action == tinytools::ToolPolicyAction::Deny
-            && decision
-                .required_permission
-                .is_some_and(|required| required <= decision.allowed_permission)
+            && crate::tools::toolpacks::pack_for_tool(name)
+                .is_some_and(|pack| pack.is_owner(child_agent_id))
         {
             continue;
         }
