@@ -121,7 +121,7 @@ impl CoreContext {
             agent: ctx.agent.clone(),
             bare: ctx.bare,
         });
-        super::context::DBG_DERIVED.lock().unwrap().push((Arc::downgrade(&dbg_new), std::backtrace::Backtrace::force_capture().to_string()));
+        super::DBG_DERIVED.lock().unwrap().push((Arc::downgrade(&dbg_new), std::backtrace::Backtrace::force_capture().to_string()));
         dbg_new
     }
 }
