@@ -184,7 +184,27 @@ impl OpenHumanTurnPrelude {
             agents_md_global: agents_md.global,
             agents_md_local: agents_md.local,
         };
-        self.prompt_builder.build_tiered(&context)
+        let mut tiered = self.prompt_builder.build_tiered(&context)?;
+        // Appended, not prepended (#5704): every line of the boundary is
+        // session-scoped, so putting it first would move the prompt's first
+        // diverging byte to offset zero and cost the prefix cache everything
+        // behind it. The volatile tier keeps it at the tail of the prompt.
+        if let Some(boundary) =
+            tinytools::render_tool_policy_boundary(&surface.tool_policy_session, 2048)
+        {
+            let boundary = boundary.trim_end().to_string();
+            if !tiered.text.is_empty() && !tiered.text.ends_with('\n') {
+                tiered.text.push('\n');
+            }
+            tiered.text.push('\n');
+            tiered.text.push_str(&boundary);
+            tiered.text.push('\n');
+            tiered.parts.push((
+                tinyagents_harness::prompt::PromptTier::Volatile,
+                format!("\n\n{boundary}"),
+            ));
+        }
+        Ok(tiered)
     }
 
     pub(super) fn drain_host_events(&self) -> bool {
