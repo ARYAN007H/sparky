@@ -225,6 +225,7 @@ fn a_durable_session_keeps_its_scoped_lifecycle_key_after_document_reopen() {
         task_id: "task".into(),
     };
     saved.lifecycle_key = Some(key.clone());
+    saved.parent_epoch = Some(7);
     docs_in(storage.as_ref(), "local").save(&[saved]).unwrap();
     let loaded = docs_in(storage.as_ref(), "local").load().unwrap();
     assert_eq!(loaded[0].lifecycle_key, Some(key));
