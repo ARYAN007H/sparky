@@ -4,6 +4,14 @@
 mod harness;
 use harness::*;
 
+async fn install_mcp_test_storage(home: &Path) {
+    let storage_url = format!("sqlite:{}", home.join("mcp-test-storage").display());
+    let backend = openhuman_core::storage::open(&storage_url)
+        .await
+        .expect("open isolated MCP test storage backend");
+    openhuman_core::storage::install_for_url(&storage_url, backend);
+}
+
 #[tokio::test]
 #[cfg_attr(
     target_os = "linux",
@@ -13,6 +21,7 @@ async fn mcp_clients_lifecycle() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
+    install_mcp_test_storage(home).await;
     let openhuman_home = home.join(".openhuman");
 
     let _home_guard = EnvVarGuard::set_to_path("HOME", home);
@@ -160,6 +169,7 @@ async fn mcp_clients_declare_connect_tool_call_happy_path() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
+    install_mcp_test_storage(home).await;
     let openhuman_home = home.join(".openhuman");
 
     let _home_guard = EnvVarGuard::set_to_path("HOME", home);
@@ -336,6 +346,7 @@ async fn mcp_clients_reconfigure_then_retire_over_rpc() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
+    install_mcp_test_storage(home).await;
     let openhuman_home = home.join(".openhuman");
 
     let _home_guard = EnvVarGuard::set_to_path("HOME", home);
@@ -476,6 +487,7 @@ async fn mcp_clients_set_enabled_smoke() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
+    install_mcp_test_storage(home).await;
     let openhuman_home = home.join(".openhuman");
 
     let _home_guard = EnvVarGuard::set_to_path("HOME", home);
@@ -561,6 +573,7 @@ async fn mcp_clients_config_round_trip_merges_credentials_and_removes_absent_ser
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
+    install_mcp_test_storage(home).await;
     let openhuman_home = home.join(".openhuman");
 
     let _home_guard = EnvVarGuard::set_to_path("HOME", home);
@@ -760,6 +773,7 @@ async fn mcp_clients_registry_settings_roundtrip() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
+    install_mcp_test_storage(home).await;
     let openhuman_home = home.join(".openhuman");
 
     let _home_guard = EnvVarGuard::set_to_path("HOME", home);
