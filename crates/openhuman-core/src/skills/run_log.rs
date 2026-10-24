@@ -433,6 +433,19 @@ pub async fn drain_to_log(
     stop
 }
 
+/// [`drain_to_log`] on its own task, acting for `ctx`. The log store resolves
+/// its storage scope from the acting context, so a bare spawn would write the
+/// steps under the default scope (or, in SaaS, fail closed) while the header
+/// sits under the dispatching tenant's.
+pub fn spawn_drain_to_log(
+    ctx: &crate::core::runtime::DispatchCtx,
+    rx: Receiver<AgentProgress>,
+    workspace: PathBuf,
+    path: PathBuf,
+) -> tokio::task::JoinHandle<Option<tinyagents_harness::turn_stop::TurnStop>> {
+    ctx.spawn(drain_to_log(rx, workspace, path))
+}
+
 #[cfg(test)]
 #[path = "run_log_tests.rs"]
 mod tests;
