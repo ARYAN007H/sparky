@@ -311,13 +311,36 @@ pub async fn call_bare<Reply: serde::de::DeserializeOwned>(
 #[cfg(test)]
 pub(crate) static MODULE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
-/// Take the module lock for the rest of the test.
+/// The module lock, and the storage the module keeps its preferences in.
 #[cfg(test)]
-pub(crate) async fn module_guard() -> tokio::sync::MutexGuard<'static, ()> {
+pub(crate) struct ModuleGuard {
+    // Fields drop in order: the previous storage slot comes back before the
+    // next test may take the module.
+    _storage: crate::storage::test_support::InstalledBackendGuard,
+    _directory: tempfile::TempDir,
+    _lock: tokio::sync::MutexGuard<'static, ()>,
+}
+
+/// Take the module lock for the rest of the test.
+///
+/// The module refuses a preference call when the host serves no storage, and
+/// a module call carries no workspace for the host to fall back to, so the
+/// guard installs what a booted host has: a SQLite backend of its own,
+/// restored on drop.
+#[cfg(test)]
+pub(crate) async fn module_guard() -> ModuleGuard {
     // Tests that take the module drive its backend mode against a local mock;
     // give this thread the stand-in route a host would register.
     super::test_backend_route::register();
-    MODULE_LOCK.lock().await
+    let lock = MODULE_LOCK.lock().await;
+    let directory = tempfile::tempdir().unwrap();
+    let url = format!("sqlite:{}", directory.path().join("storage").display());
+    let backend = crate::storage::open(&url).await.unwrap();
+    ModuleGuard {
+        _storage: crate::storage::test_support::install_for_test(&url, backend),
+        _directory: directory,
+        _lock: lock,
+    }
 }
 
 #[cfg(test)]

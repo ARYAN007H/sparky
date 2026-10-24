@@ -181,3 +181,23 @@ fn non_document_grants_match_the_owner_contracts_without_broad_prefixes() {
         Err(Denied::Target)
     );
 }
+
+#[test]
+fn connectors_may_read_the_v1_preferences_its_migration_moves() {
+    let connectors = declared("tinyconnectors").unwrap();
+    for collection in [
+        tinyconnectors_bus::storage::PREFS_NAMESPACE,
+        tinyconnectors_bus::storage::MIGRATIONS_NAMESPACE,
+        tinyconnectors_bus::storage::LEGACY_PREFS_NAMESPACE,
+    ] {
+        assert!(
+            allowed(
+                &connectors,
+                Object::Documents,
+                "Get",
+                json!({"collection": collection, "id": "gmail"})
+            ),
+            "{collection} is not granted"
+        );
+    }
+}
