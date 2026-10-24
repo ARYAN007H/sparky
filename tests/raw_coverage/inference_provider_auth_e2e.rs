@@ -31,7 +31,7 @@ use crate::env_guard::EnvVarGuard;
 use crate::rpc_harness::payload;
 use std::net::SocketAddr;
 use std::path::Path;
-use std::sync::{OnceLock};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use axum::http::header::AUTHORIZATION;
@@ -60,7 +60,8 @@ fn env_lock() -> tokio::sync::MutexGuard<'static, ()> {
 async fn env_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
     ENV_LOCK
         .get_or_init(|| tokio::sync::Mutex::new(()))
-        .lock().await
+        .lock()
+        .await
 }
 
 /// `core::auth::RPC_TOKEN`
