@@ -213,3 +213,71 @@ async fn a_preference_still_in_the_legacy_file_gates_execution() {
         }
     ));
 }
+
+/// Puts back whatever storage backend the process had when dropped.
+struct RestoreInstalledStorage(Option<std::sync::Arc<dyn crate::storage::StorageBackend>>);
+
+impl Drop for RestoreInstalledStorage {
+    fn drop(&mut self) {
+        crate::storage::clear();
+        if let Some(previous) = self.0.take() {
+            crate::storage::install(previous);
+        }
+    }
+}
+
+/// The wiring, not only the fallback value: when the connector module cannot
+/// read a stored preference, every gate that consults it denies.
+///
+/// The module caches its link to the host's storage on first use. Saving a
+/// preference while a backend is installed connects that link; removing the
+/// backend then makes the module's next preference read fail (`Unavailable`),
+/// as a storage outage would.
+#[tokio::test]
+async fn an_unreadable_preference_denies_at_every_gate() {
+    use crate::integrations::composio::module_client::module_guard;
+    let _serialised = module_guard().await;
+    let _slot = crate::storage::test_support::lock_storage_slot();
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = tmp.path().join("workspace");
+    config.config_path = tmp.path().join("config.toml");
+
+    let restore = RestoreInstalledStorage(crate::storage::install(
+        crate::storage::test_support::memory_backend(),
+    ));
+    crate::integrations::composio::ops::save_user_scope_pref(
+        &ctx,
+        &config,
+        "gmail",
+        only(true, false, false),
+    )
+    .await
+    .expect("the module stores the pref while storage is installed");
+    crate::storage::clear();
+
+    let read = crate::integrations::composio::ops::load_user_scope_pref(&ctx, &config, "gmail").await;
+    assert!(read.is_err(), "an unreadable pref is an error, not the default: {read:?}");
+    assert!(
+        !crate::integrations::composio::flow_gate::flow_tool_allowed(
+            &ctx,
+            &config,
+            "GMAIL_SEND_EMAIL",
+            None
+        )
+        .await,
+        "the flows gate must not admit a write action on an unreadable pref"
+    );
+    let decision = evaluate_tool_visibility(&ctx, &config, "GMAIL_SEND_EMAIL").await;
+    assert!(
+        matches!(
+            decision,
+            ToolDecision::BlockedByScope {
+                scope: ToolScope::Write
+            }
+        ),
+        "the execute gate must block a write action on an unreadable pref"
+    );
+    drop(restore);
+}
