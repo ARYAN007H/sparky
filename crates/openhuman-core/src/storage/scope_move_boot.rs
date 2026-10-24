@@ -277,10 +277,10 @@ fn backend_for_target_scope(
     known: &Known,
     config: &crate::config::Config,
 ) -> anyhow::Result<BackendForScope> {
-    if target_scope.is_local() || target_scope.is_cluster() {
+    let parsed = target_scope.parsed()?;
+    if matches!(parsed.tenant, crate::storage::Tenant::Local | crate::storage::Tenant::Cluster) {
         return Ok((Arc::clone(backend), None));
     }
-    let parsed = target_scope.parsed()?;
     let crate::storage::Tenant::User(_) = parsed.tenant else {
         anyhow::bail!(
             "scope {} is not an admitted tenant scope",
