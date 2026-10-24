@@ -5448,27 +5448,12 @@ async fn cancelling_a_running_background_subagent_settles_it_inner() {
     // `CANARY_BARRIER_WAIT`: long enough to cancel it while it is running.
     arm_canary_barrier(&["CANCEL_E2E_CANARY", "CANCEL_E2E_NEVER"]);
     let stack = boot_stack().await;
-    bind_thread_action_dir(
-        &stack,
-        "thread-cancel",
-        &stack._tmp.path().join("OpenHuman/projects"),
-    )
-    .await;
-    let image_path = stack._tmp.path().join("OpenHuman/projects/cancel-vision.png");
-    std::fs::create_dir_all(stack._tmp.path().join("OpenHuman/projects/uploads/validation"))
-        .expect("create attachment validation directory");
-    std::fs::copy(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/images/handoff-hero.png"),
-        &image_path,
-    )
-    .expect("copy vision fixture");
     reset_script(vec![
         tool_calls_completion(&[(
             "spawn_subagent",
             json!({
-                "agent_id": "vision_agent",
+                "agent_id": "task_manager_agent",
                 "prompt": "Find CANCEL_E2E_CANARY",
-                "image_paths": [image_path],
             }),
         )]),
         text_completion("Spawned a worker; its result will arrive later."),
