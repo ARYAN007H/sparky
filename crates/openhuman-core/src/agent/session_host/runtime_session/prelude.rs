@@ -201,7 +201,7 @@ impl OpenHumanTurnPrelude {
             tiered.text.push_str(&boundary);
             tiered.text.push('\n');
             tiered.parts.push((
-                crate::agent::prompts::PromptTier::Volatile,
+                tinyagents_harness::prompt::PromptTier::Volatile,
                 format!("\n\n{boundary}"),
             ));
         }
