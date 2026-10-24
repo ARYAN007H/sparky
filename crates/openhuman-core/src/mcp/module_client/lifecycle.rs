@@ -17,14 +17,17 @@ impl McpConfiguredClient {
     /// serialized by the client itself.
     pub(crate) fn for_config(config: &Config) -> Result<Arc<Self>, ModuleCallError> {
         if SHUTTING_DOWN.load(Ordering::Acquire) {
+            tracing::debug!("[mcp] configured client unavailable: shutdown is in progress");
             crate::modules::report::unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
         }
         if !config.modules.enabled {
+            tracing::debug!("[mcp] configured client unavailable: modules are disabled");
             crate::modules::report::unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
         }
         if current_agent_context_is_removed() {
+            tracing::debug!("[mcp] configured client unavailable: agent context was removed");
             crate::modules::report::unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
         }
@@ -38,7 +41,8 @@ impl McpConfiguredClient {
             })
             .map_err(|error| match error {
                 AdmitError::Create(error) => error,
-                _ => {
+                other => {
+                    tracing::debug!(?other, "[mcp] configured client admission rejected");
                     crate::modules::report::unavailable(MODULE);
                     ModuleCallError::Unavailable
                 }
