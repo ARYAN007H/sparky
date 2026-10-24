@@ -31,7 +31,7 @@ pub(crate) struct AdmittedInbound {
     pub(crate) legacy_history: Option<crate::channels::providers::relay::LegacyHistoryImport>,
 }
 
-fn channel_inbound_preparation_request(
+pub(super) fn channel_inbound_preparation_request(
     source: tinychannels_bus::module_inbound::ChannelInboundSource,
     preparation_mode: tinychannels_bus::module_inbound::ChannelInboundPreparationMode,
 ) -> tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
@@ -43,7 +43,7 @@ fn channel_inbound_preparation_request(
     }
 }
 
-fn inbound_console_preview(envelope: &ChannelInboundEnvelope, text: &str) -> String {
+pub(super) fn inbound_console_preview(envelope: &ChannelInboundEnvelope, text: &str) -> String {
     let contains_audio = envelope.parts.iter().any(|part| {
         matches!(
             part,

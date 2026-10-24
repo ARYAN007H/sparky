@@ -20,6 +20,8 @@ use super::super::helpers::{
 };
 use super::super::host_agent::{self, HostRoute};
 use super::admit::{admit_runtime_message, AdmittedInbound};
+#[cfg(test)]
+use super::admit::{channel_inbound_preparation_request, inbound_console_preview};
 use super::approval::channel_has_approval_surface;
 use super::RuntimeChannelMessage;
 
