@@ -4,11 +4,10 @@
 use crate::channels::context::{is_context_window_overflow_error, ChannelRuntimeContext};
 #[cfg(test)]
 use crate::channels::routes::get_or_create_turn_model_source;
-use crate::channels::routes::{get_route_selection, handle_runtime_command_with_reset};
+use crate::channels::routes::get_route_selection;
 use crate::channels::SendMessage;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio_util::sync::CancellationToken;
@@ -19,38 +18,9 @@ use super::super::helpers::{
     REPLY_LOG_TRUNCATE_CHARS,
 };
 use super::super::host_agent::{self, HostRoute};
-use super::approval::{channel_has_approval_surface, try_route_approval_reply};
+use super::admit::{admit_runtime_message, AdmittedInbound};
+use super::approval::channel_has_approval_surface;
 use super::RuntimeChannelMessage;
-
-fn channel_inbound_preparation_request(
-    source: tinychannels_bus::module_inbound::ChannelInboundSource,
-    preparation_mode: tinychannels_bus::module_inbound::ChannelInboundPreparationMode,
-) -> tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
-    tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
-        source,
-        namespace: "main".into(),
-        session_policy: Default::default(),
-        preparation_mode,
-    }
-}
-
-fn inbound_console_preview(
-    envelope: &tinychannels_bus::ChannelInboundEnvelope,
-    text: &str,
-) -> String {
-    let contains_audio = envelope.parts.iter().any(|part| {
-        matches!(
-            part,
-            tinychannels_bus::ContentPart::VoiceNote { .. }
-                | tinychannels_bus::ContentPart::Audio { .. }
-        )
-    });
-    if contains_audio {
-        "[voice message]".to_owned()
-    } else {
-        truncate_with_ellipsis(text, 80)
-    }
-}
 
 pub(crate) async fn process_channel_runtime_message(
     ctx: Arc<ChannelRuntimeContext>,

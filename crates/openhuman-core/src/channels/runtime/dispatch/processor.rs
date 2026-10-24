@@ -14,8 +14,10 @@
 //!   [`process_channel_runtime_message`] with a bounded set of host workers
 //!   and joins them when the inbound queue closes.
 
+mod admit;
 mod approval;
 mod bus_turn;
+mod in_order;
 mod native_media;
 pub(crate) mod progressive;
 mod reset;
