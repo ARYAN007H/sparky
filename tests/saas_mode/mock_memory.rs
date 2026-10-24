@@ -20,7 +20,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, PoisonError};
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// One request the mock served.
 #[derive(Debug, Clone)]
@@ -545,7 +545,7 @@ fn forget(store: &mut Store, body: &Value) -> (u16, Value) {
     let cascade = body["cascade"].as_str().unwrap_or("derived_only");
     match cascade {
         "derived_only" => {
-            return ok(json!({ "deleted": { "events": 0 }, "requested": ids.len(), "matched": 0 }))
+            return ok(json!({ "deleted": { "events": 0 }, "requested": ids.len(), "matched": 0 }));
         }
         "redact_events" => {}
         _ => return fail(400, "INVALID_CASCADE"),

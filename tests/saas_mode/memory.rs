@@ -11,7 +11,7 @@
 
 use std::path::PathBuf;
 
-use super::mock_memory::{credential_id, MemoryRequest, MockMemory};
+use super::mock_memory::{MemoryRequest, MockMemory, credential_id};
 use super::*;
 
 const USERS: [&str; 3] = ["ann", "anna", "bob"];
