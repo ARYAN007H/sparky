@@ -530,12 +530,15 @@ async fn scenario() {
     );
     {
         let reopened_sessions = sessions.lock().unwrap();
-        assert_eq!(
-            &reopened_sessions[reopened_sessions.len() - 2..],
-            [
-                ("alice".into(), Some("t1".into())),
-                ("alice".into(), Some("channel:telegram/sender/chat".into()))
-            ]
+        let tail = &reopened_sessions[reopened_sessions.len() - 2..];
+        assert_eq!(tail[0], ("alice".into(), Some("t1".into())));
+        let (profile, key) = &tail[1];
+        assert_eq!(profile, "alice");
+        assert!(
+            key.as_deref()
+                .is_some_and(|key| key.contains("|channel=p8:telegram|")
+                    && key.contains("|participant=p6:sender")),
+            "{key:?}"
         );
     }
     handles.insert(0, reopened);
