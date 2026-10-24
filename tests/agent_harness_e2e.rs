@@ -860,6 +860,21 @@ async fn boot_stack_with_options(
     // the explicit tinymemory host seams before handlers service memory-backed
     // agent turns, matching normal startup wiring.
 
+    // The transport-only router does not create a Core runtime context, and a
+    // dispatch with none resolves no storage scope (the sub-agent session store
+    // refuses to open). Bind the process default context like a booted host.
+    let (_default_context, _, _) = openhuman_core::core::runtime::CoreContext::init_with_config(
+        openhuman_core::core::types::HostKind::Library,
+        &openhuman_core::core::runtime::TokenSource::Fixed(std::sync::Arc::new(
+            "agent-harness-e2e-token".to_owned(),
+        )),
+        openhuman_core::core::runtime::DomainSet::full(),
+        openhuman_core::tools::toolpacks::ToolGroups::none(),
+        None,
+    )
+    .await
+    .expect("initialize the default core context for the harness stack");
+
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
     tokio::time::sleep(Duration::from_millis(100)).await;
