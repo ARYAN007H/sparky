@@ -7,7 +7,7 @@ use tinyinference_llm::model::{
 };
 use tinyinference_llm::providers::overrides::{ChatModelEntry, ProviderModelMetadata};
 
-const TEST_MANAGED_MODEL: &str = "hint:chat";
+const TEST_MANAGED_MODEL: &str = "test/triage-managed";
 
 struct TriageReplyModel {
     requests: Arc<Mutex<Vec<(String, String, ModelRequest)>>>,
@@ -96,8 +96,8 @@ fn triage_test_model(
 
 /// Model vocabulary for the test provider. The managed factory resolves the
 /// model through the provider's metadata and drops `hint:*` pins from the
-/// plain fallback, so a provider that wants a hint to reach the turn must say
-/// so: this one passes the pinned id (alias or not) through unchanged.
+/// plain fallback, so this provider turns every hint (and an unpinned role)
+/// into the concrete managed model the configuration names.
 fn triage_model_metadata() -> ProviderModelMetadata<crate::inference::registry::ProviderContext> {
     let hint_role = |model: &str| {
         model
@@ -111,11 +111,17 @@ fn triage_model_metadata() -> ProviderModelMetadata<crate::inference::registry::
         is_alias: Arc::new(|model| model.starts_with("hint:")),
         is_raw_model: Arc::new(|model| !model.starts_with("hint:")),
         supports_vision: Arc::new(|_| false),
-        resolve_model: Arc::new(|_role, context, model| {
-            model
-                .map(str::to_string)
-                .or_else(|| context.config.default_model.clone())
-                .or_else(|| Some(TEST_MANAGED_MODEL.to_string()))
+        resolve_model: Arc::new(|_role, context, model| match model {
+            Some(model) if !model.starts_with("hint:") => Some(model.to_string()),
+            _ => Some(
+                context
+                    .config
+                    .default_model
+                    .as_deref()
+                    .filter(|configured| !configured.starts_with("hint:"))
+                    .unwrap_or(TEST_MANAGED_MODEL)
+                    .to_string(),
+            ),
         }),
         context_window: Arc::new(|_| None),
         default_pricing: Arc::new(|| None),
