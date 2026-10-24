@@ -4661,7 +4661,7 @@ mod tool_policy_boundary_placement {
         let mut config = AgentConfig::default();
         config
             .channel_permissions
-            .insert("boundary-channel".to_string(), "read".to_string());
+            .insert("internal".to_string(), "read".to_string());
 
         let agent = OpenHumanSessionHost::builder()
             .model_name("test/session-fixture".to_string())
@@ -4678,7 +4678,7 @@ mod tool_policy_boundary_placement {
             ])
             .tool_dispatcher(Box::new(NativeDialect))
             .workspace_dir(workspace.path().to_path_buf())
-            .event_context("boundary-session", "boundary-channel")
+            .event_context("boundary-session", "internal")
             .config(config)
             .build()
             .expect("complete builder should succeed");
