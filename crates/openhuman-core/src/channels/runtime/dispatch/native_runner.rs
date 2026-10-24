@@ -467,6 +467,7 @@ impl FailureClassifier for NativeFailures {
     }
 
     fn classify_failure(&self, error: &str) -> FailureClassification {
+        eprintln!("DBGRAW {error}");
         if error == crate::channels::failure_copy::LEGACY_HISTORY_UNAVAILABLE {
             return FailureClassification {
                 class: "channel_history_unavailable".to_owned(),
