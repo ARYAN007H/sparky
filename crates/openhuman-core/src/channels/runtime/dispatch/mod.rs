@@ -12,6 +12,7 @@
 
 mod helpers;
 pub(crate) mod host_agent;
+mod inbound_batch;
 mod native_runner;
 mod processor;
 
