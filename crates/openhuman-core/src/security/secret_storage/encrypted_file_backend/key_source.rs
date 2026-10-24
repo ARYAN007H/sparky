@@ -172,6 +172,7 @@ pub(super) fn workspace_master_key(
 /// changing key state. Explicit operator key variables retain their normal
 /// precedence; otherwise only an existing key file beneath `workspace` is
 /// considered. Host key sources are excluded because they can prompt or mint.
+#[cfg(feature = "secret-file")]
 pub(super) fn profile_master_key_read_only(
     workspace: &Path,
 ) -> Result<Option<Zeroizing<[u8; 32]>>, SecretStorageError> {
@@ -220,6 +221,6 @@ pub(super) fn profile_master_key_read_only(
         .map_err(SecretStorageError::Backend)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "secret-file"))]
 #[path = "key_source_tests.rs"]
 mod tests;

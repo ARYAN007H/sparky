@@ -1147,7 +1147,6 @@ async fn run_managed_capture_turn(
     // Session transcript stores and their SQLite backend are also cached by
     // workspace path; release them before the next repetition removes it.
     openhuman_core::storage::sessions::release_workspace(&workspace_dir);
-
     with_captured_proxy_requests(|requests| requests.clone())
 }
 
@@ -3166,6 +3165,7 @@ mod streaming_support {
         config: AgentConfig,
     ) -> OpenHumanSessionHost {
         OpenHumanSessionHost::builder()
+            .model_name("test/session-fixture".to_string())
             .chat_model(provider)
             .tools(tools)
             .tool_dispatcher(Box::new(NativeDialect))
@@ -4664,6 +4664,7 @@ mod tool_policy_boundary_placement {
             .insert("boundary-channel".to_string(), "read_only".to_string());
 
         let agent = OpenHumanSessionHost::builder()
+            .model_name("test/session-fixture".to_string())
             .chat_model(provider)
             .tools(vec![
                 Box::new(ScopedTool {

@@ -1,10 +1,11 @@
 //! What `[inbound]` resolves to: the queue manifest and pipeline configuration
 //! the module runs, where its queues live, and whether routing is on.
 //!
-//! The host hands the module its configuration (`queues`, `pipeline`) in the
-//! module's private blob when it loads it ([`module_config`]), and declares
-//! the same manifest on the module's storage scope when the storage host
-//! binds it ([`queue_grant`]). Both read the last resolution, so the queues
+//! The host hands the module its queue and pipeline configuration in the
+//! module's private blob when it loads it ([`module_config`]), and declares the
+//! same manifest on the module's storage scope when the storage host binds it
+//! ([`queue_grant`]). TinyBus injects the unique storage callback destination
+//! during verified module loading. Both read the last resolution, so the queues
 //! the module asks for are exactly the queues the host serves.
 
 use std::path::Path;

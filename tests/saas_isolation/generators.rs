@@ -106,6 +106,10 @@ pub const GENERATORS: &[(&str, Generator)] = &[
         |w, a| json!({ "thread_id": w.thread_for(a, false) }),
     ),
     (
+        "openhuman.threads_state_get",
+        |w, a| json!({ "thread_id": w.thread_for(a, false) }),
+    ),
+    (
         "openhuman.threads_generate_title",
         |w, a| json!({ "thread_id": w.thread_for(a, true), "assistant_message": w.canary(a) }),
     ),

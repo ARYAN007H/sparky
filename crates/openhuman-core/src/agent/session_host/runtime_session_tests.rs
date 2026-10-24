@@ -124,7 +124,6 @@ async fn committed_progress_carries_the_sidecar_stop_on_turn_completed() {
 
 #[test]
 fn clearing_progress_releases_warm_prelude_sender() {
-    crate::agent::session_host::test_support::install_model_fixture();
     let tmp = tempfile::tempdir().expect("tempdir");
     let config = crate::config::Config {
         workspace_dir: tmp.path().join("workspace"),
@@ -132,6 +131,7 @@ fn clearing_progress_releases_warm_prelude_sender() {
         config_path: tmp.path().join("config.toml"),
         ..Default::default()
     };
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -214,7 +214,6 @@ fn spec(name: &str) -> ToolSpec {
 #[cfg(feature = "mcp")]
 #[test]
 fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
-    crate::agent::session_host::test_support::install_model_fixture();
     crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -224,6 +223,7 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
         config_path: tmp.path().join("config.toml"),
         ..Default::default()
     };
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -284,7 +284,6 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
 #[cfg(feature = "mcp")]
 #[tokio::test]
 async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec() {
-    crate::agent::session_host::test_support::install_model_fixture();
     crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -294,6 +293,7 @@ async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec(
         config_path: tmp.path().join("config.toml"),
         ..Default::default()
     };
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -378,7 +378,6 @@ async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec(
 #[cfg(feature = "modules")]
 #[tokio::test]
 async fn desktop_browser_setting_keeps_deferred_tools_in_fresh_and_resumed_surfaces() {
-    crate::agent::session_host::test_support::install_model_fixture();
     let tmp = tempfile::tempdir().expect("tempdir");
     let workspace = tmp.path().join("workspace");
     std::fs::create_dir_all(workspace.join("state")).expect("state dir");
@@ -398,6 +397,7 @@ async fn desktop_browser_setting_keeps_deferred_tools_in_fresh_and_resumed_surfa
     };
     config.browser.enabled = true;
     config.http_request.allowed_domains = vec!["example.com".into()];
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,

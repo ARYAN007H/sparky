@@ -32,6 +32,12 @@ pub use host_stores::{
 pub use rebound::{rebind_all, ReboundSessionStores, StoreRegistry};
 pub use tenant_router::TenantSessionStores;
 
+/// Drops cached stores for a profile after its lease is released. Existing
+/// handles retain their original fence; a later profile open gets fresh ones.
+pub fn release_profile(profile: &str) {
+    rebound::release_profile(profile);
+}
+
 static PROVIDER: LazyLock<RwLock<Option<Arc<dyn SessionStoreProvider>>>> =
     LazyLock::new(|| RwLock::new(None));
 

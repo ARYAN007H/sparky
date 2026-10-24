@@ -1,5 +1,5 @@
 use super::*;
-use crate::util::classic_transcript_fixture::{read_classic_rows, write_classic};
+use crate::util::classic_transcript_fixture::write_classic;
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
@@ -111,17 +111,17 @@ async fn run_pending_skips_when_version_current() {
 async fn run_pending_runs_phase_out_when_version_zero() {
     let tmp = TempDir::new().unwrap();
     let path = seed_tainted_transcript(&tmp.path().join("workspace"));
+    let before = fs::read(&path).unwrap();
 
     let mut config = config_in(&tmp);
     assert_eq!(config.schema_version, 0);
     run_pending(&mut config).await;
 
     assert_eq!(config.schema_version, CURRENT_SCHEMA_VERSION);
-    let rows = read_classic_rows(&path);
-    let first = rows[0]["content"].as_str().unwrap();
-    assert!(
-        !first.contains("### PROFILE.md"),
-        "PROFILE.md block must be stripped, got:\n{first}"
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        before,
+        "migration must preserve source transcripts; import strips the retired section"
     );
 
     let on_disk = std::fs::read_to_string(&config.config_path).unwrap();

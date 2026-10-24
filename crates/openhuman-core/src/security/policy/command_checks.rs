@@ -81,31 +81,45 @@ fn contains_unquoted_single_ampersand(command: &str) -> bool {
 
 #[cfg(test)]
 fn has_hidden_execution(command: &str) -> bool {
+    let command = strip_quoted_heredoc_bodies(command);
     ["$(", "<(", ">("]
         .iter()
         .any(|needle| command.contains(needle))
-        || contains_unquoted_char(command, '`')
-        || contains_unquoted_single_ampersand(command)
+        || contains_unquoted_char(&command, '`')
+        || contains_unquoted_single_ampersand(&command)
 }
 
 #[cfg(test)]
 fn is_command_executor(command: &str) -> bool {
-    matches!(
-        command,
-        "sh" | "bash"
-            | "zsh"
-            | "fish"
-            | "python"
-            | "python2"
-            | "python3"
-            | "node"
-            | "ruby"
-            | "perl"
-            | "php"
-            | "lua"
-            | "awk"
-            | "xargs"
-    )
+    let command = command_basename(command.trim_matches(|c: char| matches!(c, '\'' | '"')))
+        .to_ascii_lowercase();
+    let command = command.strip_suffix(".exe").unwrap_or(&command);
+    let python_executor = command
+        .strip_prefix("pythonw")
+        .or_else(|| command.strip_prefix("python"))
+        .is_some_and(|version| {
+            version.is_empty()
+                || version
+                    .chars()
+                    .all(|character| character.is_ascii_digit() || character == '.')
+        });
+    python_executor
+        || matches!(
+            command,
+            "sh" | "bash"
+                | "zsh"
+                | "fish"
+                | "python"
+                | "python2"
+                | "node"
+                | "ruby"
+                | "perl"
+                | "php"
+                | "lua"
+                | "awk"
+                | "xargs"
+                | "env"
+        )
 }
 
 impl SecurityPolicy {

@@ -27,6 +27,7 @@ fn host_with(
     let chat_model: Arc<dyn tinyinference_llm::model::ChatModel<()>> = model.clone();
     let mut host = crate::agent::SessionHostBuilder::new()
         .with_session_history_locator(Arc::clone(locator))
+        .model_name("test/session-fixture".to_string())
         .chat_model(chat_model)
         .model_name("test/session-fixture".to_string())
         .tools(Vec::new())

@@ -41,7 +41,9 @@ pub async fn load_declared_modules(config: &Config) {
     // win over a download, and `ensure_loaded` below then finds it already
     // serving rather than fetching a second copy.
     for outcome in
-        super::search_path::load_enabled(runtime.host(), &ops::disabled_lib_stems(config))
+        super::search_path::load_enabled(runtime.host(), &ops::disabled_lib_stems(config), |id| {
+            ops::module_config(config, id)
+        })
     {
         match outcome {
             Ok(info) => log::info!(

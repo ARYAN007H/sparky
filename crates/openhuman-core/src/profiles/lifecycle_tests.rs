@@ -213,7 +213,8 @@ async fn a_failed_archive_gives_the_lease_back() {
 #[tokio::test]
 async fn provisioning_waits_out_another_nodes_lease() {
     let tmp = tempfile::tempdir().unwrap();
-    let backend: Arc<dyn StorageBackend> = memory_backend();
+    let backend_fixture = crate::storage::test_support::sqlite_backend().unwrap();
+    let backend: Arc<dyn StorageBackend> = Arc::clone(&backend_fixture.backend);
     let (a, b) = (
         clustered(tmp.path(), "node-a", &backend),
         clustered(tmp.path(), "node-b", &backend),

@@ -294,7 +294,7 @@ fn make_parent(
         subagent_tool_ceiling_names: std::collections::HashSet::new(),
         model_name: "test-model".into(),
         temperature: 0.5,
-        workspace_dir: std::env::temp_dir(),
+        workspace_dir: crate::storage::test_support::isolated_workspace(),
         agent_config: crate::config::AgentConfig::default(),
         workflows: Arc::new(vec![]),
         memory_context: Arc::new(None),

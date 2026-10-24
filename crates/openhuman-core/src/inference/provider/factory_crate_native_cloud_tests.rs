@@ -276,6 +276,9 @@ async fn native_claude_turn_routes_disclose_pinned_models() {
     use std::time::Duration;
 
     let _guard = crate::inference::inference_test_guard_async().await;
+    let _storage = crate::storage::test_support::install_backend_for_test(
+        crate::storage::test_support::memory_backend(),
+    );
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().unwrap().receiver();
 

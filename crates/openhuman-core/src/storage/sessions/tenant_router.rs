@@ -156,6 +156,18 @@ impl TenantSessionStores {
             .cloned()
             .collect()
     }
+
+    /// Drops the session provider captured for one profile's current lease.
+    /// Existing handles keep their old fenced backend, so in-flight work
+    /// still fails closed after a takeover; the next open builds fresh handles
+    /// against the new lease epoch.
+    pub fn release_profile(&self, profile: &str) {
+        let tenant = crate::storage::tenant_scope(Some(profile));
+        self.tenants
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(&tenant);
+    }
 }
 
 impl SessionStoreProvider for TenantSessionStores {

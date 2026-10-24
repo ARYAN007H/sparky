@@ -28,8 +28,8 @@ async fn dispatch_publishes_tinychannels_inbound_envelope() {
     assert_eq!(envelope.channel.id, "telegram");
     assert_eq!(envelope.message_id, "m1");
     assert_eq!(envelope.conversation.id, "reply");
-    assert_eq!(envelope.conversation.thread_id, None);
-    assert_eq!(envelope.conversation.topic_id.as_deref(), Some("topic-99"));
+    assert_eq!(envelope.conversation.thread_id.as_deref(), Some("topic-99"));
+    assert_eq!(envelope.conversation.topic_id, None);
     assert_eq!(envelope.sender.id, "alice");
 }
 

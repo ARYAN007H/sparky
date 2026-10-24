@@ -8,6 +8,11 @@ fn docs_in(storage: &dyn StorageBackend, scope: &str) -> Docs {
     Docs::over(&storage.for_scope(&Scope::new(scope).unwrap()).unwrap())
 }
 
+fn opened_docs_in(storage: &std::sync::Arc<dyn StorageBackend>, scope: &str) -> Docs {
+    let scope = Scope::new(scope).unwrap();
+    Docs(crate::storage::documents::Repo::on(storage, &scope, DOMAIN, collections).unwrap())
+}
+
 fn session(id: &str) -> DurableSubagentSession {
     serde_json::from_value(json!({
         "subagentSessionId": id,
@@ -79,6 +84,7 @@ fn scopes_do_not_see_each_others_sessions() {
 #[test]
 fn the_store_uses_the_workspace_default_with_no_backend_installed() {
     let dir = tempfile::tempdir().unwrap();
+    crate::storage::local::use_persistent_default_for_test(dir.path());
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
     assert!(store.load().unwrap().is_empty());
     store.save(&[session("a")]).unwrap();
@@ -153,6 +159,7 @@ fn a_stale_snapshot_does_not_revert_a_newer_session() {
 #[test]
 fn a_legacy_session_file_is_imported_once_and_left_byte_identical() {
     let dir = tempfile::tempdir().unwrap();
+    crate::storage::local::use_persistent_default_for_test(dir.path());
     let legacy = dir.path().join(".openhuman");
     std::fs::create_dir_all(&legacy).unwrap();
     let original = serde_json::to_string(&vec![session("legacy-1")]).unwrap();
@@ -180,7 +187,8 @@ fn a_legacy_session_file_is_imported_once_and_left_byte_identical() {
 
 #[test]
 fn workspaces_sharing_a_backend_each_import_their_own_legacy_file() {
-    let docs = docs_in(memory_backend().as_ref(), "local");
+    let fixture = crate::storage::test_support::sqlite_backend().unwrap();
+    let docs = opened_docs_in(&fixture.backend, "local");
     let (one, two) = (
         std::path::Path::new("/ws/one"),
         std::path::Path::new("/ws/two"),
@@ -198,7 +206,8 @@ fn workspaces_sharing_a_backend_each_import_their_own_legacy_file() {
 
 #[test]
 fn a_late_importer_rechecks_the_marker_under_the_claim() {
-    let docs = docs_in(memory_backend().as_ref(), "local");
+    let fixture = crate::storage::test_support::sqlite_backend().unwrap();
+    let docs = opened_docs_in(&fixture.backend, "local");
     let source = std::path::Path::new("/legacy/subagent_sessions.json");
     docs.import_legacy(source, &[session("first")]).unwrap();
     assert!(docs.legacy_imported(source).unwrap());

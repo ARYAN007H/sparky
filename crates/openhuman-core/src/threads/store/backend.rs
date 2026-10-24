@@ -505,26 +505,24 @@ impl ConversationStore {
     /// this workspace's existing best-effort queue as each header is removed.
     /// Queue persistence keeps its existing IO and process-crash limitations.
     pub fn purge_threads(&self) -> Result<ConversationPurgeStats, String> {
-        let ctx = self.ctx.clone();
         let workspace_dir = self.workspace_dir.clone();
+        let deletion_state = crate::memory::deletion::open_state(&workspace_dir)
+            .map_err(|error| format!("{LOG_PREFIX} open deletion queue: {error:#}"))?;
         let stats = self.run("purge_threads", NONE, |s| async move {
-            let callback_ctx = ctx.clone();
-            let callback_workspace = workspace_dir.clone();
+            let callback_state = deletion_state;
             s.purge_threads_with_async(move |thread_id| {
-                let ctx = callback_ctx.clone();
-                let workspace_dir = callback_workspace.clone();
+                let state = callback_state.clone();
                 async move {
-                    // The TinyAgents callback runs inside the storage bridge.
-                    // Persist off-bridge and await each header's queue write
-                    // before the purge deletes the next one.
-                    ctx.spawn_blocking(move || {
-                        crate::memory::deletion::enqueue(
-                            &workspace_dir,
-                            crate::memory::deletion::PendingDeletion::Thread { thread_id },
-                        );
-                    })
+                    if let Err(error) = crate::memory::deletion::enqueue_with_state(
+                        &state,
+                        crate::memory::deletion::PendingDeletion::Thread { thread_id },
+                    )
                     .await
-                    .expect("conversation purge deletion callback worker must complete");
+                    {
+                        log::warn!(
+                            "[threads] queue conversation memory deletion failed: {error:#}"
+                        );
+                    }
                 }
             })
             .await
