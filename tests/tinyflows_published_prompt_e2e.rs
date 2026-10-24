@@ -45,7 +45,9 @@ fn dump_published_prompt(
         .expect("run the public prompt-dump command");
     assert!(
         output.status.success(),
-        "prompt dump for {agent_id} failed: {}",
+        "prompt dump for {agent_id} failed ({}):\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
     serde_json::from_slice(&output.stdout).expect("decode public prompt-dump JSON")
