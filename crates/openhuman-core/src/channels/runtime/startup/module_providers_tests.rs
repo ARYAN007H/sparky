@@ -110,7 +110,7 @@ async fn prepared_module_handle_keeps_progressive_send_alive() {
         runtime.lease.object().call_confidential(
             tinychannels_bus::methods::EXECUTE_PROGRESSIVE,
             (ProgressiveCommand::FeedOutput {
-                handle,
+                handle: handle.clone(),
                 turn_id: None,
                 channel_ref: None,
                 conversation: None,
@@ -132,6 +132,18 @@ async fn prepared_module_handle_keeps_progressive_send_alive() {
     .await
     .expect("module-to-host-to-module send must not deadlock")
     .expect("the configured module adapter should deliver the final message");
+    // Close the finished handle so the module does not report the turn as
+    // cancelled when the runtime shuts down.
+    let closed: ProgressiveResult = runtime
+        .lease
+        .object()
+        .call_confidential(
+            tinychannels_bus::methods::EXECUTE_PROGRESSIVE,
+            (ProgressiveCommand::Close { handle },),
+        )
+        .await
+        .expect("the finished handle closes");
+    assert_eq!(closed, ProgressiveResult::Closed);
     let receipt = match completed {
         ProgressiveResult::DeliveryOutcome { outcome } => {
             assert!(outcome.error.is_none());
