@@ -1838,7 +1838,7 @@ async fn subagent_delegation_happy_path_inner() {
         .first()
         .and_then(|request| request.pointer("/body/messages"))
         .map(Value::to_string)
-        .unwrap_or("");
+        .unwrap_or_default();
     assert_ne!(
         req0_messages,
         worker_request.pointer("/body/messages").unwrap().to_string(),
