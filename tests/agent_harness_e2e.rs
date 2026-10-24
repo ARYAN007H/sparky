@@ -3700,7 +3700,8 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
         text_completion("Installed the skill."),
         // The delivery turn: the orchestrator loads the installed skill itself;
         // running one is its own `run_workflow`.
-        tool_call_completion(
+        packed_tool_call_completion(
+            "workflows",
             "describe_workflow",
             json!({ "workflow_id": REGISTRY_SKILL_ID }),
         ),
@@ -3805,7 +3806,9 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     );
 
     // Usable: the orchestrator loaded the installed skill and its body reached the model.
-    let described = tool_result_text(&requests, "describe_workflow")
+    // `describe_workflow` is a member of the `workflows` pack: the call goes
+    // through `use_skill`, and its result is that call's tool result.
+    let described = tool_result_text(&requests, "use_skill")
         .unwrap_or_else(|| panic!("no tool result for describe_workflow; requests: {}", dump()));
     assert!(
         described.contains(SKILL_BODY_CANARY),
