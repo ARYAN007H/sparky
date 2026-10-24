@@ -47,21 +47,18 @@ fn skill_tools() -> AgentDefinitionSpec {
 }
 
 async fn send(agent: &Agent, message: &str) {
-    eprintln!("isolation-state: {} turn starting", agent.id());
     agent
         .turn(message)
         .session(SESSION)
         .send()
         .await
         .unwrap_or_else(|error| panic!("{}'s turn: {error}", agent.id()));
-    eprintln!("isolation-state: {} turn finished", agent.id());
 }
 
 #[test]
 fn agents_on_one_workspace_keep_their_own_state() {
     let _ = env_logger::builder().is_test(true).try_init();
     runtime().block_on(async {
-        eprintln!("isolation-state: starting backend/runtime");
         tokio::spawn(async move {
             let backend = stub_backend().await;
             let session_store = std::sync::Arc::new(InMemorySessionStores::new());
@@ -74,7 +71,6 @@ fn agents_on_one_workspace_keep_their_own_state() {
                 .build()
                 .await
                 .expect("runtime builds");
-            eprintln!("isolation-state: runtime built");
             let name = skill_name();
 
             let a_provider = scripted_provider(
@@ -102,29 +98,11 @@ fn agents_on_one_workspace_keep_their_own_state() {
                         .definition(skill_tools()),
                 )
                 .expect("b instantiates");
-            eprintln!("isolation-state: agents instantiated");
             assert_eq!(a.workspace_dir(), b.workspace_dir());
 
             // ── the same session id, concurrently, on both agents ──
-            let first_pair = tokio::time::timeout(
-                std::time::Duration::from_secs(10),
-                async {
-                    tokio::join!(send(&a, "alpha-secret-one"), send(&b, "beta-secret-one"))
-                },
-            )
-            .await;
-            if first_pair.is_err() {
-                let a_requests = chat_requests(&a_provider).await;
-                let b_requests = chat_requests(&b_provider).await;
-                panic!(
-                    "first turn pair stalled: a_requests={}, b_requests={}",
-                    a_requests.len(),
-                    b_requests.len()
-                );
-            }
-            eprintln!("isolation-state: first pair sent");
+            tokio::join!(send(&a, "alpha-secret-one"), send(&b, "beta-secret-one"));
             tokio::join!(send(&a, "alpha-secret-two"), send(&b, "beta-secret-two"));
-            eprintln!("isolation-state: second pair sent");
 
             let a_requests = chat_requests(&a_provider).await;
             let b_requests = chat_requests(&b_provider).await;
