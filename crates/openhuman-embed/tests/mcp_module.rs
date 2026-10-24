@@ -87,6 +87,7 @@ fn scenario() {
         let runtime = Runtime::builder()
             .config(config)
             .workspace(Workspace::Ephemeral)
+            .storage("memory")
             .backend_url(backend.uri())
             .provider(route(&model, "fixture"))
             .services(ServiceSet::none())
