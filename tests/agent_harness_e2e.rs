@@ -5455,6 +5455,8 @@ async fn cancelling_a_running_background_subagent_settles_it_inner() {
     )
     .await;
     let image_path = stack._tmp.path().join("OpenHuman/projects/cancel-vision.png");
+    std::fs::create_dir_all(stack._tmp.path().join("OpenHuman/projects/uploads/validation"))
+        .expect("create attachment validation directory");
     std::fs::copy(
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/images/handoff-hero.png"),
         &image_path,
