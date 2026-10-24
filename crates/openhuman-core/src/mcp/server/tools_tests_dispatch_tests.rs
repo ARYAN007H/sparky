@@ -163,6 +163,9 @@ async fn call_tool_judges_the_policy_of_the_explicit_context_across_scopes() {
     // The module resolves the installed storage from the process environment,
     // so the env lock and the ambient install guard it like the sibling tests.
     let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
+    unsafe {
+        std::env::set_var("OPENHUMAN_WORKSPACE", tmp_allow.path());
+    }
     let ambient = AmbientStorage::install();
     denying.storage.url = Some(ambient._fixture.url.clone());
     allowing.storage.url = Some(ambient._fixture.url.clone());
@@ -195,4 +198,7 @@ async fn call_tool_judges_the_policy_of_the_explicit_context_across_scopes() {
         "the permissive context reaches agent construction: {}",
         allowed.message()
     );
+    unsafe {
+        std::env::remove_var("OPENHUMAN_WORKSPACE");
+    }
 }
