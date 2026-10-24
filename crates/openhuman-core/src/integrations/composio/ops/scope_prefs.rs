@@ -189,7 +189,7 @@ pub(crate) async fn load(
             Ok(pref)
         }
         Err(error) => {
-            tracing::warn!(toolkit = %key, %error, "{LOG} pref unavailable, failing closed");
+            eprintln!("DBGERR {error}"); tracing::warn!(toolkit = %key, %error, "{LOG} pref unavailable, failing closed");
             Err(error)
         }
     }

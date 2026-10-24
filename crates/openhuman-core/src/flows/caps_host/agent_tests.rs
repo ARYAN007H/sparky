@@ -169,8 +169,10 @@ async fn headless_flow_agent_includes_nested_grandchild_result() {
     // installed storage; a real (SQLite) backend also serves the conditioned
     // session-transcript writes.
     let storage = crate::storage::test_support::sqlite_backend().expect("SQLite test backend");
-    let _storage_guard =
-        crate::storage::test_support::install_for_test(&storage.url, std::sync::Arc::clone(&storage.backend));
+    let _storage_guard = crate::storage::test_support::install_for_test(
+        &storage.url,
+        std::sync::Arc::clone(&storage.backend),
+    );
     let mut config = crate::config::Config::default();
     config.storage.url = Some(storage.url.clone());
     config.workspace_dir = workspace.path().to_path_buf();
@@ -501,8 +503,10 @@ async fn headless_child_at_depth_cap_gets_readable_spawn_refusal() {
     // installed storage; a real (SQLite) backend also serves the conditioned
     // session-transcript writes.
     let storage = crate::storage::test_support::sqlite_backend().expect("SQLite test backend");
-    let _storage_guard =
-        crate::storage::test_support::install_for_test(&storage.url, std::sync::Arc::clone(&storage.backend));
+    let _storage_guard = crate::storage::test_support::install_for_test(
+        &storage.url,
+        std::sync::Arc::clone(&storage.backend),
+    );
     let mut config = crate::config::Config::default();
     config.storage.url = Some(storage.url.clone());
     config.workspace_dir = workspace.path().to_path_buf();
