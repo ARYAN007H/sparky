@@ -7,7 +7,7 @@ use openhuman_embed::{AgentSpec, Provider, ReasoningEffort, Route, Runtime, Work
 
 #[test]
 fn attribution_headers_are_scoped_to_each_agent_and_turn_route() {
-    runtime().block_on(async { tokio::spawn(scenario()).await.unwrap() });
+    runtime().block_on(scenario());
 }
 
 async fn scenario() {
