@@ -204,6 +204,8 @@ pub struct ChannelTurnStateSubscriber {
     channels: Arc<HashMap<String, Arc<dyn Channel>>>,
     config: Option<Arc<crate::config::Config>>,
     cancellation: tokio_util::sync::CancellationToken,
+    #[cfg(test)]
+    test_marks: Option<Arc<Mutex<Vec<(String, String, bool)>>>>,
 }
 impl ChannelTurnStateSubscriber {
     pub fn with_config(
@@ -215,6 +217,8 @@ impl ChannelTurnStateSubscriber {
             channels,
             config: Some(config),
             cancellation: super::super::runtime::session::channel_session(),
+            #[cfg(test)]
+            test_marks: None,
         }
     }
     #[cfg(test)]
@@ -224,6 +228,8 @@ impl ChannelTurnStateSubscriber {
             channels: Arc::new(HashMap::new()),
             config: None,
             cancellation: tokio_util::sync::CancellationToken::new(),
+            #[cfg(test)]
+            test_marks: None,
         }
     }
     async fn mark(&self, channel: &str, reply_target: &str, event_ws: &PathBuf, busy: bool) {
@@ -234,6 +240,14 @@ impl ChannelTurnStateSubscriber {
                 .is_some_and(|channel| channel.capabilities().remote_control)
             || *event_ws != self.workspace_dir
         {
+            return;
+        }
+        #[cfg(test)]
+        if let Some(marks) = &self.test_marks {
+            marks
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .push((channel.to_owned(), reply_target.to_owned(), busy));
             return;
         }
         #[cfg(test)]

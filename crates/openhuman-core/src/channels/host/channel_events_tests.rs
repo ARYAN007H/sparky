@@ -62,7 +62,13 @@ fn approval_subscriber(channels: &[Arc<RecordingChannel>]) -> ChannelApprovalSur
 }
 
 #[cfg(feature = "e2e-test-support")]
-fn turn_state_subscriber(workspace_dir: PathBuf, names: &[&str]) -> ChannelTurnStateSubscriber {
+fn turn_state_subscriber(
+    workspace_dir: PathBuf,
+    names: &[&str],
+) -> (
+    ChannelTurnStateSubscriber,
+    Arc<StdMutex<Vec<(String, String, bool)>>>,
+) {
     let channels: HashMap<String, Arc<dyn Channel>> = names
         .iter()
         .map(|name| {
@@ -72,7 +78,9 @@ fn turn_state_subscriber(workspace_dir: PathBuf, names: &[&str]) -> ChannelTurnS
         .collect();
     let mut subscriber = ChannelTurnStateSubscriber::new(workspace_dir);
     subscriber.channels = Arc::new(channels);
-    subscriber
+    let marks = Arc::new(StdMutex::new(Vec::new()));
+    subscriber.test_marks = Some(Arc::clone(&marks));
+    (subscriber, marks)
 }
 
 fn received(channel: &str, reply_target: &str, thread_ts: Option<&str>, ws: &Path) -> DomainEvent {
@@ -104,47 +112,6 @@ fn processed(channel: &str, reply_target: &str, ws: &Path) -> DomainEvent {
         success: true,
         workspace_dir: ws.to_path_buf(),
     }
-}
-
-#[cfg(feature = "e2e-test-support")]
-async fn remote_status(ws: &Path, channel: &str, reply_target: &str) -> Option<String> {
-    let result: tinychannels_bus::module_remote::RemoteOperationResult =
-        crate::channels::module_fixture::client()
-            .await
-            .call_confidential(
-                "tinychannels",
-                tinychannels_bus::methods::EXECUTE_REMOTE,
-                (tinychannels_bus::module_remote::RemoteOperation::Execute {
-                    workspace_dir: ws.to_string_lossy().into_owned(),
-                    message: crate::channels::routes::route_compat_message(
-                        &tinychannels_bus::ChannelInboundEnvelope {
-                            channel: tinychannels_bus::ChannelRef {
-                                id: channel.into(),
-                                account_id: None,
-                            },
-                            message_id: "status-1".into(),
-                            conversation: tinychannels_bus::ConversationRef {
-                                id: reply_target.into(),
-                                ..Default::default()
-                            },
-                            sender: tinychannels_bus::SenderRef {
-                                id: "alice".into(),
-                                ..Default::default()
-                            },
-                            text: "/status".into(),
-                            ..Default::default()
-                        },
-                    ),
-                    route: tinychannels_bus::module_remote::RemoteRoute {
-                        provider: "openai".into(),
-                        model: "test-model".into(),
-                    },
-                    history_len: 0,
-                },),
-            )
-            .await
-            .expect("the linked module should answer the status command");
-    result.reply
 }
 
 fn approval(thread_id: Option<&str>, client_id: Option<&str>) -> DomainEvent {
@@ -220,56 +187,51 @@ async fn approvals_for_web_email_or_unrouted_requests_are_ignored() {
 #[tokio::test]
 #[cfg(feature = "e2e-test-support")]
 async fn turn_state_marks_busy_for_every_remote_control_channel() {
-    let _storage = crate::channels::module_fixture::install_memory_storage();
     let dir = tempdir().unwrap();
     let ws = dir.path().to_path_buf();
-    let sub = turn_state_subscriber(ws.clone(), &["telegram", "discord"]);
+    let (sub, marks) = turn_state_subscriber(ws.clone(), &["telegram", "discord"]);
     assert_eq!(sub.name(), "channels::turn_state");
     assert_eq!(sub.domains(), Some(&["channel"][..]));
     for channel in ["telegram", "discord"] {
         sub.handle(&received(channel, "chat-99", None, &ws)).await;
-        let busy = remote_status(&ws, channel, "chat-99")
-            .await
-            .expect("/status should answer after a received event");
-        assert!(busy.contains("in progress"), "{channel}: {busy}");
+        assert_eq!(
+            marks.lock().unwrap().last(),
+            Some(&(channel.to_owned(), "chat-99".to_owned(), true))
+        );
 
         sub.handle(&processed(channel, "chat-99", &ws)).await;
-        let idle = remote_status(&ws, channel, "chat-99")
-            .await
-            .expect("/status should answer after a processed event");
-        assert!(idle.contains("idle"), "{channel}: {idle}");
+        assert_eq!(
+            marks.lock().unwrap().last(),
+            Some(&(channel.to_owned(), "chat-99".to_owned(), false))
+        );
     }
 }
 
 #[tokio::test]
 #[cfg(feature = "e2e-test-support")]
 async fn turn_state_ignores_non_remote_channels_and_stale_workspaces() {
-    let _storage = crate::channels::module_fixture::install_memory_storage();
     let dir = tempdir().unwrap();
     let ws = dir.path().to_path_buf();
-    let sub = turn_state_subscriber(ws.clone(), &["telegram"]);
+    let (sub, marks) = turn_state_subscriber(ws.clone(), &["telegram"]);
     let other = tempdir().unwrap().path().to_path_buf();
     sub.handle(&received("email", "a@b.c", None, &ws)).await;
-    assert!(remote_status(&ws, "email", "a@b.c").await.is_none());
+    assert!(marks.lock().unwrap().is_empty());
 
     sub.handle(&received("telegram", "chat-1", None, &ws)).await;
-    let busy = remote_status(&ws, "telegram", "chat-1")
-        .await
-        .expect("/status should answer after a received event");
-    assert!(busy.contains("in progress"), "{busy}");
-
-    sub.handle(&processed("telegram", "chat-1", &other)).await;
-    let still_busy = remote_status(&ws, "telegram", "chat-1")
-        .await
-        .expect("/status should answer after a stale processed event");
-    assert!(
-        still_busy.contains("in progress"),
-        "a stale workspace must not clear turn state: {still_busy}"
+    assert_eq!(
+        marks.lock().unwrap().as_slice(),
+        &[("telegram".into(), "chat-1".into(), true)]
     );
 
+    sub.handle(&processed("telegram", "chat-1", &other)).await;
+    assert_eq!(marks.lock().unwrap().len(), 1, "a stale workspace is ignored");
+
     sub.handle(&processed("telegram", "chat-1", &ws)).await;
-    let idle = remote_status(&ws, "telegram", "chat-1")
-        .await
-        .expect("/status should answer after a matching processed event");
-    assert!(idle.contains("idle"), "{idle}");
+    assert_eq!(
+        marks.lock().unwrap().as_slice(),
+        &[
+            ("telegram".into(), "chat-1".into(), true),
+            ("telegram".into(), "chat-1".into(), false),
+        ]
+    );
 }
