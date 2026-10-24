@@ -4623,10 +4623,9 @@ mod tool_policy_boundary_placement {
     use super::streaming_support::ScriptedProvider;
     use tinyinference_llm::model::{ChatModel, ModelProfile};
 
-    /// Two tools at different permission levels. A `read_only` channel
-    /// permission blocks the write one, and that restriction is what makes the
-    /// boundary render at all — `render_tool_policy_boundary` returns `None`
-    /// unless `session.has_restrictions()` (`tools/agent_policy/prompt.rs:12`).
+    /// Two tools at different permission levels. The fixture exposes only the
+    /// read tool, which makes the write tool restricted and causes the policy
+    /// boundary to render.
     struct ScopedTool {
         name: &'static str,
         level: PermissionLevel,
@@ -4676,6 +4675,7 @@ mod tool_policy_boundary_placement {
                     level: PermissionLevel::Write,
                 }),
             ])
+            .visible_tool_names(std::collections::HashSet::from(["boundary_read".to_string()]))
             .tool_dispatcher(Box::new(NativeDialect))
             .workspace_dir(workspace.path().to_path_buf())
             .event_context("boundary-session", "internal")
