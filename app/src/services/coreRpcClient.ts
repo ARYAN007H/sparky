@@ -539,13 +539,14 @@ export async function getCoreRpcToken(): Promise<string | null> {
     try {
       const endpoint = await resolveShellEndpoint();
       resolvedCoreRpcToken = endpoint?.token?.trim() || null;
-      didResolveCoreRpcToken = true;
+      // Only a real token is cached: a missing one (core still starting, or a
+      // failed lookup) is looked up again on the next call.
+      didResolveCoreRpcToken = resolvedCoreRpcToken !== null;
       coreRpcLog('core RPC token loaded');
       return resolvedCoreRpcToken;
     } catch (err) {
       coreRpcError('failed to load core RPC token', err);
       resolvedCoreRpcToken = null;
-      didResolveCoreRpcToken = true;
       return null;
     } finally {
       resolvingCoreRpcToken = null;
