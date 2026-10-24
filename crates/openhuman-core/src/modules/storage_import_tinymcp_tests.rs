@@ -252,7 +252,7 @@ async fn an_unreadable_file_writes_no_marker_so_the_next_start_retries() {
         &file,
         b"this is not a sqlite database at all, just text padding",
     )
-    .unwrap();
+    .unwrap_or_else(|error| panic!("profile takeover import attempt failed: {error:#}"));
     let rig = rig();
     assert!(import(&rig, dir.path()).await.is_err());
     let done = crate::storage::import_state::host_import_done(
