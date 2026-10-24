@@ -50,6 +50,11 @@ impl SpawnSubagentTool {
             match SubagentSessionStore::new_in_context(&dispatch, parent.workspace_dir.clone()) {
                 Ok(store) => store,
                 Err(error) => {
+                    log::debug!(
+                        run_context_core_bound = run_context.core.is_some(),
+                        dispatch_resolved = dispatch.resolved().is_some(),
+                        "[spawn_subagent] caller owner context unavailable"
+                    );
                     return Ok(ToolResult::error(format!(
                         "spawn_subagent: failed to open the caller-scoped session store: {error}"
                     )));
