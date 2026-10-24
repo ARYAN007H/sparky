@@ -142,6 +142,9 @@ async fn execute_tool_per_call_factory_means_no_baked_client() {
     // `Config` to that tempdir's `config.toml` before invoking the tool.
     use crate::config::TEST_ENV_LOCK;
     let _env_guard = TEST_ENV_LOCK.lock().await;
+    // The scope-preference read is served by the connector module out of the
+    // host's installed storage; hold the module with that storage in place.
+    let _module = crate::integrations::composio::module_client::module_guard().await;
 
     let tmp = tempfile::tempdir().unwrap();
     let _workspace_guard = EnvVarGuard::workspace_unlocked(tmp.path());
@@ -151,9 +154,6 @@ async fn execute_tool_per_call_factory_means_no_baked_client() {
     config.config_path = tmp.path().join("config.toml");
     config.workspace_dir = tmp.path().join("workspace");
     std::fs::create_dir_all(&config.workspace_dir).expect("create workspace dir");
-    // The scope-preference read goes through workspace storage; the default
-    // test backend is in-memory and fenced, so give this workspace a real one.
-    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
     config.composio.mode = crate::config::schema::COMPOSIO_MODE_DIRECT.to_string();
     // No api_key here — direct-mode factory must reject.
     config.save().await.expect("save fake config to disk");
