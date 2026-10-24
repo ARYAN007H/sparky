@@ -1315,8 +1315,15 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
 
     let mut batches = Vec::new();
     let mut prior_count = 0;
-    for _ in 0..2 {
-        let home = capture_root.join("state/home");
+    for repetition in 0..2 {
+        // Each repetition boots a profile of its own. One process keeps its
+        // first runtime context, its storage-module host and the sqlite
+        // connection to every workspace it has opened (shared per path, even
+        // after the files are deleted), so wiping and reusing one path would
+        // resume the previous repetition's transcript (5 messages instead of 3)
+        // and could never model a restart. A fresh path under the same
+        // deterministic name is the profile a restarted host would start from.
+        let home = capture_root.join(format!("state/home-{repetition}"));
         if home.exists() {
             std::fs::remove_dir_all(&home).expect("reset only the managed capture profile");
         }
