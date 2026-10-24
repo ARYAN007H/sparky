@@ -171,6 +171,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         config,
     );
     crate::core::runtime::CoreContext::scope(core, async {
+    crate::channels::module_fixture::client().await;
     let ctx = runtime_context(tempdir.path().to_path_buf());
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
