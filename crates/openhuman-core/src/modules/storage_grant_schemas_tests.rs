@@ -23,8 +23,32 @@ fn every_row_has_a_valid_generated_grant() {
             .validate()
             .unwrap_or_else(|why| panic!("{}: {why}", row.module));
         assert!(grant.writable);
-        let items = module_collections(row.owner);
-        assert_eq!(grant.collections.len(), items.len(), "{}", row.module);
+        // What the owner provisions plus what its migrations read, and each
+        // one reachable: a collection the module touches but the grant lacks
+        // is refused as target-not-granted on every host with storage.
+        let mut expected: Vec<String> = module_collections(row.owner)
+            .into_iter()
+            .map(|spec| spec.name)
+            .collect();
+        for name in read_collections(row.owner) {
+            if !expected.contains(&name) {
+                expected.push(name);
+            }
+        }
+        let granted: Vec<String> = grant.collections.iter().map(|s| s.name.clone()).collect();
+        assert_eq!(granted, expected, "{}", row.module);
+        for collection in &expected {
+            assert!(
+                allowed(
+                    &grant,
+                    Object::Documents,
+                    "Get",
+                    json!({"collection": collection, "id": "x"})
+                ),
+                "{}: {collection} is not granted",
+                row.module
+            );
+        }
     }
     assert!(declared("not-a-module").is_none());
 }
