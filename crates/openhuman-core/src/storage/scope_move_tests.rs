@@ -293,6 +293,7 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     .unwrap();
 
     let source_db = legacy::v1_db(&target);
+    { let c = rusqlite::Connection::open(&source_db).unwrap(); let mut s = c.prepare("SELECT scope, coll, count(*) FROM docs GROUP BY 1,2").unwrap(); let r: Vec<(String,String,i64)> = s.query_map([], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap().map(|x| x.unwrap()).collect(); eprintln!("DBG4 {r:?}"); }
     let before = hash_file(&source_db);
     let destination =
         crate::storage::test_support::sqlite_backend_in(dir, destination_url).unwrap();
