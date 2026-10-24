@@ -1198,7 +1198,6 @@ async fn run_managed_capture_turn(
     // Session transcript stores and their SQLite backend are also cached by
     // workspace path; release them before the next repetition removes it.
     openhuman_core::storage::sessions::release_workspace(&workspace_dir);
-    tokio::time::sleep(Duration::from_secs(5)).await; // DBGSLEEP
     with_captured_proxy_requests(|requests| requests.clone())
 }
 
@@ -1212,7 +1211,6 @@ fn managed_host_requests_repeat_with_the_same_capture_identity() {
 
 async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
     let _lock = env_lock();
-    let _ = env_logger::Builder::from_env("RUST_LOG").is_test(false).try_init(); // DBGLOG
     let _prompt_clock = openhuman_core::prompts::register_prompt_clock(|| {
         chrono::DateTime::parse_from_rfc3339(MANAGED_CAPTURE_PROMPT_CLOCK)
             .expect("fixed capture instant")
@@ -1322,7 +1320,6 @@ async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
         if home.exists() {
             std::fs::remove_dir_all(&home).expect("reset only the managed capture profile");
         }
-        for e in std::fs::read_dir("/proc/self/fd").unwrap().flatten() { if let Ok(t) = std::fs::read_link(e.path()) { let t = t.display().to_string(); if t.contains("state/home") { eprintln!("DBGFD {t}"); } } } // DBGFD
         std::fs::create_dir_all(&home).expect("create managed capture profile");
         let expected_summary_count = prior_count + 2;
         let metadata = run_managed_capture_turn(
