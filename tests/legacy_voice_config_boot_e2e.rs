@@ -90,6 +90,9 @@ hotkey = "Ctrl+Shift+Space"
 [voice_server]
 always_on_enabled = true
 stt_engine = "elevenlabs"
+
+[secrets]
+encrypt = false
 "#,
     )
     .unwrap();
@@ -143,7 +146,7 @@ fn legacy_voice_settings_boot_without_starting_retired_listeners() {
     );
     assert!(
         credential.get("error").is_none(),
-        "installing the local test credential failed"
+        "installing the local test credential failed: {credential}"
     );
     let status = rpc(&base, "openhuman.voice_status", json!({}));
     let voice_enabled = status.get("error").is_none();
