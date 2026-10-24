@@ -674,6 +674,7 @@ fn a_profile_holds_web_and_relayed_channel_threads() {
             "openhuman.threads_turn_state_get",
             json!({ "thread_id": "web-1" }),
         );
+        eprintln!("DBGSTATE {state}");
         lifecycle = state
             .pointer("/result/data/turnState/lifecycle")
             .or_else(|| state.pointer("/result/result/data/turnState/lifecycle"))
