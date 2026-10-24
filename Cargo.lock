@@ -6014,6 +6014,7 @@ dependencies = [
  "tiny-artifacts",
  "tinyagents-harness",
  "tinyagents-live",
+ "tinyagents-session",
  "tinybus",
  "tinychannels-bus",
  "tinyhumans-sdk",
