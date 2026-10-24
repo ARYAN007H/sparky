@@ -1736,20 +1736,22 @@ async fn subagent_delegation_happy_path_inner() {
     std::fs::create_dir_all(image_path.parent().expect("action directory"))
         .expect("create action directory");
     std::fs::copy(&fixture_path, &image_path).expect("copy vision fixture");
+    // `spawn_subagent` is asynchronous: the parent gets a task id back at once
+    // and the child's result is delivered later, so the parent's reply and the
+    // child's model call race for the next scripted completion. Every entry
+    // carries the canary so the assertions hold in either order.
     reset_script(vec![
-        // request[0]: Orchestrator calls the `analyze_image` tool
-        // (vision_agent's delegate_name).
+        // The orchestrator spawns the vision specialist.
         tool_call_completion(
-            "analyze_image",
+            "spawn_subagent",
             json!({
+                "agent_id": "vision_agent",
                 "prompt": "Find the marker phrase",
-                "image_paths": [image_path.to_string_lossy()],
-                "blocking": true
+                "image_paths": [image_path.to_string_lossy()]
             }),
         ),
-        // request[1]: vision_agent subagent inner LLM call returns its canary.
+        text_completion("Delegated. MEMORY_CANARY_42 will be reported."),
         text_completion("MEMORY_CANARY_42 is the marker."),
-        // request[2]: Orchestrator receives the subagent result and synthesizes.
         text_completion("Done. The result is: MEMORY_CANARY_42"),
     ]);
     let mut events = spawn_sse_collector(format!(
@@ -1782,52 +1784,40 @@ async fn subagent_delegation_happy_path_inner() {
         "final response missing subagent canary; full_response: {full_response}\nevent: {done}"
     );
 
-    // Delegation evidenced by ≥3 captured upstream requests:
-    //   request[0] = orchestrator turn: analyze_image tool call returned
-    //   request[1] = vision_agent subagent inner LLM call: canary text returned
-    //   request[2] = orchestrator synthesis: canary forwarded in final reply
-    //
-    // NOTE: a completed turn's snapshot is now RETAINED (lifecycle `Completed`)
-    // so "View processing" can replay a finished turn; the snapshot is overwritten
-    // by the next turn, not deleted on completion. We verify delegation via the
-    // captured upstream requests rather than turn state, which keeps this test
-    // independent of the snapshot's retention/lifecycle details.
-    let requests = with_captured(|c| c.clone());
-    assert!(
-        requests.len() >= 3,
-        "expected ≥3 upstream requests (orchestrator + vision_agent + orchestrator synthesis), \
-         got {};\nall requests: {}",
-        requests.len(),
-        serde_json::to_string_pretty(&requests).unwrap_or_default()
-    );
-
-    // No unknown-tool result anywhere — proves the delegation tool was synthesised
-    // (registry init worked) and the orchestrator could actually call it.
+    // Delegation is evidenced by a request that is not the orchestrator's: the
+    // child builds its own context. Poll, since the detached child may not
+    // have issued its call when the parent's turn ends.
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    let requests = loop {
+        let requests = with_captured(|c| c.clone());
+        if requests.len() >= 3 {
+            break requests;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "expected ≥3 upstream requests (orchestrator, child, delivery), got {};\nall requests: {}",
+            requests.len(),
+            serde_json::to_string_pretty(&requests).unwrap_or_default()
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
     assert!(
         !captured_requests_mention_unknown_tool(&requests),
-        "found an unknown-tool result in captured requests — delegation tool was not synthesised; \
+        "found an unknown-tool result in captured requests — delegation was broken; \
          requests: {}",
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
-
-    // request[1] (vision_agent subagent) must have different system/message content
-    // from request[0] (orchestrator) — proves a genuinely different agent context
-    // ran, not the same orchestrator re-called.
-    let req0_sys = requests
-        .first()
-        .and_then(|r| r.pointer("/body/messages/0/content"))
-        .and_then(Value::as_str)
-        .unwrap_or("");
-    let req1_sys = requests
-        .get(1)
-        .and_then(|r| r.pointer("/body/messages/0/content"))
-        .and_then(Value::as_str)
-        .unwrap_or("");
-    assert_ne!(
-        req0_sys, req1_sys,
-        "request[0] and request[1] share identical first-message content — \
-         vision_agent subagent did not build its own context; \
-         content: {req0_sys:?}"
+    let first_sys = |r: &Value| {
+        r.pointer("/body/messages/0/content")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    };
+    let req0_sys = first_sys(&requests[0]);
+    assert!(
+        requests.iter().skip(1).any(|r| first_sys(r) != req0_sys),
+        "no later request carries its own system context — the vision_agent subagent \
+         did not build one; content: {req0_sys:?}"
     );
 
     stack.shutdown();
