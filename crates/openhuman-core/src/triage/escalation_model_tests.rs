@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use tinyinference_llm::model::{
     ChatModel, ModelProfile, ModelRequest, ModelResponse, ModelStream, ModelStreamItem,
 };
-use tinyinference_llm::providers::overrides::ChatModelEntry;
+use tinyinference_llm::providers::overrides::{ChatModelEntry, ProviderModelMetadata};
 
 const TEST_MANAGED_MODEL: &str = "hint:chat";
 
@@ -90,7 +90,36 @@ fn triage_test_model(
             ))
         }),
         probe: None,
-        models: None,
+        models: Some(triage_model_metadata()),
+    }
+}
+
+/// Model vocabulary for the test provider. The managed factory resolves the
+/// model through the provider's metadata and drops `hint:*` pins from the
+/// plain fallback, so a provider that wants a hint to reach the turn must say
+/// so: this one passes the pinned id (alias or not) through unchanged.
+fn triage_model_metadata() -> ProviderModelMetadata<crate::inference::registry::ProviderContext> {
+    let hint_role = |model: &str| {
+        model
+            .strip_prefix("hint:")
+            .filter(|role| crate::config::WORKLOAD_ROLES.contains(role))
+            .map(str::to_string)
+    };
+    ProviderModelMetadata {
+        default_model: Arc::new(|| Some(TEST_MANAGED_MODEL.to_string())),
+        role_for_model: Arc::new(move |model| hint_role(model)),
+        is_alias: Arc::new(|model| model.starts_with("hint:")),
+        is_raw_model: Arc::new(|model| !model.starts_with("hint:")),
+        supports_vision: Arc::new(|_| false),
+        resolve_model: Arc::new(|_role, context, model| {
+            model
+                .map(str::to_string)
+                .or_else(|| context.config.default_model.clone())
+                .or_else(|| Some(TEST_MANAGED_MODEL.to_string()))
+        }),
+        context_window: Arc::new(|_| None),
+        default_pricing: Arc::new(|| None),
+        without_reasoning: Arc::new(|request| request),
     }
 }
 
