@@ -56,6 +56,7 @@ impl OpenHumanAgentRunner {
         // Model precedence for a harness node: node `config.model` > the
         // custom registry entry's own `model` pin (if any) > the definition's
         // own default.
+        eprintln!("DBG permit ok");
         let initial = self
             .prepare_agent_run(request.clone(), entry_model, None, 0)
             .await?;
@@ -85,6 +86,7 @@ impl OpenHumanAgentRunner {
                 OpenHumanSessionHost::from_config_for_agent(dispatch, effective.as_ref(), agent_ref)
             }
         };
+        eprintln!("DBG built ok={}", built.is_ok());
         let mut agent = built.map_err(|e| {
             EngineError::Capability(format!(
                 "agent node: failed to build harness agent '{agent_ref}': {e:#}"
@@ -189,6 +191,7 @@ impl OpenHumanAgentRunner {
             Some(context) => Box::pin(crate::core::runtime::CoreContext::scope(context, run)),
             None => run,
         };
+        eprintln!("DBG running");
         let final_text = match tokio::time::timeout_at(absolute_deadline, run).await {
             Ok(Ok(text)) => text,
             Ok(Err(e)) => {
