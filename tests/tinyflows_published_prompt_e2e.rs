@@ -33,17 +33,9 @@ fn dump_published_prompt(
         .env("HOME", home)
         .env("OPENHUMAN_WORKSPACE", workspace)
         .env("OPENHUMAN_MODULE_PATH", module_search_path)
-        // Building the session agent resolves its model credentials through
-        // the host master key; give the child a file-backed keyring so the
-        // result does not depend on an OS keychain being present.
-        .env("OPENHUMAN_KEYRING_BACKEND", "file")
-        .env_remove("OPENHUMAN_KEYRING_MASTER_KEY_FILE")
-        .env("OPENHUMAN_KEYRING_MASTER_KEY", "33".repeat(32))
         .env_remove("BACKEND_URL")
         .env_remove("VITE_BACKEND_URL")
-        // The dumper builds the real session agent, which needs a backend
-        // credential to resolve the managed model; it never calls the backend.
-        .env("OPENHUMAN_BACKEND_API_KEY", "prompt-dump-test-key")
+        .env_remove("OPENHUMAN_BACKEND_API_KEY")
         .env_remove("OPENHUMAN_BACKEND_SESSION_TOKEN")
         .env_remove("OPENHUMAN_STORAGE_URL")
         .env_remove("OPENHUMAN_MODULE_SOURCE")
@@ -98,13 +90,7 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
     let _home_guard = EnvVarGuard::set_to_path("HOME", temp.path());
     let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
     let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
-    // Building a session agent resolves the managed model through a stored
-    // backend credential. Seed one into the isolated profile (file keyring, so
-    // no OS keychain is involved); the prompt-dump child reads the same store.
-    let _api_key_guard = EnvVarGuard::set("OPENHUMAN_BACKEND_API_KEY", "prompt-dump-test-key");
-    let _keyring_backend_guard = EnvVarGuard::set("OPENHUMAN_KEYRING_BACKEND", "file");
-    let _keyring_key_file_guard = EnvVarGuard::unset("OPENHUMAN_KEYRING_MASTER_KEY_FILE");
-    let _keyring_key_guard = EnvVarGuard::set("OPENHUMAN_KEYRING_MASTER_KEY", "33".repeat(32));
+    let _api_key_guard = EnvVarGuard::unset("OPENHUMAN_BACKEND_API_KEY");
     let _session_guard = EnvVarGuard::unset("OPENHUMAN_BACKEND_SESSION_TOKEN");
     let _storage_guard = EnvVarGuard::unset("OPENHUMAN_STORAGE_URL");
     let _source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE");
@@ -134,12 +120,6 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
     );
     for path in [&config_path, &local_config_path] {
         std::fs::write(path, &enabled_config).expect("write enabled module override config");
-    }
-    for path in [&config_path, &local_config_path] {
-        let seed_config = openhuman_core::config::Config::load_from_config_path(path, &workspace)
-            .await
-            .expect("load the config to seed the test credential into");
-        openhuman_core::security::credentials::seed_api_key_from_env(&seed_config);
     }
 
     for (agent_id, required, invariant) in [
