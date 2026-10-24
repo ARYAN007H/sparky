@@ -673,6 +673,7 @@ async fn wait_for_event(
 ) -> Value {
     let deadline = tokio::time::Instant::now() + timeout;
     let mut seen: Vec<String> = Vec::new();
+    let mut tool_results: Vec<String> = Vec::new();
     loop {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
         match tokio::time::timeout(remaining, rx.recv()).await {
@@ -683,6 +684,11 @@ async fn wait_for_event(
                         .unwrap_or("<no event>")
                         .to_string(),
                 );
+                if v.get("event").and_then(Value::as_str) == Some("tool_result") {
+                    let mut detail = v.to_string();
+                    detail.truncate(1_024);
+                    tool_results.push(detail);
+                }
                 if v.get("event").and_then(Value::as_str) == Some(event_name) {
                     return v;
                 }
@@ -691,7 +697,7 @@ async fn wait_for_event(
                 panic!("SSE channel closed waiting for {event_name}; seen events so far: {seen:?}")
             }
             Err(_) => panic!(
-                "timed out waiting for SSE event {event_name}; all received events: {seen:?}"
+                "timed out waiting for SSE event {event_name}; all received events: {seen:?}; tool results: {tool_results:?}"
             ),
         }
     }
@@ -5464,7 +5470,7 @@ async fn cancelling_a_running_background_subagent_settles_it_inner() {
     )
     .await;
 
-    let spawned = wait_for_event(&mut events, "subagent_spawned", Duration::from_secs(120)).await;
+    let spawned = wait_for_event(&mut events, "subagent_spawned", Duration::from_secs(15)).await;
     let task_id = spawned
         .get("skill_id")
         .and_then(Value::as_str)
