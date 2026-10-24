@@ -63,7 +63,10 @@ impl Tool for TenantTool {
                     "|conversation=p4:chat|",
                     "|participant=p6:sender",
                 ] {
-                    assert!(thread.contains(segment), "{segment} missing from {thread:?}");
+                    assert!(
+                        thread.contains(segment),
+                        "{segment} missing from {thread:?}"
+                    );
                 }
             }
             other => panic!("unexpected origin {other:?}"),
