@@ -867,13 +867,14 @@ async fn boot_stack_with_options(
     // The in-process router does not boot the host runtime. Give each request
     // an explicit context anyway: delegated tools open owner-scoped durable
     // session stores, and a bare transport dispatch has no owner to resolve.
-    let mut config: openhuman_core::config::Config = toml::from_str(
-        &std::fs::read_to_string(openhuman_home.join("config.toml"))
-            .expect("read test config"),
+    let config_path = openhuman_home.join("config.toml");
+    let workspace_dir = home.join("workspace");
+    let config = openhuman_core::config::Config::load_from_config_path(
+        &config_path,
+        &workspace_dir,
     )
-    .expect("parse test config");
-    config.workspace_dir = home.join("workspace");
-    config.config_path = openhuman_home.join("config.toml");
+    .await
+    .expect("load test config with process overrides");
     let base = match AGENT_HARNESS_CORE.get() {
         Some(core) => Arc::clone(core),
         None => {
