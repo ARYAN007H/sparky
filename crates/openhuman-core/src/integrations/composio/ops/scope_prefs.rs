@@ -120,21 +120,24 @@ pub(crate) async fn ensure_migrated(ctx: &crate::core::runtime::DispatchCtx, con
     migrate_legacy(ctx, config).await;
 }
 
-/// The scope pref stored for `toolkit`, or the default when none is.
+/// The scope pref stored for `toolkit` (the module's default when none is).
 ///
-/// **This read fails open**: a module that cannot be reached lands on the
-/// same default (`read+write`, no `admin`) a user who never opened the toggle
-/// gets. A failed read is not evidence the user revoked anything, and refusing
-/// every integration on a transient error would break a working app. The
-/// failure is logged. The **write** below does not fail open.
-pub(crate) async fn load_or_default(
+/// **This read fails closed**: an unreachable module or a stored row that
+/// cannot be read is an `Err`, never the default. The default is `read+write`,
+/// so answering it for a user who turned `write` off would widen what the agent
+/// may run. Callers that gate on the pref treat an `Err` as "not allowed".
+///
+/// # Errors
+///
+/// An empty toolkit, or the module could not answer.
+pub(crate) async fn load(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     toolkit: &str,
-) -> UserScopePref {
+) -> Result<UserScopePref, String> {
     let key = UserScopePref::key(toolkit);
     if key.is_empty() {
-        return UserScopePref::default();
+        return Err("user_scopes: toolkit must not be empty".to_string());
     }
     migrate_legacy(ctx, config).await;
     let request = ComposioGetUserScopesRequest {
@@ -156,11 +159,11 @@ pub(crate) async fn load_or_default(
                 admin = pref.admin,
                 "{LOG} pref loaded"
             );
-            pref
+            Ok(pref)
         }
         Err(error) => {
-            tracing::warn!(toolkit = %key, %error, "{LOG} pref unavailable, using default");
-            UserScopePref::default()
+            tracing::warn!(toolkit = %key, %error, "{LOG} pref unavailable, failing closed");
+            Err(error)
         }
     }
 }

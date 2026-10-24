@@ -45,8 +45,8 @@ async fn save_rejects_an_empty_toolkit() {
 
 /// A stored preference is never lost: either the module took it (the read
 /// returns it and the stored value is emptied) or the module was unreachable
-/// (the read fails open to the default and the value is left exactly as it was
-/// so the migration retries).
+/// (the read fails closed and the value is left exactly as it was so the
+/// migration retries).
 #[tokio::test]
 async fn a_legacy_pref_either_reaches_the_module_or_stays_stored() {
     let dir = tempfile::tempdir().unwrap();
@@ -66,7 +66,7 @@ async fn a_legacy_pref_either_reaches_the_module_or_stays_stored() {
         admin: true,
     };
 
-    let pref = load_or_default(
+    let pref = load(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         "github",
@@ -81,16 +81,26 @@ async fn a_legacy_pref_either_reaches_the_module_or_stays_stored() {
     .await
     .unwrap();
     if done {
-        assert_eq!(pref, stored, "the migrated row must decide visibility");
+        assert_eq!(pref, Ok(stored), "the migrated row must decide visibility");
         assert!(left.is_empty(), "the stored value is emptied once moved");
     } else {
-        assert_eq!(
-            pref,
-            UserScopePref::default(),
-            "unreachable module fails open"
+        assert!(
+            pref.is_err(),
+            "an unreachable module fails closed: {pref:?}"
         );
         assert_eq!(left.get("github"), Some(&stored));
     }
+}
+
+#[tokio::test]
+async fn load_rejects_an_empty_toolkit_instead_of_answering_the_default() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = config_in(&dir);
+    assert!(
+        load(&crate::core::runtime::DispatchCtx::ambient(), &config, "  ")
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]

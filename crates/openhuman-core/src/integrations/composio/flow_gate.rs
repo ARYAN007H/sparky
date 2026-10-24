@@ -72,9 +72,10 @@ pub(crate) async fn flow_tool_allowed(
             tracing::debug!(target: "flows", %slug, %toolkit, "[flows] tool_call curation: reject — slug is not a curated action of this toolkit");
             return false;
         };
+        // A pref that cannot be read admits nothing (fail closed).
         let allowed = load_user_scope_pref(ctx, config, &toolkit)
             .await
-            .allows(curated.scope);
+            .is_ok_and(|pref| pref.allows(curated.scope));
         tracing::debug!(target: "flows", %slug, %toolkit, allowed, "[flows] tool_call curation: static curated catalog decision");
         return allowed;
     }
@@ -102,7 +103,7 @@ pub(crate) async fn flow_tool_allowed(
     }
     let allowed = load_user_scope_pref(ctx, config, &toolkit)
         .await
-        .allows(classify_unknown(slug));
+        .is_ok_and(|pref| pref.allows(classify_unknown(slug)));
     tracing::debug!(target: "flows", %slug, %toolkit, allowed, "[flows] tool_call curation: live catalog + scope decision");
     allowed
 }
