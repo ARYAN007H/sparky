@@ -146,9 +146,6 @@ async fn execute_tool_per_call_factory_means_no_baked_client() {
     // backend a booted host has, so the gate answers and dispatch is reached.
     let _module = crate::integrations::composio::module_client::module_guard().await;
     let _env_guard = TEST_ENV_LOCK.lock().await;
-    // The scope-preference read is served by the connector module out of the
-    // host's installed storage; hold the module with that storage in place.
-    let _module = crate::integrations::composio::module_client::module_guard().await;
 
     let tmp = tempfile::tempdir().unwrap();
     let _workspace_guard = EnvVarGuard::workspace_unlocked(tmp.path());
