@@ -53,6 +53,7 @@ async fn the_tap_forwards_in_order_brackets_open_work_and_signals_the_drain() {
         runner_tx,
         activity.clone(),
         drained_tx,
+        None,
     );
 
     for event in [
@@ -95,6 +96,7 @@ async fn the_drain_is_released_when_the_stream_ends_without_a_completion() {
         runner_tx,
         TurnActivity::default(),
         drained_tx,
+        None,
     );
     agent_tx.send(AgentProgress::TurnStarted).await.unwrap();
     assert_eq!(kind(&runner_rx.recv().await.unwrap()), "other");
@@ -117,6 +119,7 @@ async fn a_dropped_runner_stops_the_tap() {
         runner_tx,
         TurnActivity::default(),
         drained_tx,
+        None,
     );
     drop(runner_rx);
     agent_tx.send(AgentProgress::TurnStarted).await.unwrap();

@@ -57,29 +57,56 @@ pub(super) fn settle_turn_snapshot(
 /// Forward the agent's progress to the runner, folding each event into the
 /// idle record and the work tracker on the way. Signals `drained` once the
 /// parent's `TurnCompleted` was forwarded or the stream ended.
+///
+/// A detached sub-agent can outlive its parent turn and still report (a
+/// cancelled child settles its card with `subagent_failed`). Once the runner has
+/// finished with the turn it no longer reads the stream, so with a `late` sink
+/// the tap keeps running and publishes only the sub-agent events straight to
+/// the web event stream, under the turn's ids; without one it stops, as before.
 pub(super) fn tap_progress(
     ctx: &DispatchCtx,
     mut rx: mpsc::Receiver<AgentProgress>,
     progress: mpsc::Sender<TurnSignal>,
     activity: TurnActivity,
     drained: watch::Sender<bool>,
+    late: Option<LateSubagentSink>,
 ) -> tokio::task::JoinHandle<()> {
+    let publish_ctx = ctx.clone();
     ctx.spawn(async move {
         let mut work = WorkTracker::default();
+        let mut runner_gone = false;
         while let Some(event) = rx.recv().await {
+            if runner_gone {
+                if let Some(late) = late.as_ref() {
+                    late.publish(&publish_ctx, event);
+                }
+                continue;
+            }
             activity.observe(&event);
             let completed = matches!(event, AgentProgress::TurnCompleted { .. });
             if let Some(signal) = work.observe(&event) {
                 if progress.send(signal).await.is_err() {
+                    runner_gone = true;
+                    if late.is_none() {
+                        break;
+                    }
+                }
+            }
+            if !runner_gone
+                && progress
+                    .send(TurnSignal::Progress(Box::new(event.clone())))
+                    .await
+                    .is_err()
+            {
+                runner_gone = true;
+                if late.is_none() {
                     break;
                 }
             }
-            if progress
-                .send(TurnSignal::Progress(Box::new(event)))
-                .await
-                .is_err()
-            {
-                break;
+            if runner_gone {
+                if let Some(late) = late.as_ref() {
+                    late.publish(&publish_ctx, event);
+                }
             }
             if completed {
                 let _ = drained.send(true);
@@ -87,6 +114,52 @@ pub(super) fn tap_progress(
         }
         let _ = drained.send(true);
     })
+}
+
+/// Where a finished turn's late sub-agent events go: the web event stream,
+/// addressed like the turn.
+#[derive(Clone)]
+pub(super) struct LateSubagentSink {
+    pub(super) client_id: String,
+    pub(super) thread_id: String,
+    pub(super) request_id: String,
+}
+
+impl LateSubagentSink {
+    fn publish(&self, ctx: &DispatchCtx, event: AgentProgress) {
+        let is_subagent = matches!(
+            event,
+            AgentProgress::SubagentSpawned { .. }
+                | AgentProgress::SubagentCompleted { .. }
+                | AgentProgress::SubagentFailed { .. }
+                | AgentProgress::SubagentAwaitingUser { .. }
+                | AgentProgress::SubagentIterationStarted { .. }
+                | AgentProgress::SubagentToolCallStarted { .. }
+                | AgentProgress::SubagentToolCallCompleted { .. }
+        );
+        if !is_subagent {
+            return;
+        }
+        let Some(output) = super::super::progress_map::subagent_event(event, 0, None) else {
+            return;
+        };
+        let mut projector = tinychannels_runtime::adapters::web::WebTurnProjector::new(
+            &self.client_id,
+            &self.thread_id,
+            &self.request_id,
+        );
+        for mut projected in projector.project(output, super::super::progress::unix_epoch_ms()) {
+            // A late event follows the turn's own sequence, which this
+            // projector does not know; leave it unstamped.
+            tinychannels_runtime::adapters::web::context_mut(&mut projected).seq = None;
+            log::debug!(
+                "[web-channel] late sub-agent event event={} request_id={}",
+                projected.event_name(),
+                self.request_id
+            );
+            super::super::event_bus_channel::publish_web_channel_event_in(ctx, projected);
+        }
+    }
 }
 
 /// The `inference_heartbeat` liveness beat for the turn's projection.

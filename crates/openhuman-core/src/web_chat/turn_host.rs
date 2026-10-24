@@ -252,8 +252,21 @@ impl WebHost {
             output: None,
         });
         let (drained_tx, mut drained_rx) = watch::channel(false);
-        let tap = tap_progress(&ctx, progress_rx, progress, activity, drained_tx);
-        let _tap = AbortOnDrop(tap);
+        // The tap outlives the turn on purpose: a detached sub-agent may still
+        // report through its sender clone after the parent finished, and the
+        // tap ends when the last sender drops.
+        let _tap = tap_progress(
+            &ctx,
+            progress_rx,
+            progress,
+            activity,
+            drained_tx,
+            Some(LateSubagentSink {
+                client_id: payload.client_id.clone(),
+                thread_id: thread_id.to_owned(),
+                request_id: id.to_owned(),
+            }),
+        );
         let _beat = AbortOnDrop(spawn_heartbeat(&ctx, projection.clone()));
 
         let origin = AgentTurnOrigin::WebChat {
