@@ -127,38 +127,40 @@ pub(super) struct LateSubagentSink {
 
 impl LateSubagentSink {
     fn publish(&self, ctx: &DispatchCtx, event: AgentProgress) {
-        let is_subagent = matches!(
-            event,
-            AgentProgress::SubagentSpawned { .. }
-                | AgentProgress::SubagentCompleted { .. }
-                | AgentProgress::SubagentFailed { .. }
-                | AgentProgress::SubagentAwaitingUser { .. }
-                | AgentProgress::SubagentIterationStarted { .. }
-                | AgentProgress::SubagentToolCallStarted { .. }
-                | AgentProgress::SubagentToolCallCompleted { .. }
-        );
-        if !is_subagent {
-            return;
-        }
-        let Some(output) = super::super::progress_map::subagent_event(event, 0, None) else {
+        // Only the event that settles a sub-agent card can matter after the
+        // turn: a child aborted by `subagent_cancel` (or one that failed late)
+        // still reports its failure. Everything else is turn-scoped output
+        // the finished turn no longer renders.
+        let AgentProgress::SubagentFailed {
+            agent_id,
+            task_id,
+            error,
+            ..
+        } = event
+        else {
             return;
         };
-        let mut projector = tinychannels_runtime::adapters::web::WebTurnProjector::new(
-            &self.client_id,
-            &self.thread_id,
-            &self.request_id,
+        log::debug!(
+            "[web-channel] late subagent_failed task_id={task_id} request_id={}",
+            self.request_id
         );
-        for mut projected in projector.project(output, super::super::progress::unix_epoch_ms()) {
-            // A late event follows the turn's own sequence, which this
-            // projector does not know; leave it unstamped.
-            tinychannels_runtime::adapters::web::context_mut(&mut projected).seq = None;
-            log::debug!(
-                "[web-channel] late sub-agent event event={} request_id={}",
-                projected.event_name(),
-                self.request_id
-            );
-            super::super::event_bus_channel::publish_web_channel_event_in(ctx, projected);
-        }
+        let context = super::super::event_context(
+            self.client_id.clone(),
+            self.thread_id.clone(),
+            self.request_id.clone(),
+        );
+        super::super::event_bus_channel::publish_web_channel_event_in(
+            ctx,
+            tinychannels_bus::web::WebChannelEvent::SubagentFailed {
+                context,
+                message: Some(error),
+                tool_name: Some(agent_id),
+                skill_id: Some(task_id),
+                success: Some(false),
+                subagent: None,
+                round: None,
+            },
+        );
     }
 }
 

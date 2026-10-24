@@ -45,7 +45,9 @@ use tinyagents_harness::progress::AgentProgress;
 mod progress_helpers;
 #[cfg(test)]
 use progress_helpers::spawn_heartbeat_with_interval;
-use progress_helpers::{settle_turn_snapshot, spawn_heartbeat, tap_progress, AbortOnDrop};
+use progress_helpers::{
+    settle_turn_snapshot, spawn_heartbeat, tap_progress, AbortOnDrop, LateSubagentSink,
+};
 
 /// How long a finished turn waits for its progress tap to forward every event
 /// the turn queued before the terminal `chat_done`/`chat_error` is published.
