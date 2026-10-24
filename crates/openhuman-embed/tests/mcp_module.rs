@@ -45,6 +45,7 @@ impl wiremock::Respond for McpStub {
 
 #[test]
 fn an_embedded_runtime_calls_a_tool_through_the_tinymcp_module() {
+    let _ = env_logger::builder().is_test(true).try_init();
     // The turn's future is large; `block_on` polls it on this thread, which
     // would otherwise have the default test stack.
     std::thread::Builder::new()
