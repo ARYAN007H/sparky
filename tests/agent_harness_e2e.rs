@@ -869,12 +869,10 @@ async fn boot_stack_with_options(
     // session stores, and a bare transport dispatch has no owner to resolve.
     let config_path = openhuman_home.join("config.toml");
     let workspace_dir = home.join("workspace");
-    let config = openhuman_core::config::Config::load_from_config_path(
-        &config_path,
-        &workspace_dir,
-    )
-    .await
-    .expect("load test config with process overrides");
+    let config =
+        openhuman_core::config::Config::load_from_config_path(&config_path, &workspace_dir)
+            .await
+            .expect("load test config with process overrides");
     let base = match AGENT_HARNESS_CORE.get() {
         Some(core) => Arc::clone(core),
         None => {
@@ -890,10 +888,7 @@ async fn boot_stack_with_options(
             .await
             .expect("initialize the agent harness test context");
             let _ = AGENT_HARNESS_CORE.set(Arc::clone(&core));
-            AGENT_HARNESS_CORE
-                .get()
-                .cloned()
-                .unwrap_or(core)
+            AGENT_HARNESS_CORE.get().cloned().unwrap_or(core)
         }
     };
     let request_context = base.derive_with(openhuman_core::core::runtime::ContextOverlay::new(
@@ -910,8 +905,7 @@ async fn boot_stack_with_options(
         move |request: axum::extract::Request, next: axum::middleware::Next| {
             let context = Arc::clone(&request_context);
             async move {
-                openhuman_core::core::runtime::CoreContext::scope(context, next.run(request))
-                    .await
+                openhuman_core::core::runtime::CoreContext::scope(context, next.run(request)).await
             }
         },
     ));
@@ -1764,10 +1758,13 @@ async fn subagent_delegation_happy_path_inner() {
     let _lock = env_lock();
     let stack = boot_stack().await;
     reset_script(vec![
-        tool_call_completion("spawn_subagent", json!({
-            "agent_id": "task_manager_agent",
-            "prompt": "Find MEMORY_CANARY_42 and report it.",
-        })),
+        tool_call_completion(
+            "spawn_subagent",
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "Find MEMORY_CANARY_42 and report it.",
+            }),
+        ),
         text_completion("I started the specialist task."),
         text_completion("MEMORY_CANARY_42 is the result."),
     ]);
@@ -1811,7 +1808,10 @@ async fn subagent_delegation_happy_path_inner() {
         }) {
             break requests;
         }
-        assert!(tokio::time::Instant::now() < deadline, "worker never issued its model request");
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "worker never issued its model request"
+        );
         tokio::time::sleep(Duration::from_millis(25)).await;
     };
 
@@ -1841,7 +1841,10 @@ async fn subagent_delegation_happy_path_inner() {
         .unwrap_or_default();
     assert_ne!(
         req0_messages,
-        worker_request.pointer("/body/messages").unwrap().to_string(),
+        worker_request
+            .pointer("/body/messages")
+            .unwrap()
+            .to_string(),
         "worker request reused the root conversation instead of its own prompt"
     );
 
@@ -4705,14 +4708,18 @@ mod tool_policy_boundary_placement {
                     level: PermissionLevel::Write,
                 }),
             ])
-            .visible_tool_names(std::collections::HashSet::from(["boundary_read".to_string()]))
+            .visible_tool_names(std::collections::HashSet::from([
+                "boundary_read".to_string()
+            ]))
             .tool_dispatcher(Box::new(NativeDialect))
             .workspace_dir(workspace.path().to_path_buf())
             .event_context("boundary-session", "internal")
             .config(config)
             .build()
             .expect("complete builder should succeed");
-        agent.set_visible_tool_names(std::collections::HashSet::from(["boundary_read".to_string()]));
+        agent.set_visible_tool_names(std::collections::HashSet::from([
+            "boundary_read".to_string()
+        ]));
 
         agent
             .render_current_turn_prompt()

@@ -224,7 +224,11 @@ async fn turn_state_ignores_non_remote_channels_and_stale_workspaces() {
     );
 
     sub.handle(&processed("telegram", "chat-1", &other)).await;
-    assert_eq!(marks.lock().unwrap().len(), 1, "a stale workspace is ignored");
+    assert_eq!(
+        marks.lock().unwrap().len(),
+        1,
+        "a stale workspace is ignored"
+    );
 
     sub.handle(&processed("telegram", "chat-1", &ws)).await;
     assert_eq!(
