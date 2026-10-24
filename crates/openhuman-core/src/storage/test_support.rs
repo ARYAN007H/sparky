@@ -1,6 +1,7 @@
 //! Test-only storage backends backed by the real TSD testkit and drivers.
 
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 #[cfg(feature = "storage-sqlite")]
 use crate::storage::block_on_anyhow;
@@ -10,6 +11,22 @@ use crate::storage::StorageBackend;
 /// writes or persistence across backend instances.
 pub fn memory_backend() -> Arc<dyn StorageBackend> {
     Arc::new(tinystoragedrivers_testkit::MemoryBackend::new())
+}
+
+static TEST_WORKSPACES: OnceLock<Mutex<Vec<tempfile::TempDir>>> = OnceLock::new();
+
+/// Returns a private workspace path retained until the test process exits.
+/// Use it when a test context can open durable storage: sharing the system
+/// temp directory lets unrelated tests declare conflicting storage indexes.
+pub fn isolated_workspace() -> PathBuf {
+    let directory = tempfile::tempdir().expect("create isolated test workspace");
+    let path = directory.path().to_path_buf();
+    TEST_WORKSPACES
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .push(directory);
+    path
 }
 
 /// The in-memory backend a workspace opens by default under `cfg(test)`.
