@@ -3890,15 +3890,16 @@ async fn assert_packed_hand_off_reaches_specialist(
     events: &mut tokio::sync::mpsc::UnboundedReceiver<Value>,
     rpc_id: i64,
     client_id: &str,
-    pack: &str,
-    hand_off: &str,
+    agent_id: &str,
     specialist_only_tools: &[&str],
 ) {
+    // Hand-offs are `spawn_subagent` calls now (asynchronous: the parent gets a
+    // task id back and the child's result is delivered later), so the parent's
+    // acknowledgement and the child's first call race for the next completion.
     reset_script(vec![
-        packed_tool_call_completion(
-            pack,
-            hand_off,
-            json!({ "prompt": format!("Handle this through {hand_off}"), "blocking": true }),
+        tool_call_completion(
+            "spawn_subagent",
+            json!({ "agent_id": agent_id, "prompt": format!("Handle this through {agent_id}") }),
         ),
         text_completion("The specialist finished the task."),
         text_completion("The specialist handled it."),
@@ -3907,32 +3908,43 @@ async fn assert_packed_hand_off_reaches_specialist(
         &stack.rpc_base,
         rpc_id,
         client_id,
-        &format!("thread-{hand_off}"),
-        &format!("Please hand this to {hand_off}"),
+        &format!("thread-{agent_id}"),
+        &format!("Please hand this to {agent_id}"),
     )
     .await;
     let done = wait_for_terminal(events, Duration::from_secs(120)).await;
-    let requests = with_captured(|c| c.clone());
-    let dump = || serde_json::to_string_pretty(&requests).unwrap_or_default();
+    let first_requests = with_captured(|c| c.clone());
     assert_eq!(
         done.get("event").and_then(Value::as_str),
         Some("chat_done"),
-        "the `{hand_off}` turn must finish: {done}\nrequests: {}",
-        dump()
+        "the `{agent_id}` turn must finish: {done}\nrequests: {}",
+        serde_json::to_string_pretty(&first_requests).unwrap_or_default()
     );
+
+    // The child is detached: poll for the request that carries its own belt.
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    let requests = loop {
+        let requests = with_captured(|c| c.clone());
+        let child_seen = requests.iter().skip(1).any(|request| {
+            advertised_tool_names(request)
+                .iter()
+                .any(|name| specialist_only_tools.contains(&name.as_str()))
+        });
+        if child_seen || std::time::Instant::now() >= deadline {
+            break requests;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
+    let dump = || serde_json::to_string_pretty(&requests).unwrap_or_default();
 
     let orchestrator = requests
         .first()
-        .unwrap_or_else(|| panic!("no model request for the `{hand_off}` turn"));
+        .unwrap_or_else(|| panic!("no model request for the `{agent_id}` turn"));
     let belt = advertised_tool_names(orchestrator);
     assert!(
-        belt.iter().any(|name| name == "use_skill") && use_skill_offers_pack(orchestrator, pack),
-        "the orchestrator must offer the `{pack}` pack through use_skill so it can reach \
-         `{hand_off}`; it advertised {belt:?}"
-    );
-    assert!(
-        !belt.iter().any(|name| name == hand_off),
-        "`{hand_off}` is packed (#6787), not a direct tool on the orchestrator's wire: {belt:?}"
+        belt.iter().any(|name| name == "spawn_subagent"),
+        "the orchestrator must offer `spawn_subagent` so it can reach `{agent_id}`; it \
+         advertised {belt:?}"
     );
     let raw: Vec<&String> = belt
         .iter()
@@ -3943,8 +3955,8 @@ async fn assert_packed_hand_off_reaches_specialist(
         "the orchestrator must not advertise raw registry tools: {raw:?}"
     );
 
-    tool_result_text(&requests, hand_off)
-        .unwrap_or_else(|| panic!("no tool result for `{hand_off}`; requests: {}", dump()));
+    tool_result_text(&requests, "spawn_subagent")
+        .unwrap_or_else(|| panic!("no tool result for `spawn_subagent`; requests: {}", dump()));
     assert!(
         requests
             .iter()
@@ -3952,7 +3964,7 @@ async fn assert_packed_hand_off_reaches_specialist(
             .any(|request| advertised_tool_names(request)
                 .iter()
                 .any(|name| specialist_only_tools.contains(&name.as_str()))),
-        "no model request came from the specialist behind `{hand_off}` (a belt with any of \
+        "no model request came from the specialist `{agent_id}` (a belt with any of \
          {specialist_only_tools:?}); requests: {}",
         dump()
     );
@@ -3986,8 +3998,7 @@ async fn orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pac
         &mut events,
         910,
         "harness-skill-handoff",
-        "skills",
-        "setup_skills",
+        "skill_setup",
         &[
             "skill_registry_install",
             "skill_registry_uninstall",
