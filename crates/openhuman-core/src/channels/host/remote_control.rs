@@ -104,7 +104,7 @@ pub(crate) async fn dispatch_callback(
                 &reset.history_key,
             )
             .await
-            .map_err(|e| { eprintln!("DBGERR2 {e:#}"); tinybus::Error::failed("durable conversation reset failed") })?;
+            .map_err(|_| tinybus::Error::failed("durable conversation reset failed"))?;
             if cancellation.is_cancelled() {
                 return Err(tinybus::Error::failed("channel session ended"));
             }
