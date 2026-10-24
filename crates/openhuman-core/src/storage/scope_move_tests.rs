@@ -293,14 +293,13 @@ fn boot_import_moves_profile_v1_scope_and_keeps_source_unchanged() {
     .unwrap();
 
     let source_db = legacy::v1_db(&target);
-    { let inv = crate::storage::import::scope_move::LegacyScopeInventory::read(&source_db).unwrap(); let v: Vec<_> = inv.documents.iter().map(|d| (d.scope.clone(), d.collection.clone(), d.id.clone())).collect(); eprintln!("DBG4 scopes={:?} docs={v:?}", inv.scopes); }
     let before = hash_file(&source_db);
     let destination =
         crate::storage::test_support::sqlite_backend_in(dir, destination_url).unwrap();
     let backend = &destination.backend;
     let _installed =
         crate::storage::test_support::install_for_test(&destination.url, Arc::clone(backend));
-    let first = crate::storage::import::run_all(backend, &config); eprintln!("DBG3 {first:?}");
+    let first = crate::storage::import::run_all(backend, &config);
     let moved = first
         .iter()
         .find(|report| report.domain == IMPORT_DOMAIN)
