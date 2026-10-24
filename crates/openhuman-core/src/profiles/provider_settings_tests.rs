@@ -82,7 +82,6 @@ fn rejects_collisions_duplicates_unsafe_identifiers_and_alias_chains() {
         "shell",
         "spawn_subagent",
         "spawn_subagent",
-        "continue_subagent",
         "memory",
         "show_page",
         "web_answer_tool",
