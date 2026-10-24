@@ -95,11 +95,6 @@ hosting
 # Memory v2 has no gate: the `memory` domain is always compiled, and with no
 # usable engine (signed out, no CortexDB key) it reports itself off at runtime.
 
-# TinyMemes final-reply remix (region slang, reaction memes). Compiled in so a
-# release can turn it on; still off at runtime until OPENHUMAN_TINYMEMES (or a
-# build-time OPENHUMAN_TINYMEMES_DEFAULT) enables it.
-tinymemes
-
 # Inbound event queues: Composio triggers and agent webhooks are ingested into
 # the tinyeventqueues module, which persists, deduplicates, filters and paces
 # them and calls the host back to run triage. Runtime switches:

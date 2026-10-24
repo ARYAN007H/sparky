@@ -475,10 +475,6 @@ pub struct Config {
     #[serde(default)]
     pub tokenjuice: TokenjuiceConfig,
 
-    /// TinyMemes remix tuning (`[memes]`); the switch is `[components] memes`.
-    #[serde(default)]
-    pub memes: MemesConfig,
-
     /// Inbound event queues (`[inbound]`); the switch is
     /// `[components] eventqueues`.
     #[serde(default)]

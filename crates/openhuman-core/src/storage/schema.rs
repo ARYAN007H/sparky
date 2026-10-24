@@ -81,12 +81,6 @@ fn declared_collections() -> Vec<CollectionOwner> {
             .collect(),
     ));
 
-    #[cfg(feature = "tinymemes")]
-    owners.push(owner(
-        "tinymemes-bus",
-        tinymemes_bus::storage::collections(),
-    ));
-
     #[cfg(feature = "inbound-queues")]
     owners.push(owner(
         "tinyeventqueues-bus",
@@ -152,10 +146,6 @@ pub fn module_collections(owner: &str) -> Vec<CollectionSpec> {
                 .map(|collection| CollectionSpec::new(collection.name))
                 .collect(),
         );
-    }
-    #[cfg(feature = "tinymemes")]
-    if owner == "memes" {
-        return module_owned_collections(tinymemes_bus::storage::collections());
     }
     #[cfg(feature = "inbound-queues")]
     if owner == "teq" {

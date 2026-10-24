@@ -265,12 +265,6 @@ fn referenced_but_disabled(config: &Config) -> Vec<Finding> {
         references.push(("hosting", "hosting"));
     }
 
-    if config.memes != crate::config::schema::MemesConfig::default()
-        || explicitly_configured(config, "memes")
-    {
-        references.push(("memes", "memes"));
-    }
-
     if tokenjuice_is_custom(config) {
         references.push(("juice", "tokenjuice"));
     }
