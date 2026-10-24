@@ -70,8 +70,8 @@ impl RelayProgressiveTransport {
                 turn_id,
                 channel_ref,
                 conversation,
+                sequence,
                 event,
-                ..
             } => {
                 self.check_scope(
                     &channel,
@@ -79,10 +79,34 @@ impl RelayProgressiveTransport {
                     channel_ref.as_ref(),
                     conversation.as_ref(),
                 )?;
+                // The final message is the hosted delivery: the gateway owns
+                // the provider send, so the callback accepts it (no receipt)
+                // and the module does not resend it as a plain text reply.
+                let delivery = match event.as_ref() {
+                    tinychannels_bus::module_progressive::ChannelOutputEvent::FinalMessage {
+                        text,
+                        parts,
+                        ..
+                    } => Some((text.clone(), parts.clone())),
+                    _ => None,
+                };
                 // Project canonical events through the same compiled web
-                // adapter used by desktop and TUI turns. Provider delivery is
-                // still performed only by the typed terminal send below.
+                // adapter used by desktop and TUI turns.
                 self.projection.output(*event).await;
+                if let Some((text, parts)) = delivery {
+                    self.channel.publish_typed_reply(
+                        &self.ctx,
+                        &self.channel_ref,
+                        &self.conversation,
+                        &self.turn_id,
+                        sequence,
+                        0,
+                        &format!("{}:{sequence}:0", self.turn_id),
+                        &parts,
+                        &text,
+                    );
+                    return Ok(ProgressiveTransportResult::Accepted);
+                }
                 Ok(ProgressiveTransportResult::Acknowledged)
             }
             ProgressiveTransportRequest::SendTyped {
