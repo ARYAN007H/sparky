@@ -54,6 +54,9 @@ async fn linked_tinyeventqueues_queues_dedupes_and_delivers_a_composio_trigger()
     linked_modules::install();
 
     let config = config();
+    openhuman_core::modules::ensure_loaded(&config, "tinyeventqueues")
+        .await
+        .expect("the linked queue module loads with its storage callback");
     let client = ops::client(config.clone());
     let envelope = TriggerEnvelope::from_composio(
         "gmail",
