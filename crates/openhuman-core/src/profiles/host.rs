@@ -268,7 +268,7 @@ impl ProfileHost {
                     (
                         Arc::strong_count(&slot.state),
                         Arc::strong_count(&slot.state.context),
-                        Arc::strong_count(slot.state.context.agent_state()),
+                        slot.state.context.tenant_in_use(),
                     )
                 })
                 .collect::<Vec<_>>();
@@ -281,7 +281,7 @@ impl ProfileHost {
         profile_lease::release_all(self, closed).await;
         if full {
             log::debug!(
-                "[profiles] no free profile slot; pinned strong counts (profile, context, agent_state)={pinned:?}"
+                "[profiles] no free profile slot; pinned counts (profile, context, tenant_in_use)={pinned:?}"
             );
             return Err(OpenError::Full {
                 max: self.saas.max_profiles_open,
