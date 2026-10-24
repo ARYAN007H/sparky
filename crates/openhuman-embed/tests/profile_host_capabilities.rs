@@ -360,15 +360,21 @@ async fn scenario() {
             "tenant_probe:bob"
         ]
     );
-    assert_eq!(
-        *sessions.lock().unwrap(),
-        [
-            ("alice".into(), Some("t1".into())),
-            ("bob".into(), Some("t1".into())),
-            ("alice".into(), Some("channel:telegram/sender/chat".into())),
-            ("bob".into(), Some("channel:telegram/sender/chat".into())),
-        ]
-    );
+    let recorded = sessions.lock().unwrap().clone();
+    assert_eq!(recorded.len(), 4, "{recorded:?}");
+    assert_eq!(recorded[0], ("alice".into(), Some("t1".into())));
+    assert_eq!(recorded[1], ("bob".into(), Some("t1".into())));
+    // A relayed channel turn runs under the tenant-scoped session key the
+    // channel module derived for the sender and conversation.
+    for (index, profile) in [(2, "alice"), (3, "bob")] {
+        let (recorded_profile, key) = &recorded[index];
+        assert_eq!(recorded_profile, profile);
+        let key = key.as_deref().expect("a relayed turn has a session key");
+        assert!(
+            key.contains("|channel=p8:telegram|") && key.contains("|participant=p6:sender"),
+            "{key:?}"
+        );
+    }
     let executions_before_denied_turn = calls.lock().unwrap().len();
     assert!(
         handles[0]
