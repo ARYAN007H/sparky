@@ -3761,14 +3761,21 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     .await;
     assert_no_jsonrpc_error(&decide, "approval_decide for skill_registry_install");
 
-    let done = wait_for_terminal(&mut events, Duration::from_secs(120)).await;
-    assert_eq!(
-        done.get("event").and_then(Value::as_str),
-        Some("chat_done"),
-        "the install-and-run turn must finish: {done}"
-    );
-
-    let requests = with_captured(|c| c.clone());
+    // The delivery turn is host-authored (no web client is waiting on it), so
+    // wait for its evidence on the wire instead of a terminal chat event: the
+    // orchestrator request that carries the finished child's result.
+    let deadline = std::time::Instant::now() + Duration::from_secs(120);
+    let requests = loop {
+        let requests = with_captured(|c| c.clone());
+        let delivered = requests.iter().any(|request| {
+            request.to_string().contains("background sub-agent finished")
+                && request.to_string().contains("Installed the skill.")
+        });
+        if delivered || std::time::Instant::now() >= deadline {
+            break requests;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
     let dump = || serde_json::to_string_pretty(&requests).unwrap_or_default();
 
     // Found: the search the agent ran returned the registry entry.
