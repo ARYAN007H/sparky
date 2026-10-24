@@ -59,7 +59,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
         .and_then(Value::as_array)
         .expect("agent_list_definitions should return definitions array");
     // The v1 `agent_memory` built-in was removed with the v1 memory system
-    // (Memory v2 is one `memory` tool, not a sub-agent); `critic` is the
+    // (Memory v2 is one `memory` tool, not a sub-agent); `task_manager_agent` is the
     // stand-in safe-library entry.
     assert!(
         !definitions
@@ -69,8 +69,10 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
     );
     let memory_agent = definitions
         .iter()
-        .find(|definition| definition.get("id").and_then(Value::as_str) == Some("critic"))
-        .expect("safe agent library should include critic");
+        .find(|definition| {
+            definition.get("id").and_then(Value::as_str) == Some("task_manager_agent")
+        })
+        .expect("safe agent library should include task_manager_agent");
     assert!(memory_agent
         .get("display_name")
         .and_then(Value::as_str)
@@ -107,7 +109,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
         286_211,
         "openhuman.agent_registry_update",
         json!({
-            "id": "critic",
+            "id": "task_manager_agent",
             "name": "Review Specialist",
             "description": "Workspace-specific review specialist.",
             "model": "hint:reasoning",
@@ -338,7 +340,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
             "system_prompt": "Write concise updates with citations when available.",
             "tool_allowlist": ["memory.recall"],
             "tool_denylist": ["shell"],
-            "subagents": ["critic"],
+            "subagents": ["task_manager_agent"],
             "tags": ["writing", "custom", "disabled"],
             "metadata": { "updated_by": "json_rpc_e2e" }
         }),
@@ -363,7 +365,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
             .and_then(Value::as_array)
             .and_then(|allowlist| allowlist.first())
             .and_then(Value::as_str),
-        Some("critic")
+        Some("task_manager_agent")
     );
 
     let reenabled_custom = post_json_rpc(
@@ -396,7 +398,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
                 "system_prompt": "Review plans for missing validation.",
                 "tool_allowlist": ["memory.recall"],
                 "tool_denylist": ["shell", "file_write"],
-                "subagents": ["critic"],
+                "subagents": ["task_manager_agent"],
                 "tags": ["review"],
                 "metadata": { "entry_shape": "full" }
             }
@@ -426,7 +428,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
             .and_then(Value::as_array)
             .and_then(|allowlist| allowlist.first())
             .and_then(Value::as_str),
-        Some("critic")
+        Some("task_manager_agent")
     );
 
     let visible_after_custom_disable = post_json_rpc(
@@ -522,7 +524,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
         &rpc_base,
         286_221,
         "openhuman.agent_registry_remove",
-        json!({ "id": "critic" }),
+        json!({ "id": "task_manager_agent" }),
     )
     .await;
     assert_eq!(
@@ -1555,8 +1557,8 @@ async fn json_rpc_agent_team_live_member_run_roundtrip_inner() {
             "leadAgentId": "lead",
             "summary": "live run e2e",
             "members": [
-                { "name": "alice", "agentId": "critic" },
-                { "name": "bob", "agentId": "critic" }
+                { "name": "alice", "agentId": "task_manager_agent" },
+                { "name": "bob", "agentId": "task_manager_agent" }
             ]
         }),
     )
@@ -1842,7 +1844,14 @@ async fn json_rpc_agent_run_mode_set_and_get_round_trip() {
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
 
-    let thread_id = "thread-run-mode-e2e";
+    // The run mode is owned by a persisted thread: the RPC refuses an id that
+    // is not one of the caller's threads.
+    let create = post_json_rpc(&rpc_base, 9400, "openhuman.threads_create_new", json!({})).await;
+    let thread_id = assert_no_jsonrpc_error(&create, "threads_create_new")["data"]["id"]
+        .as_str()
+        .expect("id in created thread")
+        .to_string();
+    let thread_id = thread_id.as_str();
 
     // Defaults to build.
     let initial = post_json_rpc(
