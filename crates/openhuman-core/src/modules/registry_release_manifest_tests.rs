@@ -4,7 +4,7 @@ use super::*;
 fn tinychannels_registry_matches_scoped_runtime_release() {
     let record = find("tinychannels").expect("compiled TinyChannels module");
     assert_eq!(record.version, "0.1.42");
-    assert_eq!(tinychannels_bus::CONTRACT_VERSION, 22);
+    assert_eq!(tinychannels_bus::CONTRACT_VERSION, 23);
     assert_eq!(
         tinychannels_bus::module_relay::MODULE_OPERATION_VERSION,
         (1, 23)
