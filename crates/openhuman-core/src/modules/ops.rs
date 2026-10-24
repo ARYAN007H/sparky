@@ -242,6 +242,11 @@ async fn ensure_loaded_with_storage_callback(
 ) -> Result<(), String> {
     let mut loads = STORAGE_CALLBACK_LOADS.lock().await;
     if let Some((binding, _served)) = loads.get(id) {
+        if matches!(state_of(id), ModuleState::Ready) {
+            // Already serving with this binding: a binding is spent once the
+            // module takes it, so re-presenting it would be refused.
+            return Ok(());
+        }
         let mut module_config = module_config(config, id);
         module_config["storage_callback"] = serde_json::json!(binding.unique_name().as_str());
         return resolver
