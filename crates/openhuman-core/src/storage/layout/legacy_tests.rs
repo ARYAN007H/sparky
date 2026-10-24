@@ -31,20 +31,16 @@ async fn importing_twice_changes_nothing() {
         .await
         .unwrap_or_else(|error| panic!("first legacy import failed: {error:#?}"));
     migrate(&fx.target).await.unwrap();
-    let first = super::super::db::table_counts(&v1_db(&fx.target)).unwrap();
+    let first_fixture_docs = fixture_docs(&v1_db(&fx.target));
+    let first_jobs = crate::storage::layout::test_fixtures::jobs_value(&v1_db(&fx.target));
     import(&fx.target, &fx.config)
         .await
         .unwrap_or_else(|error| panic!("second legacy import failed: {error:#?}"));
     migrate(&fx.target).await.unwrap();
-    let second = super::super::db::table_counts(&v1_db(&fx.target)).unwrap();
-    std::fs::write(
-        "/home/ubuntu/work/workflow-openhuman/openhuman/worktrees/test-to-green-followup-8368/ci-out/nextest/legacy-counts.txt",
-        format!("first: {first:#?}\nsecond: {second:#?}"),
-    )
-    .unwrap();
+    assert_eq!(fixture_docs(&v1_db(&fx.target)), first_fixture_docs);
     assert_eq!(
-        second,
-        first
+        crate::storage::layout::test_fixtures::jobs_value(&v1_db(&fx.target)),
+        first_jobs
     );
 }
 
