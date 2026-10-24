@@ -147,7 +147,7 @@ async fn react_dispatch_keeps_routing_without_creating_child_lifecycle_records()
             ),
         )
         .await
-        .inspect_err(|e| eprintln!("DBGERR {e:?}")).expect("react escalation should complete");
+        .expect("react escalation should complete");
 
     // Prove that the requested route reached the model before checking the
     // lifecycle boundary below, so a skipped dispatch cannot satisfy it.
@@ -399,7 +399,7 @@ async fn react_dispatch_falls_back_to_parent_model_when_hint_route_cannot_build(
             ),
         )
         .await
-        .inspect_err(|e| eprintln!("DBGERR {e:?}")).expect("react escalation should complete");
+        .expect("react escalation should complete");
 
     let builds = builds.lock().unwrap();
     assert!(builds.iter().any(|(role, _)| role == "chat"));
