@@ -9060,19 +9060,19 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.1.36"
-source = "git+https://github.com/tinyhumansai/tinybox?tag=v0.1.36#39fe22189431bdf787dafce5eea6d7d49d1a00f8"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "tinybox-bus"
 version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
  "tinystoragedrivers-types",
+]
+
+[[package]]
+name = "tinybox-bus"
+version = "0.2.1"
+source = "git+https://github.com/tinyhumansai/tinybox?tag=v0.2.1#fc34d28da8742d1014f8183fb817ffacb871ee9b"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -10063,7 +10063,7 @@ dependencies = [
  "serde_json",
  "sha2 0.11.1",
  "thiserror 2.0.21",
- "tinybox-bus 0.1.36",
+ "tinybox-bus 0.2.1",
  "tinybus",
  "tinybus-module",
  "tinymcp-bus",
