@@ -212,7 +212,7 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         .await
         .unwrap()
         .expect("the released module wrote the v2 job through the host callback");
-    assert_eq!(migrated.meta.created_ms, 1772600767123_i64);
+    assert_eq!(migrated.doc["created_ms"], 1772600767123_i64);
     for (collection, id) in [
         ("cron_jobs", "legacy-migration-proof"),
         ("cron_runs", "00000000000000000007"),
