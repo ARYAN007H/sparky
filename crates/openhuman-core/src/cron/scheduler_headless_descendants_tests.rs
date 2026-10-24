@@ -108,6 +108,29 @@ fn scheduled_agent_fixture(
     (temp, storage, storage_guard, config, core, dispatch, job)
 }
 
+/// Read a job's persisted runs without parking the test's single-threaded
+/// runtime. `cron::list_runs` blocks its caller on the storage runtime; called
+/// directly from a `#[tokio::test]` it freezes the only thread that drives the
+/// scheduler's own callbacks and timers, so no watchdog can fire and the
+/// runner's 5-minute kill is the first thing to notice. A plain thread keeps
+/// the runtime turning and the deadline real.
+async fn list_runs_off_runtime(
+    config: &Config,
+    job_id: &str,
+) -> anyhow::Result<Vec<tinyflows_bus::schedule::types::CronRun>> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let config = config.clone();
+    let job_id = job_id.to_string();
+    std::thread::spawn(move || {
+        let _ = tx.send(crate::cron::list_runs(&config, &job_id, 10));
+    });
+    match tokio::time::timeout(std::time::Duration::from_secs(30), rx).await {
+        Ok(Ok(runs)) => runs,
+        Ok(Err(_)) => Err(anyhow::anyhow!("list_runs thread exited without a result")),
+        Err(_) => Err(anyhow::anyhow!("list_runs did not return within 30s")),
+    }
+}
+
 async fn dispatch_scheduled_agent(
     core: std::sync::Arc<crate::core::runtime::CoreContext>,
     dispatch: crate::core::runtime::DispatchCtx,
@@ -283,7 +306,9 @@ async fn scheduled_agent_history_includes_its_spawned_child_result() {
             model.accepted_followups.load(std::sync::atomic::Ordering::SeqCst),
         ),
     }
-    let runs = crate::cron::list_runs(&config, &job.id, 10).expect("read persisted run history");
+    let runs = list_runs_off_runtime(&config, &job.id)
+        .await
+        .expect("read persisted run history");
     assert_eq!(runs.len(), 1, "scheduler persisted one completed run");
     assert_eq!(runs[0].status, "ok", "agent job completed successfully");
     assert!(
@@ -416,7 +441,9 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
         "the root deadline dropped the child model future"
     );
 
-    let runs = crate::cron::list_runs(&config, &job.id, 10).expect("read persisted run history");
+    let runs = list_runs_off_runtime(&config, &job.id)
+        .await
+        .expect("read persisted run history");
     assert_eq!(runs.len(), 1, "scheduler persisted one completed attempt");
     assert_ne!(runs[0].status, "ok", "the configured deadline expired");
     assert!(!runs[0]
@@ -464,7 +491,7 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
         Ok(Err(error)) => panic!("scheduled child exited before its model call: {error}"),
         Err(_) => {
             let result = tokio::time::timeout(std::time::Duration::from_secs(30), run).await;
-            let runs = crate::cron::list_runs(&config, &job.id, 10);
+            let runs = list_runs_off_runtime(&config, &job.id).await;
             let events = match &runs {
                 Ok(runs) => match runs.first().and_then(|run| run.run_id.as_deref()) {
                     Some(run_id) => crate::agent::tinyagents::journal::read_run_events(
@@ -548,7 +575,9 @@ async fn scheduled_cron_child_cannot_run_its_declared_destructive_tool() {
         .expect("the native child journal records the denied delete_artifact call");
     assert!(denial.contains("Scheduled agent turns may use read-only tools only"));
     assert!(!denial.contains("not found"));
-    let runs = crate::cron::list_runs(&config, &job.id, 10).expect("read persisted run history");
+    let runs = list_runs_off_runtime(&config, &job.id)
+        .await
+        .expect("read persisted run history");
     assert_eq!(runs.len(), 1);
     assert_eq!(runs[0].status, "error");
 }
