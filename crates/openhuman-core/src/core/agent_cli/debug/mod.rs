@@ -207,7 +207,7 @@ async fn render_via_session(
     let flow_archetype_text: Option<String> = None;
 
     let text = agent
-        .build_system_prompt_with_flow_archetype(flow_archetype_text.as_deref())
+        .render_current_turn_prompt_with_flow_archetype(flow_archetype_text.as_deref())
         .with_context(|| format!("rendering system prompt for `{agent_id}`"))?;
 
     Ok(session_dump(&agent, agent_id, text))

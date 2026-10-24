@@ -1,7 +1,38 @@
 use super::{
     channel_connection_update_payload, event_alias, origin_is_allowed_with_extra,
-    publish_companion_state_changed, subscribe_companion_state_changed,
+    publish_companion_state_changed, socket_tenant_from_request_extensions,
+    subscribe_companion_state_changed, ThreadSubscribePayload,
 };
+
+#[tokio::test]
+async fn socket_connect_reads_dispatch_context_from_request_extensions_after_spawn() {
+    let dispatch = crate::core_host::core::runtime::DispatchCtx::process_default();
+    let expected = crate::core_host::agent::plan_review::socket_scope_for_dispatch(&dispatch);
+    let mut extensions = axum::http::Extensions::new();
+    extensions.insert(dispatch);
+
+    // Mirrors socketioxide's async connect handler boundary: request parts
+    // retain Axum extensions, while the callback itself runs in a new task.
+    let actual = tokio::spawn(async move {
+        socket_tenant_from_request_extensions(&extensions).map(|tenant| tenant.0)
+    })
+    .await
+    .expect("spawned connect callback completes");
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn thread_subscribe_cannot_choose_a_profile_for_review_replay() {
+    let payload = serde_json::from_value::<ThreadSubscribePayload>(serde_json::json!({
+        "thread_id": "thread-1",
+        "profile_id": "victim-profile",
+    }));
+    assert!(
+        payload.is_err(),
+        "tenant selection is not a client payload field"
+    );
+}
 
 #[test]
 fn companion_state_transport_delivers_payload_to_bridge() {

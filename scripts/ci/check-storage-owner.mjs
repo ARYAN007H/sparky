@@ -97,10 +97,10 @@ export const ALLOWLIST = {
  */
 export const ENGINE_EXCEPTIONS = [
   {
-    package: 'tinytools-std',
+    package: 'tinyagents-harness-tools',
     engine: 'fs2',
-    reason: 'advisory file locking for the workspace lock file',
-    followUp: 'tinytools: drop fs2 from tinytools-std',
+    reason: 'advisory file locking for the workspace lock file (the `fs` tools)',
+    followUp: 'tinyagents: drop fs2 from tinyagents-harness-tools',
   },
   {
     package: 'tinymemory-integrations',

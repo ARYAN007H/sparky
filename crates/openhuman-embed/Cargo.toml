@@ -81,12 +81,11 @@ tinymcp-bus = { path = "../../vendor/tinymcp/crates/tinymcp-bus" }
 # conversations in its own database, and the in-memory provider; same path as
 # the core's so one copy resolves.
 tinyagents-hooks = { workspace = true }
+tinyagents-harness-tools = { workspace = true, default-features = false, features = ["todos"] }
 tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", default-features = false }
-tinyagents-harness-tools = { path = "../../vendor/tinyagents/crates/tinyagents-harness-tools", default-features = false, features = ["todos"] }
 tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session" }
 # Native persisted todo codec exposed by the existing session-store contract.
-tinyagents-graph = { path = "../../vendor/tinyagents/crates/tinyagents-graph", default-features = false }
 # Native cancellation contract, exposed unchanged by the existing stream API.
 tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false }
 # The wire request/response types `complete` converts to; same path as the
@@ -97,7 +96,6 @@ tinyinference-embeddings = { path = "../../vendor/tinyagents/vendor/tinyinferenc
 # path as the core's so the trait unifies.
 # `AgentDefinitionSpec::tool_rules` takes the shared tool-rule vocabulary too.
 tinytools = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinytools" }
-tinytools-std = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinytools-std" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 url = "2"
 uuid = { version = "1", features = ["v4"] }
@@ -105,6 +103,8 @@ uuid = { version = "1", features = ["v4"] }
 [dev-dependencies]
 async-trait = "0.1"
 tinymemory-api = { path = "../../vendor/tinymemory/crates/tinymemory-api", features = ["conformance"] }
+tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session", features = ["testkit"] }
+tinystoragedrivers-testkit = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-testkit" }
 dirs = "6"
 zeroize = "1"
 # `cron_tests` builds core `CronJob`s, whose schedule types live in the
@@ -122,11 +122,6 @@ tinymcp = { path = "../../vendor/tinymcp/crates/tinymcp", features = ["static-li
 # the dev graph adds no reqwest feature (see the unification note below).
 reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "rustls-tls", "stream", "http2", "multipart", "socks"] }
 wiremock = "0.6"
-# The in-memory session stores (`testkit`) the tests hand to a runtime. Same
-# features as openhuman-tinyhumans' and openhuman-cli's dev-dependency, so the dev
-# graphs stay equal (see the unification note below).
-tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session", features = ["testkit"] }
-tinystoragedrivers-testkit = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "f05fbd230c2c403c8dcdef57316fa55265379039" }
 # Feature unification with openhuman-cli's dev-dependencies. Cargo builds the
 # core once per distinct feature set of its dependencies, and the tests of
 # openhuman-embed, openhuman-tinyhumans and openhuman-cli each pull in the core

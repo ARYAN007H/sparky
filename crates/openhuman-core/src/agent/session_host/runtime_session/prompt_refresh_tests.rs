@@ -303,6 +303,7 @@ fn resumed<'a>(prefix: &'a PrefixSnapshot, history: &'a [Message]) -> SessionSta
         transcript_target: None,
         committed_turns: 1,
         resumed: true,
+        identity: None,
     }
 }
 

@@ -66,6 +66,8 @@ pub use agent_scope::{agent_scope_dir, slot_for, AgentContextRegistry, AgentScop
 pub use builder::{CoreBootMode, CoreBuilder, CoreRuntime, DomainSet, ServiceSet, TokenSource};
 pub use context::{AutonomyTierSource, ContextOverlay, CoreContext};
 pub use dispatch_ctx::DispatchCtx;
+#[cfg(test)]
+pub(crate) use mode::lock_mode;
 pub use mode::{current_mode, is_saas, Mode};
 pub use saas::SaasConfig;
 pub use tenant::{

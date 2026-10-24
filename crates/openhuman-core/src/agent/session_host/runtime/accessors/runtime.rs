@@ -1,6 +1,10 @@
 use super::*;
 
 impl OpenHumanSessionHost {
+    pub(crate) fn enable_headless_descendant_settlement(&mut self) {
+        self.settle_headless_descendants = true;
+    }
+
     /// Restricts integration task-fetch tools to tasks touched within `window`
     /// on every later turn of this agent; `None` clears the restriction.
     pub fn set_task_recency_window(&mut self, window: Option<std::time::Duration>) {

@@ -32,6 +32,7 @@ mod remove_write_auto_approve;
 mod repair_http_request_limits;
 mod retire_chat_v1_model;
 pub(crate) mod retire_cloud_provider_type;
+pub(crate) mod retire_configured_agents;
 mod retire_local_whisper_stt;
 mod unify_ai_provider_settings;
 

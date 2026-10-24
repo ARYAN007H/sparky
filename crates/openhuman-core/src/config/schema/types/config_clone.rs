@@ -75,7 +75,6 @@ impl Clone for Config {
             cost: self.cost.clone(),
             legacy_memory_sources: self.legacy_memory_sources.clone(),
             agent_registry: self.agent_registry.clone(),
-            agents: self.agents.clone(),
             local_ai: self.local_ai.clone(),
             claude_agent_sdk: self.claude_agent_sdk.clone(),
             cloud_providers: self.cloud_providers.clone(),

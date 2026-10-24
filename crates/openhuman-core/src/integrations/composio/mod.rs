@@ -59,6 +59,7 @@ pub mod identity;
 pub mod identity_store;
 pub mod module_client;
 pub mod ops;
+pub mod orchestrator_actions;
 pub(crate) mod processing;
 pub mod schemas;
 #[cfg(test)]

@@ -87,19 +87,17 @@ pub async fn prepare_scope(storage: &Storage, scope: &Scope) -> Result<usize, St
     Ok(count)
 }
 
-/// Runs the tinyagents graph and harness owner-local migrations on `scope`:
-/// v1 checkpoints, leases, task cache, run status, journals, blobs and
-/// key-value stores move to their v2 names. Idempotent.
+/// Runs the tinyagents harness owner-local migrations on `scope`: v1 run
+/// status, journals, blobs and key-value stores move to their v2 names.
+/// Idempotent. (The graph owner is gone with `tinyagents-graph`.)
 async fn migrate_owners(storage: &Storage, scope: &Scope) -> Result<(), StorageError> {
     let scoped = tinyagents_storage_kit::ScopedStorage::new(storage.clone(), scope.clone());
-    // Each owner migrates independently: a graph failure must not hold back
-    // the harness records. The first error is returned after both ran.
-    let graph = tinyagents_graph::storage::open_storage(scoped.clone()).await;
-    let harness = tinyagents_harness::storage::open_storage(scoped).await;
-    graph.and(harness).map(|_| ())
+    tinyagents_harness::storage::open_storage(scoped)
+        .await
+        .map(|_| ())
 }
 
-/// Runs the graph and harness owner migrations on `scope` again after an
+/// Runs the harness owner migrations on `scope` again after an
 /// importer copied v1 records into it (the scope move). Their steps already
 /// finished on the then-empty scope when it was prepared, and a finished step
 /// is skipped, so the two owners' progress records are cleared first. The
@@ -117,7 +115,7 @@ pub async fn remigrate_owners(storage: &Storage, scope: &Scope) -> Result<(), St
         .await?;
     for progress in docs.query_all(MIGRATIONS_COLLECTION, &Query::all()).await? {
         let owner = progress.doc.get("owner").and_then(|value| value.as_str());
-        if matches!(owner, Some("graph" | "harness")) {
+        if matches!(owner, Some("harness")) {
             docs.delete(MIGRATIONS_COLLECTION, &progress.id, Precondition::None)
                 .await?;
         }

@@ -3,9 +3,9 @@
 //! One storage URL decides where every conversation lives
 //! (`OPENHUMAN_STORAGE_URL`, else `[storage] url`, else the default
 //! `sqlite:<workspace>/storage`). The backend is opened and made the process's
-//! storage backend, and TinyAgents' `DriverSessionStores` goes in over it
-//! ([`ReboundSessionStores`], so a different user signing in can move it to
-//! their workspace's backend without reinstalling the provider): every agent's
+//! storage backend, and TinyAgents' rebindable tenant router goes in over it,
+//! so a different user signing in can move it to their workspace's backend
+//! without reinstalling the provider: every agent's
 //! transcripts, turn states, records, run ledger and journal in that backend,
 //! one storage scope per agent. There is no file layout beside it; what older
 //! installs wrote is imported once, read-only, by `storage::import` at boot.
@@ -50,7 +50,7 @@ use crate::core_host::agent::session_store::{ReboundSessionStores, WorkspaceSess
 ///
 /// The backend is opened and made the process's storage backend
 /// ([`crate::core_host::storage::install_for_url`]), and TinyAgents'
-/// `DriverSessionStores` is installed over it.
+/// TinyAgents' rebindable tenant router is installed over it.
 ///
 /// A single-process backend (SQLite, memory, files) also interrupts an
 /// agent's in-flight turns the first time it is opened, since only an earlier

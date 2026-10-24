@@ -165,7 +165,7 @@ pub(crate) async fn run_yielding(
         // the command (`_caller` closes `abandoned`) and holds the turn's
         // cleanup open until TinyBox has stopped it, so an awaited turn
         // cancellation is acknowledged only after the command is gone.
-        let hold = tinytools_std::timeout::ProcessCleanup::hold();
+        let hold = tinyagents_harness_tools::exec::timeout::ProcessCleanup::hold();
         let (_caller, abandoned) = tokio::sync::oneshot::channel::<std::convert::Infallible>();
         ctx.spawn(async move {
             let _hold = hold;

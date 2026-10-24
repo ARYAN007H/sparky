@@ -110,6 +110,10 @@ impl Channel for RecordingChannel {
         "recording"
     }
 
+    fn supports_remote_control(&self) -> bool {
+        true
+    }
+
     #[allow(
         deprecated,
         reason = "TinyChannels v22 still requires the legacy send trait method"
@@ -170,7 +174,6 @@ pub(super) fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(workspace_dir),
         message_timeout_secs: 60,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -453,52 +456,5 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
     assert_eq!(sent[0].thread_id.as_deref(), Some("thread-1"));
 }
 
-#[tokio::test]
-async fn handle_runtime_command_set_model_clears_sender_history_and_persists_route_override() {
-    let ctx = runtime_context(PathBuf::from("/tmp"));
-    let key = "telegram_alice_room";
-    ctx.conversation_histories
-        .lock()
-        .unwrap()
-        .insert(key.to_string(), vec![ChatMessage::user("old history")]);
-    let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
-    let msg = inbound(
-        "1".into(),
-        "alice".into(),
-        "room".into(),
-        "/model gpt-5-mini".into(),
-        "telegram".into(),
-        None,
-    );
-
-    let handled = handle_runtime_command_if_needed(
-        &ctx,
-        &msg,
-        Some(&channel),
-        &conversation_history_key(&msg),
-    )
-    .await;
-    assert!(handled);
-
-    assert!(ctx
-        .conversation_histories
-        .lock()
-        .unwrap()
-        .get(key)
-        .is_none());
-    assert_eq!(
-        get_route_selection(&ctx, key),
-        ChannelRouteSelection {
-            provider: "openai".into(),
-            model: "gpt-5-mini".into()
-        }
-    );
-
-    let sent = channel_impl.sent.lock().unwrap();
-    assert_eq!(sent.len(), 1);
-    assert!(sent_text(&sent[0]).contains("Model switched to `gpt-5-mini`"));
-}
-
-#[path = "routes_telegram_tests.rs"]
-mod routes_telegram_tests;
+#[path = "routes_command_tests.rs"]
+mod command_tests;

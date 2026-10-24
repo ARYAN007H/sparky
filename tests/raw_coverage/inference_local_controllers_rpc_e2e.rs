@@ -97,17 +97,16 @@ fn controller<'a>(
         .unwrap_or_else(|| panic!("controller {function} registered"))
 }
 
-async fn call(controller: &RegisteredController, params: Value) -> Result<Value, String> {
-    let params = params.as_object().cloned().unwrap_or_default();
-    (controller.handler)(DispatchCtx::process_default(), params).await
-}
-
-/// [`controller`] for the core registry, which holds [`ControllerEntry`]s.
-fn entry<'a>(controllers: &'a [ControllerEntry], function: &str) -> &'a ControllerEntry {
+fn entry_controller<'a>(controllers: &'a [ControllerEntry], function: &str) -> &'a ControllerEntry {
     controllers
         .iter()
         .find(|controller| controller.schema.function == function)
         .unwrap_or_else(|| panic!("controller {function} registered"))
+}
+
+async fn call(controller: &RegisteredController, params: Value) -> Result<Value, String> {
+    let params = params.as_object().cloned().unwrap_or_default();
+    (controller.handler)(DispatchCtx::process_default(), params).await
 }
 
 async fn call_entry(controller: &ControllerEntry, params: Value) -> Result<Value, String> {
@@ -236,7 +235,7 @@ fn local_inference_controllers_pin_their_registered_wire_method_names() {
     );
 
     for (function, wire) in EXPECTED_WIRE_METHODS {
-        let registered = entry(&controllers, function);
+        let registered = entry_controller(&controllers, function);
         assert_eq!(
             registered.rpc_method_name(),
             *wire,
@@ -490,7 +489,7 @@ async fn inference_agent_chat_simple_controller_covers_params_and_prompt_guard()
     let _workspace = EnvVarGuard::set("OPENHUMAN_WORKSPACE", tmp.path().join(".openhuman"));
 
     let controllers = all_registered_controllers();
-    let chat_simple = entry(&controllers, "agent_chat_simple");
+    let chat_simple = entry_controller(&controllers, "agent_chat_simple");
 
     let missing = call_entry(chat_simple, json!({}))
         .await

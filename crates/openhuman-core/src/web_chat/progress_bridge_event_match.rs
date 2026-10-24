@@ -253,9 +253,6 @@
                     output_chars,
                     output,
                     usage,
-                    worktree_path,
-                    changed_files,
-                    dirty_status,
                     ..
                 } => {
                     subagent_events::on_subagent_completed(
@@ -271,9 +268,6 @@
                         output_chars,
                         output,
                         usage,
-                        worktree_path,
-                        changed_files,
-                        dirty_status,
                     );
                 }
                 AgentProgress::SubagentFailed {

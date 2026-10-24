@@ -176,8 +176,12 @@ async fn local_only_set_after_construction_refuses_a_remote_local_runtime_at_dis
     let invoked = model.invoke(&(), ModelRequest::new(Vec::new())).await;
     let streamed = model.stream(&(), ModelRequest::new(Vec::new())).await;
     for error in [
-        invoked.map(|_| ()).expect_err("invoke is refused before dispatch"),
-        streamed.map(|_| ()).expect_err("stream is refused before dispatch"),
+        invoked
+            .map(|_| ())
+            .expect_err("invoke is refused before dispatch"),
+        streamed
+            .map(|_| ())
+            .expect_err("stream is refused before dispatch"),
     ] {
         assert!(error.to_string().contains("Local-only"), "{error}");
     }

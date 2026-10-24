@@ -340,3 +340,6 @@ fn only_composio_claims_a_retained_input() {
         );
     }
 }
+
+#[path = "escalation_model_tests.rs"]
+mod model_tests;

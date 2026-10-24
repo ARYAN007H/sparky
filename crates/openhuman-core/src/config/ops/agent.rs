@@ -108,7 +108,7 @@ pub async fn apply_autonomy_settings(
             other => {
                 return Err(format!(
                     "invalid autonomy level '{other}' (expected readonly | supervised | full)"
-                ))
+                ));
             }
         };
     }
@@ -216,7 +216,7 @@ pub async fn apply_agent_settings(
     config: &mut Config,
     update: AgentSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    use tinytools_std::timeout::{MAX_TIMEOUT_SECS, MIN_TIMEOUT_SECS};
+    use tinyagents_harness_tools::exec::timeout::{MAX_TIMEOUT_SECS, MIN_TIMEOUT_SECS};
 
     if let Some(timeout_secs) = update.agent_timeout_secs {
         if !(MIN_TIMEOUT_SECS..=MAX_TIMEOUT_SECS).contains(&timeout_secs) {
@@ -295,8 +295,8 @@ pub async fn get_agent_settings(ctx: &DispatchCtx) -> Result<Outcome<serde_json:
         "agent_timeout_secs": config.agent.agent_timeout_secs,
         "effective_timeout_secs": crate::tools::timeout::tool_execution_timeout_secs(),
         "env_override": crate::tools::timeout::env_override_active(),
-        "min_timeout_secs": tinytools_std::timeout::MIN_TIMEOUT_SECS,
-        "max_timeout_secs": tinytools_std::timeout::MAX_TIMEOUT_SECS,
+        "min_timeout_secs": tinyagents_harness_tools::exec::timeout::MIN_TIMEOUT_SECS,
+        "max_timeout_secs": tinyagents_harness_tools::exec::timeout::MAX_TIMEOUT_SECS,
         "tool_dispatcher": config.agent.tool_dispatcher,
         "tool_dispatcher_env_override": td::tool_dispatcher_env_override(),
     });

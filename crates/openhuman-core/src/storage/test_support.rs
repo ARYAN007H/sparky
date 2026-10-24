@@ -12,6 +12,45 @@ pub fn memory_backend() -> Arc<dyn StorageBackend> {
     Arc::new(tinystoragedrivers_testkit::MemoryBackend::new())
 }
 
+/// The in-memory backend a workspace opens by default under `cfg(test)`.
+///
+/// The TSD memory engine cannot evaluate a write condition, yet the session
+/// transcripts (lease-conditioned generation writes) and the state import
+/// claims ask every backend for a conditioned scope. In a unit test the one
+/// process is the only writer, so there is nothing to fence: this wrapper
+/// opens the plain handles for a conditioned scope. It exists only for the
+/// workspace default; tests of the conditions themselves use
+/// [`sqlite_backend`], which enforces them.
+#[derive(Debug)]
+pub(crate) struct UnfencedMemoryBackend(tinystoragedrivers_testkit::MemoryBackend);
+
+impl UnfencedMemoryBackend {
+    pub(crate) fn new() -> Self {
+        Self(tinystoragedrivers_testkit::MemoryBackend::new())
+    }
+}
+
+impl StorageBackend for UnfencedMemoryBackend {
+    fn capabilities(&self) -> tinystoragedrivers_types::Capabilities {
+        self.0.capabilities()
+    }
+
+    fn for_scope(
+        &self,
+        scope: &tinystoragedrivers::Scope,
+    ) -> Result<tinystoragedrivers::Storage, tinystoragedrivers::StorageError> {
+        self.0.for_scope(scope)
+    }
+
+    fn for_scope_conditioned(
+        &self,
+        scope: &tinystoragedrivers::Scope,
+        _condition: &tinystoragedrivers_types::WriteCondition,
+    ) -> Result<tinystoragedrivers::Storage, tinystoragedrivers::StorageError> {
+        self.0.for_scope(scope)
+    }
+}
+
 static STORAGE_SLOT_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 /// Serializes a test that reads or mutates the process-wide installed storage

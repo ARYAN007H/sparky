@@ -96,7 +96,7 @@ async fn an_orchestrator_turn_leaves_the_goal_to_the_state_block() {
 
 #[tokio::test]
 async fn a_turn_without_the_state_block_still_carries_the_active_goal() {
-    let (host, tmp) = host_for("planner");
+    let (host, tmp) = host_for("summarizer");
     goal_store::set(&store(&tmp), THREAD, "Migrate the auth schema", None)
         .await
         .unwrap();

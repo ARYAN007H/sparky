@@ -8,7 +8,7 @@ use openhuman_embed::{
     SessionStoreProvider, Tool, ToolScopeSpec, Workspace,
 };
 use std::sync::Arc;
-use tinyagents_session::port::InMemorySessionStores;
+use tinyagents_session::InMemorySessionStores;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 // Runtime is process-wide. Keep the guard on the synchronous test caller;
@@ -279,6 +279,8 @@ pub fn attached_tools_survive_clones_and_session_resume() {
                     );
                 }
             }
+            runtime.remove_agent("attached").await.unwrap();
+            runtime.remove_agent("peer").await.unwrap();
         })
         .await
         .unwrap();
@@ -344,6 +346,8 @@ pub fn attaching_before_first_turn_preserves_and_executes_native_tools() {
                     text.contains("native-wildcard-survived") && !text.contains("unknown tool"))),
                 "the native executor must actually run: {second}");
             assert!(first["messages"].to_string().contains("ORIGINAL_FRESH_HOST_PROMPT"));
+            runtime.remove_agent("fresh-attached").await.unwrap();
+            drop(agent);
         }).await.unwrap();
     });
 }

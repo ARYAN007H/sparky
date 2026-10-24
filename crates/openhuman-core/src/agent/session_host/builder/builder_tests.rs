@@ -1,7 +1,8 @@
 //! Tests for the builder module — dedup_visible_tool_specs and related logic.
 
-use super::{dedup_visible_tool_specs, visible_tool_specs_for_policy};
+use super::visible_tool_specs_for_policy;
 use serde_json::json;
+use tinyagents_runtime::dedup_visible_tool_specs;
 use tinytools::ToolSpec;
 
 fn spec(name: &str) -> ToolSpec {
@@ -34,6 +35,11 @@ fn test_config(tmp: &tempfile::TempDir) -> crate::config::Config {
     let mut config = test_config_without_inference(tmp);
     crate::agent::session_host::test_support::install_model_fixture();
     config.default_model = Some("test/session-fixture".to_string());
+    // Building the model passes the backend-session gate; a standing API key in
+    // this session's own state dir satisfies it, and the fixture answers
+    // instead of a real provider.
+    crate::security::credentials::api_key::store_api_key(&config, "test-builder-key")
+        .expect("test api key");
     config
 }
 

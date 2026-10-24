@@ -648,9 +648,9 @@ pub enum DomainEvent {
 
     // ── Plan review (interactive plan-mode gate) ────────────────────────
     /// An interactive turn parked on a thread-scoped plan the user must
-    /// review before execution. Published by
-    /// [`crate::plan_review::gate::PlanReviewGate::request_review`]
-    /// and bridged to the web channel as a `plan_review_request` socket event.
+    /// review before execution. Published by the OpenHuman notifier for
+    /// TinyAgents' plan-review store and bridged to the web channel as a
+    /// `plan_review_request` socket event.
     PlanReviewRequested {
         /// Unique id correlating the decision back to the parked turn.
         request_id: String,
@@ -1337,8 +1337,8 @@ pub enum DomainEvent {
         thread_id: String,
         goal_id: String,
         status: String,
-        /// Full goal snapshot (owned by `tinyagents-graph`'s goal shape, so
-        /// kept as a raw `Value` rather than a typed field here). `None`
+        /// Full goal snapshot (kept as a raw `Value` rather than a typed
+        /// field to keep this event independent of the harness tool type). `None`
         /// until the publish site is updated to pass it through.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         goal: Option<serde_json::Value>,
@@ -1349,7 +1349,7 @@ pub enum DomainEvent {
     /// or reordered). Drives the desktop todo drawer.
     ThreadTodosChanged {
         thread_id: String,
-        /// Full todo-list snapshot, owned by `tinyagents-graph`'s todo shape.
+        /// Full todo-list snapshot, kept independent of the harness tool type.
         todos: serde_json::Value,
     },
     // ── Plan mode ───────────────────────────────────────────────────────

@@ -134,8 +134,10 @@ pub(super) fn install_context_ladder(
     let wrap_up = wrap_up_at_cap.then(|| {
         Arc::new(
             FinalCallWrapUpMiddleware::new(
-                crate::agent::session_host::turn_checkpoint::MAX_ITER_CHECKPOINT_INSTRUCTION,
-                crate::agent::session_host::turn_checkpoint::FINAL_WRITE_INSTRUCTION,
+                crate::agent::session_host::product_copy::OPENHUMAN_CLOSE_COPY
+                    .max_iteration_instruction,
+                crate::agent::session_host::product_copy::OPENHUMAN_CLOSE_COPY
+                    .final_write_instruction,
                 Arc::new(OutcomeSinkSource(tool_outcome_sink.clone())),
                 restore_allowance,
             )
