@@ -84,9 +84,6 @@ pub(crate) struct NativeProgressiveReply {
     // Hosted relay handles own their callback runtime. Keep that lease alive
     // until Close is acknowledged or the final reply owner is dropped.
     runtime: Option<ChannelRuntimeLease>,
-    /// The final text once it was delivered. Releasing a delivered handle sends
-    /// the module this terminal text again instead of a cancellation notice.
-    delivered_text: std::sync::Mutex<Option<String>>,
 }
 
 impl NativeProgressiveReply {
@@ -114,7 +111,6 @@ impl NativeProgressiveReply {
                     object,
                     handle,
                     runtime: None,
-                    delivered_text: std::sync::Mutex::new(None),
                 })
             }
             _ => {
@@ -149,7 +145,6 @@ impl NativeProgressiveReply {
                     object,
                     handle,
                     runtime: Some(runtime),
-                    delivered_text: std::sync::Mutex::new(None),
                 })
             }
             _ => {
@@ -221,10 +216,6 @@ impl NativeProgressiveReply {
             crate::modules::report::malformed_reply("tinychannels");
             return Err(ModuleCallError::ModuleFault);
         }
-        *self
-            .delivered_text
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(text.to_owned());
         Ok(result)
     }
 
@@ -259,21 +250,10 @@ impl Drop for NativeProgressiveReply {
         };
         let object = self.object.clone();
         let handle = self.handle.clone();
-        let delivered = self
-            .delivered_text
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
         runtime.spawn(async move {
-            // A delivered reply is closed with its own terminal text; a plain
-            // close would make the module announce a cancellation.
-            let command = match delivered {
-                Some(text) => ProgressiveCommand::Finish { handle, text },
-                None => ProgressiveCommand::Close { handle },
-            };
             let close = object.call_confidential::<ProgressiveResult>(
                 methods::EXECUTE_PROGRESSIVE,
-                (command,),
+                (ProgressiveCommand::Close { handle },),
             );
             match tokio::time::timeout(std::time::Duration::from_secs(5), close).await {
                 Ok(Ok(ProgressiveResult::Closed)) => {}
