@@ -11,6 +11,16 @@ fn response(status: StatusCode, body: &str) -> reqwest::Response {
     )
 }
 
+#[tokio::test]
+async fn a_provider_error_body_is_read_only_up_to_the_cap() {
+    let huge = "x".repeat(MAX_ERROR_BODY_BYTES * 4);
+    let body = read_error_body(response(StatusCode::INTERNAL_SERVER_ERROR, &huge)).await;
+    assert_eq!(body.len(), MAX_ERROR_BODY_BYTES);
+
+    let small = read_error_body(response(StatusCode::BAD_REQUEST, "short body")).await;
+    assert_eq!(small, "short body");
+}
+
 const FIXTURE_BACKEND: &str = "fixture-managed-provider";
 
 fn install_fixture_backend_classifier() {
