@@ -52,7 +52,9 @@ fn seed_session(
     agent_id: &str,
     store_agent_id: &str,
 ) -> SessionRef {
-    let session = SessionRef::scoped(key, agent_id);
+    // The session host resolves its identity through the tenant-aware
+    // admission, whose agent is the scoped store key, not the bare definition id.
+    let session = SessionRef::scoped(key, store_agent_id);
     let history =
         crate::storage::sessions::transcripts_or_files_in(core, store_agent_id, workspace)
             .open_session(&session, transcript_meta(key, agent_id))
