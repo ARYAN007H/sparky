@@ -46,13 +46,18 @@ fn stdio_server_initializes_and_lists_core_tools() {
     let workspace_path =
         std::fs::canonicalize(workspace.path()).expect("canonicalize temporary MCP workspace");
     let stderr_path = workspace_path.join("mcp.stderr");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_openhuman-core"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_openhuman-core"));
+    if let Some(module) = std::env::var_os("OPENHUMAN_TINYMCP_TEST_MODULE") {
+        if let Some(module_dir) = std::path::Path::new(&module).parent() {
+            command.env("OPENHUMAN_MODULE_PATH", module_dir);
+        }
+    }
+    let mut child = command
         .arg("mcp")
         .current_dir(&workspace_path)
         .env("OPENHUMAN_WORKSPACE", &workspace_path)
         .env("OPENHUMAN_KEYRING_BACKEND", "encrypted_file")
         .env("OPENHUMAN_KEYRING_MASTER_KEY", "42".repeat(32))
-        .env("OPENHUMAN_MODULE_SOURCE_TINYMCP", "linked")
         .env_remove("OPENHUMAN_KEYRING_MASTER_KEY_FILE")
         .env_remove("OPENHUMAN_APP_ENV")
         .env_remove("OPENHUMAN_MODE")
