@@ -1762,35 +1762,14 @@ fn subagent_delegation_happy_path() {
 
 async fn subagent_delegation_happy_path_inner() {
     let _lock = env_lock();
-    let fixture_path =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/images/handoff-hero.png");
     let stack = boot_stack().await;
-    bind_thread_action_dir(
-        &stack,
-        "thread-sub",
-        &stack._tmp.path().join("OpenHuman/projects"),
-    )
-    .await;
-    let image_path = Path::new(&std::env::var("HOME").expect("test HOME"))
-        .join("OpenHuman/projects/delegation-vision.png");
-    std::fs::create_dir_all(image_path.parent().expect("action directory"))
-        .expect("create action directory");
-    std::fs::copy(&fixture_path, &image_path).expect("copy vision fixture");
     reset_script(vec![
-        // request[0]: Orchestrator calls the `analyze_image` tool
-        // (vision_agent's delegate_name).
-        tool_call_completion(
-            "analyze_image",
-            json!({
-                "prompt": "Find the marker phrase",
-                "image_paths": [image_path.to_string_lossy()],
-                "blocking": true
-            }),
-        ),
-        // request[1]: vision_agent subagent inner LLM call returns its canary.
-        text_completion("MEMORY_CANARY_42 is the marker."),
-        // request[2]: Orchestrator receives the subagent result and synthesizes.
-        text_completion("Done. The result is: MEMORY_CANARY_42"),
+        tool_call_completion("spawn_subagent", json!({
+            "agent_id": "task_manager_agent",
+            "prompt": "Find MEMORY_CANARY_42 and report it.",
+        })),
+        text_completion("I started the specialist task."),
+        text_completion("MEMORY_CANARY_42 is the result."),
     ]);
     let mut events = spawn_sse_collector(format!(
         "{}/events?client_id=harness-subagent",
@@ -1818,34 +1797,31 @@ async fn subagent_delegation_happy_path_inner() {
         .and_then(Value::as_str)
         .unwrap_or_else(|| panic!("chat_done missing 'full_response': {done}"));
     assert!(
-        full_response.contains("MEMORY_CANARY_42"),
-        "final response missing subagent canary; full_response: {full_response}\nevent: {done}"
+        full_response.contains("specialist task"),
+        "parent response did not follow async dispatch: {full_response}\nevent: {done}"
     );
 
-    // Delegation evidenced by ≥3 captured upstream requests:
-    //   request[0] = orchestrator turn: analyze_image tool call returned
-    //   request[1] = vision_agent subagent inner LLM call: canary text returned
-    //   request[2] = orchestrator synthesis: canary forwarded in final reply
-    //
-    // NOTE: a completed turn's snapshot is now RETAINED (lifecycle `Completed`)
-    // so "View processing" can replay a finished turn; the snapshot is overwritten
-    // by the next turn, not deleted on completion. We verify delegation via the
-    // captured upstream requests rather than turn state, which keeps this test
-    // independent of the snapshot's retention/lifecycle details.
-    let requests = with_captured(|c| c.clone());
-    assert!(
-        requests.len() >= 3,
-        "expected ≥3 upstream requests (orchestrator + vision_agent + orchestrator synthesis), \
-         got {};\nall requests: {}",
-        requests.len(),
-        serde_json::to_string_pretty(&requests).unwrap_or_default()
-    );
+    let spawned = wait_for_event(&mut events, "subagent_spawned", Duration::from_secs(10)).await;
+    assert_eq!(spawned.get("agent_id").and_then(Value::as_str), Some("task_manager_agent"));
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    let requests = loop {
+        let requests = with_captured(|c| c.clone());
+        if requests.iter().any(|request| {
+            request
+                .pointer("/body/messages")
+                .is_some_and(|messages| messages.to_string().contains("Find MEMORY_CANARY_42"))
+        }) {
+            break requests;
+        }
+        assert!(tokio::time::Instant::now() < deadline, "worker never issued its model request");
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    };
 
-    // No unknown-tool result anywhere — proves the delegation tool was synthesised
-    // (registry init worked) and the orchestrator could actually call it.
+    // No unknown-tool result anywhere, and the worker request has its own
+    // system context, proving a separate run was built.
     assert!(
         !captured_requests_mention_unknown_tool(&requests),
-        "found an unknown-tool result in captured requests — delegation tool was not synthesised; \
+        "found an unknown-tool result in captured requests — async dispatch was not registered; \
          requests: {}",
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
@@ -1858,15 +1834,22 @@ async fn subagent_delegation_happy_path_inner() {
         .and_then(|r| r.pointer("/body/messages/0/content"))
         .and_then(Value::as_str)
         .unwrap_or("");
-    let req1_sys = requests
-        .get(1)
-        .and_then(|r| r.pointer("/body/messages/0/content"))
+    let worker_request = requests
+        .iter()
+        .find(|request| {
+            request
+                .pointer("/body/messages")
+                .is_some_and(|messages| messages.to_string().contains("Find MEMORY_CANARY_42"))
+        })
+        .expect("worker request found above");
+    let req1_sys = worker_request
+        .pointer("/body/messages/0/content")
         .and_then(Value::as_str)
         .unwrap_or("");
     assert_ne!(
         req0_sys, req1_sys,
         "request[0] and request[1] share identical first-message content — \
-         vision_agent subagent did not build its own context; \
+         worker did not build its own context; \
          content: {req0_sys:?}"
     );
 

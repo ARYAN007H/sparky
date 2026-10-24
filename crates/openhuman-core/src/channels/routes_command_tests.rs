@@ -165,6 +165,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     let _storage = crate::channels::module_fixture::install_memory_storage();
     let mut config = crate::config::Config::default();
     config.workspace_dir = tempdir.path().to_path_buf();
+    config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
     let core = crate::core::runtime::CoreContext::for_test_with_config(
         crate::core::runtime::DomainSet::full(),
         config,
