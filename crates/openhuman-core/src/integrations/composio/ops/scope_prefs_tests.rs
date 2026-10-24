@@ -142,7 +142,7 @@ async fn a_saved_pref_survives_a_deferred_legacy_migration() {
         admin: false,
     };
     let saved = save(&ctx, &config, "gmail", revoked).await;
-    let pref = load_or_default(&ctx, &config, "gmail").await;
+    let pref = load(&ctx, &config, "gmail").await;
     let left: LegacyScopeFile = file_store::load(&ctx, &config, USER_SCOPES_FILE)
         .await
         .unwrap();
@@ -152,7 +152,7 @@ async fn a_saved_pref_survives_a_deferred_legacy_migration() {
     let _ = save(&ctx, &config, "slack", UserScopePref::default()).await;
 
     saved.expect("the module stores the row");
-    assert_eq!(pref, revoked, "a revoked admin scope came back");
+    assert_eq!(pref, Ok(revoked), "a revoked admin scope came back");
     assert!(
         !left.contains_key("gmail"),
         "the saved toolkit's legacy row stays"
