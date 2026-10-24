@@ -1970,6 +1970,8 @@ async fn delegated_clarification_flow_inner() {
     .await;
     let second =
         wait_for_terminal_request(&mut events, Duration::from_secs(120), Some(&request_id)).await;
+    { let requests = with_captured(|c| c.clone());
+    for (i, r) in requests.iter().enumerate() { let m = r.pointer("/body/messages").and_then(Value::as_array).cloned().unwrap_or_default(); eprintln!("DBG req[{i}] msgs={} orch={} last={}", m.len(), body_is_orchestrator(r.get("body").unwrap()), m.last().map(|x| x.to_string().chars().take(400).collect::<String>()).unwrap_or_default()); } }
     assert_eq!(
         second.get("event").and_then(Value::as_str),
         Some("chat_done"),
@@ -1985,7 +1987,6 @@ async fn delegated_clarification_flow_inner() {
     );
 
     let requests = with_captured(|c| c.clone());
-    for (i, r) in requests.iter().enumerate() { let m = r.pointer("/body/messages").and_then(Value::as_array).cloned().unwrap_or_default(); eprintln!("DBG req[{i}] msgs={} orch={} last={}", m.len(), body_is_orchestrator(r.get("body").unwrap()), m.last().map(|x| x.to_string().chars().take(400).collect::<String>()).unwrap_or_default()); }
     assert!(
         !captured_requests_mention_unknown_tool(&requests),
         "found an unknown-tool result in captured requests — delegation was broken; \
