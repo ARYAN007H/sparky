@@ -287,11 +287,17 @@ impl ModuleAccess for CallbackAccess {
 
     fn ensure_loaded<'a>(&'a self, id: &'a str) -> AccessFuture<'a, Result<(), String>> {
         Box::pin(async move {
-            if needs_storage_callback(id) {
+            let loaded = if needs_storage_callback(id) {
                 ensure_loaded(&self.config, id).await
             } else {
                 self.resolver.ensure_loaded(id).await
+            };
+            // The client collapses this message into a bare "module
+            // unavailable"; keep the reason where an operator can grep it.
+            if let Err(error) = &loaded {
+                tracing::warn!(module = id, %error, "[modules] ensure_loaded refused the module");
             }
+            loaded
         })
     }
 
