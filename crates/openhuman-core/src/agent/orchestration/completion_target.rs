@@ -195,15 +195,6 @@ pub(crate) fn forget_recovery_ctx(ctx: &crate::core::runtime::DispatchCtx, works
                 "[background_completions] could not reopen durable completion store workspace_dir={} error={error:#}",
                 workspace_dir.display()
             );
-            // The cached store captured the previous lease epoch's fence, so the
-            // swap cannot read its records back and every later call through
-            // this router would keep failing with `lease fence: key lost`. Drop
-            // the router so the next lookup opens a fresh one at the current
-            // epoch; the durable records stay in the backend, and admissions the
-            // old router handed out keep working through the pool's parent
-            // lifecycle authority.
-            let _ = super::background_completions::router_pool().remove(&scope);
-            state().stores.remove(&scope);
         }
     }
 }
