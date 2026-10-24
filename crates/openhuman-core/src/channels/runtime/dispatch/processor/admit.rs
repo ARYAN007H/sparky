@@ -83,9 +83,7 @@ pub(crate) async fn admit_runtime_message(
         Some(prepared) => prepared,
         None => {
             let source = if message.channel.is_empty() {
-                let Some(envelope) = inbound_envelope else {
-                    return None;
-                };
+                let envelope = inbound_envelope?;
                 ChannelInboundSource::Envelope {
                     envelope,
                     timestamp: 0,
