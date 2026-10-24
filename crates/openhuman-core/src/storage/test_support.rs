@@ -37,16 +37,16 @@ impl StorageBackend for UnfencedMemoryBackend {
 
     fn for_scope(
         &self,
-        scope: &crate::storage::Scope,
-    ) -> Result<crate::storage::Storage, crate::storage::StorageError> {
+        scope: &tinystoragedrivers::Scope,
+    ) -> Result<tinystoragedrivers::Storage, tinystoragedrivers::StorageError> {
         self.0.for_scope(scope)
     }
 
     fn for_scope_conditioned(
         &self,
-        scope: &crate::storage::Scope,
+        scope: &tinystoragedrivers::Scope,
         _condition: &tinystoragedrivers_types::WriteCondition,
-    ) -> Result<crate::storage::Storage, crate::storage::StorageError> {
+    ) -> Result<tinystoragedrivers::Storage, tinystoragedrivers::StorageError> {
         self.0.for_scope(scope)
     }
 }
