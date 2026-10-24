@@ -238,6 +238,8 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
     if let Some(backend) = cell.get() {
         return Ok(Arc::clone(backend));
     }
+    #[cfg(test)]
+    signal_test_sync_backend_entry(workspace_dir);
     let workspace_dir = workspace_dir.to_path_buf();
     super::block_on_anyhow(async move { initialized_backend(cell, workspace_dir).await })
 }
