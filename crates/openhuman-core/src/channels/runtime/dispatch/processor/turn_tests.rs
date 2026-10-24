@@ -1,7 +1,14 @@
 use super::*;
 
+async fn module_client_with_storage(
+    _storage: &crate::channels::module_fixture::MemoryStorageGuard,
+) -> tinybus::module::ModuleClient {
+    crate::channels::module_fixture::client().await
+}
+
 #[tokio::test]
 async fn native_inbound_preparation_preserves_image_envelope_for_typed_turns() {
+    let _storage = crate::channels::module_fixture::install_memory_storage();
     use tinychannels_bus::{
         channel::{
             ChannelRef, ContentPart, ConversationKind, ConversationRef, MediaKind, MediaReference,
@@ -50,7 +57,7 @@ async fn native_inbound_preparation_preserves_image_envelope_for_typed_turns() {
         tinychannels_bus::module_inbound::ChannelInboundPreparationMode::Typed,
     );
     let prepared: PreparedChannelInbound = crate::modules::channel_controller::prepare_inbound(
-        &crate::channels::module_fixture::client().await,
+        &module_client_with_storage(&_storage).await,
         request,
     )
     .await
@@ -63,7 +70,7 @@ async fn native_inbound_preparation_preserves_image_envelope_for_typed_turns() {
     assert!(prepared.message.content.is_empty());
 
     let legacy = crate::modules::channel_controller::prepare_inbound(
-        &crate::channels::module_fixture::client().await,
+        &module_client_with_storage(&_storage).await,
         channel_inbound_preparation_request(
             ChannelInboundSource::Envelope {
                 envelope,
@@ -81,6 +88,7 @@ async fn native_inbound_preparation_preserves_image_envelope_for_typed_turns() {
 
 #[tokio::test]
 async fn native_typed_preparation_preserves_ordered_voice_and_file_parts() {
+    let _storage = crate::channels::module_fixture::install_memory_storage();
     use tinychannels_bus::{
         channel::{
             ChannelRef, ContentPart, ConversationKind, ConversationRef, MediaKind, MediaReference,
@@ -143,7 +151,7 @@ async fn native_typed_preparation_preserves_ordered_voice_and_file_parts() {
     };
 
     let prepared = crate::modules::channel_controller::prepare_inbound(
-        &crate::channels::module_fixture::client().await,
+        &module_client_with_storage(&_storage).await,
         channel_inbound_preparation_request(
             ChannelInboundSource::Envelope {
                 envelope: envelope.clone(),
