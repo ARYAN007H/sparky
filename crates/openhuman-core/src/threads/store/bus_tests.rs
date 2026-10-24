@@ -37,11 +37,12 @@ async fn persists_inbound_and_processed_turns_into_workspace_thread() {
     inbound_envelope.conversation.scope_id = Some("T123".into());
     // The module owns the session-key format, so the expectation is built by the
     // same builder rather than spelled out.
-    let expected_session_key = tinychannels_runtime::channel::build_session_key_for_inbound_envelope(
-        "main",
-        &inbound_envelope,
-        Default::default(),
-    );
+    let expected_session_key =
+        tinychannels_runtime::channel::build_session_key_for_inbound_envelope(
+            "main",
+            &inbound_envelope,
+            Default::default(),
+        );
 
     subscriber
         .handle(&DomainEvent::ChannelMessageReceived {
