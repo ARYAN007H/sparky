@@ -477,5 +477,7 @@ async fn a_non_ascii_thread_id_builds_a_session_agent_without_panicking() {
     }))
     .expect("build_session_agent panicked on a non-ASCII thread id");
     // The label truncation only runs once the agent builds.
-    built.expect("session agent must build");
+    if let Err(error) = built {
+        panic!("session agent must build: {error:#}");
+    }
 }

@@ -39,7 +39,6 @@ fn full_product_features_enabled() -> bool {
         ("scheduler-gate", cfg!(feature = "scheduler-gate")),
         ("file-logging", cfg!(feature = "file-logging")),
         ("hosting", cfg!(feature = "hosting")),
-        ("tinymemes", cfg!(feature = "tinymemes")),
         ("inbound-queues", cfg!(feature = "inbound-queues")),
         ("storage-sqlite", cfg!(feature = "storage-sqlite")),
         ("storage-file", cfg!(feature = "storage-file")),

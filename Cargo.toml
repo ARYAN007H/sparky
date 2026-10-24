@@ -108,7 +108,7 @@ tinystoragedrivers-testkit = { path = "vendor/tinystoragedrivers/crates/tinystor
 tinystoragedrivers-types = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-types" }
 
 [patch."https://github.com/tinyhumansai/tinyinference"]
-# tinymemes depends on the Jev client by git; resolve it to the vendored copy.
+# tinycomputer depends on the Jev client by git; resolve it to the vendored copy.
 tinyinference-decisions = { path = "vendor/tinyagents/vendor/tinyinference/crates/tinyinference-decisions" }
 tinyinference-core = { path = "vendor/tinyagents/vendor/tinyinference/crates/tinyinference-core" }
 tinyinference-embeddings = { path = "vendor/tinyagents/vendor/tinyinference/crates/tinyinference-embeddings" }

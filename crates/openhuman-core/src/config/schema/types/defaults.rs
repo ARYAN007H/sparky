@@ -105,7 +105,6 @@ impl Default for Config {
             embeddings_provider: None,
             custom_embeddings: None,
             tokenjuice: TokenjuiceConfig::default(),
-            memes: MemesConfig::default(),
             inbound: InboundConfig::default(),
             inbound_debounce: InboundDebounceConfig::default(),
             components: ComponentsConfig::default(),

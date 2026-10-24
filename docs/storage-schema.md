@@ -150,17 +150,6 @@ Record shapes and migrations stay with their owners.
 | `mcp.tool_cache` |  |  |  |
 | `tsd.migrations` |  |  |  |
 
-## tinymemes-bus
-
-| Collection | Indexes | Expiry field | Search fields |
-| --- | --- | --- | --- |
-| `memes.remix_markers` |  |  |  |
-| `memes.state` |  |  |  |
-| `remix_markers` |  |  |  |
-| `tinymemes_documents` |  |  |  |
-| `tsd.leases` |  |  |  |
-| `tsd.migrations` |  |  |  |
-
 ## tinyskills-drivers
 
 | Collection | Indexes | Expiry field | Search fields |

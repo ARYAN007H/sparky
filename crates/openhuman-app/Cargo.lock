@@ -4645,7 +4645,6 @@ dependencies = [
  "tinyflows-bus",
  "tinyhosts-bus",
  "tinyinference-core",
- "tinyinference-decisions",
  "tinyinference-embeddings",
  "tinyinference-llm",
  "tinyinference-local",
@@ -4654,7 +4653,6 @@ dependencies = [
  "tinyjuice-bus",
  "tinyjuice-host",
  "tinymcp-bus",
- "tinymemes-bus",
  "tinymemory-api",
  "tinymemory-integrations",
  "tinymemory-tools",
@@ -8200,15 +8198,6 @@ version = "0.20.2"
 dependencies = [
  "base64 0.23.1",
  "schemars 1.2.2",
- "serde",
- "serde_json",
- "tinystoragedrivers-types",
-]
-
-[[package]]
-name = "tinymemes-bus"
-version = "0.4.1"
-dependencies = [
  "serde",
  "serde_json",
  "tinystoragedrivers-types",

@@ -530,26 +530,6 @@
     "verification": "threads/artifact_rows_tests.rs: recording_an_artifact_twice_writes_one_row"
   },
   {
-    "file": "crates/openhuman-core/src/tinymemes/callbacks.rs",
-    "scope": "",
-    "name": "REGISTRY",
-    "type": "LazyLock<Mutex<HashMap<String,Entry>>>",
-    "count": 1,
-    "category": "B",
-    "reason": "Keyed by a random per-remix correlation id; each entry holds the registering caller's config and CoreContext, which every callback re-enters. Callbacks are accepted only from the module peer (bus name owner) for a live id, and the entry is retired by End, a failed call, or an age sweep.",
-    "verification": "tinymemes/service_tests.rs: only_the_module_may_call_back_and_only_for_a_live_remix"
-  },
-  {
-    "file": "crates/openhuman-core/src/tinymemes/service.rs",
-    "scope": "",
-    "name": "FOREGROUND",
-    "type": "std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String,std::sync::Arc<tokio::sync::Mutex<()>>>>, >",
-    "count": 1,
-    "category": "B",
-    "reason": "Holds only unit mutexes. The key is the workspace directory, so different workspaces never share or wait on a lock and no tenant data is stored.",
-    "verification": "tinymemes/service_tests.rs: foreground_remixes_share_a_lock_per_workspace_and_never_across_workspaces"
-  },
-  {
     "file": "crates/openhuman-core/src/tools/sources.rs",
     "scope": "",
     "name": "TOOL_SOURCES",
