@@ -1897,7 +1897,6 @@ fn delegated_clarification_flow() {
 
 async fn delegated_clarification_flow_inner() {
     let _lock = env_lock();
-    let _ = env_logger::Builder::from_env("RUST_LOG").is_test(false).try_init(); // DBGLOG
     serialize_children_after_parent(2);
     reset_script(vec![
         tool_call_completion(
@@ -1916,6 +1915,20 @@ async fn delegated_clarification_flow_inner() {
         text_completion("Final: ANSWER_CANARY_V2"),
     ]);
     let stack = boot_stack().await;
+    // The delivery turn persists its reply on the thread, so the thread must
+    // exist (the UI creates it before the first message).
+    let created = post_json_rpc(
+        &stack.rpc_base,
+        399,
+        "openhuman.threads_upsert",
+        json!({
+            "id": "thread-clarify",
+            "title": "thread-clarify",
+            "created_at": "2026-01-01T00:00:00Z"
+        }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&created, "upsert clarification test thread");
 
     let mut events = spawn_sse_collector(format!(
         "{}/events?client_id=harness-clarify",
@@ -1958,9 +1971,7 @@ async fn delegated_clarification_flow_inner() {
         dump()
     );
     // Let the relay turn commit to the thread before the user replies.
-    eprintln!("DBG before-sleep reqs={}", with_captured(|c| c.len()));
-    tokio::time::sleep(Duration::from_secs(8)).await;
-    eprintln!("DBG after-sleep reqs={}", with_captured(|c| c.len()));
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     // ── turn 2: the user's answer resumes the thread ──
     let request_id = send_web_chat(
@@ -1973,8 +1984,6 @@ async fn delegated_clarification_flow_inner() {
     .await;
     let second =
         wait_for_terminal_request(&mut events, Duration::from_secs(120), Some(&request_id)).await;
-    { let requests = with_captured(|c| c.clone());
-    for (i, r) in requests.iter().enumerate() { let m = r.pointer("/body/messages").and_then(Value::as_array).cloned().unwrap_or_default(); eprintln!("DBG req[{i}] msgs={} orch={} last={}", m.len(), body_is_orchestrator(r.get("body").unwrap()), m.iter().rev().take(3).map(|x| x.to_string().chars().take(1500).collect::<String>()).collect::<Vec<_>>().join("\n   ---   ")); } }
     assert_eq!(
         second.get("event").and_then(Value::as_str),
         Some("chat_done"),
