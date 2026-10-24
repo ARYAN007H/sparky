@@ -98,7 +98,12 @@ pub(crate) fn install_memory_storage() -> MemoryStorageGuard {
     let slot_lock = crate::storage::test_support::lock_storage_slot();
     MemoryStorageGuard {
         _slot_lock: slot_lock,
-        previous: crate::storage::install(crate::storage::test_support::memory_backend()),
+        // The module's media store and legacy-import claims ask for a
+        // conditioned scope, which the plain memory engine cannot open; one
+        // test process is the only writer, so the unfenced wrapper is exact.
+        previous: crate::storage::install(std::sync::Arc::new(
+            crate::storage::test_support::UnfencedMemoryBackend::new(),
+        )),
     }
 }
 
