@@ -254,6 +254,9 @@ fn channel_activity_emits_atomic_keyed_merge_patches() {
 
 #[tokio::test]
 async fn persisted_activity_merges_concurrent_events_for_the_exact_scoped_row() {
+    // `forget` below models a restart; one installed backend keeps the rows
+    // across it, as a durable store does.
+    let _storage = crate::channels::module_fixture::install_memory_storage();
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
     use crate::threads::store::{self, ConversationMessage, CreateConversationThread};
     use tinychannels_bus::{
