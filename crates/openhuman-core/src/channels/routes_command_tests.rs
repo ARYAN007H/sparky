@@ -269,7 +269,11 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 3);
-    assert!(sent_text(&sent[0]).contains("Started new session"));
+    assert!(
+        sent_text(&sent[0]).contains("Started new session"),
+        "unexpected /new response: {}",
+        sent_text(&sent[0])
+    );
     assert!(sent_text(&sent[0]).contains("In-memory channel history cleared for this chat."));
 
     assert!(sent_text(&sent[1]).contains("**Status**"));
