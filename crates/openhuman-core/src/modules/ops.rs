@@ -244,7 +244,9 @@ async fn ensure_loaded_with_storage_callback(
     if let Some((binding, _served)) = loads.get(id) {
         if matches!(state_of(id), ModuleState::Ready) {
             // Already serving with this binding: a binding is spent once the
-            // module takes it, so re-presenting it would be refused.
+            // module takes it, so re-presenting it would be refused. The module
+            // is process-wide, so every later workspace's client finds it
+            // already serving.
             return Ok(());
         }
         let mut module_config = module_config(config, id);

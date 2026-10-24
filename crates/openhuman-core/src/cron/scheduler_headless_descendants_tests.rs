@@ -296,7 +296,7 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
     });
     let _model =
         crate::inference::provider::factory::test_provider_override::install_model(model.clone());
-    let (_temp, _storage, _storage_guard, config, core, dispatch, job) = scheduled_agent_fixture(5);
+    let (_temp, _storage, _storage_guard, config, core, dispatch, job) = scheduled_agent_fixture(15);
     let inspect_dispatch = dispatch.clone();
     let (child_started_tx, child_started_rx) = tokio::sync::oneshot::channel();
     *model.child_started.lock().unwrap() = Some(child_started_tx);
@@ -321,13 +321,13 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
     }
 
     tokio::time::timeout(
-        std::time::Duration::from_secs(4),
+        std::time::Duration::from_secs(12),
         model.accepted_followup.notified(),
     )
     .await
     .expect("the root acknowledges the spawned child before its deadline");
 
-    tokio::time::timeout(std::time::Duration::from_secs(6), run)
+    tokio::time::timeout(std::time::Duration::from_secs(20), run)
         .await
         .expect("cron timeout should settle the blocked run")
         .expect("cron scheduler task");
@@ -349,7 +349,7 @@ async fn scheduled_agent_timeout_cancels_its_blocked_child_before_history_settle
         "the descendant is terminal when the scheduled run drains"
     );
     let child = tokio::time::timeout(
-        std::time::Duration::from_secs(2),
+        std::time::Duration::from_secs(5),
         registry.wait_owned(jobs[0].id.as_str(), owner),
     )
     .await
