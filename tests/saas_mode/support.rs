@@ -386,7 +386,7 @@ pub fn start_offline(d: &Deployment) -> (Server, String, reqwest::blocking::Clie
         let mut cmd = core_command(d, &["--port", &port.to_string()]);
         cmd.env("BACKEND_URL", "http://127.0.0.1:9")
             .stdout(Stdio::null())
-            .stderr(Stdio::inherit());
+            .stderr(Stdio::null());
         cmd
     });
     let client = reqwest::blocking::Client::builder()

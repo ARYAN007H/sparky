@@ -664,31 +664,45 @@ fn a_profile_holds_web_and_relayed_channel_threads() {
     assert_eq!(status, 200, "{body}");
 
     // The web chat and relay share Alice's profile turn gate. Let the offline
-    // web turn reach a terminal snapshot before queuing the channel turn; this
-    // test covers profile/thread isolation, not same-profile turn scheduling.
+    // web turn finish before queuing the channel turn; this test covers
+    // profile/thread isolation, not same-profile turn scheduling. The backend
+    // is a closed port, so the turn fails before any progress event and leaves
+    // no turn snapshot behind: it is over once the thread's queue is idle and
+    // the failure is stored as its reply (or a terminal snapshot exists).
     let deadline = Instant::now() + Duration::from_secs(90);
-    let mut lifecycle = None;
+    let mut settled = false;
     while Instant::now() < deadline {
         let (_, state) = call(
             "alice",
             "openhuman.threads_turn_state_get",
             json!({ "thread_id": "web-1" }),
         );
-        eprintln!("DBGSTATE {state}");
-        lifecycle = state
+        let lifecycle = state
             .pointer("/result/data/turnState/lifecycle")
             .or_else(|| state.pointer("/result/result/data/turnState/lifecycle"))
-            .and_then(Value::as_str)
-            .map(str::to_owned);
-        if matches!(lifecycle.as_deref(), Some("completed" | "interrupted")) {
+            .and_then(Value::as_str);
+        let (_, queue) = call(
+            "alice",
+            "openhuman.channel_web_queue_status",
+            json!({ "thread_id": "web-1" }),
+        );
+        let idle = !queue.to_string().contains("\"active\":true");
+        let (_, messages) = call(
+            "alice",
+            "openhuman.threads_messages_list",
+            json!({ "thread_id": "web-1" }),
+        );
+        let replied = messages
+            .pointer("/result/data/count")
+            .and_then(Value::as_u64)
+            .is_some_and(|count| count >= 2);
+        if matches!(lifecycle, Some("completed" | "interrupted")) || (idle && replied) {
+            settled = true;
             break;
         }
         std::thread::sleep(Duration::from_millis(200));
     }
-    assert!(
-        matches!(lifecycle.as_deref(), Some("completed" | "interrupted")),
-        "Alice's web turn did not settle before relay: {lifecycle:?}"
-    );
+    assert!(settled, "Alice's web turn did not settle before relay");
 
     // ...and the gateway relays a Telegram message of hers.
     let relayed = json!({
