@@ -586,7 +586,8 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
             })
         },
     )
-    .unwrap_or_else(|error| panic!("profile takeover import attempt failed: {error:#}"));
+    .inspect_err(|error| eprintln!("profile takeover import attempt failed: {error:#}"))
+    .unwrap();
     assert_eq!(attempt, Some(()));
 }
 
