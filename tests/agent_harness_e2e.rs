@@ -3644,7 +3644,7 @@ async fn serve_skill_registry_fixture() -> (
 
 /// A skill found in the registry is installed by the agent (behind the approval
 /// gate), lands on disk, and is then loaded by the orchestrator itself
-/// (`describe_workflow`), with its body reaching the model.
+/// delivered to the orchestrator.
 // `skills` off drops `skill_setup` from the builtins, and this
 // target declares no `required-features`, so an ungated skill test would run
 // and fail instead of being skipped.
@@ -3698,14 +3698,10 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
             json!({ "entry_id": REGISTRY_SKILL_ID }),
         ),
         text_completion("Installed the skill."),
-        // The delivery turn: the orchestrator loads the installed skill itself;
-        // running one is its own `run_workflow`.
-        packed_tool_call_completion(
-            "workflows",
-            "describe_workflow",
-            json!({ "workflow_id": REGISTRY_SKILL_ID }),
-        ),
-        text_completion("The skill is installed and ran."),
+        // The delivery turn: the child's result reaches the orchestrator, which
+        // answers. (The `workflows` pack is closed to it while it can hand off
+        // to `workflow_builder`, so it does not load the skill itself.)
+        text_completion("The skill is installed."),
     ]);
     let stack = boot_stack().await;
 
@@ -3805,14 +3801,27 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
         "the installed SKILL.md is not the one the registry served: {body}"
     );
 
-    // Usable: the orchestrator loaded the installed skill and its body reached the model.
-    // `describe_workflow` is a member of the `workflows` pack: the call goes
-    // through `use_skill`, and its result is that call's tool result.
-    let described = tool_result_text(&requests, "use_skill")
-        .unwrap_or_else(|| panic!("no tool result for describe_workflow; requests: {}", dump()));
+    // Delivered: the child's result reached the orchestrator's delivery turn.
+    let delivered = requests.iter().any(|request| {
+        request
+            .pointer("/body/messages")
+            .and_then(Value::as_array)
+            .is_some_and(|messages| {
+                messages.iter().any(|message| {
+                    message
+                        .get("content")
+                        .and_then(Value::as_str)
+                        .is_some_and(|text| {
+                            text.contains("background sub-agent finished")
+                                && text.contains("Installed the skill.")
+                        })
+                })
+            })
+    });
     assert!(
-        described.contains(SKILL_BODY_CANARY),
-        "describe_workflow did not return the installed skill's body, so the agent cannot use it: {described}"
+        delivered,
+        "the skill_setup result never reached the orchestrator; requests: {}",
+        dump()
     );
 
     registry_join.abort();
