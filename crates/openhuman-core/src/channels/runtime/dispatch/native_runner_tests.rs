@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn channel_deadline_respects_module_floor_and_web_backstop() {
-    let minimum = tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS;
+    let minimum = tinychannels_bus::module_runtime::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS;
     assert_eq!(
         channel_turn_deadline(1, None),
         std::time::Duration::from_secs(minimum)
@@ -22,10 +22,12 @@ fn native_failure_classifier_preserves_localizable_error_metadata() {
     let failure = NativeFailures.classify_failure("429 Too Many Requests: Retry-After: 12");
 
     assert_eq!(failure.class, "rate_limited");
-    assert_eq!(failure.copy_key.as_deref(), Some("chat_error.rate_limited"));
     assert_eq!(
-        failure
-            .copy_params
+        crate::web_chat::failure_details::copy_key(&failure).as_deref(),
+        Some("chat_error.rate_limited")
+    );
+    assert_eq!(
+        crate::web_chat::failure_details::copy_params(&failure)
             .as_ref()
             .and_then(|params| params.get("retry_after_secs")),
         Some(&serde_json::json!(12))
@@ -39,8 +41,7 @@ fn native_failure_event_copy_uses_configured_locale_and_keeps_queued_context() {
     let failure = FailureClassification {
         class: "rate_limited".to_owned(),
         message: "queued turn was not run: Your AI provider is rate-limiting requests. Retry in 12 seconds.".to_owned(),
-        copy_key: Some("chat_error.rate_limited".to_owned()),
-        copy_params: Some(serde_json::json!({"retry_after_secs": 12})),
+        details: Some(crate::web_chat::failure_details::encode(Some("chat_error.rate_limited".to_owned()), Some(serde_json::json!({"retry_after_secs": 12})), "raw error")),
     };
 
     let rendered = render_classified_native_failure(Some(&config), &failure.message, &failure);
@@ -94,7 +95,6 @@ async fn native_sink_uses_dispatch_locale_and_rejects_unknown_copy_metadata() {
                 request_id: request_id.into(),
                 message: "stale message".into(),
                 class: failure.class.clone(),
-                error: "classifier input".into(),
             },
             failure,
         )
@@ -112,8 +112,11 @@ async fn native_sink_uses_dispatch_locale_and_rejects_unknown_copy_metadata() {
         FailureClassification {
             class: "rate_limited".into(),
             message: "queued turn was not run: English rate limit copy".into(),
-            copy_key: Some("chat_error.rate_limited".into()),
-            copy_params: Some(serde_json::json!({"retry_after_secs": 12})),
+            details: Some(crate::web_chat::failure_details::encode(
+                Some("chat_error.rate_limited".into()),
+                Some(serde_json::json!({"retry_after_secs": 12})),
+                "raw error",
+            )),
         },
     )
     .await;
@@ -130,11 +133,14 @@ async fn native_sink_uses_dispatch_locale_and_rejects_unknown_copy_metadata() {
         FailureClassification {
             class: "future_class".into(),
             message: "safe English fallback".into(),
-            copy_key: Some("chat_error.unrecognized".into()),
-            copy_params: Some(serde_json::json!({
-                "retry_after_secs": {"unexpected": "secret"},
-                "detail": ["untrusted"]
-            })),
+            details: Some(crate::web_chat::failure_details::encode(
+                Some("chat_error.unrecognized".into()),
+                Some(serde_json::json!({
+                    "retry_after_secs": {"unexpected": "secret"},
+                    "detail": ["untrusted"]
+                })),
+                "raw error",
+            )),
         },
     )
     .await;
@@ -186,7 +192,7 @@ async fn native_runner_checkouts_serialize_and_cancel_waiters_cleanly() {
     ) -> TurnRequest<QueuedPayload> {
         let core = dispatch.core().expect("profile context").clone();
         let definition =
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
+            crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
                 .get("orchestrator")
                 .cloned()
                 .expect("built-in orchestrator definition");
@@ -201,7 +207,7 @@ async fn native_runner_checkouts_serialize_and_cancel_waiters_cleanly() {
             channel: "telegram".into(),
             session_key: session.into(),
             event_session_id: format!("event-{session}"),
-            origin: crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+            origin: crate::security::turn_origin::AgentTurnOrigin::ExternalChannel {
                 sender_name: Some("Ada".into()),
                 channel: "telegram".into(),
                 sender: Some("sender".into()),

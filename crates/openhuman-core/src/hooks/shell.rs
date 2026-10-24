@@ -1,6 +1,6 @@
 //! The shell that runs `command` hooks, as selected by TinyBox.
 //!
-//! The hook engine (`tinyagents_runtime::command_hooks`) spawns the hook process
+//! The hook engine (`tinyagents_hooks::command`) spawns the hook process
 //! itself and asks its host for a synchronous `fn(&str) -> Command`. The host
 //! does not choose the shell: it asks TinyBox's `SelectShell` once, at the async
 //! boundary where hooks are (re)loaded, and the factory only fills the hook's
@@ -92,7 +92,7 @@ pub(super) fn command(command: &str) -> tokio::process::Command {
     // A hook leads its own process group and dies with the handle that owns it,
     // so a deadline cannot leave its pipeline running.
     process.kill_on_drop(true);
-    tinytools_std::timeout::own_process_group(process.as_std_mut());
+    tinyagents_harness_tools::exec::timeout::own_process_group(process.as_std_mut());
     process
 }
 

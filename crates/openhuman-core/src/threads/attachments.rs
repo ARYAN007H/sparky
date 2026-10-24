@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use tinychannels_bus::{ContentPart, MediaReference};
 use tinystoragedrivers::Precondition;
 
-use crate::agent::attachments::Attachment;
+use crate::attachments::Attachment;
 use crate::storage::{self, documents::Repo};
 
 const STORAGE_KEY: &str = "__openhumanStoredAttachments";
@@ -273,15 +273,11 @@ pub(crate) async fn restage_persisted_parts(
         .load_config()
         .await
         .map_err(|error| format!("stored attachment configuration unavailable: {error}"))?;
-    let workspace = crate::agent::attachments::thread_action_dir(
-        ctx,
-        &config,
-        &config.workspace_dir,
-        Some(thread_id),
-    )
-    .await
-    .map_err(|error| format!("stored attachment workspace unavailable: {error}"))?;
-    let scope = crate::agent::attachments::AttachmentAccessScope {
+    let workspace =
+        crate::attachments::thread_action_dir(ctx, &config, &config.workspace_dir, Some(thread_id))
+            .await
+            .map_err(|error| format!("stored attachment workspace unavailable: {error}"))?;
+    let scope = crate::attachments::AttachmentAccessScope {
         external_channel: false,
         workspace: Some(workspace),
         ..Default::default()
@@ -300,7 +296,7 @@ pub(crate) async fn restage_persisted_parts(
                 !mime.is_empty() && !mime.chars().any(|ch| matches!(ch, '\r' | '\n' | ']'))
             })
             .ok_or_else(|| "stored attachment content type is unavailable".to_string())?;
-        let path = crate::agent::attachments::resolve_path(&config, &relative_path, &scope)
+        let path = crate::attachments::resolve_path(&config, &relative_path, &scope)
             .await
             .map_err(|error| format!("resolve validated stored attachment: {error}"))?;
         let bytes = tokio::fs::read(&path)

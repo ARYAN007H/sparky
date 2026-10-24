@@ -1,8 +1,8 @@
 use super::super::channel::CHANNEL_OUTBOUND_EVENT;
 use super::*;
 use crate::agent::host_agents::{self, HostAgent, HostAgentResolver};
-use crate::agent::turn_origin::AgentTurnOrigin;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+use crate::security::turn_origin::AgentTurnOrigin;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -33,7 +33,7 @@ async fn relayed_thread_and_external_authority_survive_scoped_spawn() {
                 .unwrap()
                 .derive_channel_turn(Some(thread.clone()), None),
             async {
-                crate::agent::turn_origin::with_origin(origin, async {
+                crate::security::turn_origin::with_origin(origin, async {
                     let (child_thread, child_agent, child_origin) =
                         crate::core::runtime::DispatchCtx::ambient()
                             .spawn(async {
@@ -41,7 +41,7 @@ async fn relayed_thread_and_external_authority_survive_scoped_spawn() {
                                     CoreContext::current_channel_thread(),
                                     CoreContext::scoped()
                                         .and_then(|ctx| ctx.session_agent().map(str::to_owned)),
-                                    crate::agent::turn_origin::current(),
+                                    crate::security::turn_origin::current(),
                                 )
                             })
                             .await
@@ -183,7 +183,7 @@ impl HostAgentResolver for RelayAgentResolver {
     fn resolve(&self, agent_id: &str) -> Option<HostAgent> {
         (agent_id == "relay-agent").then(|| {
             let mut definition =
-                crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
+                crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
                     .get("orchestrator")
                     .cloned()
                     .expect("the orchestrator is built in");
@@ -259,7 +259,7 @@ async fn relay_provider() -> MockServer {
 async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     let _slot = host_agents::tests::lock();
     let _ = tracing_subscriber::fmt().with_test_writer().try_init();
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("hosted authority definitions should be initialized");
     let tmp = tempfile::tempdir().unwrap();
     let _module_storage = crate::channels::module_fixture::install_memory_storage();

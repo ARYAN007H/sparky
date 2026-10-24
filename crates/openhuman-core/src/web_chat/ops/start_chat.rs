@@ -139,7 +139,7 @@ fn prompt_guard_user_message(action: PromptEnforcementAction) -> &'static str {
 /// (env `OPENHUMAN_WEB_TURN_TIMEOUT_SECS=0`).
 ///
 /// This is the turn's fixed total ceiling (issue #4746), and the single source
-/// of truth for the turn's deadlines (`agent::session_host::turn_backstop`,
+/// of truth for the turn's deadlines (`web_chat::turn_guards::backstop`,
 /// default 3600s, the harness's own turn ceiling). The harness derives two
 /// earlier points from it: a **wind-down** at backstop minus
 /// `min(120s, backstop/5)`, where it pauses the run at its next safe point so
@@ -151,7 +151,7 @@ fn prompt_guard_user_message(action: PromptEnforcementAction) -> &'static str {
 /// `OPENHUMAN_WEB_TURN_TIMEOUT_SECS`; set it to `0` to disable the backstop and
 /// the derived deadlines with it.
 fn web_turn_deadline() -> Option<Duration> {
-    crate::agent::session_host::turn_backstop::configured_backstop()
+    crate::web_chat::turn_guards::backstop::configured_backstop()
 }
 
 /// The backstop for a turn that has to be allowed to run long: one on a local /

@@ -17,7 +17,7 @@
 use std::sync::Arc;
 use tinyagents_harness::run_queue::RunQueue;
 
-use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
+use crate::security::turn_origin::{with_origin, AgentTurnOrigin};
 
 use super::super::session::{
     checkin_session_agent_if_vacant, checkout_session_agent, CheckedOutSession, CheckoutPolicy,

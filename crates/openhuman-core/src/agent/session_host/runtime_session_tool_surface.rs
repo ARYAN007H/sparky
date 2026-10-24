@@ -2,72 +2,47 @@
 
 use super::*;
 
-impl OpenHumanSessionHost {
-    /// Publish a caller-driven visibility/policy mutation into the live hook
-    /// state. The runtime keeps generic snapshots immutable per request; this
-    /// simply replaces the host composition from which the *next* snapshot,
-    /// execution source, and enforcement object are built.
-    pub(in crate::agent::session_host) fn sync_runtime_tool_surface(&self) {
-        self.sync_runtime_tool_surface_with_auto_include(None);
-    }
-
-    /// Publish a visibility mutation and record whether future dynamically
-    /// connected delegates may enter the surface without an explicit allow.
-    pub(in crate::agent::session_host) fn sync_runtime_tool_surface_with_auto_include(
-        &self,
-        auto_include_new_synthesized_tools: Option<bool>,
-    ) {
-        let prelude = self
-            .runtime_state
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .prelude
-            .clone();
-        let Some(prelude) = prelude else {
-            return;
-        };
-        let prior_auto_include = prelude
-            .tool_surface
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .auto_include_new_synthesized_tools;
-        prelude.replace_tool_surface(OpenHumanTurnToolSurface {
-            tools: self.tools.clone(),
-            synthesized_tools: self.synthesized_tools.clone(),
-            tool_specs: self.tool_specs.clone(),
-            durable_tool_specs: self.durable_tool_specs.clone(),
-            visible_tool_specs: self.visible_tool_specs.clone(),
-            visible_tool_names: self.visible_tool_names.clone(),
-            deferred_tool_names: self.deferred_tool_names.clone(),
-            permanent_tool_names: self.permanent_tool_names.clone(),
-            discovery_enabled: self.discovery_enabled,
-            requested_deferred_tools: self.requested_deferred_tools.clone(),
-            auto_include_new_synthesized_tools: auto_include_new_synthesized_tools
-                .unwrap_or(prior_auto_include),
-            synthesized_tool_names: self.synthesized_tool_names.clone(),
-            tool_policy_session: self.tool_policy_session.clone(),
-            event_session_id: self.event_session_id.clone(),
-            event_channel: self.event_channel.clone(),
-            agent_definition_name: self.agent_definition_name.clone(),
-        });
-    }
-}
-
-/// Reconcile visible delegate names without reopening a caller's explicit
-/// restriction. Revoked names disappear; a newly connected name is admitted
-/// only for the wildcard belt.
-pub(in crate::agent::session_host) fn reconcile_synthesized_visibility(
+/// Apply OpenHuman's packed/deferred filters around shared synthesized-name
+/// reconciliation. TinyAgents restores permanent names after these filters.
+fn reconcile_surface_names(
     visible: &mut std::collections::HashSet<String>,
-    previous: &std::collections::HashSet<String>,
-    next: &std::collections::HashSet<String>,
+    deferred: &mut std::collections::HashSet<String>,
+    permanent: &mut std::collections::HashSet<String>,
+    previous_synthesized: &std::collections::HashSet<String>,
+    synthesized: &std::collections::HashSet<String>,
     auto_include_new: bool,
+    discovery_deferred: Option<std::collections::HashSet<String>>,
+    strip_packed: impl FnOnce(&mut std::collections::HashSet<String>),
 ) {
-    for name in previous.difference(next) {
-        visible.remove(name);
-    }
+    let mut managed = tinyagents_runtime::ManagedToolNames {
+        visible: std::mem::take(visible),
+        deferred: std::mem::take(deferred),
+        permanent: std::mem::take(permanent),
+    };
+    managed.refresh_synthesized(previous_synthesized, synthesized, auto_include_new);
+    // The host's wildcard belt re-admits every live synthesized name at each
+    // refresh. TinyAgents only adds names new since the prior snapshot, so
+    // preserve the narrower host policy before applying its packed/deferred
+    // projection. Explicit belts leave this disabled.
     if auto_include_new {
-        visible.extend(next.iter().cloned());
+        managed.visible.extend(synthesized.iter().cloned());
     }
+    // New wildcard-synthesized names must participate in packed-tool
+    // filtering so a withheld name can add its `use_skill` route. Restore
+    // permanent names afterward, preserving their precedence over both
+    // packed and deferred visibility filters.
+    strip_packed(&mut managed.visible);
+    if let Some(names) = &discovery_deferred {
+        managed.visible.retain(|name| !names.contains(name));
+        managed.deferred = names.clone();
+    }
+    managed.make_permanent(std::iter::empty::<String>());
+    if let Some(names) = &discovery_deferred {
+        managed.defer_visible(names);
+    }
+    *visible = managed.visible;
+    *deferred = managed.deferred;
+    *permanent = managed.permanent;
 }
 
 impl OpenHumanTurnPrelude {
@@ -76,8 +51,8 @@ impl OpenHumanTurnPrelude {
     /// removed from the executable source, schema, and policy together before
     /// this request is prepared.
     pub(super) fn refresh_delegation_tool_surface(&self) -> anyhow::Result<()> {
-        use crate::agent::harness::host_definition::AgentDefinitionRegistry;
-        use crate::tools::orchestrator_tools::collect_orchestrator_tools;
+        use crate::agent_registry::host_definition::AgentDefinitionRegistry;
+        use crate::integrations::composio::orchestrator_actions::collect_orchestrator_tools;
         use tinytools::ToolPolicyEngine;
 
         let Some(registry) = AgentDefinitionRegistry::current() else {
@@ -128,7 +103,7 @@ impl OpenHumanTurnPrelude {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut collected = definition
             .as_ref()
-            .map(|definition| collect_orchestrator_tools(definition, &registry, &integrations))
+            .map(|definition| collect_orchestrator_tools(definition, &integrations))
             .unwrap_or_default();
         #[cfg(feature = "mcp")]
         collected.extend(mcp_tools);
@@ -160,12 +135,6 @@ impl OpenHumanTurnPrelude {
             synthesized_names.clone(),
         );
         let auto_include_new_synthesized_tools = surface.auto_include_new_synthesized_tools;
-        reconcile_synthesized_visibility(
-            &mut surface.visible_tool_names,
-            &previous_synthesized,
-            &synthesized_names,
-            auto_include_new_synthesized_tools,
-        );
         if recorded_tool_snapshot_adopted {
             surface.visible_tool_names.extend(
                 self.mutable
@@ -176,9 +145,38 @@ impl OpenHumanTurnPrelude {
                     .map(|spec| spec.name.clone()),
             );
         }
-        // Preserve permanently attached tools when re-deriving the surface.
-        permanent::refresh_visibility(&mut surface, &synthesized);
-
+        let discovery_deferred = if surface.discovery_enabled {
+            let deferred = tinytools::deferred_set(
+                surface.tools.as_slice(),
+                &synthesized,
+                &surface.requested_deferred_tools,
+            );
+            Some(deferred)
+        } else {
+            None
+        };
+        // Apply host-specific packed/deferred policy before the shared name
+        // reconciliation. TinyAgents restores permanent visibility after
+        // those filters and protects permanent names from deferred discovery.
+        let agent_definition_name = surface.agent_definition_name.clone();
+        let OpenHumanTurnToolSurface {
+            visible_tool_names,
+            deferred_tool_names,
+            permanent_tool_names,
+            ..
+        } = &mut *surface;
+        reconcile_surface_names(
+            visible_tool_names,
+            deferred_tool_names,
+            permanent_tool_names,
+            &previous_synthesized,
+            &synthesized_names,
+            auto_include_new_synthesized_tools,
+            discovery_deferred,
+            |visible| {
+                crate::tools::toolpacks::strip_packed_from_visible(visible, &agent_definition_name)
+            },
+        );
         let mut specs = surface
             .durable_tool_specs
             .iter()
@@ -239,7 +237,9 @@ impl OpenHumanTurnPrelude {
             }
         }
         let synthesized_tools = Arc::new(synthesized);
-        crate::tools::toolpacks::bind_synthesized_pack_registry(&surface.tools, &synthesized_tools);
+        if let Some(handle) = self.pack_registry_handle.as_ref() {
+            crate::tools::toolpacks::bind_synthesized_pack_registry(handle, &synthesized_tools);
+        }
         let all_tools = surface
             .tools
             .iter()
@@ -273,7 +273,7 @@ impl OpenHumanTurnPrelude {
             &surface.agent_definition_name,
             &all_tools,
         );
-        let visible = super::super::builder::dedup_visible_tool_specs(
+        let visible = tinyagents_runtime::dedup_visible_tool_specs(
             super::super::builder::visible_tool_specs_for_policy(
                 &specs,
                 &surface.visible_tool_names,
@@ -287,3 +287,7 @@ impl OpenHumanTurnPrelude {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "runtime_session_tool_surface_tests.rs"]
+mod tests;

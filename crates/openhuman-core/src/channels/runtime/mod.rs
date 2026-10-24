@@ -3,8 +3,8 @@
 pub(crate) mod dispatch;
 pub(crate) mod session;
 mod startup;
+pub(crate) mod turn_driver;
 
-pub(crate) use startup::hydrate_channel_credentials;
 #[cfg(test)]
 pub(crate) use startup::prepare_module_runtime_for_test_in_context;
 pub(crate) use startup::prepare_runtime_limits;

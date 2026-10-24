@@ -8,7 +8,7 @@ async fn native_staged_lease_cleans_dropped_queue_and_preserves_committed_claims
     config.action_dir = dir.path().join("actions");
     let ctx = crate::core::runtime::DispatchCtx::ambient();
     let thread_id = "telegram:account-a:conversation-42";
-    let workspace = crate::agent::attachments::thread_action_dir(
+    let workspace = crate::attachments::thread_action_dir(
         &ctx,
         &config,
         &config.workspace_dir,
@@ -175,7 +175,7 @@ async fn native_staged_lease_retries_cleanup_for_its_canceled_tombstone() {
     config.action_dir = dir.path().join("actions");
     let ctx = crate::core::runtime::DispatchCtx::ambient();
     let thread_id = "telegram:account-a:conversation-canceled";
-    let workspace = crate::agent::attachments::thread_action_dir(
+    let workspace = crate::attachments::thread_action_dir(
         &ctx,
         &config,
         &config.workspace_dir,
@@ -271,7 +271,7 @@ async fn canceling_native_media_resolution_cleans_the_first_staged_part() {
         .and_then(|media| media.opaque_id.as_deref())
         .unwrap()
         .to_owned();
-    let workspace = crate::agent::attachments::thread_action_dir(
+    let workspace = crate::attachments::thread_action_dir(
         &ctx,
         &config,
         &config.workspace_dir,

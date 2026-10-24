@@ -116,3 +116,11 @@ fn the_turn_context_is_what_the_turn_recorded() {
     assert!(Arc::ptr_eq(&seen.expect("config recorded"), &config));
     assert_eq!(locale.as_deref(), Some("de"));
 }
+
+#[test]
+fn a_compaction_names_the_step_the_turn_stopped_after() {
+    assert_eq!(
+        step_of(&AgentProgress::ContextCompacting).as_deref(),
+        Some("it began summarizing earlier conversation")
+    );
+}

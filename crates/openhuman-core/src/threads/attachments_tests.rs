@@ -429,7 +429,7 @@ async fn discarding_claimed_attachment_preserves_row_owned_file() {
         &bound,
     )
     .unwrap());
-    let workspace = crate::agent::attachments::thread_action_dir(
+    let workspace = crate::attachments::thread_action_dir(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &config.workspace_dir,

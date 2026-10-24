@@ -64,7 +64,7 @@ pub(crate) async fn deliver_response(
     request_id: &str,
     full_response: &str,
     user_message: &str,
-    citations: &[crate::memory::types::TurnCitation],
+    citations: &[crate::web_chat::TurnCitation],
     usage: Option<&LastTurnUsage>,
     workspace_dir: Option<&std::path::Path>,
     timing: Option<bus_web::TurnTimingSnapshot>,
@@ -102,7 +102,7 @@ pub(crate) async fn persist_reply(
     thread_id: &str,
     request_id: &str,
     full_response: &str,
-    citations: &[crate::memory::types::TurnCitation],
+    citations: &[crate::web_chat::TurnCitation],
     workspace_dir: Option<&std::path::Path>,
 ) {
     if let Some(dir) = workspace_dir {
@@ -158,7 +158,7 @@ pub(crate) fn announce_reply(
     request_id: &str,
     full_response: &str,
     user_message: &str,
-    citations: &[crate::memory::types::TurnCitation],
+    citations: &[crate::web_chat::TurnCitation],
     usage: Option<&LastTurnUsage>,
     timing: Option<bus_web::TurnTimingSnapshot>,
     suggest_follow_ups: bool,
@@ -225,7 +225,7 @@ pub(crate) fn deliver_response_single_bubble(
 pub(super) fn chat_done_event(
     context: bus_web::WebEventContext,
     full_response: &str,
-    citations: &[crate::memory::types::TurnCitation],
+    citations: &[crate::web_chat::TurnCitation],
     usage: Option<TurnUsagePayload>,
     timing: Option<crate::web_chat::TurnTimingPayload>,
 ) -> bus_web::WebChannelEvent {
@@ -243,7 +243,7 @@ pub(super) fn chat_done_event(
 pub(super) fn announced_chat_done(
     context: bus_web::WebEventContext,
     full_response: &str,
-    citations: &[crate::memory::types::TurnCitation],
+    citations: &[crate::web_chat::TurnCitation],
     usage: Option<&LastTurnUsage>,
     timing: Option<bus_web::TurnTimingSnapshot>,
 ) -> bus_web::WebChannelEvent {
@@ -263,7 +263,7 @@ fn publish_chat_done(
     thread_id: &str,
     request_id: &str,
     full_response: &str,
-    citations: &[crate::memory::types::TurnCitation],
+    citations: &[crate::web_chat::TurnCitation],
     usage_payload: Option<TurnUsagePayload>,
     timing_payload: Option<crate::web_chat::TurnTimingPayload>,
 ) {

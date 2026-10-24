@@ -19,11 +19,12 @@
 
 mod channel_event;
 pub(crate) use channel_event::event_context;
+pub(crate) mod citations;
 mod egress_surface;
 mod event_bus;
 mod event_bus_channel;
+pub(crate) mod failure_details;
 mod ingress;
-mod journal_shadow;
 mod ops;
 pub(crate) mod proactive;
 // Response delivery/segmentation for the web surface (folded in from the former
@@ -43,6 +44,7 @@ pub(crate) use surface::{Surface, TurnIds};
 mod turn_activity;
 mod turn_close;
 mod turn_events;
+pub(crate) mod turn_guards;
 mod turn_host;
 mod types;
 
@@ -64,6 +66,7 @@ pub use channel_event::{
     SubagentProgressDetail, SubagentUsagePayload, TurnTimingPayload, TurnUsagePayload,
     WebChannelEvent, WebEventContext,
 };
+pub use citations::{TurnCitation, TURN_CITATION_SNIPPET_CHARS};
 pub use egress_surface::register_egress_surface_subscriber;
 pub use event_bus::{
     approval_request_event, plan_review_request_event, publish_web_channel_event,

@@ -9,7 +9,6 @@ use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::ChannelSystemPrompt;
 use crate::config::{MultimodalConfig, MultimodalFileConfig, ReliabilityConfig};
 use crate::core::events::DomainEvent;
-use crate::inference::provider::ProviderRuntimeOptions;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -17,8 +16,8 @@ use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tinychannels_bus::module_runtime::CHANNEL_MESSAGE_TIMEOUT_SECS;
 use tinychannels_bus::ChannelMessage;
-use tinychannels_bus::CHANNEL_MESSAGE_TIMEOUT_SECS;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
 use wiremock::matchers::{method, path};
@@ -422,7 +421,7 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         .get()
         .expect("bus initialised")
         .receiver();
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
 
     let response_text = options
         .response_text
@@ -480,13 +479,12 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         api_url: None,
         inference_url: None,
         reliability: Arc::new(ReliabilityConfig::default()),
-        provider_runtime_options: ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(harness_workspace_dir),
         // Mirror the owning TinyChannels runtime's validated floor even when
         // a test supplies an undersized value directly.
         message_timeout_secs: options
             .timeout_secs
-            .max(tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS),
+            .max(tinychannels_bus::module_runtime::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS),
         multimodal: MultimodalConfig::default(),
         multimodal_files: MultimodalFileConfig::default(),
         config: None,

@@ -2,7 +2,7 @@
 
 The session store the desktop app, the CLI and the TUI install: TinyAgents'
 `DriverSessionStores` over the process's storage backend, held in a
-`ReboundSessionStores` (core `agent::session_store`) so a different user
+`ReboundSessionStores` (core `storage::sessions`) so a different user
 signing in can move it to their workspace's backend without reinstalling the
 provider.
 
@@ -12,7 +12,7 @@ host (server shims / host::cli / host::desktop / host::tui)
      storage URL: OPENHUMAN_STORAGE_URL > [storage] url > sqlite:<workspace>/storage
      storage::open(url) -> storage::install_for_url(url, backend)
      ReboundSessionStores::new(backend, recover_on_open)
-     -> agent::session_store::install(provider)        (servers: process lifetime)
+     -> storage::sessions::install(provider)        (servers: process lifetime)
      or RuntimeBuilder::session_store(provider)        (host::tui, host::cli one-shots)
 ```
 
@@ -48,4 +48,4 @@ database.
 | File | Contents |
 | --- | --- |
 | [`mod.rs`](mod.rs) | `install_for_host`, `provider_for_host`, `install_for_url`, `provider_for_url`, `install_for_saas`, and the URL resolution. |
-| [`mod_tests.rs`](mod_tests.rs) | The driver-backed store per driver (memory, SQLite, file, and MongoDB when `TSD_MONGO_URL` names a local server), the environment URL, an unusable URL, and the no-URL SaaS case. |
+| [`mod_tests.rs`](mod_tests.rs) | Storage URL installation, SQLite agent isolation, environment URL resolution, an unusable URL, and the no-URL SaaS case. TinyAgents owns driver conformance tests. |

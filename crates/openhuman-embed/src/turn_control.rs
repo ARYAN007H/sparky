@@ -28,11 +28,12 @@ impl Turn {
         let dispatch = Box::pin(self.send_scoped());
         match environment {
             Some(environment) => {
-                let command_environment = tinytools_std::timeout::CommandEnvironment::new(
-                    environment
-                        .iter()
-                        .map(|(name, value)| (name.clone(), value.clone())),
-                );
+                let command_environment =
+                    tinyagents_harness_tools::exec::timeout::CommandEnvironment::new(
+                        environment
+                            .iter()
+                            .map(|(name, value)| (name.clone(), value.clone())),
+                    );
                 command_environment.scope(dispatch).await
             }
             None => dispatch.await,
@@ -361,9 +362,12 @@ impl Turn {
         });
         // Everything the core honours for this turn rides one explicit value;
         // nothing is recovered from an ambient scope below this point.
+        // `HostTurnEnv` carries crate-private native channel fields, so it is
+        // built by assignment rather than a struct literal from this crate.
         let mut host_env = openhuman_core::agent::turn_env::HostTurnEnv::default();
         host_env.command_environment = self.tool_env.take();
         host_env.model_budget = budget.clone();
+        host_env.dispatch_admission = self.dispatch_admission.take();
         host_env.spawn_depth_limit = self.spawn_depth_limit;
         host_env.cancellation = self.native_cancellation.clone();
         host_env.hooks = std::mem::take(&mut self.hooks);
@@ -374,7 +378,7 @@ impl Turn {
             }),
             ..Default::default()
         };
-        let chat_env = openhuman_core::inference::host_runtime::ops::AgentChatEnv {
+        let chat_env = openhuman_core::agent_runs::agent_chat::AgentChatEnv {
             progress: self.progress.take(),
             host: host_env,
             run_queue: steering.queue(),
@@ -409,7 +413,9 @@ impl Turn {
         let dispatch = dispatch(self.target, self.request, self.seed.take(), usage, options);
 
         let reply = match self.origin {
-            Some(origin) => openhuman_core::agent::turn_origin::with_origin(origin, dispatch).await,
+            Some(origin) => {
+                openhuman_core::security::turn_origin::with_origin(origin, dispatch).await
+            }
             None => dispatch.await,
         }
         .inspect_err(|err| {
@@ -433,6 +439,7 @@ impl Turn {
                 crate::error::CoreError::InsecureRoute { .. } => "insecure_route",
                 crate::error::CoreError::InvalidRoute { .. } => "invalid_route",
                 crate::error::CoreError::AgentRemoved { .. } => "agent_removed",
+                crate::error::CoreError::DispatchAdmission { .. } => "dispatch_admission",
             };
             log::debug!("[embed][agent] turn_failed session={session_id} kind={tag}");
         });

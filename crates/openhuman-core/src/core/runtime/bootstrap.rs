@@ -34,6 +34,12 @@ pub(crate) async fn bootstrap_core_runtime(
     };
     let workspace_dir = cfg.workspace_dir.clone();
 
+    // The workflow metadata loader is synchronous. Start module-owned resource
+    // acquisition before any subscriber or session snapshots it, but keep the
+    // optional download outside the critical bootstrap path.
+    #[cfg(all(feature = "flows", feature = "skills"))]
+    crate::skills::schedule_flow_authoring_prewarm(ctx, &cfg, Some(domains));
+
     // --- Legacy store import ---------------------------------------------
     // With a storage backend installed, bring the workspace's per-domain
     // SQLite files (approvals, devices, notifications, task sources) into it
@@ -61,7 +67,7 @@ pub(crate) async fn bootstrap_core_runtime(
         if guard_disabled {
             log::debug!("[file_state] guard disabled via OPENHUMAN_FILE_STATE_GUARD");
         }
-        tinytools_std::file_state::init_global(!guard_disabled);
+        tinyagents_harness_tools::fs::file_state::init_global(!guard_disabled);
     } else {
         log::debug!("[boot] agent file-state coordinator SKIPPED — Agent domain disabled");
     }
@@ -99,7 +105,7 @@ pub(crate) async fn bootstrap_core_runtime(
     //
     // An installed host session store repairs itself, once; with none, the
     // workspace default store is swept.
-    let host_store = crate::agent::session_store::installed_in(ctx);
+    let host_store = crate::storage::sessions::installed_in(ctx);
     if let Some(provider) = &host_store {
         match provider.recover() {
             Ok(()) => log::info!("[runtime] host session store recovered"),
@@ -108,7 +114,7 @@ pub(crate) async fn bootstrap_core_runtime(
     }
     if host_store.is_none() {
         let now = chrono::Utc::now().to_rfc3339();
-        match crate::agent::session_store::default_turn_states_for(&workspace_dir)
+        match crate::storage::sessions::default_turn_states_for(&workspace_dir)
             .mark_all_interrupted(&now)
         {
             Ok(0) => {}
@@ -122,17 +128,16 @@ pub(crate) async fn bootstrap_core_runtime(
     }
 
     // --- Run-ledger recovery -------------------------------------------
-    // Detached sub-agent runs (`spawn_async_subagent`) from a previous process
+    // Detached sub-agent runs (`spawn_subagent`) from a previous process
     // are gone with that process. Any `agent_runs` row still marked `running`
     // at boot is orphaned — its driver died without firing a terminal event, so
     // the finalizer never settled it. Stamp such rows `interrupted` so they stop
     // rendering as perpetual "running" timeline entries on thread reopen.
     if agent_enabled {
         if !crate::storage::installed_is_shared() {
-            match crate::agent::session_store::with_ledger(
-                &cfg.workspace_dir,
-                |ledger| async move { ledger.interrupt_orphaned_agent_runs().await },
-            ) {
+            match crate::storage::sessions::with_ledger(&cfg.workspace_dir, |ledger| async move {
+                ledger.interrupt_orphaned_agent_runs().await
+            }) {
                 Ok(0) => {}
                 Ok(count) => {
                     log::info!("[runtime] settled {count} orphaned agent run(s) on startup")
@@ -142,9 +147,8 @@ pub(crate) async fn bootstrap_core_runtime(
         }
 
         // --- Detached sub-agent TaskStore reconciliation -------------------
-        // The durable orchestration TaskStore (`<workspace>/.openhuman/
-        // orchestration_tasks.jsonl`) can hold non-terminal sub-agent records left
-        // by a previous process — their detached executor (abort handle +
+        // The durable orchestration TaskStore can hold non-terminal sub-agent
+        // records left by a previous process — their detached executor (abort handle +
         // cooperative CancellationToken) died with that process, so they cannot be
         // re-attached. Reconcile each orphan to a terminal state and emit the typed
         // terminal lifecycle event so the run ledger finalizes. Best-effort and
@@ -162,7 +166,7 @@ pub(crate) async fn bootstrap_core_runtime(
         // --- Undelivered background completions ----------------------------
         // A detached sub-agent that finished in a previous process but whose
         // result never reached its chat thread is still pending in the durable
-        // completion log (`<workspace>/.openhuman/background_completions.jsonl`).
+        // completion store.
         // Schedule its delivery turn through the normal idle-gated path.
         let redelivering =
             crate::agent::orchestration::background_delivery::recover_on_boot(ctx, &workspace_dir);
@@ -190,7 +194,7 @@ pub(crate) async fn bootstrap_core_runtime(
     // multiple times. Uses the per-user scoped workspace_dir.
     if agent_enabled {
         if let Err(err) =
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
+            crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
                 &workspace_dir,
             )
         {
@@ -249,7 +253,7 @@ pub(crate) async fn bootstrap_core_runtime(
     // Gated on the Skills domain (#4808 review): under `harness()`/`none()` the
     // skills controllers are absent, so their trigger subscriber must not install.
     if domains.allows(crate::core::all::DomainGroup::Skills) {
-        crate::skills::bus::ensure_triggered_workflow_subscriber(&workspace_dir);
+        crate::skills::bus::ensure_triggered_workflow_subscriber_for(ctx, &cfg, Some(domains));
     } else {
         log::debug!("[boot] triggered-workflow subscriber SKIPPED — Skills domain disabled");
     }
@@ -371,9 +375,6 @@ pub(crate) async fn bootstrap_core_runtime(
     // the web channel's `memory_activity` event (C5) — same unconditional
     // placement rationale as the bridges above. Idempotent (OnceLock-guarded).
     crate::web_chat::register_memory_activity_surface_subscriber();
-
-    // --- Workspace migrations --------------------------------------------
-    crate::platform::startup::run_workspace_migrations(ctx, &workspace_dir);
 
     // --- Socket manager bootstrap ---
     let socket_mgr = Arc::new(SocketManager::new());

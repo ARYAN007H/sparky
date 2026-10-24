@@ -7,8 +7,8 @@
 //! builder caller had no equivalent, and fell back to the process registry.
 //! These tests pin the route that closes that gap.
 
-use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::tinyagents::host::OpenHumanDefinitionRegistry;
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use std::sync::Arc;
 use tinyagents_definition::DefinitionRegistry;
 use tinyagents_definition::ToolScope;
@@ -36,6 +36,7 @@ fn bare() -> crate::agent::SessionHostBuilder {
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
     crate::agent::SessionHostBuilder::new()
         .chat_model(model)
+        .model_name("test/session-fixture".to_string())
         .tools(Vec::new())
         .tool_dispatcher(Box::new(tinytools_agent::dialect::XmlDialect))
 }

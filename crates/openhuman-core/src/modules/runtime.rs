@@ -33,58 +33,18 @@
 //! Everything here is created once and lives for the process. There is no
 //! shutdown path because there is nothing a shutdown could reclaim.
 
-use std::future::Future;
 use std::sync::OnceLock;
+use std::time::Duration;
 
-use tinybus::module::{ModuleRuntime, RuntimeNames};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use tinybus::module::{ModuleRuntime, RuntimeNames, RuntimeOptions};
 
 /// The module bus, built once on first use.
 static RUNTIME: OnceLock<Result<ModuleRuntime, String>> = OnceLock::new();
 
-/// A process-owned callback installation and its shared result.
-#[derive(Default)]
-struct CallbackSetup {
-    result: OnceLock<tokio::sync::watch::Receiver<Option<Result<(), String>>>>,
-}
-
-impl CallbackSetup {
-    fn start<F>(
-        &self,
-        runtime: &ModuleRuntime,
-        setup: F,
-    ) -> tokio::sync::watch::Receiver<Option<Result<(), String>>>
-    where
-        F: Future<Output = tinybus::Result<()>> + Send + 'static,
-    {
-        self.result
-            .get_or_init(|| {
-                let (result_tx, result_rx) = tokio::sync::watch::channel(None);
-                runtime.spawn(async move {
-                    result_tx.send_replace(Some(setup.await.map_err(|error| error.to_string())));
-                });
-                result_rx
-            })
-            .clone()
-    }
-
-    async fn wait(
-        mut result: tokio::sync::watch::Receiver<Option<Result<(), String>>>,
-    ) -> Result<(), String> {
-        loop {
-            if let Some(result) = result.borrow_and_update().clone() {
-                return result;
-            }
-            if result.changed().await.is_err() {
-                return Err("the module callbacks did not finish".to_string());
-            }
-        }
-    }
-}
-
 /// Host callbacks installed on the runtime's bus, once.
-static CALLBACKS: CallbackSetup = CallbackSetup {
-    result: OnceLock::new(),
-};
+static CALLBACKS: tokio::sync::OnceCell<Result<(), String>> = tokio::sync::OnceCell::const_new();
 
 /// The process-wide module runtime, standing it up on first use.
 ///
@@ -94,22 +54,50 @@ static CALLBACKS: CallbackSetup = CallbackSetup {
 /// a host callback cannot be served. The outcome is cached: a runtime that
 /// failed to start does not start on a later call.
 pub async fn runtime() -> tinybus::Result<&'static ModuleRuntime> {
+    let runtime = runtime_now()?;
+    CALLBACKS
+        .get_or_init(|| async {
+            // On the module runtime, not the caller's: the callbacks serve
+            // objects that must outlive whichever runtime asked first.
+            match runtime.spawn(install_callbacks(runtime)).await {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(error)) => Err(error.to_string()),
+                Err(error) => Err(format!("the module callbacks did not finish: {error}")),
+            }
+        })
+        .await
+        .as_ref()
+        .map_err(|error| tinybus::Error::Transport(error.clone()))?;
+    Ok(runtime)
+}
+
+/// Schedule host lifecycle cleanup without loading a module or installing callbacks.
+pub(crate) fn spawn_cleanup<F>(future: F) -> tinybus::Result<tokio::task::JoinHandle<F::Output>>
+where
+    F: std::future::Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    Ok(runtime_now()?.spawn(future))
+}
+
+fn runtime_now() -> tinybus::Result<&'static ModuleRuntime> {
     let started = RUNTIME.get_or_init(|| {
         let names = RuntimeNames {
             thread: "openhuman-module-bus".to_string(),
             worker: "openhuman-module-worker".to_string(),
         };
-        ModuleRuntime::start(&names, None).map_err(|error| error.to_string())
+        ModuleRuntime::start_with_options(
+            &names,
+            None,
+            RuntimeOptions {
+                thread_stack_size: Some(crate::core::runtime::AGENT_WORKER_STACK_BYTES),
+            },
+        )
+        .map_err(|error| error.to_string())
     });
     let runtime = started
         .as_ref()
         .map_err(|error| tinybus::Error::Transport(error.clone()))?;
-    // Start installation once on the process-lifetime module runtime. Callers
-    // only wait on a watch receiver, so cancelling one caller cannot drop the
-    // OnceCell initializer and start a second installation while this task runs.
-    CallbackSetup::wait(CALLBACKS.start(runtime, install_callbacks(runtime)))
-        .await
-        .map_err(tinybus::Error::Transport)?;
     Ok(runtime)
 }
 
@@ -127,16 +115,18 @@ async fn install_callbacks(runtime: &'static ModuleRuntime) -> tinybus::Result<(
     }
     super::site_memory_host::install(connection).await?;
     super::storage_host::install(connection, runtime.host()).await?;
-    #[cfg(feature = "tinymemes")]
-    {
-        if host.components().memes {
-            crate::tinymemes::service::install(connection).await?;
-        } else {
-            tracing::debug!("[modules] memes component off; Host callbacks not served");
-        }
-    }
     #[cfg(feature = "web3")]
     super::wallet_host::install(connection).await?;
+    // Deliver / ClassifySalience for the inbound event queues; with the
+    // component off the module never loads, so nothing would call them.
+    #[cfg(feature = "inbound-queues")]
+    {
+        if host.components().eventqueues {
+            crate::inbound::host::install(connection).await?;
+        } else {
+            tracing::debug!("[modules] eventqueues component off; inbound Host not served");
+        }
+    }
     Ok(())
 }
 
@@ -147,6 +137,77 @@ async fn install_callbacks(runtime: &'static ModuleRuntime) -> tinybus::Result<(
 #[must_use]
 pub fn is_started() -> bool {
     RUNTIME.get().is_some_and(Result::is_ok)
+}
+
+/// Returns the current runtime only when it was already started and its host
+/// callbacks are serving. Unlike [`runtime`], this accessor never starts a
+/// runtime or installs callbacks.
+pub(crate) fn existing_runtime() -> Option<&'static ModuleRuntime> {
+    let runtime = RUNTIME.get()?.as_ref().ok()?;
+    CALLBACKS.get()?.as_ref().ok()?;
+    Some(runtime)
+}
+
+/// A safe, sanitized result for a call through the already-serving module bus.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ExistingModuleCallError {
+    Unavailable,
+    Failed,
+}
+
+/// Call a read-only capability on a module that is already ready. This never
+/// starts the module runtime, loads a module, or retries through a ModuleClient.
+pub(crate) async fn call_if_ready<Request, Reply>(
+    id: &str,
+    member: &str,
+    request: Request,
+    timeout: Duration,
+) -> Result<Option<Reply>, ExistingModuleCallError>
+where
+    Request: Serialize + Send,
+    Reply: DeserializeOwned,
+{
+    if super::ops::state_of(id) != super::types::ModuleState::Ready {
+        return Ok(None);
+    }
+    let Some(runtime) = existing_runtime() else {
+        return Ok(None);
+    };
+    let record = super::registry::find(id).ok_or(ExistingModuleCallError::Unavailable)?;
+    let proxy = runtime
+        .proxy(record.bus_name, record.object_path)
+        .map_err(|_| ExistingModuleCallError::Unavailable)?
+        .with_timeout(timeout);
+    match tokio::time::timeout(
+        timeout,
+        proxy.call_confidential::<Reply>(member, (request,)),
+    )
+    .await
+    {
+        Ok(Ok(reply)) => Ok(Some(reply)),
+        Ok(Err(_)) | Err(_) => Err(ExistingModuleCallError::Failed),
+    }
+}
+
+/// Whether `id` is admitted and currently serving on an already-started
+/// module runtime. This is a read-only snapshot; it never starts the runtime.
+#[must_use]
+pub fn is_module_serving(id: &str) -> bool {
+    let Some(record) = crate::modules::registry::find(id) else {
+        return false;
+    };
+    let Some(Ok(runtime)) = RUNTIME.get() else {
+        return false;
+    };
+    runtime.host().list().into_iter().any(|module| {
+        module.manifest.bus_name.as_str() == record.bus_name
+            && module.manifest.object_path.as_str() == record.object_path
+            && module.enabled
+            && matches!(
+                module.state,
+                tinybus::module::ModuleState::Ready | tinybus::module::ModuleState::Serving
+            )
+    })
 }
 
 #[cfg(test)]

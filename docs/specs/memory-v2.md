@@ -33,13 +33,14 @@ With no usable engine (signed out and no CortexDB key), memory is **off**:
 
 ## Who is acting (`memory::scope`)
 
-A `MemoryIdentity` (an agent definition and, for a team member, its team) is
-carried explicitly on every turn's run context (`OpenHumanRunContext::memory_identity`):
-set by the session host and channel dispatch for top-level agents, derived with
-`child` by the sub-agent runner for children, and handed down by the team
-runtime for members. RPC handlers and the embed facade act as the root
-identity. Memory resolves it against the config of whoever reads or writes,
-first match wins:
+TinyMemory's `Identity` (an agent definition and, for a team member, its team)
+is carried explicitly on every turn's run context
+(`OpenHumanRunContext::memory_identity`): set by the session host and channel
+dispatch for top-level agents, derived with `child` by the sub-agent runner
+for children, and handed down by the team runtime for members. RPC handlers
+and the embed facade act as the root identity. OpenHuman adapts its config to
+`IdentityPins` in `memory::scope`; callers resolve the identity against
+those pins, first match wins:
 
 | | memory agent id | layout root |
 | --- | --- | --- |
@@ -69,9 +70,8 @@ does not use the ambient-config RPCs.
 
 The ambient-config RPCs (`openhuman.memory_recall`, `_fetch`, `_learn`,
 `_forget`, `_items_list`, `_explore`, `_items_get`) and the MCP memory tools,
-which dispatch through them, are confined the same way to the identity in
-scope (`memory::confine`): the agent of a running turn, else the config's own
-root identity (`[memory] root`, else the root). An unset `reach` becomes
+which dispatch through them, use upstream `Confinement` with `Policy::Refuse`
+for the config's root identity (`[memory] root`, else the root). An unset `reach` becomes
 `Reach::subtree(<root>)`; a caller's reach is kept only when it is
 `Reach::within` that subtree, and a wider one is refused with
 `INVALID_REQUEST`; `forget` and `items_get` skip ids outside it; `learn` with
@@ -94,7 +94,7 @@ credential.
 
 | Hook | Where | What |
 | --- | --- | --- |
-| pre-turn | session host `before_turn` (`agent/session_host/runtime_session/memory_ingest.rs`) | `lifecycle::prefetch::pre_turn` takes a completed cached pack immediately, or none on a cold cache, and queues scoped `AgentMemory::pre_turn` logging and recall |
+| pre-turn | session host `before_turn` (`memory/lifecycle/session_hooks.rs`) | `lifecycle::prefetch::pre_turn` takes a completed cached pack immediately, or none on a cold cache, and queues scoped `AgentMemory::pre_turn` logging and recall |
 | inject | `MemoryPackMiddleware` (`agent/tinyagents/middleware/memory_pack.rs`) | adds the pack, wrapped in `<memory-context>`, to every model request of the turn with `push_ephemeral_instruction` |
 | post-turn | scoped background work after the durable commit | `AgentMemory::post_turn`: logs the reply with its tool calls (name, id, and a one-line result per call), queues the belief build it hands back |
 | compaction | `MemoryRecallSummarizer` (`agent/tinyagents/memory_summarizer.rs`) wrapping the turn's summarizer | Takes completed cached context for "Recalled from memory" and queues `AgentMemory::recall_for_compaction`; engine I/O never delays the inner summarizer |

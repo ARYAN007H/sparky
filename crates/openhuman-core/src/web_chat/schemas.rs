@@ -254,7 +254,7 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
             }
             p.message.clone()
         } else {
-            crate::agent::attachments::parts::fold_into_message(&p.message, &p.attachments)
+            crate::attachments::parts::fold_into_message(&p.message, &p.attachments)
                 .map_err(|e| e.to_string())?
         };
         // Recorded before the turn starts so it reads the new choice.
@@ -281,8 +281,6 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
                     // Attribution is stamped later by run_chat_task once the
                     // target agent is resolved.
                     agent_id: None,
-                    // Decided by run_chat_task once the thread's TinyMemes
-                    // arm is known.
                     hold_text_stream: false,
                 },
                 voice_note_id,
@@ -328,7 +326,7 @@ async fn validate_voice_note_attachment(
         .await
         .map_err(|error| format!("load voice note workspace: {error}"))?
         .workspace_dir;
-    super::voice_notes::validate_typed_media(&workspace_dir, note_id, &voice_note.media)?;
+    super::voice_notes::validate_typed_media(ctx, &workspace_dir, note_id, &voice_note.media)?;
     Ok(Some(note_id.to_string()))
 }
 
@@ -358,6 +356,7 @@ fn handle_voice_note_store(ctx: DispatchCtx, params: Map<String, Value>) -> Cont
         let p = deserialize_params::<VoiceNoteStoreParams>(params)?;
         let config = ctx.load_config().await?;
         to_json(super::voice_notes::store_from_rpc(
+            &ctx,
             &config.workspace_dir,
             &p.note_id,
             p.mime.as_deref().unwrap_or("audio/webm"),
@@ -371,6 +370,7 @@ fn handle_voice_note_read(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
         let p = deserialize_params::<VoiceNoteReadParams>(params)?;
         let config = ctx.load_config().await?;
         to_json(super::voice_notes::read_for_rpc(
+            &ctx,
             &config.workspace_dir,
             &p.note_id,
         )?)

@@ -152,7 +152,6 @@ fn callback_for_channels(
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::inference::provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: 300,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -185,7 +184,7 @@ fn callback_for_channels(
 }
 
 #[tokio::test]
-async fn voice_media_projection_accepts_only_durable_refs_for_the_configured_account() {
+async fn voice_media_store_validates_the_configured_account_scope_and_declines() {
     let channel = Arc::new(RecordingChannel::new("telegram:bot-a"));
     let channels: HashMap<String, Arc<ChannelHandle>> = HashMap::from([(
         channel.name.clone(),
@@ -212,35 +211,23 @@ async fn voice_media_projection_accepts_only_durable_refs_for_the_configured_acc
             vec![7; 200 * 1024],
         ),
         mime_type: "audio/ogg".into(),
-        codec: Some("ogg_opus".into()),
-        duration_ms: Some(1000),
         file_name: Some("voice.ogg".into()),
-        media_reference: Some(tinychannels_bus::MediaReference {
-            opaque_id: Some("tinychannels_media_v1_fixture".into()),
-            kind: tinychannels_bus::MediaKind::Audio,
-            content_type: Some("audio/ogg".into()),
-            ..Default::default()
-        }),
     };
 
-    let stored = callback
+    // The module persists voice media itself; the host callback only
+    // validates the scope and declines (legacy compatibility seam).
+    let declined = callback
         .store_voice_media(request())
         .await
-        .expect("configured module's durable scoped ref is projected");
-    assert_eq!(
-        stored.media.opaque_id.as_deref(),
-        Some("tinychannels_media_v1_fixture")
-    );
-    assert!(stored.accessible_url.is_none());
+        .expect_err("the host holds no durable voice media store");
+    assert!(declined
+        .to_string()
+        .contains("stored by the channels module"));
 
     let mut forged = request();
     forged.scope.configured_instance = "telegram:bot-b".into();
     forged.scope.channel.account_id = Some("telegram:bot-b".into());
     assert!(callback.store_voice_media(forged).await.is_err());
-
-    let mut unscoped = request();
-    unscoped.media_reference.as_mut().unwrap().opaque_id = Some("external-id".into());
-    assert!(callback.store_voice_media(unscoped).await.is_err());
 
     let mut oversized = request();
     oversized.audio_base64 = base64::Engine::encode(

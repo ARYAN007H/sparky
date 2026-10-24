@@ -1,3 +1,5 @@
+#![cfg(feature = "testkit")]
+
 //! A refused tool call must not rewrite an earlier turn's result. Providers
 //! reuse tool-call ids across turns (`call_1` again), so a failure in this turn
 //! used to mark the earlier turn's successful `cron` result as failed; the
@@ -10,7 +12,7 @@ mod common;
 
 use std::sync::Arc;
 
-use common::{chat_completion, chat_requests, runtime_without_master_key, PointedTransport};
+use common::{chat_completion, chat_requests, runtime_without_master_key, PointedInference};
 use openhuman_embed::seams::ToolHookDecision;
 use openhuman_embed::{
     DirectProfileProvider, InMemorySessionStores, PermissionLevel, ProfileRuntime, SaasConfig,
@@ -102,8 +104,8 @@ async fn scenario() {
         .respond_with(ResponseTemplate::new(500))
         .mount(&managed)
         .await;
-    PointedTransport::install(&managed.uri());
-    openhuman_core::storage::install(Arc::new(openhuman_core::storage::MemoryStorage::new()));
+    PointedInference::install(&managed.uri());
+    openhuman_core::storage::install(Arc::new(tinystoragedrivers_testkit::MemoryBackend::new()));
 
     let root = tempfile::tempdir().unwrap();
     let store = Arc::new(InMemorySessionStores::new());
@@ -124,7 +126,7 @@ async fn scenario() {
                 .map(String::from)
                 .to_vec(),
         ))
-        .can_use_tool(|_| Box::pin(async { ToolHookDecision::Proceed }))
+        .can_use_tool(|_| Box::pin(async { ToolHookDecision::default() }))
         .channel_permissions([("web_channel", PermissionLevel::Execute)])
         .session_store(store.clone())
         .build()

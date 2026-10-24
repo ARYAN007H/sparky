@@ -143,7 +143,7 @@ fn every_failure_class_carries_its_i18n_key_and_params() {
         EXPECTED.iter().zip(EXPECTED_COPY_KEYS.iter())
     {
         assert_eq!(case, key_case, "fixture rows out of order");
-        let got = classify_inference_error(input);
+        let got = classify_failure_fixture(case, input);
         assert_eq!(got.copy_key, *copy_key, "{case}: copy_key");
         let got_params = got
             .copy_params

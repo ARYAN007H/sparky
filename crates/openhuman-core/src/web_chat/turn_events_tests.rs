@@ -77,10 +77,12 @@ fn the_runners_guard_failures_classify_as_a_graceful_turn_timeout() {
 fn web_runner_classifier_keeps_structured_copy_metadata() {
     let failure = WebFailures.classify_failure("429 Too Many Requests: Retry-After: 12");
     assert_eq!(failure.class, "rate_limited");
-    assert_eq!(failure.copy_key.as_deref(), Some("chat_error.rate_limited"));
     assert_eq!(
-        failure
-            .copy_params
+        crate::web_chat::failure_details::copy_key(&failure).as_deref(),
+        Some("chat_error.rate_limited")
+    );
+    assert_eq!(
+        crate::web_chat::failure_details::copy_params(&failure)
             .as_ref()
             .and_then(|params| params.get("retry_after_secs")),
         Some(&serde_json::json!(12))
@@ -139,9 +141,9 @@ async fn a_failed_turn_announces_a_classified_chat_error() {
         &req,
         TerminalEvent::Failed {
             request_id: "events-failed".into(),
-            message: "ignored".into(),
+            // An unclassified failure carries its raw error as the message.
+            message: RUNNER_IDLE.into(),
             class: "ignored".into(),
-            error: RUNNER_IDLE.into(),
         },
     )
     .await;
@@ -159,8 +161,11 @@ async fn classified_failure_event_preserves_runner_copy_and_queued_prefix() {
     let classification = FailureClassification {
         class: "auth_error".into(),
         message: "queued turn was not run: localized by the runner".into(),
-        copy_key: Some("chat_error.auth_error".into()),
-        copy_params: Some(serde_json::json!({"detail": "sanitized detail"})),
+        details: Some(crate::web_chat::failure_details::encode(
+            Some("chat_error.auth_error".into()),
+            Some(serde_json::json!({"detail": "sanitized detail"})),
+            "429 Too Many Requests: Retry-After: 12",
+        )),
     };
 
     sink.classified_failure(
@@ -169,7 +174,6 @@ async fn classified_failure_event_preserves_runner_copy_and_queued_prefix() {
             request_id: req.request_id.clone(),
             message: "stale classifier message".into(),
             class: "rate_limited".into(),
-            error: "429 Too Many Requests: Retry-After: 12".into(),
         },
         classification,
     )

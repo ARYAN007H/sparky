@@ -1,20 +1,18 @@
 #[cfg(feature = "mcp")]
 use super::implementations::network::{McpListServersTool, McpListToolsTool};
 use super::*;
-use crate::agent::host_runtime::{NativeRuntime, RuntimeAdapter};
-use crate::agent::tools::DelegateTool;
-use crate::config::{Config, DelegateAgentConfig};
+use crate::config::Config;
+use crate::modules::tinybox::host_runtime::{NativeRuntime, RuntimeAdapter};
 use crate::security::{AuditLogger, SecurityPolicy};
-use std::collections::HashMap;
 use std::sync::Arc;
-use tinyagents_harness::tools::{CurrentTimeTool, ResolveTimeTool};
-use tinytools::Tool;
-use tinytools_std::detect_tools::DetectToolsTool;
-use tinytools_std::filesystem::{
+use tinyagents_harness_tools::exec::detect_tools::DetectToolsTool;
+use tinyagents_harness_tools::fs::filesystem::{
     ApplyPatchTool, CsvExportTool, EditFileTool, FileReadTool, FileWriteTool, GitOperationsTool,
     GlobTool, GrepTool, ImageInfoTool, ListFilesTool, ReadDiffTool, RunLinterTool, RunTestsTool,
 };
-use tinytools_std::network::PushoverTool;
+use tinyagents_harness_tools::net::network::PushoverTool;
+use tinyagents_harness_tools::{CurrentTimeTool, ResolveTimeTool};
+use tinytools::Tool;
 
 /// Create the default tool registry
 pub fn default_tools(security: Arc<SecurityPolicy>) -> Vec<Box<dyn Tool>> {
@@ -54,7 +52,6 @@ pub fn all_tools(
     browser_config: &crate::config::BrowserConfig,
     http_config: &crate::config::HttpRequestConfig,
     action_dir: &std::path::Path,
-    agents: &HashMap<String, DelegateAgentConfig>,
     root_config: &crate::config::Config,
 ) -> Vec<Box<dyn Tool>> {
     all_tools_with_runtime(
@@ -65,7 +62,6 @@ pub fn all_tools(
         browser_config,
         http_config,
         action_dir,
-        agents,
         root_config,
         None,
     )
@@ -82,10 +78,43 @@ pub fn all_tools_with_runtime(
     browser_config: &crate::config::BrowserConfig,
     http_config: &crate::config::HttpRequestConfig,
     action_dir: &std::path::Path,
-    agents: &HashMap<String, DelegateAgentConfig>,
     root_config: &crate::config::Config,
     approval_workspace_root: Option<&std::path::Path>,
 ) -> Vec<Box<dyn Tool>> {
+    all_tools_with_runtime_and_pack_handle(
+        config,
+        security,
+        runtime,
+        audit,
+        browser_config,
+        http_config,
+        action_dir,
+        root_config,
+        approval_workspace_root,
+    )
+    .0
+}
+
+/// Build the full tool registry and return its pack handle alongside it.
+///
+/// The handle belongs to the session that owns the registry; callers retain it
+/// so later registry refreshes can rebind `use_skill` without inspecting the
+/// tool's generic dispatch extension.
+#[allow(clippy::implicit_hasher, clippy::too_many_arguments)]
+pub fn all_tools_with_runtime_and_pack_handle(
+    config: Arc<Config>,
+    security: &Arc<SecurityPolicy>,
+    runtime: Arc<dyn RuntimeAdapter>,
+    audit: Arc<AuditLogger>,
+    browser_config: &crate::config::BrowserConfig,
+    http_config: &crate::config::HttpRequestConfig,
+    action_dir: &std::path::Path,
+    root_config: &crate::config::Config,
+    approval_workspace_root: Option<&std::path::Path>,
+) -> (
+    Vec<Box<dyn Tool>>,
+    tinyagents_harness_tools::skills::PackRegistryHandle,
+) {
     let shell: Box<dyn Tool> = Box::new(ShellTool::with_config(
         security.clone(),
         Arc::clone(&runtime),
@@ -103,6 +132,8 @@ pub fn all_tools_with_runtime(
 
     let mut tools: Vec<Box<dyn Tool>> = vec![
         shell,
+        // Follows a `shell` command left running past its yield point.
+        Box::new(ShellProcessTool::new()),
         Box::new(FileReadTool::new(security.clone())),
         file_write,
         // Coding-harness baseline tools (issue #1205): file navigation
@@ -129,7 +160,10 @@ pub fn all_tools_with_runtime(
         // value ready to paste into a tool argument.
         Box::new(ResolveTimeTool::new()),
         Box::new(DetectToolsTool::new()),
-        Box::new(InstallToolTool::new(security.clone())),
+        Box::new(InstallToolTool::with_audit(
+            security.clone(),
+            Arc::clone(&audit),
+        )),
     ]);
     tools.extend(crate::cron::tools::tools(config.clone(), security));
     #[cfg(feature = "flows")]
@@ -137,10 +171,14 @@ pub fn all_tools_with_runtime(
     #[cfg(feature = "web3")]
     tools.extend(crate::web3::wallet::tools::all_agent_tools());
     tools.append(&mut vec![
-        Box::new(ScheduleTool::new(security.clone(), root_config.clone())),
+        Box::new(crate::cron::tools::ScheduleTool::new(
+            security.clone(),
+            root_config.clone(),
+        )),
         Box::new(ProxyConfigTool::new(config.clone(), security.clone())),
-        Box::new(UpdateCheckTool::new()),
-        Box::new(UpdateApplyTool::new(security.clone())),
+    ]);
+    tools.extend(crate::platform::update::registered_tools(security.clone()));
+    tools.append(&mut vec![
         Box::new(GitOperationsTool::new(
             security.clone(),
             action_dir.to_path_buf(),
@@ -157,7 +195,7 @@ pub fn all_tools_with_runtime(
             action_dir.to_path_buf(),
         )),
     ]);
-    tools.push(Box::new(GmailUnsubscribeTool));
+    tools.push(Box::new(crate::integrations::gmail::GmailUnsubscribeTool));
     #[cfg(feature = "skills")]
     tools.extend(crate::skills::registration::tools(config.clone()));
     tools.append(&mut vec![
@@ -168,11 +206,11 @@ pub fn all_tools_with_runtime(
         // default-OFF via `tools::user_filter` (their toggle IDs default off
         // in onboarding). The per-call permission ladder still gates them.
     ]);
-    tools.extend(crate::agent::artifacts::tiny_store::registered_tools(
+    tools.extend(crate::artifacts::tiny_store::registered_tools(
         &config.workspace_dir,
-        crate::agent::artifacts::FileRoots::from_config(&config),
+        crate::artifacts::FileRoots::from_config(&config),
         action_dir,
-        crate::integrations::file_storage::artifact_publisher(&config),
+        crate::artifacts::artifact_publisher(&config),
     ));
     tools.extend(crate::integrations::task_sources::tools::registered_tools(
         config.clone(),
@@ -182,9 +220,7 @@ pub fn all_tools_with_runtime(
     // lifecycle. doctor/health/cost/dashboard/security reads are default-ON.
     // service_status / daemon_host_prefs_get default-ON; the lifecycle
     // mutators ship default-OFF via `tools::user_filter` (service_lifecycle).
-    tools.extend(crate::platform::doctor::tools::registered_tools(
-        config.clone(),
-    ));
+    tools.extend(crate::doctor::tools::registered_tools(config.clone()));
     tools.extend(crate::platform::health::tools::registered_tools());
     tools.extend(crate::platform::cost::tools::registered_tools(
         config.clone(),
@@ -253,7 +289,9 @@ pub fn all_tools_with_runtime(
     if crate::inference::tokenjuice::enabled(root_config) {
         tools.push(Box::new(retrieve_tool_output_tool()));
         tools.push(Box::new(
-            crate::inference::tokenjuice::TokenjuiceRetrieveTool::new(),
+            tinyjuice_host::retrieve_tool::RetrieveToolOutputTool::new(Arc::new(|token, range| {
+                Box::pin(async move { crate::inference::tokenjuice::retrieve(token, range).await })
+            })),
         ));
     } else {
         tracing::debug!("[tools::ops] juice component off; recovery tools not registered");
@@ -403,29 +441,39 @@ pub fn all_tools_with_runtime(
 
     tools.extend(crate::search::build_search_tools(root_config));
 
-    // Media generation (image/video via GMI through the backend). Skipped when
-    // no integration client is configured; artifacts land under `action_dir`.
-    // Gated by the `media` compile-time feature (#4804); absent from slim
-    // builds. Runtime `DomainSet::media` (#4796) still gates it when compiled.
+    // Media generation roots. The `media_generate_*` tools themselves come from
+    // a host's registered tool source (the core ships no media generators);
+    // this records the files roots their reference policy reads, ahead of
+    // every source so one that reads them while it builds sees them. Gated by the
+    // `media` compile-time feature (#4804); absent from slim builds. Runtime
+    // `DomainSet::media` (#4796) still gates the tools when compiled.
     #[cfg(feature = "media")]
     {
         *security
             .media_files_roots
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Some(crate::agent::artifacts::FileRoots::from_config(root_config));
-        tools.extend(crate::media::generation::build_media_tools_with_allowlist(
-            root_config,
-            action_dir,
-            Arc::clone(&security.media_artifact_paths),
-        ));
+            Some(crate::artifacts::FileRoots::from_config(root_config));
     }
 
-    // Managed cloud file storage (S3 via the backend). Skipped when no
-    // integration client is configured; downloads land under `action_dir`.
-    tools.extend(crate::integrations::file_storage::build_file_storage_tools(
+    // What every registered tool source can see (`tools::sources`).
+    let source_ctx = crate::tools::sources::ToolSourceCtx {
+        config: &config,
         root_config,
+        security,
+        runtime: &runtime,
+        audit: &audit,
+        browser_config,
+        http_config,
         action_dir,
+        approval_workspace_root,
+    };
+
+    // Sources placed after the search tools (a host's media and file-storage
+    // tools), where the catalogue has always listed them.
+    tools.extend(crate::tools::sources::build_registered_tool_sources(
+        &source_ctx,
+        Some(crate::tools::sources::ANCHOR_AFTER_SEARCH),
     ));
 
     // Hosting tools — deploy a workspace directory through the compiled
@@ -460,70 +508,12 @@ pub fn all_tools_with_runtime(
     // Image metadata is always available for user-provided images.
     tools.push(Box::new(ImageInfoTool::new(security.clone())));
 
-    // Add delegation tool when agents are configured
-    if !agents.is_empty() {
-        let delegate_agents: HashMap<String, DelegateAgentConfig> = agents
-            .iter()
-            .map(|(name, cfg)| (name.clone(), cfg.clone()))
-            .collect();
-        tools.push(Box::new(DelegateTool::new_with_options(
-            delegate_agents,
-            security.clone(),
-            crate::inference::provider::ProviderRuntimeOptions {
-                auth_profile_override: None,
-                openhuman_dir: root_config
-                    .config_path
-                    .parent()
-                    .map(std::path::PathBuf::from),
-                secrets_encrypt: root_config.secrets.encrypt,
-                reasoning_enabled: root_config.runtime.reasoning_enabled,
-            },
-        )));
-    }
-
-    // ── Agent integration tools (backend-proxied) ─────────────────
-    if let Some(client) = crate::integrations::build_client(root_config) {
-        tracing::debug!("[integrations] client built successfully");
-        if root_config.integrations.google_places.is_active() {
-            tools.push(Box::new(
-                crate::integrations::tools::GooglePlacesSearchTool::new(Arc::clone(&client)),
-            ));
-            tools.push(Box::new(
-                crate::integrations::tools::GooglePlacesDetailsTool::new(Arc::clone(&client)),
-            ));
-            tracing::debug!("[integrations] registered google_places tools");
-        } else {
-            tracing::debug!("[integrations] google_places disabled — skipping");
-        }
-        // Web search providers (Exa, Gemini, TinyFish, ...) register through
-        // the TinySearch module above, so `[search] enabled = false`
-        // suppresses them too. `integrations.parallel` is parsed for old
-        // config files and no longer does anything.
-        if root_config.integrations.stock_prices.is_active() {
-            tools.push(Box::new(crate::integrations::tools::StockQuoteTool::new(
-                Arc::clone(&client),
-            )));
-            tools.push(Box::new(
-                crate::integrations::tools::StockExchangeRateTool::new(Arc::clone(&client)),
-            ));
-            tools.push(Box::new(crate::integrations::tools::StockOptionsTool::new(
-                Arc::clone(&client),
-            )));
-            tools.push(Box::new(
-                crate::integrations::tools::StockCryptoSeriesTool::new(Arc::clone(&client)),
-            ));
-            tools.push(Box::new(
-                crate::integrations::tools::StockCommodityTool::new(Arc::clone(&client)),
-            ));
-            tracing::debug!("[integrations] registered stock_prices tools");
-        } else {
-            tracing::debug!("[integrations] stock_prices disabled — skipping");
-        }
-    } else {
-        tracing::debug!(
-            "[integrations] build_client returned None — integration tools not registered"
-        );
-    }
+    // Hosted source tools retain their stable catalogue position ahead of the
+    // Composio tools.
+    tools.extend(crate::tools::sources::build_registered_tool_sources(
+        &source_ctx,
+        Some(crate::tools::sources::ANCHOR_AFTER_DELEGATE),
+    ));
 
     let composio_tools = crate::integrations::composio::all_composio_agent_tools(root_config);
     if composio_tools.is_empty() {
@@ -536,16 +526,14 @@ pub fn all_tools_with_runtime(
         tools.extend(composio_tools);
     }
 
-    // Coding-harness `lsp` tool (issue #1205) — capability-gated by the
-    // OPENHUMAN_LSP_ENABLED env var. The backend (real language-server
-    // bridge) is a follow-up; today the gate just controls visibility
-    // so agents don't see a method that always errors.
-    if crate::tools::implementations::lsp_capability_enabled() {
-        tools.push(Box::new(crate::tools::implementations::LspTool::new()));
-        tracing::debug!("[lsp] capability gate on — LspTool registered");
-    } else {
-        tracing::debug!("[lsp] capability gate off (set OPENHUMAN_LSP_ENABLED=1 to register)");
-    }
+    // Registered tool sources placed at the end of the catalogue
+    // (`tools::sources`), after every built-in and before the filters below,
+    // so they are gated exactly like built-ins. Nothing registered => nothing
+    // appended.
+    tools.extend(crate::tools::sources::build_registered_tool_sources(
+        &source_ctx,
+        None,
+    ));
 
     // Post-filters over the assembled list:
     //
@@ -584,18 +572,16 @@ pub fn all_tools_with_runtime(
         tools.len()
     );
 
-    // Append the two always-on pack tools. They resolve packed tools by name
-    // out of the agent's live registry (bound after `Arc::new`), so they also
-    // cover the `delegate_*` tools synthesised later by
-    // `orchestrator_tools::collect_orchestrator_tools` — which never pass
-    // through this function.
-    crate::tools::toolpacks::append_pack_tools(&mut tools);
+    // Append the pack proxy and return its late-bound registry handle. The
+    // session host retains the handle so it can bind both durable and
+    // synthesized tool registries after construction.
+    let pack_registry = crate::tools::toolpacks::append_pack_tools(&mut tools);
     // The lookup half of `ToolExposure::Deferred` is not registered here: the
     // tinyagents harness advertises its intrinsic `tool_search` bridge
     // (a found tool is then called by its own name) whenever a run has a
     // deferred tool (`tool::discover`), ranked by whatever `agent::tinyagents::discovery` installed. A host-registered
     // `tool_search` would shadow that bridge.
-    tools
+    (tools, pack_registry)
 }
 
 #[path = "ops_tool_groups.rs"]

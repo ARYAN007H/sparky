@@ -6,8 +6,8 @@
 
 /// Whether `task_id` is usable as a single filename component.
 ///
-/// This is untrusted input on its way into a path join. `continue_subagent`
-/// takes `task_id` straight from its tool arguments — which the model authors —
+/// This is untrusted input on its way into a path join. The same-key async
+/// spawn takes `task_id` straight from its tool arguments — which the model authors —
 /// and passes it back through `SubagentRunOptions::task_id`, so a re-paused
 /// child writes its checkpoint under a name the model chose. Without this,
 /// `../../../../tmp/pwn` walks the write clean out of the checkpoint directory.
@@ -18,11 +18,7 @@
 /// an allow-list cannot be walked around by an encoding this check did not
 /// anticipate.
 pub(crate) fn is_safe_task_id(task_id: &str) -> bool {
-    !task_id.is_empty()
-        && task_id.len() <= 128
-        && task_id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+    tinyagents_orchestration::subagent::is_safe_task_id(task_id)
 }
 
 #[cfg(test)]

@@ -3,7 +3,6 @@ use super::super::runtime::process_channel_message;
 use super::super::runtime::test_support::{run_dispatch_harness, DispatchHarnessOptions};
 use super::common::{use_real_agent_handler, HistoryCaptureModel};
 use crate::channels::runtime::ChannelHandle;
-use crate::inference::provider;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tinychannels_bus as traits;
@@ -221,7 +220,6 @@ async fn discord_host_pipeline_keeps_thread_histories_separate() {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(workspace.path().to_path_buf()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),

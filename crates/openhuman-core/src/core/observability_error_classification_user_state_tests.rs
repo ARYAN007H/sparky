@@ -631,7 +631,7 @@ fn does_not_classify_genuine_backend_500_without_cloudflare_body() {
 
 #[test]
 fn classifies_list_models_404_as_provider_user_state() {
-    // OPENHUMAN-TAURI-YJ: `inference/provider/ops.rs::list_models` probed
+    // OPENHUMAN-TAURI-YJ: `inference/provider/models/catalog_listing.rs::list_models` probed
     // a custom-provider's `/models` endpoint and the upstream server
     // returned 404 because the base URL is wrong / doesn't host a models
     // listing. User-config state — the model-dropdown probe already
@@ -711,7 +711,10 @@ fn connector_provider_output_is_already_reported_without_affecting_other_modules
         "Composio v3 connected_accounts failed: HTTP 401: Invalid API key",
         "ListConnectionsDirect: ai.tinyhumans.tinybus.Error.Failed: Composio v3 connected_accounts failed: HTTP 401: Invalid API key",
     ] {
-        assert_eq!(expected_error_kind(message), Some(ExpectedErrorKind::ModuleUnavailable));
+        assert_eq!(
+            expected_error_kind(message),
+            Some(ExpectedErrorKind::ModuleUnavailable)
+        );
     }
     for message in [
         "Execute: ai.tinyhumans.tinybus.Error.Failed: private module failure",

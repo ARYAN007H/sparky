@@ -2,12 +2,12 @@ use crate::config::{
     runtime_proxy_config, set_runtime_proxy_config, Config, ProxyConfig, ProxyScope,
 };
 use crate::security::SecurityPolicy;
-use crate::tools::schema_cache::static_schema;
 use crate::util::MaybeSet;
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::fs;
 use std::sync::Arc;
+use tinyagents_harness_tools::static_schema;
 use tinytools::{Tool, ToolResult};
 
 pub struct ProxyConfigTool {
@@ -157,7 +157,11 @@ impl ProxyConfigTool {
     }
 
     async fn handle_set(&self, args: &Value) -> anyhow::Result<ToolResult> {
-        let mut cfg = self.load_config_without_env()?;
+        let mut cfg = Config::load_from_config_path_without_env(
+            &self.config.config_path,
+            &self.config.workspace_dir,
+        )
+        .await?;
         let previous_scope = cfg.proxy.scope;
         let mut proxy = cfg.proxy.clone();
         let mut touched_proxy_url = false;
@@ -250,7 +254,11 @@ impl ProxyConfigTool {
     }
 
     async fn handle_disable(&self, args: &Value) -> anyhow::Result<ToolResult> {
-        let mut cfg = self.load_config_without_env()?;
+        let mut cfg = Config::load_from_config_path_without_env(
+            &self.config.config_path,
+            &self.config.workspace_dir,
+        )
+        .await?;
         let clear_env_default = cfg.proxy.scope == ProxyScope::Environment;
         cfg.proxy.enabled = false;
         cfg.save().await?;

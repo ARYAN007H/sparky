@@ -102,6 +102,7 @@ import {
   truncateMessagesFrom,
   updateThreadTitle,
 } from '../../store/threadSlice';
+import { userScopedStorage } from '../../store/userScopedStorage';
 import type { ConfirmationModal as ConfirmationModalType } from '../../types/intelligence';
 import type { ThreadMessage } from '../../types/thread';
 import { chatThreadPath } from '../../utils/chatRoutes';
@@ -121,7 +122,7 @@ import { StallWarning } from './aui/StallWarning';
 import { ThreadWorkspaceChip } from './aui/ThreadWorkspaceChip';
 import { useChatSurfaceRegistration } from './hooks/useChatSurfaceRegistration';
 import { useThreadArtifactsHydration } from './hooks/useThreadArtifactsHydration';
-import { useThreadDraft } from './hooks/useThreadDraft';
+import { draftStorageKey, useThreadDraft } from './hooks/useThreadDraft';
 import { ThreadList } from './threadList/ThreadList';
 import { useThreadPins } from './threadList/useThreadPins';
 import { useUnreadThreads } from './threadList/useUnreadThreads';
@@ -298,6 +299,10 @@ const Conversations = ({
   // Per-thread, reload-surviving draft (`useThreadDraft`): switching threads
   // swaps it instead of carrying half-typed text into the next conversation.
   const [inputValue, setInputValue] = useThreadDraft(selectedThreadId ?? null);
+  // The live selection, for async send paths that finish after the user may
+  // have switched threads.
+  const selectedThreadIdRef = useRef(selectedThreadId);
+  selectedThreadIdRef.current = selectedThreadId;
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   // Failed sends retain their attachments by originating thread. A send may
   // reject after the user has navigated elsewhere, so restoring into the
@@ -514,6 +519,9 @@ const Conversations = ({
   // `default_model` (the core keys per-model levels by it after a restart,
   // before anything is picked here).
   const [persistedDefaultModel, setPersistedDefaultModel] = useState<string | null>(null);
+  // Set once the user picks or clears a model here, so a slow mount read of
+  // the persisted default can't overwrite that choice when it lands.
+  const composerModelChosenRef = useRef(false);
   const reasoningModel = composerModelOverride ?? persistedDefaultModel;
   const composerReasoningEffort: ReasoningEffortChoice =
     (reasoningModel ? reasoningEffortByModel[reasoningModel] : undefined) ?? globalReasoningEffort;
@@ -523,7 +531,9 @@ const Conversations = ({
       .then(res => {
         if (!cancelled) {
           setGlobalReasoningEffort(toReasoningEffortChoice(res.result?.reasoning_effort));
-          setPersistedDefaultModel(res.result?.default_model?.trim() || null);
+          if (!composerModelChosenRef.current) {
+            setPersistedDefaultModel(res.result?.default_model?.trim() || null);
+          }
           const byModel: Record<string, ReasoningEffortChoice> = {};
           for (const [model, effort] of Object.entries(
             res.result?.reasoning_effort_by_model ?? {}
@@ -629,6 +639,7 @@ const Conversations = ({
 
   const applyComposerModel = useCallback(
     (value: string | null, contextWindow?: number | null) => {
+      composerModelChosenRef.current = true;
       setComposerModelOverride(value);
       setPersistedDefaultModel(value);
       setComposerModelContextWindow(contextWindow ?? null);
@@ -646,7 +657,7 @@ const Conversations = ({
     let cancelled = false;
     (async () => {
       try {
-        const hint = composerModelOverride ?? CHAT_MODEL_HINT;
+        const hint = composerModelOverride ?? persistedDefaultModel ?? CHAT_MODEL_HINT;
         const res = await callCoreRpc<{ model: string }>({
           method: 'openhuman.inference_resolve_model',
           params: { hint },
@@ -663,7 +674,7 @@ const Conversations = ({
     return () => {
       cancelled = true;
     };
-  }, [composerModelOverride]);
+  }, [composerModelOverride, persistedDefaultModel]);
 
   // One-shot guard for the Stop/ESC partial-preservation path (#4862): request
   // ids whose partial reply has already been persisted, so a repeated Stop/ESC
@@ -902,37 +913,6 @@ const Conversations = ({
       void dispatch(fetchAndHydrateTurnState(selectedThreadId));
     }
   }, [selectedThreadId, dispatch]);
-
-  useEffect(() => {
-    const onDictationInsert = (event: Event) => {
-      const customEvent = event as CustomEvent<{ text?: string; autoSend?: boolean }>;
-      const text = customEvent.detail?.text?.trim();
-      if (!text) return;
-
-      customEvent.preventDefault();
-
-      // When autoSend is set (hotkey dictation), dispatch the transcript directly
-      // to the agent without going through the text composer.
-      if (customEvent.detail?.autoSend) {
-        void handleSendMessageRef.current?.(text);
-        return;
-      }
-
-      // A dictated draft needs a text surface where the user can inspect and
-      // send it. The mic-first composer has neither, so hand it back first.
-      setComposerOverride('text');
-      setInputValue(prev => {
-        const base = prev.trim();
-        if (!base) return text;
-        return `${base}${base.endsWith(' ') ? '' : ' '}${text}`;
-      });
-    };
-
-    window.addEventListener('dictation://insert-text', onDictationInsert as EventListener);
-    return () =>
-      window.removeEventListener('dictation://insert-text', onDictationInsert as EventListener);
-    // `setInputValue` is `useThreadDraft`'s stable setter.
-  }, [setInputValue]);
 
   useEffect(() => {
     if (preserveSendErrorForRestoredDraftRef.current) {
@@ -1409,6 +1389,18 @@ const Conversations = ({
       }
       const msg = error instanceof Error ? error.message : String(error);
       setSendError(chatSendError('cloud_send_failed', msg));
+      // assistant-ui already cleared the composer; give the draft back to its
+      // own thread so a failed persist doesn't lose what the user typed.
+      failedAttachmentsByThreadRef.current.set(sendingThreadId, pendingAttachments);
+      if (selectedThreadIdRef.current === sendingThreadId) {
+        preserveSendErrorForRestoredDraftRef.current = true;
+        setInputValue(normalized);
+        attachmentsRef.current = pendingAttachments.slice();
+        setAttachments(pendingAttachments);
+      } else {
+        // The user moved on: keep it as that thread's draft, not this one's.
+        void userScopedStorage.setItem(draftStorageKey(sendingThreadId), normalized);
+      }
       pendingSendsRef.current.delete(sendingThreadId);
       removePendingSendingThread(sendingThreadId);
       return;
@@ -2408,7 +2400,7 @@ const Conversations = ({
           : 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
       }>
       <AssistantUiChat
-        model={composerModelOverride ?? resolvedModel ?? CHAT_MODEL_HINT}
+        model={composerModelOverride ?? persistedDefaultModel ?? resolvedModel ?? CHAT_MODEL_HINT}
         modelContextWindow={composerModelContextWindow}
         composerHeader={assistantComposerHeader}
         composerFooterExtras={assistantComposerFooterExtras}

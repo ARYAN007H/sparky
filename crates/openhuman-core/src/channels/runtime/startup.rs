@@ -3,7 +3,21 @@
 mod callback;
 mod chat_workload;
 mod credentials;
+#[cfg(feature = "legacy-import")]
 mod delivery_import;
+#[cfg(not(feature = "legacy-import"))]
+mod delivery_import {
+    use std::path::Path;
+
+    pub(super) async fn import_legacy_delivery(
+        _ctx: &crate::core::runtime::DispatchCtx,
+        _workspace: &Path,
+    ) -> anyhow::Result<()> {
+        anyhow::bail!(
+            "legacy delivery import is unavailable without `legacy-import`; legacy data was not inspected or migrated"
+        )
+    }
+}
 mod module_providers;
 mod progressive_transport;
 mod prompt;
@@ -261,7 +275,7 @@ pub(crate) async fn prepare_runtime_limits(
         ChannelControlResult::RuntimeLimits {
             timeout_secs,
             max_in_flight,
-        } if timeout_secs >= tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS
+        } if timeout_secs >= tinychannels_bus::module_runtime::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS
             && max_in_flight > 0 =>
         {
             Ok((timeout_secs, max_in_flight))
@@ -274,7 +288,6 @@ pub(crate) async fn prepare_runtime_limits(
     }
 }
 
-pub(crate) use credentials::hydrate_channel_credentials;
 pub use start_channels::start_channels;
 pub(crate) use start_channels::start_channels_with_session;
 pub(crate) use turn_parts::{build_channel_turn_parts, runtime_context, PromptToolDescs};

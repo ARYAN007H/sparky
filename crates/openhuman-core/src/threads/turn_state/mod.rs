@@ -1,7 +1,7 @@
 //! Restart-survivable snapshots of in-flight agent turns.
 //!
 //! The `tinyagents_session::port::TurnStates` port is the persistence layer
-//! (reached through `agent::session_store::turn_states_for`): one snapshot per
+//! (reached through `storage::sessions::turn_states_for`): one snapshot per
 //! turn in the storage backend, so a thread's turn state survives a restart;
 //! `mark_all_interrupted` flags any non-terminal snapshot left over from an
 //! unclean shutdown at cold boot.

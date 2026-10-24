@@ -8,6 +8,47 @@ use std::path::PathBuf;
 
 use crate::config::schema::*;
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ConfigDocumentSnapshot {
+    pub version: Option<tinystoragedrivers::Version>,
+    pub anchor: Option<super::super::load::source::ConfigSourceAnchor>,
+}
+
+/// Opaque runtime bookkeeping that accompanies a [`Config`] snapshot.
+///
+/// Public only to preserve `Config { ..Default::default() }` construction in
+/// downstream crates; its fields remain private to this crate.
+#[doc(hidden)]
+#[derive(Debug, Default)]
+pub struct ConfigRuntimeState {
+    pub(crate) provenance: super::super::load::ConfigProvenance,
+    pub(crate) load_diagnostics: super::super::load::LoadDiagnostics,
+    pub(crate) doctor_profile_layout_version:
+        Option<crate::config::schema::profile_layout::LayoutVersion>,
+    pub(crate) doctor_profile_resolution_source: Option<String>,
+    pub(crate) document_snapshot: std::sync::Mutex<ConfigDocumentSnapshot>,
+    pub(crate) context_snapshot: Option<std::sync::Weak<std::sync::Mutex<Config>>>,
+    pub(crate) context_overlay: std::sync::Mutex<
+        Option<std::sync::Arc<super::super::load::context_overlay::ConfigContextOverlay>>,
+    >,
+}
+
+impl Clone for ConfigRuntimeState {
+    fn clone(&self) -> Self {
+        Self {
+            provenance: self.provenance.clone(),
+            load_diagnostics: self.load_diagnostics.clone(),
+            doctor_profile_layout_version: self.doctor_profile_layout_version,
+            doctor_profile_resolution_source: self.doctor_profile_resolution_source.clone(),
+            document_snapshot: std::sync::Mutex::new(
+                self.document_snapshot.lock().unwrap().clone(),
+            ),
+            context_snapshot: self.context_snapshot.clone(),
+            context_overlay: std::sync::Mutex::new(self.context_overlay.lock().unwrap().clone()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct ModelRegistryEntry {
     pub id: String,
@@ -54,6 +95,11 @@ pub struct CustomEmbeddingsConfig {
 /// `Clone` is implemented by hand in `config_clone.rs` so it is emitted once.
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct Config {
+    /// Non-serialized persistence and context bookkeeping.
+    #[serde(skip)]
+    #[schemars(skip)]
+    #[doc(hidden)]
+    pub runtime_state: ConfigRuntimeState,
     /// Immutable operator provider binding, absent from the user wire format.
     #[serde(skip)]
     #[schemars(skip)]
@@ -241,8 +287,9 @@ pub struct Config {
     /// Global context management configuration — budget thresholds,
     /// summarization trigger, microcompact/autocompact toggles, and the
     /// session-memory extraction cadence. Consumed by
-    /// [`crate::agent::context::ContextManager`].
+    /// the agent context middleware configuration.
     #[serde(default)]
+    #[schemars(with = "super::super::context::ContextConfigSchema")]
     pub context: ContextConfig,
 
     #[serde(default)]
@@ -335,10 +382,7 @@ pub struct Config {
     /// User-facing agent registry — shipped default agents plus user-authored
     /// custom agents and persisted enable/disable/tool-policy overrides.
     #[serde(default)]
-    pub agent_registry: crate::agent::registry::types::AgentRegistryConfig,
-
-    #[serde(default)]
-    pub agents: HashMap<String, DelegateAgentConfig>,
+    pub agent_registry: crate::agent_registry::types::AgentRegistryConfig,
 
     #[serde(default)]
     pub local_ai: LocalAiConfig,
@@ -390,6 +434,14 @@ pub struct Config {
     #[schemars(skip)]
     pub ephemeral_route: Option<crate::config::schema::ephemeral_route::EphemeralRoute>,
 
+    /// Runtime only — service endpoints and identity a host's config enricher
+    /// resolved ([`crate::config::register_enricher`]). Empty until one runs;
+    /// never serialized. See
+    /// [`resolved_endpoints`](crate::config::schema::resolved_endpoints).
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub resolved_endpoints: crate::config::schema::resolved_endpoints::ResolvedEndpoints,
+
     /// Provider string for direct conversational chat (simple back-and-forth).
     #[serde(default)]
     pub chat_provider: Option<String>,
@@ -428,9 +480,13 @@ pub struct Config {
     #[serde(default)]
     pub tokenjuice: TokenjuiceConfig,
 
-    /// TinyMemes remix tuning (`[memes]`); the switch is `[components] memes`.
+    /// Inbound event queues (`[inbound]`); the switch is
+    /// `[components] eventqueues`.
     #[serde(default)]
-    pub memes: MemesConfig,
+    pub inbound: InboundConfig,
+    /// Per-conversation batching of inbound channel messages (`[inbound_debounce]`).
+    #[serde(default)]
+    pub inbound_debounce: InboundDebounceConfig,
 
     /// Per-dependency switches (`[components]`). Narrow-only; applied at the
     /// next core start.
@@ -488,9 +544,6 @@ pub struct Config {
     #[serde(default)]
     pub update: UpdateConfig,
 
-    #[serde(default)]
-    pub dictation: DictationConfig,
-
     /// Spoken-reply policy for channels (`[channel_voice]`).
     #[serde(default)]
     pub channel_voice: ChannelVoiceConfig,
@@ -515,6 +568,41 @@ pub struct Config {
 
     #[serde(default)]
     pub model_registry: Vec<ModelRegistryEntry>,
+}
+
+impl Config {
+    /// Pins read-only doctor selection metadata to this in-memory snapshot.
+    pub(crate) fn set_doctor_profile_metadata(
+        &mut self,
+        layout_version: Option<crate::config::schema::profile_layout::LayoutVersion>,
+        resolution_source: Option<String>,
+    ) {
+        self.runtime_state.doctor_profile_layout_version = layout_version;
+        self.runtime_state.doctor_profile_resolution_source = resolution_source;
+    }
+
+    /// Metadata recorded when this snapshot was selected for doctor inspection.
+    pub(crate) fn doctor_profile_metadata(
+        &self,
+    ) -> (
+        Option<crate::config::schema::profile_layout::LayoutVersion>,
+        Option<String>,
+    ) {
+        (
+            self.runtime_state.doctor_profile_layout_version,
+            self.runtime_state.doctor_profile_resolution_source.clone(),
+        )
+    }
+
+    /// Diagnostics captured while the loader parsed or migrated this snapshot.
+    pub(crate) fn load_diagnostics(&self) -> &super::super::load::LoadDiagnostics {
+        &self.runtime_state.load_diagnostics
+    }
+
+    /// Mutable access for the config loader while it assembles diagnostics.
+    pub(crate) fn load_diagnostics_mut(&mut self) -> &mut super::super::load::LoadDiagnostics {
+        &mut self.runtime_state.load_diagnostics
+    }
 }
 
 /// Shared default so `#[serde(default)]` and `Config::default()` stay in sync.

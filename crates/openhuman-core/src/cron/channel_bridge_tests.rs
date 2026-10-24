@@ -1,5 +1,5 @@
 use super::*;
-use tinyflows_bus::schedule::types::ChannelConversationIdentity;
+use tinyflows_bus::schedule::ChannelConversationIdentity;
 
 #[test]
 fn conversation_ref_preserves_full_provider_scope() {

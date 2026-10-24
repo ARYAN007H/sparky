@@ -7,13 +7,14 @@ mod common;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use common::{chat_completion, last_user_message, runtime_without_master_key, PointedTransport};
+use common::{chat_completion, last_user_message, runtime_without_master_key, PointedInference};
 use openhuman_core::cron::{self, AgentJobSpec, DeliveryConfig, Schedule};
 use openhuman_embed::profiles::ProfileCredentialKind;
 use openhuman_embed::{CronDelivery, CronReply, JobOrigin, ProfileRuntime, SaasConfig};
 use wiremock::{Mock, Request, Respond, ResponseTemplate};
 
-/// Answers each job by its prompt: `quiet` says nothing, others name their owner.
+/// Answers each job by its prompt: `quiet` (which allows `NO_REPLY`) says
+/// nothing, others name their owner.
 struct Reply;
 impl Respond for Reply {
     fn respond(&self, request: &Request) -> ResponseTemplate {
@@ -62,9 +63,9 @@ async fn scenario() {
         .with_priority(10)
         .mount(&inference)
         .await;
-    PointedTransport::install(&inference.uri());
+    PointedInference::install(&inference.uri());
     // The shared backend every sweeper would contend on.
-    openhuman_core::storage::install(Arc::new(openhuman_core::storage::MemoryStorage::new()));
+    openhuman_core::storage::install(Arc::new(tinystoragedrivers_testkit::MemoryBackend::new()));
 
     let root = tempfile::tempdir().unwrap();
     let recorder = Arc::new(Recorder::default());
@@ -79,7 +80,10 @@ async fn scenario() {
     let soon = chrono::Utc::now() + chrono::Duration::seconds(5);
     for (user, prompts) in [
         ("alice", vec!["alice reminder"]),
-        ("bob", vec!["bob reminder", "bob quiet"]),
+        (
+            "bob",
+            vec!["bob reminder", "bob quiet: otherwise reply NO_REPLY"],
+        ),
     ] {
         let provisioned = runtime.provision(user).await.unwrap();
         runtime

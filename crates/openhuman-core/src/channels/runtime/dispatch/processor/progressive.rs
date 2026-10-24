@@ -266,6 +266,7 @@ pub(crate) fn delivery_succeeded(
             outcomes,
             unsupported,
             failure,
+            ..
         } => {
             outcomes.iter().all(|outcome| outcome.error.is_none())
                 && unsupported.is_empty()

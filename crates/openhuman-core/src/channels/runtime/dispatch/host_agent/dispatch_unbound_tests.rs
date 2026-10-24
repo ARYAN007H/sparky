@@ -26,13 +26,13 @@ async fn a_binding_no_agent_answers_is_refused_not_sent_to_the_orchestrator() {
 
 #[test]
 fn an_unbound_channel_still_runs_the_orchestrator() {
-    on_agent_runtime(an_unbound_channel_runs_the_orchestrator());
+    on_agent_runtime(an_unbound_channel_runs_the_orchestrator);
 }
 
 async fn an_unbound_channel_runs_the_orchestrator() {
     let _storage = crate::channels::module_fixture::install_memory_storage();
     crate::channels::module_fixture::client().await;
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .unwrap();
     let provider = MockServer::start().await;
     Mock::given(method("POST"))

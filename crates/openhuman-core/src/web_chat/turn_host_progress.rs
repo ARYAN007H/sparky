@@ -39,9 +39,12 @@ pub(super) fn settle_turn_snapshot(
         tinyagents_session::turn_state::TurnLifecycle::Interrupted
     };
     let now = chrono::Utc::now().to_rfc3339();
-    if let Err(err) = crate::agent::session_store::turn_states_for(&config.workspace_dir)
-        .settle_turn(&request.thread_id, &request.request_id, lifecycle, &now)
-    {
+    if let Err(err) = crate::storage::sessions::turn_states_for(&config.workspace_dir).settle_turn(
+        &request.thread_id,
+        &request.request_id,
+        lifecycle,
+        &now,
+    ) {
         log::warn!(
             "[web-channel] failed to settle turn snapshot client={} thread={} request_id={}: {err}",
             request.payload.client_id,

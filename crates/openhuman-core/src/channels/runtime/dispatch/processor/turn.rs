@@ -444,13 +444,13 @@ pub(crate) async fn process_channel_runtime_message(
             .account_id
             .as_deref()
             .filter(|account| !account.trim().is_empty())?;
-        Some(tinyflows_bus::schedule::types::ChannelSessionIdentity {
+        Some(tinyflows_bus::schedule::ChannelSessionIdentity {
             tenant_key: crate::core::runtime::tenant::tenant_key(&tenant, ""),
             agent_id: host.definition.id.clone(),
             session_key: canonical_session_key.clone(),
             provider: envelope.channel.id.clone(),
             account_id: Some(account_id.to_owned()),
-            conversation: tinyflows_bus::schedule::types::ChannelConversationIdentity {
+            conversation: tinyflows_bus::schedule::ChannelConversationIdentity {
                 kind: envelope.conversation.kind.as_session_segment().to_string(),
                 id: envelope.conversation.id.clone(),
                 scope_id: envelope.conversation.scope_id.clone(),
@@ -460,7 +460,7 @@ pub(crate) async fn process_channel_runtime_message(
             },
         })
     });
-    let turn_origin = crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+    let turn_origin = crate::security::turn_origin::AgentTurnOrigin::ExternalChannel {
         sender_name: msg.sender_name.clone(),
         channel: msg.channel.clone(),
         sender: Some(msg.sender.clone()),
@@ -472,7 +472,6 @@ pub(crate) async fn process_channel_runtime_message(
     let execution = match selected_host {
         Some(host) => {
             let request_id = format!("{}:{}:{}", msg.channel, msg.id, uuid::Uuid::new_v4());
-            crate::channels::host::voice::record_inbound_envelope(&envelope, &tenant, &request_id);
             let trusted = Arc::new(crate::agent::turn_host::TrustedAgentTurn {
                 host_agent: host,
                 channel: msg.channel.clone(),
@@ -512,7 +511,7 @@ pub(crate) async fn process_channel_runtime_message(
         None => {
             let timeout_secs = ctx
                 .message_timeout_secs
-                .max(tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS);
+                .max(tinychannels_bus::module_runtime::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS);
             let result = match tokio::time::timeout(
                 std::time::Duration::from_secs(timeout_secs),
                 super::bus_turn::dispatch_test_turn(

@@ -226,6 +226,28 @@ async fn spawn_test_bridge_with_interval(
     (tx, task)
 }
 
+/// Compaction is announced to the UI as a `context_compacting` web event
+/// instead of falling through to the sub-agent handler.
+#[tokio::test]
+async fn context_compacting_progress_emits_context_compacting_event() {
+    let mut events = crate::web_chat::subscribe_web_channel_events();
+    let thread_id = "thread-context-compacting";
+    let tx = spawn_test_bridge(thread_id, "req-context-compacting").await;
+    tx.send(AgentProgress::TurnStarted).await.unwrap();
+    tx.send(AgentProgress::ContextCompacting).await.unwrap();
+    let mut seen = Vec::new();
+    for _ in 0..2 {
+        let event = tokio::time::timeout(
+            Duration::from_secs(10),
+            recv_for_thread(&mut events, thread_id),
+        )
+        .await
+        .expect("bridge should emit its events");
+        seen.push(event.event_name().to_owned());
+    }
+    assert_eq!(seen, ["inference_start", "context_compacting"]);
+}
+
 /// Repro-gone guard: once a turn is in flight, the bridge emits a periodic
 /// `inference_heartbeat` even though no other progress event has streamed —
 /// this is the signal the FE silence timer rearms on to avoid the false

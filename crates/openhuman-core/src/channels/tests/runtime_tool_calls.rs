@@ -9,7 +9,6 @@ use super::common::{
 };
 use crate::channels::runtime::ChannelHandle;
 use crate::channels::runtime::TestChannel;
-use crate::inference::provider;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
@@ -43,7 +42,6 @@ async fn process_channel_message_executes_native_tool_calls() {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -82,7 +80,7 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
     let linked = linked_telegram_runtime().await;
     crate::core::bus::init().await.expect("bus init");
     let _builtins =
-        crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let channel_impl = Arc::new(TestChannel::new("telegram"));
     let channel = Arc::new(ChannelHandle::Test(channel_impl.clone()));
 
@@ -122,7 +120,6 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(linked.config().workspace_dir.clone()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -134,6 +131,21 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         &mut runtime_ctx,
         linked.config(),
     );
+    // `/models` offers the configured cloud providers; register the managed
+    // backend so the command can switch to it.
+    crate::channels::register_hosted_route_test_policy();
+    if let Some(config) = runtime_ctx.config.as_mut() {
+        Arc::make_mut(config)
+            .cloud_providers
+            .push(crate::config::schema::CloudProviderCreds {
+                id: "p_managed_models_test".to_string(),
+                slug: "openhuman".to_string(),
+                label: "Managed Backend".to_string(),
+                endpoint: "https://api.openhuman.ai/v1".to_string(),
+                auth_style: crate::config::schema::AuthStyle::OpenhumanJwt,
+                default_model: Some("default-model".to_string()),
+            });
+    }
     let runtime_ctx = Arc::new(runtime_ctx);
 
     let cmd_msg = traits::ChannelMessage {
@@ -236,7 +248,6 @@ async fn process_channel_message_uses_route_override_provider_and_model() {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -288,7 +299,6 @@ async fn process_channel_message_respects_configured_max_tool_iterations_above_d
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -350,7 +360,6 @@ async fn process_channel_message_reports_configured_max_tool_iterations_limit() 
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),

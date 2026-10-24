@@ -82,7 +82,7 @@ SSE stream, the TUI and the hosted channel subscriber.
    opaque references, then resolved under the trusted turn context. Queued
    media is revalidated at execution before its row is persisted. The legacy
    textual `[FILE:...]` and `[IMAGE:...]` marker path is retained for older
-   callers; it stages through `agent::attachments::stage` before prompt
+   callers; it stages through `attachments::stage` before prompt
    scanning. `security::prompt_injection::enforce_prompt_input` follows; a
    block comes back as `StartChatError::Guardrail` with a verdict, score and
    reasons so the frontend can classify on `chat_error.error_type ==
@@ -131,7 +131,7 @@ SSE stream, the TUI and the hosted channel subscriber.
    (`progress_map.rs`) and asks the compiled module to project them onto the
    web wire (`surface.rs`). It also does host side effects in the same pass:
    the run ledger (`progress_ledger.rs`), the `TurnStates`
-   mirror, the tracing export (`progress_trace.rs`, `journal_shadow.rs`),
+   mirror, the tracing export (`progress_trace.rs`),
    first-token timing and the throttled live `turn_cost`. An
    `inference_heartbeat` every `INFERENCE_HEARTBEAT_SECS` (20 s) keeps a long
    silent prefill from tripping the frontend's roughly 120 s silence timeout
@@ -232,7 +232,7 @@ endless heartbeat stream (#4746), both owned by the runner:
   bounds: session checkout, the persistence plumbing, or a harness that
   stopped with no call open.
 - The **wall-clock backstop** is the fixed total ceiling, 3600 s by default
-  (`agent::session_host::turn_backstop`, `OPENHUMAN_WEB_TURN_TIMEOUT_SECS`, `0`
+  (`web_chat::turn_guards::backstop`, `OPENHUMAN_WEB_TURN_TIMEOUT_SECS`, `0`
   disables it and the derived deadlines). The harness winds the turn down at
   3480 s and writes the grounded close, and its own `max_wall_clock_ms` is
   clamped to 3540 s, so a busy turn still delivers an answer before the
@@ -278,10 +278,12 @@ and artifact bridges itself (`openhuman-tui/src/runner.rs`).
 | [`turn_events.rs`](./turn_events.rs) | `WebEvents` (progress and the terminal event), `WebFailures` (error copy), `WebReplies` (reply store), `WebSummarizer` (grounded close). Sentry suppression and timeout tagging. |
 | [`turn_activity.rs`](./turn_activity.rs) | Where a turn got stuck (`TurnActivity`, `StuckPoint`) and its reply context. Work-liveness folding lives in TinyAgents' `turn_runner::WorkTracker`. |
 | [`turn_close.rs`](./turn_close.rs) | The reply that closes a turn a guard stopped. |
+| [`turn_guards/backstop.rs`](./turn_guards/backstop.rs) | The web-turn wall-clock backstop: default, env override, `0` opt-out. |
+| [`citations.rs`](./citations.rs) | `TurnCitation`: memory hits a turn cited, recorded per thread and attached to `chat_done`. |
 | [`progress.rs`](./progress.rs) | `ProgressProjection`, the single consumer of a turn's progress, and `spawn_progress_bridge`. |
 | [`progress_map.rs`](./progress_map.rs) | `AgentProgress` to the canonical `ChannelOutputEvent`, with payload caps. |
 | [`progress_ledger.rs`](./progress_ledger.rs) | The run-ledger rows and telemetry a turn's progress writes. |
-| [`progress_trace.rs`](./progress_trace.rs), [`journal_shadow.rs`](./journal_shadow.rs) | Tracing export and the live-versus-journal span comparison. |
+| [`progress_trace.rs`](./progress_trace.rs) | Tracing export for one bridged turn. |
 | [`surface.rs`](./surface.rs) | The host adapter for TinyChannels' compiled projection module: `Surface` owns per-turn module handles, stamps host routing, and publishes projected events onto the broadcast bus. |
 | [`ops.rs`](./ops.rs) | Thin shell over [`ops/`](./ops/); re-exports the request surface and state. |
 | [`ops/start_chat.rs`](./ops/start_chat.rs) | `start_chat`, `StartChatError`, and the backstop resolution. |

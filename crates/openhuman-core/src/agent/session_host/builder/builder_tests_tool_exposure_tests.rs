@@ -2,7 +2,7 @@ use super::*;
 
 fn visible_names(agent_id: &str) -> std::collections::HashSet<String> {
     let definition =
-        crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
             .get(agent_id)
             .cloned()
             .unwrap_or_else(|| panic!("built-in agent definition not found: {agent_id}"));
@@ -10,7 +10,7 @@ fn visible_names(agent_id: &str) -> std::collections::HashSet<String> {
 }
 
 fn visible_names_for(
-    definition: &crate::agent::harness::host_definition::AgentDefinition,
+    definition: &crate::agent_registry::host_definition::AgentDefinition,
 ) -> std::collections::HashSet<String> {
     let tmp = tempfile::TempDir::new().unwrap();
     let config = test_config(&tmp);
@@ -122,6 +122,7 @@ fn build_with(
         std::sync::Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
     crate::agent::SessionHostBuilder::new()
         .chat_model(model)
+        .model_name("test/session-fixture".to_string())
         .tools(tools)
         .visible_tool_names(visible)
         .tool_dispatcher(Box::new(tinytools_agent::dialect::XmlDialect))
@@ -146,11 +147,11 @@ fn wildcard_belt_defers_but_keeps_reachable() {
     let agent = build_with(direct_and_deferred(), std::collections::HashSet::new());
 
     assert_eq!(
-        agent.deferred_tool_names_for_test(),
-        &std::collections::HashSet::from(["rare".to_string()])
+        agent.deferred_tool_names,
+        std::collections::HashSet::from(["rare".to_string()])
     );
-    assert!(agent.visible_tool_names_for_test().contains("plain"));
-    assert!(!agent.visible_tool_names_for_test().contains("rare"));
+    assert!(agent.visible_tool_names.contains("plain"));
+    assert!(!agent.visible_tool_names.contains("rare"));
     assert!(
         !agent
             .visible_tool_specs_arc()
@@ -159,7 +160,7 @@ fn wildcard_belt_defers_but_keeps_reachable() {
         "a deferred tool must not be in the prompt's spec list"
     );
     assert!(
-        agent.tool_policy_session_for_test().is_allowed("rare"),
+        agent.tool_policy_session.is_allowed("rare"),
         "a deferred tool must be callable once found"
     );
 }
@@ -177,14 +178,14 @@ fn named_belt_opts_into_discovery_by_naming_tool_search() {
     let agent = build_with(direct_and_deferred(), visible);
 
     assert_eq!(
-        agent.visible_tool_names_for_test(),
-        &std::collections::HashSet::from(["plain".to_string()])
+        agent.visible_tool_names,
+        std::collections::HashSet::from(["plain".to_string()])
     );
     assert_eq!(
-        agent.deferred_tool_names_for_test(),
-        &std::collections::HashSet::from(["rare".to_string()])
+        agent.deferred_tool_names,
+        std::collections::HashSet::from(["rare".to_string()])
     );
-    assert!(agent.tool_policy_session_for_test().is_allowed("rare"));
+    assert!(agent.tool_policy_session.is_allowed("rare"));
 }
 
 /// A named belt that does not opt in reaches nothing beyond what it wrote
@@ -194,16 +195,18 @@ fn named_belt_without_tool_search_reaches_no_deferred_tool() {
     let visible: std::collections::HashSet<String> = std::iter::once("plain".to_string()).collect();
     let agent = build_with(direct_and_deferred(), visible);
 
-    assert!(agent.deferred_tool_names_for_test().is_empty());
-    assert!(!agent.tool_policy_session_for_test().is_allowed("rare"));
+    assert!(agent.deferred_tool_names.is_empty());
+    assert!(!agent.tool_policy_session.is_allowed("rare"));
 }
 
 /// A hand-written `[tools] named` belt is left exactly as written: exposure is
-/// only for the wildcard belt. `critic` names `file_read` among its tools; it
-/// must keep it and gain nothing a wildcard would add.
+/// only for the wildcard belt. This test-owned definition names `file_read`;
+/// it must keep that tool and gain nothing a wildcard would add.
 #[test]
 fn named_belt_keeps_its_listed_members() {
-    let visible = visible_names("critic");
+    let mut definition = super::wildcard_probe_def();
+    definition.tools = tinyagents_definition::ToolScope::Named(vec!["file_read".to_owned()]);
+    let visible = visible_names_for(&definition);
     assert!(
         visible.contains("file_read"),
         "named belt must keep the members it lists; got {visible:?}"
@@ -227,43 +230,60 @@ fn named_belt_keeps_its_listed_members() {
 fn orchestrator_reaches_the_replaced_specialists_tools_through_discovery() {
     let tmp = tempfile::TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let definition =
-        crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
-            .get("orchestrator")
-            .cloned()
-            .expect("orchestrator built-in definition");
-    let agent = crate::agent::OpenHumanSessionHost::from_config_with_definition(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
-        &definition,
+    let definitions = std::sync::Arc::new(
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only(),
+    );
+    let definition = definitions
+        .get("orchestrator")
+        .cloned()
+        .expect("orchestrator built-in definition");
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config.clone(),
     )
-    .expect("orchestrator session build");
-    let deferred = agent.deferred_tool_names_for_test();
-    let visible = agent.visible_tool_names_for_test();
-    let policy = agent.tool_policy_session_for_test();
-    // Unconditionally registered members only: language commands run through shell and need
-    // host Node runtime and the wallet family needs the `web3`
-    // feature, so a test profile without them cannot see them either way.
-    for tool in [
-        "cron",
-        "config_snapshot",
-        "service_restart",
-        "gitbooks_search",
-        "edit",
-        "curl",
-        "read_diff",
-        "run_linter",
-        "run_tests",
-        "mcp_registry_installed_list",
-    ] {
-        assert!(
-            deferred.contains(tool),
-            "`{tool}` must be deferred; got {deferred:?}"
-        );
-        assert!(!visible.contains(tool), "`{tool}` must stay off the wire");
-        assert!(
-            policy.is_allowed(tool),
-            "`{tool}` must be callable once found"
-        );
-    }
+    .derive_with(
+        crate::core::runtime::ContextOverlay::new(
+            config.clone(),
+            crate::core::runtime::DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::packed(),
+        )
+        .definitions(definitions),
+    );
+
+    crate::core::runtime::CoreContext::sync_scope(core, || {
+        let agent = crate::agent::OpenHumanSessionHost::from_config_with_definition(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &config,
+            &definition,
+        )
+        .expect("orchestrator session build");
+        let deferred = agent.deferred_tool_names;
+        let visible = agent.visible_tool_names;
+        let policy = agent.tool_policy_session;
+        // Unconditionally registered members only: language commands run through shell and need
+        // host Node runtime and the wallet family needs the `web3`
+        // feature, so a test profile without them cannot see them either way.
+        for tool in [
+            "cron",
+            "config_snapshot",
+            "service_restart",
+            "gitbooks_search",
+            "edit",
+            "curl",
+            "read_diff",
+            "run_linter",
+            "run_tests",
+            "mcp_registry_installed_list",
+        ] {
+            assert!(
+                deferred.contains(tool),
+                "`{tool}` must be deferred; got {deferred:?}"
+            );
+            assert!(!visible.contains(tool), "`{tool}` must stay off the wire");
+            assert!(
+                policy.is_allowed(tool),
+                "`{tool}` must be callable once found"
+            );
+        }
+    });
 }

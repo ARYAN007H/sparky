@@ -6,7 +6,7 @@
 //! submodules below are gated behind the default-ON `skills` Cargo feature;
 //! when it is off, [`stub`] takes their place and exposes the same public
 //! surface that always-on callers depend on (`load_workflow_metadata`,
-//! `init_workflows_dir`, `registry`, `bus`, the controller aggregators) with
+//! `registry`, `bus`, the controller aggregators) with
 //! no-op / empty bodies. Callers therefore do **not** need per-call `#[cfg]`.
 //! (The `tools` glob is `#[cfg(feature = "skills")]` at its re-export site in
 //! `tools/mod.rs`, so the stub omits it — mirroring the `voice` gate.)
@@ -27,12 +27,33 @@ pub mod ops_types;
 // outright: it has always-compiled callers in `crates/openhuman-core/src/core/` and is not part of
 // the `skills` gate at all.
 pub mod catalog;
+#[cfg(feature = "skills")]
+pub(crate) mod run_workflow;
 
 /// Whether the ambient context has the `skills` component on. No ambient
 /// context (a bare library call) counts as on.
 #[must_use]
 pub fn skills_component_enabled() -> bool {
     crate::core::runtime::CoreContext::current().is_none_or(|ctx| ctx.components().skills)
+}
+
+/// Schedule optional TinyFlows skill-resource discovery without blocking the
+/// host that owns the selected configuration and dispatch identity.
+#[cfg(all(feature = "skills", feature = "flows"))]
+pub(crate) fn schedule_flow_authoring_prewarm(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &crate::config::Config,
+    domains: Option<crate::core::runtime::DomainSet>,
+) {
+    bundled::flow_authoring::schedule_prewarm(ctx, config, domains);
+}
+
+#[cfg(not(all(feature = "skills", feature = "flows")))]
+pub(crate) fn schedule_flow_authoring_prewarm(
+    _ctx: &crate::core::runtime::DispatchCtx,
+    _config: &crate::config::Config,
+    _domains: Option<crate::core::runtime::DomainSet>,
+) {
 }
 pub mod runtime;
 pub mod webhooks;

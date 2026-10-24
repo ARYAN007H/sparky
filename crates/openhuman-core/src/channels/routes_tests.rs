@@ -58,7 +58,6 @@ pub(super) fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::inference::provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(workspace_dir),
         message_timeout_secs: 60,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -208,6 +207,7 @@ async fn module_route_help_response(
 
     let request = ChannelControlRequest::Route {
         workspace_dir: workspace_dir.to_string_lossy().into_owned(),
+        capabilities: None,
         message: Box::new(ChannelMessage {
             reply_to_id: None,
             topic_id: None,

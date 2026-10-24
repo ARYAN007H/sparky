@@ -41,7 +41,7 @@ pub fn clear_channel_bridge() {
 /// fails.
 pub async fn send_to_channel(
     channel: &str,
-    identity: &tinyflows_bus::schedule::types::ChannelSessionIdentity,
+    identity: &tinyflows_bus::schedule::ChannelSessionIdentity,
     reply_target: &str,
     text: &str,
     idempotency_key: &str,
@@ -78,6 +78,65 @@ pub async fn send_to_channel(
     )
     .await
     .map_err(|_| "channel progressive output could not be opened".to_string())?;
+    finish_reply(reply, text).await
+}
+
+/// Send `text` to an explicitly configured `reply_target` on `channel` (the
+/// `announce` delivery mode): no captured session identity, so the target
+/// account is the single configured account of that provider. Errors when the
+/// runtime is not running, the provider has no account or more than one, or
+/// the provider does not confirm delivery.
+pub async fn announce_to_channel(
+    channel: &str,
+    reply_target: &str,
+    thread_id: Option<&str>,
+    text: &str,
+    idempotency_key: &str,
+) -> Result<(), String> {
+    let Some(bridge) = current() else {
+        return Err("channel runtime is not running".to_string());
+    };
+    let provider = tinychannels_bus::provider_id(channel);
+    let mut accounts = bridge
+        .module_objects
+        .iter()
+        .filter(|(account, _)| tinychannels_bus::provider_id(account) == provider);
+    let Some((account_id, object)) = accounts.next() else {
+        return Err(format!("channel {channel} is not configured"));
+    };
+    if accounts.next().is_some() {
+        return Err(format!(
+            "channel {channel} has more than one account; announce delivery needs one"
+        ));
+    }
+    tracing::debug!(
+        channel = %channel,
+        has_thread = thread_id.is_some(),
+        "[cron] announce delivery through the channel module"
+    );
+    let reply = crate::channels::bus::NativeProgressiveReply::open(
+        object.clone(),
+        ChannelRef {
+            id: provider.to_string(),
+            account_id: Some(account_id.clone()),
+        },
+        ConversationRef {
+            id: reply_target.to_string(),
+            thread_id: thread_id.map(str::to_owned),
+            ..Default::default()
+        },
+        idempotency_key.to_string(),
+        std::time::Duration::from_secs(60),
+    )
+    .await
+    .map_err(|_| "channel progressive output could not be opened".to_string())?;
+    finish_reply(reply, text).await
+}
+
+async fn finish_reply(
+    reply: crate::channels::bus::NativeProgressiveReply,
+    text: &str,
+) -> Result<(), String> {
     match reply.finish(text).await {
         Ok(result) if crate::channels::runtime::dispatch::delivery_succeeded(&result) => Ok(()),
         Ok(
@@ -92,7 +151,7 @@ pub async fn send_to_channel(
 }
 
 fn conversation_ref(
-    identity: &tinyflows_bus::schedule::types::ChannelConversationIdentity,
+    identity: &tinyflows_bus::schedule::ChannelConversationIdentity,
 ) -> Result<ConversationRef, String> {
     let kind = match identity.kind.as_str() {
         "dm" => ConversationKind::Dm,

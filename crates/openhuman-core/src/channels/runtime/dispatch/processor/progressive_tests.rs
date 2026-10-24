@@ -118,6 +118,7 @@ fn progressive_delivery_status_rejects_partial_or_unsupported_terminal_results()
         }],
         unsupported: Vec::new(),
         failure: Some(ProgressiveOutputFailure::ProviderTransport),
+        hosted_accepted: false,
     };
     assert!(!delivery_succeeded(&partial));
 

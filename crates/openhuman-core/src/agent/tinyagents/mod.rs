@@ -23,7 +23,6 @@ pub mod config;
 mod context_wiring;
 mod deadline_wind_down;
 pub mod discovery;
-mod embeddings;
 pub mod host;
 pub(crate) mod hosted_error;
 pub(crate) mod journal;
@@ -32,9 +31,7 @@ pub(crate) mod journal;
 pub(crate) mod live_harness;
 mod memory_summarizer;
 pub(crate) mod middleware;
-pub(crate) mod model;
 pub(crate) mod observability;
-pub mod run_mode;
 // `pub` since issue #6014, and the inconsistency it removes is the point:
 // `AgentBuilder::payload_summarizer` is a **public** setter taking
 // `Arc<DynPayloadSummarizer>`, so the seam was already advertised to embedders
@@ -50,39 +47,36 @@ pub mod budget;
 pub mod payload_summarizer;
 mod policy_denial;
 pub(crate) mod reaper;
-pub(crate) mod reasoning;
-pub(crate) mod replay;
-mod routes;
+pub(crate) mod state_block;
 mod steering_forwarder;
-pub(crate) mod stop_hooks;
-pub mod todos;
+mod supplemental_trace;
+pub(crate) mod thread_reasoning;
 pub(crate) mod tool_registration;
 mod turn_exec;
+mod turn_exec_native;
 mod turn_middleware;
-mod turn_model_resolver;
-mod turn_models;
 mod turn_outcome;
 mod turn_plan;
-mod turn_policy;
+pub(crate) mod turn_policy;
 mod turn_run_error;
 mod turn_run_finalize;
-mod use_skill_dispatch;
 mod verify_before_finish;
 
 pub(crate) use crate::agent::message_convert::chat_message_to_message;
 #[cfg(feature = "flows")]
 pub(crate) use crate::agent::message_convert::ta_call_to_oh_call;
 
-#[allow(unused_imports)] // Wired into the recall/retrieval facade in workstream 09.2.
-pub(crate) use embeddings::ProviderEmbeddingModel;
+pub use crate::inference::turn_models::TurnModelSource;
 pub(crate) use observability::SubagentScope;
-pub(crate) use reasoning::{apply_requested_effort, parse_reasoning_effort};
+pub(crate) use supplemental_trace::SupplementalTrace;
+pub(crate) use thread_reasoning::apply_requested_effort;
 pub(crate) use turn_exec::TurnSpec;
-pub use turn_models::TurnModelSource;
-pub(crate) use turn_models::TurnModels;
+pub(crate) use turn_exec_native::NativeSubagentRunContext;
+#[cfg(test)]
+pub(crate) use turn_outcome::DeferredTurnTerminal;
 pub(crate) use turn_outcome::TinyagentsTurnOutcome;
 #[cfg(test)]
-pub(crate) use turn_policy::is_subagent_spawn_or_delegate_tool;
+pub(crate) use turn_policy::is_subagent_spawn_tool;
 pub(crate) use turn_policy::{
     agent_turn_wall_clock_ms_for, chat_provider_is_local, local_web_turn_backstop_secs,
     ToolPolicyEnforcement,
@@ -105,6 +99,3 @@ mod prompt_cache_golden_tests;
 #[cfg(test)]
 #[path = "tinyagents_tests.rs"]
 mod tests;
-#[cfg(test)]
-#[path = "topology_collision_tests.rs"]
-mod topology_collision_tests;

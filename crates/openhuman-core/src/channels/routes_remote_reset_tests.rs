@@ -54,7 +54,7 @@ fn seed_session(
 ) -> SessionRef {
     let session = SessionRef::scoped(key, agent_id);
     let history =
-        crate::agent::session_store::transcripts_or_files_in(core, store_agent_id, workspace)
+        crate::storage::sessions::transcripts_or_files_in(core, store_agent_id, workspace)
             .open_session(&session, transcript_meta(key, agent_id))
             .unwrap();
     history
@@ -73,7 +73,7 @@ fn session_messages(
     session: &SessionRef,
 ) -> Vec<String> {
     let locator =
-        crate::agent::session_store::transcripts_or_files_in(core, store_agent_id, workspace);
+        crate::storage::sessions::transcripts_or_files_in(core, store_agent_id, workspace);
     let head = locator.head_generation(session);
     locator
         .read_session_transcript(&head)
@@ -172,12 +172,10 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     let canonical = "channel-session:telegram:bot-a:group:room-1";
     let alice_key = crate::core::runtime::tenant::tenant_key(&alice_tenant, canonical);
     let bob_key = crate::core::runtime::tenant::tenant_key(&bob_tenant, canonical);
-    let alice_store_agent = crate::agent::session_store::current_agent_key_or(
-        &alice_dispatch,
-        &alice_agent.definition.id,
-    );
+    let alice_store_agent =
+        crate::storage::sessions::current_agent_key_or(&alice_dispatch, &alice_agent.definition.id);
     let bob_store_agent =
-        crate::agent::session_store::current_agent_key_or(&bob_dispatch, &bob_agent.definition.id);
+        crate::storage::sessions::current_agent_key_or(&bob_dispatch, &bob_agent.definition.id);
     assert_ne!(alice_key, bob_key);
     let alice_session = seed_session(
         &alice_core,
@@ -261,7 +259,7 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
         "reset should empty Alice's actual session: agent={}, session={alice_session:?}, \
          head={:?}, messages={alice_after:?}, history_len={}",
         alice_agent.definition.id,
-        crate::agent::session_store::transcripts_or_files_in(
+        crate::storage::sessions::transcripts_or_files_in(
             &alice_core,
             &alice_store_agent,
             workspace,
@@ -287,7 +285,7 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
         "a reset clears the durable status count",
     );
 
-    let alice_locator = crate::agent::session_store::transcripts_or_files_in(
+    let alice_locator = crate::storage::sessions::transcripts_or_files_in(
         &alice_core,
         &alice_store_agent,
         workspace,

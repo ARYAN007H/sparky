@@ -27,11 +27,12 @@ use tinyagents_harness::context::RunContext;
 use tinyagents_harness::summarization::payload_summarizer::{
     run_unary_summary, summary_child_config, PayloadSummarizer as HarnessPayloadSummarizer,
 };
+use tinyagents_orchestration::subagent::{subagent_framing, SubagentRole};
 use tracing::debug;
 
-use crate::agent::harness::host_definition::AgentDefinition;
 use crate::agent::subagent_host;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
+use crate::agent_registry::host_definition::AgentDefinition;
 use {
     crate::inference::tokenjuice::generate::PreparedGenerate, tinyjuice_bus::wire::GenerateRequest,
 };
@@ -100,13 +101,14 @@ impl HarnessPayloadSummarizer<OpenHumanRunContext> for SubagentPayloadSummarizer
         let thread_id = parent_ctx.data.thread_id.clone();
         let max_output_tokens = definition
             .max_turn_output_tokens
-            .unwrap_or(crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS);
+            .unwrap_or(tinyagents_harness::turn_policy::AGENT_TURN_MAX_OUTPUT_TOKENS);
         let child_context = unary_child_context(
             parent_ctx,
             &definition.id,
             definition.max_iterations,
             max_output_tokens,
         )?;
+        let summary_depth = child_context.depth();
         debug!(
             agent = %definition.id,
             parent_depth = parent_ctx.depth(),
@@ -129,8 +131,8 @@ impl HarnessPayloadSummarizer<OpenHumanRunContext> for SubagentPayloadSummarizer
                     definition.temperature,
                 );
                 let max_output_tokens = request.max_output_tokens.min(max_output_tokens).max(1);
-                let system_prompt =
-                    subagent_host::append_subagent_role_contract(request.system, &definition.id);
+                let framing = subagent_framing(SubagentRole::Leaf, summary_depth, &request.prompt);
+                let system_prompt = format!("{}\n\n{framing}", request.system.trim_end());
 
                 let provider_model = tinyinference_llm::model::MaxTokensModel::new(
                     source.build_summarizer(
@@ -142,9 +144,23 @@ impl HarnessPayloadSummarizer<OpenHumanRunContext> for SubagentPayloadSummarizer
                 );
                 let provider_model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
                     Arc::new(provider_model);
-                let provider_model = match &child_context.data.model_budget {
-                    Some(budget) => budget.wrap(provider_model),
-                    None => provider_model,
+                let provider_model = if child_context.data.model_budget.is_some()
+                    || child_context.data.dispatch_admission.is_some()
+                {
+                    let monetary_budget = child_context.data.model_budget.as_ref().map(|budget| {
+                        tinyagents_harness::cost::ModelBudget::new(
+                            budget.ledger.clone(),
+                            budget.call,
+                        )
+                    });
+                    Arc::new(tinyagents_harness::cost::ControlledChatModel::new(
+                        provider_model,
+                        tinyagents_harness::cost::DispatchModelOptions::new()
+                            .monetary_budget(monetary_budget)
+                            .admission(child_context.data.dispatch_admission.clone()),
+                    ))
+                } else {
+                    provider_model
                 };
                 // Unary, never streaming: a streaming child would publish the
                 // internal summary to the user as parent `TextDelta`s.

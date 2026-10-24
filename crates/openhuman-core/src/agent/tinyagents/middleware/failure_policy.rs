@@ -100,7 +100,7 @@ const ALWAYS_RETRYABLE_ON_TIMEOUT: &[&str] = &[
 /// The shell agent commands run under on this host, for a nudge that has to
 /// say which commands exist.
 fn host_shell_description() -> String {
-    let shell = match crate::agent::host_runtime::host_shell_flavor() {
+    let shell = match crate::modules::tinybox::host_runtime::host_shell_flavor() {
         tinybox_bus::ShellFlavor::Cmd => "cmd.exe",
         tinybox_bus::ShellFlavor::Posix => "bash or sh",
     };
@@ -235,7 +235,9 @@ pub(super) fn classified_recovery_policy(
         // attempt, steered by a reconcile-first nudge, and halts on a second.
         // Remote actions (`gmail_send`, payments, …) stay at zero: a retry
         // there can repeat an effect the agent cannot observe.
-        Class::Timeout if tool == "shell" => ("uncertain_side_effect", 1),
+        Class::Timeout if tool == "shell" || tool == "shell_process" => {
+            ("uncertain_side_effect", 1)
+        }
         Class::Timeout => ("uncertain_side_effect", 0),
         // The harness's own schema-validation answer, classified from its
         // prefix before any keyword in the echoed schema could read as a

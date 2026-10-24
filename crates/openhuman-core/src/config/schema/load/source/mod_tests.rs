@@ -1,7 +1,7 @@
 use super::tests_support::ForcedDocumentSource;
 use super::*;
 use crate::config::Config;
-use crate::storage::{MemoryStorage, Scope, ScopedStorage, StorageBackend};
+use crate::storage::{test_support::memory_backend, Scope, Storage, StorageBackend};
 use std::sync::Arc;
 use tinystoragedrivers::secrets::{crypto, DerivedKeys, KeyProvider};
 use zeroize::Zeroizing;
@@ -10,16 +10,16 @@ fn keys(byte: u8) -> Arc<dyn KeyProvider> {
     Arc::new(DerivedKeys::new(Zeroizing::new([byte; 32])))
 }
 
-fn scoped(storage: &MemoryStorage, scope: &str) -> ScopedStorage {
+fn scoped(storage: &dyn StorageBackend, scope: &str) -> Storage {
     storage.for_scope(&Scope::new(scope).unwrap()).unwrap()
 }
 
-fn document_source(storage: &MemoryStorage, scope: &str, file: &Path) -> DocumentConfigSource {
+fn document_source(storage: &dyn StorageBackend, scope: &str, file: &Path) -> DocumentConfigSource {
     document_source_keyed(storage, scope, file, keys(1))
 }
 
 fn document_source_keyed(
-    storage: &MemoryStorage,
+    storage: &dyn StorageBackend,
     scope: &str,
     file: &Path,
     keys: Arc<dyn KeyProvider>,
@@ -29,6 +29,7 @@ fn document_source_keyed(
         Scope::new(scope).unwrap(),
         keys,
         FileConfigSource::new(file),
+        super::DocumentBackendIdentity::Test(Arc::new(())),
     )
 }
 
@@ -111,15 +112,15 @@ async fn a_save_keeps_hand_edits_but_not_comments() {
 async fn a_document_holds_no_plaintext_and_no_bootstrap_tables() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("config.toml");
-    let storage = MemoryStorage::new();
-    let source = document_source(&storage, "alice", &file);
+    let storage = memory_backend();
+    let source = document_source(storage.as_ref(), "alice", &file);
 
     source
         .write("default_model = \"m\"\napi_key = \"sk-very-secret\"\n[storage]\nurl = \"mongodb://u:pw@db/x\"\n")
         .await
         .unwrap();
 
-    let docs = Arc::clone(scoped(&storage, "alice").documents());
+    let docs = Arc::clone(scoped(storage.as_ref(), "alice").documents());
     let stored = docs
         .get("config.documents", "alice")
         .await
@@ -139,24 +140,29 @@ async fn a_document_holds_no_plaintext_and_no_bootstrap_tables() {
 #[tokio::test]
 async fn a_document_does_not_decrypt_under_another_scope_or_master_key() {
     let tmp = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
-    let alice = document_source(&storage, "alice", &tmp.path().join("a.toml"));
+    let storage = memory_backend();
+    let alice = document_source(storage.as_ref(), "alice", &tmp.path().join("a.toml"));
     alice.write("default_model = \"m\"\n").await.unwrap();
 
     // Another master key fails closed.
-    let wrong_key = document_source_keyed(&storage, "alice", &tmp.path().join("a.toml"), keys(2));
+    let wrong_key = document_source_keyed(
+        storage.as_ref(),
+        "alice",
+        &tmp.path().join("a.toml"),
+        keys(2),
+    );
     assert!(wrong_key.read().await.is_err());
 
     // Another scope's data key cannot open alice's ciphertext even when the
     // sealed value is copied across (per-scope key derivation).
-    let docs = Arc::clone(scoped(&storage, "alice").documents());
+    let docs = Arc::clone(scoped(storage.as_ref(), "alice").documents());
     let sealed = docs
         .get("config.documents", "alice")
         .await
         .unwrap()
         .unwrap()
         .doc;
-    let bob_docs = Arc::clone(scoped(&storage, "bob").documents());
+    let bob_docs = Arc::clone(scoped(storage.as_ref(), "bob").documents());
     bob_docs
         .put(
             "config.documents",
@@ -166,7 +172,7 @@ async fn a_document_does_not_decrypt_under_another_scope_or_master_key() {
         )
         .await
         .unwrap();
-    let bob = document_source(&storage, "bob", &tmp.path().join("b.toml"));
+    let bob = document_source(storage.as_ref(), "bob", &tmp.path().join("b.toml"));
     assert!(bob.read().await.is_err(), "copied ciphertext must not open");
 }
 
@@ -174,8 +180,8 @@ async fn a_document_does_not_decrypt_under_another_scope_or_master_key() {
 async fn a_malformed_bootstrap_file_is_an_error_not_an_empty_one() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("config.toml");
-    let storage = MemoryStorage::new();
-    let source = document_source(&storage, "alice", &file);
+    let storage = memory_backend();
+    let source = document_source(storage.as_ref(), "alice", &file);
     source.write("default_model = \"m\"\n").await.unwrap();
     std::fs::write(&file, "[storage\n").unwrap();
     assert!(source.read().await.is_err());
@@ -186,8 +192,8 @@ async fn a_document_read_takes_its_bootstrap_tables_from_the_file() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("config.toml");
     std::fs::write(&file, "[storage]\nurl = \"sqlite:/data\"\n").unwrap();
-    let storage = MemoryStorage::new();
-    let source = document_source(&storage, "alice", &file);
+    let storage = memory_backend();
+    let source = document_source(storage.as_ref(), "alice", &file);
     source.write("default_model = \"m\"\n").await.unwrap();
 
     let read = source.read().await.unwrap();
@@ -196,7 +202,7 @@ async fn a_document_read_takes_its_bootstrap_tables_from_the_file() {
     assert_eq!(table["storage"]["url"].as_str(), Some("sqlite:/data"));
 
     // Even a document that somehow carries a [storage] table is overruled.
-    let docs = Arc::clone(scoped(&storage, "alice").documents());
+    let docs = Arc::clone(scoped(storage.as_ref(), "alice").documents());
     let key = keys(1).data_key(&Scope::new("alice").unwrap()).unwrap();
     let sealed = crypto::encrypt_enc2(&key, b"[storage]\nurl = \"evil\"\n").unwrap();
     docs.put(
@@ -216,8 +222,8 @@ async fn a_document_read_takes_its_bootstrap_tables_from_the_file() {
 async fn without_a_document_the_source_reads_the_file() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("config.toml");
-    let storage = MemoryStorage::new();
-    let source = document_source(&storage, "alice", &file);
+    let storage = memory_backend();
+    let source = document_source(storage.as_ref(), "alice", &file);
     assert!(!source.exists().await.unwrap());
 
     std::fs::write(&file, "default_model = \"from-file\"\n").unwrap();
@@ -232,9 +238,9 @@ async fn without_a_document_the_source_reads_the_file() {
 #[tokio::test]
 async fn two_scopes_keep_their_config_apart() {
     let tmp = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
-    let alice = document_source(&storage, "alice", &tmp.path().join("a.toml"));
-    let bob = document_source(&storage, "bob", &tmp.path().join("b.toml"));
+    let storage = memory_backend();
+    let alice = document_source(storage.as_ref(), "alice", &tmp.path().join("a.toml"));
+    let bob = document_source(storage.as_ref(), "bob", &tmp.path().join("b.toml"));
 
     alice
         .write("default_model = \"alice-model\"\n")
@@ -257,9 +263,9 @@ async fn two_scopes_keep_their_config_apart() {
 #[tokio::test]
 async fn config_save_and_reload_use_the_document_on_a_shared_backend() {
     let tmp = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-a"),
+        scoped(storage.as_ref(), "tenant-a"),
         Scope::new("tenant-a").unwrap(),
         keys(3),
     );
@@ -286,6 +292,60 @@ async fn config_save_and_reload_use_the_document_on_a_shared_backend() {
 }
 
 #[tokio::test]
+async fn stale_document_config_snapshot_returns_conflict_instead_of_overwriting() {
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = memory_backend();
+    let _forced = ForcedDocumentSource::new(
+        scoped(storage.as_ref(), "tenant-a"),
+        Scope::new("tenant-a").unwrap(),
+        keys(3),
+    );
+    let path = tmp.path().join("config.toml");
+    let initial = config_at(tmp.path(), "initial");
+    initial.save().await.unwrap();
+    let mut first = Config::load_from_config_path(&path, &tmp.path().join("workspace"))
+        .await
+        .unwrap();
+    let mut stale = Config::load_from_config_path(&path, &tmp.path().join("workspace"))
+        .await
+        .unwrap();
+    first.default_model = Some("first".into());
+    stale.output_language = Some("fr".into());
+    first.save().await.unwrap();
+    first.default_temperature = 0.25;
+    first.save().await.unwrap();
+
+    let error = stale.save().await.unwrap_err();
+    let storage_error = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<tinystoragedrivers::StorageError>())
+        .expect("CAS failure retains the typed storage error");
+    assert_eq!(
+        storage_error.kind(),
+        tinystoragedrivers::ErrorKind::Conflict
+    );
+    let _ = error;
+    let rpc_error = crate::config::ops::apply_autonomy_settings(
+        &mut stale,
+        crate::config::ops::AutonomySettingsPatch {
+            enabled: Some(true),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap_err();
+    let rpc_error = crate::core::StructuredRpcError::decode(&rpc_error)
+        .expect("config RPC boundary exposes a structured conflict");
+    assert_eq!(rpc_error.data.unwrap()["kind"], "ConfigConflict");
+    let loaded = Config::load_from_config_path(&path, &tmp.path().join("workspace"))
+        .await
+        .unwrap();
+    assert_eq!(loaded.default_model.as_deref(), Some("first"));
+    assert_eq!(loaded.default_temperature, 0.25);
+    assert_ne!(loaded.output_language.as_deref(), Some("fr"));
+}
+
+#[tokio::test]
 async fn without_a_shared_backend_config_stays_on_the_file() {
     // No forced scope and no installed backend: the file source.
     let tmp = tempfile::tempdir().unwrap();
@@ -298,9 +358,9 @@ async fn without_a_shared_backend_config_stays_on_the_file() {
 #[tokio::test]
 async fn a_document_backed_config_keeps_secrets_readable_on_reload() {
     let tmp = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-a"),
+        scoped(storage.as_ref(), "tenant-a"),
         Scope::new("tenant-a").unwrap(),
         keys(3),
     );
@@ -319,15 +379,15 @@ async fn a_document_backed_config_keeps_secrets_readable_on_reload() {
 
 #[test]
 fn forced_sources_nest_and_restore() {
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let outer = ForcedDocumentSource::new(
-        scoped(&storage, "outer"),
+        scoped(storage.as_ref(), "outer"),
         Scope::new("outer").unwrap(),
         keys(1),
     );
     {
         let _inner = ForcedDocumentSource::new(
-            scoped(&storage, "inner"),
+            scoped(storage.as_ref(), "inner"),
             Scope::new("inner").unwrap(),
             keys(1),
         );
@@ -355,9 +415,9 @@ async fn a_present_but_malformed_document_is_an_error_not_absence() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("config.toml");
     std::fs::write(&file, "default_model = \"stale-file\"\n").unwrap();
-    let storage = MemoryStorage::new();
-    let source = document_source(&storage, "alice", &file);
-    let docs = Arc::clone(scoped(&storage, "alice").documents());
+    let storage = memory_backend();
+    let source = document_source(storage.as_ref(), "alice", &file);
+    let docs = Arc::clone(scoped(storage.as_ref(), "alice").documents());
     docs.put(
         "config.documents",
         "alice",
@@ -376,14 +436,14 @@ async fn a_present_but_malformed_document_is_an_error_not_absence() {
 #[tokio::test]
 async fn a_document_that_does_not_parse_is_an_error_and_leaves_the_bootstrap_file_alone() {
     let tmp = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-a"),
+        scoped(storage.as_ref(), "tenant-a"),
         Scope::new("tenant-a").unwrap(),
         keys(3),
     );
     let config = config_at(tmp.path(), "m");
-    let docs = Arc::clone(scoped(&storage, "tenant-a").documents());
+    let docs = Arc::clone(scoped(storage.as_ref(), "tenant-a").documents());
     let key = keys(3).data_key(&Scope::new("tenant-a").unwrap()).unwrap();
     let sealed = crypto::encrypt_enc2(&key, b"default_model = 5\n").unwrap();
     docs.put(
@@ -416,8 +476,8 @@ async fn a_read_reports_whether_its_text_is_a_document_body() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("config.toml");
     std::fs::write(&file, "default_model = \"from-file\"\n").unwrap();
-    let storage = MemoryStorage::new();
-    let source = document_source(&storage, "alice", &file);
+    let storage = memory_backend();
+    let source = document_source(storage.as_ref(), "alice", &file);
     assert!(!source.read().await.unwrap().from_document, "file fallback");
     source.write("default_model = \"doc\"\n").await.unwrap();
     assert!(source.read().await.unwrap().from_document);
@@ -434,8 +494,8 @@ async fn a_read_reports_whether_its_text_is_a_document_body() {
 async fn a_recovered_bootstrap_file_is_restored_beside_the_document() {
     let tmp = tempfile::tempdir().unwrap();
     let file = tmp.path().join("config.toml");
-    let storage = MemoryStorage::new();
-    let source = document_source(&storage, "alice", &file);
+    let storage = memory_backend();
+    let source = document_source(storage.as_ref(), "alice", &file);
     source.write("default_model = \"m\"\n").await.unwrap();
     let bootstrap = "[storage]\nurl = \"sqlite:/b\"\n";
     std::fs::write(tmp.path().join("config.toml.bak"), bootstrap).unwrap();
@@ -450,9 +510,9 @@ async fn a_recovered_bootstrap_file_is_restored_beside_the_document() {
 #[tokio::test]
 async fn a_file_fallback_keeps_the_file_backup_recovery() {
     let tmp = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-a"),
+        scoped(storage.as_ref(), "tenant-a"),
         Scope::new("tenant-a").unwrap(),
         keys(3),
     );
@@ -473,9 +533,9 @@ async fn a_file_fallback_keeps_the_file_backup_recovery() {
 #[tokio::test]
 async fn a_document_save_never_nests_process_key_ciphertext() {
     let tmp = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-a"),
+        scoped(storage.as_ref(), "tenant-a"),
         Scope::new("tenant-a").unwrap(),
         keys(3),
     );
@@ -490,7 +550,7 @@ async fn a_document_save_never_nests_process_key_ciphertext() {
     config.api_key = Some(sealed);
     config.save().await.unwrap();
 
-    let body = document_source_keyed(&storage, "tenant-a", &config.config_path, keys(3))
+    let body = document_source_keyed(storage.as_ref(), "tenant-a", &config.config_path, keys(3))
         .read()
         .await
         .unwrap()
@@ -503,9 +563,9 @@ async fn a_document_save_never_nests_process_key_ciphertext() {
 async fn a_document_save_refuses_process_key_secrets_it_cannot_open() {
     let tmp = tempfile::tempdir().unwrap();
     let other_node = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-a"),
+        scoped(storage.as_ref(), "tenant-a"),
         Scope::new("tenant-a").unwrap(),
         keys(3),
     );
@@ -521,7 +581,7 @@ async fn a_document_save_refuses_process_key_secrets_it_cannot_open() {
         format!("{error:#}").contains("could not be opened"),
         "{error:#}"
     );
-    let docs = Arc::clone(scoped(&storage, "tenant-a").documents());
+    let docs = Arc::clone(scoped(storage.as_ref(), "tenant-a").documents());
     docs.ensure_collection(&tinystoragedrivers::CollectionSpec::new("config.documents"))
         .await
         .unwrap();
@@ -537,9 +597,9 @@ async fn a_document_save_refuses_process_key_secrets_it_cannot_open() {
 #[tokio::test]
 async fn a_recovered_file_fallback_rewrites_the_bootstrap_file_too() {
     let tmp = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
+    let storage = memory_backend();
     let _forced = ForcedDocumentSource::new(
-        scoped(&storage, "tenant-a"),
+        scoped(storage.as_ref(), "tenant-a"),
         Scope::new("tenant-a").unwrap(),
         keys(3),
     );
@@ -557,4 +617,11 @@ async fn a_recovered_file_fallback_rewrites_the_bootstrap_file_too() {
     let body = source.read().await.unwrap();
     assert!(body.from_document);
     assert!(body.contents.contains("recovered"));
+
+    // The auxiliary bootstrap-file export must not erase the document
+    // revision captured by the first successful save.
+    config.save().await.unwrap();
 }
+
+#[path = "concurrency_tests.rs"]
+mod concurrency_tests;

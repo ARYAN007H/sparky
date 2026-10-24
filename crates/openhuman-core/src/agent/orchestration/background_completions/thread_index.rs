@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use tinyagents_tasks::CompletionRouter;
 
-use super::{router_for_workspace, state, SESSION_THREADS_CAP};
+use super::{state, SESSION_THREADS_CAP};
 use crate::core::runtime::DispatchCtx;
 
 /// The key of a thread or session id in `HostState`'s maps: per profile of
@@ -21,7 +21,7 @@ pub(super) fn key(ctx: &DispatchCtx, id: &str) -> String {
 }
 
 /// Remember which workspace holds `thread_id`'s completions.
-pub(super) fn note_thread_workspace(ctx: &DispatchCtx, thread_id: &str, workspace_dir: &Path) {
+pub(crate) fn note_thread_workspace(ctx: &DispatchCtx, thread_id: &str, workspace_dir: &Path) {
     state()
         .thread_workspaces
         .insert(key(ctx, thread_id), workspace_dir.to_path_buf());
@@ -37,7 +37,7 @@ pub(crate) fn router_for_thread(
         .thread_workspaces
         .get(&key(ctx, thread_id))
         .cloned()?;
-    Some(router_for_workspace(&workspace))
+    Some(super::router_for_workspace_ctx(ctx, &workspace))
 }
 
 /// The workspace holding `thread_id`'s completions, if known to this process.

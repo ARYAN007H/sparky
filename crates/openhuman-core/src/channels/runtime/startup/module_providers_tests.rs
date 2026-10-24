@@ -134,6 +134,10 @@ async fn prepared_module_handle_keeps_progressive_send_alive() {
             tinychannels_bus::methods::EXECUTE_PROGRESSIVE,
             (ProgressiveCommand::FeedOutput {
                 handle,
+                turn_id: None,
+                channel_ref: None,
+                conversation: None,
+                sequence: None,
                 events: vec![
                     ChannelOutputEvent::TextDelta {
                         text: "working".into(),
@@ -610,6 +614,10 @@ async fn run_hosted_compiled_turn(
             tinychannels_bus::methods::EXECUTE_PROGRESSIVE,
             (ProgressiveCommand::FeedOutput {
                 handle: handle.clone(),
+                turn_id: None,
+                channel_ref: None,
+                conversation: None,
+                sequence: None,
                 events: vec![ChannelOutputEvent::FinalMessage {
                     text: text.into(),
                     parts: vec![],

@@ -60,8 +60,8 @@ fn request(tool: &str) -> (RunContext<OpenHumanRunContext>, ToolCall) {
 
 /// The orchestrator's definition is the embed default, and the widest one:
 /// every registered tool, delegation and memory. Host-only must narrow it.
-fn orchestrator_def() -> crate::agent::harness::host_definition::AgentDefinition {
-    let mut def = crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
+fn orchestrator_def() -> crate::agent_registry::host_definition::AgentDefinition {
+    let mut def = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
         .get("orchestrator")
         .cloned()
         .expect("built-in orchestrator");
@@ -142,10 +142,7 @@ fn a_host_only_session_runs_a_definition_that_cannot_delegate_or_act() {
 
 #[tokio::test]
 async fn the_host_only_policy_admits_only_host_names() {
-    let policy = super::super::host_only::HostOnlyToolPolicy::new(
-        ["read_file".to_string()].into_iter().collect(),
-        None,
-    );
+    let policy = tinyagents_runtime::HostOnlyToolPolicy::new(["read_file".to_string()], None);
 
     assert_eq!(
         {
@@ -180,8 +177,8 @@ async fn the_host_only_policy_still_consults_the_hosts_own_gate() {
             PolicyDecision::deny("host says no")
         }
     }
-    let policy = super::super::host_only::HostOnlyToolPolicy::new(
-        ["read_file".to_string()].into_iter().collect(),
+    let policy = tinyagents_runtime::HostOnlyToolPolicy::new(
+        ["read_file".to_string()],
         Some(Arc::new(DenyAll)),
     );
 

@@ -13,24 +13,70 @@ impl CoreContext {
         domains: crate::core::runtime::DomainSet,
         workspace_dir: Option<std::path::PathBuf>,
     ) -> Arc<CoreContext> {
+        Self::for_test_with_host_kind(HostKind::Cli, domains, workspace_dir)
+    }
+
+    /// Test-only constructor with an explicit host policy identity.
+    pub(crate) fn for_test_with_host_kind(
+        host_kind: HostKind,
+        domains: crate::core::runtime::DomainSet,
+        workspace_dir: Option<std::path::PathBuf>,
+    ) -> Arc<CoreContext> {
         Arc::new(CoreContext {
-            host_kind: HostKind::Cli,
+            host_kind,
             workspace_binding: RwLock::new(Arc::new(RwLock::new(WorkspaceBinding {
                 workspace_dir,
+                config_path: None,
             }))),
             domains,
             tool_groups: Default::default(),
+            autonomy_tier_source: AutonomyTierSource::LiveConfig,
+            autonomy_tier_ceiling: None,
             components: Default::default(),
             embedder_config: None,
+            latest_embedder_config: None,
             user_skill_roots: true,
-            backend_transport: None,
+            extensions: Default::default(),
             turn_origin: None,
             channel_thread: None,
             session_agent: None,
             profile: None,
+            profile_admission: Arc::new(()),
             agent: Default::default(),
             bare: false,
         })
+    }
+
+    /// Test-only constructor with context-local hook registrations.
+    pub(crate) fn for_test_with_extensions(
+        domains: crate::core::runtime::DomainSet,
+        workspace_dir: Option<std::path::PathBuf>,
+        extensions: crate::core::slots::Extensions,
+    ) -> Arc<CoreContext> {
+        Self::for_test_with_host_kind_and_extensions(
+            HostKind::Cli,
+            domains,
+            workspace_dir,
+            extensions,
+        )
+    }
+
+    /// Test-only constructor with explicit host policy and scoped registrations.
+    pub(crate) fn for_test_with_host_kind_and_extensions(
+        host_kind: HostKind,
+        domains: crate::core::runtime::DomainSet,
+        workspace_dir: Option<std::path::PathBuf>,
+        extensions: crate::core::slots::Extensions,
+    ) -> Arc<CoreContext> {
+        let mut ctx = Arc::try_unwrap(Self::for_test_with_host_kind(
+            host_kind,
+            domains,
+            workspace_dir,
+        ))
+        .ok()
+        .unwrap();
+        ctx.extensions = extensions;
+        Arc::new(ctx)
     }
 
     /// Test-only: given `[components]` switches.
@@ -59,23 +105,45 @@ impl CoreContext {
         domains: crate::core::runtime::DomainSet,
         config: crate::config::Config,
     ) -> Arc<CoreContext> {
+        let latest_embedder_config = Arc::new(std::sync::Mutex::new(config.clone()));
+        crate::config::Config::bind_context_snapshot(&latest_embedder_config);
         Arc::new(CoreContext {
             host_kind: HostKind::Cli,
             workspace_binding: RwLock::new(Arc::new(RwLock::new(WorkspaceBinding {
                 workspace_dir: Some(config.workspace_dir.clone()),
+                config_path: Some(config.config_path.clone()),
             }))),
             domains,
             tool_groups: Default::default(),
+            autonomy_tier_source: AutonomyTierSource::Captured,
+            autonomy_tier_ceiling: None,
             components: Default::default(),
             embedder_config: Some(config),
+            latest_embedder_config: Some(latest_embedder_config),
             user_skill_roots: true,
-            backend_transport: None,
+            extensions: Default::default(),
             turn_origin: None,
             channel_thread: None,
             session_agent: None,
             profile: None,
+            profile_admission: Arc::new(()),
             agent: Default::default(),
             bare: false,
         })
+    }
+
+    /// Test-only constructor for a normal-boot binding with its resolved config
+    /// path, without exposing an embedder config snapshot.
+    pub(crate) fn for_test_with_boot_config_path(
+        domains: crate::core::runtime::DomainSet,
+        workspace_dir: std::path::PathBuf,
+        config_path: std::path::PathBuf,
+    ) -> Arc<CoreContext> {
+        let mut ctx = Arc::try_unwrap(Self::for_test(domains, None)).ok().unwrap();
+        ctx.workspace_binding = RwLock::new(Arc::new(RwLock::new(WorkspaceBinding {
+            workspace_dir: Some(workspace_dir),
+            config_path: Some(config_path),
+        })));
+        Arc::new(ctx)
     }
 }

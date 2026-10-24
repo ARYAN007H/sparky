@@ -27,6 +27,9 @@ frontend:
   # job exists to check them, so a PR that touches only a spec has to
   # match this filter or the job skips and the check reads as green.
   - 'app/test/**'
+  # The skip policy checker is part of browser-test validation; changing it
+  # must also arm the frontend lane that invokes it.
+  - 'scripts/ci/check-browser-test-skips.mjs'
   - 'app/tsconfig*.json'
   - 'app/vite.config.*'
   - 'app/tailwind.config.*'
@@ -57,10 +60,13 @@ docs:
   - 'EMBED.md'
   - 'package.json'
 rust-core:
+  - '.config/nextest.toml'
   - '.github/workflows/ci-*.yml'
   - '.github/ci-paths-filter.yml'
   - 'scripts/ci/self-hosted/**'
   - 'scripts/ci/rust-coverage.sh'
+  - 'scripts/ci/nextest-coverage.sh'
+  - 'scripts/ci/nextest-report.mjs'
   # The product feature set decides what the Rust lanes below
   # actually compile (clippy's `--features`, the test suite's, and
   # rust-coverage.sh's). Changing it changes the code under
@@ -121,9 +127,12 @@ rust-core:
   - '.gitmodules'
   - 'vendor/**'
 rust-tauri:
+  - '.config/nextest.toml'
   - '.github/workflows/ci-*.yml'
   - '.github/ci-paths-filter.yml'
   - 'scripts/ci/self-hosted/**'
+  - 'scripts/ci/nextest-coverage.sh'
+  - 'scripts/ci/nextest-report.mjs'
   - 'Cargo.lock'
   - '.cargo/config.toml'
   - 'rust-toolchain.toml'
@@ -139,11 +148,21 @@ rust-tauri:
 # own socket-auth tests never ran in CI) — arm the scripts
 # self-test job on any mock/script change.
 scripts:
+  - 'scripts/ci/rust-coverage.sh'
+  - 'scripts/ci/fetch-submodule-tags.sh'
+  - '.config/nextest.toml'
   - '.github/workflows/ci-*.yml'
   - '.github/ci-paths-filter.yml'
   - 'scripts/ci/self-hosted/**'
+  - 'scripts/ci/nextest-coverage.sh'
+  - 'scripts/ci/nextest-report.mjs'
   - 'scripts/ci/check-module-boundaries.mjs'
+  - 'scripts/ci/check-browser-test-skips.mjs'
   - 'scripts/ci/module-boundaries.json'
+  - 'scripts/ci/check-storage-bypass.mjs'
+  - 'scripts/ci/storage-bypass-debt.mjs'
+  - 'scripts/ci/storage-bypass*.json'
+  - 'scripts/ci/storage-bypass*.md'
   - 'scripts/ci/check-process-statics.mjs'
   - 'scripts/ci/check-ci-module-source.mjs'
   - 'scripts/ci/check-crate-chain.mjs'
@@ -171,6 +190,10 @@ scripts:
   - 'app/scripts/e2e-ports.sh'
   - 'app/scripts/e2e-web-build.sh'
   - 'app/scripts/e2e-web-session.sh'
+  # The native E2E runners, whose schedule and shard lists
+  # scripts/__tests__/e2e-run-shards.test.mjs cross-checks.
+  - 'app/scripts/e2e-run-all-flows.sh'
+  - 'app/scripts/e2e-run-shards.sh'
   # Shared logic behind the gate CLIs, and the module-pin gate's own
   # files. Without these a change to the checking logic would skip
   # the lane that tests it — the gate would stop watching itself.
@@ -189,12 +212,11 @@ scripts:
   - 'app/scripts/e2e-web-session.sh'
   - 'app/vite.config.*'
   # The storage-target parity test in self-hosted-lanes.test.mjs checks that
-  # every registered `tests/storage_*_e2e.rs` target is in the storage lane
-  # and the MongoDB workflow; adding a target must run it.
+  # every registered `tests/storage_*_e2e.rs` target is in the storage lane;
+  # adding a target must run it.
   - 'tests/storage_*.rs'
   - 'tests/cli_storage_url_e2e.rs'
   - 'crates/openhuman-cli/Cargo.toml'
-  - '.github/workflows/storage-mongodb.yml'
 # Test-wiring surface: a change here can orphan a test or add an
 # untested controller domain → run the inventory guard.
 inventory:
@@ -219,16 +241,18 @@ install_ps1:
   - 'scripts/ci/self-hosted/**'
   - 'scripts/install.ps1'
   - 'scripts/tests/OpenHumanWindowsInstall.Tests.ps1'
-# The storage ports and the domains that sit on them (storage-sqlite /
-# storage-file lane in the lane plan; the MongoDB lane has its own workflow,
-# storage-mongodb.yml, with the same paths). The vendor tree is covered whole,
+# The storage ports and the domains that sit on them (the host runs on SQLite;
+# per-driver conformance, MongoDB included, runs in tinystoragedrivers' own
+# CI). The vendor tree is covered whole,
 # like `rust-core`: the ports and drivers are vendored, and a pointer bump
 # anywhere can change what the driver features compile.
 storage:
+  - '.config/nextest.toml'
   - '.github/workflows/ci-*.yml'
-  - '.github/workflows/storage-mongodb.yml'
   - '.github/ci-paths-filter.yml'
   - 'scripts/ci/self-hosted/**'
+  - 'scripts/ci/nextest-coverage.sh'
+  - 'scripts/ci/nextest-report.mjs'
   - 'scripts/ci/checkout-submodules.sh'
   - 'scripts/ci-cancel-aware.sh'
   - 'build.rs'
@@ -259,7 +283,7 @@ storage:
   - 'crates/openhuman-*/Cargo.toml'
   - 'tests/storage_*.rs'
   - 'tests/cli_storage_url_e2e.rs'
-  - 'tests/support/storage_drivers.rs'
+  - 'tests/support/storage_case.rs'
   - '.cargo/config.toml'
   - 'rust-toolchain.toml'
   - '.gitmodules'

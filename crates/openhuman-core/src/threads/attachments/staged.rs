@@ -271,18 +271,14 @@ pub(crate) async fn stage_queued_parts(
         .load_config()
         .await
         .map_err(|error| format!("queued attachment configuration unavailable: {error}"))?;
-    let workspace = crate::agent::attachments::thread_action_dir(
-        ctx,
-        &config,
-        &config.workspace_dir,
-        Some(thread_id),
-    )
-    .await
-    .map_err(|error| format!("queued attachment workspace unavailable: {error}"))?;
+    let workspace =
+        crate::attachments::thread_action_dir(ctx, &config, &config.workspace_dir, Some(thread_id))
+            .await
+            .map_err(|error| format!("queued attachment workspace unavailable: {error}"))?;
     let origin = ctx.turn_origin_or_scoped();
-    let folded = crate::agent::attachments::parts::fold_into_message("", input)
+    let folded = crate::attachments::parts::fold_into_message("", input)
         .map_err(|error| error.to_string())?;
-    let staged = crate::agent::attachments::stage_turn(
+    let staged = crate::attachments::stage_turn(
         &folded,
         Some(&config),
         Some(&tinytools::WorkspaceDescriptor::new(workspace)),
@@ -291,7 +287,7 @@ pub(crate) async fn stage_queued_parts(
     )
     .await
     .map_err(|error| format!("stage queued attachments: {error}"))?;
-    let (_, files) = crate::agent::attachments::parse(&staged);
+    let (_, files) = crate::attachments::parse(&staged);
     let entries = from_staged_parts(input, &files)?;
     let tenant = tenant_for(ctx)?;
     let repo = staged_repo(ctx, &config.workspace_dir)?;
@@ -334,14 +330,10 @@ pub(super) async fn validate_staged_files(
     config: &crate::config::Config,
     entries: &[StoredAttachment],
 ) -> Result<(), String> {
-    let workspace = crate::agent::attachments::thread_action_dir(
-        ctx,
-        config,
-        &config.workspace_dir,
-        Some(thread_id),
-    )
-    .await
-    .map_err(|error| format!("staged attachment workspace unavailable: {error}"))?;
+    let workspace =
+        crate::attachments::thread_action_dir(ctx, config, &config.workspace_dir, Some(thread_id))
+            .await
+            .map_err(|error| format!("staged attachment workspace unavailable: {error}"))?;
     let image_count = entries
         .iter()
         .filter(|entry| matches!(entry.part, ContentPart::Image { .. }))
@@ -356,13 +348,13 @@ pub(super) async fn validate_staged_files(
         return Err("staged attachment count exceeds configured limit".into());
     }
     for entry in entries {
-        let scope = crate::agent::attachments::AttachmentAccessScope {
+        let scope = crate::attachments::AttachmentAccessScope {
             external_channel: false,
             workspace: Some(workspace.clone()),
             thread_id: Some(thread_id.to_owned()),
             ..Default::default()
         };
-        let path = crate::agent::attachments::resolve_path(config, &entry.path, &scope)
+        let path = crate::attachments::resolve_path(config, &entry.path, &scope)
             .await
             .map_err(|error| format!("staged attachment is unavailable: {error}"))?;
         let metadata = tokio::fs::metadata(path)
@@ -406,14 +398,10 @@ pub(super) async fn discard_staged_entries(
     config: &crate::config::Config,
     entries: Vec<StoredAttachment>,
 ) -> Result<(), String> {
-    let workspace = crate::agent::attachments::thread_action_dir(
-        ctx,
-        config,
-        &config.workspace_dir,
-        Some(thread_id),
-    )
-    .await
-    .map_err(|error| format!("staged attachment workspace unavailable: {error}"))?;
+    let workspace =
+        crate::attachments::thread_action_dir(ctx, config, &config.workspace_dir, Some(thread_id))
+            .await
+            .map_err(|error| format!("staged attachment workspace unavailable: {error}"))?;
     let tenant = tenant_for(ctx)?;
     let repo = staged_repo(ctx, &config.workspace_dir)?;
     for entry in entries {
@@ -432,13 +420,13 @@ pub(super) async fn discard_staged_entries(
         if !cancel_staged_record(&repo, &tenant, thread_id, &id, &entry.part, &cancellation)? {
             continue;
         }
-        let scope = crate::agent::attachments::AttachmentAccessScope {
+        let scope = crate::attachments::AttachmentAccessScope {
             external_channel: false,
             workspace: Some(workspace.clone()),
             thread_id: Some(thread_id.to_owned()),
             ..Default::default()
         };
-        let path = crate::agent::attachments::resolve_path(config, &entry.path, &scope)
+        let path = crate::attachments::resolve_path(config, &entry.path, &scope)
             .await
             .map_err(|error| format!("staged attachment cleanup refused: {error}"))?;
         match tokio::fs::remove_file(path).await {

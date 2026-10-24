@@ -3,13 +3,9 @@ use crate::config::{BrowserConfig, Config};
 use crate::security::credentials::{AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME};
 use crate::security::AuditLogger;
 use crate::tools::ops::{all_tools, tool_group};
-use std::collections::HashMap;
 use tempfile::TempDir;
 use tinytools::ToolContent;
 use tinytools::ToolResult;
-
-#[path = "../integrations/test_support.rs"]
-mod integration_test_support;
 
 fn test_config(tmp: &TempDir) -> Config {
     Config {
@@ -73,7 +69,6 @@ fn integration_tools_for_config(tmp: &TempDir, cfg: &Config) -> Vec<Box<dyn Tool
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         cfg,
     )
 }
@@ -113,7 +108,6 @@ fn expansion_tools_for(tmp: &TempDir) -> Vec<Box<dyn Tool>> {
         &browser,
         &http,
         tmp.path(),
-        &HashMap::new(),
         &cfg,
     )
 }
@@ -312,7 +306,7 @@ const DESKTOP_ALWAYS_ON: &[&str] = &[
 const REPRESENTATIVE: &[(&str, crate::core::all::DomainGroup)] = {
     use crate::core::all::DomainGroup as G;
     &[
-        ("delegate", G::Agent),
+        ("spawn_subagent", G::Agent),
         ("memory", G::Memory),
         ("goal_get", G::Threads),
         ("mcp_list_servers", G::Mcp),

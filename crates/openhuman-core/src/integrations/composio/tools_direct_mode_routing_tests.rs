@@ -48,6 +48,7 @@ fn execute_tool_resolves_to_backend_kind_when_mode_is_backend() {
     // the user is on default (mode = "backend") and a session token is
     // present. Without the token, `resolve_composio_route` returns
     // Err("no backend session"); store one to get past that gate.
+    crate::integrations::composio::test_backend_route::register();
     let tmp = tempfile::tempdir().unwrap();
     let mut config = crate::config::Config::default();
     config.config_path = tmp.path().join("config.toml");
@@ -140,7 +141,14 @@ async fn execute_tool_per_call_factory_means_no_baked_client() {
     // `OPENHUMAN_WORKSPACE` at a tempdir, and persist the test's
     // `Config` to that tempdir's `config.toml` before invoking the tool.
     use crate::config::TEST_ENV_LOCK;
+    // The scope gate reads the user's scope preference from the connector
+    // module's storage and fails closed when it cannot; give it the memory
+    // backend a booted host has, so the gate answers and dispatch is reached.
+    let _module = crate::integrations::composio::module_client::module_guard().await;
     let _env_guard = TEST_ENV_LOCK.lock().await;
+    // The scope-preference read is served by the connector module out of the
+    // host's installed storage; hold the module with that storage in place.
+    let _module = crate::integrations::composio::module_client::module_guard().await;
 
     let tmp = tempfile::tempdir().unwrap();
     let _workspace_guard = EnvVarGuard::workspace_unlocked(tmp.path());

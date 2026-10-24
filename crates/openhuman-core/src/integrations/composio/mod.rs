@@ -38,6 +38,9 @@
 //! crate::core::events::DomainEvent::ComposioTriggerReceived
 
 pub mod action_tool;
+mod auth_probe;
+#[cfg(any(feature = "flows", test))]
+pub(crate) mod builder_tools;
 pub mod bus;
 pub mod catalog;
 pub mod client;
@@ -48,21 +51,27 @@ pub(crate) mod direct_auth;
 pub mod execute_dispatch;
 pub(crate) mod file_store;
 mod file_store_documents;
+pub(crate) mod flow_backend;
+pub mod flow_gate;
 pub(crate) use file_store_documents::migrate_legacy_state;
 pub mod googlecalendar_args;
 pub mod identity;
 pub mod identity_store;
 pub mod module_client;
 pub mod ops;
+pub mod orchestrator_actions;
 pub(crate) mod processing;
 pub mod schemas;
+#[cfg(test)]
+pub(crate) mod test_backend_route;
 pub mod tools;
 pub(crate) mod trigger_history;
 pub mod types;
 
-pub use crate::agent::prompts::types::ConnectedIntegration;
+pub use crate::agent::prompts::ConnectedIntegration;
 pub use crate::integrations::composio::contract::ProviderUserProfile;
 pub use action_tool::ComposioActionTool;
+pub(crate) use auth_probe::user_is_signed_in_to_composio;
 pub use bus::{
     register_composio_trigger_subscriber, ComposioConfigChangedSubscriber,
     ComposioConnectionCreatedSubscriber, ComposioTriggerSubscriber,
@@ -73,6 +82,7 @@ pub use ops::{
     fetch_connected_integrations_status, invalidate_connected_integrations_cache,
     FetchConnectedIntegrationsStatus,
 };
+pub(crate) use schemas::all_controller_entries as all_composio_controller_entries;
 pub use schemas::{
     all_controller_schemas as all_composio_controller_schemas,
     all_registered_controllers as all_composio_registered_controllers,

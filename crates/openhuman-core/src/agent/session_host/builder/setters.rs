@@ -13,6 +13,7 @@ impl SessionHostBuilder {
             turn_model_source: None,
             runtime_config: None,
             tools: None,
+            pack_registry_handle: None,
             synthesized_tools: None,
             visible_tool_names: None,
             withheld_tool_names: std::collections::HashSet::new(),
@@ -70,10 +71,10 @@ impl SessionHostBuilder {
         self
     }
 
-    /// Sets the AI provider as a **crate-native** turn-model source (Phase 3 P3-B):
-    /// `build`/`build_summarizer` construct crate `ChatModel`s from `(role, config)`
-    /// via `create_turn_chat_model` (managed → `OpenHumanBackendModel`, local/cloud →
-    /// crate `OpenAiModel`) instead of wrapping `provider` in `native model adapters.
+    /// Sets the AI provider as a **crate-native** turn-model source:
+    /// `build`/`build_summarizer` use TinyAgents' `TurnModelSet` to construct
+    /// the primary, workload routes, and summarizer through the host model factory,
+    /// rather than wrapping `provider` in generic model adapters.
     /// Used by the production session factory; the plain
     /// [`provider`](Self::provider) setter (Provider path) stays for tests that
     /// inject a mock they observe.
@@ -89,9 +90,27 @@ impl SessionHostBuilder {
         self
     }
 
+    pub(crate) fn turn_model_source(
+        mut self,
+        source: crate::agent::tinyagents::TurnModelSource,
+    ) -> Self {
+        self.turn_model_source = Some(source);
+        self
+    }
+
     /// Sets the available tools for the agent.
     pub fn tools(mut self, tools: Vec<Box<dyn Tool>>) -> Self {
         self.tools = Some(tools);
+        self
+    }
+
+    /// Retains the host-owned pack handle used by the session's `use_skill`
+    /// tool so registry refreshes can rebind its durable and synthesized views.
+    pub fn pack_registry_handle(
+        mut self,
+        handle: Option<tinyagents_harness_tools::skills::PackRegistryHandle>,
+    ) -> Self {
+        self.pack_registry_handle = handle;
         self
     }
 
@@ -164,10 +183,8 @@ impl SessionHostBuilder {
         self
     }
 
-    /// Sets the global context-management configuration. Threaded
-    /// into the [`ContextManager`] constructed in [`Self::build`]. If
-    /// not set the manager is constructed with
-    /// [`ContextConfig::default`].
+    /// Sets the context middleware configuration used by this session. If
+    /// unset, [`ContextConfig::default`] applies.
     pub fn context_config(mut self, context_config: ContextConfig) -> Self {
         self.context_config = Some(context_config);
         self
@@ -233,7 +250,7 @@ impl SessionHostBuilder {
     /// Sets the post-turn hooks to be executed after each turn.
     pub fn post_turn_hooks(
         mut self,
-        hooks: Vec<Arc<dyn crate::agent::hooks::PostTurnHook>>,
+        hooks: Vec<Arc<dyn tinyagents_harness::host::LearningSink>>,
     ) -> Self {
         self.post_turn_hooks = hooks;
         self
@@ -332,7 +349,7 @@ impl SessionHostBuilder {
     /// [`OpenHumanDefinitionRegistry::with_session_definition`]: crate::agent::tinyagents::host::OpenHumanDefinitionRegistry::with_session_definition
     pub fn agent_definition(
         mut self,
-        definition: Arc<crate::agent::harness::host_definition::AgentDefinition>,
+        definition: Arc<crate::agent_registry::host_definition::AgentDefinition>,
     ) -> Self {
         self.session_definition = Some(definition);
         self

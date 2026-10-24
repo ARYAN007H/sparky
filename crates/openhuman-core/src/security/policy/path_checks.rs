@@ -224,11 +224,11 @@ impl SecurityPolicy {
                         .unwrap_or(forbidden_expanded);
                     if canonical.starts_with(&forbidden_canonical) {
                         log::trace!(
-                        "[security:policy] path blocked: symlink resolves to forbidden tree (requested={}, resolved={}, forbidden={})",
-                        path,
-                        canonical.display(),
-                        forbidden_canonical.display()
-                    );
+                            "[security:policy] path blocked: symlink resolves to forbidden tree (requested={}, resolved={}, forbidden={})",
+                            path,
+                            canonical.display(),
+                            forbidden_canonical.display()
+                        );
                         return false;
                     }
                 }
@@ -568,6 +568,12 @@ impl SecurityPolicy {
                 return false;
             }
             let root_path = PathBuf::from(self.expand_tilde(&root.path));
+            // `Path::starts_with("")` is true for every path, and a relative
+            // root resolves against the process CWD: only an absolute root
+            // grants anything.
+            if !root_path.is_absolute() {
+                return false;
+            }
             let canonical_root = root_path
                 .canonicalize()
                 .unwrap_or_else(|_| root_path.clone());
@@ -678,35 +684,29 @@ impl SecurityPolicy {
             return false;
         }
 
-        let artifacts = match crate::agent::artifacts::store::list_artifacts(
-            &self.workspace_dir,
-            0,
-            usize::MAX,
-            None,
-        )
-        .await
-        {
-            Ok((artifacts, _)) => artifacts,
-            Err(error) => {
-                tracing::warn!(
-                    target: "security",
-                    %error,
-                    "[security] could not resolve a media artifact read"
-                );
-                return false;
-            }
-        };
+        let artifacts =
+            match crate::artifacts::store::list_artifacts(&self.workspace_dir, 0, usize::MAX, None)
+                .await
+            {
+                Ok((artifacts, _)) => artifacts,
+                Err(error) => {
+                    tracing::warn!(
+                        target: "security",
+                        %error,
+                        "[security] could not resolve a media artifact read"
+                    );
+                    return false;
+                }
+            };
 
         for meta in artifacts.iter().filter(|meta| {
             matches!(
                 &meta.kind,
-                crate::agent::artifacts::ArtifactKind::Image
-                    | crate::agent::artifacts::ArtifactKind::Video
-            ) && matches!(&meta.status, crate::agent::artifacts::ArtifactStatus::Ready)
+                crate::artifacts::ArtifactKind::Image | crate::artifacts::ArtifactKind::Video
+            ) && matches!(&meta.status, crate::artifacts::ArtifactStatus::Ready)
         }) {
             let Ok(ready_path) =
-                crate::agent::artifacts::resolve_ready_file_meta(&self.workspace_dir, &roots, meta)
-                    .await
+                crate::artifacts::resolve_ready_file_meta(&self.workspace_dir, &roots, meta).await
             else {
                 continue;
             };

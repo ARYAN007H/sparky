@@ -16,7 +16,6 @@ fn compaction_exempt_tools_contains_every_proposal_tool() {
 }
 
 #[tokio::test]
-#[ignore = "requires a built TinyJuice module"]
 async fn tool_output_tabulates_a_large_graph_for_a_non_exempt_tool() {
     // Sanity baseline proving this test's payload actually exercises real
     // tinyjuice tabulation (and isn't just below-threshold): a tool name
@@ -118,7 +117,7 @@ async fn tool_output_leaves_an_oversized_propose_workflow_byte_for_byte_intact()
     let mw = truncation_probe_mw();
     let payload = oversized_workflow_proposal_json(30);
     assert!(
-        payload.len() > DEFAULT_TOOL_RESULT_BUDGET_BYTES,
+        payload.len() > tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes,
         "test payload must exceed the shared byte budget to exercise step 4: {} bytes",
         payload.len()
     );

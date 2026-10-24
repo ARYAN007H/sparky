@@ -12,8 +12,10 @@ use tinytools::Tool;
 
 pub(crate) use tinychannels_bus::context::ChannelRouteSelection;
 #[cfg(test)]
-pub(crate) use tinychannels_bus::{CHANNEL_MESSAGE_TIMEOUT_SECS, MIN_CHANNEL_MESSAGE_TIMEOUT_SECS};
-pub(crate) use tinychannels_bus::{
+pub(crate) use tinychannels_bus::module_runtime::{
+    CHANNEL_MESSAGE_TIMEOUT_SECS, MIN_CHANNEL_MESSAGE_TIMEOUT_SECS,
+};
+pub(crate) use tinychannels_bus::module_runtime::{
     CHANNEL_TYPING_REFRESH_INTERVAL_SECS, DEFAULT_CHANNEL_INITIAL_BACKOFF_SECS,
     DEFAULT_CHANNEL_MAX_BACKOFF_SECS, MAX_CHANNEL_HISTORY,
 };
@@ -70,7 +72,6 @@ pub(crate) struct ChannelRuntimeContext {
     pub(crate) api_url: Option<String>,
     pub(crate) inference_url: Option<String>,
     pub(crate) reliability: Arc<crate::config::ReliabilityConfig>,
-    pub(crate) provider_runtime_options: crate::inference::provider::ProviderRuntimeOptions,
     pub(crate) workspace_dir: Arc<PathBuf>,
     pub(crate) message_timeout_secs: u64,
     pub(crate) multimodal: crate::config::MultimodalConfig,

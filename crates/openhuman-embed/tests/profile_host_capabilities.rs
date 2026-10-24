@@ -8,12 +8,14 @@ use std::time::Duration;
 
 use common::{
     chat_completion, chat_requests, runtime_without_master_key, tool_call_completion, tool_names,
-    PointedTransport,
+    PointedInference,
 };
 use openhuman_embed::memory::api::conformance::ReferenceEngine;
 use openhuman_embed::memory::api::{LearningKind, MemoryEngine, MemoryMeta, StoreItem};
 use openhuman_embed::profiles::ProfileCredentialKind;
-use openhuman_embed::seams::ToolHookDecision;
+use openhuman_embed::seams::{
+    OpenHumanRunContext, ToolHookContext, ToolHookDecision, ToolHookEvent,
+};
 use openhuman_embed::{
     HostTurnTools, PermissionLevel, ProfileRuntime, RelayMessage, SaasConfig, Tool, ToolResult,
     ToolScopeSpec,
@@ -107,7 +109,7 @@ impl Respond for CallTools {
             tool_call_completion("tenant_probe", r#"{"deny":true}"#)
         } else if common::last_user_message(&body).contains("unsafe fixture request") {
             let mut completion = tool_call_completion("shell", "{}");
-            completion["choices"][0]["message"]["tool_calls"] = json!(["shell", "delegate", "http_request", "run_workflow"].iter().enumerate().map(|(i, name)| json!({"id":format!("unsafe_{i}"),"type":"function","function":{"name":name,"arguments":"{}"}})).collect::<Vec<_>>());
+            completion["choices"][0]["message"]["tool_calls"] = json!(["shell", "spawn_subagent", "http_request", "run_workflow"].iter().enumerate().map(|(i, name)| json!({"id":format!("unsafe_{i}"),"type":"function","function":{"name":name,"arguments":"{}"}})).collect::<Vec<_>>());
             completion
         } else if has_tool_results
             || !tool_names(request)
@@ -188,7 +190,7 @@ async fn scenario() {
         .with_priority(10)
         .mount(&inference)
         .await;
-    PointedTransport::install(&inference.uri());
+    PointedInference::install(&inference.uri());
     let root = tempfile::tempdir().unwrap();
     let calls = Arc::new(Mutex::new(Vec::new()));
     let factory_calls = calls.clone();
@@ -212,7 +214,7 @@ async fn scenario() {
                     "tenant_probe",
                     "hidden",
                     "shell",
-                    "delegate",
+                    "spawn_subagent",
                     "curl",
                     "install_workflow_from_url",
                     "http_request",
@@ -234,7 +236,7 @@ async fn scenario() {
             "tenant_probe".into(),
             "memory".into(),
             "shell".into(),
-            "delegate".into(),
+            "spawn_subagent".into(),
             "curl".into(),
             "install_workflow_from_url".into(),
             "http_request".into(),
@@ -244,9 +246,9 @@ async fn scenario() {
         .can_use_tool(|context| {
             Box::pin(async move {
                 if context.arguments.get("deny").and_then(Value::as_bool) == Some(true) {
-                    ToolHookDecision::Deny("operator refused this call".into())
+                    ToolHookDecision::deny("operator refused this call")
                 } else {
-                    ToolHookDecision::Proceed
+                    ToolHookDecision::default()
                 }
             })
         })
@@ -375,7 +377,21 @@ async fn scenario() {
     assert_eq!(calls.lock().unwrap().len(), executions_before_denied_turn);
     // Persistent hooks fail closed if reused under a different profile or
     // after the owning lease is fenced, before the host callback is consulted.
-    let hook_context = serde_json::from_value(json!({"event":"PreToolUse", "call_id":"fixture", "tool_name":"tenant_probe", "arguments":{}, "success":null, "duration_ms":null})).unwrap();
+    let alice_run = OpenHumanRunContext::new().with_core(Some(handles[0].context().clone()));
+    let bob_run = OpenHumanRunContext::new().with_core(Some(handles[1].context().clone()));
+    let hook_context = |tool_name: &str| ToolHookContext {
+        event: ToolHookEvent::PreToolUse,
+        call_id: "fixture".to_owned(),
+        tool_name: tool_name.to_owned(),
+        arguments: json!({}),
+        success: None,
+        duration_ms: None,
+        output: None,
+        error: None,
+        session_id: Some("t1".to_owned()),
+        agent_id: None,
+        cwd: None,
+    };
     let alice_hook = handles[0]
         .context()
         .host_overrides()
@@ -384,31 +400,28 @@ async fn scenario() {
         .into_iter()
         .find(|hook| hook.name() == "profile.can_use_tool")
         .unwrap();
-    assert!(matches!(
-        handles[0]
-            .scope(alice_hook.before_tool_decision(&hook_context))
-            .await,
-        ToolHookDecision::Proceed
-    ));
+    assert!(handles[0]
+        .scope(alice_hook.before_tool_decision(&alice_run, &hook_context("tenant_probe")))
+        .await
+        .permission
+        .is_none());
     assert!(handles[1]
-        .scope(alice_hook.before_tool_decision(&hook_context))
+        .scope(alice_hook.before_tool_decision(&bob_run, &hook_context("tenant_probe")))
         .await
         .is_deny());
     for name in [
         "hidden",
         "shell",
-        "delegate",
+        "spawn_subagent",
         "curl",
         "http_request",
         "run_workflow",
         "delegate_to",
         "install_workflow_from_url",
     ] {
-        let mut denied = hook_context.clone();
-        denied.tool_name = name.to_owned();
         assert!(
             handles[0]
-                .scope(alice_hook.before_tool_decision(&denied))
+                .scope(alice_hook.before_tool_decision(&alice_run, &hook_context(name)))
                 .await
                 .is_deny(),
             "{name} must be refused even with a proceeding host callback"
@@ -434,7 +447,7 @@ async fn scenario() {
         .await;
     let closed_hook = no_callback.hook(handles[0].id(), alice_profile.lease_fence().clone());
     assert!(handles[0]
-        .scope(closed_hook.before_tool_decision(&hook_context))
+        .scope(closed_hook.before_tool_decision(&alice_run, &hook_context("tenant_probe")))
         .await
         .is_deny());
     // Closing really releases the old lease; reopening must install the same
@@ -525,12 +538,12 @@ async fn scenario() {
         .into_iter()
         .find(|hook| hook.name() == "profile.can_use_tool")
         .unwrap();
-    assert!(matches!(
-        handles[0]
-            .scope(alice_hook.before_tool_decision(&hook_context))
-            .await,
-        ToolHookDecision::Proceed
-    ));
+    let reopened_run = OpenHumanRunContext::new().with_core(Some(handles[0].context().clone()));
+    assert!(handles[0]
+        .scope(alice_hook.before_tool_decision(&reopened_run, &hook_context("tenant_probe")))
+        .await
+        .permission
+        .is_none());
     let requests = chat_requests(&inference).await;
     assert!(requests
         .iter()
@@ -668,7 +681,7 @@ async fn scenario() {
         "a latched profile must not resolve the shared engine"
     );
     assert!(handles[0]
-        .scope(alice_hook.before_tool_decision(&hook_context))
+        .scope(alice_hook.before_tool_decision(&reopened_run, &hook_context("tenant_probe")))
         .await
         .is_deny());
     runtime.shutdown().await;

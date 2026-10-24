@@ -199,7 +199,14 @@ impl Config {
                     );
                 }
             } else {
-                let corrupted_path = config_path.with_extension("toml.corrupted");
+                // Keep an earlier corrupted copy: `rename` would replace it.
+                let mut corrupted_path = config_path.with_extension("toml.corrupted");
+                if tokio::fs::try_exists(&corrupted_path).await.unwrap_or(true) {
+                    let ts = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_or(0, |d| d.as_secs());
+                    corrupted_path = config_path.with_extension(format!("toml.corrupted.{ts}"));
+                }
                 match fs::rename(&config_path, &corrupted_path).await {
                     Ok(()) => {
                         tracing::debug!(
@@ -307,10 +314,22 @@ pub(super) async fn save_recovered(
     config: &Config,
     source: &dyn super::source::ConfigSource,
 ) -> Result<()> {
-    config.save().await?;
-    if source.label() == "document" {
-        let file = super::source::FileConfigSource::new(&config.config_path);
-        Box::pin(config.save_to(&file)).await?;
+    let document_result = config.save().await;
+    if source.label() != "document" {
+        return document_result;
     }
-    Ok(())
+
+    // The corrupted primary file has already been moved aside. Restore its
+    // bootstrap tables even when this node loses the document CAS race; a
+    // later boot still needs the storage URL to reach the shared backend.
+    let file = super::source::FileConfigSource::new(&config.config_path);
+    let file_result = Box::pin(config.save_file_export(&file)).await;
+    match (document_result, file_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(document_error), Ok(())) => Err(document_error),
+        (Ok(()), Err(file_error)) => Err(file_error),
+        (Err(document_error), Err(file_error)) => Err(file_error.context(format!(
+            "document persistence also failed: {document_error:#}"
+        ))),
+    }
 }

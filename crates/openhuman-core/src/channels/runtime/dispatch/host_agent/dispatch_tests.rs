@@ -42,7 +42,6 @@ fn context(
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::inference::provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(config.workspace_dir.clone()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -97,7 +96,7 @@ struct Probe {
     name: &'static str,
     level: PermissionLevel,
     runs: Arc<AtomicUsize>,
-    origins: Arc<Mutex<Vec<Option<crate::agent::turn_origin::AgentTurnOrigin>>>>,
+    origins: Arc<Mutex<Vec<Option<crate::security::turn_origin::AgentTurnOrigin>>>>,
 }
 
 #[async_trait::async_trait]
@@ -128,7 +127,7 @@ struct OneHostAgent {
     config: Config,
     reads: Arc<AtomicUsize>,
     writes: Arc<AtomicUsize>,
-    origins: Arc<Mutex<Vec<Option<crate::agent::turn_origin::AgentTurnOrigin>>>>,
+    origins: Arc<Mutex<Vec<Option<crate::security::turn_origin::AgentTurnOrigin>>>>,
 }
 
 impl HostAgentResolver for OneHostAgent {
@@ -137,7 +136,7 @@ impl HostAgentResolver for OneHostAgent {
             return None;
         }
         let mut definition =
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
+            crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
                 .get("orchestrator")
                 .cloned()
                 .unwrap();
@@ -263,22 +262,34 @@ impl Drop for InstalledResolver {
     }
 }
 
-/// An agent turn is a deep future; run it the way hosts do, on workers with
-/// the documented stack.
-fn on_agent_runtime(test: impl std::future::Future<Output = ()> + Send + 'static) {
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_stack_size(crate::core::runtime::AGENT_WORKER_STACK_BYTES)
-        .build()
+/// An agent turn is a deep future; run it the way hosts do, on a worker with
+/// the documented stack. The future is built on that worker, so it may hold
+/// non-`Send` guards (the storage-slot lock) across awaits.
+fn on_agent_runtime<F, Fut>(make: F)
+where
+    F: FnOnce() -> Fut + Send + 'static,
+    Fut: std::future::Future<Output = ()>,
+{
+    std::thread::Builder::new()
+        .stack_size(crate::core::runtime::AGENT_WORKER_STACK_BYTES)
+        .spawn(move || {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_stack_size(crate::core::runtime::AGENT_WORKER_STACK_BYTES)
+                .build()
+                .unwrap()
+                .block_on(make())
+        })
         .unwrap()
-        .block_on(async { tokio::spawn(test).await.unwrap() });
+        .join()
+        .unwrap();
 }
 
 #[test]
 fn a_bound_channel_runs_its_host_agent_and_refuses_its_write_tool() {
     // The resolver slot is process-wide; hold it for the whole turn.
     let _slot = host_agents::tests::lock();
-    on_agent_runtime(bound_channel_runs_its_host_agent());
+    on_agent_runtime(bound_channel_runs_its_host_agent);
 }
 
 async fn bound_channel_runs_its_host_agent() {
@@ -289,7 +300,7 @@ async fn bound_channel_runs_its_host_agent() {
     let tmp = tempfile::tempdir().unwrap();
     // Every host boots the definition registry; a session's hosted authority
     // is built from it.
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .unwrap();
     let mut agent_config = config(&tmp, None);
     agent_config.default_model = Some("fixture".into());
@@ -369,7 +380,7 @@ async fn bound_channel_runs_its_host_agent() {
     assert!(
         matches!(
             origins.as_slice(),
-            [Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel { channel, .. })]
+            [Some(crate::security::turn_origin::AgentTurnOrigin::ExternalChannel { channel, .. })]
                 if channel == "telegram"
         ),
         "the read-only tool ran under the channel's origin: {origins:?}"
@@ -471,7 +482,7 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
     let _bus = crate::agent::bus::use_real_agent_handler().await;
     let _storage = crate::channels::module_fixture::install_memory_storage();
     crate::channels::module_fixture::client().await;
-    let timeout = tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS;
+    let timeout = tinychannels_bus::module_runtime::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS;
     let request_arrived = Arc::new(tokio::sync::Notify::new());
     let request_path = Arc::new(Mutex::new(None));
     let server = delayed_provider(
@@ -481,7 +492,7 @@ async fn native_host_agent_turn_enforces_the_configured_channel_deadline_inner()
     )
     .await;
     let tmp = tempfile::tempdir().unwrap();
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .unwrap();
     let mut agent_config = config(&tmp, None);
     agent_config.default_model = Some("fixture".into());

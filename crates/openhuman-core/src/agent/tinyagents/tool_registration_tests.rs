@@ -6,6 +6,44 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tinyagents_harness::runtime::AgentHarness;
 use tinytools::{Tool, ToolCallOptions, ToolResult};
 
+#[cfg(unix)]
+#[test]
+fn subagent_owner_scope_preserves_non_utf8_workspace_identity() {
+    use std::os::unix::ffi::OsStringExt;
+
+    let path_a = std::path::PathBuf::from(std::ffi::OsString::from_vec(vec![b'w', 0xff]));
+    let path_b = std::path::PathBuf::from(std::ffi::OsString::from_vec(vec![b'w', 0xfe]));
+    let owner_a = super::subagent_owner_key(&path_a, "parent", Some("thread"));
+    let owner_b = super::subagent_owner_key(&path_b, "parent", Some("thread"));
+
+    assert_ne!(owner_a, owner_b);
+}
+
+struct BlockingLiveContextTool {
+    started: tokio::sync::mpsc::Sender<()>,
+}
+
+#[async_trait]
+impl Tool for BlockingLiveContextTool {
+    fn name(&self) -> &str {
+        "memory"
+    }
+
+    fn description(&self) -> &str {
+        "Blocks until its parent turn is cancelled."
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        serde_json::json!({"type": "object"})
+    }
+
+    async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        let _ = self.started.send(()).await;
+        std::future::pending::<()>().await;
+        unreachable!("the live-parent cancellation must win")
+    }
+}
+
 /// Register the real goal tools on a fresh harness and return the candidate
 /// names handed on to the exposure layer.
 fn candidate_names(has_thread: bool) -> Vec<String> {
@@ -35,12 +73,58 @@ fn thread_less_turn_drops_goal_tools_from_the_exposure_candidates() {
 fn threaded_turn_keeps_goal_tools_as_exposure_candidates() {
     let candidates = candidate_names(true);
 
-    for name in ["goal_get", "goal_set", "goal_complete"] {
+    for name in ["goal_get", "goal_set", "goal_complete", "goal_resume"] {
         assert!(
             candidates.iter().any(|candidate| candidate == name),
             "{name} must stay a candidate on a threaded turn: {candidates:?}"
         );
     }
+}
+
+struct NamedTopologyTool(&'static str);
+
+#[async_trait]
+impl Tool for NamedTopologyTool {
+    fn name(&self) -> &str {
+        self.0
+    }
+
+    fn description(&self) -> &str {
+        "Topology projection test tool."
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        serde_json::json!({"type": "object"})
+    }
+
+    async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        Ok(ToolResult::success("ok"))
+    }
+}
+
+#[test]
+fn capability_diagnostics_omit_retired_graphs() {
+    let names = [
+        "agent_teams:member",
+        "delegation",
+        "workflow_runs:scheduler_preview",
+    ];
+    let tools: SharedToolSet = Arc::new(
+        names
+            .iter()
+            .map(|name| Box::new(NamedTopologyTool(name)) as Box<dyn Tool>)
+            .collect(),
+    );
+    let diagnostics = capability_diagnostics(&[], &[tools], &names.map(str::to_owned));
+
+    let reused_names: Vec<_> = diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.name.as_str())
+        .collect();
+    assert!(
+        reused_names.is_empty(),
+        "retired graph diagnostics: {reused_names:?}"
+    );
 }
 
 #[tokio::test]
@@ -73,6 +157,54 @@ async fn registered_memory_dispatch_enforces_one_budget_across_distinct_calls() 
     }
 }
 
+#[tokio::test]
+async fn memory_live_context_dispatch_cancels_with_parent_without_creating_a_child_job() {
+    use tinyagents_harness::context::RunConfig;
+    use tinyagents_harness::tool::ToolDispatch;
+
+    let (started_tx, mut started_rx) = tokio::sync::mpsc::channel(1);
+    let tool: Arc<dyn Tool> = Arc::new(BlockingLiveContextTool {
+        started: started_tx,
+    });
+    let dispatch = LiveToolContextDispatch::new(tool);
+    let cancellation = tinyagents_harness::CancellationToken::new();
+    let config = crate::config::Config::default();
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config,
+    );
+    let parent = OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_cancellation(cancellation.clone())
+        .into_tinyagents(RunConfig::new("memory-live-context-cancel"));
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    >(&parent.data.dispatch_ctx());
+    assert!(jobs.list().is_empty(), "fresh parent has no child jobs");
+
+    let execution = dispatch.execute(
+        &(),
+        tinyagents_harness::CallId::new("memory-cancel-call"),
+        serde_json::json!({}),
+        ToolCallOptions::default(),
+        &parent,
+    );
+    tokio::pin!(execution);
+    tokio::select! {
+        _ = started_rx.recv() => cancellation.cancel(),
+        result = &mut execution => panic!("blocking memory tool returned before cancellation: {result:?}"),
+    }
+    let result = execution
+        .await
+        .expect("parent cancellation returns a tool result");
+    assert!(result.is_error);
+    assert!(result.output().contains("cancelled"));
+    assert!(
+        jobs.list().is_empty(),
+        "memory remains a tool on the parent run"
+    );
+}
+
 struct OriginObservingTool(Arc<AtomicBool>);
 
 #[async_trait]
@@ -98,7 +230,7 @@ impl Tool for OriginObservingTool {
         self.0.store(
             matches!(
                 crate::core::runtime::CoreContext::current_turn_origin(),
-                Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
+                Some(crate::security::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
             ),
             Ordering::SeqCst,
         );
@@ -119,7 +251,7 @@ async fn shared_adapter_scopes_tool_execution_to_the_run_origin() {
     let adapter = shared_tool_adapter(tools, "origin_observer").unwrap();
     let mut host = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     host.origin = Some(
-        crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+        crate::security::turn_origin::AgentTurnOrigin::ExternalChannel {
             sender_name: None,
             channel: "test".into(),
             sender: None,

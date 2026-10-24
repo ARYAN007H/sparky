@@ -1,29 +1,22 @@
 use super::*;
+use crate::core::all::assert_schema_controller_parity;
 use crate::core::runtime::DispatchCtx;
 
 #[test]
-fn status_schema_shape() {
-    let schema = schemas("status");
-    assert_eq!(schema.namespace, "subsystems");
-    assert_eq!(schema.function, "status");
-    assert!(schema.inputs.is_empty());
-    assert_eq!(schema.outputs.len(), 1);
-    assert_eq!(schema.outputs[0].name, "subsystems");
-}
-
-#[test]
-fn schemas_and_controllers_line_up() {
-    let schemas = all_controller_schemas();
-    let controllers = all_registered_controllers();
-    assert_eq!(schemas.len(), controllers.len());
-    for (schema, controller) in schemas.iter().zip(controllers.iter()) {
-        assert_eq!(schema.namespace, controller.schema.namespace);
-        assert_eq!(schema.function, controller.schema.function);
-    }
+fn subsystem_catalog_matches_registered_controllers() {
+    crate::core::all::expect_schema_namespace(&all_controller_schemas(), "subsystems");
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "status",
+    );
 }
 
 #[tokio::test]
 async fn handler_returns_a_subsystems_array_containing_the_memory_slot() {
+    // The handler loads the process-default config, which reads the workspace
+    // environment other tests point at temp dirs under this lock.
+    let _env = crate::config::TEST_ENV_LOCK.lock().await;
     let value = handle_status(DispatchCtx::process_default(), Map::new())
         .await
         .expect("handler succeeds");

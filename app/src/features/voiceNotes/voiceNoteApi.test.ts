@@ -35,15 +35,26 @@ describe('voiceNoteApi', () => {
     expect(part).toEqual({
       kind: 'voice_note',
       voiceNote: {
+        codec: null,
         durationMs: 5000,
         waveform: [0.2, 0.8],
         pushToTalk: false,
+        transcript: null,
         media: {
           opaqueId: 'note-123',
           kind: 'audio',
           contentType: 'audio/wav',
           durationMs: 5000,
           sizeBytes: 3,
+          codec: null,
+          fileName: null,
+          height: null,
+          localCachePath: null,
+          path: null,
+          platformMessageId: null,
+          transcribed: false,
+          url: null,
+          width: null,
         },
       },
     });

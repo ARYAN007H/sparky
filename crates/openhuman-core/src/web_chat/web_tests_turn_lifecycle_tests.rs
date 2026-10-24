@@ -188,7 +188,7 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     // Root chat turns need the process's hosted definition catalogue. Other
     // tests may initialize it first, so the idempotent `OnceLock` initializer
     // is intentionally best-effort here.
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     use wiremock::{
         matchers::{method, path},
         Mock, MockServer, ResponseTemplate,

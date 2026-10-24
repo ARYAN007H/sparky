@@ -4,7 +4,7 @@ use crate::core::runtime::{CoreContext, DomainSet};
 
 fn trusted_turn(session_key: &str) -> Arc<super::super::turn_host::TrustedAgentTurn> {
     let definition =
-        crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
             .get("orchestrator")
             .cloned()
             .expect("built-in orchestrator definition");
@@ -19,7 +19,7 @@ fn trusted_turn(session_key: &str) -> Arc<super::super::turn_host::TrustedAgentT
         channel: "telegram".into(),
         session_key: session_key.into(),
         event_session_id: "event-scope".into(),
-        origin: crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+        origin: crate::security::turn_origin::AgentTurnOrigin::ExternalChannel {
             channel: "telegram".into(),
             sender: Some("sender-a".into()),
             sender_name: Some("Alice".into()),
@@ -45,7 +45,7 @@ fn trusted_turn(session_key: &str) -> Arc<super::super::turn_host::TrustedAgentT
 }
 
 fn marker(name: &str) -> String {
-    super::super::attachments::Attachment {
+    crate::attachments::Attachment {
         path: "uploads/thread/id/file.zip".into(),
         name: name.into(),
         mime: "application/zip".into(),
@@ -86,7 +86,7 @@ fn mixed_markers_keep_source_order() {
 
 #[test]
 fn invalid_durable_reference_stays_literal() {
-    let invalid = super::super::attachments::Attachment {
+    let invalid = crate::attachments::Attachment {
         path: "../escape.zip".into(),
         name: "escape.zip".into(),
         mime: "application/zip".into(),
@@ -133,7 +133,7 @@ fn requeued_placeholder_adopts_trusted_agent_and_channel_identity() {
     assert_eq!(adopted.channel, "telegram");
     assert!(matches!(
         &adopted.origin,
-        crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+        crate::security::turn_origin::AgentTurnOrigin::ExternalChannel {
             sender: Some(sender), ..
         } if sender == "sender-a"
     ));

@@ -330,27 +330,16 @@ impl ChannelHostCallbacks {
                 "voice media scope does not match configured account",
             ));
         }
-        let media = request
-            .media_reference
-            .filter(|media| {
-                media
-                    .opaque_id
-                    .as_deref()
-                    .is_some_and(|id| id.starts_with("tinychannels_media_v1_"))
-            })
-            .ok_or_else(|| {
-                tracing::debug!(
-                    reason = "opaque_reference",
-                    "scoped channel voice media rejected"
-                );
-                Error::failed("voice media has no durable scoped reference")
-            })?;
-        tracing::debug!("scoped channel voice media accepted");
-        Ok(tinychannels_bus::HostStoreVoiceMediaResult {
-            media,
-            // A local durable reference does not grant public-link access.
-            accessible_url: None,
-        })
+        // The TinyChannels module persists and serves voice media itself
+        // (`BeginMediaRead`); this callback is only a one-release compatibility
+        // seam for older modules, and the host holds no durable store for it.
+        tracing::debug!(
+            reason = "module_owned_media",
+            "scoped channel voice media store declined"
+        );
+        Err(Error::failed(
+            "voice media is stored by the channels module",
+        ))
     }
 
     async fn get_voice_reply_policy(
@@ -358,7 +347,7 @@ impl ChannelHostCallbacks {
         request: HostVoiceReplyPolicyRequest,
     ) -> Result<HostVoiceReplyPolicy> {
         Self::validate_callback_size(&request)?;
-        Ok(self.voice().reply_policy(&request.scope, &self.tenant))
+        Ok(self.voice().reply_policy(&request))
     }
 
     async fn publish_event(&self, publication: HostEventPublication) -> Result<()> {

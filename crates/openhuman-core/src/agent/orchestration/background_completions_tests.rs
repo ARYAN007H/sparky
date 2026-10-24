@@ -1,5 +1,6 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tinyagents_tasks::CompletionStatus;
 use tokio::sync::MutexGuard;
 
@@ -31,6 +32,17 @@ fn record(ws: &Path, session: &str, task: &str, summary: &str, thread: Option<&s
         summary,
         thread.map(str::to_owned),
     ));
+}
+
+fn record_admitted(ws: &Path, session: &str, task: &str, summary: &str, thread: &str) {
+    let target = CompletionTarget::new(
+        cx(),
+        ws.to_path_buf(),
+        session.to_owned(),
+        Some(thread.to_owned()),
+    )
+    .expect("the parent thread admits a new child");
+    futures::executor::block_on(target.completed(task, "researcher", summary.to_owned()));
 }
 
 fn pending_ids(ws: &Path, thread: &str) -> Vec<String> {
@@ -208,59 +220,6 @@ fn recovery_is_claimed_once_per_workspace() {
 }
 
 #[test]
-fn mark_collected_sweeps_the_queued_entry() {
-    let _guard = test_guard();
-    let ws = workspace();
-    let w = ws.path();
-    record(w, "sess-mc", "mc-sub-1", "collected", Some("thread-mc"));
-    record(w, "sess-mc", "mc-sub-2", "keep", Some("thread-mc"));
-
-    // The parent collected sub-1 inline, so it must not be delivered again;
-    // sub-2 (never waited on) survives for normal idle delivery.
-    assert!(mark_collected(w, "mc-sub-1"), "swept the queued entry");
-    assert_eq!(pending_ids(w, "thread-mc"), ["mc-sub-2"]);
-}
-
-#[test]
-fn record_after_mark_collected_is_dropped() {
-    let _guard = test_guard();
-    let ws = workspace();
-    let w = ws.path();
-    assert!(
-        !mark_collected(w, "mc-late"),
-        "nothing queued yet, nothing swept"
-    );
-    // A completion that records *after* (the wait-before-record order) is
-    // dropped rather than queued for a duplicate delivery turn.
-    record(
-        w,
-        "sess-mc-race",
-        "mc-late",
-        "stale",
-        Some("thread-mc-race"),
-    );
-    assert!(pending_ids(w, "thread-mc-race").is_empty());
-}
-
-#[test]
-fn mark_collected_is_task_scoped() {
-    let _guard = test_guard();
-    let ws = workspace();
-    let w = ws.path();
-    // Only the collected task is suppressed; an un-waited sibling still
-    // surfaces (the genuinely-later fire-and-forget feature is preserved).
-    mark_collected(w, "mc-scope-1");
-    record(
-        w,
-        "sess-mc-scope",
-        "mc-scope-2",
-        "later",
-        Some("thread-mc-scope"),
-    );
-    assert_eq!(pending_ids(w, "thread-mc-scope"), ["mc-scope-2"]);
-}
-
-#[test]
 fn record_failure_queues_a_framed_failure_for_delivery() {
     let _guard = test_guard();
     let ws = workspace();
@@ -279,30 +238,6 @@ fn record_failure_queues_a_framed_failure_for_delivery() {
     assert_eq!(pending[0].status, CompletionStatus::Failed);
     assert!(pending[0].result.text.starts_with("[SUBAGENT_FAILED]"));
     assert!(pending[0].result.text.contains("provider exploded"));
-}
-
-#[test]
-fn record_awaiting_input_queues_a_framed_needs_input_for_delivery() {
-    let _guard = test_guard();
-    let ws = workspace();
-    let w = ws.path();
-    futures::executor::block_on(record_awaiting_input(
-        &cx(),
-        w,
-        "sess-ask",
-        "sub-ask",
-        "researcher",
-        "which repo?",
-        true,
-        Some("thread-ask".into()),
-    ));
-    let pending = pending_for(w, "thread-ask");
-    assert_eq!(pending.len(), 1);
-    assert_eq!(
-        BackgroundAgentOutcome::of(&pending[0]),
-        BackgroundAgentOutcome::AwaitingInput
-    );
-    assert!(pending[0].result.text.contains("which repo?"));
 }
 
 #[test]
@@ -398,12 +333,12 @@ fn discard_pending_for_thread_blocks_late_results_until_the_next_turn() {
         pending_ids(w, "thread-stop-live").is_empty(),
         "the stopped generation's task ids stay tombstoned after the thread reopens"
     );
-    record(
+    record_admitted(
         w,
         "sess-stop",
         "sub-stop-new-turn",
         "next turn",
-        Some("thread-stop-live"),
+        "thread-stop-live",
     );
     assert_eq!(pending_ids(w, "thread-stop-live"), ["sub-stop-new-turn"]);
 }
@@ -425,12 +360,12 @@ fn a_stop_before_a_restart_is_lifted_by_the_first_new_spawn() {
         "thread-restart-stop",
         "sub-new"
     ));
-    record(
+    record_admitted(
         w,
         "sess-rs",
         "sub-new",
         "after restart",
-        Some("thread-restart-stop"),
+        "thread-restart-stop",
     );
     assert_eq!(
         pending_ids(w, "thread-restart-stop"),
@@ -459,10 +394,14 @@ fn undelivered_completions_are_found_again_after_a_restart() {
         Some("thread-boot-done"),
     );
     let router = router_for_workspace(w);
-    router
+    let claimed = router
         .claim_pending("thread-boot-done", usize::MAX)
         .unwrap();
-    router.mark_delivered(&["sub-2"]).unwrap();
+    let receipts: Vec<_> = claimed
+        .iter()
+        .map(|record| record.receipt().expect("claimed record has receipt"))
+        .collect();
+    router.mark_delivered(&receipts).unwrap();
     drop(router);
 
     forget_workspace_for_test(w);
@@ -532,19 +471,18 @@ fn clear_all_also_withdraws_a_completion_a_delivery_has_leased() {
     record(w, "sess-l", "sub-1", "x", Some("thread-leased"));
     let router = router_for_workspace(w);
     // A delivery claimed it: the record is leased but still pending in the store.
-    assert_eq!(
-        router
-            .claim_pending("thread-leased", usize::MAX)
-            .unwrap()
-            .len(),
-        1
-    );
+    let claimed = router.claim_pending("thread-leased", usize::MAX).unwrap();
+    assert_eq!(claimed.len(), 1);
+    let receipts: Vec<_> = claimed
+        .iter()
+        .map(|record| record.receipt().expect("claimed record has receipt"))
+        .collect();
 
     assert_eq!(clear_all(&cx(), w), 1);
 
     assert!(pending_ids(w, "thread-leased").is_empty());
     assert_eq!(
-        router.mark_delivered(&["sub-1"]).unwrap(),
+        router.mark_delivered(&receipts).unwrap(),
         0,
         "nothing left to settle"
     );
@@ -596,6 +534,43 @@ fn a_delete_marker_outlives_compaction() {
 }
 
 #[test]
+fn deleting_a_thread_with_only_compacted_completion_history_stays_durable() {
+    let _guard = test_guard();
+    let ws = workspace();
+    let w = ws.path();
+    record(
+        w,
+        "sess-cm-history",
+        "sub-1",
+        "x",
+        Some("thread-cm-history"),
+    );
+    let router = router_for_workspace(w);
+    let claimed = router
+        .claim_pending("thread-cm-history", usize::MAX)
+        .unwrap();
+    let receipts: Vec<_> = claimed
+        .iter()
+        .map(|record| record.receipt().expect("claimed record has receipt"))
+        .collect();
+    assert_eq!(router.mark_delivered(&receipts).unwrap(), 1);
+    router.compact(std::time::Duration::ZERO).unwrap();
+
+    // Simulate a restart before the delete request. The completion row is
+    // compacted, but the owner's parent lifecycle marker still records that
+    // this thread had background work.
+    forget_workspace_for_test(w);
+    assert_eq!(discard_for_thread(&cx(), w, "thread-cm-history"), 0);
+    forget_workspace_for_test(w);
+    assert!(mark_stopped_task_if_thread_stopped(
+        &cx(),
+        w,
+        "thread-cm-history",
+        "sub-late"
+    ));
+}
+
+#[test]
 fn deleting_a_thread_that_never_used_background_work_writes_nothing() {
     let _guard = test_guard();
     let ws = workspace();
@@ -632,60 +607,5 @@ fn a_completion_for_a_removed_workspace_does_not_recreate_it() {
     assert!(!gone.exists(), "the workspace directory is not recreated");
 }
 
-/// A store whose writes always fail, like a full disk.
-struct FullDisk(InMemoryCompletionStore);
-
-impl CompletionStore for FullDisk {
-    fn get(&self, task_id: &str) -> Option<CompletionRecord> {
-        self.0.get(task_id)
-    }
-    fn put(&self, _record: &CompletionRecord) -> tinyagents_harness::error::Result<()> {
-        Err(tinyagents_harness::error::TinyAgentsError::Graph(
-            "disk full".into(),
-        ))
-    }
-    fn list(&self, parent_key: Option<&str>) -> Vec<CompletionRecord> {
-        self.0.list(parent_key)
-    }
-}
-
-#[tokio::test]
-async fn a_store_that_keeps_failing_degrades_to_memory_instead_of_losing_the_result() {
-    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
-    let ws = workspace();
-    let w = ws.path();
-    install_store_for_test(w, Arc::new(FullDisk(InMemoryCompletionStore::new())));
-
-    record_completion(
-        &cx(),
-        w,
-        "sess-fd",
-        "sub-1",
-        "researcher",
-        "must not be lost",
-        Some("thread-fd".into()),
-    )
-    .await;
-
-    let pending = pending_for(w, "thread-fd");
-    assert_eq!(pending.len(), 1, "the result is held in memory");
-    assert_eq!(pending[0].result.text, "must not be lost");
-}
-
-#[tokio::test]
-async fn concurrent_degradation_installs_one_fallback() {
-    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
-    let ws = workspace();
-    let w = ws.path();
-    let failing = router_for_workspace(w);
-
-    // Two records saw the same failing router; both ask to degrade.
-    let first = degrade_to_memory(w, &failing);
-    let second = degrade_to_memory(w, &failing);
-
-    assert!(
-        Arc::ptr_eq(&first.router, &second.router),
-        "the second caller reuses the fallback the first installed"
-    );
-    assert!(Arc::ptr_eq(&entry_for(w).router, &first.router));
-}
+#[path = "background_completions_migration_tests.rs"]
+mod migration_tests;

@@ -22,7 +22,18 @@ mod keychain;
 mod lock;
 mod migration;
 mod persistence;
+mod readonly;
+pub(crate) use persistence::STORAGE_SECRET_NAME as PROFILES_SECRET_NAME;
 mod store_core;
+pub use readonly::ReadOnlyAuthProfileError;
+
+pub(crate) fn load_profile_read_only(
+    config: &crate::config::Config,
+    provider: &str,
+    profile_override: Option<&str>,
+) -> Result<Option<AuthProfile>, ReadOnlyAuthProfileError> {
+    readonly::load_profile(config, provider, profile_override)
+}
 
 const CURRENT_SCHEMA_VERSION: u32 = 1;
 
@@ -38,7 +49,7 @@ struct KeychainSecrets {
     #[serde(default)]
     pub id_token: Option<String>,
 }
-const PROFILES_FILENAME: &str = "auth-profiles.json";
+pub(crate) const PROFILES_FILENAME: &str = "auth-profiles.json";
 /// The auth-profiles file a store over `state_dir` keeps.
 pub(crate) fn profiles_file(state_dir: &Path) -> PathBuf {
     state_dir.join(PROFILES_FILENAME)
@@ -207,6 +218,11 @@ impl Default for AuthProfilesData {
 /// Prefix used for keychain entries that store auth profile secrets.
 /// Full key format (as handled by the keyring module): `"{user_id}:auth:{profile_id}"`.
 const KEYCHAIN_AUTH_PREFIX: &str = "auth:";
+
+/// The logical key used for an auth profile's secret payload.
+pub(crate) fn auth_profile_secret_key(profile_id: &str) -> String {
+    format!("{KEYCHAIN_AUTH_PREFIX}{profile_id}")
+}
 
 /// Derive a stable keychain user-id from a state directory path.
 ///
@@ -437,6 +453,12 @@ impl Drop for AuthProfileLockGuard {
             }
         }
     }
+}
+
+/// Whether `bytes` parse as the persisted profiles document (what a read from
+/// the storage backend requires).
+pub(crate) fn is_persisted_document(bytes: &[u8]) -> bool {
+    serde_json::from_slice::<PersistedAuthProfiles>(bytes).is_ok()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

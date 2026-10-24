@@ -167,15 +167,11 @@ pub(crate) async fn stage_native_channel_part(
         return Err("native attachment scope and bytes must be non-empty".into());
     }
     let mut staged_config = config.clone();
-    staged_config.action_dir = crate::agent::attachments::thread_action_dir(
-        ctx,
-        config,
-        &config.workspace_dir,
-        Some(thread_id),
-    )
-    .await
-    .map_err(|error| format!("native attachment workspace unavailable: {error}"))?;
-    let file = crate::agent::attachments::store_scoped_channel_media(
+    staged_config.action_dir =
+        crate::attachments::thread_action_dir(ctx, config, &config.workspace_dir, Some(thread_id))
+            .await
+            .map_err(|error| format!("native attachment workspace unavailable: {error}"))?;
+    let file = crate::attachments::store_scoped_channel_media(
         &staged_config,
         thread_id,
         name,
@@ -302,21 +298,17 @@ pub(crate) async fn read_authorized_native_attachment(
     let entries = vec![record.attachment.clone()];
     validate_staged_files(ctx, thread_id, config, &entries).await?;
     let entry = &record.attachment;
-    let workspace = crate::agent::attachments::thread_action_dir(
-        ctx,
-        config,
-        &config.workspace_dir,
-        Some(thread_id),
-    )
-    .await
-    .map_err(|_| "native attachment workspace is unavailable".to_owned())?;
-    let scope = crate::agent::attachments::AttachmentAccessScope {
+    let workspace =
+        crate::attachments::thread_action_dir(ctx, config, &config.workspace_dir, Some(thread_id))
+            .await
+            .map_err(|_| "native attachment workspace is unavailable".to_owned())?;
+    let scope = crate::attachments::AttachmentAccessScope {
         external_channel: false,
         workspace: Some(workspace.clone()),
         thread_id: Some(thread_id.to_owned()),
         ..Default::default()
     };
-    let path = crate::agent::attachments::resolve_path(config, &entry.path, &scope)
+    let path = crate::attachments::resolve_path(config, &entry.path, &scope)
         .await
         .map_err(|_| "native attachment workspace path is invalid".to_owned())?;
     let media =
@@ -354,7 +346,7 @@ pub(in crate::threads::attachments) async fn read_staged_file_bounded(
     root: &std::path::Path,
     limit: usize,
 ) -> Result<Vec<u8>, String> {
-    let file = crate::agent::attachments::provider::open::secure_open(path, root)
+    let file = crate::security::secure_open::secure_open(path, root)
         .map_err(|_| "native attachment bytes are unavailable".to_owned())?;
     let metadata = file
         .metadata()
