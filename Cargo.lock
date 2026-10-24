@@ -383,7 +383,7 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "parking_lot",
  "percent-encoding",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
  "x11rb",
 ]
 
@@ -2761,7 +2761,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3869,7 +3869,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.57.0",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -6931,7 +6931,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7579,7 +7579,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7663,7 +7663,7 @@ dependencies = [
  "security-framework 3.7.0",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -8801,10 +8801,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.5",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -10353,7 +10353,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "tinystoragedrivers-api",
  "tinystoragedrivers-blob",
@@ -10367,7 +10367,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-api"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -10380,7 +10380,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-blob"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -10399,7 +10399,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-bus"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -10409,7 +10409,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-busproxy"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -10426,7 +10426,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-connect"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "lapin",
  "mongodb",
@@ -10441,7 +10441,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-document"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "async-trait",
  "data-encoding",
@@ -10461,7 +10461,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-kv"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -10477,7 +10477,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-queue"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "async-trait",
  "data-encoding",
@@ -10494,7 +10494,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-secrets"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "async-trait",
  "atomicwrites",
@@ -10519,7 +10519,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-testkit"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -10539,7 +10539,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-types"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "serde",
  "serde_json",
