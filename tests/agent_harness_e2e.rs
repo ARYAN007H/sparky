@@ -1150,6 +1150,11 @@ async fn run_managed_capture_turn(
         "mock inference responses did not all complete successfully: {completed:?}"
     );
     drop(events);
+    // The process default context keeps its storage handles open on the profile
+    // the fixture deletes next, so purge the conversation (transcripts included)
+    // through the product instead of relying on the files going away.
+    let purge = post_json_rpc(&stack.rpc_base, 703, "openhuman.threads_purge", json!({})).await;
+    assert_no_jsonrpc_error(&purge, "threads_purge after the managed capture turn");
     stack.shutdown_and_wait().await;
     // The bare test router dispatches RPC under the process default context
     // that `boot_stack` initialized. Its cached web-chat agent outlives a router
