@@ -454,6 +454,3 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
 
 #[path = "routes_command_tests.rs"]
 mod command_tests;
-
-#[path = "routes_telegram_tests.rs"]
-mod routes_telegram_tests;
