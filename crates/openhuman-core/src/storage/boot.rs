@@ -4,6 +4,10 @@
 //! Collection declarations belong to each record owner. The host asks each
 //! linked crate for its declarations and prepares them on the shared local and
 //! cluster scopes; tenant scopes are prepared when their owner is created.
+//!
+//! Preparing a scope also runs the tinyagents graph and harness owner-local
+//! migrations (`migrate_owners`), which carry their v1 collection names and
+//! shapes forward. Both are idempotent, so a prepared scope re-runs nothing.
 
 use std::sync::Arc;
 
@@ -16,6 +20,8 @@ pub struct BootReport {
     pub scopes: usize,
     /// Collection declarations ensured across those scopes.
     pub collections: usize,
+    /// Owner migrations that failed (logged; the next boot retries them).
+    pub failures: usize,
 }
 
 /// Ensures each linked crate's collections in the host's shared scopes.
@@ -25,7 +31,9 @@ pub struct BootReport {
 ///
 /// # Errors
 /// Returns a collection validation, scope binding, or preparation error.
-/// Preparation is idempotent and may be retried on the next boot.
+/// Preparation is idempotent and may be retried on the next boot. A failed
+/// owner migration is logged and counted in [`BootReport::failures`] instead,
+/// so one scope's migration never stops the boot.
 pub async fn prepare_and_migrate(
     backend: &Arc<dyn StorageBackend>,
 ) -> Result<BootReport, StorageError> {
@@ -40,22 +48,33 @@ pub async fn prepare_and_migrate(
                 report.collections += 1;
             }
         }
+        if let Err(error) = migrate_owners(&storage, &scope).await {
+            tracing::warn!(
+                target: "openhuman::storage",
+                scope = scope.as_str(),
+                %error,
+                "[storage][boot] owner migration failed; retried at the next boot"
+            );
+            report.failures += 1;
+        }
         report.scopes += 1;
     }
     tracing::info!(
         target: "openhuman::storage",
         scopes = report.scopes,
         collections = report.collections,
+        failures = report.failures,
         "[storage][boot] owner collections prepared"
     );
     Ok(report)
 }
 
-/// Prepares a tenant or module scope before its owner starts writing there.
+/// Prepares a tenant or module scope before its owner starts writing there,
+/// including the graph and harness owner migrations (`migrate_owners`).
 ///
 /// # Errors
-/// Returns the first owner declaration or backend error.
-pub async fn prepare_scope(storage: &Storage) -> Result<usize, StorageError> {
+/// Returns the first owner declaration, migration or backend error.
+pub async fn prepare_scope(storage: &Storage, scope: &Scope) -> Result<usize, StorageError> {
     let owners = super::schema::collection_owners()?;
     let mut count = 0;
     for owner in &owners {
@@ -64,7 +83,46 @@ pub async fn prepare_scope(storage: &Storage) -> Result<usize, StorageError> {
             count += 1;
         }
     }
+    migrate_owners(storage, scope).await?;
     Ok(count)
+}
+
+/// Runs the tinyagents graph and harness owner-local migrations on `scope`:
+/// v1 checkpoints, leases, task cache, run status, journals, blobs and
+/// key-value stores move to their v2 names. Idempotent.
+async fn migrate_owners(storage: &Storage, scope: &Scope) -> Result<(), StorageError> {
+    let scoped = tinyagents_storage_kit::ScopedStorage::new(storage.clone(), scope.clone());
+    // Each owner migrates independently: a graph failure must not hold back
+    // the harness records. The first error is returned after both ran.
+    let graph = tinyagents_graph::storage::open_storage(scoped.clone()).await;
+    let harness = tinyagents_harness::storage::open_storage(scoped).await;
+    graph.and(harness).map(|_| ())
+}
+
+/// Runs the graph and harness owner migrations on `scope` again after an
+/// importer copied v1 records into it (the scope move). Their steps already
+/// finished on the then-empty scope when it was prepared, and a finished step
+/// is skipped, so the two owners' progress records are cleared first. The
+/// steps write absent-only, so re-running over migrated records changes
+/// nothing.
+///
+/// # Errors
+///
+/// The first storage error; the cleared steps re-run on the next preparation.
+pub async fn remigrate_owners(storage: &Storage, scope: &Scope) -> Result<(), StorageError> {
+    use tinyagents_storage_kit::{DocumentStoreExt, MIGRATIONS_COLLECTION};
+    use tinystoragedrivers::{CollectionSpec, Precondition, Query};
+    let docs = storage.documents();
+    docs.ensure_collection(&CollectionSpec::new(MIGRATIONS_COLLECTION))
+        .await?;
+    for progress in docs.query_all(MIGRATIONS_COLLECTION, &Query::all()).await? {
+        let owner = progress.doc.get("owner").and_then(|value| value.as_str());
+        if matches!(owner, Some("graph" | "harness")) {
+            docs.delete(MIGRATIONS_COLLECTION, &progress.id, Precondition::None)
+                .await?;
+        }
+    }
+    migrate_owners(storage, scope).await
 }
 
 #[cfg(test)]

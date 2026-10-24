@@ -223,6 +223,10 @@ fn tenant_scope_for(workspace_dir: &Path, what: &str) -> Option<(String, ScopedS
         }
     };
     let scope = session_scope(&key);
+    if let Err(error) = crate::storage::documents::prepare_once(&backend, &scope) {
+        log::warn!("[session_store] {what} scope not prepared agent={key}: {error}");
+        return None;
+    }
     match backend.for_scope(&scope) {
         Ok(scoped) => match tinyagents_storage_kit::Scope::new(scope.as_str()) {
             Ok(port_scope) => Some((key, ScopedStorage::new(scoped, port_scope))),
@@ -279,7 +283,12 @@ pub fn current_documents_for(workspace_dir: &Path) -> Option<Arc<dyn DocumentSto
             return None;
         }
     };
-    match backend.for_scope(&session_scope(&key)) {
+    let scope = session_scope(&key);
+    if let Err(error) = crate::storage::documents::prepare_once(&backend, &scope) {
+        log::warn!("[session_store] documents scope not prepared agent={key}: {error}");
+        return None;
+    }
+    match backend.for_scope(&scope) {
         Ok(scoped) => Some(Arc::clone(scoped.documents())),
         Err(error) => {
             log::warn!("[session_store] documents scope refused agent={key}: {error}");
@@ -306,7 +315,12 @@ pub fn status_store_for(
                 return None;
             }
         };
-        let scoped = match backend.for_scope(&session_scope(super::DEFAULT_AGENT)) {
+        let scope = session_scope(super::DEFAULT_AGENT);
+        if let Err(error) = crate::storage::documents::prepare_once(&backend, &scope) {
+            log::warn!("[session_store] local run-status scope not prepared: {error}");
+            return None;
+        }
+        let scoped = match backend.for_scope(&scope) {
             Ok(scoped) => scoped,
             Err(error) => {
                 log::warn!("[session_store] local run-status scope refused: {error}");

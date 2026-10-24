@@ -353,7 +353,11 @@ pub fn open_delegation_checkpointer(
     config: &Config,
 ) -> Result<Arc<dyn Checkpointer<DelegationState>>, String> {
     let scoped = crate::storage::local::open("delegation", &config.workspace_dir)
-        .and_then(|opened| opened.scoped())
+        .and_then(|opened| {
+            // Carries v1 `delegation_graph_*` checkpoints forward before the read.
+            crate::storage::documents::prepare_once(&opened.backend, &opened.scope)?;
+            opened.scoped()
+        })
         .map_err(|e| format!("open the storage for graph checkpoints: {e:#}"))?;
     Ok(Arc::new(
         tinyagents_graph::checkpoint::DriverCheckpointer::<DelegationState>::with_namespace(
