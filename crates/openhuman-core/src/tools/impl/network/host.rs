@@ -55,9 +55,12 @@ impl AsyncHtmlExtractor for TinyJuiceHtml {
     }
 
     async fn to_markdown(&self, html: &str) -> anyhow::Result<String> {
-        crate::inference::tokenjuice::extract_html(&DispatchCtx::from_weak(self.core.as_ref()), html.to_string())
-            .await
-            .map_err(anyhow::Error::msg)
+        crate::inference::tokenjuice::extract_html(
+            &DispatchCtx::from_weak(self.core.as_ref()),
+            html.to_string(),
+        )
+        .await
+        .map_err(anyhow::Error::msg)
     }
 }
 
@@ -247,7 +250,9 @@ pub fn web_fetch_tool(
         max_bytes,
         timeout_secs,
         http_limits(),
-        Arc::new(TinyJuiceHtml { core: ctx.downgrade() }),
+        Arc::new(TinyJuiceHtml {
+            core: ctx.downgrade(),
+        }),
     )
     // Opts into a caller-steered summary; see `tokenjuice::focus`.
     .with_schema_property(SUMMARY_FOCUS_ARG, summary_focus_property())

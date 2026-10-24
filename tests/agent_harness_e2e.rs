@@ -5420,7 +5420,23 @@ async fn cancelling_a_running_background_subagent_settles_it_inner() {
     )
     .await;
 
-    tokio::time::sleep(Duration::from_secs(5)).await; eprintln!("DBG {}", with_captured(|c| serde_json::to_string(&c.iter().map(|r| r.pointer("/body/messages").cloned()).collect::<Vec<_>>()).unwrap().chars().rev().take(3000).collect::<String>().chars().rev().collect::<String>()));
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    eprintln!(
+        "DBG {}",
+        with_captured(|c| serde_json::to_string(
+            &c.iter()
+                .map(|r| r.pointer("/body/messages").cloned())
+                .collect::<Vec<_>>()
+        )
+        .unwrap()
+        .chars()
+        .rev()
+        .take(3000)
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect::<String>())
+    );
     let spawned = wait_for_event(&mut events, "subagent_spawned", Duration::from_secs(120)).await;
     let task_id = spawned
         .get("skill_id")

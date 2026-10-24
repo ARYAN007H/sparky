@@ -118,7 +118,9 @@ impl OpenHumanPersistence {
         // The generic driver may run in a detached Tokio task. Storage reads
         // before execution and commits after execution must use the actor the
         // authenticated parent carried, even outside the executor's scope.
-        if let Some(core) = crate::core::runtime::DispatchCtx::from_weak(self.core.as_ref()).resolved() {
+        if let Some(core) =
+            crate::core::runtime::DispatchCtx::from_weak(self.core.as_ref()).resolved()
+        {
             crate::core::runtime::CoreContext::sync_scope(core, open)
         } else if crate::core::runtime::is_saas() {
             Err(SubagentError::Persistence(
