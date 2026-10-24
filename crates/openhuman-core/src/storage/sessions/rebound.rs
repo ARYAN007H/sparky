@@ -59,6 +59,12 @@ impl StoreRegistry {
         );
         live.len()
     }
+
+    fn release_profile(&self, profile: &str) {
+        for stores in self.live() {
+            stores.release_profile(profile);
+        }
+    }
 }
 
 /// The process's registry, the one [`ReboundSessionStores::new`] joins.
@@ -130,12 +136,23 @@ impl ReboundSessionStores {
             "[session_store] rebound to a new storage backend"
         );
     }
+
+    /// Drops cached session handles for a profile whose lease was released.
+    /// Handles already handed out remain tied to their original fence.
+    pub fn release_profile(&self, profile: &str) {
+        self.current().release_profile(profile);
+    }
 }
 
 /// Rebinds every live [`ReboundSessionStores`] of the process to `backend`;
 /// returns how many.
 pub fn rebind_all(backend: &Arc<dyn StorageBackend>) -> usize {
     PROCESS.rebind(backend)
+}
+
+/// Drops the cached provider for `profile` from every live process store.
+pub fn release_profile(profile: &str) {
+    PROCESS.release_profile(profile);
 }
 
 impl SessionStoreProvider for ReboundSessionStores {
