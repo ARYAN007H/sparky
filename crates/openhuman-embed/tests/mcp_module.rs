@@ -11,7 +11,7 @@
 
 mod common;
 
-use common::{offline_config, route, runtime, scripted_provider, stub_backend};
+use common::{offline_config, route, scripted_provider, stub_backend};
 use openhuman_core::config::schema::{ModuleOverride, ModuleSourceMode};
 use openhuman_embed::{
     Access, AgentSpec, McpServer, Runtime, RuntimeModule, ServiceSet, Workspace,
@@ -58,7 +58,11 @@ fn an_embedded_runtime_calls_a_tool_through_the_tinymcp_module() {
 
 fn scenario() {
     openhuman_embed::modules::register_linked("tinymcp", tinymcp::linked_module);
-    let rt = runtime();
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(openhuman_embed::process::AGENT_WORKER_STACK_BYTES)
+        .build()
+        .expect("tokio runtime");
     rt.block_on(async {
         let backend = stub_backend().await;
         let mcp = wiremock::MockServer::start().await;
@@ -92,7 +96,6 @@ fn scenario() {
                 RuntimeModule::Memory,
                 RuntimeModule::Mcp,
                 RuntimeModule::Skills,
-                RuntimeModule::Automation,
             ])
             .build()
             .await
