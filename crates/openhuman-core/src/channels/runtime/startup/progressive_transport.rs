@@ -226,7 +226,15 @@ fn receipt_matches_scope(
     receipt
         .channel
         .as_ref()
-        .is_some_and(|receipt_channel| channel.is_some_and(|channel| receipt_channel == channel))
+        .is_some_and(|receipt_channel| {
+            // Provider adapters stamp receipts with the provider id only; a
+            // receipt that names an account must name the scoped one.
+            channel.is_some_and(|channel| {
+                receipt_channel.id == channel.id
+                    && (receipt_channel.account_id.is_none()
+                        || receipt_channel.account_id == channel.account_id)
+            })
+        })
         && receipt
             .conversation
             .as_ref()
