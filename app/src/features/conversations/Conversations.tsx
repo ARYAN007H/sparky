@@ -1588,7 +1588,9 @@ const Conversations = ({
       });
       if (!ack.requestId) throw new Error('The core did not identify the queued follow-up');
       if (attachmentParts.length > 0 && ack.queuedAttachments.length === 0) {
-        throw new Error('The core did not return staged attachment references for the queued follow-up');
+        throw new Error(
+          'The core did not return staged attachment references for the queued follow-up'
+        );
       }
       // Only clear the composer once the backend has accepted the queue, so a
       // failed send leaves the user's draft + attachments intact to retry.

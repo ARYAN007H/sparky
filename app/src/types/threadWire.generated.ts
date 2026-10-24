@@ -33,16 +33,8 @@ export type ToolTimelineStatus = 'running' | 'success' | 'error';
  * inline "Agentic task insights" thoughts survive a settled turn / reload.
  */
 export type SubagentTranscriptItem =
-  | {
-      iteration?: number | null;
-      kind: 'thinking';
-      text: string;
-    }
-  | {
-      iteration?: number | null;
-      kind: 'text';
-      text: string;
-    }
+  | { iteration?: number | null; kind: 'thinking'; text: string }
+  | { iteration?: number | null; kind: 'text'; text: string }
   | {
       callId: string;
       detail?: string | null;
@@ -67,12 +59,7 @@ export type SubagentTranscriptItem =
  * the row's status/label live in exactly one place.
  */
 export type TranscriptItem =
-  | {
-      kind: 'narration';
-      round: number;
-      seq: number;
-      text: string;
-    }
+  | { kind: 'narration'; round: number; seq: number; text: string }
   | {
       endedAt?: number | null;
       kind: 'thinking';
@@ -81,12 +68,7 @@ export type TranscriptItem =
       startedAt?: number | null;
       text: string;
     }
-  | {
-      callId: string;
-      kind: 'toolCall';
-      round: number;
-      seq: number;
-    };
+  | { callId: string; kind: 'toolCall'; round: number; seq: number };
 /**
  * Provider-neutral ordered inbound content.
  */
@@ -99,12 +81,7 @@ export type ContentPart =
       markdownDialect?: string | null;
       text: string;
     }
-  | {
-      altText: string | null;
-      caption: string | null;
-      kind: 'image';
-      media: MediaReference;
-    }
+  | { altText: string | null; caption: string | null; kind: 'image'; media: MediaReference }
   | {
       caption: string | null;
       durationMs: number | null;
@@ -120,16 +97,8 @@ export type ContentPart =
       title: string | null;
       transcript: string | null;
     }
-  | {
-      caption: string | null;
-      fileName: string | null;
-      kind: 'file';
-      media: MediaReference;
-    }
-  | {
-      kind: 'voice_note';
-      voiceNote: VoiceNote;
-    }
+  | { caption: string | null; fileName: string | null; kind: 'file'; media: MediaReference }
+  | { kind: 'voice_note'; voiceNote: VoiceNote }
   | {
       altText: string | null;
       emoji: string | null;
@@ -154,10 +123,7 @@ export type ContentPart =
       organization: string | null;
       phoneNumbers: ContactMethod[];
     }
-  | {
-      kind: 'buttons';
-      rows: ButtonAction[][];
-    }
+  | { kind: 'buttons'; rows: ButtonAction[][] }
   | {
       closesAtUnixMs: number | null;
       kind: 'poll';
@@ -166,15 +132,8 @@ export type ContentPart =
       providerPollId: string | null;
       question: string;
     }
-  | {
-      blocks: any;
-      kind: 'presentation';
-    }
-  | {
-      data: any;
-      kind: 'native';
-      provider: string;
-    };
+  | { blocks: any; kind: 'presentation' }
+  | { data: any; kind: 'native'; provider: string };
 /**
  * Origin of voice transcript enrichment.
  */
@@ -253,9 +212,7 @@ export interface AgentRun {
   /**
    * Inline resumable checkpoint state, if small enough to store directly.
    */
-  checkpoint: {
-    [k: string]: any;
-  };
+  checkpoint: { [k: string]: any };
   /**
    * Filesystem path to a resumable checkpoint for this run, if persisted
    * out-of-band from `checkpoint`.
@@ -286,9 +243,7 @@ export interface AgentRun {
   /**
    * Arbitrary caller-supplied metadata.
    */
-  metadata: {
-    [k: string]: any;
-  };
+  metadata: { [k: string]: any };
   /**
    * The run that spawned this one, if any.
    */
@@ -591,9 +546,7 @@ export interface SubagentToolCall {
    * call row, and the frontend grafts it onto the matching transcript item
    * by `call_id` when it rehydrates.
    */
-  args?: {
-    [k: string]: any;
-  };
+  args?: { [k: string]: any };
   callId: string;
   /**
    * Server-computed contextual detail (e.g. the path / recipient).
@@ -645,9 +598,7 @@ export interface ConversationMessageRecord {
   attachments?: ContentPart[];
   content: string;
   createdAt: string;
-  extraMetadata: {
-    [k: string]: any;
-  };
+  extraMetadata: { [k: string]: any };
   id: string;
   sender: string;
   type: string;
@@ -777,9 +728,7 @@ export interface RunEvent {
   /**
    * Arbitrary event payload.
    */
-  payload: {
-    [k: string]: any;
-  };
+  payload: { [k: string]: any };
   runId: string;
   /**
    * Per-run monotonically increasing sequence number; the primary key

@@ -258,7 +258,6 @@ where
         Ok::<_, tinybus::module::ModuleCallError>(response)
     }
     .await;
-    eprintln!("DBG operation={:?}", operation.as_ref().map(|_| ()).map_err(|e| e.to_string()));
     let (reply, next_route, clear_history) = match operation {
         Ok(ChannelControlResult::Route {
             reply,

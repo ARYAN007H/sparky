@@ -105,9 +105,9 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
     vi.clearAllMocks();
     resetRuntimeState();
     vi.mocked(threadApi.appendMessage).mockImplementation(async (_tid, msg) => msg);
-    vi.mocked(threadApi.getThreadMessages).mockResolvedValue({
-      messages: [],
-    } as unknown as Awaited<ReturnType<typeof threadApi.getThreadMessages>>);
+    vi.mocked(threadApi.getThreadMessages).mockResolvedValue({ messages: [] } as unknown as Awaited<
+      ReturnType<typeof threadApi.getThreadMessages>
+    >);
     vi.mocked(threadApi.getThreads).mockResolvedValue({ threads: [], count: 0 });
     vi.mocked(threadApi.getTurnState).mockResolvedValue(null);
     vi.mocked(threadApi.listRuns).mockResolvedValue([]);
@@ -976,14 +976,7 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
         },
       ];
       const stagedParts = [
-        {
-          ...parts[0],
-          media: {
-            ...parts[0].media,
-            url: null,
-            opaqueId: 'opaque-upload',
-          },
-        },
+        { ...parts[0], media: { ...parts[0].media, url: null, opaqueId: 'opaque-upload' } },
       ];
       store.dispatch(
         pendingFollowupAdded({
@@ -1028,12 +1021,13 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
       });
       await waitFor(() => expect(threadApi.getThreadMessages).toHaveBeenCalledWith('t-upload'));
       expect(
-        vi.mocked(threadApi.appendMessage).mock.calls.some(([, message]) => message.sender === 'user')
+        vi
+          .mocked(threadApi.appendMessage)
+          .mock.calls.some(([, message]) => message.sender === 'user')
       ).toBe(false);
       const persisted = store
         .getState()
-        .thread.messagesByThreadId['t-upload']
-        .find(message => message.id === 'user:r-upload');
+        .thread.messagesByThreadId['t-upload'].find(message => message.id === 'user:r-upload');
       expect(persisted?.content).toBe('look');
       expect(JSON.stringify(persisted?.attachments)).toContain('opaque-upload');
       expect(JSON.stringify(persisted)).not.toMatch(/base64|\[(ATTACHMENT|IMAGE|FILE):/i);
@@ -1069,7 +1063,9 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
       });
       expect(store.getState().queue.pendingFollowupsByThread['t-fup']).toHaveLength(1);
       expect(
-        vi.mocked(threadApi.appendMessage).mock.calls.some(([, message]) => message.sender === 'user')
+        vi
+          .mocked(threadApi.appendMessage)
+          .mock.calls.some(([, message]) => message.sender === 'user')
       ).toBe(false);
 
       await act(async () => {
@@ -1114,7 +1110,9 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
         });
       });
 
-      expect(store.getState().queue.pendingFollowupsByThread['t-fup-failed-reload']).toHaveLength(1);
+      expect(store.getState().queue.pendingFollowupsByThread['t-fup-failed-reload']).toHaveLength(
+        1
+      );
     });
 
     it('stamps the assistant answer with the producing turn requestId on chat_done', async () => {

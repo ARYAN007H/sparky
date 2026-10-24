@@ -46,7 +46,6 @@ import {
 } from '../services/chatService';
 import { socketService } from '../services/socketService';
 import { store } from '../store';
-import { pendingFollowupCompleted } from '../store/queueSlice';
 import {
   appendSubagentStreamDelta,
   beginInferenceTurn,
@@ -94,6 +93,7 @@ import {
   upsertArtifactReadyForThread,
 } from '../store/chatRuntimeSlice';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { pendingFollowupCompleted } from '../store/queueSlice';
 import { setRunMode } from '../store/runModeSlice';
 import { selectSocketStatus } from '../store/socketSelectors';
 import { clearThreadGoal, setThreadGoal } from '../store/threadGoalSlice';

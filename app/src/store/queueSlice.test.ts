@@ -159,10 +159,7 @@ describe('queueSlice — chat runtime lifecycle', () => {
     expect(state.itemsByThread.t1).toBeUndefined();
     expect(state.pendingFollowupsByThread.t1).toHaveLength(1);
     expect(state.itemsByThread.t2).toBeDefined();
-    state = reducer(
-      state,
-      pendingFollowupCompleted({ threadId: 't1', requestId: 'm1' })
-    );
+    state = reducer(state, pendingFollowupCompleted({ threadId: 't1', requestId: 'm1' }));
     expect(state.pendingFollowupsByThread.t1).toBeUndefined();
   });
 

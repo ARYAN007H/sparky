@@ -1,5 +1,5 @@
-use super::*;
 use super::tests::find_agent_web_event;
+use super::*;
 use crate::web_chat::{QueueItemPayload, ScopedWebEvent, WebChannelEvent, WebEventContext};
 use tokio::sync::broadcast;
 

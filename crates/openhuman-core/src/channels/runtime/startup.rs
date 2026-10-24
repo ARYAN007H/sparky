@@ -94,7 +94,17 @@ impl ChannelHandle {
             Self::Module(channel) => channel.capabilities(),
             Self::Relay(_) => tinychannels_bus::ChannelCapabilities::unknown(),
             #[cfg(test)]
-            Self::Test(_channel) => tinychannels_bus::ChannelCapabilities::unknown(),
+            Self::Test(channel) => {
+                // A test channel stands in for a chat provider: the module only
+                // parses remote commands for channels that advertise them.
+                let mut capabilities = tinychannels_bus::ChannelCapabilities::unknown();
+                capabilities.remote_control = true;
+                capabilities.chat_approvals = true;
+                capabilities.history_key_ignores_thread =
+                    tinychannels_bus::provider_id(&channel.name) == "telegram";
+                capabilities.reactions = channel.supports_reactions;
+                capabilities
+            }
         }
     }
 

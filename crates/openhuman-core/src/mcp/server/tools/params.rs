@@ -224,8 +224,8 @@ async fn validate_tool_arguments(
             log::warn!("[mcp][params] argument validation unavailable: {error:?}");
             ToolCallError::Internal("MCP argument validation is unavailable".into())
         })?;
-    let client = crate::mcp::module_client::McpConfiguredClient::for_config(&config)
-        .map_err(|error| {
+    let client =
+        crate::mcp::module_client::McpConfiguredClient::for_config(&config).map_err(|error| {
             log::warn!("[mcp][params] argument validation unavailable: {error:?}");
             ToolCallError::Internal("MCP argument validation is unavailable".into())
         })?;

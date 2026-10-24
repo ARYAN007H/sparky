@@ -10,8 +10,7 @@ struct AmbientStorage {
 
 impl AmbientStorage {
     fn install() -> Self {
-        let fixture =
-            crate::storage::test_support::sqlite_backend().expect("SQLite test backend");
+        let fixture = crate::storage::test_support::sqlite_backend().expect("SQLite test backend");
         let guard = crate::storage::test_support::install_for_test(
             &fixture.url,
             std::sync::Arc::clone(&fixture.backend),
