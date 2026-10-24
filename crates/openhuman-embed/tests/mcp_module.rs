@@ -57,8 +57,8 @@ fn an_embedded_runtime_calls_a_tool_through_the_tinymcp_module() {
 }
 
 fn scenario() {
-    let rt = runtime();
     openhuman_embed::modules::register_linked("tinymcp", tinymcp::linked_module);
+    let rt = runtime();
     rt.block_on(async {
         let backend = stub_backend().await;
         let mcp = wiremock::MockServer::start().await;
@@ -125,7 +125,9 @@ fn scenario() {
                     .map(str::to_string)
             })
             .collect();
-        eprintln!("TinyMCP methods={methods:?}; tool results={results}");
+        if !methods.iter().any(|method| method == "tools/call") {
+            eprintln!("TinyMCP methods={methods:?}; tool results={results}");
+        }
         assert_eq!(reply.reply, "done");
         assert!(
             methods.iter().any(|m| m == "tools/call"),
