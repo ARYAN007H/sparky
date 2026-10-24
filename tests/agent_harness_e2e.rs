@@ -1957,7 +1957,9 @@ async fn delegated_clarification_flow_inner() {
         dump()
     );
     // Let the relay turn commit to the thread before the user replies.
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    eprintln!("DBG before-sleep reqs={}", with_captured(|c| c.len()));
+    tokio::time::sleep(Duration::from_secs(8)).await;
+    eprintln!("DBG after-sleep reqs={}", with_captured(|c| c.len()));
 
     // ── turn 2: the user's answer resumes the thread ──
     let request_id = send_web_chat(
