@@ -793,6 +793,10 @@ async fn mcp_clients_registry_settings_roundtrip() {
         json!({}),
     )
     .await;
+    if get1.get("error").is_some() {
+        let modules = post_json_rpc(&rpc_base, 9931, "openhuman.modules_list", json!({})).await;
+        eprintln!("modules.list after failure: {modules}");
+    }
     let get1_result = assert_no_jsonrpc_error(&get1, "registry_settings_get (initial)");
     let get1_body = peel_logs_envelope(get1_result);
     assert_eq!(get1_body.get("smithery_api_key_set"), Some(&json!(false)));
