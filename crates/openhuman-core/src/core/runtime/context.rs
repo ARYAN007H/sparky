@@ -268,6 +268,7 @@ impl CoreContext {
             }
         };
         let agent = self.agent.derive(&mut overlay, fresh_state);
+        let dbg_shares = !fresh_state && overlay.session_agent.is_none() && overlay.profile.is_none();
         config_access::record_context_config_overlay(self.profile(), parent_config, &mut overlay);
         overlay.config.runtime_state.context_snapshot = None;
         let latest_embedder_config = Some(Arc::new(std::sync::Mutex::new(overlay.config.clone())));
@@ -283,7 +284,7 @@ impl CoreContext {
         } else {
             Arc::new(())
         };
-        Arc::new(CoreContext {
+        let dbg_new = Arc::new(CoreContext {
             host_kind: self.host_kind,
             workspace_binding: RwLock::new(shared_binding),
             domains,
