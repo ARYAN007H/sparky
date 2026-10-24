@@ -38,7 +38,10 @@ impl CronChildModel {
     async fn wait_for_release(&self) {
         loop {
             let notified = self.child_release.notified();
-            if self.child_released.load(std::sync::atomic::Ordering::SeqCst) {
+            if self
+                .child_released
+                .load(std::sync::atomic::Ordering::SeqCst)
+            {
                 return;
             }
             notified.await;
