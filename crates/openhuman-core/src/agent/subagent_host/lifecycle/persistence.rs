@@ -370,7 +370,9 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<SubagentOutcome>, SubagentError> {
-        if let Some(outcome) = self.store()?.terminal_outcome(key)? {
+        let r = self.store()?.terminal_outcome(key);
+        eprintln!("DBGR load_terminal {key:?} -> {:?}", r.as_ref().map(|o| o.is_some()));
+        if let Some(outcome) = r? {
             return Ok(Some(outcome));
         }
         Ok(self.read_terminal_record(key)?.map(|record| record.outcome))
