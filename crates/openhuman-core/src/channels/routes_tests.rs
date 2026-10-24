@@ -410,7 +410,10 @@ async fn load_cached_model_preview_returns_empty_when_cache_json_is_invalid() {
     .unwrap();
 
     let response = module_route_help_response(tempdir.path(), "/model", Vec::new()).await;
-    assert!(response.contains("No cached model list found for `openai`"));
+    assert!(
+        response.contains("No cached model list found for `openai`"),
+        "{response}"
+    );
 }
 
 #[tokio::test]
