@@ -244,14 +244,14 @@ async fn a_detached_driver_uses_its_carried_actor_for_lifecycle_commits() {
     )
     .await
     .unwrap();
-    let res = tokio::time::timeout(std::time::Duration::from_secs(10), receiver.recv())
+    tokio::time::timeout(std::time::Duration::from_secs(10), receiver.recv())
         .await
         .unwrap()
+        .unwrap()
         .unwrap();
-    eprintln!("DBGA {res:?}");
-    for e in walkdir::WalkDir::new(workspace.path()) { eprintln!("DBGF {}", e.unwrap().path().display()); }
-    res.unwrap();
-    let alice_dispatch = CoreContext::scope(alice, async {
+    // The persistence holds its actor weakly, so both contexts stay owned here
+    // until the reads finish.
+    let alice_dispatch = CoreContext::scope(alice.clone(), async {
         crate::core::runtime::DispatchCtx::ambient()
     })
     .await;
@@ -265,11 +265,13 @@ async fn a_detached_driver_uses_its_carried_actor_for_lifecycle_commits() {
         .expect("detached lifecycle write committed in its carried actor scope");
     assert_eq!(durable.output, "detached actor result");
     let bob_dispatch =
-        CoreContext::scope(bob, async { crate::core::runtime::DispatchCtx::ambient() }).await;
+        CoreContext::scope(bob.clone(), async { crate::core::runtime::DispatchCtx::ambient() })
+            .await;
     let other = super::super::persistence::OpenHumanPersistence::new(checkpoints)
         .with_dispatch(bob_dispatch);
     assert!(other.load_terminal(&key).await.unwrap().is_none());
     drop(bundle);
+    drop((alice, bob));
 }
 
 async fn assert_legacy_terminal_fixture(format: &str) {

@@ -108,7 +108,6 @@ impl OpenHumanPersistence {
     ) -> Result<tinyagents_orchestration::subagent::DocumentSubagentPersistence, SubagentError>
     {
         let open = || {
-            eprintln!("DBGS terminal={terminal} scope={:?}", crate::storage::current_scope());
             let legacy = if terminal {
                 super::store::LifecycleStore::before_terminal(&self.checkpoint_dir)?
             } else {
@@ -371,9 +370,7 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<SubagentOutcome>, SubagentError> {
-        let r = self.store()?.terminal_outcome(key);
-        eprintln!("DBGR load_terminal {key:?} -> {:?}", r.as_ref().map(|o| o.is_some()));
-        if let Some(outcome) = r? {
+        if let Some(outcome) = self.store()?.terminal_outcome(key)? {
             return Ok(Some(outcome));
         }
         Ok(self.read_terminal_record(key)?.map(|record| record.outcome))
@@ -583,9 +580,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<SubagentOutcome>, SubagentError> {
-        let r = self.store()?.terminal_outcome(key);
-        eprintln!("DBGR2 load_terminal -> {:?}", r.as_ref().map(|o| o.is_some()));
-        if let Some(outcome) = r? {
+        if let Some(outcome) = self.store()?.terminal_outcome(key)? {
             return Ok(Some(outcome));
         }
         Ok(self.read_terminal_record(key)?.map(|record| record.outcome))
@@ -709,16 +704,13 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
                 serde_json::json!(host.elapsed.as_nanos().min(u64::MAX as u128) as u64),
             );
         }
-        eprintln!("DBGR record_terminal {key:?}");
         let disposition = tinyagents_orchestration::subagent::SubagentPersistence::record_terminal(
             &self.open_store(true)?,
             key,
             &durable_outcome,
             replaces,
         )
-        .await;
-        eprintln!("DBGR result {disposition:?}");
-        let disposition = disposition?;
+        .await?;
         let host_disposition = match disposition {
             SubagentTerminalPersistenceDisposition::Inserted => {
                 tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalInserted
