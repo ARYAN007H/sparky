@@ -1897,6 +1897,7 @@ fn delegated_clarification_flow() {
 
 async fn delegated_clarification_flow_inner() {
     let _lock = env_lock();
+    let _ = env_logger::Builder::from_env("RUST_LOG").is_test(false).try_init(); // DBGLOG
     serialize_children_after_parent(2);
     reset_script(vec![
         tool_call_completion(
