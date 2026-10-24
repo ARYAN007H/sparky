@@ -544,7 +544,7 @@ pub(super) fn build_artifacts_service_with_scope(
             workspace_dir,
             storage,
         )),
-        None => Arc::new(versioned_store(workspace_dir)),
+        None => Arc::new(UnavailableArtifactStore),
     };
     let file_store = storage
         .as_ref()
