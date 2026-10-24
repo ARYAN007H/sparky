@@ -160,7 +160,6 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 }
 
 #[tokio::test]
-#[ignore = "the linked tinychannels-module is given no storage backend here, so /new fails to persist the chat binding (host storage is unavailable); needs a storage fixture"]
 async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     let tempdir = tempfile::tempdir().unwrap();
     let ctx = runtime_context(tempdir.path().to_path_buf());
