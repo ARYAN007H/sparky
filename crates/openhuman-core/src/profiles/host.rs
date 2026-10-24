@@ -258,13 +258,31 @@ impl ProfileHost {
         {
             return Err(OpenError::NotProvisioned(id.clone()));
         }
-        let (closed, full) = {
+        let (closed, full, pinned) = {
             let mut open = self.lock();
             let closed = self.evict_locked(&mut open, Instant::now());
-            (closed, open.len() >= self.saas.max_profiles_open.max(1))
+            let pinned = open
+                .values()
+                .filter(|slot| in_use(slot))
+                .map(|slot| {
+                    (
+                        Arc::strong_count(&slot.state),
+                        Arc::strong_count(&slot.state.context),
+                        Arc::strong_count(&slot.state.context.agent.state),
+                    )
+                })
+                .collect::<Vec<_>>();
+            (
+                closed,
+                open.len() >= self.saas.max_profiles_open.max(1),
+                pinned,
+            )
         };
         profile_lease::release_all(self, closed).await;
         if full {
+            log::debug!(
+                "[profiles] no free profile slot; pinned strong counts (profile, context, agent_state)={pinned:?}"
+            );
             return Err(OpenError::Full {
                 max: self.saas.max_profiles_open,
             });
