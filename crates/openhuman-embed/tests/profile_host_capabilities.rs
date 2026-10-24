@@ -49,14 +49,25 @@ impl Tool for TenantTool {
         let thread = context
             .and_then(tinytools::ToolRunContext::thread_id)
             .expect("every hosted tool has its durable conversation key");
-        let expected = match openhuman_embed::current_turn_origin().unwrap() {
-            openhuman_embed::AgentTurnOrigin::WebChat { thread_id, .. } => thread_id,
+        match openhuman_embed::current_turn_origin().unwrap() {
+            openhuman_embed::AgentTurnOrigin::WebChat { thread_id, .. } => {
+                assert_eq!(thread, thread_id);
+            }
+            // A channel turn's durable conversation key is the tenant-scoped
+            // session key the channel module derived for the exact sender and
+            // conversation.
             openhuman_embed::AgentTurnOrigin::ExternalChannel { .. } => {
-                "channel:telegram/sender/chat".to_owned()
+                for segment in [
+                    "|namespace=p4:main|",
+                    "|channel=p8:telegram|",
+                    "|conversation=p4:chat|",
+                    "|participant=p6:sender",
+                ] {
+                    assert!(thread.contains(segment), "{segment} missing from {thread:?}");
+                }
             }
             other => panic!("unexpected origin {other:?}"),
-        };
-        assert_eq!(thread, expected);
+        }
         self.execute(args).await
     }
     async fn execute(&self, _: Value) -> anyhow::Result<ToolResult> {
