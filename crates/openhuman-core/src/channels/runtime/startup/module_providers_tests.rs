@@ -34,29 +34,6 @@ async fn prepared_module_handle_keeps_progressive_send_alive() {
         .mount(&server)
         .await;
     Mock::given(method("POST"))
-        .and(path("/bottoken/editMessageText"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-            "ok": true,
-            "result": {
-                "message_id": 991,
-                "date": 1,
-                "chat": { "id": 42, "type": "private" },
-                "text": "updated"
-            }
-        })))
-        .expect(1)
-        .mount(&server)
-        .await;
-    Mock::given(method("POST"))
-        .and(path("/bottoken/deleteMessage"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-            "ok": true,
-            "result": true
-        })))
-        .expect(1)
-        .mount(&server)
-        .await;
-    Mock::given(method("POST"))
         .and(path("/bottoken/sendMessage"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "ok": true,
@@ -167,9 +144,9 @@ async fn prepared_module_handle_keeps_progressive_send_alive() {
         other => panic!("expected typed delivery outcome, got {other:?}"),
     };
 
-    // Exercise the actual host adapter against the same compiled module object.
-    // These Edit/Delete callback operations must retain the module receipt scope
-    // and return the provider's real outcome through the bus contract.
+    // The module owns provider edits and deletes now (the `EditMessage` and
+    // `DeleteMessage` interactions are gone), so only the host's fail-closed
+    // receipt scope check is exercised here against the compiled module object.
     let adapter = ModuleChannel {
         name: "telegram".into(),
         object: runtime.lease.object().clone(),
@@ -191,34 +168,6 @@ async fn prepared_module_handle_keeps_progressive_send_alive() {
         id: "42".into(),
         ..Default::default()
     };
-    let edited = adapter
-        .dispatch_progressive(ProgressiveTransportRequest::Edit {
-            channel: "telegram".into(),
-            turn_id: Some("compiled-module-turn".into()),
-            channel_ref: Some(channel_ref.clone()),
-            conversation: Some(conversation.clone()),
-            message_id: "991".into(),
-            receipt: Some(receipt.clone()),
-            text: "updated".into(),
-        })
-        .await
-        .expect("scoped edit should cross the compiled module bus");
-    assert!(
-        matches!(&edited, ProgressiveTransportResult::Outcome(outcome) if outcome.error.is_none()),
-        "unexpected edit result: {edited:?}"
-    );
-    let deleted = adapter
-        .dispatch_progressive(ProgressiveTransportRequest::Delete {
-            channel: "telegram".into(),
-            turn_id: Some("compiled-module-turn".into()),
-            channel_ref: Some(channel_ref.clone()),
-            conversation: Some(conversation.clone()),
-            message_id: "991".into(),
-            receipt: Some(receipt.clone()),
-        })
-        .await
-        .expect("scoped delete should cross the compiled module bus");
-    assert!(matches!(deleted, ProgressiveTransportResult::Acknowledged));
     let mut wrong_scope = conversation.clone();
     wrong_scope.kind = tinychannels_bus::ConversationKind::Group;
     let rejected = adapter
@@ -242,22 +191,6 @@ async fn prepared_module_handle_keeps_progressive_send_alive() {
     let body: serde_json::Value = serde_json::from_slice(&send.body).expect("JSON request body");
     assert_eq!(body["chat_id"], "42");
     assert_eq!(body["text"], "nested callback delivery");
-    let edit = requests
-        .iter()
-        .find(|request| request.url.path() == "/bottoken/editMessageText")
-        .expect("one scoped Telegram editMessageText request");
-    let edit_body: serde_json::Value = serde_json::from_slice(&edit.body).expect("JSON edit body");
-    assert_eq!(edit_body["chat_id"], "42");
-    assert_eq!(edit_body["message_id"], 991);
-    assert_eq!(edit_body["text"], "updated");
-    let delete = requests
-        .iter()
-        .find(|request| request.url.path() == "/bottoken/deleteMessage")
-        .expect("one scoped Telegram deleteMessage request");
-    let delete_body: serde_json::Value =
-        serde_json::from_slice(&delete.body).expect("JSON delete body");
-    assert_eq!(delete_body["chat_id"], "42");
-    assert_eq!(delete_body["message_id"], 991);
     server.verify().await;
     runtime
         .close()
