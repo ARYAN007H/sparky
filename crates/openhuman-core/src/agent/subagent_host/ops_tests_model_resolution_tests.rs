@@ -76,6 +76,80 @@ async fn runner_rejects_spawn_beyond_max_depth() {
 }
 
 #[tokio::test]
+async fn a_team_depth_cap_below_the_product_limit_is_enforced() {
+    // Driven through `run_subagent`, so the runner's own gate must honour the
+    // team's cap (not the budget helper alone): a team capped at one level runs
+    // a child and refuses a grandchild before any provider dispatch, and a cap
+    // above the product limit cannot widen it.
+    use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
+    let def = make_def_named_tools(&[]);
+
+    let provider = ScriptedProvider::new(vec![text_response("ok")]);
+    let mut options = with_parent(
+        make_parent(provider.clone(), vec![]),
+        SubagentRunOptions::default(),
+    );
+    options.run_context.max_spawn_depth = Some(1);
+    let child = run_host_from_test_options(&def, "x", options).await;
+    assert!(
+        !matches!(child, Err(SubagentRunError::SpawnDepthExceeded { .. })),
+        "a one-level team must admit its child: {child:?}"
+    );
+    assert!(
+        !provider.captured.lock().is_empty(),
+        "the admitted child reaches the provider: {child:?}"
+    );
+
+    let provider = ScriptedProvider::new(vec![text_response("should not be called")]);
+    let mut options = with_parent(
+        make_parent(provider.clone(), vec![]),
+        SubagentRunOptions::default(),
+    );
+    options.run_context.max_spawn_depth = Some(1);
+    let grandchild = with_run_depth(
+        RunDepth {
+            depth: 1,
+            max_depth: MAX_SPAWN_DEPTH,
+        },
+        async { run_host_from_test_options(&def, "x", options).await },
+    )
+    .await;
+    assert!(
+        matches!(
+            grandchild,
+            Err(SubagentRunError::SpawnDepthExceeded {
+                attempted_depth: 2,
+                max_depth: 1
+            })
+        ),
+        "a grandchild of a one-level team is refused: {grandchild:?}"
+    );
+    assert!(
+        provider.captured.lock().is_empty(),
+        "the refused grandchild never reaches the provider"
+    );
+
+    let provider = ScriptedProvider::new(vec![text_response("should not be called")]);
+    let mut options = with_parent(
+        make_parent(provider.clone(), vec![]),
+        SubagentRunOptions::default(),
+    );
+    options.run_context.max_spawn_depth = Some(MAX_SPAWN_DEPTH + 3);
+    let beyond = with_run_depth(
+        RunDepth {
+            depth: MAX_SPAWN_DEPTH,
+            max_depth: MAX_SPAWN_DEPTH,
+        },
+        async { run_host_from_test_options(&def, "x", options).await },
+    )
+    .await;
+    let Err(SubagentRunError::SpawnDepthExceeded { max_depth, .. }) = &beyond else {
+        panic!("a cap above the product limit cannot widen it: {beyond:?}");
+    };
+    assert_eq!(*max_depth, MAX_SPAWN_DEPTH);
+}
+
+#[tokio::test]
 async fn typed_mode_model_override_pins_exact_model_for_spawn() {
     let provider = ScriptedProvider::new(vec![text_response("ok")]);
     let parent = make_parent(provider.clone(), vec![]);

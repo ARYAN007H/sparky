@@ -26,6 +26,37 @@ use tinyagents_tasks::{
 
 use super::*;
 
+/// Presents the host's storage backend as the storage-kit backend the
+/// completion store opens, as the core's own adapter does.
+struct KitBackend(Arc<dyn openhuman_core::storage::StorageBackend>);
+
+impl tinyagents_storage_kit::StorageBackend for KitBackend {
+    fn for_scope(
+        &self,
+        scope: &tinyagents_storage_kit::Scope,
+    ) -> tinyagents_storage_kit::error::Result<tinyagents_storage_kit::ScopedStorage> {
+        let host_scope = openhuman_core::storage::Scope::new(scope.as_str())?;
+        let storage = self.0.for_scope(&host_scope)?;
+        Ok(tinyagents_storage_kit::ScopedStorage::new(
+            storage,
+            scope.clone(),
+        ))
+    }
+
+    fn for_scope_conditioned(
+        &self,
+        scope: &tinyagents_storage_kit::Scope,
+        condition: &tinyagents_storage_kit::WriteCondition,
+    ) -> tinyagents_storage_kit::error::Result<tinyagents_storage_kit::ScopedStorage> {
+        let host_scope = openhuman_core::storage::Scope::new(scope.as_str())?;
+        let storage = self.0.for_scope_conditioned(&host_scope, condition)?;
+        Ok(tinyagents_storage_kit::ScopedStorage::new(
+            storage,
+            scope.clone(),
+        ))
+    }
+}
+
 const OWNER: &str = "ann";
 const OTHER: &str = "bob";
 const THREAD: &str = "shared-thread";
@@ -100,8 +131,11 @@ fn leave_undelivered_result(root: &std::path::Path, user: &str) {
     })
     .expect("open the profile's database");
     let scope = openhuman_core::storage::scope_for_profile(id.as_str());
-    let store: Arc<dyn CompletionStore> =
-        Arc::new(DriverCompletionStore::new(backend, scope).expect("open the completion queue"));
+    let scope = tinyagents_storage_kit::Scope::new(scope.as_str()).expect("the profile's scope");
+    let store: Arc<dyn CompletionStore> = Arc::new(
+        DriverCompletionStore::new(Arc::new(KitBackend(backend)), scope)
+            .expect("open the completion queue"),
+    );
     let record = CompletionRecord::new(
         "task-delivery-recovery-1",
         THREAD,

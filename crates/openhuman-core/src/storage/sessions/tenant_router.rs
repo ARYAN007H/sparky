@@ -113,8 +113,9 @@ impl TenantSessionStores {
             let scope = PortScope::new(owner_scope.as_str())?;
             let storage = backend.for_scope(&owner_scope)?;
             let prepare_storage = storage.clone();
+            let prepare_scope = scope.clone();
             super::super::block_on(async move {
-                crate::storage::boot::prepare_scope(&prepare_storage).await
+                crate::storage::boot::prepare_scope(&prepare_storage, &prepare_scope).await
             })?;
             Ok(ScopedStorage::new(storage, scope))
         });

@@ -27,7 +27,7 @@ pub struct WorkflowRunStarted {
     pub log_path: std::path::PathBuf,
 }
 
-/// Spawn a single autonomous workflow_run as a detached `tokio::spawn`. Used by
+/// Spawn a single autonomous workflow_run as a detached task acting for `ctx`. Used by
 /// both the `openhuman.skills_run` JSON-RPC controller and the `run_workflow`
 /// agent tool (which lets the orchestrator chain one skill into another —
 /// e.g. `github-issue-crusher` → `pr-review-shepherd` once the draft PR is
@@ -163,7 +163,8 @@ pub async fn spawn_workflow_run_background(
         let workspace = workspace.clone();
         let inherited_origin = inherited_origin.clone();
         let ctx = ctx.clone();
-        tokio::spawn(async move {
+        let dispatch = ctx.clone();
+        dispatch.spawn(async move {
             if let Err(e) = run_log::write_header(
                 &workspace,
                 &log_path,
@@ -232,11 +233,8 @@ pub async fn spawn_workflow_run_background(
             ));
             let (tx, rx) = tokio::sync::mpsc::channel(256);
             agent.set_on_progress(Some(tx));
-            let bridge = tokio::spawn(run_log::drain_to_log(
-                rx,
-                workspace.clone(),
-                log_path.clone(),
-            ));
+            let bridge =
+                run_log::spawn_drain_to_log(&ctx, rx, workspace.clone(), log_path.clone());
 
             // Register the cancellation token now (after the run can actually
             // start) so `skills_cancel` can stop it; a config/agent-build

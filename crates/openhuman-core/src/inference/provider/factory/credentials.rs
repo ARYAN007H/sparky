@@ -41,6 +41,10 @@ impl CredentialAccess {
     }
 }
 
+/// The read-only lookup's secret-free report that an OAuth token is due for
+/// a refresh it does not perform.
+pub(super) const OAUTH_REFRESH_REQUIRED: &str = "OpenAI OAuth credential requires refresh";
+
 pub(super) struct ReadOnlyCloudCredential {
     pub(super) key: String,
     pub(super) is_oauth: bool,
@@ -72,7 +76,7 @@ pub(super) fn lookup_key_for_slug_read_only(
                     expires_at <= chrono::Utc::now() + chrono::Duration::minutes(2)
                 })
             {
-                anyhow::bail!("OpenAI OAuth credential requires refresh");
+                anyhow::bail!("{OAUTH_REFRESH_REQUIRED}");
             }
             if !key.trim().is_empty() {
                 return Ok(ReadOnlyCloudCredential {
@@ -97,7 +101,7 @@ pub(super) fn lookup_key_for_slug_read_only(
                 if expires_at.is_some_and(|expires_at| {
                     expires_at <= chrono::Utc::now() + chrono::Duration::minutes(2)
                 }) {
-                    anyhow::bail!("OpenAI OAuth credential requires refresh");
+                    anyhow::bail!("{OAUTH_REFRESH_REQUIRED}");
                 }
                 return Ok(ReadOnlyCloudCredential {
                     key,

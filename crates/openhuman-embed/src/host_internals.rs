@@ -91,7 +91,9 @@ pub mod core {
         pub use openhuman_core::core::server_launcher::{install_server_launcher, ServeRequest};
     }
     pub mod session_expiry {
-        pub use openhuman_core::core::session_expiry::is_session_expired_error;
+        pub use openhuman_core::core::session_expiry::{
+            backend_status_means_session_expired, is_session_expired_error,
+        };
     }
     pub mod shutdown {
         pub use openhuman_core::core::shutdown::{register, signal};
@@ -508,7 +510,9 @@ pub mod storage {
     };
 
     /// The layout v1 -> v2 migration the host runs at boot when
-    /// `[storage] auto_migrate_layout` is set.
+    /// `[storage] auto_migrate_layout` is set. The core builds it only with
+    /// `legacy-import`.
+    #[cfg(feature = "legacy-import")]
     pub mod layout {
         pub use openhuman_core::storage::layout::auto_migrate;
     }

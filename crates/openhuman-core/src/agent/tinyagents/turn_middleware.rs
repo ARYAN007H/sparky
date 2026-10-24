@@ -233,23 +233,7 @@ pub(super) fn install_turn_middleware(
                     .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(route);
             },
         )
-        .with_pricing_lookup(|model| {
-            if crate::agent::cost::is_free_model(model) {
-                Some(tinyagents_harness::events::GenerationPricing {
-                    input_per_mtok_usd: Some(0.0),
-                    cached_input_per_mtok_usd: Some(0.0),
-                    output_per_mtok_usd: Some(0.0),
-                })
-            } else {
-                tinyagents_registry::pricing::lookup(model).map(|price| {
-                    tinyagents_harness::events::GenerationPricing {
-                        input_per_mtok_usd: Some(price.input_per_mtok_usd),
-                        cached_input_per_mtok_usd: Some(price.cached_input_per_mtok_usd),
-                        output_per_mtok_usd: Some(price.output_per_mtok_usd),
-                    }
-                })
-            }
-        }),
+        .with_pricing_lookup(generation_pricing),
     ));
 
     // Per-call capability gate (issue #4249, Workstream 02.1): when the turn has
@@ -720,6 +704,26 @@ fn record_stop_summary(summary: &HaltSummarySlot, iteration: u32, reason: &str) 
         .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(format!(
         "Stopping after {iteration} model call(s): {reason}"
     ));
+}
+
+/// The per-token pricing a resolved route's generation is enriched with: a
+/// free model is priced at zero, a catalogued one at its list price, and an
+/// unknown one is left unpriced.
+fn generation_pricing(model: &str) -> Option<tinyagents_harness::events::GenerationPricing> {
+    if crate::agent::cost::is_free_model(model) {
+        return Some(tinyagents_harness::events::GenerationPricing {
+            input_per_mtok_usd: Some(0.0),
+            cached_input_per_mtok_usd: Some(0.0),
+            output_per_mtok_usd: Some(0.0),
+        });
+    }
+    tinyagents_registry::pricing::lookup(model).map(|price| {
+        tinyagents_harness::events::GenerationPricing {
+            input_per_mtok_usd: Some(price.input_per_mtok_usd),
+            cached_input_per_mtok_usd: Some(price.cached_input_per_mtok_usd),
+            output_per_mtok_usd: Some(price.output_per_mtok_usd),
+        }
+    })
 }
 
 #[cfg(test)]

@@ -46,8 +46,12 @@ fn test_bundled_record() -> &'static crate::modules::types::ModuleRecord {
     }))
 }
 
+/// The record pins the empty-input digest, so the staged empty archive passes
+/// the digest check and fails to unpack. Digest rejection itself is tinybus's
+/// to test; this pins only that the host reports it and never falls back to
+/// the user cache.
 #[tokio::test]
-async fn invalid_installer_bundle_is_reported_without_falling_back_to_the_cache() {
+async fn an_unreadable_installer_bundle_is_reported_without_falling_back_to_the_cache() {
     let record = test_bundled_record();
     let bundled = tempfile::tempdir().unwrap();
     let user_cache = tempfile::tempdir().unwrap();
@@ -705,4 +709,19 @@ fn the_ahead_warning_is_silent_for_released_modules_other_ids_and_release_builds
     assert!(pin_ahead_warning("tinydocs", ModuleSource::Source, None, true).is_none());
     // A release build never warns.
     assert!(pin_ahead_warning("tinydocs", ModuleSource::Source, Some("tinydocs"), false).is_none());
+}
+
+#[test]
+fn tinymcp_is_told_which_bus_name_serves_its_storage() {
+    // TinyMCP refuses to load without a storage destination, so an empty config
+    // faults the module at startup and every MCP call reports "unavailable".
+    let config = ops::module_config_for_test(&Config::default(), "tinymcp");
+    assert_eq!(
+        config,
+        serde_json::json!({ "storage_callback": "ai.tinyhumans.tinystorage.Storage" })
+    );
+    assert_eq!(
+        ops::module_config_for_test(&Config::default(), "tinybox"),
+        serde_json::json!({})
+    );
 }

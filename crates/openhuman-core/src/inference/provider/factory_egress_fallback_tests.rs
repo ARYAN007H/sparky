@@ -215,6 +215,41 @@ fn a_readable_profile_with_no_stored_key_is_treated_as_missing_credentials() {
 }
 
 #[test]
+fn a_failed_credential_lookup_does_not_echo_its_underlying_error() {
+    // The lookup error can carry stored-credential content, so the user-facing
+    // error is the guidance alone; the routing shape goes to the log. The
+    // read-only (doctor) lookup fails on an unreadable profile store.
+    let _guard = crate::inference::inference_test_guard();
+    let tmp = TempDir::new().expect("tempdir");
+    let mut config = config_with_providers_in_tempdir(&tmp, vec![openai_entry("p_oai", "openai")]);
+    config.chat_provider = Some("openai:gpt-4o".to_string());
+    std::fs::write(
+        tmp.path().join("auth-profiles.json"),
+        "{ not json sk-leak-marker",
+    )
+    .expect("corrupt profile store");
+
+    let err = match super::super::inspection::create_chat_model_with_model_id_in_for_inspection(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "chat",
+        &config,
+        0.0,
+    ) {
+        Ok(_) => panic!("an unreadable credential store must not build a client"),
+        Err(err) => err,
+    };
+    let message = err.to_string();
+    assert!(
+        message.contains("No usable credentials for 'openai'"),
+        "expected the actionable guidance, got: {message}"
+    );
+    assert!(
+        !message.contains("underlying error") && !message.contains("leak-marker"),
+        "the lookup error leaked into the user-facing message: {message}"
+    );
+}
+
+#[test]
 fn implicit_cloud_fallback_is_claimed_only_when_the_role_has_no_route_of_its_own() {
     let mut config = Config::default();
     config.chat_provider = Some("ollama:gemma3:1b".to_string());
@@ -324,4 +359,35 @@ fn the_route_resolves_to_a_provider_the_factory_can_build() {
     )
     .expect("the per-call route builds a chat model");
     assert_eq!(model_id, "x/y");
+}
+
+#[test]
+fn a_failed_lookup_keeps_only_its_expiry_signal() {
+    // The doctor reports "requires refresh" and chat routes a Codex expiry to
+    // the reconnect copy, both from these fixed phrases; the detail beside
+    // them (a refresh response's body) stays out.
+    use super::super::cloud_slug::lookup_failure;
+    let guidance = || "No usable credentials for 'openai'.".to_string();
+    for (error, signal) in [
+        (
+            anyhow::anyhow!("OpenAI OAuth credential requires refresh"),
+            "requires refresh",
+        ),
+        (
+            anyhow::anyhow!(
+                "Codex authentication token is expired — refresh failed: leak-marker. Please reconnect Codex."
+            ),
+            "Codex authentication token is expired",
+        ),
+    ] {
+        let message = lookup_failure(&error, guidance()).to_string();
+        assert!(message.contains(signal), "{message}");
+        assert!(message.contains("No usable credentials"), "{message}");
+        assert!(!message.contains("leak-marker"), "{message}");
+    }
+    let message = lookup_failure(
+        &anyhow::anyhow!("store read failed: leak-marker"),
+        guidance(),
+    );
+    assert_eq!(message.to_string(), guidance());
 }

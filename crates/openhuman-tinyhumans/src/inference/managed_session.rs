@@ -4,13 +4,15 @@
 
 use tinyinference_llm::model::ProviderError;
 use tinyinference_llm::providers::tinyhumans::{
-    TinyHumansAuthFailure, TinyHumansAuthFailureKind, TinyHumansOperation,
+    TinyHumansAuthFailure, TinyHumansAuthFailureKind, TinyHumansCredentialKind, TinyHumansOperation,
 };
 
 /// Resolve the persisted app-session token for a managed inference caller.
 /// Both chat and embeddings use this path so signed-out state, expiry checks,
-/// and offline-local credential refusal stay consistent.
+/// offline-local credential refusal, and the plaintext-endpoint refusal stay
+/// consistent.
 pub(super) fn resolve_session_bearer(
+    endpoint: &str,
     state_dir: &std::path::Path,
     secrets_encrypt: bool,
     profile_override: Option<&str>,
@@ -19,6 +21,7 @@ pub(super) fn resolve_session_bearer(
     use openhuman_embed::__host::security::credentials::session_support::classify_session_token;
     use openhuman_embed::__host::security::credentials::{AuthService, APP_SESSION_PROVIDER};
 
+    ensure_session_endpoint(endpoint)?;
     if openhuman_embed::__host::platform::llm_gate::is_signed_out() {
         anyhow::bail!("SESSION_EXPIRED: backend session not active — sign in to resume LLM work");
     }
@@ -39,14 +42,14 @@ pub(super) fn managed_bearer_for_inspection(
         load_app_session_profile_read_only, SessionTokenCheck,
     };
 
+    let endpoint = format!(
+        "{}/openai/v1",
+        crate::backend::url::effective_api_url(&config.api_url).trim_end_matches('/')
+    );
     if let Some(key) =
         openhuman_embed::__host::security::credentials::api_key::get_api_key_read_only(config)
             .map_err(|_| anyhow::anyhow!("managed API key profile is unavailable or invalid"))?
     {
-        let endpoint = format!(
-            "{}/openai/v1",
-            crate::backend::url::effective_api_url(&config.api_url).trim_end_matches('/')
-        );
         anyhow::ensure!(
             crate::client::endpoint::is_managed_endpoint_for_api_key(&endpoint),
             "managed API key endpoint is not an approved managed endpoint"
@@ -54,6 +57,7 @@ pub(super) fn managed_bearer_for_inspection(
         return Ok(key);
     }
 
+    ensure_session_endpoint(&endpoint)?;
     let profile = load_app_session_profile_read_only(config)
         .map_err(|_| anyhow::anyhow!("managed session profile is unavailable or invalid"))?;
     check_session_backend(config, profile.as_ref())
@@ -66,6 +70,18 @@ pub(super) fn managed_bearer_for_inspection(
         }
         SessionTokenCheck::Absent => anyhow::bail!("managed session credential is unavailable"),
     }
+}
+
+/// Refuse to put the session JWT on a plaintext wire: HTTPS, or HTTP only to
+/// loopback — the same rule every other backend credential caller applies.
+fn ensure_session_endpoint(endpoint: &str) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        crate::client::endpoint::is_safe_endpoint_for_managed_bearer(endpoint),
+        "refusing to send the TinyHumans session token to an insecure endpoint: {} — \
+         use HTTPS, or HTTP only to loopback",
+        super::managed_model::endpoint_origin_for_log(endpoint)
+    );
+    Ok(())
 }
 
 /// The bearer a classified app-session token yields for managed inference.
@@ -133,14 +149,27 @@ fn maybe_publish_local_session_expiry(operation: &str) {
 }
 
 /// Publish expiry only from TinyInference's explicit managed-endpoint
-/// provenance. The provider label is a wire diagnostic and is not an auth
-/// ownership signal.
+/// provenance, and only for a 401 on the session credential that this failing
+/// request was sent with (not whichever credential the model used last). A
+/// failure without credential provenance is never treated as the session. A
+/// 403 is a refusal (plan, tier, WAF) and an API-key 401 is a rejected key;
+/// neither signs the user out. The provider label is a wire diagnostic and is
+/// not an auth ownership signal.
 pub(super) fn publish_managed_auth_failure(error: &ProviderError, context: TinyHumansAuthFailure) {
+    let api_key = context.credential() != Some(TinyHumansCredentialKind::Session);
     let status = match context.kind() {
         TinyHumansAuthFailureKind::Unauthorized => 401,
         TinyHumansAuthFailureKind::Forbidden => 403,
         TinyHumansAuthFailureKind::Other => return,
     };
+    if !openhuman_embed::__host::core::session_expiry::backend_status_means_session_expired(
+        status, api_key,
+    ) {
+        log::warn!(
+            "[providers][openhuman-backend] managed {status} (api_key={api_key}) is a refusal — keeping the session"
+        );
+        return;
+    }
     let operation = match context.operation() {
         TinyHumansOperation::Invoke => "invoke",
         TinyHumansOperation::Stream => "stream",

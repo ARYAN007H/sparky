@@ -5764,7 +5764,7 @@ dependencies = [
  "tinyagents-session",
  "tinyagents-storage-kit",
  "tinyagents-tasks",
- "tinybox-bus 0.2.0",
+ "tinybox-bus 0.2.1",
  "tinybox-core",
  "tinybus",
  "tinybus-module",
@@ -5931,6 +5931,7 @@ dependencies = [
  "tinyflows-module",
  "tinyinference-embeddings",
  "tinyinference-llm",
+ "tinymcp",
  "tinymcp-bus",
  "tinymemory-api",
  "tinymemory-tools",
@@ -6034,6 +6035,7 @@ dependencies = [
  "tiny-artifacts",
  "tinyagents-harness",
  "tinyagents-live",
+ "tinyagents-session",
  "tinybus",
  "tinychannels-bus",
  "tinyhumans-sdk",
@@ -9237,7 +9239,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -9246,17 +9248,17 @@ dependencies = [
 
 [[package]]
 name = "tinybox-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "serde",
  "thiserror 2.0.21",
- "tinybox-bus 0.2.0",
+ "tinybox-bus 0.2.1",
 ]
 
 [[package]]
 name = "tinybox-docker"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "serde_json",
@@ -9267,12 +9269,12 @@ dependencies = [
 
 [[package]]
 name = "tinybox-drivers"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "log",
  "serde",
  "serde_json",
- "tinybox-bus 0.2.0",
+ "tinybox-bus 0.2.1",
  "tinybox-core",
  "tinybox-jail",
  "tinystoragedrivers-api",
@@ -9282,13 +9284,13 @@ dependencies = [
 
 [[package]]
 name = "tinybox-host"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "cap-std",
  "command-group",
  "nix 0.31.3",
- "tinybox-bus 0.2.0",
+ "tinybox-bus 0.2.1",
  "tinybox-core",
  "tinybox-jail",
  "tokio",
@@ -9296,13 +9298,13 @@ dependencies = [
 
 [[package]]
 name = "tinybox-jail"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "landlock",
  "log",
  "serde",
  "serde_json",
- "tinybox-bus 0.2.0",
+ "tinybox-bus 0.2.1",
  "tinybox-core",
  "tinybox-linux",
  "windows-sys 0.61.2",
@@ -9310,7 +9312,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-linux"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "tinybox-core",
@@ -9318,7 +9320,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-microvm"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "serde",
@@ -9328,12 +9330,12 @@ dependencies = [
 
 [[package]]
 name = "tinybox-module"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "log",
  "nix 0.31.3",
  "tempfile",
- "tinybox-bus 0.2.0",
+ "tinybox-bus 0.2.1",
  "tinybox-core",
  "tinybox-docker",
  "tinybox-drivers",
@@ -9353,7 +9355,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-ssh"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "tinybox-core",
@@ -9405,7 +9407,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "anyhow",
  "async-imap",
@@ -9455,7 +9457,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-bus"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9470,7 +9472,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-module"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9494,7 +9496,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-runtime"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9515,7 +9517,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "getrandom 0.4.3",
  "serde",
@@ -9534,7 +9536,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-accessibility"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "arboard",
  "command-group",
@@ -9549,7 +9551,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-browser"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "agent-browser",
  "base64 0.22.1",
@@ -9568,7 +9570,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-bus"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "base64 0.22.1",
  "serde",
@@ -9578,7 +9580,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-core"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -9590,7 +9592,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-cursor"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "getrandom 0.4.3",
  "serde",
@@ -9600,7 +9602,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-desktop"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "agent-desktop-core",
  "agent-desktop-linux",
@@ -9615,7 +9617,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-engine"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "getrandom 0.4.3",
  "serde",
@@ -9632,7 +9634,7 @@ dependencies = [
 
 [[package]]
 name = "tinyconnectors"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9658,7 +9660,7 @@ dependencies = [
 
 [[package]]
 name = "tinyconnectors-bus"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -9666,7 +9668,7 @@ dependencies = [
 
 [[package]]
 name = "tinyconnectors-sync"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -9715,7 +9717,7 @@ dependencies = [
 
 [[package]]
 name = "tinyeventqueues"
-version = "0.1.3"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "data-encoding",
@@ -9736,7 +9738,7 @@ dependencies = [
 
 [[package]]
 name = "tinyeventqueues-bus"
-version = "0.1.3"
+version = "0.2.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -9745,7 +9747,7 @@ dependencies = [
 
 [[package]]
 name = "tinyflows"
-version = "0.8.29"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -9883,7 +9885,7 @@ dependencies = [
 
 [[package]]
 name = "tinyhosts"
-version = "0.4.1"
+version = "0.4.3"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -9903,7 +9905,7 @@ dependencies = [
 
 [[package]]
 name = "tinyhosts-bus"
-version = "0.4.1"
+version = "0.4.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -9912,7 +9914,7 @@ dependencies = [
 
 [[package]]
 name = "tinyhumans-sdk"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "futures",
@@ -10149,7 +10151,7 @@ dependencies = [
 
 [[package]]
 name = "tinyjuice-module"
-version = "0.11.2"
+version = "0.11.4"
 dependencies = [
  "log",
  "serde_json",
@@ -10184,7 +10186,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp"
-version = "0.20.1"
+version = "0.20.2"
 dependencies = [
  "base64 0.23.1",
  "data-encoding",
@@ -10213,7 +10215,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.20.1"
+version = "0.20.2"
 dependencies = [
  "base64 0.23.1",
  "schemars",
@@ -10301,7 +10303,7 @@ dependencies = [
 
 [[package]]
 name = "tinysearch"
-version = "0.5.1"
+version = "0.5.3"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
@@ -10315,7 +10317,7 @@ dependencies = [
 
 [[package]]
 name = "tinysearch-bus"
-version = "0.5.1"
+version = "0.5.3"
 dependencies = [
  "schemars",
  "serde",
@@ -10632,7 +10634,7 @@ dependencies = [
 
 [[package]]
 name = "tinyvoice-module"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -10655,7 +10657,7 @@ dependencies = [
 
 [[package]]
 name = "tinywallet"
-version = "0.24.1"
+version = "0.26.0"
 dependencies = [
  "bitcoin",
  "bs58",
@@ -10677,7 +10679,7 @@ dependencies = [
 
 [[package]]
 name = "tinywallet-bus"
-version = "0.24.1"
+version = "0.26.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -10687,7 +10689,7 @@ dependencies = [
 
 [[package]]
 name = "tinywallet-crypto"
-version = "0.24.1"
+version = "0.26.0"
 dependencies = [
  "async-trait",
  "bech32 0.12.0",
@@ -10703,7 +10705,7 @@ dependencies = [
 
 [[package]]
 name = "tinywallet-module"
-version = "0.24.1"
+version = "0.26.0"
 dependencies = [
  "async-trait",
  "bitcoin",
@@ -10732,7 +10734,7 @@ dependencies = [
 
 [[package]]
 name = "tinywallet-web3"
-version = "0.24.1"
+version = "0.26.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -10751,7 +10753,7 @@ dependencies = [
 
 [[package]]
 name = "tinywallet-x402"
-version = "0.24.1"
+version = "0.26.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",

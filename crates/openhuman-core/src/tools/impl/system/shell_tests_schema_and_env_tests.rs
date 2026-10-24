@@ -116,6 +116,28 @@ async fn shell_emits_audit_line_on_denial() {
     );
 }
 
+/// Full autonomy runs a write with no prompt, so no human approved it. The
+/// tool never learns the gate's decision; its audit row must not claim one.
+#[tokio::test]
+async fn shell_audit_never_claims_a_human_approval() {
+    use crate::security::AuditEvent;
+    let (audit, tmp) = audit_with_tempdir();
+    let tool = ShellTool::new(test_security(AutonomyLevel::Full), test_runtime(), audit);
+    let _ = tool
+        .execute(json!({"command": "echo hello"}))
+        .await
+        .unwrap();
+    let log =
+        std::fs::read_to_string(tmp.path().join("audit.log")).expect("audit log file should exist");
+    let parsed: AuditEvent = serde_json::from_str(log.trim()).expect("audit event JSON parses");
+    let action = parsed.action.expect("action present");
+    assert!(action.allowed, "the command ran");
+    assert!(
+        !action.approved,
+        "the audit row claimed a human approval that never happened"
+    );
+}
+
 #[test]
 fn shell_tool_name() {
     let tool = ShellTool::new(

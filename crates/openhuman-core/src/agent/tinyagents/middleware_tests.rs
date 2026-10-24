@@ -370,6 +370,8 @@ mod command_exit_failure_tests;
 mod failure_effect_tests;
 #[path = "middleware_failure_policy_class_tests.rs"]
 mod failure_policy_class_tests;
+#[path = "middleware_terminal_inference_halt_tests.rs"]
+mod terminal_inference_halt_tests;
 #[path = "middleware_loop_guard_tests.rs"]
 mod loop_guard_tests;
 #[path = "middleware_memory_budget_tests.rs"]

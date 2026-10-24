@@ -184,6 +184,45 @@ async fn waiter_future_dropped_mid_park_evicts_waiter_clears_routing_and_denies_
     );
 }
 
+/// The decision channel can drop after `decide()` already committed an
+/// approval. The gate must honour the persisted decision, not deny a call
+/// the durable audit row says was approved.
+#[tokio::test]
+async fn a_dropped_channel_after_a_persisted_approval_allows() {
+    let (gate, _dir) = test_gate();
+    let gate = Arc::new(gate);
+    let g = gate.clone();
+    let handle = tokio::spawn(async move {
+        let turn = ApprovalTurnContext::chat(chat_ctx());
+        turn_origin::with_origin(
+            web_origin(),
+            g.intercept(&turn, "shell", "run ls", serde_json::json!({})),
+        )
+        .await
+    });
+    let mut tries = 0;
+    let request_id = loop {
+        if let Some(id) = gate.pending_for_thread("t-test") {
+            break id;
+        }
+        tries += 1;
+        assert!(tries < 200, "thread mapping never appeared");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    };
+
+    // The approval is persisted, then the waiter's sender goes away without
+    // delivering it.
+    store::decide(&gate.config, &request_id, ApprovalDecision::ApproveOnce)
+        .expect("persist approval")
+        .expect("row was pending");
+    drop(gate.waiters.lock().remove(&request_id));
+
+    assert!(
+        matches!(handle.await.unwrap(), GateOutcome::Allow),
+        "a persisted approval was denied because the channel dropped"
+    );
+}
+
 // ── caller park bound (issue #4756) ──────────────────────────────
 //
 // A caller (composio_connect) can cap the park via

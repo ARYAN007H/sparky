@@ -67,6 +67,7 @@
   "gmail_unsubscribe",
   "goal_complete",
   "goal_get",
+  "goal_resume",
   "goal_set",
   "grep",
   "health_snapshot",

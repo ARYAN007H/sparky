@@ -444,13 +444,16 @@ serde = { version = "1", features = ["derive"] }
 tempfile = "3"
 tinyinference-llm = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-llm" }
 # The document-port contract for failure injection in cron storage regressions.
-tinystoragedrivers-api = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "05eaada962decbab33bafa4763d2bd1a67f6b456" }
-tinystoragedrivers = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "05eaada962decbab33bafa4763d2bd1a67f6b456", default-features = false, features = ["sqlite"] }
+tinystoragedrivers-api = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "f05fbd230c2c403c8dcdef57316fa55265379039" }
+tinystoragedrivers = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "f05fbd230c2c403c8dcdef57316fa55265379039", default-features = false, features = ["sqlite"] }
+# The in-memory host storage backend the integration suites install.
 tinystoragedrivers-testkit = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-testkit" }
 zeroize = "1"
 tinytools = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinytools" }
 # The completion log a detached sub-agent leaves, for the SaaS delivery-recovery e2e.
 tinyagents-tasks = { path = "../../vendor/tinyagents/crates/tinyagents-tasks" }
+# The storage-kit backend port the completion-queue fixture adapts the host backend to.
+tinyagents-storage-kit = { path = "../../vendor/tinyagents/crates/tinyagents-storage-kit" }
 tinyagents-harness-tools = { path = "../../vendor/tinyagents/crates/tinyagents-harness-tools", default-features = false, features = ["goals"] }
 toml = "1.0"
 tracing = "0.1"
@@ -468,7 +471,7 @@ sha2 = "0.10"
 tar = "0.4"
 tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", features = ["sqlite", "multimodal"] }
 tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }
-tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session" }
+tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session", features = ["testkit"] }
 tinydocs-bus = { path = "../../vendor/tinydocs/crates/tinydocs-bus" }
 # `inbound_linked_e2e` names the ingest dispositions from the contract.
 tinyeventqueues-bus = { path = "../../vendor/tinyeventqueues/crates/tinyeventqueues-bus" }
@@ -571,9 +574,4 @@ path = "../../tests/embeddings_opt_out.rs"
 [[test]]
 name = "storage_backend_capabilities"
 path = "../../tests/storage_backend_capabilities.rs"
-required-features = ["storage-sqlite"]
-
-[[test]]
-name = "storage_delegation_e2e"
-path = "../../tests/storage_delegation_e2e.rs"
 required-features = ["storage-sqlite"]

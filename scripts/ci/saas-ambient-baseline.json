@@ -547,6 +547,20 @@
   },
   {
     "rule": "bare-spawn",
+    "path": "crates/openhuman-core/src/modules/storage_import_tinymcp.rs",
+    "line": 114,
+    "text": "let (legacy_servers, legacy_audit) = tokio::task::spawn_blocking(move || {",
+    "occurrence": 1
+  },
+  {
+    "rule": "bare-spawn",
+    "path": "crates/openhuman-core/src/modules/storage_import_tinymcp.rs",
+    "line": 195,
+    "text": "let (legacy_servers, legacy_audit) = tokio::task::spawn_blocking(move || {",
+    "occurrence": 2
+  },
+  {
+    "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/platform/llm_gate/throttle.rs",
     "line": 140,
     "text": "tokio::spawn(async move {",
@@ -707,24 +721,10 @@
     "occurrence": 1
   },
   {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/skills/runtime/run_machinery.rs",
-    "line": 162,
-    "text": "tokio::spawn(async move {",
-    "occurrence": 1
-  },
-  {
     "rule": "ambient-config",
     "path": "crates/openhuman-core/src/skills/runtime/run_machinery.rs",
     "line": 168,
     "text": "let mut config = match Config::load_or_init().await {",
-    "occurrence": 1
-  },
-  {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/skills/runtime/run_machinery.rs",
-    "line": 222,
-    "text": "let bridge = tokio::spawn(run_log::drain_to_log(rx, log_path.clone()));",
     "occurrence": 1
   },
   {
@@ -792,6 +792,13 @@
   },
   {
     "rule": "bare-spawn",
+    "path": "crates/openhuman-core/src/storage/import/tinyflows_reader/legacy_db.rs",
+    "line": 38,
+    "text": "tokio::task::spawn_blocking(move || {",
+    "occurrence": 1
+  },
+  {
+    "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/storage/import_state.rs",
     "line": 240,
     "text": "std::thread::spawn(move || {",
@@ -837,6 +844,13 @@
     "path": "crates/openhuman-core/src/storage/local.rs",
     "line": 179,
     "text": "tokio::task::spawn_blocking(move || backend_for(&workspace_dir))",
+    "occurrence": 1
+  },
+  {
+    "rule": "bare-spawn",
+    "path": "crates/openhuman-core/src/storage/scope_move.rs",
+    "line": 396,
+    "text": "let inventory = tokio::task::spawn_blocking(move || {",
     "occurrence": 1
   },
   {

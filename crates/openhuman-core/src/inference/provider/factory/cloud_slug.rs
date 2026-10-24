@@ -77,6 +77,30 @@ pub(crate) fn resolve_cloud_slug_for<'a>(
     )
 }
 
+/// The user-facing error for a failed credential lookup: the guidance, plus
+/// the expiry signal when the lookup reported one. The doctor's
+/// refresh-required check and the Codex reconnect classifier key on those
+/// fixed phrases; the rest of the lookup error can carry stored-credential
+/// content or a refresh response's body, so it is dropped.
+pub(super) fn lookup_failure(error: &anyhow::Error, guidance: String) -> anyhow::Error {
+    let text = format!("{error:#}");
+    let signal = if text.contains(super::credentials::OAUTH_REFRESH_REQUIRED) {
+        Some(super::credentials::OAUTH_REFRESH_REQUIRED)
+    } else if tinyinference_llm::failure::is_codex_token_expired_text(&text.to_ascii_lowercase()) {
+        Some(CODEX_TOKEN_EXPIRED)
+    } else {
+        None
+    };
+    match signal {
+        Some(signal) => anyhow::anyhow!("{guidance} (underlying error: {signal})"),
+        None => anyhow::anyhow!("{guidance}"),
+    }
+}
+
+/// The Codex OAuth expiry phrase (`openai_oauth::store`) the reconnect
+/// classifier recognises.
+const CODEX_TOKEN_EXPIRED: &str = "Codex authentication token is expired";
+
 pub(super) fn resolve_cloud_slug_with_access<'a>(
     role: &str,
     slug: &str,
@@ -224,17 +248,13 @@ pub(super) fn resolve_cloud_slug_with_access<'a>(
         // invoke. Its hosted construction callback is config-only and offline.
         (String::new(), false, None)
     } else if credential_access == CredentialAccess::Inspection {
-        let credential =
-            super::credentials::lookup_key_for_slug_read_only(slug, config).map_err(|error| {
-                anyhow::anyhow!("{} (underlying error: {error})", missing_credentials())
-            })?;
+        let credential = super::credentials::lookup_key_for_slug_read_only(slug, config)
+            .map_err(|error| lookup_failure(&error, missing_credentials()))?;
         (credential.key, credential.is_oauth, credential.account_id)
     } else {
         let key = credential_access
             .lookup_key_for_slug(slug, config)
-            .map_err(|error| {
-                anyhow::anyhow!("{} (underlying error: {error})", missing_credentials())
-            })?;
+            .map_err(|error| lookup_failure(&error, missing_credentials()))?;
         let is_oauth = slug == "openai" && credential_access.openai_bearer_is_oauth(config);
         (key, is_oauth, None)
     };
@@ -682,8 +702,17 @@ fn try_create_cloud_slug_chat_model_from_string_with_native_tools_and_access(
             key.clone()
         };
         let output_budget = inspection_output_budget_capability(&codex);
+        // Doctor's live probe deduplicates on this identity, so it carries
+        // everything else that shapes the request: two aliases with the same
+        // endpoint, key and model but another auth style, header or CA bundle
+        // are two different requests.
+        let transport = format!(
+            "{:?}\u{1f}{extra_headers:?}\u{1f}{extra_query_params:?}\u{1f}{user_agent:?}\u{1f}{:?}",
+            entry.auth_style,
+            config.cloud_provider_ca_certs.get(&slug),
+        );
         *identity = Some((
-            codex.endpoint.clone(),
+            format!("{}\u{1f}{transport}", codex.endpoint),
             credential,
             effective_model.clone(),
             output_budget,
