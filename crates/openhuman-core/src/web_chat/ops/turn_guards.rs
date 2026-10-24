@@ -241,7 +241,11 @@ where
         request_id,
     });
     let deadline = resolve_web_turn_deadline(ctx).await;
-    let (env, turn_cancellation) = turn_host_env(deadline);
+    let (mut env, turn_cancellation) = turn_host_env(deadline);
+    // The turn context crosses task boundaries with this value. Carry its
+    // owner explicitly so tools (especially sub-agent persistence) do not
+    // depend on a task-local CoreContext surviving the web-chat spawn.
+    env.core = ctx.downgrade();
     run_until_stopped(
         cancel_token,
         turn_cancellation,

@@ -1004,29 +1004,50 @@ async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
     rpc_join.abort();
 }
 
-/// Seed a raw append-only session transcript at
-/// `{workspace}/session_raw/{stem}.jsonl` (meta header + body lines).
-fn seed_raw_transcript(workspace: &Path, stem: &str, thread_id: &str, body: &[&str]) {
-    let raw_dir = workspace.join("session_raw");
-    std::fs::create_dir_all(&raw_dir).expect("create session_raw");
-    let meta = format!(
-        r#"{{"_meta":{{"version":1,"agent":"orchestrator","dispatcher":"native","created":"2026-07-21T00:00:00Z","updated":"2026-07-21T00:00:10Z","turn_count":1,"input_tokens":30,"output_tokens":13,"cached_input_tokens":0,"charged_amount_usd":0.003,"thread_id":"{thread_id}"}}}}"#
-    );
-    let mut buf = meta;
-    buf.push('\n');
-    for line in body {
-        buf.push_str(line);
-        buf.push('\n');
-    }
-    std::fs::write(raw_dir.join(format!("{stem}.jsonl")), buf).expect("write transcript");
+/// Seed the same driver-backed session store the RPC reads. Workspace
+/// transcripts moved from `session_raw/*.jsonl` into the session-store port;
+/// writing legacy files here left this endpoint with an empty transcript.
+fn seed_transcript(
+    locator: &std::sync::Arc<dyn tinyagents_session::transcript::TranscriptLocator>,
+    stem: &str,
+    thread_id: &str,
+    agent_name: &str,
+    agent_type: Option<&str>,
+    messages: &[tinyagents_session::transcript::TranscriptMessage],
+) {
+    use tinyagents_session::transcript::TranscriptMeta;
+
+    let meta = TranscriptMeta {
+        agent_name: agent_name.to_string(),
+        agent_id: Some(agent_name.to_string()),
+        agent_type: agent_type.map(str::to_string),
+        dispatcher: "native".to_string(),
+        provider: Some("anthropic".to_string()),
+        model: Some("claude-x".to_string()),
+        created: "2026-07-21T00:00:00Z".to_string(),
+        updated: "2026-07-21T00:00:10Z".to_string(),
+        turn_count: 1,
+        prefix_message_count: None,
+        input_tokens: 30,
+        output_tokens: 13,
+        cached_input_tokens: 0,
+        charged_amount_usd: 0.003,
+        thread_id: Some(thread_id.to_string()),
+        task_id: None,
+        session_id: None,
+        parent_session_id: None,
+    };
+    locator
+        .open_stem(stem, meta)
+        .expect("open transcript")
+        .replace(messages)
+        .expect("write transcript messages");
 }
 
 #[tokio::test]
 async fn json_rpc_threads_transcript_get_projects_and_paginates() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
-    // Config resolves the runtime workspace to `OPENHUMAN_WORKSPACE/workspace`
-    // (see resolve_config_dir_for_workspace), so seed transcripts there.
     let workspace = tmp.path().join("workspace");
     std::fs::create_dir_all(&workspace).expect("create workspace");
     let workspace = workspace.as_path();
@@ -1036,32 +1057,108 @@ async fn json_rpc_threads_transcript_get_projects_and_paginates() {
     let _vite_backend_url_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
     let _api_url_guard = EnvVarGuard::unset("OPENHUMAN_API_URL");
 
+    let provider = openhuman_core::storage::sessions::provider_for_workspace(workspace);
+    let locator = provider.for_agent("orchestrator").transcripts;
+
     let thread_id = "thr_transcript_e2e";
     let root_stem = "1000_orchestrator";
-    // A full turn: system scaffolding (dropped), user with injected datetime
-    // prefix, assistant tool-calling step (reasoning + tool_calls), tool result,
-    // final assistant answer.
-    seed_raw_transcript(
-        workspace,
-        root_stem,
-        thread_id,
-        &[
-            r#"{"role":"system","content":"[tool-policy preamble] ..."}"#,
-            r#"{"role":"user","content":"Current Date & Time: 2026-07-21 09:00:00 UTC\n\nWeather in NYC?","request_id":"req-1"}"#,
-            r#"{"role":"assistant","content":"Checking.","provider":"anthropic","model":"claude-x","usage":{"input":10,"output":5,"cached_input":0,"cost_usd":0.001},"ts":"2026-07-21T09:00:01Z","reasoning_content":"call the tool","tool_calls":[{"id":"call-1","name":"get_weather","arguments":"{\"city\":\"NYC\"}"},{"id":"call-2","name":"get_traffic","arguments":"{\"city\":\"NYC\"}"}],"iteration":1,"request_id":"req-1"}"#,
-            r#"{"role":"tool","content":"72F sunny","id":"call-1","request_id":"req-1"}"#,
-            r#"{"role":"tool","content":"error: traffic service unavailable","id":"call-2","request_id":"req-1","failure":true,"failure_detail":"traffic service unavailable"}"#,
-            r#"{"role":"assistant","content":"72F and sunny.","provider":"anthropic","model":"claude-x","usage":{"input":20,"output":8,"cached_input":0,"cost_usd":0.002},"ts":"2026-07-21T09:00:02Z","iteration":2,"request_id":"req-1"}"#,
+    use tinyagents_session::transcript::{
+        MessageUsage, ToolFailure, TranscriptMessage, TranscriptToolCall, TurnUsage,
+    };
+
+    let mut user = TranscriptMessage::user(
+        "Current Date & Time: 2026-07-21 09:00:00 UTC\n\nWeather in NYC?",
+    );
+    user.request_id = Some("req-1".to_string());
+    let mut assistant = TranscriptMessage::assistant_with_calls(
+        "Checking.",
+        vec![
+            TranscriptToolCall {
+                id: "call-1".to_string(),
+                name: "get_weather".to_string(),
+                arguments: r#"{"city":"NYC"}"#.to_string(),
+                extra_content: None,
+            },
+            TranscriptToolCall {
+                id: "call-2".to_string(),
+                name: "get_traffic".to_string(),
+                arguments: r#"{"city":"NYC"}"#.to_string(),
+                extra_content: None,
+            },
         ],
     );
+    assistant.request_id = Some("req-1".to_string());
+    assistant.turn_usage = Some(TurnUsage {
+        provider: "anthropic".to_string(),
+        model: "claude-x".to_string(),
+        usage: MessageUsage {
+            input: 10,
+            output: 5,
+            cost_usd: 0.001,
+            ..MessageUsage::default()
+        },
+        ts: "2026-07-21T09:00:01Z".to_string(),
+        reasoning_content: Some("call the tool".to_string()),
+        tool_calls: Vec::new(),
+        iteration: 1,
+    });
+    let mut weather = TranscriptMessage::tool_result("call-1", "72F sunny");
+    weather.request_id = Some("req-1".to_string());
+    let mut traffic = TranscriptMessage::tool_result(
+        "call-2",
+        "error: traffic service unavailable",
+    );
+    traffic.request_id = Some("req-1".to_string());
+    traffic.tool_failure = Some(ToolFailure {
+        failed: true,
+        detail: Some("traffic service unavailable".to_string()),
+    });
+    let mut answer = TranscriptMessage::assistant("72F and sunny.");
+    answer.request_id = Some("req-1".to_string());
+    answer.turn_usage = Some(TurnUsage {
+        provider: "anthropic".to_string(),
+        model: "claude-x".to_string(),
+        usage: MessageUsage {
+            input: 20,
+            output: 8,
+            cost_usd: 0.002,
+            ..MessageUsage::default()
+        },
+        ts: "2026-07-21T09:00:02Z".to_string(),
+        reasoning_content: None,
+        tool_calls: Vec::new(),
+        iteration: 2,
+    });
+    seed_transcript(
+        &locator,
+        root_stem,
+        thread_id,
+        "orchestrator",
+        None,
+        &[user, assistant, weather, traffic, answer],
+    );
     // A sub-agent sibling sharing the root stem.
-    seed_raw_transcript(
-        workspace,
+    let mut subagent_answer = TranscriptMessage::assistant("sub work done");
+    subagent_answer.turn_usage = Some(TurnUsage {
+        provider: "anthropic".to_string(),
+        model: "claude-x".to_string(),
+        usage: MessageUsage {
+            input: 5,
+            output: 3,
+            ..MessageUsage::default()
+        },
+        ts: "2026-07-21T09:10:00Z".to_string(),
+        reasoning_content: None,
+        tool_calls: Vec::new(),
+        iteration: 1,
+    });
+    seed_transcript(
+        &locator,
         &format!("{root_stem}__50_coder"),
         thread_id,
-        &[
-            r#"{"role":"assistant","content":"sub work done","provider":"anthropic","model":"claude-x","usage":{"input":5,"output":3,"cached_input":0,"cost_usd":0.0},"ts":"2026-07-21T09:10:00Z","iteration":1}"#,
-        ],
+        "coder",
+        Some("subagent"),
+        &[subagent_answer],
     );
 
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;

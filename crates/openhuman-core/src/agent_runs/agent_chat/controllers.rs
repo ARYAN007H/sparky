@@ -156,7 +156,13 @@ fn handle_agent_chat(
                     .with_provider_options(params.inference_provider_options)
                     .with_reasoning_effort(params.inference_reasoning_effort)
             }),
-            super::AgentChatEnv::default(),
+            super::AgentChatEnv {
+                host: crate::agent::turn_env::HostTurnEnv {
+                    core: ctx.downgrade(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
         )
         .await?
         .into_rpc_json()
