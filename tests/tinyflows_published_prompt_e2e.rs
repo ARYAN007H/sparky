@@ -41,7 +41,9 @@ fn dump_published_prompt(
         .env("OPENHUMAN_KEYRING_MASTER_KEY", "33".repeat(32))
         .env_remove("BACKEND_URL")
         .env_remove("VITE_BACKEND_URL")
-        .env_remove("OPENHUMAN_BACKEND_API_KEY")
+        // The dumper builds the real session agent, which needs a backend
+        // credential to resolve the managed model; it never calls the backend.
+        .env("OPENHUMAN_BACKEND_API_KEY", "prompt-dump-test-key")
         .env_remove("OPENHUMAN_BACKEND_SESSION_TOKEN")
         .env_remove("OPENHUMAN_STORAGE_URL")
         .env_remove("OPENHUMAN_MODULE_SOURCE")
