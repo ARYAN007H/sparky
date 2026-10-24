@@ -41,6 +41,22 @@ impl crate::inference::turn_models::TurnModels {
         if budget.is_none() && admission.is_none() {
             return self;
         }
+        // A native turn set owns the resolver and error slots, so the
+        // decorator must be applied inside it, not only to the copies held here.
+        if let Some(models) = self.native_model_set.take() {
+            let models =
+                models.map_models(|_, model| control_model(model, budget, admission.clone()));
+            let mut registrations = models.registrations("primary").into_iter();
+            self.primary = registrations
+                .next()
+                .expect("native turn set contains its primary")
+                .1;
+            self.routes = registrations.collect();
+            self.summarizer = models.summarizer();
+            self.error_slot = models.primary_error_slot();
+            self.native_model_set = Some(models);
+            return self;
+        }
         self.primary = control_model(self.primary, budget, admission.clone());
         self.summarizer = control_model(self.summarizer, budget, admission.clone());
         for (_, route) in &mut self.routes {
