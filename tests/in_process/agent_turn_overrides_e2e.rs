@@ -266,6 +266,7 @@ fn agent_with(
     dispatcher: Box<dyn tinytools_agent::dialect::ToolDialect>,
 ) -> OpenHumanSessionHost {
     OpenHumanSessionHost::builder()
+        .model_name("test/session-fixture".to_string())
         .chat_model(model)
         .tools(tools)
         .tool_dispatcher(dispatcher)

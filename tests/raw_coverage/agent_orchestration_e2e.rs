@@ -204,6 +204,23 @@ async fn setup() -> Harness {
         EnvVarGuard::set("OPENHUMAN_MEMORY_EMBED_STRICT", "false"),
     ];
 
+    // The cancel path resolves the dispatch's owner scope from the process's
+    // default core context. A real host always boots one; without it the
+    // outcome depends on whether an earlier test in the same process happened
+    // to build it (nextest runs each test in its own process).
+    openhuman_core::core::bus::init().await.expect("init event bus");
+    openhuman_core::core::runtime::CoreContext::init_with_config(
+        openhuman_core::core::types::HostKind::Library,
+        &openhuman_core::core::runtime::TokenSource::Fixed(std::sync::Arc::new(
+            TEST_RPC_TOKEN.to_string(),
+        )),
+        openhuman_core::core::runtime::DomainSet::full(),
+        openhuman_core::tools::toolpacks::ToolGroups::none(),
+        None,
+    )
+    .await
+    .expect("boot the default core context");
+
     let (addr, token, join) = serve_rpc().await;
     Harness {
         _tmp: tmp,

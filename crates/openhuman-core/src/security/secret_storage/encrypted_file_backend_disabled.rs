@@ -84,7 +84,10 @@ impl EncryptedFileBackend {
         Self
     }
 
-    /// Fails closed like every other operation of this adapter.
+    /// Read one profile secret without initializing keyring state.
+    ///
+    /// This adapter cannot read encrypted files, so the lookup fails closed
+    /// with the same unavailable error as every other operation.
     pub fn get_profile_read_only(
         &self,
         _namespaced_key: &str,

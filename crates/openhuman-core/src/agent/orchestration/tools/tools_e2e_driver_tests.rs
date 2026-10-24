@@ -58,6 +58,7 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
     let scratch = tempfile::tempdir().expect("isolated force-fresh fixture");
     let workspace = scratch.path().join("workspace");
     std::fs::create_dir_all(&workspace).expect("create workspace");
+    crate::storage::local::use_persistent_default_for_test(&workspace);
     let (first_started_tx, mut first_started_rx) = tokio::sync::mpsc::channel(1);
     let (second_started_tx, mut second_started_rx) = tokio::sync::mpsc::channel(1);
     let release_first = Arc::new(tokio::sync::Notify::new());

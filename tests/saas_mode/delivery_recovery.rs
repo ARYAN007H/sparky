@@ -18,7 +18,7 @@
 
 use std::sync::Arc;
 
-use openhuman_core::profiles::{ProfileId, ProfileIdMode, ProfileLayout};
+use openhuman_core::profiles::{ProfileId, ProfileIdMode};
 use tinyagents_tasks::{
     CompletionRecord, CompletionResult, CompletionStatus, CompletionStore, DriverCompletionStore,
     NotifyMode,
@@ -119,13 +119,12 @@ fn seed_thread(node: &Node, user: &str) {
 
 /// The pending record a core killed before delivery leaves in `user`'s
 /// completion queue.
-fn leave_undelivered_result(root: &std::path::Path, user: &str) {
+fn leave_undelivered_result(d: &Deployment, user: &str) {
     let id = ProfileId::for_user(user, ProfileIdMode::Raw).unwrap();
-    let workspace = ProfileLayout::new(root, &id).workspace_dir;
-    // The profile's default database, in the profile's own scope: where the
-    // running core keeps (and looks for) its completion queue.
-    let url = openhuman_core::storage::config::default_url(&workspace);
-    std::fs::create_dir_all(workspace.join(openhuman_core::storage::config::DEFAULT_DIR)).unwrap();
+    // The operator's storage backend, in the profile's own scope: the node
+    // installs the configured `storage_url` process-wide, so that is where the
+    // running core keeps (and looks for) every profile's completion queue.
+    let url = format!("sqlite:{}/saas-storage.db", d.tmp.path().display());
     let backend = openhuman_core::storage::block_on_anyhow(async move {
         Ok(openhuman_core::storage::open(&url).await?)
     })
@@ -173,7 +172,7 @@ fn an_undelivered_subagent_result_reaches_its_own_profile_after_a_restart() {
 
     // The core dies with ann's sub-agent result recorded but undelivered.
     node.kill();
-    leave_undelivered_result(&d.root, OWNER);
+    leave_undelivered_result(&d, OWNER);
 
     // Restart. Opening bob, whose thread has the same id, delivers nothing.
     let node = node_logging(&d, llm.port);

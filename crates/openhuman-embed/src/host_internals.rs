@@ -514,7 +514,18 @@ pub mod storage {
     /// `legacy-import`.
     #[cfg(feature = "legacy-import")]
     pub mod layout {
+        #[cfg(feature = "legacy-import")]
         pub use openhuman_core::storage::layout::auto_migrate;
+
+        /// Return `false` when legacy layout import is not part of this build.
+        ///
+        /// The RPC session-store host calls this before resolving its storage
+        /// URL. In builds without `legacy-import`, there is no layout migration
+        /// to run and the configured workspace remains unchanged.
+        #[cfg(not(feature = "legacy-import"))]
+        pub async fn auto_migrate(_config: &openhuman_core::config::Config) -> bool {
+            false
+        }
     }
 }
 

@@ -292,6 +292,7 @@ async fn tiny_session_port_recovers_legacy_key_from_owned_pause_and_hides_foreig
     use tinyagents_orchestration::subagent::SubagentSessionStore as _;
 
     let workspace = tempfile::tempdir().unwrap();
+    crate::storage::local::use_persistent_default_for_test(workspace.path());
     let checkpoint_dir = workspace.path().join(".openhuman/subagent_checkpoints");
     let key = key();
     let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(

@@ -1,7 +1,12 @@
 use super::*;
 
 fn default_policy() -> SecurityPolicy {
-    SecurityPolicy::default()
+    // These tests exercise the autonomy gates. The shipped config leaves
+    // autonomy disabled, so enable it explicitly in the shared test fixture.
+    SecurityPolicy {
+        enabled: true,
+        ..SecurityPolicy::default()
+    }
 }
 
 fn readonly_policy() -> SecurityPolicy {

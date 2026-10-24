@@ -484,7 +484,6 @@ fn availability_notes_are_status_not_instructions() {
 /// thread would write into the same file.
 #[test]
 fn a_subagent_thread_binding_claims_no_session_identity() {
-    crate::agent::session_host::test_support::install_model_fixture();
     let tmp = tempfile::tempdir().unwrap();
     let config = crate::config::Config {
         workspace_dir: tmp.path().join("workspace"),
@@ -493,6 +492,7 @@ fn a_subagent_thread_binding_claims_no_session_identity() {
         ..crate::config::Config::default()
     };
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
 
     let ctx = crate::core::runtime::DispatchCtx::ambient();
     let mut root =

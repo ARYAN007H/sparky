@@ -581,13 +581,13 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                         Precondition::Absent,
                     )
                     .await;
-                assert!(current_write.is_ok(), "the current lease remains writable");
+                current_write.expect("the current lease remains writable");
                 Ok::<_, anyhow::Error>(())
             })
         },
-    )
-    .unwrap();
-    assert_eq!(attempt, Some(()));
+    );
+    let error = attempt.expect_err("the old claim cannot be released after profile takeover");
+    assert!(error.to_string().contains("lease fence"), "{error:#}");
 }
 
 /// Another process holding the import claim is reported as `ClaimHeld`, so the

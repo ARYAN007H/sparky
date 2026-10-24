@@ -59,6 +59,18 @@ pub fn offline_config() -> Config {
     config
 }
 
+/// Install an isolated SQLite backend for tests that exercise atomic storage
+/// capabilities. The basic in-memory testkit intentionally advertises none.
+pub async fn install_sqlite_storage() -> tempfile::TempDir {
+    let directory = tempfile::tempdir().expect("SQLite storage directory");
+    let url = openhuman_core::storage::config::default_url(directory.path());
+    let backend = openhuman_core::storage::open(&url)
+        .await
+        .expect("SQLite test backend opens");
+    openhuman_core::storage::install(backend);
+    directory
+}
+
 /// Serve the tinyflows module (scheduler runtime, job store, schedule maths)
 /// from the test binary instead of a downloaded release. The factory goes in
 /// through the core's `register_linked` seam and the module is resolved once,

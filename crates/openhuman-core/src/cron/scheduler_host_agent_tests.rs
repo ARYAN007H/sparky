@@ -65,12 +65,16 @@ impl HostAgentResolver for Host {
 fn config(tmp: &TempDir) -> Config {
     let workspace = tmp.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
-    Config {
+    crate::storage::local::use_persistent_default_for_test(&workspace);
+    let config = Config {
         workspace_dir: workspace.clone(),
         action_dir: workspace,
         config_path: tmp.path().join("config.toml"),
         ..Config::default()
-    }
+    };
+    crate::security::credentials::api_key::store_api_key(&config, "cron-host-test-key")
+        .expect("store the managed inference fixture credential");
+    config
 }
 
 fn agent_job(agent_id: &str) -> CronJob {
