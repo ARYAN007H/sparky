@@ -922,8 +922,6 @@ async fn json_rpc_retired_workflow_run_methods_are_not_found() {
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
 
-    let rpc_base = format!("http://{rpc_addr}");
-
     for (id, method) in [
         (9141, "openhuman.workflow_run_list_definitions"),
         (9142, "openhuman.workflow_run_start"),
