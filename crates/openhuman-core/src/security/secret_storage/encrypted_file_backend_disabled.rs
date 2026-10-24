@@ -83,11 +83,11 @@ impl EncryptedFileBackend {
     pub fn new(_workspace_dir: &Path) -> Self {
         Self
     }
-}
 
-impl EncryptedFileBackend {
-    /// A profile-scoped read-only lookup, as the enabled backend offers it.
-    /// There is no encrypted file to read, so it fails closed.
+    /// Read one profile secret without initializing keyring state.
+    ///
+    /// This adapter cannot read encrypted files, so the lookup fails closed
+    /// with the same unavailable error as every other operation.
     pub fn get_profile_read_only(
         &self,
         _namespaced_key: &str,

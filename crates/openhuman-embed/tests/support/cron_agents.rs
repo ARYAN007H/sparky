@@ -15,12 +15,12 @@ use std::time::Duration;
 
 use common::{chat_completion, chat_requests, offline_config, runtime, stub_backend};
 use openhuman_embed::{
-    AgentDefinitionSpec, AgentSpec, AgentTurnOrigin, CronError, HostTurnTools,
-    InMemorySessionStores, JobSchedule, JobSpec, JobTarget, Provider, ReasoningEffort, Runtime,
-    RuntimeError, RuntimeEventKind, RuntimeEvents, ServiceSet, SessionStoreProvider, Tool,
-    ToolScopeSpec, TrustedAutomationSource, Workspace,
+    AgentDefinitionSpec, AgentSpec, AgentTurnOrigin, CronError, HostTurnTools, JobSchedule,
+    JobSpec, JobTarget, Provider, ReasoningEffort, Runtime, RuntimeError, RuntimeEventKind,
+    RuntimeEvents, ServiceSet, SessionStoreProvider, Tool, ToolScopeSpec, TrustedAutomationSource,
+    Workspace,
 };
-use tinyagents_session::port::AgentStores;
+use tinyagents_session::port::{AgentStores, InMemorySessionStores};
 use tinyagents_session::transcript::{
     SessionRef, ThreadTranscripts, TranscriptHistory, TranscriptLocator, TranscriptMessage,
     TranscriptMeta, TranscriptPartial, TranscriptRead,
@@ -242,6 +242,7 @@ pub fn a_scheduled_job_runs_a_runtime_agent_with_its_host_tool_as_cron() {
                 Err(CronError::NotFound(_))
             ));
 
+            runtime.remove_agent("teeny").await.unwrap();
             drop(agent);
             drop(runtime);
         })
@@ -271,7 +272,10 @@ pub fn background_services_drive_the_scheduler_and_stop_with_the_runtime() {
                 })
                 .build()
                 .await
-                .expect("runtime builds");
+                .unwrap_or_else(|error| {
+                    eprintln!("background scheduler runtime build failed: {error:?}");
+                    panic!("runtime builds");
+                });
             let mut events = runtime.events();
 
             let fired = Arc::new(Mutex::new(0usize));
@@ -376,7 +380,10 @@ pub fn deferred_services_wait_for_the_host_so_a_due_job_finds_its_handler() {
                 .defer_services()
                 .build()
                 .await
-                .expect("runtime builds");
+                .unwrap_or_else(|error| {
+                    eprintln!("deferred scheduler runtime build failed: {error:?}");
+                    panic!("runtime builds");
+                });
             let mut events = runtime.events();
 
             // Stored and due before any handler exists.

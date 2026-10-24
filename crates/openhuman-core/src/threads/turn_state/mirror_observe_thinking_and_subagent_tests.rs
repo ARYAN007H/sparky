@@ -182,9 +182,6 @@ fn subagent_completed_persists_capped_output_on_the_activity() {
         output_chars: 11,
         usage: None,
         output: "final answer".into(),
-        worktree_path: None,
-        changed_files: Vec::new(),
-        dirty_status: None,
         stop: None,
     });
 

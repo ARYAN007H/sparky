@@ -492,16 +492,6 @@
   {
     "file": "crates/openhuman-core/src/storage/sessions/mod.rs",
     "scope": "",
-    "name": "OPEN_WORKSPACE_STORES",
-    "type": "LazyLock<Mutex<HashMap<(std::path::PathBuf,String),tinyagents_session::port::WorkspaceStores>>, >",
-    "count": 1,
-    "category": "D",
-    "reason": "Holds open the workspace transcript stores used when no host session store is installed. Each entry is a handle to the SQLite store under one workspace, keyed by that workspace and the session store key (agent_key_for: <profile>~<agent> for a SaaS profile), so two profiles or agents never share an entry; the store under the workspace is the authoritative data. release_workspace_defaults drops them all for a data reset, release_workspace those of one workspace.",
-    "verification": "threads/ops/edit_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate; storage/sessions/mod_tests.rs: without_a_store_transcripts_come_from_the_workspace_store_not_files"
-  },
-  {
-    "file": "crates/openhuman-core/src/storage/sessions/mod.rs",
-    "scope": "",
     "name": "PROVIDER",
     "type": "LazyLock<RwLock<Option<Arc<dyn SessionStoreProvider>>>>",
     "count": 1,
@@ -530,16 +520,6 @@
     "verification": "storage/sessions/mod_tests.rs: each_workspace_keeps_its_sessions_in_its_own_database; storage/sessions/mod_tests.rs: two_profiles_default_agents_keep_separate_session_keys_and_stores; threads/ops/edit_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate"
   },
   {
-    "file": "crates/openhuman-core/src/storage/sessions/workspace.rs",
-    "scope": "",
-    "name": "MEMORY",
-    "type": "LazyLock<Mutex<HashMap<PathBuf,Arc<dyn SessionStoreProvider>>>>",
-    "count": 1,
-    "category": "D",
-    "reason": "The in-memory provider is a workspace-keyed fallback routing handle; its AgentStores are selected with the caller's tenant session key, and an unusable workspace cannot read another workspace's provider.",
-    "verification": "storage/sessions/workspace_tests.rs: an_unusable_workspace_degrades_to_an_in_memory_store; storage/sessions/mod_tests.rs: two_profiles_default_agents_keep_separate_session_keys_and_stores; threads/ops/edit_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate"
-  },
-  {
     "file": "crates/openhuman-core/src/threads/artifact_rows.rs",
     "scope": "",
     "name": "ARTIFACT_ROW_HANDLE",
@@ -548,26 +528,6 @@
     "category": "A",
     "reason": "Keeps the one process-wide event-bus subscription that writes artifact rows alive and makes registration idempotent; it holds no data, and each event names the workspace and thread its row is written to.",
     "verification": "threads/artifact_rows_tests.rs: recording_an_artifact_twice_writes_one_row"
-  },
-  {
-    "file": "crates/openhuman-core/src/tinymemes/callbacks.rs",
-    "scope": "",
-    "name": "REGISTRY",
-    "type": "LazyLock<Mutex<HashMap<String,Entry>>>",
-    "count": 1,
-    "category": "B",
-    "reason": "Keyed by a random per-remix correlation id; each entry holds the registering caller's config and CoreContext, which every callback re-enters. Callbacks are accepted only from the module peer (bus name owner) for a live id, and the entry is retired by End, a failed call, or an age sweep.",
-    "verification": "tinymemes/service_tests.rs: only_the_module_may_call_back_and_only_for_a_live_remix"
-  },
-  {
-    "file": "crates/openhuman-core/src/tinymemes/service.rs",
-    "scope": "",
-    "name": "FOREGROUND",
-    "type": "std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String,std::sync::Arc<tokio::sync::Mutex<()>>>>, >",
-    "count": 1,
-    "category": "B",
-    "reason": "Holds only unit mutexes. The key is the workspace directory, so different workspaces never share or wait on a lock and no tenant data is stored.",
-    "verification": "tinymemes/service_tests.rs: foreground_remixes_share_a_lock_per_workspace_and_never_across_workspaces"
   },
   {
     "file": "crates/openhuman-core/src/tools/sources.rs",

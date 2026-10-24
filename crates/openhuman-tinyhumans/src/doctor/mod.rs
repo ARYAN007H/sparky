@@ -203,8 +203,10 @@ impl DoctorCheck for BackendIdentity {
         if health_check(ctx.config()).await.is_err() {
             return vec![backend_dependent_skipped(self.id())];
         }
-
-        let client = hosted_client(ctx.config(), credential);
+        let client = match hosted_client(ctx.config(), credential) {
+            Ok(client) => client,
+            Err(reason) => return vec![endpoint_refused(self.id(), &reason)],
+        };
         vec![match client.sdk().auth().me().await {
             Ok(_) => Finding::pass(self.id(), "The backend accepted the configured identity."),
             Err(error) => auth_finding(self.id(), client.kind(), error, AUTH_FIX),
@@ -385,8 +387,10 @@ impl DoctorCheck for ManagedCatalog {
         if health_check(ctx.config()).await.is_err() {
             return vec![backend_dependent_skipped(self.id())];
         }
-
-        let client = hosted_client(ctx.config(), credential);
+        let client = match hosted_client(ctx.config(), credential) {
+            Ok(client) => client,
+            Err(reason) => return vec![endpoint_refused(self.id(), &reason)],
+        };
         let query = [("catalog", Some("openrouter".to_owned()))];
         vec![match client.sdk().inference().list_models(&query).await {
             Ok(_) => Finding::pass(self.id(), "The managed inference catalog is reachable."),
@@ -431,8 +435,16 @@ fn doctor_credential(config: &Config) -> CredentialState {
     }
 }
 
-fn hosted_client(config: &Config, credential: BackendCredential) -> HostedClient {
+fn hosted_client(config: &Config, credential: BackendCredential) -> Result<HostedClient, String> {
     HostedClient::with_credential(&effective_backend_api_url(&config.api_url), credential)
+}
+
+fn endpoint_refused(id: &str, reason: &str) -> Finding {
+    Finding::error(
+        id,
+        format!("The hosted credential was not sent: {reason}."),
+        "Point the API URL at the managed backend over HTTPS, or at a loopback endpoint for local testing.",
+    )
 }
 
 fn credential_skipped(id: &str) -> Finding {

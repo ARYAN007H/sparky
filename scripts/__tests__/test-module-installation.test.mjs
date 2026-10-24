@@ -532,7 +532,7 @@ test("the Rust E2E runner reuses container-staged module paths", () => {
   assert.match(runnerSource, /pre-staged native modules/);
 });
 
-test("the CI installer builds nothing: every module, tinyconnectors included, is a registry release", () => {
+test("the CI installer stages callback modules as registry releases", () => {
   const source = readFileSync(installer, "utf8");
   assert.doesNotMatch(source, /cargo build|cargo-cancel|--target-dir/);
   assert.doesNotMatch(source, /stage-connector-test-module|modules\.toml/);
@@ -541,10 +541,46 @@ test("the CI installer builds nothing: every module, tinyconnectors included, is
     "ubuntu-22.04-x86_64",
   );
   const connectors = assets.find((asset) => asset.id === "tinyconnectors");
+  const eventqueues = assets.find((asset) => asset.id === "tinyeventqueues");
   assert.ok(
     connectors,
     "the installer resolves tinyconnectors from the registry",
   );
   assert.match(connectors.sha256, /^[a-f0-9]{64}$/);
   assert.match(connectors.url, /\/releases\/download\/v\d+\.\d+\.\d+\//);
+  assert.ok(eventqueues, "the installer stages tinyeventqueues from the registry");
+  assert.match(eventqueues.sha256, /^[a-f0-9]{64}$/);
+  assert.match(eventqueues.url, /\/releases\/download\/v\d+\.\d+\.\d+\//);
+  assert.match(source, /tinymcp tinyeventqueues tinyjuice/);
+});
+
+test("the core workflow isolates tests that need staged callback modules", () => {
+  const workflow = readFileSync(
+    new URL("../../.github/workflows/test-reusable.yml", import.meta.url),
+    "utf8",
+  );
+  const moduleTests = [
+    "inbound::ops::tests::a_burst_over_max_batch_runs_in_turns_of_at_most_max_batch",
+    "inbound::ops::tests::the_operations_reach_the_module",
+    "inbound::ops::tests::three_offers_within_the_window_run_one_turn_with_one_result_and_one_event",
+    "inbound::route::tests::an_accepted_event_is_queued_and_a_redelivery_ends_at_ingress",
+    "integrations::composio::bus::trigger_subscriber::tests::a_deferred_composio_trigger_is_retried_at_its_defer_time_instead_of_dropped",
+    "integrations::composio::bus::trigger_subscriber::tests::a_redelivered_composio_trigger_produces_one_turn",
+    "integrations::composio::bus::trigger_subscriber::tests::without_a_config_a_trigger_is_triaged_directly",
+    "integrations::composio::bus::trigger_subscriber::tests::with_the_queues_off_a_trigger_is_triaged_directly",
+    "modules::channel_runtime::tests::released_runtime_scopes_callbacks_and_replays_one_final_send",
+    "modules::event_queues::tests::every_member_is_reachable",
+    "skills::webhooks::bus::tests::inbound::with_the_component_off_an_agent_webhook_is_triaged_directly",
+    "skills::webhooks::bus::tests::inbound::a_redelivered_agent_webhook_produces_one_turn",
+    "skills::webhooks::bus::tests::inbound::a_deferred_agent_webhook_is_retried_at_its_defer_time_instead_of_dropped",
+  ];
+
+  for (const moduleTest of moduleTests) {
+    assert.ok(
+      workflow.includes(moduleTest),
+      `the CI core suite must run ${moduleTest} with staged module artifacts`,
+    );
+  }
+  assert.match(workflow, /for module_test in "\$\{MODULE_TESTS\[@\]\}"/);
+  assert.match(workflow, /unset OPENHUMAN_MODULE_PATH/);
 });

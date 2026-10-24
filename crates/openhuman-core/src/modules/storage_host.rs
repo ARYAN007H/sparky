@@ -599,7 +599,17 @@ impl CallerDirectory for Live {
 #[async_trait]
 impl Environment for Live {
     fn backend(&self) -> Option<Arc<dyn StorageBackend>> {
-        crate::storage::installed()
+        // A host that installed a backend (the app, or an embedder that passed
+        // one) wins. An embedder that did not gets the workspace default every
+        // other store already opens for itself ([`crate::storage::local::backend_for`]),
+        // so a module is not the one consumer left with no storage.
+        crate::storage::installed().or_else(|| {
+            let workspace = crate::core::runtime::DispatchCtx::ambient()
+                .resolved()?
+                .workspace_dir()
+                .ok()?;
+            crate::storage::local::backend_for(&workspace).ok()
+        })
     }
 
     fn module_scope(&self, module_id: &str) -> Result<Scope, StorageError> {
@@ -653,7 +663,7 @@ pub(super) async fn serve_objects(
 /// ([`super::storage_host_linked`]). If that cannot be attached the objects
 /// are served from the host connection as before, with Secrets unreachable,
 /// and the failure is logged.
-pub(super) async fn install(
+pub(crate) async fn install(
     connection: &tinybus::Connection,
     modules: &tinybus::module::ModuleHost,
 ) -> tinybus::Result<()> {
@@ -674,6 +684,38 @@ pub(super) async fn install(
             })
         }
     }
+}
+
+/// Prepare the exact per-module storage capability used by TinyMCP and
+/// TinyEventQueues. The callback endpoint reuses the live storage policy but
+/// is reachable only by the verified module instance loaded with this binding.
+pub(super) async fn prepare_module_callbacks(
+    runtime: &tinybus::module::ModuleRuntime,
+) -> tinybus::Result<(
+    Arc<tinybus::module::HostCallbackBinding>,
+    tinystoragedrivers_busproxy::ServedStorage,
+)> {
+    let connection = runtime.connection();
+    prepare_callbacks(connection, runtime.host()).await
+}
+
+/// Prepare a callback storage endpoint for a module host on `connection`.
+pub(crate) async fn prepare_callbacks(
+    connection: &tinybus::Connection,
+    modules: &tinybus::module::ModuleHost,
+) -> tinybus::Result<(
+    Arc<tinybus::module::HostCallbackBinding>,
+    tinystoragedrivers_busproxy::ServedStorage,
+)> {
+    let binding = tinystoragedrivers_busproxy::prepare_storage_host_callbacks(modules).await?;
+    let endpoint = Arc::new(HostEndpoint::new(
+        live_host(connection),
+        Some(tokio::runtime::Handle::current()),
+    ));
+    let served =
+        tinystoragedrivers_busproxy::serve_with_host_callbacks(Arc::clone(&binding), endpoint)
+            .await?;
+    Ok((binding, served))
 }
 
 #[path = "storage_host_endpoint.rs"]

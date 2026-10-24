@@ -1,6 +1,7 @@
 //! Test-only storage backends backed by the real TSD testkit and drivers.
 
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 #[cfg(feature = "storage-sqlite")]
 use crate::storage::block_on_anyhow;
@@ -10,6 +11,61 @@ use crate::storage::StorageBackend;
 /// writes or persistence across backend instances.
 pub fn memory_backend() -> Arc<dyn StorageBackend> {
     Arc::new(tinystoragedrivers_testkit::MemoryBackend::new())
+}
+
+static TEST_WORKSPACES: OnceLock<Mutex<Vec<tempfile::TempDir>>> = OnceLock::new();
+
+/// Returns a private workspace path retained until the test process exits.
+/// Use it when a test context can open durable storage: sharing the system
+/// temp directory lets unrelated tests declare conflicting storage indexes.
+pub fn isolated_workspace() -> PathBuf {
+    let directory = tempfile::tempdir().expect("create isolated test workspace");
+    let path = directory.path().to_path_buf();
+    TEST_WORKSPACES
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .push(directory);
+    path
+}
+
+/// The in-memory backend a workspace opens by default under `cfg(test)`.
+///
+/// The TSD memory engine cannot evaluate a write condition, yet the session
+/// transcripts (lease-conditioned generation writes) and the state import
+/// claims ask every backend for a conditioned scope. In a unit test the one
+/// process is the only writer, so there is nothing to fence: this wrapper
+/// opens the plain handles for a conditioned scope. It exists only for the
+/// workspace default; tests of the conditions themselves use
+/// [`sqlite_backend`], which enforces them.
+#[derive(Debug)]
+pub(crate) struct UnfencedMemoryBackend(tinystoragedrivers_testkit::MemoryBackend);
+
+impl UnfencedMemoryBackend {
+    pub(crate) fn new() -> Self {
+        Self(tinystoragedrivers_testkit::MemoryBackend::new())
+    }
+}
+
+impl StorageBackend for UnfencedMemoryBackend {
+    fn capabilities(&self) -> tinystoragedrivers_types::Capabilities {
+        self.0.capabilities()
+    }
+
+    fn for_scope(
+        &self,
+        scope: &tinystoragedrivers::Scope,
+    ) -> Result<tinystoragedrivers::Storage, tinystoragedrivers::StorageError> {
+        self.0.for_scope(scope)
+    }
+
+    fn for_scope_conditioned(
+        &self,
+        scope: &tinystoragedrivers::Scope,
+        _condition: &tinystoragedrivers_types::WriteCondition,
+    ) -> Result<tinystoragedrivers::Storage, tinystoragedrivers::StorageError> {
+        self.0.for_scope(scope)
+    }
 }
 
 static STORAGE_SLOT_TEST_LOCK: Mutex<()> = Mutex::new(());
@@ -36,6 +92,19 @@ pub fn install_for_test(url: &str, backend: Arc<dyn StorageBackend>) -> Installe
     let slot_lock = lock_storage_slot();
     let previous_url = crate::storage::installed_url();
     let previous_backend = crate::storage::install_for_url(url, backend);
+    InstalledBackendGuard {
+        _slot_lock: slot_lock,
+        previous_backend,
+        previous_url,
+    }
+}
+
+/// [`install_for_test`] for a backend opened from no URL (memory): a test
+/// that needs storage in the slot without exercising the boot path.
+pub fn install_backend_for_test(backend: Arc<dyn StorageBackend>) -> InstalledBackendGuard {
+    let slot_lock = lock_storage_slot();
+    let previous_url = crate::storage::installed_url();
+    let previous_backend = crate::storage::install(backend);
     InstalledBackendGuard {
         _slot_lock: slot_lock,
         previous_backend,

@@ -502,3 +502,32 @@ fn chat_error_event_serializes_copy_key_and_params_to_literal_json() {
     let bare = serde_json::to_value(WebChannelEvent::default()).expect("serializes");
     assert!(bare.get("copy_key").is_none() && bare.get("copy_params").is_none());
 }
+
+#[test]
+fn a_key_echoed_in_provider_detail_never_reaches_the_copy() {
+    // Host smoke test: a rejected request's provider detail is quoted into the
+    // user-facing message and sent as a copy param, and both must carry the
+    // sanitized detail. Key-shape coverage lives with the sanitizer in
+    // TinyInference. The key is synthetic, built at runtime.
+    let key = format!("sk-proj-{}", "AbCdEf0123456789".repeat(2));
+    let got = classify_inference_error(&format!(
+        r#"someprovider API error (422 Unprocessable Entity): {{"error":{{"message":"bad parameter for key {key}"}}}}"#
+    ));
+    assert!(
+        got.message.contains("bad parameter"),
+        "the provider detail must still be quoted: {}",
+        got.message
+    );
+    assert!(
+        !got.message.contains("AbCdEf0123456789"),
+        "key leaked into the message: {}",
+        got.message
+    );
+    let params = got.copy_params.expect("provider and detail copy params");
+    let detail = params["detail"].as_str().expect("a detail copy param");
+    assert!(detail.contains("bad parameter"), "{detail}");
+    assert!(
+        !params.to_string().contains("AbCdEf0123456789"),
+        "key leaked into the copy params: {params}"
+    );
+}

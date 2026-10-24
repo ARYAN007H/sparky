@@ -427,6 +427,15 @@ export interface ChatPlanReviewRequestEvent {
   expires_at?: string;
 }
 
+/** A parked plan-review gate resolved or was cancelled by the core. */
+export interface ChatPlanReviewDecidedEvent {
+  thread_id: string;
+  request_id: string;
+  decision: string;
+  /** Web-channel terminal reason, serialized on `cancel_reason`. */
+  cancel_reason?: 'expired' | 'cancelled' | string;
+}
+
 /**
  * One item of a thread's live todo list, as the core writes it via the
  * `todo` tool. Bridged from `DomainEvent::ThreadTodosChanged` by the web
@@ -678,16 +687,6 @@ export interface SubagentProgressDetail {
   /** Human-readable display name from the agent registry. */
   display_name?: string;
   /**
-   * Absolute path to the worker's isolated `git worktree` checkout (on
-   * `subagent_completed`, when the worker ran with `isolation = "worktree"`).
-   * Drives the inline worktree row's open/diff/remove actions (#3376).
-   */
-  worktree_path?: string;
-  /** Files (relative to the worktree root) the worker changed (on `subagent_completed`). */
-  changed_files?: string[];
-  /** Whether the worker's worktree had uncommitted changes (on `subagent_completed`). */
-  dirty_status?: boolean;
-  /**
    * This child's own spend (on `subagent_completed`) — present **only when it
    * is not already inside the parent turn's totals**.
    *
@@ -703,7 +702,7 @@ export interface SubagentProgressDetail {
   /** `null` when the child's cost is not known. */
   cost_usd?: number | null;
   /**
-   * Provider-assigned id of the `spawn_subagent`/`spawn_async_subagent`/
+   * Provider-assigned id of the `spawn_subagent`/
    * `delegate_*` tool call that started this delegation
    * (`AgentProgress::SubagentSpawned::parent_call_id`, threaded onto every
    * event in the `subagent_*` family — see `crates/openhuman-rpc/src/server/socketio.rs`).
@@ -901,6 +900,7 @@ export interface ChatEventListeners {
   onApprovalRequest?: (event: ChatApprovalRequestEvent) => void;
   onApprovalDecided?: (event: ChatApprovalDecidedEvent) => void;
   onPlanReviewRequest?: (event: ChatPlanReviewRequestEvent) => void;
+  onPlanReviewDecided?: (event: ChatPlanReviewDecidedEvent) => void;
   onThreadTodosChanged?: (event: ChatThreadTodosChangedEvent) => void;
   onThreadGoalUpdated?: (event: ChatThreadGoalUpdatedEvent) => void;
   onThreadGoalCleared?: (event: ChatThreadGoalClearedEvent) => void;
@@ -955,6 +955,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
     approvalRequest: 'approval_request',
     approvalDecided: 'approval_decided',
     planReviewRequest: 'plan_review_request',
+    planReviewDecided: 'plan_review_decided',
     threadTodosChanged: 'thread_todos_changed',
     threadGoalUpdated: 'thread_goal_updated',
     threadGoalCleared: 'thread_goal_cleared',
@@ -1354,6 +1355,22 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
     };
     socket.on(EVENTS.planReviewRequest, cb);
     handlers.push([EVENTS.planReviewRequest, cb]);
+  }
+
+  if (listeners.onPlanReviewDecided) {
+    const cb = (payload: unknown) => {
+      const e = payload as ChatPlanReviewDecidedEvent;
+      chatLog(
+        '%s thread_id=%s request_id=%s resolution=%s',
+        EVENTS.planReviewDecided,
+        e.thread_id,
+        e.request_id,
+        e.cancel_reason
+      );
+      listeners.onPlanReviewDecided?.(e);
+    };
+    socket.on(EVENTS.planReviewDecided, cb);
+    handlers.push([EVENTS.planReviewDecided, cb]);
   }
 
   if (listeners.onThreadTodosChanged) {

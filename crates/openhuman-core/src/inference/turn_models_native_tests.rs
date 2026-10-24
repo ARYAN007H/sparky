@@ -49,9 +49,10 @@ async fn native_turn_factory_applies_default_temperature_and_preserves_explicit_
 }
 #[tokio::test]
 async fn native_budget_wrapping_keeps_owner_error_slots_for_primary_tiers_and_summary() {
-    use crate::agent::tinyagents::budget::{CallBudget, ModelBudget, SpendLimits};
+    use crate::agent::tinyagents::budget::{CallBudget, SpendLimits};
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     use crate::core::slots::Extensions;
+    use tinyagents_harness::cost::ModelBudget;
 
     let _guard = crate::inference::inference_test_guard_async().await;
     let extensions = Extensions::new();
@@ -69,17 +70,17 @@ async fn native_budget_wrapping_keeps_owner_error_slots_for_primary_tiers_and_su
     let ctx = DispatchCtx::new(context.clone());
     let tmp = tempfile::tempdir().expect("isolated workspace");
     let config = Arc::new(managed_fixture_config(&tmp));
-    let budget = ModelBudget {
-        ledger: tinyinference_llm::model::budget::Budget::new(SpendLimits {
+    let budget = ModelBudget::new(
+        tinyinference_llm::model::budget::Budget::new(SpendLimits {
             tokens: Some(0),
             cost_micros: None,
         }),
-        call: CallBudget {
+        CallBudget {
             input_tokens: 10_000,
             output_tokens: 1,
             cost_micros: 1,
         },
-    };
+    );
     let models = TurnModelSource::new_crate_native(&ctx, "chat", config)
         .build("hint:chat", 0.0, None, None)
         .expect("native model set")

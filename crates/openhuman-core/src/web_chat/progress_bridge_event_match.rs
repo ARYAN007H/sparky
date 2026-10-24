@@ -253,9 +253,6 @@
                     output_chars,
                     output,
                     usage,
-                    worktree_path,
-                    changed_files,
-                    dirty_status,
                     ..
                 } => {
                     subagent_events::on_subagent_completed(
@@ -271,9 +268,6 @@
                         output_chars,
                         output,
                         usage,
-                        worktree_path,
-                        changed_files,
-                        dirty_status,
                     );
                 }
                 AgentProgress::SubagentFailed {
@@ -427,17 +421,15 @@
                     // Buffer the round's narration so it can be flushed as an
                     // interim bubble if a tool call closes this round.
                     pending_narration.push_str(&delta);
-                    if !metadata.hold_text_stream {
-                        text_events::publish_text_delta(
-                            &dispatch_ctx,
-                            &mut emit_seq,
-                            &client_id,
-                            &thread_id,
-                            &request_id,
-                            iteration,
-                            delta,
-                        );
-                    }
+                    text_events::publish_text_delta(
+                        &dispatch_ctx,
+                        &mut emit_seq,
+                        &client_id,
+                        &thread_id,
+                        &request_id,
+                        iteration,
+                        delta,
+                    );
                 }
                 AgentProgress::ThinkingDelta { delta, iteration } => {
                     publish_seq_stamped(

@@ -11,7 +11,6 @@ use crate::config::{MultimodalConfig, MultimodalFileConfig, ReliabilityConfig};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::progress::AgentProgress;
-use crate::tools::delegate::ProviderRuntimeOptions;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -464,7 +463,6 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         api_url: None,
         inference_url: None,
         reliability: Arc::new(ReliabilityConfig::default()),
-        provider_runtime_options: ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(harness_workspace_dir),
         message_timeout_secs: options.timeout_secs,
         multimodal: MultimodalConfig::default(),

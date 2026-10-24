@@ -454,9 +454,6 @@ fn subagent_lifecycle_records_and_clears_active() {
         output_chars: 80,
         usage: None,
         output: String::new(),
-        worktree_path: None,
-        changed_files: Vec::new(),
-        dirty_status: None,
         stop: None,
     });
     let s = m.snapshot();
@@ -557,7 +554,7 @@ fn thinking_timing_wire_shape_is_camel_case_and_backward_compatible() {
 #[test]
 fn subagent_spawned_derives_source_tool_name_from_the_parent_row() {
     // Only `spawn_subagent` ever hardcoded a "spawn_subagent" source. Every
-    // other delegation path (`spawn_parallel_agents`, `spawn_async_subagent`,
+    // other delegation path (`spawn_subagent`,
     // a synthesized `delegate_researcher`, …) must show its own real tool
     // name, derived from the parent call's row by `parent_call_id` — never
     // the historical hardcoded default.
@@ -649,9 +646,6 @@ fn subagent_completed_persists_capped_output_on_the_activity() {
         output_chars: 11,
         usage: None,
         output: "final answer".into(),
-        worktree_path: None,
-        changed_files: Vec::new(),
-        dirty_status: None,
         stop: None,
     });
 

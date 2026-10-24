@@ -2,7 +2,10 @@ use super::*;
 use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 
 fn test_config() -> Config {
-    Config::default()
+    let config = Config::default();
+    crate::security::credentials::api_key::store_api_key(&config, "test-session-fixture-key")
+        .expect("store triage test credential");
+    config
 }
 
 fn openai_entry(id: &str, slug: &str) -> CloudProviderCreds {

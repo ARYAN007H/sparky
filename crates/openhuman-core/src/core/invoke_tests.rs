@@ -130,26 +130,6 @@ async fn invoke_service_status_rejects_unknown_param() {
 }
 
 #[tokio::test]
-async fn invoke_memory_init_accepts_empty_params() {
-    // jwt_token is optional (accepted for backward compat but ignored).
-    // The call may still fail for workspace reasons in test, but must NOT
-    // fail with a missing-param error for jwt_token.
-    let result = invoke_method(
-        DispatchCtx::ambient(),
-        default_state(),
-        "openhuman.memory_init",
-        json!({}),
-    )
-    .await;
-    if let Err(ref e) = result {
-        assert!(
-            !e.contains("missing required param") || !e.contains("jwt_token"),
-            "jwt_token should be optional, got: {e}"
-        );
-    }
-}
-
-#[tokio::test]
 async fn invoke_memory_learn_rejects_unknown_param() {
     let err = invoke_method(
         DispatchCtx::process_default(),
@@ -276,22 +256,17 @@ async fn invoke_method_rejects_string_params_for_registered_method() {
 
 #[tokio::test]
 async fn invoke_method_accepts_null_params_for_registered_method() {
-    // JSON-RPC 2.0 allows omitting params; null must be treated like {}.
+    // JSON-RPC 2.0 allows omitting params; null must behave exactly like {}
+    // (see invoke_health_snapshot_via_registry), not merely avoid one error.
     let result = invoke_method(
         DispatchCtx::ambient(),
         default_state(),
         "openhuman.health_snapshot",
         json!(null),
     )
-    .await;
-    // Call should succeed or fail for domain reasons — but must NOT
-    // fail with the "invalid params" shape error.
-    if let Err(e) = result {
-        assert!(
-            !e.contains("invalid params"),
-            "null should be accepted as empty object, got: {e}"
-        );
-    }
+    .await
+    .expect("null params must behave like {}");
+    assert!(result.get("result").is_some());
 }
 
 #[tokio::test]

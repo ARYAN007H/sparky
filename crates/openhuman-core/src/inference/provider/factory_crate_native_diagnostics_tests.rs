@@ -95,6 +95,9 @@ async fn from_string_external_provider_emits_egress_realpath() {
 #[tokio::test]
 async fn caller_owned_models_build_without_openhuman_session() {
     let _guard = crate::inference::inference_test_guard_async().await;
+    let _storage = crate::storage::test_support::install_backend_for_test(
+        crate::storage::test_support::memory_backend(),
+    );
     let _signed_out = crate::platform::llm_gate::SignedOutTestGuard::set(true);
     let dir = tempfile::tempdir().unwrap();
     let config = Config {

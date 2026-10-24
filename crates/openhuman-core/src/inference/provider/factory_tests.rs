@@ -630,6 +630,8 @@ mod crate_native_tests;
 mod egress_fallback_tests;
 #[path = "factory_explicit_ctx_tests.rs"]
 mod explicit_ctx_tests;
+#[path = "factory_local_only_endpoint_tests.rs"]
+mod local_only_endpoint_tests;
 #[path = "factory_managed_ledger_tests.rs"]
 mod managed_ledger_tests;
 #[path = "factory_model_gate_tests.rs"]

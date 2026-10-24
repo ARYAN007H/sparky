@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 
 #[cfg(test)]
-use super::command_analysis::classify_host_command;
+use super::command_vocabulary::classify_segment_source;
 use super::CommandAnalysis;
 
 #[cfg(test)]
@@ -81,36 +81,45 @@ fn contains_unquoted_single_ampersand(command: &str) -> bool {
 
 #[cfg(test)]
 fn has_hidden_execution(command: &str) -> bool {
+    let command = strip_quoted_heredoc_bodies(command);
     ["$(", "<(", ">("]
         .iter()
         .any(|needle| command.contains(needle))
-        || contains_unquoted_char(command, '`')
-        || contains_unquoted_single_ampersand(command)
+        || contains_unquoted_char(&command, '`')
+        || contains_unquoted_single_ampersand(&command)
 }
 
 #[cfg(test)]
 fn is_command_executor(command: &str) -> bool {
-    matches!(
-        command,
-        "sh" | "bash"
-            | "zsh"
-            | "fish"
-            | "python"
-            | "python2"
-            | "python3"
-            | "node"
-            | "ruby"
-            | "perl"
-            | "php"
-            | "lua"
-            | "awk"
-            | "xargs"
-    )
-}
-
-#[cfg(test)]
-fn classify_segment(base: &str, args: &[String], joined: &str) -> CommandClass {
-    classify_host_command(base, args, joined)
+    let command = command_basename(command.trim_matches(|c: char| matches!(c, '\'' | '"')))
+        .to_ascii_lowercase();
+    let command = command.strip_suffix(".exe").unwrap_or(&command);
+    let python_executor = command
+        .strip_prefix("pythonw")
+        .or_else(|| command.strip_prefix("python"))
+        .is_some_and(|version| {
+            version.is_empty()
+                || version
+                    .chars()
+                    .all(|character| character.is_ascii_digit() || character == '.')
+        });
+    python_executor
+        || matches!(
+            command,
+            "sh" | "bash"
+                | "zsh"
+                | "fish"
+                | "python"
+                | "python2"
+                | "node"
+                | "ruby"
+                | "perl"
+                | "php"
+                | "lua"
+                | "awk"
+                | "xargs"
+                | "env"
+        )
 }
 
 impl SecurityPolicy {
@@ -313,17 +322,12 @@ impl SecurityPolicy {
         // `rm` or `curl` lifts a plain file write to Destructive/Network.
         let command = &strip_quoted_heredoc_bodies(command);
         let mut class = CommandClass::Read;
+        // The same per-segment classifier production applies to TinyBox's
+        // segment facts (`CommandAnalysis::from_shell_analysis`).
         for segment in split_unquoted_segments(command) {
-            let cmd_part = skip_env_assignments(&segment);
-            let mut words = cmd_part.split_whitespace();
-            let Some(base_raw) = words.next() else {
-                continue;
-            };
-            let base = normalized_command_name(base_raw);
-            let args: Vec<String> = words.map(|w| w.to_ascii_lowercase()).collect();
-            let joined = cmd_part.to_ascii_lowercase();
-            let segment_class = classify_segment(&base, &args, &joined);
-            class = class.max(segment_class);
+            if !segment.trim().is_empty() {
+                class = class.max(classify_segment_source(&segment));
+            }
         }
         // A redirect or `tee` writes a file regardless of the base command.
         if contains_unquoted_char(command, '>')
@@ -415,7 +419,10 @@ impl SecurityPolicy {
         let words = strip_quoted_heredoc_bodies(input)
             .split(|c: char| {
                 c.is_whitespace()
-                    || matches!(c, '\'' | '"' | '(' | ')' | '[' | ']' | ',' | ';' | '=')
+                    || matches!(
+                        c,
+                        '\'' | '"' | '(' | ')' | '[' | ']' | ',' | ';' | '=' | '@'
+                    )
             })
             .map(str::to_owned)
             .collect::<Vec<_>>();

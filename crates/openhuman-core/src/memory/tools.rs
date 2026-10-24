@@ -260,7 +260,7 @@ impl Tool for MemoryTool {
     }
 
     fn parameters_schema(&self) -> Value {
-        crate::tools::schema_cache::static_schema!(include_str!("parameters/memory.json"))
+        tinyagents_harness_tools::static_schema!(include_str!("parameters/memory.json"))
     }
 
     fn permission_level(&self) -> PermissionLevel {

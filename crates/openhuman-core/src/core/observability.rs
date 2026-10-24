@@ -27,7 +27,7 @@ use std::fmt::Display;
 #[path = "observability_release_tag.rs"]
 mod release_tag;
 #[cfg(feature = "crash-reporting")]
-use release_tag::{parse_release_tag, parse_version};
+pub use release_tag::is_stale_release_event;
 
 #[path = "observability_availability.rs"]
 mod availability;

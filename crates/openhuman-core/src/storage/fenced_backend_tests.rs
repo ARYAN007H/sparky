@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::storage::fence::{fence_error, FenceError, LeaseFence, ScopeMatch};
-use crate::storage::lease::{DocumentLeases, LeaseGrant, LeaseStore};
+use crate::storage::lease::{DocumentLeases, LeaseGrant, LeaseStore, LocalLeases};
 use serde_json::json;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -72,6 +72,60 @@ impl Node {
 
 fn shared() -> crate::storage::test_support::SqliteBackend {
     crate::storage::test_support::sqlite_backend().unwrap()
+}
+
+#[tokio::test]
+async fn a_file_lease_guards_profile_handles_until_release() {
+    let shared = shared();
+    let root = tempfile::tempdir().unwrap();
+    let leases: Arc<dyn LeaseStore> = Arc::new(LocalLeases::new(root.path(), "node-a"));
+    let grant = leases.acquire("alice", 0).await.unwrap();
+    let fences = Arc::new(FenceRegistry::new(crate::storage::fence::system_now_ms));
+    let fence = Arc::new(LeaseFence::new(
+        Arc::clone(&leases),
+        "alice",
+        "node-a",
+        grant.epoch,
+        grant.expires_at_ms,
+        0,
+        vec![ScopeMatch::Exact("profile:alice".into())],
+    ));
+    fences.register(Arc::clone(&fence));
+    let backend = FencedBackend::new(Arc::clone(&shared.backend), Arc::clone(&fences));
+    let scope = Scope::new("profile:alice").unwrap();
+    let storage = backend.for_scope(&scope).unwrap();
+    storage
+        .documents()
+        .ensure_collection(&CollectionSpec::new("items"))
+        .await
+        .unwrap();
+    storage
+        .documents()
+        .put(
+            "items",
+            "during-lease",
+            json!({"ok": true}),
+            Precondition::Absent,
+        )
+        .await
+        .unwrap();
+
+    fences.retire("alice", grant.epoch);
+    leases.release(grant).await.unwrap();
+    let error = storage
+        .documents()
+        .put(
+            "items",
+            "after-release",
+            json!({"ok": false}),
+            Precondition::Absent,
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        fence_error(&error),
+        Some(FenceError::Fenced { .. })
+    ));
 }
 
 #[tokio::test]
@@ -174,7 +228,11 @@ async fn a_cached_handle_cannot_mutate_after_cross_process_takeover_on_any_port(
         .await
         .is_err());
     assert!(storage.kv().put("key", json!(1)).await.is_err());
-    assert!(!storage.queues().ack("work", &receipt).await.unwrap());
+    let error = storage.queues().ack("work", &receipt).await.unwrap_err();
+    assert!(matches!(
+        fence_error(&error),
+        Some(FenceError::Fenced { .. })
+    ));
 
     let raw = shared
         .backend

@@ -4,6 +4,7 @@
 //! `tools/impl/README.md`; `security_for_tool_context` below is the shared
 //! `SecurityPolicy` resolver that must stay in step with the `filesystem` copy.
 
+mod exec_adapters;
 mod install_tool;
 mod lsp;
 mod proxy_config;
@@ -18,8 +19,8 @@ mod shell_support;
 mod update_apply;
 mod update_check;
 
-use crate::security::policy::{TrustedAccess, TrustedRoot};
 use crate::security::SecurityPolicy;
+use crate::tools::implementations::filesystem::gate::security_scoped_to_root;
 use tinytools::ToolRunContext;
 
 pub use install_tool::InstallToolTool;
@@ -54,12 +55,11 @@ pub use update_check::UpdateCheckTool;
 /// The root always originates from trusted in-process code (the session
 /// builder, the sub-agent runner, or the `cwd` RPC parameter) — never from
 /// model-supplied text.
-pub(super) fn security_for_tool_context(
+pub(in crate::tools::implementations) fn security_for_tool_context(
     security: &SecurityPolicy,
     context: Option<&dyn ToolRunContext>,
     tool: &str,
 ) -> SecurityPolicy {
-    let mut scoped = security.clone();
     if let Some(workspace) = context.and_then(|ctx| ctx.workspace()) {
         tracing::debug!(
             tool,
@@ -67,11 +67,8 @@ pub(super) fn security_for_tool_context(
             policy_id = %workspace.policy_id,
             "[tools:system] granting TinyAgents workspace descriptor as action dir + trusted root"
         );
-        scoped.action_dir = workspace.root.clone();
-        scoped.trusted_roots.push(TrustedRoot {
-            path: workspace.root.to_string_lossy().to_string(),
-            access: TrustedAccess::ReadWrite,
-        });
+        security_scoped_to_root(security, &workspace.root)
+    } else {
+        security.clone()
     }
-    scoped
 }

@@ -116,6 +116,7 @@ pub use runtime::test_support;
 pub use prompt::build_system_prompt;
 #[cfg(feature = "channels")]
 pub use runtime::start_channels;
+pub(crate) use runtime::turn_driver::run_channel_turn;
 #[cfg(feature = "channels")]
 pub(crate) use runtime::{session, start_channels_with_session};
 

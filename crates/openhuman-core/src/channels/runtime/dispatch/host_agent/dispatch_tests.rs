@@ -66,7 +66,6 @@ fn context(channel: Arc<Telegram>, config: Config) -> Arc<ChannelRuntimeContext>
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(config.workspace_dir.clone()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -110,6 +109,8 @@ fn config(tmp: &tempfile::TempDir, agent_id: Option<&str>) -> Config {
     config.memory.conversations.enabled = false;
     config.agent.session_dual_write = false;
     config.agent.session_shadow_reads = false;
+    crate::security::credentials::api_key::store_api_key(&config, "test-session-fixture-key")
+        .expect("store channel test credential");
     if let Some(agent_id) = agent_id {
         config
             .agent

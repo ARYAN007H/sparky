@@ -42,7 +42,37 @@ impl OpenHumanSessionHost {
             origin,
         )
         .await?;
-        let mut context = OpenHumanRunContext::new().with_host_env(&self.host_env);
+        let mut host_env = self.host_env.clone();
+        let headless = self.settle_headless_descendants;
+        let root_cancellation = if headless {
+            let cancellation = host_env
+                .cancellation
+                .as_ref()
+                .map(tinyagents_harness::cancel::CancellationToken::child_token)
+                .unwrap_or_default();
+            host_env.cancellation = Some(cancellation.clone());
+            if host_env.turn_deadline.is_none() {
+                host_env.turn_deadline = Some(
+                    tinyagents_harness::turn_deadline::TurnDeadline::starting_now(
+                        std::time::Duration::from_secs(900),
+                    ),
+                );
+            }
+            Some(RootRunCancellationGuard(cancellation))
+        } else {
+            None
+        };
+        let mut context = OpenHumanRunContext::new().with_host_env(&host_env);
+        context.hosted_base = self.hosted_base.clone();
+        context.headless_descendant_settlement = headless;
+        let headless_owner = headless.then(|| {
+            crate::agent::tinyagents::tool_registration::subagent_owner_key(
+                &self.workspace_dir,
+                &self.event_session_id,
+                self.thread_id.as_deref(),
+            )
+        });
+        context.headless_descendant_owner = headless_owner.clone();
         context.untrusted_input_turn = self.untrusted_input;
         context.origin = origin.cloned();
         context.approval = approval;
@@ -53,12 +83,30 @@ impl OpenHumanSessionHost {
         context.workspace = self.workspace_descriptor.clone();
         // Sub-agents of this turn write their transcripts to this session's
         // store, under the key it resolved for its own.
-        context.transcripts = Some(self.session_locator());
+        context.transcripts = Some(self.subagent_transcript_locator());
         // The web backstop's deadline (`host_env.turn_deadline`), when this
         // turn runs under one, is already on the context: the harness winds
         // down before it instead of being dropped by it.
         let cancellation = context.cancellation.clone();
         let root_config = context.root_run_config("openhuman-session");
+        let settlement_deadline = host_env.turn_deadline.map(|deadline| {
+            tokio::time::Instant::from_std(deadline.started() + deadline.backstop())
+        });
+        let descendant_lease = if headless {
+            let dispatch = context.dispatch_ctx();
+            let jobs = crate::core::runtime::slot_for::<
+                tinyagents_orchestration::subagent::SubAgentJobRegistry,
+            >(&dispatch);
+            let owner = headless_owner.expect("headless settlement has a root owner scope");
+            Some(
+                jobs.retain_root_run_descendants(&root_config.run_id, owner)
+                    .map_err(|error| {
+                        anyhow::anyhow!("retain headless sub-agent results: {error}")
+                    })?,
+            )
+        } else {
+            None
+        };
         let mut options = TurnOptions {
             request_id: origin.and_then(|origin| match origin {
                 crate::security::turn_origin::AgentTurnOrigin::WebChat { request_id, .. } => {
@@ -68,9 +116,12 @@ impl OpenHumanSessionHost {
             }),
             thread_id: self.thread_id.clone(),
             stream: self.on_progress.is_some(),
-            session: self.session.clone(),
+            session: self
+                .session_history_locator
+                .as_ref()
+                .and(self.session.clone()),
             resume: self.turn_resume_mode(),
-            cancellation,
+            cancellation: cancellation.clone(),
             run_context: context.into_tinyagents(root_config),
             controls: Default::default(),
         };
@@ -148,10 +199,50 @@ impl OpenHumanSessionHost {
         let outcome = match Box::pin(turn).await {
             Ok(outcome) => outcome,
             Err(error) => {
+                drop(descendant_lease);
+                drop(root_cancellation);
                 return Err(runtime_turn_error(error, &session_sidecar));
             }
         };
-        Ok(outcome.output.unwrap_or_default())
+        let mut output = outcome.output.unwrap_or_default();
+        if let Some(lease) = descendant_lease {
+            let deadline = settlement_deadline.expect("headless turns always have a deadline");
+            let jobs = lease
+                .settle(deadline, &cancellation)
+                .await
+                .map_err(|error| anyhow::anyhow!("settle headless sub-agent results: {error}"))?;
+            for job in jobs {
+                match job.status {
+                    tinyagents_orchestration::subagent::SubAgentJobStatus::Completed => {
+                        if let Some(child_output) =
+                            job.output.filter(|text| !text.trim().is_empty())
+                        {
+                            output.push_str("\n\n[Sub-agent result: ");
+                            output.push_str(&job.agent);
+                            output.push_str("]\n");
+                            output.push_str(&child_output);
+                        }
+                    }
+                    status => {
+                        return Err(anyhow::anyhow!(
+                            "headless sub-agent '{}' ended with {status:?}: {}",
+                            job.agent,
+                            job.error.unwrap_or_else(|| "no error details".to_string())
+                        ));
+                    }
+                }
+            }
+        }
+        drop(root_cancellation);
+        Ok(output)
+    }
+}
+
+struct RootRunCancellationGuard(tinyagents_harness::cancel::CancellationToken);
+
+impl Drop for RootRunCancellationGuard {
+    fn drop(&mut self) {
+        self.0.cancel();
     }
 }
 

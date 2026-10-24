@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tinychannels_bus as traits;
 use tokio::sync::Barrier;
 
 #[tokio::test]
@@ -29,8 +28,8 @@ async fn dispatch_publishes_tinychannels_inbound_envelope() {
     assert_eq!(envelope.channel.id, "telegram");
     assert_eq!(envelope.message_id, "m1");
     assert_eq!(envelope.conversation.id, "reply");
-    assert_eq!(envelope.conversation.thread_id, None);
-    assert_eq!(envelope.conversation.topic_id.as_deref(), Some("topic-99"));
+    assert_eq!(envelope.conversation.thread_id.as_deref(), Some("topic-99"));
+    assert_eq!(envelope.conversation.topic_id, None);
     assert_eq!(envelope.sender.id, "alice");
 }
 
@@ -135,7 +134,6 @@ async fn message_dispatch_processes_messages_in_parallel() {
             api_url: None,
             inference_url: None,
             reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-            provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
             workspace_dir: Arc::new(std::env::temp_dir()),
             message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
             multimodal: crate::config::MultimodalConfig::default(),
@@ -212,7 +210,6 @@ async fn process_channel_message_cancels_scoped_typing_task() {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -302,7 +299,6 @@ async fn dispatch_routes_through_agent_run_turn_bus_handler() {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -423,7 +419,6 @@ async fn resolved_route_ctx() -> Arc<ChannelRuntimeContext> {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -557,7 +552,6 @@ async fn process_channel_message_hardens_multimodal_files_against_smuggled_marke
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -642,7 +636,6 @@ async fn process_channel_message_hardens_against_relative_path_markers() {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::tools::delegate::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),

@@ -170,11 +170,6 @@ name = "storage_agent_scopes_e2e"
 path = "../../tests/storage_agent_scopes_e2e.rs"
 
 [[test]]
-# Its own binary: the delegation graph's checkpointer on every driver.
-name = "storage_delegation_e2e"
-path = "../../tests/storage_delegation_e2e.rs"
-
-[[test]]
 # Its own binary: it boots a core with `[components]` switches off.
 name = "components_e2e"
 path = "../../tests/components_e2e.rs"
@@ -298,6 +293,10 @@ path = "../../tests/cli_model_overrides_e2e.rs"
 [[test]]
 name = "cli_sigpipe"
 path = "../../tests/cli_sigpipe.rs"
+
+[[test]]
+name = "cli_agent_chat_headless_e2e"
+path = "../../tests/cli_agent_chat_headless_e2e.rs"
 
 [[test]]
 name = "cli_storage_url_e2e"
@@ -445,13 +444,17 @@ serde = { version = "1", features = ["derive"] }
 tempfile = "3"
 tinyinference-llm = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-llm" }
 # The document-port contract for failure injection in cron storage regressions.
-tinystoragedrivers-api = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "05eaada962decbab33bafa4763d2bd1a67f6b456" }
-tinystoragedrivers = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "05eaada962decbab33bafa4763d2bd1a67f6b456", default-features = false, features = ["sqlite"] }
+tinystoragedrivers-api = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "f05fbd230c2c403c8dcdef57316fa55265379039" }
+tinystoragedrivers = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "f05fbd230c2c403c8dcdef57316fa55265379039", default-features = false, features = ["sqlite"] }
+# The in-memory host storage backend the integration suites install.
+tinystoragedrivers-testkit = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-testkit" }
 zeroize = "1"
 tinytools = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinytools" }
-tinytools-std = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinytools-std" }
 # The completion log a detached sub-agent leaves, for the SaaS delivery-recovery e2e.
 tinyagents-tasks = { path = "../../vendor/tinyagents/crates/tinyagents-tasks" }
+# The storage-kit backend port the completion-queue fixture adapts the host backend to.
+tinyagents-storage-kit = { path = "../../vendor/tinyagents/crates/tinyagents-storage-kit" }
+tinyagents-harness-tools = { path = "../../vendor/tinyagents/crates/tinyagents-harness-tools", default-features = false, features = ["goals"] }
 toml = "1.0"
 tracing = "0.1"
 # The TinyComputer contract, for the live computer-use e2e (`computer_bali_live_e2e`).
@@ -466,11 +469,9 @@ hex = "0.4"
 parking_lot = "0.12"
 sha2 = "0.10"
 tar = "0.4"
-tinyagents-graph = { path = "../../vendor/tinyagents/crates/tinyagents-graph", features = ["sqlite", "storage-drivers"] }
 tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", features = ["sqlite", "multimodal"] }
-tinyagents-harness-tools = { path = "../../vendor/tinyagents/crates/tinyagents-harness-tools", default-features = false, features = ["goals"] }
 tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }
-tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session" }
+tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session", features = ["testkit"] }
 tinydocs-bus = { path = "../../vendor/tinydocs/crates/tinydocs-bus" }
 # `inbound_linked_e2e` names the ingest dispositions from the contract.
 tinyeventqueues-bus = { path = "../../vendor/tinyeventqueues/crates/tinyeventqueues-bus" }
@@ -511,7 +512,6 @@ default = [
     "file-logging",
     "modules",
     "jev",
-    "tinymemes",
     "inbound-queues",
     "storage-sqlite",
     "storage-file",
@@ -526,7 +526,6 @@ http-server = ["openhuman-rpc/http-server"]
 inference = ["openhuman-rpc/inference"]
 documents = ["openhuman-rpc/documents"]
 hosting = ["openhuman-rpc/hosting"]
-tinymemes = ["openhuman-rpc/tinymemes"]
 inbound-queues = ["openhuman-rpc/inbound-queues"]
 modules = ["openhuman-rpc/modules"]
 voice = ["openhuman-rpc/voice"]

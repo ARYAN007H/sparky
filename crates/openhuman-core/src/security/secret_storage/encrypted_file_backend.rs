@@ -20,7 +20,7 @@ use zeroize::Zeroizing;
 
 #[path = "encrypted_file_backend/key_source.rs"]
 pub mod key_source;
-use key_source::{env_value, master_key_from_env};
+use key_source::{env_value, master_key_from_env, read_master_key_file};
 
 /// Environment variable carrying the master key inline as `2 * KEY_LEN` hex
 /// characters (`openssl rand -hex 32`). Lets a headless `openhuman-core
@@ -254,34 +254,6 @@ fn try_load_master_key() -> Result<([u8; KEY_LEN], String), MasterKeyError> {
         .map_err(|e| MasterKeyError::Configured(e.to_string()))
 }
 
-/// Reads the file named by [`MASTER_KEY_FILE_ENV`].
-///
-/// On Unix a key file must not be writable by other users. Read-only group or
-/// other permissions are supported for container secret mounts, where the
-/// runtime may add group-read access for a non-root core.
-fn read_master_key_file(path: &Path) -> Result<String, String> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let metadata = std::fs::metadata(path).map_err(|e| {
-            format!("cannot inspect master key file permissions ({MASTER_KEY_FILE_ENV}): {e}")
-        })?;
-        let mode = metadata.permissions().mode() & 0o777;
-        if key_file_mode_is_other_writable(mode) {
-            return Err(format!(
-                "master key file ({MASTER_KEY_FILE_ENV}) is writable by other users; \
-                 restrict it to a read-only secret mount"
-            ));
-        }
-    }
-    std::fs::read_to_string(path).map_err(|e| format!("cannot read master key file: {e}"))
-}
-
-#[cfg(unix)]
-fn key_file_mode_is_other_writable(mode: u32) -> bool {
-    mode & 0o002 != 0
-}
-
 /// Decodes a master key supplied as exactly `2 * KEY_LEN` hex characters.
 /// The value never appears in the error.
 fn parse_master_key_hex(hex: &str) -> Result<[u8; KEY_LEN], String> {
@@ -289,11 +261,6 @@ fn parse_master_key_hex(hex: &str) -> Result<[u8; KEY_LEN], String> {
     let got = hex.chars().count();
     if got != expected {
         return Err(format!("expected {expected} hex characters, got {got}"));
-    }
-    // `hex_decode` slices by byte; a non-ASCII value of the right character
-    // count would panic there instead of being rejected.
-    if !hex.is_ascii() {
-        return Err("value is not valid hex".to_string());
     }
     let bytes = crypto::hex_decode(hex).map_err(|_| "value is not valid hex".to_string())?;
     let mut key = [0u8; KEY_LEN];

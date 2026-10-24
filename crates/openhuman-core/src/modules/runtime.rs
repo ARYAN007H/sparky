@@ -115,14 +115,6 @@ async fn install_callbacks(runtime: &'static ModuleRuntime) -> tinybus::Result<(
     }
     super::site_memory_host::install(connection).await?;
     super::storage_host::install(connection, runtime.host()).await?;
-    #[cfg(feature = "tinymemes")]
-    {
-        if host.components().memes {
-            crate::tinymemes::service::install(connection).await?;
-        } else {
-            tracing::debug!("[modules] memes component off; Host callbacks not served");
-        }
-    }
     #[cfg(feature = "web3")]
     super::wallet_host::install(connection).await?;
     // Deliver / ClassifySalience for the inbound event queues; with the

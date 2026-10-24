@@ -264,7 +264,7 @@ impl ApprovalGate {
         // so the two are identical whenever both are present. They diverge only
         // when a turn is detached from the chat turn that started it and keeps
         // the origin but not the approval context — most importantly
-        // an async-delegated sub-agent (`spawn_async_subagent`, reached when the
+        // an async-delegated sub-agent (`spawn_subagent`, reached when the
         // orchestrator routes "remind me…" to `scheduler_agent`): the origin
         // travels but the chat context does not (`detached_child`). Without the fallback the gate
         // parks with `thread_id: None`, the web-channel surface drops the

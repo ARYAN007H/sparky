@@ -219,7 +219,6 @@ The compiled capability report describes this build:
     "storage-mongodb": false,
     "storage-s3": false,
     "storage-sqlite": false,
-    "tinymemes": true,
     "voice": false,
     "web3": false
   },
@@ -251,7 +250,6 @@ The compiled capability report describes this build:
     "skills": "withheld",
     "storage": "withheld",
     "system": "withheld",
-    "tasks": "withheld",
     "web3": "withheld",
     "workflows": "withheld"
   },

@@ -5,7 +5,9 @@
 //! supplies OpenHuman's live credential resolver and client policy.
 
 use std::path::PathBuf;
-use tinyinference_llm::providers::tinyhumans::{TinyHumansFailurePoint, TinyHumansModel};
+use tinyinference_llm::providers::tinyhumans::{
+    TinyHumansCredential, TinyHumansCredentialKind, TinyHumansFailurePoint, TinyHumansModel,
+};
 
 use super::managed_session::{publish_managed_auth_failure, resolve_session_bearer};
 use crate::backend::url::effective_api_url;
@@ -37,7 +39,13 @@ impl ManagedOptions {
         })
     }
 
+    #[cfg(test)]
     fn resolve_bearer(&self, endpoint: &str) -> anyhow::Result<String> {
+        self.resolve_bearer_kind(endpoint).map(|(bearer, _)| bearer)
+    }
+
+    /// The bearer, and whether it is the API key (`true`) or the session JWT.
+    fn resolve_bearer_kind(&self, endpoint: &str) -> anyhow::Result<(String, bool)> {
         if let Some(key) = openhuman_embed::__host::security::credentials::api_key::get_api_key_in(
             &self.state_dir(),
             self.secrets_encrypt,
@@ -52,14 +60,16 @@ impl ManagedOptions {
             log::debug!(
                 "[providers][openhuman-backend] authenticating managed inference with api-key"
             );
-            return Ok(key);
+            return Ok((key, true));
         }
         resolve_session_bearer(
+            endpoint,
             &self.state_dir(),
             self.secrets_encrypt,
             self.auth_profile_override.as_deref(),
             "openhuman_backend_model.resolve_bearer",
         )
+        .map(|token| (token, false))
     }
 }
 
@@ -86,14 +96,23 @@ pub(super) fn build_chat_model(
     let endpoint = effective_api_url(&api_url.map(str::to_owned));
     let resolver_options = options.clone();
     let resolver_endpoint = endpoint.clone();
-    let mut managed = TinyHumansModel::new(
+    // The owner hands each request's credential kind back on that request's
+    // auth failure, so an API-key 401 (a rejected key) is never read as an
+    // expired session, even while the stored credential changes mid-flight.
+    let mut managed = TinyHumansModel::new_with_credential(
         endpoint,
         model,
         super::tiers::MODEL_MANAGED_DEFAULT,
         move || {
-            resolver_options
-                .resolve_bearer(&resolver_endpoint)
-                .map_err(|error| tinyinference_llm::Error::Model(error.to_string()))
+            let (bearer, api_key) = resolver_options
+                .resolve_bearer_kind(&resolver_endpoint)
+                .map_err(|error| tinyinference_llm::Error::Model(error.to_string()))?;
+            let kind = if api_key {
+                TinyHumansCredentialKind::ApiKey
+            } else {
+                TinyHumansCredentialKind::Session
+            };
+            Ok(TinyHumansCredential { bearer, kind })
         },
     )?
     .with_cache_namespace("openhuman")
@@ -102,9 +121,7 @@ pub(super) fn build_chat_model(
     .with_error_observer(log_managed_error);
 
     if observe_auth_failures {
-        managed = managed.with_managed_auth_failure_handler(|error, context| {
-            publish_managed_auth_failure(error, context);
-        });
+        managed = managed.with_managed_auth_failure_handler(publish_managed_auth_failure);
     }
     Ok(managed)
 }

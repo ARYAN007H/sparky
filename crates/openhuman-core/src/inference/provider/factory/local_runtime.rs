@@ -2,7 +2,10 @@
 //! local-openai) as crate-native `ChatModel`s.
 
 use super::*;
-use crate::inference::provider::factory::access_gates::verify_provider_session;
+use crate::inference::provider::factory::access_gates::{
+    enforce_local_only_endpoint, is_loopback_endpoint, is_ollama_cloud_model,
+    verify_provider_session, LocalOnlyRequestGuard,
+};
 use tinyinference_llm::providers::openai::build_local_runtime_chat_model;
 use tinyinference_llm::providers::openai::AuthStyle as CompatAuthStyle;
 
@@ -103,13 +106,6 @@ fn try_create_local_runtime_chat_model_from_string_with_identity(
         }
     }
 
-    // Egress spine (privacy epic S2, #4436): committed to a local runtime here
-    // (past the non-local `None` return + access gates). Disclose it as
-    // NON-external — local inference never leaves the device, so
-    // `emit_external_transfer` records it without firing a pending event. This
-    // is the single local chokepoint for every ChatModel/turn entry.
-    emit_inference_egress(role, &p, egress);
-
     // Endpoint, auth, model and `@temp` resolution is the module's pure
     // `resolve_local_runtime`; the host only supplies config + env.
     let inputs = LocalRuntimeInputs {
@@ -122,6 +118,26 @@ fn try_create_local_runtime_chat_model_from_string_with_identity(
         Ok(r) => r,
         Err(e) => return Some(Err(anyhow::anyhow!("{e}"))),
     };
+    if let Err(e) = enforce_local_only_endpoint(role, &resolved.endpoint) {
+        return Some(Err(e));
+    }
+    // Egress spine (privacy epic S2, #4436): the single local chokepoint for
+    // every ChatModel/turn entry. A loopback runtime is disclosed as
+    // non-external; another host, or an Ollama `-cloud` tag, is external.
+    let external = !is_loopback_endpoint(&resolved.endpoint) || is_ollama_cloud_model(&p);
+    let service = if resolved.model.is_empty() {
+        role
+    } else {
+        &resolved.model
+    };
+    crate::security::egress::emit_external_transfer_in(
+        egress,
+        crate::security::egress::EgressDescriptor::inference(
+            resolved.kind.as_str().to_string(),
+            service.to_string(),
+            external,
+        ),
+    );
     if let Some(identity) = inspection_identity {
         let credential = match &resolved.auth {
             LocalRuntimeAuth::None => String::new(),
@@ -151,6 +167,14 @@ fn try_create_local_runtime_chat_model_from_string_with_identity(
         resolved.temperature,
         resolved.num_ctx,
     );
+    let chat: Arc<dyn ChatModel<()>> = Arc::new(LocalOnlyRequestGuard {
+        inner: chat,
+        role: role.to_string(),
+        slug: resolved.kind.as_str().to_string(),
+        endpoint: resolved.endpoint.clone(),
+        model: resolved.model.clone(),
+        egress: egress.clone(),
+    });
     Some(Ok((chat, resolved.model)))
 }
 

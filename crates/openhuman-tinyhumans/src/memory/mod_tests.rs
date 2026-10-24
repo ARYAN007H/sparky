@@ -635,3 +635,43 @@ async fn a_signed_out_account_is_not_free() {
     let signed_out = config_with_endpoint(&other, "http://127.0.0.1:9");
     assert!(!billing::free_period_active(signed_out, bound).await);
 }
+
+#[tokio::test]
+async fn readonly_health_refuses_to_send_an_api_key_to_a_foreign_endpoint() {
+    let _registry = crate::registry_test_lock_async().await;
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_with_endpoint(&tmp, "https://not-tinyhumans.example.test");
+    // A plaintext schema-1 profile, as the session fixtures above use: the
+    // read-only engine reads the selected store without unlocking a keyring.
+    let state_dir = config.config_path.parent().expect("config state directory");
+    std::fs::create_dir_all(state_dir).expect("create profile fixture directory");
+    std::fs::write(
+        state_dir.join("auth-profiles.json"),
+        serde_json::to_vec(&json!({
+            "schema_version": 1,
+            "active_profiles": {},
+            "profiles": {
+                "api-key:default": {
+                    "provider": "api-key",
+                    "profile_name": "default",
+                    "kind": "token",
+                    "token": "th_test_key",
+                    "created_at": "2026-01-01T00:00:00Z",
+                    "updated_at": "2026-01-01T00:00:00Z",
+                    "metadata": { "kind": "tinyhumans-api-key" },
+                }
+            }
+        }))
+        .unwrap(),
+    )
+    .expect("write API-key profile fixture");
+
+    let health = read_only_health_probe(config).await;
+
+    let refused = openhuman_embed::__host::memory_engines::ReadOnlyEngineError::EndpointUnavailable
+        .safe_message();
+    assert!(
+        matches!(&health, EngineHealth::Down(message) if message == refused),
+        "an API key must not be sent to a non-managed endpoint: {health:?}"
+    );
+}

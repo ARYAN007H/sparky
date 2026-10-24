@@ -46,8 +46,12 @@ fn test_bundled_record() -> &'static crate::modules::types::ModuleRecord {
     }))
 }
 
+/// The record pins the empty-input digest, so the staged empty archive passes
+/// the digest check and fails to unpack. Digest rejection itself is tinybus's
+/// to test; this pins only that the host reports it and never falls back to
+/// the user cache.
 #[tokio::test]
-async fn invalid_installer_bundle_is_reported_without_falling_back_to_the_cache() {
+async fn an_unreadable_installer_bundle_is_reported_without_falling_back_to_the_cache() {
     let record = test_bundled_record();
     let bundled = tempfile::tempdir().unwrap();
     let user_cache = tempfile::tempdir().unwrap();
@@ -112,6 +116,14 @@ fn the_default_config_enables_modules_and_downloads() {
     assert!(config.modules.allow_download);
     assert!(config.modules.install_dir.is_none());
     assert!(config.modules.overrides.is_empty());
+}
+
+#[test]
+fn tinymcp_storage_destination_is_not_a_generic_module_config_value() {
+    let config = Config::default();
+    let module_config = ops::module_config_for_test(&config, "tinymcp");
+
+    assert!(module_config.get("storage_callback").is_none());
 }
 
 #[test]
@@ -705,4 +717,16 @@ fn the_ahead_warning_is_silent_for_released_modules_other_ids_and_release_builds
     assert!(pin_ahead_warning("tinydocs", ModuleSource::Source, None, true).is_none());
     // A release build never warns.
     assert!(pin_ahead_warning("tinydocs", ModuleSource::Source, Some("tinydocs"), false).is_none());
+}
+
+#[test]
+fn tinymcp_storage_destination_is_bound_by_the_verified_loader() {
+    // A generic config cannot choose the callback destination. The verified
+    // loader injects the unique name bound to this exact module instance.
+    let config = ops::module_config_for_test(&Config::default(), "tinymcp");
+    assert_eq!(config, serde_json::json!({}));
+    assert_eq!(
+        ops::module_config_for_test(&Config::default(), "tinybox"),
+        serde_json::json!({})
+    );
 }

@@ -91,7 +91,9 @@ pub mod core {
         pub use openhuman_core::core::server_launcher::{install_server_launcher, ServeRequest};
     }
     pub mod session_expiry {
-        pub use openhuman_core::core::session_expiry::is_session_expired_error;
+        pub use openhuman_core::core::session_expiry::{
+            backend_status_means_session_expired, is_session_expired_error,
+        };
     }
     pub mod shutdown {
         pub use openhuman_core::core::shutdown::{register, signal};
@@ -149,8 +151,8 @@ pub mod config {
     pub mod schema {
         // tinyhumans integrations: the Composio routing-mode strings.
         pub use openhuman_core::config::schema::{
-            DelegateAgentConfig, ModelRouteConfig, TeamModelConfig, COMPOSIO_MODE_BACKEND,
-            COMPOSIO_MODE_DIRECT, COMPOSIO_MODE_DISABLED,
+            ModelRouteConfig, TeamModelConfig, COMPOSIO_MODE_BACKEND, COMPOSIO_MODE_DIRECT,
+            COMPOSIO_MODE_DISABLED,
         };
         pub mod cloud_providers {
             pub use openhuman_core::config::schema::cloud_providers::{
@@ -189,14 +191,14 @@ pub mod agent {
         pub use openhuman_core::agent::orchestration::release_background_completion_stores;
     }
     pub mod plan_review {
-        pub mod gate {
-            pub use openhuman_core::plan_review::gate::global;
-        }
+        pub use openhuman_core::plan_review::host::{
+            parked_review_for_socket, socket_scope_for_dispatch, SocketReviewScope,
+        };
     }
     pub mod session_store {
         pub use openhuman_core::storage::sessions::{
             context_workspace_dir, install, installed, restore, ReboundSessionStores,
-            WorkspaceSessionStores,
+            TenantSessionStores, WorkspaceSessionStores,
         };
     }
 }
@@ -326,7 +328,7 @@ pub mod tool_sources {
 pub mod artifact_publisher {
     pub use openhuman_core::artifacts::{
         register_artifact_publisher, register_artifact_publisher_in, unregister_artifact_publisher,
-        ArtifactPublisherFactory,
+        ArtifactPublisherBinder, ArtifactPublisherFactory,
     };
     // tinyhumans file-storage publisher: the protected-path guard it re-checks
     // before upload, and the store its tests save artifacts into.
@@ -508,11 +510,22 @@ pub mod storage {
     };
 
     /// The layout v1 -> v2 migration the host runs at boot when
-    /// `[storage] auto_migrate_layout` is set. It reads the v1 layout, so it
-    /// exists only with `legacy-import`.
+    /// `[storage] auto_migrate_layout` is set. The core builds it only with
+    /// `legacy-import`.
     #[cfg(feature = "legacy-import")]
     pub mod layout {
+        #[cfg(feature = "legacy-import")]
         pub use openhuman_core::storage::layout::auto_migrate;
+
+        /// Return `false` when legacy layout import is not part of this build.
+        ///
+        /// The RPC session-store host calls this before resolving its storage
+        /// URL. In builds without `legacy-import`, there is no layout migration
+        /// to run and the configured workspace remains unchanged.
+        #[cfg(not(feature = "legacy-import"))]
+        pub async fn auto_migrate(_config: &openhuman_core::config::Config) -> bool {
+            false
+        }
     }
 }
 

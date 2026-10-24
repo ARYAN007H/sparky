@@ -482,18 +482,6 @@ fn temperature(config: &Config) -> Vec<Finding> {
         }
     }
 
-    let mut agent_ids = config.agents.keys().collect::<Vec<_>>();
-    agent_ids.sort();
-    for (index, agent_id) in agent_ids.into_iter().enumerate() {
-        if let Some(temperature) = config.agents[agent_id].temperature {
-            add_temperature_finding(
-                &mut findings,
-                &format!("agents[{index}].temperature"),
-                temperature,
-            );
-        }
-    }
-
     findings
 }
 

@@ -40,12 +40,6 @@ test('collection names must be <owner>.<entity> in snake_case', () => {
   assert.equal(problems.length, 3, problems.join('\n'));
 });
 
-test('known legacy migration collections remain inventoried', () => {
-  assert.deepEqual(lint({
-    owners: [{ crate: 'openhuman', collections: [collection('remix_markers'), collection('tinymemes_documents')] }],
-  }), []);
-});
-
 test('duplicate collection and index names are refused within one crate', () => {
   const problems = lint({
     owners: [{ crate: 'tinyflows-scheduler', collections: [

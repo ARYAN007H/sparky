@@ -98,6 +98,22 @@ describe('chatService.subscribeChatEvents', () => {
     expect(onInferenceHeartbeat).toHaveBeenCalledWith(beat);
   });
 
+  it('forwards plan_review_decided to clear the pending review surface', () => {
+    const socket = createMockSocket();
+    bindMockSocket(socket);
+    const onPlanReviewDecided = vi.fn();
+    subscribeChatEvents({ onPlanReviewDecided });
+
+    const event = {
+      thread_id: 'thread-plan',
+      request_id: 'review-1',
+      decision: 'reject',
+      cancel_reason: 'cancelled',
+    };
+    socket.emit('plan_review_decided', event);
+    expect(onPlanReviewDecided).toHaveBeenCalledWith(event);
+  });
+
   it('does not process alias events when only canonical subscriptions are active', () => {
     const socket = createMockSocket();
     bindMockSocket(socket);

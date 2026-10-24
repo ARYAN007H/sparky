@@ -124,7 +124,6 @@ async fn committed_progress_carries_the_sidecar_stop_on_turn_completed() {
 
 #[test]
 fn clearing_progress_releases_warm_prelude_sender() {
-    crate::agent::session_host::test_support::install_model_fixture();
     let tmp = tempfile::tempdir().expect("tempdir");
     let config = crate::config::Config {
         workspace_dir: tmp.path().join("workspace"),
@@ -132,6 +131,7 @@ fn clearing_progress_releases_warm_prelude_sender() {
         config_path: tmp.path().join("config.toml"),
         ..Default::default()
     };
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -214,7 +214,6 @@ fn spec(name: &str) -> ToolSpec {
 #[cfg(feature = "mcp")]
 #[test]
 fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
-    crate::agent::session_host::test_support::install_model_fixture();
     crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -224,6 +223,7 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
         config_path: tmp.path().join("config.toml"),
         ..Default::default()
     };
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -284,7 +284,6 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
 #[cfg(feature = "mcp")]
 #[tokio::test]
 async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec() {
-    crate::agent::session_host::test_support::install_model_fixture();
     crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -294,6 +293,7 @@ async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec(
         config_path: tmp.path().join("config.toml"),
         ..Default::default()
     };
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -378,7 +378,6 @@ async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec(
 #[cfg(feature = "modules")]
 #[tokio::test]
 async fn desktop_browser_setting_keeps_deferred_tools_in_fresh_and_resumed_surfaces() {
-    crate::agent::session_host::test_support::install_model_fixture();
     let tmp = tempfile::tempdir().expect("tempdir");
     let workspace = tmp.path().join("workspace");
     std::fs::create_dir_all(workspace.join("state")).expect("state dir");
@@ -398,6 +397,7 @@ async fn desktop_browser_setting_keeps_deferred_tools_in_fresh_and_resumed_surfa
     };
     config.browser.enabled = true;
     config.http_request.allowed_domains = vec!["example.com".into()];
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -517,19 +517,10 @@ async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
     );
 }
 
-/// The incident this guards: `session_locator()` is called from more than one
-/// place while assembling a session's runtime turn machinery (the
-/// `before_resume` resume target and the eager construction-time
-/// `builder.session(...)` bind), and tinyagents only accepts a later
-/// transcript-target change when it is the exact same locator object
-/// (`Arc::ptr_eq`), not merely an equivalent one over the same file. Before
-/// this was memoized, each call minted a fresh `FileTranscriptLocator`, so a
-/// thread's second turn was rejected with "cannot change a transcript target
-/// after it is bound or committed" even though both binds agreed on the
-/// destination. Pin the fix directly: every call must return the identical
-/// `Arc`.
+/// Session admission is deterministic for the same OpenHuman run context and
+/// returns a pinned lease from the workspace provider.
 #[tokio::test]
-async fn session_locator_is_memoized_across_calls() {
+async fn session_identity_resolver_admits_stable_workspace_stores() {
     let action_dir = tempfile::tempdir().expect("tempdir");
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
@@ -544,12 +535,23 @@ async fn session_locator_is_memoized_across_calls() {
         .build()
         .expect("session build");
 
-    let first = host.session_locator();
-    let second = host.session_locator();
-    assert!(
-        Arc::ptr_eq(&first, &second),
-        "session_locator() must return the same Arc on every call, or tinyagents' \
-         same-binding check rejects the second transcript bind"
+    let resolver = host.session_identity_resolver();
+    let context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+    let request = tinyagents_runtime::SessionIdentityRequest {
+        thread_id: Some("stable-thread".into()),
+        session_key: "stable-thread".into(),
+        parent: None,
+        child_key: None,
+    };
+    let first = tinyagents_runtime::SessionIdentityResolver::resolve(&resolver, &request, &context)
+        .expect("first admission");
+    let second =
+        tinyagents_runtime::SessionIdentityResolver::resolve(&resolver, &request, &context)
+            .expect("second admission");
+    assert_eq!(first.agent_id, second.agent_id);
+    assert_eq!(
+        first.stores.stores().transcripts.destination_key(),
+        second.stores.stores().transcripts.destination_key()
     );
 }
 
@@ -593,14 +595,16 @@ async fn prompt_and_declared_tools(
         .prelude
         .clone()
         .expect("prelude");
-    let tiered = prelude.build_system_prompt_tiered().expect("system prompt");
+    let prompt = host
+        .render_current_turn_prompt()
+        .expect("current-turn system prompt");
     let snapshot = prelude
         .prepare(true)
         .await
         .expect("tool surface")
         .tools
         .expect("declared tools");
-    (tiered.text, snapshot)
+    (prompt, snapshot)
 }
 
 fn assert_no_goal_tools(prompt: &str, snapshot: &ToolSnapshot) {

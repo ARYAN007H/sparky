@@ -202,6 +202,7 @@ fn import_inventory(
                 found += inventory_scope_counts(inventory, &source_scope);
             }
             Some(Some(scope_report)) => {
+                remigrate_copied_scope(&scope_backend, &target_scope);
                 let scope_found = inventory_scope_counts(inventory, &source_scope);
                 found += scope_found;
                 written += usize::try_from(
@@ -238,6 +239,28 @@ fn import_inventory(
         Ok(crate::storage::import::Outcome::AlreadyDone)
     } else {
         Ok(crate::storage::import::Outcome::Imported { found, written })
+    }
+}
+
+/// The copy wrote v1 graph and harness records into a scope whose owner
+/// migrations already ran when it was prepared; run them again so the v2
+/// readers see the records. Best effort: a failure is logged, and the cleared
+/// steps re-run on the next preparation of the scope.
+#[cfg(feature = "legacy-import")]
+fn remigrate_copied_scope(backend: &Arc<dyn StorageBackend>, scope: &Scope) {
+    let result = backend.for_scope(scope).and_then(|storage| {
+        let target = scope.to_storage_scope();
+        crate::storage::block_on(async move {
+            crate::storage::boot::remigrate_owners(&storage, &target).await
+        })
+    });
+    if let Err(error) = result {
+        tracing::warn!(
+            target: "openhuman::storage",
+            scope = scope.as_str(),
+            %error,
+            "[storage][scope_move] owner migration after the copy failed; retried when the scope is next prepared"
+        );
     }
 }
 
