@@ -77,8 +77,8 @@ fn scenario() {
         .await;
         let mut config = offline_config();
         config.modules.allow_download = false;
-        let module_path = std::env::var("OPENHUMAN_TINYMCP_TEST_MODULE")
-            .expect("staged TinyMCP module artifact");
+        let module_path =
+            std::env::var("OPENHUMAN_TINYMCP_TEST_MODULE").expect("staged TinyMCP module artifact");
         config
             .modules
             .overrides
