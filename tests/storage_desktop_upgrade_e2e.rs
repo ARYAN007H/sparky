@@ -440,7 +440,7 @@ async fn import_modules(workspace: &Path) {
     modules::import_legacy_tinyjuice(
         &ctx,
         &workspace.join("ccr"),
-        Some(Duration::from_secs(3600)),
+        None,
     )
     .await;
 }
