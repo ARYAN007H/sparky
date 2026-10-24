@@ -586,6 +586,7 @@ pub(crate) async fn checkin_session_agent(
     fingerprint: SessionCacheFingerprint,
 ) {
     let mut sessions = super::ops::thread_sessions(ctx).lock_owned().await;
+    if std::env::var("DBG_NOCACHE").is_ok() { drop(agent); let _ = fingerprint; return; }
     sessions.insert(
         super::ops::key_for(ctx, thread_id),
         SessionEntry { agent, fingerprint },
