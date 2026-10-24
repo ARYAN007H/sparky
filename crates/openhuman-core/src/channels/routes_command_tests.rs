@@ -161,7 +161,7 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 
 #[tokio::test]
 async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
-    let _storage = crate::channels::module_fixture::install_memory_storage();
+    let _module = crate::integrations::composio::module_client::module_guard().await;
     let tempdir = tempfile::tempdir().unwrap();
     let ctx = runtime_context(tempdir.path().to_path_buf());
     let channel_impl = Arc::new(RecordingChannel::default());
