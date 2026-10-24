@@ -138,8 +138,8 @@ fn handle_agent_chat(
         // spawned tools) has settled. The run context carries only a weak
         // reference so a persisted session cannot pin a tenant indefinitely.
         let core_lease = ctx.resolved();
-        log::debug!(
-            "[agent_chat] one-shot owner context resolved headless={} bound={}",
+        eprintln!(
+            "[test-diagnostic] agent_chat owner context resolved headless={} bound={}",
             ctx.is_headless_agent_chat(),
             core_lease.is_some()
         );

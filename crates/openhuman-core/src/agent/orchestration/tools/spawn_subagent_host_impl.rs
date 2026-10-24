@@ -50,8 +50,8 @@ impl SpawnSubagentTool {
             match SubagentSessionStore::new_in_context(&dispatch, parent.workspace_dir.clone()) {
                 Ok(store) => store,
                 Err(error) => {
-                    log::debug!(
-                        "[spawn_subagent] caller owner context unavailable: run_core_bound={} dispatch_resolved={}",
+                    eprintln!(
+                        "[test-diagnostic] spawn owner context unavailable: run_core_bound={} dispatch_resolved={}",
                         run_context.core.is_some(),
                         dispatch.resolved().is_some()
                     );
