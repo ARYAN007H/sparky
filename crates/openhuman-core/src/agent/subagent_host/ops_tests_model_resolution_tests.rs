@@ -634,3 +634,9 @@ fn unsigned_in_user_fails_probe() {
         "user with neither backend session nor direct key must NOT be reported as signed in"
     );
 }
+
+#[path = "ops_tests_driver_bridge_tests.rs"]
+mod driver_bridge_tests;
+
+#[path = "ops_tests_trace_export_tests.rs"]
+mod trace_export_tests;

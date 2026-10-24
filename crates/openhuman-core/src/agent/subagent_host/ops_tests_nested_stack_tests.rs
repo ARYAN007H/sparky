@@ -114,9 +114,3 @@ fn nested_subagent_dispatch_runs_on_a_constrained_worker_stack() {
         outcome.output
     );
 }
-
-#[path = "ops_tests_driver_bridge_tests.rs"]
-mod driver_bridge_tests;
-
-#[path = "ops_tests_trace_export_tests.rs"]
-mod trace_export_tests;
