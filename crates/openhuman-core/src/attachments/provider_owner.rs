@@ -105,15 +105,19 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
         max_bytes: usize,
         metadata: &MediaSourceMetadata,
     ) -> Result<ResolvedMedia, String> {
-        if (metadata.kind == MediaSourceKind::Url
-            && !source.starts_with("data:")
-            && !source.starts_with("http://")
-            && !source.starts_with("https://"))
-            || (metadata.kind == MediaSourceKind::Untyped
+        // Staged native attachments are opaque host references that
+        // `resolve_block` authorizes against the thread, not URLs to fetch.
+        let staged = source.starts_with("openhuman-staged://");
+        if !staged
+            && ((metadata.kind == MediaSourceKind::Url
                 && !source.starts_with("data:")
-                && source.contains("://")
                 && !source.starts_with("http://")
                 && !source.starts_with("https://"))
+                || (metadata.kind == MediaSourceKind::Untyped
+                    && !source.starts_with("data:")
+                    && source.contains("://")
+                    && !source.starts_with("http://")
+                    && !source.starts_with("https://")))
         {
             return Err("unsupported media URL scheme".into());
         }
