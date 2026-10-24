@@ -4661,7 +4661,7 @@ mod tool_policy_boundary_placement {
         let mut config = AgentConfig::default();
         config
             .channel_permissions
-            .insert("boundary-channel".to_string(), "readonly".to_string());
+            .insert("boundary-channel".to_string(), "read".to_string());
 
         let agent = OpenHumanSessionHost::builder()
             .model_name("test/session-fixture".to_string())
