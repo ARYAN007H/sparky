@@ -16,9 +16,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ContentPart } from '../../services/chatWire';
 import chatRuntimeReducer from '../../store/chatRuntimeSlice';
-import threadReducer from '../../store/threadSlice';
 import { editMessage } from '../../services/chatService';
-import { loadThreadMessages } from '../../store/threadSlice';
+import threadReducer, { loadThreadMessages } from '../../store/threadSlice';
 import { registerChatSurface } from '../chatSurfaceHandlers';
 import { useOpenHumanExternalStore } from '../useOpenHumanExternalStore';
 

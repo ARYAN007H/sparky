@@ -52,7 +52,7 @@ describe('useLoadThreadGoal', () => {
       tokenBudget: null,
       createdAtMs: 1,
       updatedAtMs: 1,
-      continuationSuppressed: false,
+      timeUsedSubsecNanos: 0,
     };
     vi.mocked(threadApi.getGoal).mockResolvedValue(goal);
     const { store, wrapper } = setup();
