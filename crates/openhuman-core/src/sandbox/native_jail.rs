@@ -285,7 +285,9 @@ fn credential_denials(
 ) -> anyhow::Result<Vec<String>> {
     let granted: Vec<std::path::PathBuf> = std::iter::once(root)
         .chain(read_write.iter().map(std::path::PathBuf::as_path))
-        .filter_map(|path| path.canonicalize().ok())
+        // A root or grant that doesn't exist yet still sits where its nearest
+        // existing ancestor resolves; dropping it skipped the check for it.
+        .map(crate::config::ops::canonical_prefix)
         .collect();
     let mut denied = Vec::new();
     for store in stores {
