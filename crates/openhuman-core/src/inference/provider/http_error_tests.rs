@@ -125,17 +125,29 @@ async fn byo_401_publishes_api_key_rejected_not_session_expired() {
         ),
     )
     .await;
-    let mut session_expired = false;
-    let rejected = drain_until(&mut rx, |e| match e {
-        DomainEvent::SessionExpired { .. } => {
-            session_expired = true;
-            None
+    // The bus is process-wide: only a SessionExpired raised by this call (its
+    // body is in the reason) counts, not one from a concurrent test. Drain
+    // every queued event so an expiry published after the rejection is seen.
+    let (mut session_expired, mut rejected) = (false, false);
+    drain_until(&mut rx, |e| -> Option<()> {
+        match e {
+            DomainEvent::SessionExpired { reason, .. }
+                if reason.contains("Invalid or missing API key") || reason.contains(provider) =>
+            {
+                session_expired = true
+            }
+            DomainEvent::ProviderApiKeyRejected { provider: p, .. } if p == provider => {
+                rejected = true
+            }
+            _ => {}
         }
-        DomainEvent::ProviderApiKeyRejected { provider: p, .. } if p == provider => Some(()),
-        _ => None,
+        None
     });
-    assert!(rejected.is_some(), "BYO key rejection must be surfaced");
-    assert!(!session_expired || rejected.is_some());
+    assert!(rejected, "BYO key rejection must be surfaced");
+    assert!(
+        !session_expired,
+        "a BYO key's 401 must not expire the OpenHuman session"
+    );
 }
 
 #[tokio::test]
