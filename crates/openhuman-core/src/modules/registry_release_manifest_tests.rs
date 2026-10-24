@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn tinychannels_registry_matches_scoped_runtime_release() {
     let record = find("tinychannels").expect("compiled TinyChannels module");
-    assert_eq!(record.version, "0.1.40");
+    assert_eq!(record.version, "0.1.42");
     assert_eq!(tinychannels_bus::CONTRACT_VERSION, 22);
     assert_eq!(
         tinychannels_bus::module_relay::MODULE_OPERATION_VERSION,
@@ -12,88 +12,88 @@ fn tinychannels_registry_matches_scoped_runtime_release() {
     let expected = [
         (
             "archlinux-arm64",
-            "tinychannels-module-0.1.40-archlinux-arm64.tar.gz",
-            "2643b5aefb51a882739640666e456022921304b1ff3cf935005803e1baeae2db",
+            "tinychannels-module-0.1.42-archlinux-arm64.tar.gz",
+            "7e1073c1eeb93b5c3d63ed2628b3ea3b52ec3e7de5b1419704be28f1d26a2209",
         ),
         (
             "archlinux-x86_64",
-            "tinychannels-module-0.1.40-archlinux-x86_64.tar.gz",
-            "b65e7e2e99af174166ce18acce7b3e9948b03f93644ac34958a2dd1d45b9783f",
+            "tinychannels-module-0.1.42-archlinux-x86_64.tar.gz",
+            "f59564ec7d40a245cb5c2c4ff9d6a087701929307fa637c3ff555f3a78e9468d",
         ),
         (
             "fedora-43-arm64",
-            "tinychannels-module-0.1.40-fedora-43-arm64.tar.gz",
-            "06470acac32353419b9e2c8eed0b13244de9957bc6d7575932b8bf5989579780",
+            "tinychannels-module-0.1.42-fedora-43-arm64.tar.gz",
+            "6cb8308631035c03c638768626ba90f963e973eccc405e78924a4aaf55395f4e",
         ),
         (
             "fedora-43-x86_64",
-            "tinychannels-module-0.1.40-fedora-43-x86_64.tar.gz",
-            "5956996b8fdc829e530a5cf808a8f9561dba7f91aead25df4f091a6c5ead605f",
+            "tinychannels-module-0.1.42-fedora-43-x86_64.tar.gz",
+            "6d0328d3535552b68e1aade4cdf2f319f5d7647f25c4462389d51704349407c9",
         ),
         (
             "fedora-44-arm64",
-            "tinychannels-module-0.1.40-fedora-44-arm64.tar.gz",
-            "e449125869811077cb020b6dbd9f5dffc25fbf1526b8ee2402f0fac0b2f53bbc",
+            "tinychannels-module-0.1.42-fedora-44-arm64.tar.gz",
+            "379758e4ee298bb90358ad33a1c2ee112f7bfbd860e8457084e0361bab4e4b7d",
         ),
         (
             "fedora-44-x86_64",
-            "tinychannels-module-0.1.40-fedora-44-x86_64.tar.gz",
-            "f5ab13f94fe850ec90a95f1d527ee9c55ab3fdeb427f3c1c2e390c35b300d76e",
+            "tinychannels-module-0.1.42-fedora-44-x86_64.tar.gz",
+            "f5970f8313992b7beb3b5c90ab2504a537dfd7703055b67ad4ea8197d2763a1d",
         ),
         (
             "macos-15-arm64",
-            "tinychannels-module-0.1.40-macos-15-arm64.tar.gz",
-            "98d31e633601c365200c679f288b13f9d7aef2023ebb9853bcbad690ddbbe1a0",
+            "tinychannels-module-0.1.42-macos-15-arm64.tar.gz",
+            "b52a725650cb210d29c8a31838ecd92b0a0a7a398222289bea360c1992095096",
         ),
         (
             "macos-15-x86_64",
-            "tinychannels-module-0.1.40-macos-15-x86_64.tar.gz",
-            "4ac740b410102b29ba469f37f450b3e03fac3ce31ccb9d3538c1633025a7bd4d",
+            "tinychannels-module-0.1.42-macos-15-x86_64.tar.gz",
+            "db056c66f0d2b1c22ccec3b461239013909316af200e845e0747434112cbcd50",
         ),
         (
             "macos-26-arm64",
-            "tinychannels-module-0.1.40-macos-26-arm64.tar.gz",
-            "ed2aab10a198193e5bebb5957095acad664a5a66a02d6142563815df6c353b53",
+            "tinychannels-module-0.1.42-macos-26-arm64.tar.gz",
+            "7bfcfaccbc5cd454899cc163bbe3d8fc0533a6e8fa9c0eedee9eabbbbe9aeb0f",
         ),
         (
             "macos-26-x86_64",
-            "tinychannels-module-0.1.40-macos-26-x86_64.tar.gz",
-            "210a7904dd942629af46d7ad36d0b0312f3a1cf0aa238b667ca6309ebf86c8e2",
+            "tinychannels-module-0.1.42-macos-26-x86_64.tar.gz",
+            "0fdbaf108ed1b31824cd3c1ee2cd7ff9f1ccbe781a3a19d50e1885bc0b39c569",
         ),
         (
             "ubuntu-22.04-arm64",
-            "tinychannels-module-0.1.40-ubuntu-22.04-arm64.tar.gz",
-            "48d360aea7849bb93050dbb56f9c28de6848572632908b635fb77df2a65c3bb1",
+            "tinychannels-module-0.1.42-ubuntu-22.04-arm64.tar.gz",
+            "d79d6cc8720c57f0fce36d17d505fe8c64e6b1d5c2568eb486e615140b04ca9b",
         ),
         (
             "ubuntu-22.04-x86_64",
-            "tinychannels-module-0.1.40-ubuntu-22.04-x86_64.tar.gz",
-            "6026081ac8ceb7b91daf0101364c92f99c10c5072a270b91eaeed6acad5d1f90",
+            "tinychannels-module-0.1.42-ubuntu-22.04-x86_64.tar.gz",
+            "8c737a5e2ba0ac277d1632179fa164608cded7c955923a808ee5f9c51ab8a10e",
         ),
         (
             "ubuntu-24.04-arm64",
-            "tinychannels-module-0.1.40-ubuntu-24.04-arm64.tar.gz",
-            "0b4ef6b3c9c2c81f1efdbc5cbe8713478ff4e2f76682625465ee8c7120dfb798",
+            "tinychannels-module-0.1.42-ubuntu-24.04-arm64.tar.gz",
+            "b3c9deb3790337518542473bc8b779fa904d46654e10ae9834fcc72c74ede3cc",
         ),
         (
             "ubuntu-24.04-x86_64",
-            "tinychannels-module-0.1.40-ubuntu-24.04-x86_64.tar.gz",
-            "bec22856f0b5f36f8c48f893c53d83015961a596d4ad56a33714ca378c2b4c98",
+            "tinychannels-module-0.1.42-ubuntu-24.04-x86_64.tar.gz",
+            "e01e8529a423bb44ac4b5ca46808fb1f8f38cbd682b5d28e7da907c8f1a68ad7",
         ),
         (
             "windows-11-arm64",
-            "tinychannels-module-0.1.40-windows-11-arm64.zip",
-            "5f463711be6f8c856e13f77ba5d376b1b4e5b9519551411ae7bfd94a196bd633",
+            "tinychannels-module-0.1.42-windows-11-arm64.zip",
+            "66f3e658e395f4726bb6391e00d99a6c75f8da578f6c7bc692e43c9fa6be9f39",
         ),
         (
             "windows-2022-x86_64",
-            "tinychannels-module-0.1.40-windows-2022-x86_64.zip",
-            "5df4ce49573c7d1e03a93b50cf092bf62dc6b92f50bcfe1471aff50a844268ce",
+            "tinychannels-module-0.1.42-windows-2022-x86_64.zip",
+            "d070816a13ae53e0ff2bfd2feee8b93e7a4c390e603bf40869da39f2d5e4c9ad",
         ),
         (
             "windows-2025-x86_64",
-            "tinychannels-module-0.1.40-windows-2025-x86_64.zip",
-            "e8dd10cc102a7889d7d9ba8f50416b2ee3cec810f203555bf40cd0f157765552",
+            "tinychannels-module-0.1.42-windows-2025-x86_64.zip",
+            "659df880c0bc2e526efc9921c95bbc9da872a16b6959dca058c7004716eeb706",
         ),
     ];
     assert_eq!(record.assets.len(), expected.len());
