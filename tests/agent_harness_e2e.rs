@@ -1211,6 +1211,7 @@ fn managed_host_requests_repeat_with_the_same_capture_identity() {
 
 async fn managed_host_requests_repeat_with_the_same_capture_identity_inner() {
     let _lock = env_lock();
+    let _ = env_logger::Builder::from_env("RUST_LOG").is_test(false).try_init(); // DBGLOG
     let _prompt_clock = openhuman_core::prompts::register_prompt_clock(|| {
         chrono::DateTime::parse_from_rfc3339(MANAGED_CAPTURE_PROMPT_CLOCK)
             .expect("fixed capture instant")
