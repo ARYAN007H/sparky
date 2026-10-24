@@ -144,7 +144,6 @@ async fn sent_texts(server: &MockServer) -> Vec<String> {
 
 #[test]
 fn a_telegram_message_is_answered_by_the_bound_runtime_agent() {
-    let _ = tracing_subscriber::fmt().with_env_filter("openhuman=debug,tinychannels=debug,warn").with_writer(std::io::stderr).try_init();
     runtime().block_on(async {
         tokio::spawn(async {
             let backend = stub_backend().await;
@@ -157,9 +156,14 @@ fn a_telegram_message_is_answered_by_the_bound_runtime_agent() {
             // The Bot API base is read when the channel is built.
             std::env::set_var("OPENHUMAN_TELEGRAM_BOT_API_BASE", bot_api.uri());
 
+            // The TinyChannels module keeps its delivery state in the host's
+            // installed storage, so the runtime needs a backend of its own.
+            let storage_dir = tempfile::tempdir().expect("SQLite storage directory");
+            let storage_url = openhuman_core::storage::config::default_url(storage_dir.path());
             let runtime = Runtime::builder()
                 .config(offline_config())
                 .workspace(Workspace::Ephemeral)
+                .storage(storage_url)
                 .backend_url(backend.uri())
                 .api_key("sk-managed-fixture")
                 .build()
@@ -233,9 +237,6 @@ fn a_telegram_message_is_answered_by_the_bound_runtime_agent() {
                 }
                 tokio::time::sleep(Duration::from_millis(250)).await;
             }
-            for r in bot_api.received_requests().await.unwrap_or_default() { eprintln!("DBGT bot {} {}", r.url.path(), String::from_utf8_lossy(&r.body)); }
-            for r in provider.received_requests().await.unwrap_or_default() { eprintln!("DBGT prov {}", r.url.path()); }
-            for r in backend.received_requests().await.unwrap_or_default() { eprintln!("DBGT backend {}", r.url.path()); }
             assert!(
                 sent.iter().any(|text| text.contains("teeny says hi")),
                 "the agent's reply was posted to the chat: {sent:?}"
