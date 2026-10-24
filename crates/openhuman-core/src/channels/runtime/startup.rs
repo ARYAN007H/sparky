@@ -144,6 +144,7 @@ impl ChannelHandle {
     }
 
     pub(crate) async fn start_typing(&self, recipient: &str) -> anyhow::Result<()> {
+        let _ = recipient;
         match self {
             // The module owns typing through the progressive output it opens
             // for the turn; its adapters have no separate `StartTyping`
@@ -162,6 +163,7 @@ impl ChannelHandle {
     }
 
     pub(crate) async fn stop_typing(&self, recipient: &str) -> anyhow::Result<()> {
+        let _ = recipient;
         match self {
             // The module owns typing through the progressive output it opens
             // for the turn; its adapters have no separate `StopTyping`
@@ -184,6 +186,7 @@ impl ChannelHandle {
         recipient: &str,
         interval_secs: u64,
     ) -> anyhow::Result<Option<String>> {
+        let _ = (recipient, interval_secs);
         match self {
             // Typing refresh runs inside the module's progressive worker.
             Self::Module(_) => Ok(None),
@@ -197,6 +200,7 @@ impl ChannelHandle {
     }
 
     pub(crate) async fn end_typing_refresh(&self, handle: &str) -> anyhow::Result<()> {
+        let _ = handle;
         match self {
             Self::Module(_) => Ok(()),
             Self::Relay(_) => Ok(()),
