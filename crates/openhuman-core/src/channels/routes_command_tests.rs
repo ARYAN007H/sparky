@@ -87,7 +87,7 @@ async fn handle_runtime_command_without_target_channel_still_consumes_command() 
         "1".into(),
         "alice".into(),
         "chat-remote".into(),
-        "/help".into(),
+        "/models".into(),
         "telegram".into(),
         None,
     );
