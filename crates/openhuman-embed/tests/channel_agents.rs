@@ -156,14 +156,9 @@ fn a_telegram_message_is_answered_by_the_bound_runtime_agent() {
             // The Bot API base is read when the channel is built.
             std::env::set_var("OPENHUMAN_TELEGRAM_BOT_API_BASE", bot_api.uri());
 
-            // The TinyChannels module keeps its delivery state in the host's
-            // installed storage, so the runtime needs a backend of its own.
-            let storage_dir = tempfile::tempdir().expect("SQLite storage directory");
-            let storage_url = openhuman_core::storage::config::default_url(storage_dir.path());
             let runtime = Runtime::builder()
                 .config(offline_config())
                 .workspace(Workspace::Ephemeral)
-                .storage(storage_url)
                 .backend_url(backend.uri())
                 .api_key("sk-managed-fixture")
                 .build()
