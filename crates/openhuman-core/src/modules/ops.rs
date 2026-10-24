@@ -293,7 +293,7 @@ impl ModuleAccess for CallbackAccess {
     fn ensure_loaded<'a>(&'a self, id: &'a str) -> AccessFuture<'a, Result<(), String>> {
         Box::pin(async move {
             if needs_storage_callback(id) {
-                ensure_loaded(&self.config, id).await
+                let r = ensure_loaded(&self.config, id).await; eprintln!("DBGM {id} {r:?}"); r
             } else {
                 self.resolver.ensure_loaded(id).await
             }
