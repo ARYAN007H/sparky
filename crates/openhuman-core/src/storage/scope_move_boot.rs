@@ -281,6 +281,11 @@ fn backend_for_target_scope(
         return Ok((Arc::clone(backend), None));
     }
     let parsed = target_scope.parsed()?;
+    // Module, agent and other scopes below the local operator tenant live in
+    // the installed backend, exactly like the bare `local` scope.
+    if matches!(parsed.tenant, crate::storage::Tenant::Local) {
+        return Ok((Arc::clone(backend), None));
+    }
     let crate::storage::Tenant::User(_) = parsed.tenant else {
         anyhow::bail!(
             "scope {} is not an admitted tenant scope",
