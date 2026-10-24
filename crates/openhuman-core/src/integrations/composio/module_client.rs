@@ -328,16 +328,23 @@ pub(crate) struct ModuleGuard {
 /// every build has), restored on drop.
 #[cfg(test)]
 pub(crate) async fn module_guard() -> ModuleGuard {
-    // Tests that take the module drive its backend mode against a local mock;
-    // give this thread the stand-in route a host would register.
-    super::test_backend_route::register();
-    let lock = MODULE_LOCK.lock().await;
+    let lock = module_lock_guard().await;
     ModuleGuard {
         _storage: crate::storage::test_support::install_backend_for_test(
             crate::storage::test_support::memory_backend(),
         ),
         _lock: lock,
     }
+}
+
+/// The module lock without [`module_guard`]'s storage, for tests of the
+/// process keyring: an installed backend moves user secrets into storage.
+#[cfg(test)]
+pub(crate) async fn module_lock_guard() -> tokio::sync::MutexGuard<'static, ()> {
+    // Tests that take the module drive its backend mode against a local mock;
+    // give this thread the stand-in route a host would register.
+    super::test_backend_route::register();
+    MODULE_LOCK.lock().await
 }
 
 #[cfg(test)]
