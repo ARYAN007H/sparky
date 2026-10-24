@@ -65,10 +65,7 @@ impl FencedBackend {
         }
     }
 
-    fn condition_for(
-        &self,
-        scope: &Scope,
-    ) -> Result<FencedWriteCondition, StorageError> {
+    fn condition_for(&self, scope: &Scope) -> Result<FencedWriteCondition, StorageError> {
         let fence = if let Some(captured) = &self.captured {
             if !captured.covers(scope.as_str()) {
                 return Err(StorageError::backend(
