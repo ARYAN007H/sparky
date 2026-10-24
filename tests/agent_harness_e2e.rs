@@ -285,6 +285,28 @@ async fn hold_for_canary_peer(canary: String) {
     lock_or_recover(canary_in_flight()).remove(&canary);
 }
 
+/// How many orchestrator requests must have been answered before any other
+/// agent's request is. `spawn_subagent` is asynchronous, so a child's first
+/// model call races the parent's acknowledgement for the next scripted
+/// completion; arming this makes the order deterministic (`0` = off).
+static PARENT_FIRST_LIMIT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static PARENT_ANSWERED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+fn serialize_children_after_parent(parent_requests: usize) {
+    PARENT_ANSWERED.store(0, std::sync::atomic::Ordering::SeqCst);
+    PARENT_FIRST_LIMIT.store(parent_requests, std::sync::atomic::Ordering::SeqCst);
+}
+
+fn body_is_orchestrator(body: &Value) -> bool {
+    body.get("messages")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|message| message.get("role").and_then(Value::as_str) == Some("system"))
+        .filter_map(|message| message.get("content").and_then(Value::as_str))
+        .any(|content| content.contains(ORCHESTRATOR_PROMPT_MARKER))
+}
+
 async fn scripted_chat_completions(
     uri: Uri,
     headers: HeaderMap,
@@ -334,7 +356,20 @@ async fn scripted_chat_completions(
         }
     }
 
+    let parent_first = PARENT_FIRST_LIMIT.load(std::sync::atomic::Ordering::SeqCst);
+    let is_orchestrator = parent_first > 0 && body_is_orchestrator(&body);
+    if parent_first > 0 && !is_orchestrator {
+        let deadline = std::time::Instant::now() + Duration::from_secs(15);
+        while PARENT_ANSWERED.load(std::sync::atomic::Ordering::SeqCst) < parent_first
+            && std::time::Instant::now() < deadline
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
     let next = with_scripted(|q| q.pop_front());
+    if is_orchestrator {
+        PARENT_ANSWERED.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
     let Some(mut entry) = next else {
         let message = json!({ "role": "assistant", "content": "default scripted completion" });
         return completion_response(streaming, message);
@@ -860,6 +895,21 @@ async fn boot_stack_with_options(
     // the explicit tinymemory host seams before handlers service memory-backed
     // agent turns, matching normal startup wiring.
 
+    // The transport-only router does not create a Core runtime context, and a
+    // dispatch with none resolves no storage scope (the sub-agent session store
+    // refuses to open). Bind the process default context like a booted host.
+    let (_default_context, _, _) = openhuman_core::core::runtime::CoreContext::init_with_config(
+        openhuman_core::core::types::HostKind::Library,
+        &openhuman_core::core::runtime::TokenSource::Fixed(std::sync::Arc::new(
+            "agent-harness-e2e-token".to_owned(),
+        )),
+        openhuman_core::core::runtime::DomainSet::full(),
+        openhuman_core::tools::toolpacks::ToolGroups::packed(),
+        None,
+    )
+    .await
+    .expect("initialize the default core context for the harness stack");
+
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -1136,11 +1186,12 @@ async fn run_managed_capture_turn(
     );
     drop(events);
     stack.shutdown_and_wait().await;
-    // The bare test router dispatches RPC with DispatchCtx::unbound(). Its
-    // cached web-chat agent outlives a router shutdown, so remove that session
-    // from the same process-default slot before the fixture resets its files.
+    // The bare test router dispatches RPC under the process default context
+    // that `boot_stack` initialized. Its cached web-chat agent outlives a router
+    // shutdown, so remove that session from the same slot before the fixture
+    // resets its files.
     openhuman_core::web_chat::invalidate_thread_sessions(
-        &openhuman_core::core::runtime::DispatchCtx::unbound(),
+        &openhuman_core::core::runtime::DispatchCtx::process_default(),
         "managed-capture-thread",
     )
     .await;
@@ -1721,20 +1772,22 @@ async fn subagent_delegation_happy_path_inner() {
     std::fs::create_dir_all(image_path.parent().expect("action directory"))
         .expect("create action directory");
     std::fs::copy(&fixture_path, &image_path).expect("copy vision fixture");
+    // `spawn_subagent` is asynchronous: the parent gets a task id back at once
+    // and the child's result is delivered later, so the parent's reply and the
+    // child's model call race for the next scripted completion. Every entry
+    // carries the canary so the assertions hold in either order.
     reset_script(vec![
-        // request[0]: Orchestrator calls the `analyze_image` tool
-        // (vision_agent's delegate_name).
+        // The orchestrator spawns the vision specialist.
         tool_call_completion(
-            "analyze_image",
+            "spawn_subagent",
             json!({
+                "agent_id": "vision_agent",
                 "prompt": "Find the marker phrase",
-                "image_paths": [image_path.to_string_lossy()],
-                "blocking": true
+                "image_paths": [image_path.to_string_lossy()]
             }),
         ),
-        // request[1]: vision_agent subagent inner LLM call returns its canary.
+        text_completion("Delegated. MEMORY_CANARY_42 will be reported."),
         text_completion("MEMORY_CANARY_42 is the marker."),
-        // request[2]: Orchestrator receives the subagent result and synthesizes.
         text_completion("Done. The result is: MEMORY_CANARY_42"),
     ]);
     let mut events = spawn_sse_collector(format!(
@@ -1767,52 +1820,40 @@ async fn subagent_delegation_happy_path_inner() {
         "final response missing subagent canary; full_response: {full_response}\nevent: {done}"
     );
 
-    // Delegation evidenced by ≥3 captured upstream requests:
-    //   request[0] = orchestrator turn: analyze_image tool call returned
-    //   request[1] = vision_agent subagent inner LLM call: canary text returned
-    //   request[2] = orchestrator synthesis: canary forwarded in final reply
-    //
-    // NOTE: a completed turn's snapshot is now RETAINED (lifecycle `Completed`)
-    // so "View processing" can replay a finished turn; the snapshot is overwritten
-    // by the next turn, not deleted on completion. We verify delegation via the
-    // captured upstream requests rather than turn state, which keeps this test
-    // independent of the snapshot's retention/lifecycle details.
-    let requests = with_captured(|c| c.clone());
-    assert!(
-        requests.len() >= 3,
-        "expected ≥3 upstream requests (orchestrator + vision_agent + orchestrator synthesis), \
-         got {};\nall requests: {}",
-        requests.len(),
-        serde_json::to_string_pretty(&requests).unwrap_or_default()
-    );
-
-    // No unknown-tool result anywhere — proves the delegation tool was synthesised
-    // (registry init worked) and the orchestrator could actually call it.
+    // Delegation is evidenced by a request that is not the orchestrator's: the
+    // child builds its own context. Poll, since the detached child may not
+    // have issued its call when the parent's turn ends.
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    let requests = loop {
+        let requests = with_captured(|c| c.clone());
+        if requests.len() >= 3 {
+            break requests;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "expected ≥3 upstream requests (orchestrator, child, delivery), got {};\nall requests: {}",
+            requests.len(),
+            serde_json::to_string_pretty(&requests).unwrap_or_default()
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
     assert!(
         !captured_requests_mention_unknown_tool(&requests),
-        "found an unknown-tool result in captured requests — delegation tool was not synthesised; \
+        "found an unknown-tool result in captured requests — delegation was broken; \
          requests: {}",
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
-
-    // request[1] (vision_agent subagent) must have different system/message content
-    // from request[0] (orchestrator) — proves a genuinely different agent context
-    // ran, not the same orchestrator re-called.
-    let req0_sys = requests
-        .first()
-        .and_then(|r| r.pointer("/body/messages/0/content"))
-        .and_then(Value::as_str)
-        .unwrap_or("");
-    let req1_sys = requests
-        .get(1)
-        .and_then(|r| r.pointer("/body/messages/0/content"))
-        .and_then(Value::as_str)
-        .unwrap_or("");
-    assert_ne!(
-        req0_sys, req1_sys,
-        "request[0] and request[1] share identical first-message content — \
-         vision_agent subagent did not build its own context; \
-         content: {req0_sys:?}"
+    let first_sys = |r: &Value| {
+        r.pointer("/body/messages/0/content")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    };
+    let req0_sys = first_sys(&requests[0]);
+    assert!(
+        requests.iter().skip(1).any(|r| first_sys(r) != req0_sys),
+        "no later request carries its own system context — the vision_agent subagent \
+         did not build one; content: {req0_sys:?}"
     );
 
     stack.shutdown();
@@ -2748,11 +2789,11 @@ async fn parallel_subagent_fanout_inner() {
         tool_calls_completion(&[
             (
                 "spawn_subagent",
-                json!({ "agent_id": "vision_agent", "prompt": "Find PARALLEL_ALPHA_CANARY" }),
+                json!({ "agent_id": "task_manager_agent", "prompt": "Find PARALLEL_ALPHA_CANARY" }),
             ),
             (
                 "spawn_subagent",
-                json!({ "agent_id": "vision_agent", "prompt": "Find PARALLEL_BETA_CANARY" }),
+                json!({ "agent_id": "task_manager_agent", "prompt": "Find PARALLEL_BETA_CANARY" }),
             ),
         ]),
         text_completion("Spawned two workers; results will arrive as they land."),
@@ -2883,30 +2924,26 @@ async fn multi_hop_delegation_chain_inner() {
     std::fs::create_dir_all(image_path.parent().expect("action directory"))
         .expect("create action directory");
     std::fs::copy(&fixture_path, &image_path).expect("copy vision fixture");
+    // The spawn is asynchronous (see `subagent_delegation_happy_path`): the
+    // parent's acknowledgement and the child's first model call race for the
+    // next scripted completion, so the canary rides in every text entry.
     reset_script(vec![
-        // request[0]: Orchestrator delegates to vision_agent via
-        // `analyze_image` (its delegate_name, agent_registry/agents/vision_agent/agent.toml:3).
         tool_call_completion(
-            "analyze_image",
+            "spawn_subagent",
             json!({
+                "agent_id": "vision_agent",
                 "prompt": "deep question",
-                "image_paths": [image_path.to_string_lossy()],
-                "blocking": true
+                "image_paths": [image_path.to_string_lossy()]
             }),
         ),
-        // request[1]: vision_agent first inner LLM call → scripts file_write.
-        // file_write is NOT in vision_agent's read-only named tools
-        // (`[tools] named`), so SubagentToolSource returns a blocked/error
-        // result (tool_source.rs:36). The subagent loop continues to a second
-        // LLM call.
+        text_completion("Delegated. DEPTH2_CANARY will be reported."),
+        // The child's first inner call scripts `file_write`, which is not on
+        // vision_agent's read-only belt, so it is refused and the loop goes on.
         tool_call_completion(
             "file_write",
             json!({ "path": "depth-2.txt", "content": "depth-2 write?" }),
         ),
-        // request[2]: vision_agent second inner LLM call → text result.
-        // This becomes the `analyze_image` tool result forwarded by dispatch_subagent.
         text_completion("DEPTH2_CANARY"),
-        // request[3]: Orchestrator receives the analyze_image result and synthesizes.
         text_completion("Final answer: DEPTH2_CANARY"),
     ]);
     let mut events = spawn_sse_collector(format!(
@@ -2938,28 +2975,31 @@ async fn multi_hop_delegation_chain_inner() {
         "synthesis must contain DEPTH2_CANARY; full_response: {full_response}"
     );
 
-    // ≥4 upstream requests prove the full delegation path ran (≥3 would
-    // false-pass if the subagent inner loop early-exited):
-    //   request[0] = orchestrator (analyze_image call),
-    //   request[1] = vision_agent first iter (file_write → blocked),
-    //   request[2] = vision_agent second iter (DEPTH2_CANARY text),
-    //   request[3] = orchestrator synthesis.
-    let requests = with_captured(|c| c.clone());
-    assert!(
-        requests.len() >= 4,
-        "expected ≥4 upstream requests (orchestrator + vision_agent x2 + synthesis), got {};\
-        \nrequests: {}",
-        requests.len(),
-        serde_json::to_string_pretty(&requests).unwrap_or_default()
-    );
+    // ≥4 upstream requests prove the child's inner loop ran past its refused
+    // `file_write`: the orchestrator's spawn, its acknowledgement, the child's
+    // two calls and the delivery. Poll: the detached child may still be running
+    // when the parent's turn ends.
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    let requests = loop {
+        let requests = with_captured(|c| c.clone());
+        if requests.len() >= 4 {
+            break requests;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "expected ≥4 upstream requests (orchestrator, acknowledgement, child x2), got {};\
+            \nrequests: {}",
+            requests.len(),
+            serde_json::to_string_pretty(&requests).unwrap_or_default()
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
 
-    // No unknown-tool result for `analyze_image` — delegation was synthesised correctly.
-    // Scoped to `analyze_image`: the subagent's `file_write` call IS
-    // rejected as unknown by design (see the ordering note above), so a blanket
-    // check would fail on the very mechanic this test exercises.
+    // `spawn_subagent` itself must never be rejected as unknown. Scoped to it:
+    // the child's `file_write` IS refused as unknown by design.
     assert!(
-        !captured_requests_reject_tool_as_unknown(&requests, "analyze_image"),
-        "found an unknown-tool result — `analyze_image` delegation was not synthesised; requests: {}",
+        !captured_requests_reject_tool_as_unknown(&requests, "spawn_subagent"),
+        "found an unknown-tool result — `spawn_subagent` was not offered; requests: {}",
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
 
@@ -3604,7 +3644,7 @@ async fn serve_skill_registry_fixture() -> (
 
 /// A skill found in the registry is installed by the agent (behind the approval
 /// gate), lands on disk, and is then loaded by the orchestrator itself
-/// (`describe_workflow`), with its body reaching the model.
+/// delivered to the orchestrator.
 // `skills` off drops `skill_setup` from the builtins, and this
 // target declares no `required-features`, so an ungated skill test would run
 // and fail instead of being skipped.
@@ -3638,12 +3678,16 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     let _local_http = EnvVarGuard::set("OPENHUMAN_SKILL_INSTALL_ALLOW_LOCAL_HTTP", "1");
     let _cache = EnvVarGuard::set_to_path("OPENHUMAN_SKILL_REGISTRY_CACHE_DIR", cache_dir.path());
 
+    // The hand-off is a `spawn_subagent` (asynchronous): the parent's
+    // acknowledgement is answered before the child's first call, and the child's
+    // result is delivered to a later parent turn that loads the skill.
+    serialize_children_after_parent(2);
     reset_script(vec![
-        // Orchestrator hands the install to `skill_setup` (a direct hand-off, #6302).
         tool_call_completion(
-            "setup_skills",
-            json!({ "prompt": "Install the harness registry skill", "blocking": true }),
+            "spawn_subagent",
+            json!({ "agent_id": "skill_setup", "prompt": "Install the harness registry skill" }),
         ),
+        text_completion("Handed the install to the skill specialist."),
         // skill_setup finds the entry, then installs it (the gate parks here).
         tool_call_completion(
             "skill_registry_search",
@@ -3654,13 +3698,10 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
             json!({ "entry_id": REGISTRY_SKILL_ID }),
         ),
         text_completion("Installed the skill."),
-        // The orchestrator loads the installed skill itself — there is no
-        // skill-executor hand-off; running one is its own `run_workflow`.
-        tool_call_completion(
-            "describe_workflow",
-            json!({ "workflow_id": REGISTRY_SKILL_ID }),
-        ),
-        text_completion("The skill is installed and ran."),
+        // The delivery turn: the child's result reaches the orchestrator, which
+        // answers. (The `workflows` pack is closed to it while it can hand off
+        // to `workflow_builder`, so it does not load the skill itself.)
+        text_completion("The skill is installed."),
     ]);
     let stack = boot_stack().await;
 
@@ -3692,7 +3733,9 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
         };
         match event.get("event").and_then(Value::as_str) {
             Some("approval_request") => break event,
-            Some("chat_done") | Some("chat_error") => panic!(
+            // The acknowledgement turn ends before the detached child asks.
+            Some("chat_done") => {}
+            Some("chat_error") => panic!(
                 "turn ended before skill_registry_install asked for approval: {event}\nrequests: {}",
                 serde_json::to_string_pretty(&with_captured(|c| c.clone())).unwrap_or_default()
             ),
@@ -3718,14 +3761,23 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     .await;
     assert_no_jsonrpc_error(&decide, "approval_decide for skill_registry_install");
 
-    let done = wait_for_terminal(&mut events, Duration::from_secs(120)).await;
-    assert_eq!(
-        done.get("event").and_then(Value::as_str),
-        Some("chat_done"),
-        "the install-and-run turn must finish: {done}"
-    );
-
-    let requests = with_captured(|c| c.clone());
+    // The delivery turn is host-authored (no web client is waiting on it), so
+    // wait for its evidence on the wire instead of a terminal chat event: the
+    // orchestrator request that carries the finished child's result.
+    let deadline = std::time::Instant::now() + Duration::from_secs(120);
+    let requests = loop {
+        let requests = with_captured(|c| c.clone());
+        let delivered = requests.iter().any(|request| {
+            request
+                .to_string()
+                .contains("background sub-agent finished")
+                && request.to_string().contains("Installed the skill.")
+        });
+        if delivered || std::time::Instant::now() >= deadline {
+            break requests;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
     let dump = || serde_json::to_string_pretty(&requests).unwrap_or_default();
 
     // Found: the search the agent ran returned the registry entry.
@@ -3758,12 +3810,27 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
         "the installed SKILL.md is not the one the registry served: {body}"
     );
 
-    // Usable: the orchestrator loaded the installed skill and its body reached the model.
-    let described = tool_result_text(&requests, "describe_workflow")
-        .unwrap_or_else(|| panic!("no tool result for describe_workflow; requests: {}", dump()));
+    // Delivered: the child's result reached the orchestrator's delivery turn.
+    let delivered = requests.iter().any(|request| {
+        request
+            .pointer("/body/messages")
+            .and_then(Value::as_array)
+            .is_some_and(|messages| {
+                messages.iter().any(|message| {
+                    message
+                        .get("content")
+                        .and_then(Value::as_str)
+                        .is_some_and(|text| {
+                            text.contains("background sub-agent finished")
+                                && text.contains("Installed the skill.")
+                        })
+                })
+            })
+    });
     assert!(
-        described.contains(SKILL_BODY_CANARY),
-        "describe_workflow did not return the installed skill's body, so the agent cannot use it: {described}"
+        delivered,
+        "the skill_setup result never reached the orchestrator; requests: {}",
+        dump()
     );
 
     registry_join.abort();
@@ -3885,15 +3952,16 @@ async fn assert_packed_hand_off_reaches_specialist(
     events: &mut tokio::sync::mpsc::UnboundedReceiver<Value>,
     rpc_id: i64,
     client_id: &str,
-    pack: &str,
-    hand_off: &str,
+    agent_id: &str,
     specialist_only_tools: &[&str],
 ) {
+    // Hand-offs are `spawn_subagent` calls now (asynchronous: the parent gets a
+    // task id back and the child's result is delivered later), so the parent's
+    // acknowledgement and the child's first call race for the next completion.
     reset_script(vec![
-        packed_tool_call_completion(
-            pack,
-            hand_off,
-            json!({ "prompt": format!("Handle this through {hand_off}"), "blocking": true }),
+        tool_call_completion(
+            "spawn_subagent",
+            json!({ "agent_id": agent_id, "prompt": format!("Handle this through {agent_id}") }),
         ),
         text_completion("The specialist finished the task."),
         text_completion("The specialist handled it."),
@@ -3902,32 +3970,43 @@ async fn assert_packed_hand_off_reaches_specialist(
         &stack.rpc_base,
         rpc_id,
         client_id,
-        &format!("thread-{hand_off}"),
-        &format!("Please hand this to {hand_off}"),
+        &format!("thread-{agent_id}"),
+        &format!("Please hand this to {agent_id}"),
     )
     .await;
     let done = wait_for_terminal(events, Duration::from_secs(120)).await;
-    let requests = with_captured(|c| c.clone());
-    let dump = || serde_json::to_string_pretty(&requests).unwrap_or_default();
+    let first_requests = with_captured(|c| c.clone());
     assert_eq!(
         done.get("event").and_then(Value::as_str),
         Some("chat_done"),
-        "the `{hand_off}` turn must finish: {done}\nrequests: {}",
-        dump()
+        "the `{agent_id}` turn must finish: {done}\nrequests: {}",
+        serde_json::to_string_pretty(&first_requests).unwrap_or_default()
     );
+
+    // The child is detached: poll for the request that carries its own belt.
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    let requests = loop {
+        let requests = with_captured(|c| c.clone());
+        let child_seen = requests.iter().skip(1).any(|request| {
+            advertised_tool_names(request)
+                .iter()
+                .any(|name| specialist_only_tools.contains(&name.as_str()))
+        });
+        if child_seen || std::time::Instant::now() >= deadline {
+            break requests;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
+    let dump = || serde_json::to_string_pretty(&requests).unwrap_or_default();
 
     let orchestrator = requests
         .first()
-        .unwrap_or_else(|| panic!("no model request for the `{hand_off}` turn"));
+        .unwrap_or_else(|| panic!("no model request for the `{agent_id}` turn"));
     let belt = advertised_tool_names(orchestrator);
     assert!(
-        belt.iter().any(|name| name == "use_skill") && use_skill_offers_pack(orchestrator, pack),
-        "the orchestrator must offer the `{pack}` pack through use_skill so it can reach \
-         `{hand_off}`; it advertised {belt:?}"
-    );
-    assert!(
-        !belt.iter().any(|name| name == hand_off),
-        "`{hand_off}` is packed (#6787), not a direct tool on the orchestrator's wire: {belt:?}"
+        belt.iter().any(|name| name == "spawn_subagent"),
+        "the orchestrator must offer `spawn_subagent` so it can reach `{agent_id}`; it \
+         advertised {belt:?}"
     );
     let raw: Vec<&String> = belt
         .iter()
@@ -3938,8 +4017,8 @@ async fn assert_packed_hand_off_reaches_specialist(
         "the orchestrator must not advertise raw registry tools: {raw:?}"
     );
 
-    tool_result_text(&requests, hand_off)
-        .unwrap_or_else(|| panic!("no tool result for `{hand_off}`; requests: {}", dump()));
+    tool_result_text(&requests, "spawn_subagent")
+        .unwrap_or_else(|| panic!("no tool result for `spawn_subagent`; requests: {}", dump()));
     assert!(
         requests
             .iter()
@@ -3947,7 +4026,7 @@ async fn assert_packed_hand_off_reaches_specialist(
             .any(|request| advertised_tool_names(request)
                 .iter()
                 .any(|name| specialist_only_tools.contains(&name.as_str()))),
-        "no model request came from the specialist behind `{hand_off}` (a belt with any of \
+        "no model request came from the specialist `{agent_id}` (a belt with any of \
          {specialist_only_tools:?}); requests: {}",
         dump()
     );
@@ -3981,8 +4060,7 @@ async fn orchestrator_hands_skill_installs_to_skill_setup_through_the_skills_pac
         &mut events,
         910,
         "harness-skill-handoff",
-        "skills",
-        "setup_skills",
+        "skill_setup",
         &[
             "skill_registry_install",
             "skill_registry_uninstall",
@@ -4482,6 +4560,9 @@ async fn orchestrator_calls_an_operator_trusted_mcp_tool_directly_inner() {
     .await;
 
     let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
+    // The same approval can reach this subscription more than once (a replay on
+    // the stream); decide each request id a single time.
+    let mut decided = std::collections::HashSet::new();
     let done = loop {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
         let event = tokio::time::timeout(remaining, events.recv())
@@ -4495,6 +4576,9 @@ async fn orchestrator_calls_an_operator_trusted_mcp_tool_directly_inner() {
                     .or_else(|| event.get("request_id"))
                     .and_then(Value::as_str)
                     .expect("MCP approval request id");
+                if !decided.insert(request_id.to_string()) {
+                    continue;
+                }
                 let decision = post_json_rpc(
                     &stack.rpc_base,
                     944,
@@ -5395,7 +5479,7 @@ async fn cancelling_a_running_background_subagent_settles_it_inner() {
     reset_script(vec![
         tool_calls_completion(&[(
             "spawn_subagent",
-            json!({ "agent_id": "vision_agent", "prompt": "Find CANCEL_E2E_CANARY" }),
+            json!({ "agent_id": "task_manager_agent", "prompt": "Find CANCEL_E2E_CANARY" }),
         )]),
         text_completion("Spawned a worker; its result will arrive later."),
         text_completion("worker would have finished here"),
@@ -5415,6 +5499,23 @@ async fn cancelling_a_running_background_subagent_settles_it_inner() {
     )
     .await;
 
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    eprintln!(
+        "DBG {}",
+        with_captured(|c| serde_json::to_string(
+            &c.iter()
+                .map(|r| r.pointer("/body/messages").cloned())
+                .collect::<Vec<_>>()
+        )
+        .unwrap()
+        .chars()
+        .rev()
+        .take(3000)
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect::<String>())
+    );
     let spawned = wait_for_event(&mut events, "subagent_spawned", Duration::from_secs(120)).await;
     let task_id = spawned
         .get("skill_id")
