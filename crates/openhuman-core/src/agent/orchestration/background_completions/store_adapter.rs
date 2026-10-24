@@ -250,29 +250,3 @@ pub(in crate::agent::orchestration) fn router_for_workspace(
 ) -> Arc<CompletionRouter> {
     router_for_workspace_ctx(&DispatchCtx::ambient(), workspace_dir)
 }
-
-/// Drops the cached completion router and store sidecar of profile `profile`'s
-/// `workspace_dir`, after the profile's lease was released. The cached driver
-/// store captured the old lease epoch's fence, so a later open of the same
-/// profile (a new epoch) would otherwise keep failing with
-/// `lease fence: key lost`. Handles already handed out stay fenced.
-pub(crate) fn release_profile_workspace(profile: &str, workspace_dir: &Path) {
-    let tenant = crate::core::runtime::Tenant {
-        profile: Some(profile.to_owned()),
-        agent: None,
-    };
-    let scope = RouterScope {
-        profile_key: crate::core::runtime::tenant::profile_key_in(&tenant, ""),
-        workspace_dir: workspace_dir.to_path_buf(),
-    };
-    match router_pool().remove(&scope) {
-        Ok(removed) => log::debug!(
-            "[background_completions] released profile={profile} router_cached={}",
-            removed.is_some()
-        ),
-        Err(error) => {
-            log::warn!("[background_completions] release profile={profile} failed: {error}");
-        }
-    }
-    state().stores.remove(&scope);
-}
