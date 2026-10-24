@@ -127,7 +127,15 @@ fn child_keeps_the_pack_tools_its_parent_closed_to_hand_off() {
     // be able to call it.
     let tool = PolicyFixtureTool("skill_registry_search", PermissionLevel::ReadOnly);
     let mut parent = parent_policy(PermissionLevel::Dangerous);
-    parent.session.deny(["skill_registry_search"]);
+    parent.session.decisions.insert(
+        "skill_registry_search".to_string(),
+        tinytools::ToolPolicyDecision {
+            tool_name: "skill_registry_search".to_string(),
+            action: tinytools::ToolPolicyAction::Deny,
+            required_permission: Some(PermissionLevel::ReadOnly),
+            allowed_permission: PermissionLevel::Dangerous,
+        },
+    );
     let names = HashSet::from(["skill_registry_search".to_string()]);
 
     let specialist = child_tool_policy(Some(&parent), "skill_setup", &names, &[&tool])
