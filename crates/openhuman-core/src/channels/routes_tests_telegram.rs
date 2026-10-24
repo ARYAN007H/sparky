@@ -89,7 +89,12 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     );
 
     let sent = channel_state.sent.lock().unwrap();
-    assert_eq!(sent.len(), 3, "{:?}", sent.iter().map(|m| m.content.clone()).collect::<Vec<_>>());
+    assert_eq!(
+        sent.len(),
+        3,
+        "{:?}",
+        sent.iter().map(|m| m.content.clone()).collect::<Vec<_>>()
+    );
     assert!(sent[0].content.contains("Started new session"));
     assert!(sent[0]
         .content
