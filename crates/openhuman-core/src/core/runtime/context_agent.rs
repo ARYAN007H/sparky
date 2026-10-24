@@ -90,6 +90,8 @@ impl CoreContext {
     ///
     /// A host must not close or evict a tenant while this is `true`: its
     /// in-flight tables (turns, queues, caches) live in those slots.
+    pub fn debug_counts(self: &Arc<Self>) -> usize { Arc::strong_count(&self.agent.state) }
+
     pub fn tenant_in_use(self: &Arc<Self>) -> bool {
         Arc::strong_count(self) > 1 || Arc::strong_count(&self.agent.state) > 1
     }

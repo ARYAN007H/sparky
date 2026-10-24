@@ -638,7 +638,7 @@ impl ProfileHost {
 /// or a turn still running on its context (a detached turn outlives the
 /// request that started it).
 fn in_use(slot: &Slot) -> bool {
-    log::warn!("DBGINUSE slotstate={} ctx={} agentstate={}", Arc::strong_count(&slot.state), Arc::strong_count(&slot.state.context), Arc::strong_count(&slot.state.context.agent_state_arc()));
+    log::warn!("DBGINUSE slotstate={} ctx={} agent={}", Arc::strong_count(&slot.state), Arc::strong_count(&slot.state.context), slot.state.context.debug_counts());
     Arc::strong_count(&slot.state) > 1 || slot.state.context.tenant_in_use()
 }
 
