@@ -19,7 +19,9 @@
 //! * `runtime_dispatch.rs` — the dispatch loop through
 //!   `runtime::test_support::run_dispatch_harness`: inbound-envelope
 //!   publication, parallel processing, typing-task cancellation, the
-//!   `agent.run_turn` bus route, and multimodal path-marker hardening.
+//!   `agent.run_turn` bus route, and the dispatch deadline.
+//! * `runtime_hardening.rs` — multimodal file and relative path-marker
+//!   hardening through `process_channel_message`.
 //! * `runtime_tool_calls.rs` — native tool-call execution, the `/models`
 //!   command short-circuit, route overrides, and `max_tool_iterations`
 //!   through `process_channel_message`.
@@ -29,4 +31,5 @@ mod host_pipeline;
 mod identity;
 mod prompt;
 mod runtime_dispatch;
+mod runtime_hardening;
 mod runtime_tool_calls;
