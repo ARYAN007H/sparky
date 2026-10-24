@@ -35,7 +35,10 @@ fn dump_published_prompt(
         .env("OPENHUMAN_MODULE_PATH", module_search_path)
         .env_remove("BACKEND_URL")
         .env_remove("VITE_BACKEND_URL")
-        .env_remove("OPENHUMAN_BACKEND_API_KEY")
+        // Building the session agent resolves a backend credential before it
+        // renders a prompt (`SESSION_EXPIRED` otherwise). A fixed local key
+        // satisfies that without reaching any backend: `api_url` is unroutable.
+        .env("OPENHUMAN_BACKEND_API_KEY", "th_test_local_only")
         .env_remove("OPENHUMAN_BACKEND_SESSION_TOKEN")
         .env_remove("OPENHUMAN_STORAGE_URL")
         .env_remove("OPENHUMAN_MODULE_SOURCE")
