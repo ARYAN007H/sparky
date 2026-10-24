@@ -562,6 +562,13 @@ async fn a_captured_import_claim_cannot_write_after_profile_lease_takeover() {
                     .for_scope(&scope)
                     .map_err(anyhow::Error::from)
                     .context("bind current profile storage")?;
+                let current_fence = profile_b.lease_fence();
+                eprintln!(
+                    "takeover test: current profile fence epoch={} check={:?} registry={:?}",
+                    current_fence.epoch(),
+                    current_fence.check(crate::profiles::lease::now_ms()).await,
+                    second.fences().lookup(id.as_str()).map(|fence| fence.epoch()),
+                );
 
                 eprintln!("takeover test: verify stale writes");
                 let stale_write = stale_storage
