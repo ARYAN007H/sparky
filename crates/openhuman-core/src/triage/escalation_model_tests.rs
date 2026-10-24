@@ -285,7 +285,17 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
         .build()
         .await
         .expect("isolated core runtime");
-    let ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(runtime.context()));
+    // The turn runs hosted, so the context must carry the agent catalogue the
+    // hosted invocation base is built from.
+    let context = runtime.context().derive_with(
+        crate::core::runtime::ContextOverlay::new(
+            config.clone(),
+            crate::core::runtime::DomainSet::none(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .definitions(Arc::new(AgentDefinitionRegistry::builtins_only())),
+    );
+    let ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&context));
     let definition = AgentDefinitionRegistry::builtins_only()
         .get("trigger_reactor")
         .expect("built-in trigger reactor exists")
@@ -298,7 +308,7 @@ async fn direct_turn_model_source_metadata_probe_does_not_duplicate_egress_discl
 
     runtime
         .run_in(
-            Arc::clone(runtime.context()),
+            context,
             crate::security::turn_origin::with_origin(
                 crate::triage::local_trigger_origin(),
                 crate::agent_runs::agent_chat::agent_chat_for_with_turn_model_source(
