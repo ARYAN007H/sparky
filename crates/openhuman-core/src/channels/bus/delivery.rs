@@ -84,6 +84,9 @@ pub(crate) struct NativeProgressiveReply {
     // Hosted relay handles own their callback runtime. Keep that lease alive
     // until Close is acknowledged or the final reply owner is dropped.
     runtime: Option<ChannelRuntimeLease>,
+    /// The final text once it was delivered. Releasing a delivered handle sends
+    /// the module this terminal text again instead of a cancellation notice.
+    delivered_text: std::sync::Mutex<Option<String>>,
 }
 
 impl NativeProgressiveReply {
@@ -111,6 +114,7 @@ impl NativeProgressiveReply {
                     object,
                     handle,
                     runtime: None,
+                    delivered_text: std::sync::Mutex::new(None),
                 })
             }
             _ => {
@@ -145,6 +149,7 @@ impl NativeProgressiveReply {
                     object,
                     handle,
                     runtime: Some(runtime),
+                    delivered_text: std::sync::Mutex::new(None),
                 })
             }
             _ => {
