@@ -668,12 +668,14 @@ fn a_profile_holds_web_and_relayed_channel_threads() {
     // test covers profile/thread isolation, not same-profile turn scheduling.
     let deadline = Instant::now() + Duration::from_secs(90);
     let mut lifecycle = None;
+    let mut turn_state_response = None;
     while Instant::now() < deadline {
-        let (_, state) = call(
+        let (state_status, state) = call(
             "alice",
             "openhuman.threads_turn_state_get",
             json!({ "thread_id": "web-1" }),
         );
+        turn_state_response = Some((state_status, state.clone()));
         lifecycle = state
             .pointer("/result/data/turnState/lifecycle")
             .or_else(|| state.pointer("/result/result/data/turnState/lifecycle"))
@@ -686,7 +688,7 @@ fn a_profile_holds_web_and_relayed_channel_threads() {
     }
     assert!(
         matches!(lifecycle.as_deref(), Some("completed" | "interrupted")),
-        "Alice's web turn did not settle before relay: {lifecycle:?}"
+        "Alice's web turn did not settle before relay: lifecycle={lifecycle:?}, response={turn_state_response:?}"
     );
 
     // ...and the gateway relays a Telegram message of hers.
