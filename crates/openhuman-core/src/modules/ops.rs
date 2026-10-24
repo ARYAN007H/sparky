@@ -222,17 +222,18 @@ fn needs_storage_callback(id: &str) -> bool {
 }
 
 /// Serializes creation and retention of module-scoped storage callback bindings.
-static STORAGE_CALLBACK_LOADS: std::sync::LazyLock<
-    tokio::sync::Mutex<
-        std::collections::HashMap<
-            String,
-            (
-                std::sync::Arc<tinybus::module::HostCallbackBinding>,
-                tinystoragedrivers_busproxy::ServedStorage,
-            ),
-        >,
+type StorageCallbackLoads = tokio::sync::Mutex<
+    std::collections::HashMap<
+        String,
+        (
+            std::sync::Arc<tinybus::module::HostCallbackBinding>,
+            tinystoragedrivers_busproxy::ServedStorage,
+        ),
     >,
-> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
+>;
+
+static STORAGE_CALLBACK_LOADS: std::sync::LazyLock<StorageCallbackLoads> =
+    std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
 
 async fn ensure_loaded_with_storage_callback(
     resolver: &Resolver,

@@ -696,7 +696,7 @@ pub(super) async fn prepare_module_callbacks(
     tinystoragedrivers_busproxy::ServedStorage,
 )> {
     let connection = runtime.connection();
-    prepare_callbacks(&connection, runtime.host()).await
+    prepare_callbacks(connection, runtime.host()).await
 }
 
 /// Prepare a callback storage endpoint for a module host on `connection`.

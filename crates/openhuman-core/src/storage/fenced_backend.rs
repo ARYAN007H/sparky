@@ -16,6 +16,8 @@ use tinystoragedrivers_types::WriteCondition;
 
 use super::fence::{FenceRegistry, LeaseFence};
 
+type FencedWriteCondition = Option<(Arc<LeaseFence>, Option<WriteCondition>)>;
+
 /// A backend whose scope handles carry the applicable host lease condition.
 pub struct FencedBackend {
     inner: Arc<dyn StorageBackend>,
@@ -66,7 +68,7 @@ impl FencedBackend {
     fn condition_for(
         &self,
         scope: &Scope,
-    ) -> Result<Option<(Arc<LeaseFence>, Option<WriteCondition>)>, StorageError> {
+    ) -> Result<FencedWriteCondition, StorageError> {
         let fence = if let Some(captured) = &self.captured {
             if !captured.covers(scope.as_str()) {
                 return Err(StorageError::backend(
