@@ -204,7 +204,8 @@ async fn prepared_module_handle_keeps_progressive_send_alive() {
         .await
         .expect("scoped edit should cross the compiled module bus");
     assert!(
-        matches!(edited, ProgressiveTransportResult::Outcome(outcome) if outcome.error.is_none())
+        matches!(&edited, ProgressiveTransportResult::Outcome(outcome) if outcome.error.is_none()),
+        "unexpected edit result: {edited:?}"
     );
     let deleted = adapter
         .dispatch_progressive(ProgressiveTransportRequest::Delete {
