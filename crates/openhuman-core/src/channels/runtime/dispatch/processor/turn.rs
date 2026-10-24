@@ -30,12 +30,20 @@ pub(crate) async fn process_channel_runtime_message(
     runtime_msg: RuntimeChannelMessage,
 ) {
     if let Some(admitted) = admit_runtime_message(Arc::clone(&ctx), runtime_msg).await {
-        run_admitted_turn(ctx, admitted).await;
+        run_admitted_turn(ctx, admitted, None).await;
     }
 }
 
 /// Run the agent turn for one admitted message (or one merged batch).
-pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted: AdmittedInbound) {
+///
+/// `handoff` is released right before the turn is handed to the shared turn
+/// runner (or when the turn ends early), which lets the dispatch loop start
+/// the next batch of the same conversation after this one in receive order.
+pub(crate) async fn run_admitted_turn(
+    ctx: Arc<ChannelRuntimeContext>,
+    admitted: AdmittedInbound,
+    handoff: Option<tokio::sync::oneshot::Sender<()>>,
+) {
     let AdmittedInbound {
         msg,
         envelope,
@@ -306,6 +314,7 @@ pub(crate) async fn run_admitted_turn(ctx: Arc<ChannelRuntimeContext>, admitted:
         history_key: Some(history_key.clone()),
         channel_session,
     };
+    drop(handoff);
     let execution = match selected_host {
         Some(host) => {
             let request_id = format!("{}:{}:{}", msg.channel, msg.id, uuid::Uuid::new_v4());

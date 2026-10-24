@@ -102,11 +102,11 @@ impl From<ChannelMessage> for RuntimeChannelMessage {
     }
 }
 
+use admit::admit_runtime_message;
+pub(crate) use admit::AdmittedInbound;
 #[cfg(test)]
 pub(crate) use approval::channel_has_approval_surface;
 pub(crate) use reset::reset_durable_channel_session;
-use admit::admit_runtime_message;
-pub(crate) use admit::AdmittedInbound;
 pub(crate) use turn::process_channel_runtime_message;
 use turn::run_admitted_turn;
 
@@ -120,8 +120,8 @@ pub(crate) async fn process_channel_message(ctx: Arc<ChannelRuntimeContext>, msg
 /// commands and approval replies), concurrently but released in receive order.
 /// Admitted messages are then debounced per conversation (`history_key`): a
 /// burst becomes one turn. The debouncer only delays and merges intake. It
-/// releases a conversation as soon as its batch is handed to a turn, so the
-/// shared TinyAgents turn runner still owns queueing and steering for
+/// releases a conversation as soon as its batch is handed to the shared
+/// TinyAgents turn runner, which still owns queueing and steering for
 /// messages that arrive while a turn runs. At most `max_in_flight_messages`
 /// turns start concurrently, and the loop stops receiving while
 /// [`intake_budget`] admitted messages are waiting for a turn, so a sustained
@@ -142,6 +142,7 @@ pub(crate) async fn run_message_dispatch_loop(
     let mut admit_seqs: HashMap<tokio::task::Id, u64> = HashMap::new();
     let mut admission_order = InOrder::new();
     let mut turns = JoinSet::new();
+    let mut handoffs: JoinSet<String> = JoinSet::new();
     let mut debouncer: KeyedDebouncer<String, QueuedInbound> = KeyedDebouncer::new();
     let mut ready: VecDeque<(String, Vec<QueuedInbound>)> = VecDeque::new();
 
@@ -152,24 +153,34 @@ pub(crate) async fn run_message_dispatch_loop(
             };
             let batch_len = batch.len();
             held = held.saturating_sub(batch_len);
-            // The turn runner serializes and steers per conversation, so the
-            // debouncer lets go of the key as soon as the batch is dispatched.
-            debouncer.complete(&key);
-            if let Some(admitted) = merge_channel_batch(batch) {
-                tracing::debug!(
-                    channel = %admitted.msg.channel,
-                    message_id = %admitted.msg.id,
-                    batch_len,
-                    in_flight = turns.len() + 1,
-                    held,
-                    "[dispatch][debounce] starting turn"
-                );
-                turns.spawn(run_admitted_turn(Arc::clone(&ctx), admitted));
+            match merge_channel_batch(batch) {
+                None => debouncer.complete(&key),
+                Some(admitted) => {
+                    tracing::debug!(
+                        channel = %admitted.msg.channel,
+                        message_id = %admitted.msg.id,
+                        batch_len,
+                        in_flight = turns.len() + 1,
+                        held,
+                        "[dispatch][debounce] starting turn"
+                    );
+                    // The turn runner owns serialization and steering per
+                    // conversation. The debouncer keeps a key only until its batch
+                    // is handed to the runner, so the next batch of that
+                    // conversation is handed over after it, in receive order.
+                    let (handoff, handed_off) = tokio::sync::oneshot::channel::<()>();
+                    turns.spawn(run_admitted_turn(Arc::clone(&ctx), admitted, Some(handoff)));
+                    handoffs.spawn(async move {
+                        let _ = handed_off.await;
+                        key
+                    });
+                }
             }
         }
         if !inbound_open
             && admitting.is_empty()
             && turns.is_empty()
+            && handoffs.is_empty()
             && ready.is_empty()
             && debouncer.is_empty()
         {
@@ -211,6 +222,12 @@ pub(crate) async fn run_message_dispatch_loop(
                         held += 1;
                         buffer_admitted(&debounce, &mut debouncer, seq, inbound);
                     }
+                }
+            }
+            Some(joined) = handoffs.join_next(), if !handoffs.is_empty() => {
+                match joined {
+                    Ok(key) => debouncer.complete(&key),
+                    Err(error) => log_join_error("handoff", Some(error)),
                 }
             }
             Some(joined) = turns.join_next(), if !turns.is_empty() => {

@@ -124,9 +124,18 @@ fn item_traits_classify_media_commands_blanks_and_owned_state() {
         caption: None,
         alt_text: None,
     });
-    assert!(typed_media.carries_media(), "a typed image stretches the window");
+    assert!(
+        typed_media.carries_media(),
+        "a typed image stretches the window"
+    );
 
     let mut imported = queued(1, "m", 1, "hello");
-    imported.inbound.imported_history = vec![tinyagents_session::transcript::TranscriptMessage::user("old")];
-    assert!(!imported.mergeable(), "imported history belongs to one message");
+    imported.inbound.imported_history =
+        vec![tinyagents_session::transcript::TranscriptMessage::user(
+            "old",
+        )];
+    assert!(
+        !imported.mergeable(),
+        "imported history belongs to one message"
+    );
 }

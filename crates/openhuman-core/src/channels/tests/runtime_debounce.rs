@@ -86,7 +86,11 @@ async fn install_handler(turns: Arc<Turns>, gate: Option<Gate>) -> MockBusGuard 
             let active = turns.active.fetch_add(1, Ordering::SeqCst) + 1;
             turns.peak.fetch_max(active, Ordering::SeqCst);
             if let Some(gate) = gate.filter(|gate| gate.all_turns || index == 1) {
-                gate.permits.acquire().await.expect("gate stays open").forget();
+                gate.permits
+                    .acquire()
+                    .await
+                    .expect("gate stays open")
+                    .forget();
             }
             turns.active.fetch_sub(1, Ordering::SeqCst);
             Ok(AgentTurnResponse::new(format!("reply {index}")))
@@ -218,7 +222,11 @@ async fn two_quick_messages_from_one_sender_become_one_turn() {
     sleep_ms(2000).await;
 
     assert_eq!(turns.count(), 1);
-    assert!(turns.user(0).ends_with("first\nsecond"), "{}", turns.user(0));
+    assert!(
+        turns.user(0).ends_with("first\nsecond"),
+        "{}",
+        turns.user(0)
+    );
     run.finish().await;
     assert_eq!(turns.count(), 1);
     assert_eq!(channel.sent_messages.lock().await.len(), 1);
@@ -234,7 +242,11 @@ async fn text_after_an_image_joins_it_through_the_media_window() {
     run.send("alice", "[IMAGE:https://example.com/a.png]\nlook")
         .await;
     sleep_ms(3000).await;
-    assert_eq!(turns.count(), 0, "the media window outlasts the text window");
+    assert_eq!(
+        turns.count(),
+        0,
+        "the media window outlasts the text window"
+    );
     run.send("alice", "what is this?").await;
     sleep_ms(5000).await;
 
@@ -264,7 +276,11 @@ async fn messages_during_a_running_turn_are_not_held_behind_it() {
     // debouncer only merges intake, so the next burst starts its own turn once
     // its quiet window closes, without waiting for the running turn.
     assert_eq!(turns.count(), 2);
-    assert!(turns.user(1).ends_with("second\nthird"), "{}", turns.user(1));
+    assert!(
+        turns.user(1).ends_with("second\nthird"),
+        "{}",
+        turns.user(1)
+    );
 
     gate.open();
     run.finish().await;
