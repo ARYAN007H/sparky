@@ -86,6 +86,10 @@ fn the_scope_error_names_the_toolkit_and_the_unlock_path() {
     let unread = scope_error_message("GMAIL_SEND_EMAIL", ToolScope::Write, None);
     assert!(unread.contains("could not be read"), "{unread}");
     assert!(!unread.contains("write="), "{unread}");
+    assert!(
+        !unread.contains("Connections →"),
+        "an unreadable pref must not send the user to a disabled toggle: {unread}"
+    );
 }
 
 fn visible(

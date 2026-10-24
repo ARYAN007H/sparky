@@ -178,8 +178,9 @@ fn decide_visibility(toolkit: &str, slug: &str, pref: UserScopePref) -> ToolDeci
 /// flip scopes (see the note above the removed `ComposioEnableScopeTool`
 /// for why) — it can only describe the gate and point at the UI.
 ///
-/// `pref` is `None` when the stored preference could not be read; the message
-/// then says so instead of printing flags nobody chose.
+/// `pref` is `None` when the stored preference could not be read. The scope
+/// may well be on, and the Connections toggles are disabled until the read
+/// works again, so that message reports the outage instead of the unlock path.
 pub(super) fn scope_error_message(
     slug: &str,
     scope: ToolScope,
@@ -187,20 +188,23 @@ pub(super) fn scope_error_message(
 ) -> String {
     let toolkit = toolkit_from_slug(slug).unwrap_or_default();
     let scope_str = scope.as_str();
-    let current = match pref {
-        Some(pref) => format!(
-            "read={}, write={}, admin={}",
-            pref.read, pref.write, pref.admin
-        ),
-        None => "the stored preferences could not be read".to_string(),
+    let Some(pref) = pref else {
+        return format!(
+            "composio_execute: action `{slug}` was not run because the user's scope \
+             preferences for `{toolkit}` could not be read right now. This is a \
+             temporary storage problem, not a disabled `{scope_str}` scope: tell the \
+             user the action is unavailable for the moment and to try again shortly. \
+             Do not tell them to change their Connections settings.",
+        );
     };
     format!(
         "composio_execute: action `{slug}` is classified `{scope_str}` and is \
          disabled in the user's current scope preferences for `{toolkit}` \
-         ({current}). Tell the user this action requires the \
+         (read={}, write={}, admin={}). Tell the user this action requires the \
          `{scope_str}` scope and they can enable it themselves in \
          **Connections → {toolkit} → {scope_str}**. Do not claim you can flip \
          it — you cannot.",
+        pref.read, pref.write, pref.admin,
     )
 }
 
