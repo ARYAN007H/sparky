@@ -366,3 +366,44 @@ async fn requests_the_callback_does_not_serve_are_refused() {
     .await;
     assert!(refused.is_err());
 }
+
+#[tokio::test]
+async fn a_context_bearing_delete_or_typing_keeps_the_empty_id_guards() {
+    let tmp = tempfile::tempdir().unwrap();
+    let server = MockServer::start().await;
+    Mock::given(wiremock::matchers::any())
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({"success": true, "data": {}})),
+        )
+        .mount(&server)
+        .await;
+    let turn = || Some("turn-1".to_string());
+    for request in [
+        ProgressiveTransportRequest::Delete {
+            channel: "telegram".into(),
+            turn_id: turn(),
+            channel_ref: None,
+            conversation: None,
+            message_id: String::new(),
+            receipt: None,
+        },
+        ProgressiveTransportRequest::Typing {
+            channel: " / ".into(),
+            turn_id: turn(),
+            channel_ref: None,
+            conversation: None,
+        },
+    ] {
+        let answer = serve(
+            ctx(test_support::signed_in(&tmp, &server.uri()), None),
+            ChannelBackendRequest::ProgressiveTransport(Box::new(request)),
+        )
+        .await
+        .unwrap();
+        assert!(matches!(
+            answer,
+            ChannelBackendResult::ProgressiveTransport(ProgressiveTransportResult::Failed)
+        ));
+    }
+    assert!(server.received_requests().await.unwrap().is_empty());
+}
