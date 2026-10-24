@@ -382,8 +382,8 @@ async fn mcp_clients_reconfigure_then_retire_over_rpc() {
     )
     .await;
     if connect.get("error").is_some() {
-        let modules = post_json_rpc(&rpc_base, 9952, "openhuman.modules_list", json!({})).await;
-        panic!("mcp_clients_connect failed; module status: {modules}");
+        let status = post_json_rpc(&rpc_base, 9952, "openhuman.mcp_clients_status", json!({})).await;
+        panic!("mcp_clients_connect failed for {server_id}; status: {status}; response: {connect}");
     }
     assert_no_jsonrpc_error(&connect, "mcp_clients_connect");
     let listed = post_json_rpc(
