@@ -138,11 +138,6 @@ fn handle_agent_chat(
         // spawned tools) has settled. The run context carries only a weak
         // reference so a persisted session cannot pin a tenant indefinitely.
         let core_lease = ctx.resolved();
-        eprintln!(
-            "[test-diagnostic] agent_chat owner context resolved headless={} bound={}",
-            ctx.is_headless_agent_chat(),
-            core_lease.is_some()
-        );
         let target = match params.agent_id.as_deref().map(str::trim) {
             Some(id) if !id.is_empty() => super::AgentChatTarget::AgentId(id),
             _ => super::AgentChatTarget::Orchestrator,

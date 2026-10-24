@@ -1066,9 +1066,8 @@ async fn json_rpc_threads_transcript_get_projects_and_paginates() {
         MessageUsage, ToolFailure, TranscriptMessage, TranscriptToolCall, TurnUsage,
     };
 
-    let mut user = TranscriptMessage::user(
-        "Current Date & Time: 2026-07-21 09:00:00 UTC\n\nWeather in NYC?",
-    );
+    let mut user =
+        TranscriptMessage::user("Current Date & Time: 2026-07-21 09:00:00 UTC\n\nWeather in NYC?");
     user.request_id = Some("req-1".to_string());
     let mut assistant = TranscriptMessage::assistant_with_calls(
         "Checking.",
@@ -1104,10 +1103,8 @@ async fn json_rpc_threads_transcript_get_projects_and_paginates() {
     });
     let mut weather = TranscriptMessage::tool_result("call-1", "72F sunny");
     weather.request_id = Some("req-1".to_string());
-    let mut traffic = TranscriptMessage::tool_result(
-        "call-2",
-        "error: traffic service unavailable",
-    );
+    let mut traffic =
+        TranscriptMessage::tool_result("call-2", "error: traffic service unavailable");
     traffic.request_id = Some("req-1".to_string());
     traffic.tool_failure = Some(ToolFailure {
         failed: true,

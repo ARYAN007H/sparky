@@ -1,5 +1,4 @@
-type DetachedSpawnParent<'a> =
-    &'a RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>;
+type DetachedSpawnParent<'a> = &'a RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>;
 
 impl SpawnSubagentTool {
     async fn execute_with_context_inner(
@@ -50,11 +49,6 @@ impl SpawnSubagentTool {
             match SubagentSessionStore::new_in_context(&dispatch, parent.workspace_dir.clone()) {
                 Ok(store) => store,
                 Err(error) => {
-                    eprintln!(
-                        "[test-diagnostic] spawn owner context unavailable: run_core_bound={} dispatch_resolved={}",
-                        run_context.core.is_some(),
-                        dispatch.resolved().is_some()
-                    );
                     return Ok(ToolResult::error(format!(
                         "spawn_subagent: failed to open the caller-scoped session store: {error}"
                     )));

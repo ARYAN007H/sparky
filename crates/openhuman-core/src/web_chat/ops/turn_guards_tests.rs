@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use super::*;
+use std::sync::Arc;
 
 fn result(text: &str) -> WebChatTaskResult {
     WebChatTaskResult {
@@ -34,10 +34,8 @@ fn disabled_backstop_carries_no_deadline() {
 /// tenant-scoped persistence after the task-local scope has ended.
 #[tokio::test]
 async fn guarded_turn_env_carries_the_callers_core_context() {
-    let core = crate::core::runtime::CoreContext::for_test(
-        crate::core::runtime::DomainSet::full(),
-        None,
-    );
+    let core =
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
     let ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&core));
     let returned = run_turn_under_cancel_and_deadline(
         &ctx,
