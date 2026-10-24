@@ -129,10 +129,9 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
     let _master_key_guard =
         EnvVarGuard::set("OPENHUMAN_KEYRING_MASTER_KEY", "5a".repeat(32).as_str());
     let _keyring_backend_guard = EnvVarGuard::set("OPENHUMAN_KEYRING_BACKEND", "file");
-    let credential_config =
-        openhuman_core::config::Config::load_from_config_path(&config_path, &workspace)
-            .await
-            .expect("load the config the prompt dump will read");
+    let credential_config = openhuman_core::config::Config::load_or_init()
+        .await
+        .expect("load the config the prompt dump will read");
     openhuman_core::security::credentials::api_key::store_api_key(
         &credential_config,
         "th_test_local_only",
