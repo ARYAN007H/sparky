@@ -30,7 +30,7 @@ async fn importing_twice_changes_nothing() {
     import(&fx.target, &fx.config).await.unwrap();
     migrate(&fx.target).await.unwrap();
     let first = super::super::db::table_counts(&v1_db(&fx.target)).unwrap();
-    import(&fx.target, &fx.config).await.unwrap();
+    if let Err(e) = import(&fx.target, &fx.config).await { eprintln!("DBG2 {e:#}"); panic!("x"); }
     migrate(&fx.target).await.unwrap();
     assert_eq!(
         super::super::db::table_counts(&v1_db(&fx.target)).unwrap(),
