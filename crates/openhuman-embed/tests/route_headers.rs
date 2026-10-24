@@ -17,7 +17,6 @@ async fn scenario() {
         .config(offline_config())
         .workspace(Workspace::Ephemeral)
         .backend_url(backend.uri())
-        .api_key("offline-test-key")
         .build()
         .await
         .unwrap();
