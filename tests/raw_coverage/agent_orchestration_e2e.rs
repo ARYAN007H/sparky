@@ -238,7 +238,10 @@ async fn subagent_steer_is_method_not_found_and_cancel_requires_a_task_id() {
     let cancel = h
         .err(3505, "openhuman.subagent_cancel", json!({}))
         .await;
-    assert_eq!(cancel, "taskId is required");
+    assert!(
+        cancel.starts_with("missing required param 'taskId'"),
+        "the registered cancel controller validates taskId: {cancel}"
+    );
 
     h.join.abort();
 }
