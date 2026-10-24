@@ -232,6 +232,9 @@ fn a_telegram_message_is_answered_by_the_bound_runtime_agent() {
                 }
                 tokio::time::sleep(Duration::from_millis(250)).await;
             }
+            for r in bot_api.received_requests().await.unwrap_or_default() { eprintln!("DBGT bot {} {}", r.url.path(), String::from_utf8_lossy(&r.body)); }
+            for r in provider.received_requests().await.unwrap_or_default() { eprintln!("DBGT prov {}", r.url.path()); }
+            for r in backend.received_requests().await.unwrap_or_default() { eprintln!("DBGT backend {}", r.url.path()); }
             assert!(
                 sent.iter().any(|text| text.contains("teeny says hi")),
                 "the agent's reply was posted to the chat: {sent:?}"
