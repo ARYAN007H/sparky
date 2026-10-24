@@ -101,6 +101,8 @@ fn tenant_runtime(
         config_path: workspace.join("config.toml"),
         ..Default::default()
     };
+    crate::security::credentials::api_key::store_api_key(&config, "test-session-fixture-key")
+        .expect("store reset test credential");
     config.cloud_providers = vec![crate::config::schema::CloudProviderCreds {
         id: "p_openai_reset_test".into(),
         slug: "openai".into(),
