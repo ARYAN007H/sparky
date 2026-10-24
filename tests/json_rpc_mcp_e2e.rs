@@ -9,7 +9,7 @@ async fn install_mcp_test_storage(home: &Path) {
     let backend = openhuman_core::storage::open(&storage_url)
         .await
         .expect("open isolated MCP test storage backend");
-    openhuman_core::storage::install_for_url(&storage_url, backend);
+    openhuman_core::storage::install(backend);
 }
 
 #[tokio::test]
