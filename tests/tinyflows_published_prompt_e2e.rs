@@ -35,10 +35,7 @@ fn dump_published_prompt(
         .env("OPENHUMAN_MODULE_PATH", module_search_path)
         .env_remove("BACKEND_URL")
         .env_remove("VITE_BACKEND_URL")
-        // Building the session agent resolves a backend credential before it
-        // renders a prompt (`SESSION_EXPIRED` otherwise). A fixed local key
-        // satisfies that without reaching any backend: `api_url` is unroutable.
-        .env("OPENHUMAN_BACKEND_API_KEY", "th_test_local_only")
+        .env_remove("OPENHUMAN_BACKEND_API_KEY")
         .env_remove("OPENHUMAN_BACKEND_SESSION_TOKEN")
         .env_remove("OPENHUMAN_STORAGE_URL")
         .env_remove("OPENHUMAN_MODULE_SOURCE")
@@ -124,6 +121,23 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
     for path in [&config_path, &local_config_path] {
         std::fs::write(path, &enabled_config).expect("write enabled module override config");
     }
+
+    // `agent dump-prompt` reads the install it is pointed at and builds the real
+    // session agent, which needs a stored backend credential (`SESSION_EXPIRED`
+    // otherwise). Store a local-only key where the child will read it, under a
+    // per-run master key the child inherits. `api_url` is unroutable.
+    let _master_key_guard =
+        EnvVarGuard::set("OPENHUMAN_KEYRING_MASTER_KEY", "5a".repeat(32).as_str());
+    let _keyring_backend_guard = EnvVarGuard::set("OPENHUMAN_KEYRING_BACKEND", "file");
+    let credential_config =
+        openhuman_core::config::Config::load_from_config_path(&config_path, &workspace)
+            .await
+            .expect("load the config the prompt dump will read");
+    openhuman_core::security::credentials::api_key::store_api_key(
+        &credential_config,
+        "th_test_local_only",
+    )
+    .expect("store a local test credential for the prompt dump");
 
     for (agent_id, required, invariant) in [
         ("workflow_builder", "propose_workflow", "propose-only"),

@@ -1080,8 +1080,9 @@ async fn json_rpc_threads_transcript_get_projects_and_paginates() {
     let mut config = config;
     config.agent.chat_agent_id = Some("orchestrator".into());
     config.save().await.expect("save test chat agent");
-    openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
-        .expect("initialize built-in agent definitions");
+    openhuman_core::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins(
+    )
+    .expect("initialize built-in agent definitions");
     let backend = openhuman_core::storage::local::backend_for(&config.workspace_dir)
         .expect("open test workspace storage");
     let reports = openhuman_core::storage::import::sessions::run_with(&backend, &config);
