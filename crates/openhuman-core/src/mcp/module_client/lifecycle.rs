@@ -17,14 +17,17 @@ impl McpConfiguredClient {
     /// serialized by the client itself.
     pub(crate) fn for_config(config: &Config) -> Result<Arc<Self>, ModuleCallError> {
         if SHUTTING_DOWN.load(Ordering::Acquire) {
+            eprintln!("DBGL shutting");
             crate::modules::report::unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
         }
         if !config.modules.enabled {
+            eprintln!("DBGL disabled");
             crate::modules::report::unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
         }
         if current_agent_context_is_removed() {
+            eprintln!("DBGL removed");
             crate::modules::report::unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
         }
@@ -37,8 +40,8 @@ impl McpConfiguredClient {
                 Self::new(&data_dir, config).map(Arc::new)
             })
             .map_err(|error| match error {
-                AdmitError::Create(error) => error,
-                _ => {
+                AdmitError::Create(error) => { eprintln!("DBGL create {error:?}"); error }
+                other => { eprintln!("DBGL admit");
                     crate::modules::report::unavailable(MODULE);
                     ModuleCallError::Unavailable
                 }
