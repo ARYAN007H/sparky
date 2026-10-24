@@ -1151,7 +1151,6 @@ async fn run_managed_capture_turn(
         "The managed gateway request is stable.",
     )]);
     with_captured_proxy_requests(|requests| requests.clear());
-    eprintln!("DBGI start installed={} url={:?}", openhuman_core::storage::installed().is_some(), openhuman_core::storage::installed_url());
     let workspace_dir = home.join("workspace");
     let stack = boot_stack_with_capture_endpoint(api_origin, home).await;
     let mut events = spawn_sse_collector(format!(
@@ -1199,9 +1198,6 @@ async fn run_managed_capture_turn(
     // Session transcript stores and their SQLite backend are also cached by
     // workspace path; release them before the next repetition removes it.
     openhuman_core::storage::sessions::release_workspace(&workspace_dir);
-    eprintln!("DBGI end installed={} url={:?}", openhuman_core::storage::installed().is_some(), openhuman_core::storage::installed_url());
-    openhuman_core::storage::clear();
-    openhuman_core::storage::local::forget(&workspace_dir);
     with_captured_proxy_requests(|requests| requests.clone())
 }
 
