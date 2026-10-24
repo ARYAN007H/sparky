@@ -2763,11 +2763,11 @@ async fn parallel_subagent_fanout_inner() {
         tool_calls_completion(&[
             (
                 "spawn_subagent",
-                json!({ "agent_id": "vision_agent", "prompt": "Find PARALLEL_ALPHA_CANARY" }),
+                json!({ "agent_id": "task_manager_agent", "prompt": "Find PARALLEL_ALPHA_CANARY" }),
             ),
             (
                 "spawn_subagent",
-                json!({ "agent_id": "vision_agent", "prompt": "Find PARALLEL_BETA_CANARY" }),
+                json!({ "agent_id": "task_manager_agent", "prompt": "Find PARALLEL_BETA_CANARY" }),
             ),
         ]),
         text_completion("Spawned two workers; results will arrive as they land."),
@@ -5410,7 +5410,7 @@ async fn cancelling_a_running_background_subagent_settles_it_inner() {
     reset_script(vec![
         tool_calls_completion(&[(
             "spawn_subagent",
-            json!({ "agent_id": "vision_agent", "prompt": "Find CANCEL_E2E_CANARY" }),
+            json!({ "agent_id": "task_manager_agent", "prompt": "Find CANCEL_E2E_CANARY" }),
         )]),
         text_completion("Spawned a worker; its result will arrive later."),
         text_completion("worker would have finished here"),
