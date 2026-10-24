@@ -16,3 +16,4 @@ target-test-run
 test/e2e/artifacts
 test-results
 src/services/chatWire.generated.ts
+src/types/threadWire.generated.ts
