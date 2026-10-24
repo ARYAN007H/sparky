@@ -84,7 +84,10 @@ async fn a_legacy_pref_either_reaches_the_module_or_stays_stored() {
         assert_eq!(pref, Ok(stored), "the migrated row must decide visibility");
         assert!(left.is_empty(), "the stored value is emptied once moved");
     } else {
-        assert!(pref.is_err(), "an unreachable module fails closed: {pref:?}");
+        assert!(
+            pref.is_err(),
+            "an unreachable module fails closed: {pref:?}"
+        );
         assert_eq!(left.get("github"), Some(&stored));
     }
 }
@@ -93,9 +96,11 @@ async fn a_legacy_pref_either_reaches_the_module_or_stays_stored() {
 async fn load_rejects_an_empty_toolkit_instead_of_answering_the_default() {
     let dir = tempfile::tempdir().unwrap();
     let config = config_in(&dir);
-    assert!(load(&crate::core::runtime::DispatchCtx::ambient(), &config, "  ")
-        .await
-        .is_err());
+    assert!(
+        load(&crate::core::runtime::DispatchCtx::ambient(), &config, "  ")
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]

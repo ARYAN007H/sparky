@@ -234,6 +234,10 @@ impl Drop for RestoreInstalledStorage {
 /// backend then makes the module's next preference read fail (`Unavailable`),
 /// as a storage outage would.
 #[tokio::test]
+#[allow(
+    clippy::await_holding_lock,
+    reason = "the storage-slot guard must cover the whole test; the runtime is current-thread"
+)]
 async fn an_unreadable_preference_denies_at_every_gate() {
     use crate::integrations::composio::module_client::module_guard;
     let _serialised = module_guard().await;
@@ -257,8 +261,12 @@ async fn an_unreadable_preference_denies_at_every_gate() {
     .expect("the module stores the pref while storage is installed");
     crate::storage::clear();
 
-    let read = crate::integrations::composio::ops::load_user_scope_pref(&ctx, &config, "gmail").await;
-    assert!(read.is_err(), "an unreadable pref is an error, not the default: {read:?}");
+    let read =
+        crate::integrations::composio::ops::load_user_scope_pref(&ctx, &config, "gmail").await;
+    assert!(
+        read.is_err(),
+        "an unreadable pref is an error, not the default: {read:?}"
+    );
     assert!(
         !crate::integrations::composio::flow_gate::flow_tool_allowed(
             &ctx,

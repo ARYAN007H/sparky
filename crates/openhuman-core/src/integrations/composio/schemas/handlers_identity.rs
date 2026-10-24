@@ -66,7 +66,9 @@ pub(super) fn handle_get_user_scopes(
                     %error,
                     "[composio:scopes] pref unavailable"
                 );
-                return Err(format!("scope preference for `{toolkit}` is unavailable: {error}"));
+                return Err(format!(
+                    "scope preference for `{toolkit}` is unavailable: {error}"
+                ));
             }
         };
         tracing::debug!(
