@@ -317,11 +317,18 @@ impl McpConfiguredClient {
         if SHUTTING_DOWN.load(Ordering::Acquire) || self.retiring.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
-        let object = self.ensure_open(&mut state, config).await?;
+        let object = self.ensure_open(&mut state, config).await.map_err(|error| {
+            tracing::debug!(member, ?error, "[mcp] configured object open failed");
+            error
+        })?;
         let reply = self
             .port
             .call_object(&object.object_path, member, args, confidential)
-            .await?;
+            .await
+            .map_err(|error| {
+                tracing::debug!(member, ?error, "[mcp] configured object call failed");
+                error
+            })?;
         serde_json::from_value(reply).map_err(|_| {
             crate::modules::report::malformed_reply(MODULE);
             ModuleCallError::ModuleFault
