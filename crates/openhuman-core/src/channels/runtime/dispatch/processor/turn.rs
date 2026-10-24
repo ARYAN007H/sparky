@@ -8,6 +8,7 @@ use crate::channels::routes::get_route_selection;
 use crate::channels::SendMessage;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
+use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio_util::sync::CancellationToken;
