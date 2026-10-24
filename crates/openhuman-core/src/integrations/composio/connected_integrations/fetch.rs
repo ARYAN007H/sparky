@@ -152,6 +152,7 @@ fn fetch_connected_integrations_uncached(
             Ok(crate::integrations::composio::client::ComposioRoute::Backend) => Mode::Backend,
             Ok(crate::integrations::composio::client::ComposioRoute::Direct(_)) => Mode::Direct,
             Err(error) => {
+                eprintln!("DBGC noclient {error}");
                 tracing::debug!(%error,
                     "[composio][integrations] no client (not signed in?)");
                 return None;
@@ -169,6 +170,7 @@ fn fetch_connected_integrations_uncached(
         {
             Ok(resp) => Some(to_prompt_integrations(resp)),
             Err(error) => {
+                eprintln!("DBGC {error}");
                 tracing::warn!(?mode, %error,
                     "[composio][integrations] ListConnectedIntegrations failed");
                 None
