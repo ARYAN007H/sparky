@@ -108,93 +108,93 @@ fn tinychannels_registry_matches_scoped_runtime_release() {
 #[test]
 fn voice_capture_release_pins_summary_contract_and_every_platform_digest() {
     let record = find("tinyvoice").unwrap();
-    assert_eq!(record.version, "0.4.0");
+    assert_eq!(record.version, "0.4.1");
     assert_eq!(tinyvoice_bus::CONTRACT_VERSION, (1, 12));
     let expected = [
         (
             "archlinux-arm64",
-            "tinyvoice-module-0.4.0-archlinux-arm64.tar.gz",
-            "216a99dc13cb7216fd8682bb88c87e381edcc4432ac4eb865db2b473cf18656a",
+            "tinyvoice-module-0.4.1-archlinux-arm64.tar.gz",
+            "b6bb17e6097f1b089f014c2392e028a481b0c6f8543652d7fc8ae890c86777a7",
         ),
         (
             "archlinux-x86_64",
-            "tinyvoice-module-0.4.0-archlinux-x86_64.tar.gz",
-            "1de1939573e21248ede86a568f511e8d1f4a493e6cd38f5fdcd942d5000734cc",
+            "tinyvoice-module-0.4.1-archlinux-x86_64.tar.gz",
+            "fde049b4112de018799a91215cbc84572a9b4bd598bb44cfa61d8fcd1b96c9f9",
         ),
         (
             "fedora-43-arm64",
-            "tinyvoice-module-0.4.0-fedora-43-arm64.tar.gz",
-            "97164ab70529a8f38b7650c3bcbb92798c55140275f0302a811148f9a37a39e2",
+            "tinyvoice-module-0.4.1-fedora-43-arm64.tar.gz",
+            "58a9bd07922770610b7f42e6f3708940ca501f430d27cd3ebbb6115402fdb9c8",
         ),
         (
             "fedora-43-x86_64",
-            "tinyvoice-module-0.4.0-fedora-43-x86_64.tar.gz",
-            "031cad7e8a4e47a2641d7a56ff8c6ca83a05b74b6c3545063956a527acea7476",
+            "tinyvoice-module-0.4.1-fedora-43-x86_64.tar.gz",
+            "e8c95d1d85f4d89a1b8f8fa1740f8e174c835dab3ad856a99184749ca846bca7",
         ),
         (
             "fedora-44-arm64",
-            "tinyvoice-module-0.4.0-fedora-44-arm64.tar.gz",
-            "8697a58237c102f48ac68a8ea8a5ea67675670b1fb495d6ecb00cca9051a882e",
+            "tinyvoice-module-0.4.1-fedora-44-arm64.tar.gz",
+            "15370fb697a4ffdafe9264728b45efbbe155a91cf00aeba55471b0daa85c4768",
         ),
         (
             "fedora-44-x86_64",
-            "tinyvoice-module-0.4.0-fedora-44-x86_64.tar.gz",
-            "2cc8feb4ee0662bf0dfc558640da63d45095efba119f11f9049b9e840e411bda",
+            "tinyvoice-module-0.4.1-fedora-44-x86_64.tar.gz",
+            "c7ee0327548bd05079ba30af0108385bea723bb8080f846c4def31ddbab57fcd",
         ),
         (
             "macos-15-arm64",
-            "tinyvoice-module-0.4.0-macos-15-arm64.tar.gz",
-            "de6907175ccde6cc2c25140d75220537dd44d986e5e3b5c51586bf8deead3d88",
+            "tinyvoice-module-0.4.1-macos-15-arm64.tar.gz",
+            "77332a814521ac6ae0a5fd36671088ab6596b981544130b852431fe1d08e9f49",
         ),
         (
             "macos-15-x86_64",
-            "tinyvoice-module-0.4.0-macos-15-x86_64.tar.gz",
-            "5405bc4d4a08c62b33c6a1ae671a512bd5379304b5c969cf34a7138bc887dd08",
+            "tinyvoice-module-0.4.1-macos-15-x86_64.tar.gz",
+            "2b4556461e3a30cb06fa5b548cc7e9ee8aee63475de05d16d4809140c44d9f4c",
         ),
         (
             "macos-26-arm64",
-            "tinyvoice-module-0.4.0-macos-26-arm64.tar.gz",
-            "b08ffb8ab2883a7c35b245f48a38eb226b48271e7d862b95855a55cb82501685",
+            "tinyvoice-module-0.4.1-macos-26-arm64.tar.gz",
+            "17c1a6a80c1ae7a46fb19ce129e4b0dffb3d6391747bf9d1a5df0fab6ac75c48",
         ),
         (
             "macos-26-x86_64",
-            "tinyvoice-module-0.4.0-macos-26-x86_64.tar.gz",
-            "c0bd82d8164d603af8137c578c93e3b27f6018af8ddbffd93d103cf8878f3261",
+            "tinyvoice-module-0.4.1-macos-26-x86_64.tar.gz",
+            "1cf0fbd9f20ffc449a9df938cdc15be4d9c2d4077a839ddeba4423ed8ec2f175",
         ),
         (
             "ubuntu-22.04-arm64",
-            "tinyvoice-module-0.4.0-ubuntu-22.04-arm64.tar.gz",
-            "42e2e1a10e195f062b47e593119171ebc8229c740fe3d2bb882d94aa944e6344",
+            "tinyvoice-module-0.4.1-ubuntu-22.04-arm64.tar.gz",
+            "001b8b76b920dcab616a1f504efb2893c0ce87a251513dfd8e52c6414b239c7f",
         ),
         (
             "ubuntu-22.04-x86_64",
-            "tinyvoice-module-0.4.0-ubuntu-22.04-x86_64.tar.gz",
-            "0030adce6ffb5d2a196ab35bcb3c4edcc0ae205810c729bc2a04af58aa7a7c78",
+            "tinyvoice-module-0.4.1-ubuntu-22.04-x86_64.tar.gz",
+            "c6f6a764747324a2789d9a6cd3764b6b5a5dc08a4a1ca305e157f65df762ae0d",
         ),
         (
             "ubuntu-24.04-arm64",
-            "tinyvoice-module-0.4.0-ubuntu-24.04-arm64.tar.gz",
-            "a3ade2060ab22e16115a926e1c3fa32536777ec122565dfdc1f01a364c15979e",
+            "tinyvoice-module-0.4.1-ubuntu-24.04-arm64.tar.gz",
+            "8cb7d71e60213896326b85a551dfdd8af2ff1ee8b1a6d6fab27a53ed0d457f57",
         ),
         (
             "ubuntu-24.04-x86_64",
-            "tinyvoice-module-0.4.0-ubuntu-24.04-x86_64.tar.gz",
-            "4ddc8eebce5d644eff123488cd4422b9e227915f3d8793e0a838f141ca7a04e9",
+            "tinyvoice-module-0.4.1-ubuntu-24.04-x86_64.tar.gz",
+            "7755ee1652735ac081bedbdc6dd6a80f8171639cd480f3a0d044230f5da2b0f3",
         ),
         (
             "windows-11-arm64",
-            "tinyvoice-module-0.4.0-windows-11-arm64.zip",
-            "e44c9457dfde9aacbda869954201237f1e4ddba97ddcf6c79c3de92e04b7b171",
+            "tinyvoice-module-0.4.1-windows-11-arm64.zip",
+            "ea575671e6d119886ec09ea43eed5bd35a7c9445aa8d54fa4621e26100856c6c",
         ),
         (
             "windows-2022-x86_64",
-            "tinyvoice-module-0.4.0-windows-2022-x86_64.zip",
-            "82a8f02df915a532cf4115f8ed2ffa290ec0690e350d003bf30f98b8c07af02a",
+            "tinyvoice-module-0.4.1-windows-2022-x86_64.zip",
+            "b472b4ef877bca793b45fca87bb5edbc43f119748cff85a3a25ea6d83815e254",
         ),
         (
             "windows-2025-x86_64",
-            "tinyvoice-module-0.4.0-windows-2025-x86_64.zip",
-            "c220042612de4f8c728907d5f5ff44264a97bf15943ac91758434a2c0132b8d0",
+            "tinyvoice-module-0.4.1-windows-2025-x86_64.zip",
+            "c8c4cd75139c09a31082747d9ad4c1b656d9f6d4f8572370ee8017779c3fc1c0",
         ),
     ];
     assert_eq!(record.assets.len(), expected.len());

@@ -138,7 +138,8 @@ fn handle_agent_chat(
             Some(id) if !id.is_empty() => super::AgentChatTarget::AgentId(id),
             _ => super::AgentChatTarget::Orchestrator,
         };
-        super::agent_chat_reply_for(
+        let headless = ctx.is_headless_agent_chat();
+        super::session_turn::agent_chat_reply_for_with_headless(
             &mut config,
             target,
             &params.common.message,
@@ -157,6 +158,7 @@ fn handle_agent_chat(
                     .with_reasoning_effort(params.inference_reasoning_effort)
             }),
             super::AgentChatEnv::default(),
+            headless,
         )
         .await?
         .into_rpc_json()

@@ -513,7 +513,11 @@ async fn only_the_core_bearer_completes_the_socketio_handshake() {
 async fn handshake_bearer_gate() {
     let token = ensure_rpc_token();
     let (layer, _io) = super::attach_socketio();
-    let app = axum::Router::new().layer(layer);
+    // The serving router stamps every request with its dispatch context; the
+    // connect handler refuses a socket that arrives without one.
+    let app = axum::Router::new().layer(layer).layer(axum::Extension(
+        crate::core_host::core::runtime::DispatchCtx::host_default(),
+    ));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
     tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });

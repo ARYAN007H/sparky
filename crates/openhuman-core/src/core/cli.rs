@@ -494,6 +494,23 @@ fn run_call_command(args: &[String]) -> Result<()> {
                     .map_err(|error| error.to_string())?;
                 }
                 crate::security::credentials::seed_api_key_from_env(&config);
+                // An agent turn spawns sub-agents, whose session store opens under
+                // the dispatch's resolved storage scope. Boot the process default
+                // context the way a server does, or `spawn_subagent` answers "no
+                // resolved owner scope".
+                if crate::core::runtime::CoreContext::default_context().is_none() {
+                    crate::core::runtime::CoreContext::init_with_config(
+                        crate::core::types::HostKind::Cli,
+                        &crate::core::runtime::TokenSource::Fixed(std::sync::Arc::new(
+                            uuid::Uuid::new_v4().to_string(),
+                        )),
+                        crate::core::runtime::DomainSet::full(),
+                        Default::default(),
+                        Some(config.clone()),
+                    )
+                    .await
+                    .map_err(|error| error.to_string())?;
+                }
             }
             let dispatch = DispatchCtx::process_default();
             let dispatch = if headless_agent_chat {
