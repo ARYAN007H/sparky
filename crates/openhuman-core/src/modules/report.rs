@@ -33,7 +33,6 @@ impl FailureSink for SentrySink {
     }
 
     fn capture(&self, report: &FailureReport<'_>) {
-        eprintln!("DBGREPORT module={} reason={} bt={}", report.module, report.reason.code(), std::backtrace::Backtrace::force_capture());
         let capture = || {
             crate::core::observability::report_error(
                 "loadable module operation failed",
