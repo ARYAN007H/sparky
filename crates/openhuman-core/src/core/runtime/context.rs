@@ -268,7 +268,6 @@ impl CoreContext {
             }
         };
         let agent = self.agent.derive(&mut overlay, fresh_state);
-        let dbg_shares = !fresh_state && overlay.session_agent.is_none() && overlay.profile.is_none();
         config_access::record_context_config_overlay(self.profile(), parent_config, &mut overlay);
         overlay.config.runtime_state.context_snapshot = None;
         let latest_embedder_config = Some(Arc::new(std::sync::Mutex::new(overlay.config.clone())));
@@ -284,7 +283,7 @@ impl CoreContext {
         } else {
             Arc::new(())
         };
-        let dbg_new = Arc::new(CoreContext {
+        Arc::new(CoreContext {
             host_kind: self.host_kind,
             workspace_binding: RwLock::new(shared_binding),
             domains,
@@ -308,9 +307,7 @@ impl CoreContext {
             profile_admission,
             agent,
             bare: self.bare,
-        });
-        if dbg_shares { DBG_DERIVED.lock().unwrap().push((Arc::downgrade(&dbg_new), std::backtrace::Backtrace::force_capture().to_string())); }
-        dbg_new
+        })
     }
 
     /// The agent a host session store scopes work under this context to, if
@@ -513,5 +510,3 @@ mod test_support;
 #[cfg(test)]
 #[path = "context_tests.rs"]
 mod tests;
-
-pub static DBG_DERIVED: std::sync::Mutex<Vec<(std::sync::Weak<CoreContext>, String)>> = std::sync::Mutex::new(Vec::new());

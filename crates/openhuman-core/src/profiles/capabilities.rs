@@ -168,7 +168,7 @@ impl ProfileCapabilities {
                 // Native construction stays inside the domains registered for this
                 // profile. The named packs narrow registration within those domains.
                 let assembly =
-                    ctx.derive_for_inspection(ContextOverlay::new(config.clone(), ctx.domains(), groups));
+                    ctx.derive_with(ContextOverlay::new(config.clone(), ctx.domains(), groups));
                 let security = Arc::new(crate::security::SecurityPolicy::from_config(
                     &config.autonomy,
                     &config.workspace_dir,

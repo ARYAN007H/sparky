@@ -96,7 +96,7 @@ impl CoreContext {
         origin: Option<crate::security::turn_origin::AgentTurnOrigin>,
     ) -> Arc<CoreContext> {
         let ctx = self;
-        let dbg_new = Arc::new(CoreContext {
+        Arc::new(CoreContext {
             host_kind: ctx.host_kind,
             workspace_binding: RwLock::new(
                 ctx.workspace_binding
@@ -120,8 +120,6 @@ impl CoreContext {
             profile_admission: Arc::clone(&ctx.profile_admission),
             agent: ctx.agent.clone(),
             bare: ctx.bare,
-        });
-        super::DBG_DERIVED.lock().unwrap().push((Arc::downgrade(&dbg_new), std::backtrace::Backtrace::force_capture().to_string()));
-        dbg_new
+        })
     }
 }
