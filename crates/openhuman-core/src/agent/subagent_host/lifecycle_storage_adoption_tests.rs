@@ -249,6 +249,7 @@ async fn a_detached_driver_uses_its_carried_actor_for_lifecycle_commits() {
         .unwrap()
         .unwrap();
     eprintln!("DBGA {res:?}");
+    for e in walkdir::WalkDir::new(workspace.path()) { eprintln!("DBGF {}", e.unwrap().path().display()); }
     res.unwrap();
     let alice_dispatch = CoreContext::scope(alice, async {
         crate::core::runtime::DispatchCtx::ambient()
