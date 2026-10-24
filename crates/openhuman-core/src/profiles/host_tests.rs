@@ -460,6 +460,10 @@ async fn a_reprovisioned_profile_does_not_inherit_the_old_credential() {
 async fn a_clean_reopen_does_not_recover_but_a_takeover_does() {
     let tmp = tempfile::tempdir().unwrap();
     let host = host(&tmp, 4, 0);
+    let previous = crate::storage::install(Arc::clone(
+        host.backend.as_ref().expect("test host has shared storage"),
+    ));
+    let _restore_storage = RestoreInstalledStorage(previous);
     let id = profile(&format!("recover-{}", uuid::Uuid::new_v4()));
     host.provision(&id).await.unwrap();
     let workspace = host.layout_of(&id).workspace_dir;
