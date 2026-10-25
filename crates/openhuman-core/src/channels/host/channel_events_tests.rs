@@ -67,7 +67,7 @@ fn turn_state_subscriber(
     names: &[&str],
 ) -> (
     ChannelTurnStateSubscriber,
-    Arc<StdMutex<Vec<(String, String, bool)>>>,
+    Arc<StdMutex<Vec<(String, String, bool, bool)>>>,
 ) {
     let channels: HashMap<String, Arc<dyn Channel>> = names
         .iter()
@@ -81,6 +81,26 @@ fn turn_state_subscriber(
     let marks = Arc::new(StdMutex::new(Vec::new()));
     subscriber.test_marks = Some(Arc::clone(&marks));
     (subscriber, marks)
+}
+
+struct TurnStateHostCallback;
+
+#[tinybus::interface(name = "ai.tinyhumans.tinychannels.ChannelsHost")]
+impl TurnStateHostCallback {
+    async fn dispatch_controller_backend(
+        &self,
+        _request: tinychannels_bus::ChannelBackendRequest,
+    ) -> tinybus::Result<tinychannels_bus::ChannelBackendResult> {
+        Err(tinybus::Error::failed("unused turn-state callback"))
+    }
+}
+
+#[cfg(feature = "e2e-test-support")]
+async fn open_turn_state_runtime() -> crate::modules::channel_runtime::ChannelRuntimeLease {
+    let client = crate::channels::module_fixture::client().await;
+    crate::modules::channel_runtime::ChannelRuntimeLease::open(client, TurnStateHostCallback)
+        .await
+        .expect("retain the host callback for remote turn-state calls")
 }
 
 fn received(channel: &str, reply_target: &str, thread_ts: Option<&str>, ws: &Path) -> DomainEvent {
@@ -187,6 +207,8 @@ async fn approvals_for_web_email_or_unrouted_requests_are_ignored() {
 #[tokio::test]
 #[cfg(feature = "e2e-test-support")]
 async fn turn_state_marks_busy_for_every_remote_control_channel() {
+    let _storage = crate::channels::module_fixture::install_memory_storage();
+    let lease = open_turn_state_runtime().await;
     let dir = tempdir().unwrap();
     let ws = dir.path().to_path_buf();
     let (sub, marks) = turn_state_subscriber(ws.clone(), &["telegram", "discord"]);
@@ -196,20 +218,23 @@ async fn turn_state_marks_busy_for_every_remote_control_channel() {
         sub.handle(&received(channel, "chat-99", None, &ws)).await;
         assert_eq!(
             marks.lock().unwrap().last(),
-            Some(&(channel.to_owned(), "chat-99".to_owned(), true))
+            Some(&(channel.to_owned(), "chat-99".to_owned(), true, true))
         );
 
         sub.handle(&processed(channel, "chat-99", &ws)).await;
         assert_eq!(
             marks.lock().unwrap().last(),
-            Some(&(channel.to_owned(), "chat-99".to_owned(), false))
+            Some(&(channel.to_owned(), "chat-99".to_owned(), false, true))
         );
     }
+    lease.close().await.unwrap();
 }
 
 #[tokio::test]
 #[cfg(feature = "e2e-test-support")]
 async fn turn_state_ignores_non_remote_channels_and_stale_workspaces() {
+    let _storage = crate::channels::module_fixture::install_memory_storage();
+    let lease = open_turn_state_runtime().await;
     let dir = tempdir().unwrap();
     let ws = dir.path().to_path_buf();
     let (sub, marks) = turn_state_subscriber(ws.clone(), &["telegram"]);
@@ -220,7 +245,7 @@ async fn turn_state_ignores_non_remote_channels_and_stale_workspaces() {
     sub.handle(&received("telegram", "chat-1", None, &ws)).await;
     assert_eq!(
         marks.lock().unwrap().as_slice(),
-        &[("telegram".into(), "chat-1".into(), true)]
+        &[("telegram".into(), "chat-1".into(), true, true)]
     );
 
     sub.handle(&processed("telegram", "chat-1", &other)).await;
@@ -234,8 +259,9 @@ async fn turn_state_ignores_non_remote_channels_and_stale_workspaces() {
     assert_eq!(
         marks.lock().unwrap().as_slice(),
         &[
-            ("telegram".into(), "chat-1".into(), true),
-            ("telegram".into(), "chat-1".into(), false),
+            ("telegram".into(), "chat-1".into(), true, true),
+            ("telegram".into(), "chat-1".into(), false, true),
         ]
     );
+    lease.close().await.unwrap();
 }

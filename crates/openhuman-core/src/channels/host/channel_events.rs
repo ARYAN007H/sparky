@@ -205,7 +205,7 @@ pub struct ChannelTurnStateSubscriber {
     config: Option<Arc<crate::config::Config>>,
     cancellation: tokio_util::sync::CancellationToken,
     #[cfg(test)]
-    test_marks: Option<Arc<Mutex<Vec<(String, String, bool)>>>>,
+    test_marks: Option<Arc<Mutex<Vec<(String, String, bool, bool)>>>>,
 }
 impl ChannelTurnStateSubscriber {
     pub fn with_config(
@@ -243,14 +243,6 @@ impl ChannelTurnStateSubscriber {
             return;
         }
         #[cfg(test)]
-        if let Some(marks) = &self.test_marks {
-            marks
-                .lock()
-                .unwrap_or_else(|error| error.into_inner())
-                .push((channel.to_owned(), reply_target.to_owned(), busy));
-            return;
-        }
-        #[cfg(test)]
         let client = if self.config.is_none() {
             crate::channels::module_fixture::client().await
         } else {
@@ -270,6 +262,18 @@ impl ChannelTurnStateSubscriber {
                 },),
             )
             .await;
+        #[cfg(test)]
+        if let Some(marks) = &self.test_marks {
+            marks
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .push((
+                    channel.to_owned(),
+                    reply_target.to_owned(),
+                    busy,
+                    result.is_ok(),
+                ));
+        }
         if result.is_err() {
             tracing::debug!("channel turn status unavailable");
         }
