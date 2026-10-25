@@ -136,5 +136,6 @@ embedding_strict = false
         cfg.to_string()
     };
     std::fs::write(openhuman_dir.join("config.toml"), &cfg).expect("write config.toml");
-    let _: openhuman_core::config::Config = toml::from_str(&cfg).expect("test config must match schema");
+    let _: openhuman_core::config::Config =
+        toml::from_str(&cfg).expect("test config must match schema");
 }

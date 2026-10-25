@@ -279,7 +279,10 @@ fn backend_for_target_scope(
     source_path: &Path,
 ) -> anyhow::Result<BackendForScope> {
     let parsed = target_scope.parsed()?;
-    if matches!(parsed.tenant, crate::storage::Tenant::Local | crate::storage::Tenant::Cluster) {
+    if matches!(
+        parsed.tenant,
+        crate::storage::Tenant::Local | crate::storage::Tenant::Cluster
+    ) {
         return Ok((Arc::clone(backend), None));
     }
     let crate::storage::Tenant::User(_) = parsed.tenant else {

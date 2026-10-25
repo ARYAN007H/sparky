@@ -20,7 +20,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 /// Marks a user message whose turn must stay in flight.
 pub const HANG: &str = "HANG-TURN";

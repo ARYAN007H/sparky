@@ -15,8 +15,8 @@ async fn spawn_openhuman_probe_listener(
     listener
         .set_nonblocking(true)
         .expect("set probe listener non-blocking");
-    let listener = tokio::net::TcpListener::from_std(listener)
-        .expect("adopt reserved probe listener");
+    let listener =
+        tokio::net::TcpListener::from_std(listener).expect("adopt reserved probe listener");
     let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
 
     let task = tokio::spawn(async move {

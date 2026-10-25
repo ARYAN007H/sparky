@@ -789,7 +789,11 @@ async fn removed_agent_work_and_team_methods_are_not_registered() {
         let error = assert_jsonrpc_error(&response, method);
         assert_eq!(error.get("code").and_then(Value::as_i64), Some(-32000));
         assert!(
-            error.get("message").and_then(Value::as_str).unwrap_or_default().contains("unknown method"),
+            error
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .contains("unknown method"),
             "retired method should remain unavailable: {error}"
         );
     }

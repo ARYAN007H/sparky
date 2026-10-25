@@ -37,11 +37,9 @@ async fn assert_supplied_backend_owns_the_cap_and_fence(
         crate::cron::client::store_in::<crate::cron::CronJob>(&config, &query_scope, agent_add())
             .await;
     let error = second.expect_err("the cap must be installed in the supplied backend");
-    assert!(
-        error
-            .to_string()
-            .contains("Failed to insert cron agent job")
-    );
+    assert!(error
+        .to_string()
+        .contains("Failed to insert cron agent job"));
 
     let _opened = host.open(id).await.unwrap();
     let lease_ttl = host.saas().lease_ttl();

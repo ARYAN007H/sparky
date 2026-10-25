@@ -20,7 +20,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, PoisonError};
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 /// One request the mock served.
 #[derive(Debug, Clone)]

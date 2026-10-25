@@ -13,9 +13,9 @@
 
 use std::sync::{Mutex, MutexGuard};
 
-use axum::Json;
 use axum::http::HeaderMap;
-use serde_json::{Value, json};
+use axum::Json;
+use serde_json::{json, Value};
 
 /// Lock `m`, recovering the data when a panicking test poisoned it.
 pub fn lock_or_recover<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {

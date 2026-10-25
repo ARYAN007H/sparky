@@ -437,12 +437,7 @@ async fn import_modules(workspace: &Path) {
     #[cfg(feature = "web3")]
     assert!(modules::import_legacy_x402(&ctx, workspace).await);
     modules::import_legacy_tinybox(&ctx, workspace).await;
-    modules::import_legacy_tinyjuice(
-        &ctx,
-        &workspace.join("ccr"),
-        None,
-    )
-    .await;
+    modules::import_legacy_tinyjuice(&ctx, &workspace.join("ccr"), None).await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

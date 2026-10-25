@@ -3,9 +3,7 @@
 #[path = "support/rpc_e2e_harness.rs"]
 mod harness;
 use harness::*;
-use openhuman_core::platform::connectivity::rpc::{
-    pick_listen_port_for_host_with, OccupiedByCore,
-};
+use openhuman_core::platform::connectivity::rpc::{pick_listen_port_for_host_with, OccupiedByCore};
 
 #[tokio::test]
 async fn json_rpc_legacy_provider_type_preserves_default_endpoint() {
@@ -560,13 +558,10 @@ async fn port_conflict_recovery_core_starts_on_fallback_port_e2e() {
         .collect();
 
     // ── 2. pick_listen_port should fall back to a neighbouring port ───────
-    let pick_result = pick_listen_port_for_host_with(
-        "127.0.0.1",
-        preferred,
-        OccupiedByCore::Fallback,
-    )
-        .await
-        .expect("pick_listen_port must succeed when port is occupied by non-OpenHuman process");
+    let pick_result =
+        pick_listen_port_for_host_with("127.0.0.1", preferred, OccupiedByCore::Fallback)
+            .await
+            .expect("pick_listen_port must succeed when port is occupied by non-OpenHuman process");
     assert!(
         pick_result.fallback_from.is_some(),
         "expected fallback_from to be Some({preferred}) when preferred port is occupied, got None"
@@ -624,13 +619,10 @@ async fn port_conflict_recovery_core_starts_on_fallback_port_e2e() {
     // ── 5. drop blocker — verify the preferred port is now free ──────────
     drop(blocker);
 
-    let after_drop = pick_listen_port_for_host_with(
-        "127.0.0.1",
-        preferred,
-        OccupiedByCore::Fallback,
-    )
-        .await
-        .expect("pick_listen_port should succeed with 7788 free");
+    let after_drop =
+        pick_listen_port_for_host_with("127.0.0.1", preferred, OccupiedByCore::Fallback)
+            .await
+            .expect("pick_listen_port should succeed with 7788 free");
     assert_eq!(
         after_drop.port, preferred,
         "after releasing the blocker, pick_listen_port should bind directly on the preferred port"

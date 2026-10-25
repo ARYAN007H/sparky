@@ -155,11 +155,9 @@ fn leave_undelivered_result(d: &Deployment, user: &str) {
     store
         .put_fenced(&record, THREAD, &gate)
         .expect("write the pending record under the parent gate");
-    assert!(
-        store
-            .release_parent_gate(THREAD, &gate)
-            .expect("release the fixture's parent gate")
-    );
+    assert!(store
+        .release_parent_gate(THREAD, &gate)
+        .expect("release the fixture's parent gate"));
 }
 
 #[test]
