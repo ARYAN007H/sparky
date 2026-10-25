@@ -2048,22 +2048,31 @@ async fn delegated_background_task_completion_flow_inner() {
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
 
-    // request[2] went to task_manager_agent, not the orchestrator: its system
-    // prompt carries both the background contract and task-manager-specific role.
-    let child_request = requests.get(2).map(Value::to_string).unwrap_or_default();
+    // Find the specialist by its own system prompt rather than assuming the
+    // parent's acknowledgement and child request always occupy fixed slots.
+    let child_index = requests.iter().position(|request| {
+        request
+            .to_string()
+            .contains("You own the user's task-source feeds and artifacts")
+    });
+    let child_index = child_index.expect("the task_manager_agent made its own model request");
+    let child_request = requests[child_index].to_string();
     assert!(
-        child_request.contains("You own the user's task-source feeds and artifacts")
-            && child_request.contains("Do not call ask_user_clarification"),
-        "request[2] did not carry the task_manager_agent prompt — spawn_subagent did not \
-         run the specialist; request: {child_request}"
+        child_request.contains("Do not call ask_user_clarification"),
+        "the background task request did not carry the no-clarification contract: {child_request}"
     );
 
-    // request[3] saw the host-authored child result in the delivery turn.
-    let relay_request = requests.get(3).map(Value::to_string).unwrap_or_default();
+    // A later parent request sees the host-authored result, regardless of
+    // whether an unrelated parent inference entered the capture first.
+    let delivery_request = requests
+        .iter()
+        .skip(child_index + 1)
+        .find(|request| request.to_string().contains("TASK_MANAGER_RESULT_CANARY"))
+        .map(Value::to_string)
+        .unwrap_or_default();
     assert!(
-        relay_request.contains("TASK_MANAGER_RESULT_CANARY"),
-        "request[3] did not carry the child's best-effort result; \
-         request: {relay_request}"
+        !delivery_request.is_empty(),
+        "no parent request carried the child's result: {requests:#?}"
     );
 
     // The turn-2 request must still hold the child result: the delivery was
