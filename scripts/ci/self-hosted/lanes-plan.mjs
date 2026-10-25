@@ -493,8 +493,14 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           run: "bash scripts/ci-cancel-aware.sh cargo doc -p openhuman-embed --no-deps",
         },
         {
+          name: "install-test-modules",
+          when: core,
+          run: `bash scripts/ci/self-hosted/install-test-modules.sh "${modulesDir}" ${modulesEnvFile}`,
+        },
+        {
           name: "embed-offline-examples",
           when: core,
+          needs: ["install-test-modules"],
           env: { RUST_MIN_STACK: "67108864" },
           // Dev profile: the release-declared linux_fleet measurement then
           // shares the plain dev build instead of a thin-LTO one nothing else
