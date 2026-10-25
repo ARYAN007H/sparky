@@ -1895,8 +1895,9 @@ async fn subagent_delegation_happy_path_inner() {
 //     relays in its own reply;
 //   * the user's next message resumes the thread with that relay in context.
 //
-// Deterministic request ordering (`serialize_children_after_parent(2)` holds the
-// child's first model call until the parent has answered twice):
+// Deterministic request ordering holds the child until the parent has answered
+// twice, then holds later parent requests until the child's scripted exchange
+// is complete:
 //   request[0] = orchestrator turn 1 → spawn_subagent(task_manager_agent)
 //   request[1] = orchestrator, acknowledges; turn 1 ends (chat_done)
 //   request[2] = task_manager_agent → ask_user_clarification pauses the child
@@ -1917,7 +1918,7 @@ fn delegated_clarification_flow() {
 
 async fn delegated_clarification_flow_inner() {
     let _lock = env_lock();
-    serialize_children_after_parent(2);
+    serialize_children_after_parent(2, 2);
     reset_script(vec![
         tool_call_completion(
             "spawn_subagent",
@@ -3693,7 +3694,7 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     // The hand-off is a `spawn_subagent` (asynchronous): the parent's
     // acknowledgement is answered before the child's first call, and the child's
     // result is delivered to a later parent turn that loads the skill.
-    serialize_children_after_parent(2);
+    serialize_children_after_parent(2, 3);
     reset_script(vec![
         tool_call_completion(
             "spawn_subagent",
