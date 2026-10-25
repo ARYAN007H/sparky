@@ -7,7 +7,7 @@ icon: messages-square
 
 # 消息渠道
 
-渠道是代理用来与你交流的消息应用。你可以在平时使用的平台上给代理发消息，代理也会在那里回复。渠道与[集成](integrations/README.md)不同：集成主要供代理读取信息，例如邮箱、日历或 CRM；渠道则支持双向对话。
+渠道是代理用来与你交流的消息应用。你可以在平时使用的平台上给代理发消息，代理也会在那里回复。渠道与[集成](../../en/features/integrations/README.md)不同：集成主要供代理读取信息，例如邮箱、日历或 CRM；渠道则支持双向对话。
 
 渠道提供方会把平台消息规范化为带类型的信封，并通过配置的提供方发送带类型的回复。OpenHuman 在主机侧负责账户策略、授权、代理执行和持久化对话会话；提供方传输由 TinyChannels v2 模块通过总线契约运行。主机通过带类型的 TinyBus 请求和回调与模块通信，不会链接提供方实现。模块会准备提供方身份和有序消息部分，并拥有规范的带类型渠道与 Web 事件契约；OpenHuman 检查访问权限、选择代理，并在运行轮次前将消息绑定到持久化会话。通用轮次准入和排队机制由 TinyAgents 提供。
 
@@ -61,7 +61,7 @@ Email 是原生、自托管的连接器，不需要第三方代理。它通过 I
 - **使用自己的凭据。** 你提供机器人令牌、API 密钥和密钥，或应用凭据。Telegram（BotFather 令牌）、Discord、Slack、WhatsApp、Lark/Feishu、DingTalk、元宝、Signal、Mattermost、QQ、Linq、IRC 和 Email 均支持此方式。你拥有最高控制权，同时也负责平台账户、速率限制和 webhook 端点。
 - **本地运行，无需凭据。** Web 聊天和 iMessage 不需要令牌。Web 在桌面应用内运行。iMessage 通过 AppleScript 操作本机 macOS 信息应用，因此需要授予“完全磁盘访问”权限。两者都会将消息保留在本机。
 
-任何方式的密钥都会经过 OpenHuman 凭据层处理，并在静态存储时加密（参见[隐私与安全](privacy-and-security.md)）。在界面中管理的渠道不会把明文密钥写入 `config.toml`。
+任何方式的密钥都会经过 OpenHuman 凭据层处理，并在静态存储时加密（参见[隐私与安全](../../en/features/privacy-and-security.md)）。在界面中管理的渠道不会把明文密钥写入 `config.toml`。
 
 ## 连接渠道
 
@@ -78,7 +78,7 @@ Slack 作为应用连接在**连接 > OAuth**中，让代理可以读取和操�
 
 ## 延伸阅读
 
-- [集成](integrations/README.md)：代理读取上下文的数据源目录。
-- [触发器](integrations/triggers.md)：触发主动渠道消息的实时事件。
-- [隐私与安全](privacy-and-security.md)：凭据存储位置和后端边界。
-- [操作系统密钥环与密钥存储](os-keyring-and-secret-storage.md)：渠道密钥的静态保护。
+- [集成](../../en/features/integrations/README.md)：代理读取上下文的数据源目录。
+- [触发器](../../en/features/integrations/triggers.md)：触发主动渠道消息的实时事件。
+- [隐私与安全](../../en/features/privacy-and-security.md)：凭据存储位置和后端边界。
+- [操作系统密钥环与密钥存储](../../en/features/os-keyring-and-secret-storage.md)：渠道密钥的静态保护。
