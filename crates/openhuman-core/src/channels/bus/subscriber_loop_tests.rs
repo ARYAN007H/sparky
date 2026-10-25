@@ -29,8 +29,21 @@ impl ProgressiveReplySink for Sink {
 }
 
 impl Sink {
-    fn events(&self) -> Vec<ProgressiveEvent> {
-        self.batches.lock().unwrap().iter().flatten().cloned().collect()
+    fn events(&self) -> Vec<String> {
+        self.batches
+            .lock()
+            .unwrap()
+            .iter()
+            .flatten()
+            .map(|event| match event {
+                ProgressiveEvent::TextDelta(t) => format!("text:{t}"),
+                ProgressiveEvent::ThinkingDelta(t) => format!("thinking:{t}"),
+                ProgressiveEvent::ToolCall(n) => format!("call:{n}"),
+                ProgressiveEvent::ToolResult { tool_name, success } => {
+                    format!("result:{tool_name}:{success}")
+                }
+            })
+            .collect()
     }
     fn finals(&self) -> Vec<String> {
         self.finalized.lock().unwrap().clone()
@@ -90,12 +103,12 @@ async fn progress_is_batched_and_the_final_reply_finalizes_once() {
 
     assert_eq!(
         sink.events(),
-        vec![
-            ProgressiveEvent::ThinkingDelta("hmm".into()),
-            ProgressiveEvent::TextDelta("Hel".into()),
-            ProgressiveEvent::ToolCall("search".into()),
-            ProgressiveEvent::ToolResult { tool_name: "search".into(), success: false },
-            ProgressiveEvent::ToolResult { tool_name: "fetch".into(), success: true },
+        [
+            "thinking:hmm",
+            "text:Hel",
+            "call:search",
+            "result:search:false",
+            "result:fetch:true",
         ]
     );
     assert_eq!(sink.finals(), ["Hello!"]);
@@ -124,7 +137,7 @@ async fn errors_and_cancellations_finalize_with_a_user_visible_message() {
     )
     .await;
     assert_eq!(sink.finals(), ["Sorry, I encountered an error: model exploded"]);
-    assert_eq!(sink.events(), vec![ProgressiveEvent::TextDelta("partial".into())], "pending progress flushes first");
+    assert_eq!(sink.events(), ["text:partial"], "pending progress flushes first");
 
     let sink = Sink::default();
     run(vec![event("req-1", "chat_error", serde_json::json!({}))], &sink, false).await;
