@@ -89,7 +89,9 @@ fn record_in_scope(provider: &str, status: u16, scope: CurrentScope) -> bool {
             origins.entry(provider.to_owned()).or_default().unscoped = true;
         }
         CurrentScope::Unresolved(error) => {
-            log::warn!("[auth-errors] record provider={provider} skipped: scope unresolved ({error})");
+            log::warn!(
+                "[auth-errors] record provider={provider} skipped: scope unresolved ({error})"
+            );
         }
     }
     changed

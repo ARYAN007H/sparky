@@ -2013,8 +2013,25 @@ async fn delegated_background_task_completion_flow_inner() {
         "the child's best-effort result was never delivered to the parent; requests: {}",
         dump()
     );
-    // Let the relay turn commit to the thread before the user replies.
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    // Queue exhaustion only proves that the delivery call took its scripted
+    // response. Wait for its persisted turn state to report completion before
+    // asking the parent to resume the thread.
+    let deadline = std::time::Instant::now() + Duration::from_secs(120);
+    loop {
+        let history = turn_state_history(&stack.rpc_base, 402, "thread-clarify").await;
+        let completed = history
+            .iter()
+            .filter(|turn| turn["lifecycle"] == "completed")
+            .count();
+        if completed >= 2 {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "delivery turn did not commit before turn 2; persisted turns: {history:#?}"
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
 
     // ── turn 2: the user's answer resumes the thread ──
     let request_id = send_web_chat(
