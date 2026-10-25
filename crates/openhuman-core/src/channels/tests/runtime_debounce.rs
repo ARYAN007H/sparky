@@ -350,7 +350,7 @@ async fn a_command_arriving_inside_the_window_runs_as_its_own_turn_after_the_tex
 
     // A slash command never merges: the buffered text and the command are two
     // turns, and the text (received first) is dispatched before the command.
-    eprintln!("SENT {:?}", _channel.sent_messages.lock().await.iter().map(|m| m.content.clone()).collect::<Vec<_>>());
+    eprintln!("SENT {:?}", _channel.sent_messages.lock().await.iter().cloned().collect::<Vec<_>>());
     assert_eq!(turns.count(), 2);
     let first = turns.user(0);
     let second = turns.user(1);
