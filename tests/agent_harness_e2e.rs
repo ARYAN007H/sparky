@@ -412,7 +412,21 @@ async fn scripted_chat_completions(
                 continue;
             }
             let name = scripted_discovered_mcp_tool_name(&body).unwrap_or_else(|| {
-                panic!("the next model request did not advertise the searched MCP action")
+                let tools = body
+                    .pointer("/tools")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .map(|tool| {
+                        let function = &tool["function"];
+                        json!({
+                            "name": function["name"],
+                            "description": function["description"],
+                            "parameters": function["parameters"]
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                panic!("the next model request did not advertise the searched MCP action; tools: {tools:#?}")
             });
             call["name"] = json!(name);
             call["id"] = json!(format!("call_{name}"));
