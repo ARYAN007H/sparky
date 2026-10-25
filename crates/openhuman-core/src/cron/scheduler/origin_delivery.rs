@@ -507,6 +507,6 @@ async fn deliver_to_web_thread(
 #[path = "origin_delivery_tests.rs"]
 mod tests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "channels"))]
 #[path = "origin_delivery_channel_tests.rs"]
 mod channel_tests;

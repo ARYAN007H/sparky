@@ -45,12 +45,12 @@ impl Surface {
     /// A surface for the turn `ids`, publishing under `ctx`. Every canonical
     /// projection goes through the compiled TinyChannels module.
     pub(crate) async fn new(ctx: &DispatchCtx, ids: TurnIds, config: Config) -> Self {
-        #[cfg(test)]
+        #[cfg(all(test, feature = "channels", feature = "modules"))]
         let module = {
             let _ = config;
             crate::channels::module_fixture::client().await
         };
-        #[cfg(not(test))]
+        #[cfg(not(all(test, feature = "channels", feature = "modules")))]
         let module = crate::modules::client(config);
 
         let tenant = super::ops::tenant_of(ctx);

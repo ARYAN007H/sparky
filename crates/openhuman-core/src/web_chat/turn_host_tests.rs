@@ -182,6 +182,7 @@ async fn a_late_subagent_failure_is_published_after_the_runner_is_gone() {
 #[tokio::test]
 async fn the_heartbeat_beats_only_for_a_live_turn() {
     use super::super::surface::TurnIds;
+    #[cfg(all(feature = "channels", feature = "modules"))]
     let _module = crate::channels::module_fixture::client().await;
     let mut bus = crate::web_chat::subscribe_web_channel_events();
     let ids = TurnIds {

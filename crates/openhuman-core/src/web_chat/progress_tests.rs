@@ -204,6 +204,7 @@ async fn spawn_test_bridge_with_interval(
     tokio::sync::mpsc::Sender<AgentProgress>,
     tokio::task::JoinHandle<()>,
 ) {
+    #[cfg(all(feature = "channels", feature = "modules"))]
     let _module = crate::channels::module_fixture::client().await;
     let (tx, rx) = tokio::sync::mpsc::channel::<AgentProgress>(16);
     let dir = tempfile::tempdir().expect("tempdir");
