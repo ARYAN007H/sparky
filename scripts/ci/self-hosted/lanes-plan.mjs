@@ -520,7 +520,8 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           name: "gate-contract-tests",
           when: gateSmoke,
           run:
-            "cargo test --manifest-path Cargo.toml -p openhuman --no-default-features --lib --" +
+            "cargo test --manifest-path Cargo.toml -p openhuman --no-default-features" +
+            " --features storage-sqlite --lib --" +
             " core::all:: core::cli:: core::invoke:: core::session_expiry:: core::legacy_aliases:: core::runtime::" +
             " agent_registry::agents::loader:: commands::ops::tests:: memory::people::contacts_gate_tests::" +
             " memory::layout_migration::" +
