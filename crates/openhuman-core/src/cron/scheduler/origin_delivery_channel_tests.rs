@@ -54,6 +54,35 @@ fn account_of(objects: &std::collections::HashMap<String, tinybus::module::Modul
         .clone()
 }
 
+/// A prior live turn, written the way the session host does, so the cron
+/// append has a session to extend (a channel that never spoke has none).
+fn seed_session(ctx: &DispatchCtx, config: &Config, identity: &ChannelSessionIdentity) {
+    use tinyagents_session::transcript::{TranscriptMessage, TranscriptTurn};
+    let tenant = ctx.tenant().unwrap();
+    let locator = origin_channel_transcripts(ctx, config, identity, &identity.agent_id).unwrap();
+    let session = SessionRef::scoped(
+        &crate::core::runtime::tenant_key(&tenant, &identity.session_key),
+        &identity.agent_id,
+    );
+    let meta = super::tests::meta();
+    let next = vec![
+        TranscriptMessage::user("remind me"),
+        TranscriptMessage::assistant("Scheduled."),
+    ];
+    locator
+        .open_session(&session, meta.clone())
+        .unwrap()
+        .append_turn(TranscriptTurn {
+            prev: &[],
+            next: &next,
+            meta: &meta,
+            turn_usage: None,
+            request_id: None,
+            tools: None,
+        })
+        .unwrap();
+}
+
 fn assistant_messages(
     ctx: &DispatchCtx,
     config: &Config,
@@ -89,6 +118,7 @@ async fn channel_origin_reply_reaches_the_provider_and_the_durable_session() {
     let cfg = config(&tmp);
     let ctx = ctx_for(&cfg);
     let ident = identity(&ctx, &cfg, &account);
+    seed_session(&ctx, &cfg, &ident);
     let j = job(Some(channel_origin(Some(ident.clone()))));
 
     let status = deliver_to_origin(&ctx, &cfg, &j, "run-chan-1", "Drink water!").await;
@@ -100,7 +130,7 @@ async fn channel_origin_reply_reaches_the_provider_and_the_durable_session() {
         .await
         .iter()
         .any(|p| p.ends_with("/sendMessage")));
-    assert_eq!(assistant_messages(&ctx, &cfg, &ident), ["Drink water!"]);
+    assert_eq!(assistant_messages(&ctx, &cfg, &ident), ["Scheduled.", "Drink water!"]);
 }
 
 #[tokio::test]
@@ -180,6 +210,7 @@ async fn host_routed_channel_origin_reply_is_also_recorded_in_the_session_transc
     let sink = Arc::new(Capture(Mutex::new(Vec::new())));
     let previous = crate::cron::host_delivery::install(sink.clone());
 
+    seed_session(&ctx, &cfg, &ident);
     let j = job(Some(channel_origin(Some(ident.clone()))));
     let status = deliver_to_origin(&ctx, &cfg, &j, "run-host-1", "Host reply").await;
 
@@ -192,5 +223,5 @@ async fn host_routed_channel_origin_reply_is_also_recorded_in_the_session_transc
     assert_eq!(replies.len(), 1);
     assert_eq!(replies[0].text, "Host reply");
     assert_eq!(replies[0].profile_id.as_deref(), Some("cron-origin-profile"));
-    assert_eq!(assistant_messages(&ctx, &cfg, &ident), ["Host reply"]);
+    assert_eq!(assistant_messages(&ctx, &cfg, &ident), ["Scheduled.", "Host reply"]);
 }

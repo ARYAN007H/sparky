@@ -277,7 +277,7 @@ async fn origin_mode_without_an_origin_is_an_error() {
     .is_err());
 }
 
-fn meta() -> TranscriptMeta {
+pub(super) fn meta() -> TranscriptMeta {
     TranscriptMeta {
         session_id: None,
         parent_session_id: None,
