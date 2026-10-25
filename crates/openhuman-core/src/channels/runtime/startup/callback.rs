@@ -87,6 +87,7 @@ impl ChannelHostCallbacks {
         if message.channel.id != channel {
             return Err(Error::failed("callback channel does not match message"));
         }
+        tracing::debug!(channel, message_id = %message.message_id, "[channels] module delivered inbound message");
         self.dispatch
             .send(RuntimeChannelMessage::with_inbound_envelope(message))
             .await
