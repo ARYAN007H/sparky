@@ -292,3 +292,7 @@ async fn flush_events(
 #[cfg(test)]
 #[path = "subscriber_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "subscriber_loop_tests.rs"]
+mod loop_tests;
