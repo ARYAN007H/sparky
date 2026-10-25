@@ -109,7 +109,8 @@ impl wiremock::Respond for ForecastModel {
             1 => {
                 assert!(
                     support::tool_results(request).contains("forecast"),
-                    "remote tools were listed successfully"
+                    "remote tools were listed successfully: {}",
+                    support::tool_results(request)
                 );
                 support::tool_call_completion(
                     "mcp_call_tool",
