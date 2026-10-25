@@ -18,7 +18,7 @@
 
 use std::sync::Arc;
 
-use openhuman_core::profiles::{ProfileId, ProfileIdMode};
+use openhuman_core::profiles::{ProfileId, ProfileIdMode, ProfileLayout};
 use tinyagents_tasks::{
     CompletionRecord, CompletionResult, CompletionStatus, CompletionStore, DriverCompletionStore,
     NotifyMode,
