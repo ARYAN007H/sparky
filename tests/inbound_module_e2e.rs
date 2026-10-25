@@ -21,7 +21,7 @@ fn config() -> Config {
     config.modules.enabled = true;
     // A fallback to the release must fail loudly rather than download.
     config.modules.allow_download = false;
-    let artifact = openhuman_core::modules::local_artifact("tinyeventqueues")
+    let artifact = openhuman_core::modules::staged_artifact("tinyeventqueues")
         .expect("stage the verified TinyEventQueues release module");
     config.modules.overrides = vec![ModuleOverride::with_path(
         "tinyeventqueues",
