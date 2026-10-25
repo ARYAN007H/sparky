@@ -232,6 +232,13 @@ fn a_telegram_message_is_answered_by_the_bound_runtime_agent() {
                 }
                 tokio::time::sleep(Duration::from_millis(250)).await;
             }
+            if !sent.iter().any(|text| text.contains("teeny says hi")) {
+                eprintln!(
+                    "Telegram diagnostics: sent={sent:?}; Bot API requests={:#?}; model requests={:#?}",
+                    bot_api.received_requests().await.unwrap_or_default(),
+                    chat_requests(&provider).await
+                );
+            }
             assert!(
                 sent.iter().any(|text| text.contains("teeny says hi")),
                 "the agent's reply was posted to the chat: {sent:?}; Bot API requests: {:#?}; model requests: {:#?}",
