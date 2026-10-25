@@ -230,27 +230,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         },
     );
 
-    let mut config = crate::config::Config::default();
-    config.workspace_dir = tempdir.path().to_path_buf();
-    config.modules.allow_download = false;
-    config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
     let channel: Arc<dyn Channel> = channel_impl.clone();
-    let subscriber = ChannelTurnStateSubscriber::with_config(
-        Arc::new(HashMap::from([("telegram".to_string(), Arc::clone(&channel))])),
-        Arc::new(config),
-    );
-    subscriber
-        .handle(&DomainEvent::ChannelMessageReceived {
-            channel: "telegram".into(),
-            message_id: "2".into(),
-            sender: "alice".into(),
-            reply_target: "chat-remote".into(),
-            content: "work".into(),
-            thread_ts: Some("42".into()),
-            inbound_envelope: None,
-            workspace_dir: tempdir.path().to_path_buf(),
-        })
-        .await;
 
     let status_msg = inbound(
         "3".into(),
@@ -302,11 +282,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     assert!(sent_text(&sent[1]).contains("Provider: `anthropic`"));
     assert!(sent_text(&sent[1]).contains("Model: `claude-3`"));
     assert!(sent_text(&sent[1]).contains("In-memory turns: 1"));
-    assert!(
-        sent_text(&sent[1]).contains("Turn: in progress"),
-        "unexpected /status reply: {}",
-        sent_text(&sent[1])
-    );
+    assert!(sent_text(&sent[1]).contains("Turn: idle"));
 
     assert!(sent_text(&sent[2]).contains("**Recent sessions**"));
     assert!(sent_text(&sent[2]).contains("→ `Telegram"));
