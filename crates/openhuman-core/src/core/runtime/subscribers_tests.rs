@@ -282,6 +282,7 @@ fn proactive_message_reaches_web_on_channelless_core_boot() {
     );
 }
 
+#[cfg(feature = "modules")]
 #[test]
 fn proactive_message_is_scoped_to_originating_saas_profile() {
     const CHILD: &str = "OPENHUMAN_PROACTIVE_SUBSCRIBER_TEST_CHILD";
