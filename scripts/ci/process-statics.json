@@ -637,7 +637,7 @@
     "count": 1,
     "category": "B",
     "reason": "Test-only #[cfg(test)] slot recording the last run_chat_task error string; it is not compiled into production builds and carries no tenant data.",
-    "verification": "web_chat/ops/start_chat_tests.rs: start_chat tests read the slot through test_hooks"
+    "verification": "channels/bus/subscriber_tests.rs: reads the slot through last_run_chat_task_error_for_test"
   },
   {
     "file": "crates/openhuman-core/src/web_chat/proactive.rs",
