@@ -283,10 +283,15 @@ fn orchestrator_routes_every_registered_specialist_through_spawn_subagent() {
                 );
                 continue;
             }
-            if agent_id == "skill_setup" && !cfg!(feature = "skills") {
+            let gated_off = match agent_id.as_str() {
+                "skill_setup" => !cfg!(feature = "skills"),
+                "workflow_builder" | "flow_discovery" => !cfg!(feature = "flows"),
+                _ => false,
+            };
+            if gated_off {
                 assert!(
                     registry.get(agent_id).is_none(),
-                    "skill_setup is intentionally absent without skills"
+                    "{agent_id} is intentionally absent with its feature gate off"
                 );
                 continue;
             }
