@@ -235,7 +235,7 @@ fn a_telegram_message_is_answered_by_the_bound_runtime_agent() {
             assert_eq!(listener.agent_id(), "teeny-chat");
 
             let mut sent = Vec::new();
-            for _ in 0..240 {
+            for _ in 0..80 {
                 sent = sent_texts(&bot_api).await;
                 if sent.iter().any(|text| text.contains("teeny says hi")) {
                     break;
