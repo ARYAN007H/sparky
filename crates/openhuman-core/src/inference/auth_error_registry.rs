@@ -64,9 +64,7 @@ pub fn record(provider: &str, status: u16) -> bool {
 
 fn record_in_scope(provider: &str, status: u16, scope: CurrentScope) -> bool {
     if let CurrentScope::Unresolved(error) = scope {
-        log::warn!(
-            "[auth-errors] record provider={provider} skipped: scope unresolved ({error})"
-        );
+        log::warn!("[auth-errors] record provider={provider} skipped: scope unresolved ({error})");
         return false;
     }
 
