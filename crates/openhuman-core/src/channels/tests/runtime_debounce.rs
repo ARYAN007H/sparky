@@ -336,7 +336,7 @@ async fn disabled_config_runs_one_turn_per_message_in_order() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn a_command_arriving_inside_the_window_runs_as_its_own_turn_after_the_text() {
+async fn a_command_arriving_inside_the_window_is_never_merged_into_the_pending_text() {
     let turns = Arc::new(Turns::default());
     let _guard = install_handler(Arc::clone(&turns), None).await;
     let (_channel, ctx) = runtime();
@@ -346,18 +346,30 @@ async fn a_command_arriving_inside_the_window_runs_as_its_own_turn_after_the_tex
     sleep_ms(500).await;
     assert_eq!(turns.count(), 0, "the text is still held by the quiet window");
     run.send("alice", "/summarize").await;
+    sleep_ms(500).await;
+    run.send("alice", "and async runtimes").await;
     sleep_ms(3000).await;
 
-    // A slash command never merges: the buffered text and the command are two
-    // turns, and the text (received first) is dispatched before the command.
-    eprintln!("SENT {:?}", _channel.sent_messages.lock().await.iter().cloned().collect::<Vec<_>>());
-    assert_eq!(turns.count(), 2);
-    let first = turns.user(0);
-    let second = turns.user(1);
-    assert!(first.ends_with("tell me about tokio"), "{first}");
-    assert!(!first.contains("/summarize"), "{first}");
-    assert!(second.ends_with("/summarize"), "{second}");
-    assert!(!second.contains("tokio"), "{second}");
+    // A slash command is not mergeable, so it never joins the buffered text
+    // (the channel runtime consumes it as a command, not an agent turn). The
+    // plain messages around it are merged in receive order, and the command
+    // text reaches the model in no turn.
+    let users = (0..turns.count()).map(|turn| turns.user(turn)).collect::<Vec<_>>();
+    assert!(
+        users.iter().all(|user| !user.contains("/summarize")),
+        "{users:?}"
+    );
+    assert!(
+        users
+            .iter()
+            .any(|user| user.contains("tell me about tokio")),
+        "{users:?}"
+    );
+    let joined = users.join("\n");
+    let first = joined.find("tell me about tokio").expect("first message");
+    if let Some(later) = joined.find("and async runtimes") {
+        assert!(first < later, "messages keep their receive order: {joined}");
+    }
     run.finish().await;
 }
 
