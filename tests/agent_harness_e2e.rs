@@ -249,6 +249,10 @@ fn canary_overlap_observed() -> bool {
     CANARY_OVERLAP.load(std::sync::atomic::Ordering::SeqCst)
 }
 
+fn canary_request_in_flight(canary: &str) -> bool {
+    lock_or_recover(canary_in_flight()).contains(canary)
+}
+
 /// Which armed canary this request is a **worker's own** request for, if any.
 ///
 /// Structural, not a substring search over the serialized body, and that
@@ -5542,11 +5546,7 @@ async fn cancelling_a_running_background_subagent_settles_it_inner() {
     // Cancel only once the worker is really in flight (its own model request
     // is parked on the barrier), so this is a live run, not a queued one.
     let deadline = std::time::Instant::now() + Duration::from_secs(60);
-    while with_captured(|c| {
-        !c.iter()
-            .filter_map(|r| canary_worker_request(r.get("body")?))
-            .any(|canary| canary == "CANCEL_E2E_CANARY")
-    }) {
+    while !canary_request_in_flight("CANCEL_E2E_CANARY") {
         assert!(
             std::time::Instant::now() < deadline,
             "the worker never issued its request"
