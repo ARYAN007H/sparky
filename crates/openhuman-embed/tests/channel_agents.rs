@@ -234,7 +234,9 @@ fn a_telegram_message_is_answered_by_the_bound_runtime_agent() {
             }
             assert!(
                 sent.iter().any(|text| text.contains("teeny says hi")),
-                "the agent's reply was posted to the chat: {sent:?}"
+                "the agent's reply was posted to the chat: {sent:?}; Bot API requests: {:#?}; model requests: {:#?}",
+                bot_api.received_requests().await.unwrap_or_default(),
+                chat_requests(&provider).await
             );
             assert!(listener.is_running());
             listener.stop();
