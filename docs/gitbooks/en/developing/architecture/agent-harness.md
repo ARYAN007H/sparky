@@ -103,7 +103,7 @@ Multi-agent orchestration runs on the tinyagents graph layer, through `tinyagent
 - The delegation graph is a `plan → execute ⇄ review → finalize` `CompiledGraph`. It has conditional routing, `RecursionPolicy`, a durable `FileCheckpointer`, a `CancellationToken` and a `GraphTracingSink`.
 - The workflow phase engine fans each phase's agents out on the graph (`with_max_concurrency`). The durable `WorkflowRun` ledger stays the source of truth for resume.
 - `spawn_parallel_agents` runs its fan-out through the host `spawn_parallel` adapter over `tinyagents_orchestration::parallel`.
-- The agent-teams member runtime is a conditional-routing graph (`execute → complete | fail → done`, the agent-teams runtime graph).
+- The agent-teams member runtime is a conditional-routing graph (`execute → complete | fail → done`).
 - The detached-sub-agent registry is backed by a typed `TaskStore` lifecycle ledger (Pending, Running, then Completed, Failed or Cancelled).
 
 ## TinyAgents crate: features and compatibility
