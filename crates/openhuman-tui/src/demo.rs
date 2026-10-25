@@ -327,3 +327,7 @@ fn activate_overlay(state: &mut TranscriptState, ui: &mut UiState) -> bool {
     }
     false
 }
+
+#[cfg(test)]
+#[path = "demo_tests.rs"]
+mod tests;
