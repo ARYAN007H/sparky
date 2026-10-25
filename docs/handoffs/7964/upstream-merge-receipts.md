@@ -8,7 +8,7 @@ copied from them. Nothing was pushed to `tinyhumansai/*`.
 
 | Repo | Fork epic tip | Notes |
 | --- | --- | --- |
-| senamakel/tinychannels | `7278130d` | upstream main 337d7137 merged; later PRs: context_compacting event (wire contract 33), typed inbound preparation + turn-lease cap, final-message handle end, inbound voice ingress |
+| senamakel/tinychannels | `ec6bdf9d` | upstream main 337d7137 merged; later PRs: context_compacting event (wire contract 33), typed inbound preparation + turn-lease cap, final-message handle end, inbound voice ingress, PR #130 (outbound voice replies + adapter typing, merged) |
 | senamakel/tinyagents | `3020f2e2` | upstream main 7346fabd merged; restored `run_progress_ledger` export and `TurnRunnerConfig::cancel_grace` |
 | senamakel/tinyflows | `5953af94` | upstream main merged (clean) |
 | senamakel/tinyvoice | `fca28c70` | upstream main merged (clean) |
@@ -39,13 +39,13 @@ Every other gitlink is upstream's pin; `vendor/tinymemes` is gone with upstream;
 - `modules::registry::tests::release_manifest_tests::tinychannels_registry_matches_scoped_runtime_release`:
   the registry pins the published TinyChannels release (contract 23); the fork bus is contract 33.
   Needs a release + re-pin; pins were deliberately not touched.
-- `native_channel_session_restart_e2e::telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_modules`:
-  inbound STT works; the outbound mirrored voice reply does not. The fork TinyChannels module (already
-  before this merge, 5bb0f0c4) has no outbound voice synthesis (`ModuleSynthesizer` /
-  `prepare_voice_reply` are gone, nothing emits `OutboundVoice::Synthesize`).
-- Module channels have no typing indicator: the module's adapter path does not implement
-  `StartTyping`; the host no longer calls it for module channels.
-- Several saas/embed e2e suites need the fork TinyChannels module staged
+- RESOLVED (senamakel/tinychannels#130, merged `ec6bdf9d`): outbound mirrored voice replies and module-channel
+  typing. `native_channel_session_restart_e2e` (3 tests, including the voice-note mirror TTS test) passes against the
+  staged fork module; the host drives `StartTyping` / `StartTypingRefresh` again and
+  `channels::tests::runtime_dispatch` now asserts typing precedes the reply.
+- Staged-module run (`node scripts/modules/build.mjs tinychannels --out <dir>` + `OPENHUMAN_TEST_MODULE_SOURCE_DIR`): `native_channel_session_restart_e2e` 3/3, `saas_mode_e2e` 19/19, `saas_profile_isolation_e2e` 4/4, `components_e2e` 1/1, `embedded_server_shutdown_e2e` 1/1. `json_rpc_auth_security_e2e::telegram_bot_token_connect...` still needs the registry-pinned release (it rejects a source override), so it stays red until the post-merge re-pin.
+- Debounce: a command arriving inside the debounce window is pinned by `inbound_debounce::tests::non_mergeable_item_seals_pending_batch_and_runs_behind_it` (and `inbound_batch_tests`: commands are never mergeable). A dispatch-loop level test was attempted and dropped: the loop does not drain with a slash command in the stub runtime.
+- (earlier note) Several saas/embed e2e suites need the fork TinyChannels module staged
   (`node scripts/modules/build.mjs tinychannels --out <dir> --print-env`, plus
   `OPENHUMAN_TEST_MODULE_SOURCE_DIR`); with the published module they fail until re-pin. Two timing
   flakes (`lease fence ... expired before renewal`, `inline_permissions`) were also seen on upstream/main.
