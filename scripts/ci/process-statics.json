@@ -50,26 +50,6 @@
     "verification": "agent/orchestration/background_delivery_slots_tests.rs: one_profiles_busy_turn_does_not_block_anothers_thread"
   },
   {
-    "file": "crates/openhuman-core/src/agent/orchestration/workflow_runs/engine/lifecycle.rs",
-    "scope": "",
-    "name": "SUPERVISOR",
-    "type": "OnceLock<WorkflowRunSupervisor>",
-    "count": 1,
-    "category": "D",
-    "reason": "The process-local supervisor holds generation cancellation handles keyed by run id, not durable workflow state or tenant data. Durable run transitions remain fenced by the storage driver's revision and lease checks.",
-    "verification": "agent/orchestration/workflow_runs/engine/lifecycle_tests.rs: losing_resume_cas_keeps_the_installed_workflow_generation"
-  },
-  {
-    "file": "crates/openhuman-core/src/agent/tinyagents/turn_exec.rs",
-    "scope": "",
-    "name": "ROOT_HOSTED_HARNESS",
-    "type": "LazyLock<AgentHarness<(),OpenHumanRunContext>>",
-    "count": 1,
-    "category": "A",
-    "reason": "One unconfigured harness is process infrastructure; per-invocation models, tools, middleware, progress, and host capabilities are supplied through each invocation, so the singleton carries no tenant authority or data.",
-    "verification": "agent/tinyagents/turn_exec_tests.rs: hosted_roots_share_only_an_unconfigured_process_harness"
-  },
-  {
     "file": "crates/openhuman-core/src/agent_registry/host_definition.rs",
     "scope": "",
     "name": "GLOBAL",
@@ -420,16 +400,6 @@
     "verification": "modules/wallet_backend_tests.rs: a_registered_handler_answers_the_call"
   },
   {
-    "file": "crates/openhuman-core/src/plan_review/gate.rs",
-    "scope": "",
-    "name": "GATE",
-    "type": "OnceLock<PlanReviewGate>",
-    "count": 1,
-    "category": "B",
-    "reason": "The process gate is infrastructure, and its waiter, parked-review, and thread lookup tables use the profile-only tenant key plus request/thread id; agent requests remain available to their profile-level UI while other profiles cannot reach them.",
-    "verification": "plan_review/gate_tests.rs: parked_reviews_are_isolated_by_tenant"
-  },
-  {
     "file": "crates/openhuman-core/src/prompts/section_renderers.rs",
     "scope": "",
     "name": "EMPTY_INTEGRATIONS",
@@ -508,16 +478,6 @@
     "category": "A",
     "reason": "The process's registry of weak handles to the rebindable session-store providers a host installed, so a workspace switch (storage::rebind) can point each at the new backend. It holds no records and no tenant state, only Weak references; the stores' data lives in the storage backend. A test builds its own StoreRegistry, so rebinding one never moves another's stores.",
     "verification": "storage/sessions/rebound_tests.rs: a_registry_rebind_leaves_other_registries_alone"
-  },
-  {
-    "file": "crates/openhuman-core/src/storage/sessions/workspace.rs",
-    "scope": "",
-    "name": "FALLBACKS",
-    "type": "LazyLock<Mutex<HashMap<PathBuf,Fallback>>>",
-    "count": 1,
-    "category": "D",
-    "reason": "Each entry routes one workspace path to its storage backend and DriverSessionStores provider; returned stores still require the caller's tenant session key, while authoritative session data remains in the backend.",
-    "verification": "storage/sessions/mod_tests.rs: each_workspace_keeps_its_sessions_in_its_own_database; storage/sessions/mod_tests.rs: two_profiles_default_agents_keep_separate_session_keys_and_stores; threads/ops/edit_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate"
   },
   {
     "file": "crates/openhuman-core/src/threads/artifact_rows.rs",
