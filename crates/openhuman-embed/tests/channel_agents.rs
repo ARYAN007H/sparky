@@ -157,8 +157,17 @@ fn a_telegram_message_is_answered_by_the_bound_runtime_agent() {
             // The Bot API base is read when the channel is built.
             std::env::set_var("OPENHUMAN_TELEGRAM_BOT_API_BASE", bot_api.uri());
 
+            let mut config = offline_config();
+            if let Some(artifact) = openhuman_core::modules::local_artifact("tinychannels") {
+                config.modules.overrides = vec![
+                    openhuman_core::config::schema::ModuleOverride::with_path(
+                        "tinychannels",
+                        artifact.to_string_lossy(),
+                    ),
+                ];
+            }
             let runtime = Runtime::builder()
-                .config(offline_config())
+                .config(config)
                 .workspace(Workspace::Ephemeral)
                 .backend_url(backend.uri())
                 .api_key("sk-managed-fixture")
