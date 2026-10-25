@@ -104,7 +104,10 @@ export function auditGraph(metadata, roots, policy, contract = null) {
             item.scope === scope && item.package === name &&
             (!item.parent || item.parent === parent));
           const finding = { scope, package: name, path: path.map(id => packages.get(id).name) };
-          (exemption ? exceptions : violations).push(finding);
+          const findings = exemption ? exceptions : violations;
+          if (!findings.some(item => item.scope === scope && item.package === name)) {
+            findings.push(finding);
+          }
           // Contract exceptions pin the first unsafe dependency. Its implementation
           // closure is deliberately NOT approved vocabulary and must disappear
           // with this edge. Hosts still traverse it to catch indirect implementations.
