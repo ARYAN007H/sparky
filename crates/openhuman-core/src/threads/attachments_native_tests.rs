@@ -539,7 +539,7 @@ fn typed_parts_pair_with_staged_files_and_drop_provider_locations() {
 #[test]
 fn typed_part_pairing_rejects_count_mismatches_and_unsupported_kinds() {
     let image = source(MediaKind::Image);
-    let err = from_staged_parts(&[image.clone()], &[]).unwrap_err();
+    let err = from_staged_parts(std::slice::from_ref(&image), &[]).unwrap_err();
     assert!(err.contains("media ordering"), "{err}");
     // Voice notes carry no staged file and are skipped.
     let voice = ContentPart::VoiceNote {

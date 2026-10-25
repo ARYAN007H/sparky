@@ -63,7 +63,7 @@ fn seed_session(ctx: &DispatchCtx, config: &Config, identity: &ChannelSessionIde
     let tenant = ctx.tenant().unwrap();
     let locator = origin_channel_transcripts(ctx, config, identity, &identity.agent_id).unwrap();
     let session = SessionRef::scoped(
-        &crate::core::runtime::tenant_key(&tenant, &identity.session_key),
+        crate::core::runtime::tenant_key(&tenant, &identity.session_key),
         &identity.agent_id,
     );
     let meta = super::tests::meta();
@@ -93,7 +93,7 @@ fn assistant_messages(
     let tenant = ctx.tenant().unwrap();
     let locator = origin_channel_transcripts(ctx, config, identity, &identity.agent_id).unwrap();
     let session = SessionRef::scoped(
-        &crate::core::runtime::tenant_key(&tenant, &identity.session_key),
+        crate::core::runtime::tenant_key(&tenant, &identity.session_key),
         &identity.agent_id,
     );
     let head = locator.head_generation(&session);
