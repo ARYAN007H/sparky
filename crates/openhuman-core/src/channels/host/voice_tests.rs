@@ -136,3 +136,141 @@ async fn overlong_reply_is_rejected_without_calling_the_backend() {
         .unwrap_err();
     assert!(err.to_string().contains("maximum spoken duration"));
 }
+
+mod stt {
+    use super::*;
+    use crate::core::Outcome;
+    use crate::voice::factory::registry::{register_stt_provider, unregister_stt_provider};
+    use crate::voice::factory::{SttProvider, SttResult};
+
+    struct EchoStt {
+        fail: bool,
+    }
+
+    #[async_trait::async_trait]
+    impl SttProvider for EchoStt {
+        fn name(&self) -> &'static str {
+            "channel-voice-test"
+        }
+
+        async fn transcribe(
+            &self,
+            _config: &Config,
+            audio_base64: &str,
+            mime_type: Option<&str>,
+            file_name: Option<&str>,
+            language: Option<&str>,
+        ) -> Result<Outcome<SttResult>, String> {
+            if self.fail {
+                return Err("backend refused the audio".into());
+            }
+            Ok(Outcome::new(
+                SttResult {
+                    text: format!(
+                        "{audio_base64}|{}|{}|{}",
+                        mime_type.unwrap_or("-"),
+                        file_name.unwrap_or("-"),
+                        language.unwrap_or("-")
+                    ),
+                    provider: "channel-voice-test".into(),
+                },
+                vec![],
+            ))
+        }
+    }
+
+    fn host(slug: &str) -> ChannelVoiceHost {
+        let mut config = Config::default();
+        config.stt_provider = Some(slug.into());
+        ChannelVoiceHost {
+            config: Arc::new(config),
+        }
+    }
+
+    #[tokio::test]
+    async fn unscoped_transcription_runs_the_configured_provider_with_the_request_hints() {
+        register_stt_provider("channel-voice-test-ok", |_, _| Ok(Box::new(EchoStt { fail: false })));
+        let result = host("channel-voice-test-ok")
+            .transcribe_host(HostTranscriptionRequest {
+                scope: None,
+                audio_base64: "QUJD".into(),
+                mime_type: Some("audio/ogg".into()),
+                file_name: Some("note.ogg".into()),
+                language: Some("en".into()),
+            })
+            .await;
+        unregister_stt_provider("channel-voice-test-ok");
+        let result = result.unwrap();
+        assert_eq!(result.text, "QUJD|audio/ogg|note.ogg|en");
+        assert_eq!(result.language.as_deref(), Some("en"));
+        assert_eq!(result.duration_secs, None);
+    }
+
+    #[tokio::test]
+    async fn scoped_transcription_validates_the_scope_then_delegates() {
+        register_stt_provider("channel-voice-test-scoped", |_, _| Ok(Box::new(EchoStt { fail: false })));
+        let host = host("channel-voice-test-scoped");
+        let result = host
+            .transcribe_voice(HostVoiceTranscriptionRequest {
+                scope: scope("telegram", "chat-1", "turn-1"),
+                audio_base64: "REVG".into(),
+                mime_type: None,
+                file_name: None,
+                language: None,
+            })
+            .await;
+        unregister_stt_provider("channel-voice-test-scoped");
+        assert_eq!(result.unwrap().text, "REVG|-|-|-");
+    }
+
+    #[tokio::test]
+    async fn provider_failure_and_unknown_provider_surface_as_errors() {
+        register_stt_provider("channel-voice-test-fail", |_, _| Ok(Box::new(EchoStt { fail: true })));
+        let err = host("channel-voice-test-fail")
+            .transcribe_host(HostTranscriptionRequest {
+                audio_base64: "QQ==".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap_err();
+        unregister_stt_provider("channel-voice-test-fail");
+        assert!(err.to_string().contains("backend refused the audio"), "{err}");
+
+        let err = host("channel-voice-test-never-registered")
+            .transcribe_host(HostTranscriptionRequest::default())
+            .await;
+        assert!(err.is_err());
+    }
+}
+
+#[tokio::test]
+async fn synthesis_fails_cleanly_when_the_voice_module_cannot_be_loaded() {
+    let mut config = Config::default();
+    config.modules.allow_download = false;
+    config.modules.source = crate::config::schema::ModuleSourceMode::Release;
+    let host = ChannelVoiceHost {
+        config: Arc::new(config),
+    };
+    let err = host
+        .synthesize_speech(HostSpeechSynthesisRequest {
+            scope: scope("telegram", "c", "t"),
+            text: "short reply".into(),
+            voice: Some("alloy".into()),
+            format: None,
+        })
+        .await;
+    assert!(err.is_err(), "no voice module is available offline");
+}
+
+#[test]
+fn reply_policy_reports_the_configured_mode_for_the_scoped_turn() {
+    let mut config = Config::default();
+    config.channel_voice.threads.insert("chat-9".into(), VoiceReplyMode::SpeakReply);
+    let host = ChannelVoiceHost {
+        config: Arc::new(config),
+    };
+    let policy = host.reply_policy(&policy_request(scope("telegram", "chat-9", "t"), true, false));
+    assert_eq!(policy.mode, HostVoiceReplyMode::SpeakReply);
+    let default = host.reply_policy(&policy_request(scope("telegram", "other", "t"), false, true));
+    assert_eq!(default.mode, HostVoiceReplyMode::Mirror);
+}
