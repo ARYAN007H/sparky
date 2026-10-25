@@ -336,6 +336,31 @@ async fn disabled_config_runs_one_turn_per_message_in_order() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_command_arriving_inside_the_window_runs_as_its_own_turn_after_the_text() {
+    let turns = Arc::new(Turns::default());
+    let _guard = install_handler(Arc::clone(&turns), None).await;
+    let (_channel, ctx) = runtime();
+    let mut run = Running::start(ctx, InboundDebounceConfig::default());
+
+    run.send("alice", "tell me about tokio").await;
+    sleep_ms(500).await;
+    assert_eq!(turns.count(), 0, "the text is still held by the quiet window");
+    run.send("alice", "/new").await;
+    sleep_ms(3000).await;
+
+    // A slash command never merges: the buffered text and the command are two
+    // turns, and the text (received first) is dispatched before the command.
+    assert_eq!(turns.count(), 2);
+    let first = turns.user(0);
+    let second = turns.user(1);
+    assert!(first.ends_with("tell me about tokio"), "{first}");
+    assert!(!first.contains("/new"), "{first}");
+    assert!(second.ends_with("/new"), "{second}");
+    assert!(!second.contains("tokio"), "{second}");
+    run.finish().await;
+}
+
+#[tokio::test(start_paused = true)]
 async fn different_senders_are_never_merged() {
     let turns = Arc::new(Turns::default());
     let _guard = install_handler(Arc::clone(&turns), None).await;
