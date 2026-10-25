@@ -1,10 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  CompressionStream as NodeCompressionStream,
-  DecompressionStream as NodeDecompressionStream,
-  ReadableStream as NodeReadableStream,
-  Response as NodeResponse,
-} from 'node:stream/web';
 
 import {
   ALLOWED_ATTACHMENT_MIME_TYPES,
@@ -92,13 +86,6 @@ describe('validateAndReadFile', () => {
   });
 
   it('uses reversible gzip transport while preserving original filename and MIME', async () => {
-    // jsdom does not provide a compatible compression stream stack. Use
-    // Node's matching Web Streams constructors so the test exercises the
-    // real gzip transport rather than jsdom's incomplete stream adapters.
-    vi.stubGlobal('CompressionStream', NodeCompressionStream);
-    vi.stubGlobal('DecompressionStream', NodeDecompressionStream);
-    vi.stubGlobal('ReadableStream', NodeReadableStream);
-    vi.stubGlobal('Response', NodeResponse);
     const original = new TextEncoder().encode('a'.repeat(4096));
     const file = new File([original], 'Report.TXT', { type: 'text/plain' });
     Object.defineProperty(file, 'stream', {
