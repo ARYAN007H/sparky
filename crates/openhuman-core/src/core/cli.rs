@@ -482,7 +482,7 @@ fn run_call_command(args: &[String]) -> Result<()> {
             let headless_agent_chat = crate::core::legacy_aliases::resolve_legacy(&method)
                 == crate::agent_runs::INFERENCE_AGENT_CHAT;
             let dispatch = if headless_agent_chat {
-                let config = crate::config::Config::load_or_init()
+                let config = crate::config::load_config_with_timeout()
                     .await
                     .map_err(|error| error.to_string())?;
                 if crate::agent_registry::host_definition::AgentDefinitionRegistry::global()

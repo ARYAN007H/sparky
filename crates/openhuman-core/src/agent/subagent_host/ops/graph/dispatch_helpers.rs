@@ -20,7 +20,7 @@ pub(super) fn spawn_subagent_trace_export(
     let thread_id = thread_id.map(str::to_owned);
     let agent_id = agent_id.to_owned();
     let task_id = task_id.to_owned();
-    tokio::spawn(async move {
+    dispatch.spawn(async move {
         crate::core::observability::progress_tracing::export_subagent_journal_trace(
             &dispatch,
             &config,

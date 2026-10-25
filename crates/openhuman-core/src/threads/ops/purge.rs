@@ -37,7 +37,7 @@ where
     Fut: std::future::Future<Output = ()> + Send,
 {
     let admission_workspace = dir.clone();
-    let _admission = tokio::task::spawn_blocking(move || {
+    let _admission = ctx.spawn_blocking(move || {
         crate::threads::store::backend::begin_thread_purge(&admission_workspace)
     })
     .await
