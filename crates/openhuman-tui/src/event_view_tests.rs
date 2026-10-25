@@ -42,9 +42,8 @@ fn final_response_variants_expose_full_response() {
             "event": name, "client_id": "c", "thread_id": "t", "request_id": "r",
             "full_response": "answer"
         }));
-        if let Ok(event) = parsed {
-            assert_eq!(WebEventView::from_event(&event).full_response.as_deref(), Some("answer"), "{name}");
-        }
+        let event = parsed.unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(WebEventView::from_event(&event).full_response.as_deref(), Some("answer"), "{name}");
     }
     let v = view(json!({"event": "chat_done", "full_response": "answer"}));
     assert_eq!(v.full_response.as_deref(), Some("answer"));
@@ -164,7 +163,7 @@ fn artifact_events_expose_call_id_and_args() {
             "event": name, "client_id": "c", "thread_id": "t", "request_id": "r",
             "tool_call_id": "tc", "args": {"a": 1}
         }));
-        let Ok(event) = parsed else { continue };
+        let event = parsed.unwrap_or_else(|e| panic!("{name}: {e}"));
         let v = WebEventView::from_event(&event);
         assert_eq!(v.tool_call_id.as_deref(), Some("tc"), "{name}");
         assert_eq!(v.args, Some(json!({"a": 1})), "{name}");
