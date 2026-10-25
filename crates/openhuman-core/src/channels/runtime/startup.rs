@@ -144,12 +144,10 @@ impl ChannelHandle {
     }
 
     pub(crate) async fn start_typing(&self, recipient: &str) -> anyhow::Result<()> {
-        let _ = recipient;
         match self {
-            // The module owns typing through the progressive output it opens
-            // for the turn; its adapters have no separate `StartTyping`
-            // interaction, so a host-side call would only fault.
-            Self::Module(_) => Ok(()),
+            // Factory-built adapters serve `StartTyping` through their typing
+            // port, so the host drives the indicator again.
+            Self::Module(module) => module.start_typing(recipient).await,
             Self::Relay(_) => Ok(()),
             #[cfg(test)]
             Self::Test(channel) => {
@@ -163,12 +161,8 @@ impl ChannelHandle {
     }
 
     pub(crate) async fn stop_typing(&self, recipient: &str) -> anyhow::Result<()> {
-        let _ = recipient;
         match self {
-            // The module owns typing through the progressive output it opens
-            // for the turn; its adapters have no separate `StopTyping`
-            // interaction, so a host-side call would only fault.
-            Self::Module(_) => Ok(()),
+            Self::Module(module) => module.stop_typing(recipient).await,
             Self::Relay(_) => Ok(()),
             #[cfg(test)]
             Self::Test(channel) => {
