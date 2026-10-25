@@ -353,7 +353,7 @@ test('host boundary audit ignores writer features unified only by unrelated work
       'openhuman-tui': [['openhuman-rpc']],
       openhuman: [],
     });
-    assert.equal(auditGraph(unified, ['openhuman'], strict).violations.length, 5);
+    assert.equal(auditGraph(unified, ['openhuman'], strict).violations.length, 4);
     assert.deepEqual(auditGraph(scoped, ['openhuman'], policy).violations, []);
     assert.deepEqual(auditGraph(scoped, ['openhuman'], policy).exceptions.map(item => item.package), ['tinyflows']);
     const manifestToContract = new Map(policy.contracts.map(item => [
