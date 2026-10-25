@@ -236,7 +236,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
     let channel: Arc<dyn Channel> = channel_impl.clone();
     let subscriber = ChannelTurnStateSubscriber::with_config(
-        Arc::new(HashMap::from([("telegram".to_string(), channel)])),
+        Arc::new(HashMap::from([("telegram".to_string(), Arc::clone(&channel))])),
         Arc::new(config),
     );
     subscriber
