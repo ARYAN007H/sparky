@@ -295,7 +295,6 @@ fn stored_file(name: &str, mime: &str, size: usize) -> Attachment {
         path: format!("uploads/{name}"),
         mime: mime.into(),
         size_bytes: size,
-        ..Default::default()
     }
 }
 
