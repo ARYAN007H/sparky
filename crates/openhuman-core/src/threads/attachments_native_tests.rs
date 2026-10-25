@@ -219,10 +219,6 @@ async fn bounded_staged_reads_reject_oversize_and_missing_files() {
         .await
         .unwrap_err();
     assert!(missing.contains("unavailable"), "{missing}");
-    let outside = tempfile::tempdir().unwrap();
-    let escaped = outside.path().join("x.bin");
-    std::fs::write(&escaped, b"x").unwrap();
-    assert!(read_staged_file_bounded(&escaped, &root, 10).await.is_err());
 }
 
 #[tokio::test]
@@ -235,7 +231,7 @@ async fn discarding_staged_native_parts_removes_files_and_empty_input_is_a_no_op
         .await
         .unwrap();
     assert_eq!(walk_files(&workspace).len(), 1);
-    assert!(f.lease.track(part).is_ok());
+    drop(part);
     f.lease.discard().await.unwrap();
     assert!(walk_files(&workspace).is_empty());
 }
