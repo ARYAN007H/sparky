@@ -36,7 +36,11 @@ fn an_unscoped_saas_auth_error_is_not_attributed_to_every_profile() {
     reset_for_tests();
     let scope = current_scope_in(true, None);
     assert!(matches!(scope, CurrentScope::Unresolved(_)));
-    record_in_scope("saas-unscoped-provider", 401, scope);
+    assert!(!record_in_scope("saas-unscoped-provider", 401, scope));
+    assert!(
+        snapshot().is_empty(),
+        "an unresolved SaaS failure must not enter the process-wide registry"
+    );
 
     let workspace = tempfile::tempdir().expect("profile workspace");
     let (errors, has_unscoped) = snapshot_for_scope(
