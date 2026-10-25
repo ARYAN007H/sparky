@@ -136,6 +136,10 @@ fn reset_script(responses: Vec<Value>) {
     });
     with_captured(|c| c.clear());
     with_captured_managed_gemini(|requests| requests.clear());
+    PARENT_FIRST_LIMIT.store(0, std::sync::atomic::Ordering::SeqCst);
+    PARENT_ANSWERED.store(0, std::sync::atomic::Ordering::SeqCst);
+    CHILD_RESPONSES_REQUIRED.store(0, std::sync::atomic::Ordering::SeqCst);
+    CHILD_RESPONSES.store(0, std::sync::atomic::Ordering::SeqCst);
 }
 
 fn tool_call_completion(name: &str, arguments: Value) -> Value {
@@ -1879,46 +1883,42 @@ async fn subagent_delegation_happy_path_inner() {
     stack.shutdown();
 }
 
-// ─── Task 4: Delegated clarification flow ─────────────────────────────────────
+// ─── Task 4: Background delegation completes on a best-effort basis ───────────
 //
 // The blocking `manage_tasks` delegate aliases were retired when specialist
 // hand-offs moved onto `spawn_subagent` (da9d535c6d "route specialist hand-offs
-// through spawn_subagent", 4bcc2f6773 "assert retired specialist aliases are
-// unpacked"), so the old flow — a blocking delegate whose pause came back as the
-// `manage_tasks` tool result — no longer exists. The contract now is:
+// through spawn_subagent"), so the old blocking delegate flow no longer exists.
+// Background children receive a contract to finish without requiring attention
+// from the parent or user, so a child cannot pause for clarification. The
+// contract now is:
 //
 //   * `spawn_subagent` is asynchronous: the parent gets a task id back and ends
 //     its turn on an acknowledgement (turn 1);
-//   * a child that calls `ask_user_clarification` pauses (it is checkpointed,
-//     not failed) and the pause is delivered back to the parent's thread as a
-//     host-authored `[SUBAGENT_AWAITING_USER]` envelope, which the orchestrator
-//     relays in its own reply;
-//   * the user's next message resumes the thread with that relay in context.
+//   * the child follows its background contract, makes best-effort progress,
+//     and its result is delivered to the parent thread;
+//   * the user's next message resumes the thread with that result in context.
 //
 // Deterministic request ordering holds the child until the parent has answered
 // twice, then holds later parent requests until the child's scripted exchange
 // is complete:
 //   request[0] = orchestrator turn 1 → spawn_subagent(task_manager_agent)
 //   request[1] = orchestrator, acknowledges; turn 1 ends (chat_done)
-//   request[2] = task_manager_agent → ask_user_clarification pauses the child
-//   request[3] = orchestrator delivery turn with the awaiting-user envelope →
-//                relays the question as text
+//   request[2] = task_manager_agent → best-effort result
+//   request[3] = orchestrator delivery turn → reports the child's result
 //   request[4] = orchestrator turn 2 ("version 2") → synthesis (chat_done)
 
-/// A delegated request whose specialist needs clarification surfaces its question
-/// to the parent, then preserves that question in the context used to answer the
-/// user's reply.
+/// A detached specialist completes without asking the user, and its result is
+/// delivered to the parent thread and preserved for the next user turn.
 #[test]
-fn delegated_clarification_flow() {
+fn delegated_background_task_completion_flow() {
     run_on_agent_stack(
-        "delegated_clarification_flow",
-        delegated_clarification_flow_inner,
+        "delegated_background_task_completion_flow",
+        delegated_background_task_completion_flow_inner,
     );
 }
 
-async fn delegated_clarification_flow_inner() {
+async fn delegated_background_task_completion_flow_inner() {
     let _lock = env_lock();
-    serialize_children_after_parent(2, 2);
     reset_script(vec![
         tool_call_completion(
             "spawn_subagent",
@@ -1928,13 +1928,13 @@ async fn delegated_clarification_flow_inner() {
             }),
         ),
         text_completion("Handed that to the task manager."),
-        tool_call_completion(
-            "ask_user_clarification",
-            json!({ "question": "WHICH_VERSION_CANARY?" }),
+        text_completion(
+            "Best-effort task-source setup completed using the default API version. TASK_MANAGER_RESULT_CANARY",
         ),
-        text_completion("The task manager needs one detail: WHICH_VERSION_CANARY?"),
+        text_completion("The task manager completed its best-effort setup: TASK_MANAGER_RESULT_CANARY."),
         text_completion("Final: ANSWER_CANARY_V2"),
     ]);
+    serialize_children_after_parent(2, 1);
     let stack = boot_stack().await;
     // The delivery turn persists its reply on the thread, so the thread must
     // exist (the UI creates it before the first message).
@@ -1974,9 +1974,9 @@ async fn delegated_clarification_flow_inner() {
         "turn-1 expected chat_done: {first}"
     );
 
-    // ── the child's pause reaches the parent, which relays it ──
+    // ── the child's result reaches the parent's thread ──
     // The delivery turn is host-authored (no web client waits on it), so wait for
-    // the script to drain: the relay is the fourth completion consumed.
+    // the script to drain until only turn 2's response remains.
     let deadline = std::time::Instant::now() + Duration::from_secs(120);
     loop {
         let consumed_all_but_last = with_scripted(|q| q.len()) <= 1;
@@ -1988,7 +1988,7 @@ async fn delegated_clarification_flow_inner() {
     let dump = || serde_json::to_string_pretty(&with_captured(|c| c.clone())).unwrap_or_default();
     assert!(
         with_scripted(|q| q.len()) <= 1,
-        "the child's clarification was never delivered to the parent; requests: {}",
+        "the child's best-effort result was never delivered to the parent; requests: {}",
         dump()
     );
     // Let the relay turn commit to the thread before the user replies.
@@ -2035,11 +2035,11 @@ async fn delegated_clarification_flow_inner() {
     );
 
     // request[2] went to task_manager_agent, not the orchestrator: its system
-    // prompt is task-manager-specific. Without this the flow degrades to the
-    // orchestrator asking the user itself, which never exercises the pause.
+    // prompt carries both the background contract and task-manager-specific role.
     let child_request = requests.get(2).map(Value::to_string).unwrap_or_default();
     assert!(
-        child_request.contains("You own the user's task-source feeds and artifacts"),
+        child_request.contains("You own the user's task-source feeds and artifacts")
+            && child_request.contains("Do not call ask_user_clarification"),
         "request[2] did not carry the task_manager_agent prompt — spawn_subagent did not \
          run the specialist; request: {child_request}"
     );
