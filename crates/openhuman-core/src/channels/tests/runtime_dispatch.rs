@@ -240,11 +240,8 @@ async fn process_channel_message_sends_typing_before_the_provider_reply() {
     .await;
 
     let requests = linked.provider_request_paths().await;
-    // Typing is owned by the module's progressive output, whose configured
-    // adapter sender currently has no typing port (`AdapterSender::typing` is a
-    // no-op in tinychannels-module), and the module rejects host-side
-    // `StartTyping` for factory-built adapters. So the host sends no typing
-    // action; any that does arrive must still precede the reply (checked below).
+    // The host drives typing through the module's `StartTyping` interaction
+    // for the factory-built adapter, and it must precede the reply.
     assert_eq!(
         requests
             .iter()
@@ -263,6 +260,10 @@ async fn process_channel_message_sends_typing_before_the_provider_reply() {
         .iter()
         .position(|path| path.ends_with("/sendMessage"))
         .expect("provider should receive the model reply");
+    assert!(
+        !typing_indices.is_empty(),
+        "the host should start typing on the module-backed provider: {requests:?}"
+    );
     assert!(
         typing_indices.iter().all(|index| *index < reply_index),
         "typing should precede reply: {requests:?}"
