@@ -160,8 +160,8 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 }
 
 #[tokio::test]
-#[ignore = "remote binding persistence requires a host-storage callback-backed module lease; module-owned behavior is covered in vendor/tinychannels"]
 async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
+    let _storage = crate::channels::module_fixture::install_memory_storage();
     let tempdir = tempfile::tempdir().unwrap();
     let ctx = runtime_context(tempdir.path().to_path_buf());
     let channel_impl = Arc::new(RecordingChannel::default());
