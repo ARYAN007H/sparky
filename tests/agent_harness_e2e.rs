@@ -2044,26 +2044,23 @@ async fn delegated_background_task_completion_flow_inner() {
          run the specialist; request: {child_request}"
     );
 
-    // request[3] saw the pause as a `[SUBAGENT_AWAITING_USER]` envelope carrying
-    // the child's question, not a plain success the model could read as "answered".
+    // request[3] saw the host-authored child result in the delivery turn.
     let relay_request = requests.get(3).map(Value::to_string).unwrap_or_default();
     assert!(
-        relay_request.contains("[SUBAGENT_AWAITING_USER]")
-            && relay_request.contains("WHICH_VERSION_CANARY"),
+        relay_request.contains("TASK_MANAGER_RESULT_CANARY"),
         "request[3] did not carry the awaiting-user envelope with the child's question; \
          request: {relay_request}"
     );
 
-    // The turn-2 request must still hold the question: the relay was persisted in
-    // thread history. Scoped to the last request because request[3] carries the
-    // canary through the envelope, so an `any()` over all requests would pass
-    // without persistence.
-    let turn2_contains_question = requests
+    // The turn-2 request must still hold the child result: the delivery was
+    // persisted in thread history. Scoped to the last request because request[3]
+    // also carries the canary, so an `any()` would pass without persistence.
+    let turn2_contains_result = requests
         .last()
-        .map(|request| request.to_string().contains("WHICH_VERSION_CANARY"))
+        .map(|request| request.to_string().contains("TASK_MANAGER_RESULT_CANARY"))
         .unwrap_or(false);
     assert!(
-        turn2_contains_question,
+        turn2_contains_result,
         "WHICH_VERSION_CANARY not found in the turn-2 request — the clarification \
          question was not persisted in thread history; requests: {}",
         serde_json::to_string_pretty(&requests).unwrap_or_default()
