@@ -291,10 +291,16 @@ async fn hold_for_canary_peer(canary: String) {
 /// completion; arming this makes the order deterministic (`0` = off).
 static PARENT_FIRST_LIMIT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 static PARENT_ANSWERED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static CHILD_RESPONSES_REQUIRED: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+static CHILD_RESPONSES: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
 
-fn serialize_children_after_parent(parent_requests: usize) {
+fn serialize_children_after_parent(parent_requests: usize, child_responses: usize) {
     PARENT_ANSWERED.store(0, std::sync::atomic::Ordering::SeqCst);
     PARENT_FIRST_LIMIT.store(parent_requests, std::sync::atomic::Ordering::SeqCst);
+    CHILD_RESPONSES_REQUIRED.store(child_responses, std::sync::atomic::Ordering::SeqCst);
+    CHILD_RESPONSES.store(0, std::sync::atomic::Ordering::SeqCst);
 }
 
 fn body_is_orchestrator(body: &Value) -> bool {
@@ -338,15 +344,6 @@ async fn scripted_chat_completions(
     {
         return completion_response(streaming, json!({ "role": "assistant", "content": "[]" }));
     }
-    with_captured(|reqs| {
-        reqs.push(json!({
-            "path": uri.path(),
-            "model": body.get("model").and_then(Value::as_str),
-            "stream": streaming,
-            "body": body.clone(),
-        }))
-    });
-
     // Park an armed fan-out worker before it is answered, so a peer has a
     // chance to arrive. Before the queue pop, not after: holding the popped
     // entry would serialize the FIFO itself and deadlock the peer.
@@ -358,17 +355,33 @@ async fn scripted_chat_completions(
 
     let parent_first = PARENT_FIRST_LIMIT.load(std::sync::atomic::Ordering::SeqCst);
     let is_orchestrator = parent_first > 0 && body_is_orchestrator(&body);
-    if parent_first > 0 && !is_orchestrator {
+    let child_responses_required = CHILD_RESPONSES_REQUIRED.load(std::sync::atomic::Ordering::SeqCst);
+    if parent_first > 0 {
         let deadline = std::time::Instant::now() + Duration::from_secs(15);
-        while PARENT_ANSWERED.load(std::sync::atomic::Ordering::SeqCst) < parent_first
-            && std::time::Instant::now() < deadline
-        {
+        while std::time::Instant::now() < deadline {
+            let parent_ready = PARENT_ANSWERED.load(std::sync::atomic::Ordering::SeqCst)
+                >= parent_first;
+            let child_ready = CHILD_RESPONSES.load(std::sync::atomic::Ordering::SeqCst)
+                >= child_responses_required;
+            if if is_orchestrator { parent_ready && child_ready } else { parent_ready } {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
     }
+    with_captured(|reqs| {
+        reqs.push(json!({
+            "path": uri.path(),
+            "model": body.get("model").and_then(Value::as_str),
+            "stream": streaming,
+            "body": body.clone(),
+        }))
+    });
     let next = with_scripted(|q| q.pop_front());
     if is_orchestrator {
         PARENT_ANSWERED.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    } else if next.is_some() && parent_first > 0 {
+        CHILD_RESPONSES.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
     let Some(mut entry) = next else {
         let message = json!({ "role": "assistant", "content": "default scripted completion" });
