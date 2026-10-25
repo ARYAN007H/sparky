@@ -2014,21 +2014,30 @@ async fn delegated_background_task_completion_flow_inner() {
         dump()
     );
     // Queue exhaustion only proves that the delivery call took its scripted
-    // response. Wait for its persisted turn state to report completion before
-    // asking the parent to resume the thread.
+    // response. Wait until the thread's durable message list contains the
+    // delivery reply before asking the parent to resume the thread.
     let deadline = std::time::Instant::now() + Duration::from_secs(120);
     loop {
-        let history = turn_state_history(&stack.rpc_base, 402, "thread-clarify").await;
-        let completed = history
+        let response = post_json_rpc(
+            &stack.rpc_base,
+            402,
+            "openhuman.threads_messages_list",
+            json!({ "thread_id": "thread-clarify" }),
+        )
+        .await;
+        let messages = assert_no_jsonrpc_error(&response, "threads_messages_list")["data"]
+            ["messages"]
+            .as_array()
+            .expect("thread message list");
+        if messages
             .iter()
-            .filter(|turn| turn["lifecycle"] == "completed")
-            .count();
-        if completed >= 2 {
+            .any(|message| message.to_string().contains("TASK_MANAGER_RESULT_CANARY"))
+        {
             break;
         }
         assert!(
             std::time::Instant::now() < deadline,
-            "delivery turn did not commit before turn 2; persisted turns: {history:#?}"
+            "delivery turn did not commit before turn 2; persisted messages: {messages:#?}"
         );
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
