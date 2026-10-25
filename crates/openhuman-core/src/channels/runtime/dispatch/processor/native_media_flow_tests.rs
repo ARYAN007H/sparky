@@ -10,6 +10,9 @@ use tinychannels_bus::{ChannelRef, ConversationKind, ConversationRef};
 
 const THREAD: &str = "telegram:telegram:conversation-42";
 
+/// A valid 1x1 PNG: the module checks image bytes against their declared type.
+const PNG: &[u8] = &[0x89, 0x50, 0x4e, 0x47, 0xd, 0xa, 0x1a, 0xa, 0x0, 0x0, 0x0, 0xd, 0x49, 0x48, 0x44, 0x52, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x1, 0x8, 0x6, 0x0, 0x0, 0x0, 0x1f, 0x15, 0xc4, 0x89, 0x0, 0x0, 0x0, 0xb, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x60, 0x0, 0x2, 0x0, 0x0, 0x5, 0x0, 0x1, 0x7a, 0x5e, 0xab, 0x3f, 0x0, 0x0, 0x0, 0x0, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82];
+
 fn envelope(parts: Vec<ContentPart>) -> ChannelInboundEnvelope {
     ChannelInboundEnvelope {
         channel: ChannelRef {
@@ -135,7 +138,7 @@ async fn typed_media_is_read_from_the_module_staged_and_converted_to_a_model_mes
     let host = DispatchCtx::ambient();
 
     let probe = envelope(Vec::new());
-    let image = upload(&linked, &probe, MediaKind::Image, "image/png", "pic.png", b"png-payload").await;
+    let image = upload(&linked, &probe, MediaKind::Image, "image/png", "pic.png", PNG).await;
     let file = upload(&linked, &probe, MediaKind::Document, "text/plain", "notes.txt", b"file-payload").await;
     let voice = ContentPart::VoiceNote {
         voice_note: tinychannels_bus::VoiceNote {
@@ -190,7 +193,7 @@ async fn typed_media_is_read_from_the_module_staged_and_converted_to_a_model_mes
     .map_err(|e| e.to_string())
     .map(|r| r.bytes)
     .unwrap();
-    assert_eq!(read, b"png-payload");
+    assert_eq!(read, PNG);
     resolved.staged_lease.discard().await.unwrap();
 }
 
@@ -284,7 +287,7 @@ async fn module_read_failures_and_metadata_mismatches_reject_the_turn() {
     assert!(err.contains("could not be resolved") || err.contains("mismatch"), "{err}");
 
     // The envelope's declared content type disagrees with what the module stored.
-    let stored = upload(&linked, &probe, MediaKind::Image, "image/png", "pic.png", b"png-payload").await;
+    let stored = upload(&linked, &probe, MediaKind::Image, "image/png", "pic.png", PNG).await;
     let mut lying = stored.clone();
     lying.content_type = Some("image/jpeg".into());
     let err = reject(&ctx, &config, &envelope(vec![image_part(lying)])).await;
