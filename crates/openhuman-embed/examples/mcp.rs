@@ -5,7 +5,7 @@
 
 mod support;
 use openhuman_core::config::schema::{ModuleOverride, ModuleSourceMode};
-use openhuman_embed::{AgentSpec, Runtime, Workspace};
+use openhuman_embed::{AgentSpec, Runtime, RuntimeModule, ServiceSet, Workspace};
 
 fn main() -> anyhow::Result<()> {
     support::run(run())
@@ -24,11 +24,24 @@ async fn run() -> anyhow::Result<()> {
         "tinymcp",
         ModuleSourceMode::Linked,
     ));
+    // TinyMCP needs a host storage callback even when linked into this example.
+    let storage_dir = tempfile::tempdir()?;
+    let storage_url = openhuman_core::storage::config::default_url(storage_dir.path());
     let runtime = Runtime::builder()
         .config(config)
         .workspace(Workspace::Ephemeral)
+        .storage(storage_url)
         .backend_url(backend.uri())
         .provider(support::route(&provider, "fixture"))
+        .services(ServiceSet::none())
+        .modules([
+            RuntimeModule::Agent,
+            RuntimeModule::Inference,
+            RuntimeModule::Modules,
+            RuntimeModule::Memory,
+            RuntimeModule::Mcp,
+            RuntimeModule::Skills,
+        ])
         .build()
         .await?;
     // ANCHOR: mcp
