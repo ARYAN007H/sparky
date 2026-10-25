@@ -19,6 +19,9 @@ use std::sync::Arc;
 use tempfile::{tempdir, TempDir};
 
 struct TestHarness {
+    /// The MCP audit and registry reads run in the TinyMCP module, which
+    /// reaches the host's installed storage backend.
+    _storage: crate::storage_case::Case,
     _tmp: TempDir,
     _guards: Vec<EnvVarGuard>,
     rpc_base: String,
@@ -51,8 +54,11 @@ async fn setup_with_config(memory_config: Option<&str>) -> TestHarness {
         EnvVarGuard::set("OPENHUMAN_MEMORY_EMBED_MODEL", ""),
     ];
 
+    let storage = crate::storage_case::Case::open();
+    storage.install();
     let (addr, join) = serve_rpc().await;
     TestHarness {
+        _storage: storage,
         _tmp: tmp,
         _guards: guards,
         rpc_base: format!("http://{addr}"),
@@ -299,18 +305,18 @@ async fn config_agent_tools_and_threads_mutation_paths_round_trip() {
         &harness.rpc_base,
         30_011,
         "openhuman.config_get_data_paths",
-        // A caller with an identity gets paths for its user-scoped directory.
-        // The shared legacy root is intentionally not clearable because it
-        // contains every account's data.
-        json!({ "user_id": "domain-e2e-user" }),
+        json!({}),
     )
     .await;
-    let error = err(&data_paths, "get_data_paths");
+    // The harness runs on the legacy single-user layout (the config dir is the
+    // shared root), where the controller refuses rather than hand a caller a
+    // folder that holds every account's data to delete.
     assert!(
-        error["message"]
-            .as_str()
+        data_paths
+            .pointer("/error/message")
+            .and_then(Value::as_str)
             .is_some_and(|message| message.contains("legacy data layout")),
-        "the shared legacy root must not be offered for per-user deletion: {data_paths}"
+        "data paths on the legacy layout must be refused: {data_paths}"
     );
 
     let diagnostics = rpc(
@@ -820,12 +826,10 @@ async fn mcp_audit_list_dispatches_internally_and_stays_out_of_the_schema_dump()
         json!({ "limit": 5 }),
     )
     .await;
-    let route_error = err(&listed, "mcp_audit_list");
+    let records = payload(&listed, "mcp_audit_list");
     assert!(
-        route_error["message"]
-            .as_str()
-            .is_some_and(|message| message.contains("module unavailable")),
-        "the internal route must dispatch to the module-backed audit store: {listed}"
+        records.is_object() || records.is_array(),
+        "mcp_audit_list must answer with a payload, not unknown-method: {listed}"
     );
 
     // Internal-only: callable, but never advertised.
@@ -854,9 +858,16 @@ async fn mcp_audit_list_dispatches_internally_and_stays_out_of_the_schema_dump()
 /// **schema validation happens before any outward call, and a refusal names the
 /// remedy rather than leaking a generic transport error.**
 ///
-/// This router fixture validates missing arguments before module calls. The
-/// uninstalled-server behavior is covered where TinyMCP is booted in
-/// `mcp_registry_e2e.rs`.
+/// The specific defect this catches is a handler that drops `read_required` and
+/// lets `""` or a missing key through to the network layer, where the failure
+/// arrives as an opaque timeout the user cannot act on. Each assertion is on the
+/// message content, so a refusal that stops being actionable fails the test.
+///
+/// NOT asserted here, and named rather than faked: that a *connected* server's
+/// tools come back filtered. That needs the `test-mcp-stub` extended to serve a
+/// hostile tool description, and lives with `tests/mcp_registry_e2e.rs`, which
+/// already owns the stub. The scan those tools pass through is covered
+/// separately below.
 #[tokio::test]
 async fn mcp_clients_read_paths_validate_before_reaching_outward() {
     let _lock = env_lock_async().await;
@@ -884,6 +895,30 @@ async fn mcp_clients_read_paths_validate_before_reaching_outward() {
             "{method} must refuse a missing `{missing}` by name before any outward call, got: {message}"
         );
     }
+
+    // `list_tools` against a server that was never installed must say so, and
+    // say what to do. It is not "not connected": connecting something that is
+    // not installed is advice nobody can follow (#6313).
+    let disconnected = rpc(
+        &harness.rpc_base,
+        45_110,
+        "openhuman.mcp_clients_list_tools",
+        json!({ "server_id": "never-connected-server" }),
+    )
+    .await;
+    let message = err(&disconnected, "mcp_clients_list_tools (disconnected)")
+        .get("message")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+    assert!(
+        message.contains("no installed MCP server"),
+        "list_tools on an uninstalled server must say it is not installed, got: {message}"
+    );
+    assert!(
+        message.contains("mcp_clients_status"),
+        "the refusal must name the RPC remedy so a caller can act on it, got: {message}"
+    );
 
     harness.join.abort();
 }

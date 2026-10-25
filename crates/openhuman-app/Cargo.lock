@@ -7919,7 +7919,7 @@ dependencies = [
 
 [[package]]
 name = "tinydocs-bus"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "serde",
  "thiserror 2.0.20",
@@ -7995,19 +7995,6 @@ dependencies = [
  "httpdate",
  "regex",
  "url",
-]
-
-[[package]]
-name = "tinyinference-decisions"
-version = "0.5.0"
-dependencies = [
- "async-trait",
- "httpdate",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
 ]
 
 [[package]]

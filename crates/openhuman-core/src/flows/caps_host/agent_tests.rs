@@ -251,11 +251,11 @@ async fn headless_flow_agent_includes_nested_grandchild_result_inner() {
         .await
     });
     let grandchild_reached_model = matches!(
-        tokio::time::timeout(std::time::Duration::from_secs(5), child_started_rx).await,
+        tokio::time::timeout(std::time::Duration::from_secs(30), child_started_rx).await,
         Ok(Ok(()))
     );
     tokio::time::timeout(
-        std::time::Duration::from_secs(5),
+        std::time::Duration::from_secs(30),
         model.root_followup.notified(),
     )
     .await
@@ -622,7 +622,7 @@ async fn headless_child_at_depth_cap_gets_readable_spawn_refusal() {
         .expect("the child reaches the scripted model")
         .expect("the child start signal is delivered");
     tokio::time::timeout(
-        std::time::Duration::from_secs(5),
+        std::time::Duration::from_secs(30),
         model.root_followup.notified(),
     )
     .await

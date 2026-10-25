@@ -60,33 +60,35 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
         .and_then(Value::as_array)
         .expect("agent_list_definitions should return definitions array");
     // The v1 `agent_memory` built-in was removed with the v1 memory system
-    // (Memory v2 is one `memory` tool, not a sub-agent). `summarizer` is the
-    // shipped safe-library entry used to verify definition projection.
+    // (Memory v2 is one `memory` tool, not a sub-agent); `task_manager_agent` is the
+    // stand-in safe-library entry.
     assert!(
         !definitions
             .iter()
             .any(|definition| definition.get("id").and_then(Value::as_str) == Some("agent_memory")),
         "the v1 memory agent must stay removed"
     );
-    let summarizer = definitions
+    let memory_agent = definitions
         .iter()
-        .find(|definition| definition.get("id").and_then(Value::as_str) == Some("summarizer"))
-        .expect("safe agent library should include summarizer");
-    assert!(summarizer
+        .find(|definition| {
+            definition.get("id").and_then(Value::as_str) == Some("task_manager_agent")
+        })
+        .expect("safe agent library should include task_manager_agent");
+    assert!(memory_agent
         .get("display_name")
         .and_then(Value::as_str)
         .is_some());
-    assert!(summarizer
+    assert!(memory_agent
         .get("when_to_use")
         .and_then(Value::as_str)
         .is_some());
-    assert!(summarizer.get("system_prompt").is_none());
-    assert!(summarizer.get("tools").is_some());
-    assert!(summarizer
+    assert!(memory_agent.get("system_prompt").is_none());
+    assert!(memory_agent.get("tools").is_some());
+    assert!(memory_agent
         .get("direct_tool_count")
         .and_then(Value::as_u64)
         .is_some());
-    assert!(summarizer
+    assert!(memory_agent
         .get("can_run_as_user_facing_worker")
         .and_then(Value::as_bool)
         .is_some());
@@ -108,7 +110,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
         286_211,
         "openhuman.agent_registry_update",
         json!({
-            "id": "summarizer",
+            "id": "task_manager_agent",
             "name": "Review Specialist",
             "description": "Workspace-specific review specialist.",
             "model": "hint:reasoning",
@@ -339,7 +341,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
             "system_prompt": "Write concise updates with citations when available.",
             "tool_allowlist": ["memory.recall"],
             "tool_denylist": ["shell"],
-            "subagents": ["critic"],
+            "subagents": ["task_manager_agent"],
             "tags": ["writing", "custom", "disabled"],
             "metadata": { "updated_by": "json_rpc_e2e" }
         }),
@@ -364,7 +366,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
             .and_then(Value::as_array)
             .and_then(|allowlist| allowlist.first())
             .and_then(Value::as_str),
-        Some("critic")
+        Some("task_manager_agent")
     );
 
     let reenabled_custom = post_json_rpc(
@@ -397,7 +399,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
                 "system_prompt": "Review plans for missing validation.",
                 "tool_allowlist": ["memory.recall"],
                 "tool_denylist": ["shell", "file_write"],
-                "subagents": ["critic"],
+                "subagents": ["task_manager_agent"],
                 "tags": ["review"],
                 "metadata": { "entry_shape": "full" }
             }
@@ -427,7 +429,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
             .and_then(Value::as_array)
             .and_then(|allowlist| allowlist.first())
             .and_then(Value::as_str),
-        Some("critic")
+        Some("task_manager_agent")
     );
 
     let visible_after_custom_disable = post_json_rpc(
@@ -523,7 +525,7 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
         &rpc_base,
         286_221,
         "openhuman.agent_registry_remove",
-        json!({ "id": "summarizer" }),
+        json!({ "id": "task_manager_agent" }),
     )
     .await;
     assert_eq!(
@@ -567,6 +569,17 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
 
     // The agent editor's tool picker is fed by available_tools — every entry is
     // a {name, description} pair whose name is a valid tool_allowlist value.
+    // The tools catalog builds a real session agent, which needs a backend
+    // session.
+    let store = post_json_rpc(
+        &rpc_base,
+        286_199,
+        "openhuman.auth_store_session",
+        json!({ "token": "e2e-test-jwt", "user_id": "e2e-user" }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&store, "auth_store_session");
+
     let available_tools = post_json_rpc(
         &rpc_base,
         286_224,
@@ -1066,6 +1079,11 @@ async fn team_rpc_e2e() {
     rpc_join.abort();
 }
 
+/// End-to-end: plant a thread's session transcript on disk, then verify the
+/// `openhuman.threads_token_usage` RPC reads back the correct cumulative token
+/// totals, cost, last-turn usage, model, and inferred context window — the data
+/// the composer footer seeds itself from when a thread is selected.
+
 #[tokio::test]
 async fn json_rpc_agent_run_mode_set_and_get_round_trip() {
     // `agent.set_run_mode` / `agent.get_run_mode` flip and read back a
@@ -1090,13 +1108,14 @@ async fn json_rpc_agent_run_mode_set_and_get_round_trip() {
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
 
+    // The run mode is owned by a persisted thread: the RPC refuses an id that
+    // is not one of the caller's threads.
     let create = post_json_rpc(&rpc_base, 9400, "openhuman.threads_create_new", json!({})).await;
-    let thread_id = assert_no_jsonrpc_error(&create, "threads_create_new for run mode")
-        .get("data")
-        .and_then(|data| data.get("id"))
-        .and_then(Value::as_str)
-        .expect("created thread should have an id")
+    let thread_id = assert_no_jsonrpc_error(&create, "threads_create_new")["data"]["id"]
+        .as_str()
+        .expect("id in created thread")
         .to_string();
+    let thread_id = thread_id.as_str();
 
     // Defaults to build.
     let initial = post_json_rpc(
@@ -1181,6 +1200,16 @@ async fn json_rpc_agent_context_breakdown_default_agent_returns_sections() {
 
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
+
+    // The report builds the real session agent, which needs a backend session.
+    let store = post_json_rpc(
+        &rpc_base,
+        9500,
+        "openhuman.auth_store_session",
+        json!({ "token": "e2e-test-jwt", "user_id": "e2e-user" }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&store, "auth_store_session");
 
     let breakdown = post_json_rpc(
         &rpc_base,

@@ -142,6 +142,7 @@ fn handle_agent_chat(
             Some(id) if !id.is_empty() => super::AgentChatTarget::AgentId(id),
             _ => super::AgentChatTarget::Orchestrator,
         };
+        let headless = ctx.is_headless_agent_chat();
         let reply = super::session_turn::agent_chat_reply_for_with_headless(
             &mut config,
             target,
@@ -167,7 +168,7 @@ fn handle_agent_chat(
                 },
                 ..Default::default()
             },
-            ctx.is_headless_agent_chat(),
+            headless,
         )
         .await?;
         drop(core_lease);

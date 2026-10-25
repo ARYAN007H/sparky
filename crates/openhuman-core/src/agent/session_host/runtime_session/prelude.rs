@@ -186,9 +186,10 @@ impl OpenHumanTurnPrelude {
         };
         let mut tiered = self.prompt_builder.build_tiered(&context)?;
         // Appended, not prepended (#5704): every line of the boundary is
-        // session-scoped, so putting it first would move the prompt's first
-        // diverging byte to offset zero and cost the prefix cache everything
-        // behind it. The volatile tier keeps it at the tail of the prompt.
+        // session-scoped (agent id, channel, entry point, risk level), so
+        // putting it first would move the prompt's first diverging byte to
+        // offset 0 and cost the backend's prefix cache everything behind it.
+        // It rides the volatile tier, which is the tail of the system prompt.
         if let Some(boundary) =
             tinytools::render_tool_policy_boundary(&surface.tool_policy_session, 2048)
         {

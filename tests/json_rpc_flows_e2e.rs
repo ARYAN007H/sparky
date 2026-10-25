@@ -212,7 +212,14 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         .await
         .unwrap()
         .expect("the released module wrote the v2 job through the host callback");
+    // Module ports cannot set host-owned record metadata, so the migrated
+    // job carries its original creation time as the body field `created_ms`
+    // (the backend stamps `meta.created_ms` with the write time).
     assert_eq!(migrated.doc["created_ms"], 1772600767123_i64);
+    assert!(
+        migrated.meta.created_ms > 0,
+        "the backend owns record metadata"
+    );
     for (collection, id) in [
         ("cron_jobs", "legacy-migration-proof"),
         ("cron_runs", "00000000000000000007"),

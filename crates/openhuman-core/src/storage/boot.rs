@@ -118,7 +118,24 @@ pub async fn remigrate_owners(storage: &Storage, scope: &Scope) -> Result<(), St
                 .await?;
         }
     }
-    migrate_owners(storage, scope).await
+    rerun_harness_steps(storage, scope).await
+}
+
+/// Re-runs the harness schema steps under the owner's migration lease.
+///
+/// `open_storage` remembers a scope it already migrated in this process and
+/// returns at once, so it cannot carry rows copied in after preparation. The
+/// lease-taking primitive it is built on runs the steps again.
+async fn rerun_harness_steps(storage: &Storage, scope: &Scope) -> Result<(), StorageError> {
+    use tinyagents_storage_kit::{MigrateOptions, Registry};
+    let scoped = tinyagents_storage_kit::ScopedStorage::new(storage.clone(), scope.clone());
+    let owned = scoped.clone();
+    tinyagents_storage_kit::with_migration_lease(&scoped, "harness", move |lease| async move {
+        let registry = Registry::compose([tinyagents_harness::storage_schema()])?;
+        registry.migrate(&owned, &MigrateOptions::new()).await?;
+        lease.renew().await
+    })
+    .await
 }
 
 #[cfg(test)]

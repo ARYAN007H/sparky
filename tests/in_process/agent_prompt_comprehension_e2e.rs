@@ -439,6 +439,9 @@ async fn wait_for_terminal(rx: &mut tokio::sync::mpsc::UnboundedReceiver<Value>)
 }
 
 struct Stack {
+    /// The connectors module serves the integration catalogue from the host's
+    /// installed storage backend.
+    _storage: crate::storage_case::Case,
     rpc_base: String,
     _guards: Vec<EnvVarGuard>,
     _tmp: tempfile::TempDir,
@@ -469,6 +472,8 @@ async fn boot_stack(extra_config: &str) -> Stack {
         openhuman_core::agent::bus::register_agent_handlers();
     });
 
+    let storage = crate::storage_case::Case::open();
+    storage.install();
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path().to_path_buf();
     let openhuman_home = home.join(".openhuman");
@@ -511,6 +516,7 @@ async fn boot_stack(extra_config: &str) -> Stack {
     assert_no_jsonrpc_error(&store, "auth_store_session");
 
     Stack {
+        _storage: storage,
         rpc_base,
         _guards: guards,
         _tmp: tmp,
