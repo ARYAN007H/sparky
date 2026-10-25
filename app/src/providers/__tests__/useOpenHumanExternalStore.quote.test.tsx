@@ -14,11 +14,10 @@ import type { ReactNode } from 'react';
 import { Provider } from 'react-redux';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { editMessage } from '../../services/chatService';
 import type { ContentPart } from '../../services/chatWire';
 import chatRuntimeReducer from '../../store/chatRuntimeSlice';
-import threadReducer from '../../store/threadSlice';
-import { editMessage } from '../../services/chatService';
-import { loadThreadMessages } from '../../store/threadSlice';
+import threadReducer, { loadThreadMessages } from '../../store/threadSlice';
 import { registerChatSurface } from '../chatSurfaceHandlers';
 import { useOpenHumanExternalStore } from '../useOpenHumanExternalStore';
 
@@ -62,9 +61,9 @@ function withQuote(text: string): AppendMessage {
   } as unknown as Partial<AppendMessage>);
 }
 
-function mount(store = configureStore({
-  reducer: { thread: threadReducer, chatRuntime: chatRuntimeReducer },
-})) {
+function mount(
+  store = configureStore({ reducer: { thread: threadReducer, chatRuntime: chatRuntimeReducer } })
+) {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <Provider store={store}>{children}</Provider>
   );

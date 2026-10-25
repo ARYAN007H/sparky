@@ -21,10 +21,10 @@
 //! | [`types`]     | `OpenHumanSessionHost` and `SessionHostBuilder` struct definitions (no logic).        |
 //! | [`builder`]   | `SessionHostBuilder` fluent API + `OpenHumanSessionHost::from_config` factory.        |
 //! | [`runtime_session`] | Runtime session composition and public `turn()`.          |
-//! | [`session_api`] | Start / read / list the durable session.                       |
 //! | [`driver`]    | OpenHuman model/harness `SessionDriver`.                         |
 //! | [`hooks`]     | Product preparation/commit/terminal hooks.                       |
 //! | [`runtime`]   | Public accessors and `run_single` / `run_interactive`.           |
+//! | [`session_key`] | Minting and renaming the per-host transcript key.              |
 //!
 //! External callers should import [`OpenHumanSessionHost`] and [`SessionHostBuilder`] from
 //! `crate::agent`, which re-exports them from this module.
@@ -32,46 +32,34 @@
 
 #[cfg(feature = "flows")]
 pub(crate) use builder::provider_role_for_definition;
-pub use builder::{HostOnlyToolPolicy, HostTools, HostTurnTools, TurnContext};
+pub use builder::{HostTools, HostTurnTools, TurnContext};
 
 mod builder;
+mod builder_config;
 mod codec;
 mod driver;
-mod factory;
-mod hooks;
+pub(crate) mod product_copy;
 // Tool surface for live voice sessions (`voice::live`).
 #[cfg(feature = "voice")]
 mod live_tools;
-mod prefix_snapshot;
-mod recorded_tools;
 mod runtime;
 mod runtime_session;
-mod session_api;
-pub(crate) mod stop_summary;
-#[cfg(test)]
-mod tool_progress;
-mod turn;
-// `pub(crate)` since issue #6014: the tool-call-cap instruction is now appended
-// inside the loop by `tinyagents::middleware::FinalCallWrapUpMiddleware`, so the
-// harness-assembly site has to name it. It stays the one definition — the whole
-// point is that the in-loop conclusion and the out-of-band fallback ask for the
-// same thing.
-pub(crate) mod turn_backstop;
-pub(crate) mod turn_checkpoint;
+mod session_key;
+pub(crate) mod stop_policy;
 mod types;
 
+#[cfg(test)]
+#[path = "test_support.rs"]
+pub(crate) mod test_support;
+
 pub use codec::OpenHumanTranscriptCodec;
-pub use factory::OpenHumanSessionFactory;
-pub use hooks::OpenHumanSessionHooks;
+pub type OpenHumanSessionHooks =
+    tinyagents_runtime::FnSessionHooks<crate::agent::tinyagents::host::OpenHumanRunContext>;
 pub use types::{OpenHumanSessionHost, SessionHostBuilder, TurnOverrides};
 
 // Re-export the duplicate-tool-spec guard for sibling harness modules
 // (`session::runtime`, `subagent_host`) so all provider call sites
 // share one tested implementation.
-pub(crate) use builder::dedup_visible_tool_specs;
-
-mod announcement_notes;
-mod artifact_wiring;
 
 #[cfg(test)]
 #[path = "imported_history_tests.rs"]
@@ -81,11 +69,17 @@ mod orphaned_head_resume_tests;
 #[cfg(test)]
 mod response_shape_turn_tests;
 #[cfg(test)]
+mod runtime_adapter_session_state_tests;
+#[cfg(test)]
 mod runtime_adapter_tests;
 #[cfg(test)]
-mod transcript_compat_tests;
+mod runtime_adapter_trace_tests;
 #[cfg(test)]
+mod runtime_adapter_usage_tests;
+#[cfg(all(test, feature = "legacy-import"))]
+mod transcript_compat_tests;
+#[cfg(all(test, feature = "legacy-import"))]
 #[path = "transcript_resume_stable_tests.rs"]
 mod transcript_resume_stable_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-import"))]
 mod typed_transcript_compat_tests;

@@ -109,8 +109,11 @@ impl FailureClassifier for WebFailures {
         FailureClassification {
             class: classified.error_type.to_owned(),
             message: classified.message,
-            copy_key: Some(classified.copy_key.to_owned()),
-            copy_params: classified.copy_params,
+            details: Some(super::failure_details::encode(
+                Some(classified.copy_key.to_owned()),
+                classified.copy_params,
+                error,
+            )),
         }
     }
 }
@@ -433,10 +436,10 @@ fn chat_error_event(
         error_fallback_available: classified.fallback_available,
         copy_key: structured.map_or_else(
             || Some(classified.copy_key.to_owned()),
-            |failure| failure.copy_key.clone(),
+            super::failure_details::copy_key,
         ),
         copy_params: structured.map_or(classified.copy_params, |failure| {
-            failure.copy_params.clone()
+            super::failure_details::copy_params(failure)
         }),
         guardrail: None,
     }
@@ -546,7 +549,13 @@ impl WebEvents {
         if let Some(surface) = self.surface_of(request, &projection).await {
             match event {
                 TerminalEvent::Completed { .. } => self.completed(request, &surface, done).await,
-                TerminalEvent::Failed { error, .. } => {
+                TerminalEvent::Failed { message, .. } => {
+                    // The runner no longer carries the raw error on the event;
+                    // the classifier recorded it in the failure details.
+                    let error = classification
+                        .as_ref()
+                        .and_then(super::failure_details::raw_error)
+                        .unwrap_or(message);
                     self.failed(request, &surface, &error, classification.as_ref())
                         .await;
                 }

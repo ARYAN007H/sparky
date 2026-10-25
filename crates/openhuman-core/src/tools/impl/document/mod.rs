@@ -32,7 +32,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde_json::{json, Value};
 
-use crate::agent::artifacts::production::Production;
+use crate::artifacts::production::Production;
 use crate::security::SecurityPolicy;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
@@ -72,7 +72,7 @@ pub const TOOL_NAME: &str = "generate_document";
 pub struct DocumentTool {
     workspace_dir: PathBuf,
     /// Visible folder the generated document is written into (#5505).
-    files_dir: crate::agent::artifacts::FileRoots,
+    files_dir: crate::artifacts::FileRoots,
     /// Retained for constructor parity with [`PresentationTool`] (both are
     /// registered identically in `tools::ops`) and for future features
     /// (e.g. embedding a `File`-source image) that will need the same
@@ -88,7 +88,7 @@ impl DocumentTool {
     /// both tools register with an identical call).
     pub fn new(
         workspace_dir: PathBuf,
-        files_dir: impl Into<crate::agent::artifacts::FileRoots>,
+        files_dir: impl Into<crate::artifacts::FileRoots>,
         security: Arc<SecurityPolicy>,
     ) -> Self {
         Self {
@@ -103,7 +103,7 @@ impl DocumentTool {
     pub fn for_config(config: &crate::config::Config, security: Arc<SecurityPolicy>) -> Self {
         Self::new(
             config.workspace_dir.clone(),
-            crate::agent::artifacts::FileRoots::from_config(config),
+            crate::artifacts::FileRoots::from_config(config),
             security,
         )
     }
@@ -198,7 +198,8 @@ impl Tool for DocumentTool {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
-        self.run(args, None).await
+        self.run(args, None, &crate::core::runtime::DispatchCtx::ambient())
+            .await
     }
 
     async fn execute_with_context(
@@ -208,7 +209,12 @@ impl Tool for DocumentTool {
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
-        self.run(args, approval.chat.as_ref()).await
+        self.run(
+            args,
+            approval.chat.as_ref(),
+            &crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context),
+        )
+        .await
     }
 }
 
@@ -219,6 +225,7 @@ impl DocumentTool {
         &self,
         args: Value,
         chat: Option<&crate::security::approval::ApprovalChatContext>,
+        _ctx: &crate::core::runtime::DispatchCtx,
     ) -> anyhow::Result<ToolResult> {
         // The document wire contract is `deny_unknown_fields`, so the optional
         // `artifact_id` is read here (and stripped from the args before
@@ -276,12 +283,9 @@ impl DocumentTool {
         // Retry can re-dispatch this exact spec (#3162). Best-effort: a
         // write failure only forfeits regeneration, never aborts an
         // otherwise-successful generation.
-        if let Err(err) = crate::agent::artifacts::store::save_artifact_args(
-            &self.workspace_dir,
-            production.id(),
-            &args,
-        )
-        .await
+        if let Err(err) =
+            crate::artifacts::store::save_artifact_args(&self.workspace_dir, production.id(), &args)
+                .await
         {
             tracing::warn!(
                 target: "document",

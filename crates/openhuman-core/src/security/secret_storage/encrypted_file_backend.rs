@@ -20,7 +20,7 @@ use zeroize::Zeroizing;
 
 #[path = "encrypted_file_backend/key_source.rs"]
 pub mod key_source;
-use key_source::{env_value, master_key_from_env};
+use key_source::{env_value, master_key_from_env, read_master_key_file};
 
 /// Environment variable carrying the master key inline as `2 * KEY_LEN` hex
 /// characters (`openssl rand -hex 32`). Lets a headless `openhuman-core
@@ -160,6 +160,40 @@ pub(crate) fn storage_master_key() -> Result<[u8; KEY_LEN], String> {
     }
 }
 
+/// Whether the storage master key can be resolved without minting a new one:
+/// an operator key (env), a host key source, an already loaded key, or an
+/// existing workspace key file (a host source only when it holds a key). A layout migration that deletes the plaintext
+/// credential files only imports them when this holds, because a key minted
+/// by an offline tool would not match the one the desktop later loads.
+pub(crate) fn storage_master_key_resolvable() -> bool {
+    let env_set =
+        |name: &str| std::env::var_os(name).is_some_and(|v| !v.to_string_lossy().trim().is_empty());
+    // Cached outcomes first: a loaded key answers yes, and a denied keychain
+    // is not asked again this session.
+    if matches!(MASTER_KEY.get(), Some(Ok(Some(_)))) {
+        return true;
+    }
+    let configured = env_set(MASTER_KEY_ENV) || env_set(MASTER_KEY_FILE_ENV);
+    // A configured key or a denied keychain skips the host probe entirely.
+    let host_skipped = configured || HOST_KEY_UNAVAILABLE.get().is_some();
+    let dir = crate::security::secret_storage::store::workspace_dir_for_file_backend();
+    resolvable(
+        false,
+        configured,
+        // A host source counts only when it already holds the key (an empty
+        // one would have a key minted into it by the load), and is read last.
+        !host_skipped
+            && key_source::installed_master_key_source()
+                .is_some_and(|source| matches!(source.load(), Ok(Some(_)))),
+        dir.join("keyring/master.key").is_file(),
+    )
+}
+
+/// The pure decision behind [`storage_master_key_resolvable`].
+pub(crate) fn resolvable(loaded: bool, env: bool, host: bool, key_file: bool) -> bool {
+    loaded || env || host || key_file
+}
+
 /// Runs `init` at most once per `cell` and reports its outcome on every call.
 ///
 /// A configuration error is stored in the cell rather than leaving it empty
@@ -220,34 +254,6 @@ fn try_load_master_key() -> Result<([u8; KEY_LEN], String), MasterKeyError> {
         .map_err(|e| MasterKeyError::Configured(e.to_string()))
 }
 
-/// Reads the file named by [`MASTER_KEY_FILE_ENV`].
-///
-/// On Unix a key file must not be writable by other users. Read-only group or
-/// other permissions are supported for container secret mounts, where the
-/// runtime may add group-read access for a non-root core.
-fn read_master_key_file(path: &Path) -> Result<String, String> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let metadata = std::fs::metadata(path).map_err(|e| {
-            format!("cannot inspect master key file permissions ({MASTER_KEY_FILE_ENV}): {e}")
-        })?;
-        let mode = metadata.permissions().mode() & 0o777;
-        if key_file_mode_is_other_writable(mode) {
-            return Err(format!(
-                "master key file ({MASTER_KEY_FILE_ENV}) is writable by other users; \
-                 restrict it to a read-only secret mount"
-            ));
-        }
-    }
-    std::fs::read_to_string(path).map_err(|e| format!("cannot read master key file: {e}"))
-}
-
-#[cfg(unix)]
-fn key_file_mode_is_other_writable(mode: u32) -> bool {
-    mode & 0o002 != 0
-}
-
 /// Decodes a master key supplied as exactly `2 * KEY_LEN` hex characters.
 /// The value never appears in the error.
 fn parse_master_key_hex(hex: &str) -> Result<[u8; KEY_LEN], String> {
@@ -255,11 +261,6 @@ fn parse_master_key_hex(hex: &str) -> Result<[u8; KEY_LEN], String> {
     let got = hex.chars().count();
     if got != expected {
         return Err(format!("expected {expected} hex characters, got {got}"));
-    }
-    // `hex_decode` slices by byte; a non-ASCII value of the right character
-    // count would panic there instead of being rejected.
-    if !hex.is_ascii() {
-        return Err("value is not valid hex".to_string());
     }
     let bytes = crypto::hex_decode(hex).map_err(|_| "value is not valid hex".to_string())?;
     let mut key = [0u8; KEY_LEN];
@@ -328,6 +329,24 @@ impl EncryptedFileBackend {
             path: secrets_file(workspace_dir),
             workspace_dir: workspace_dir.to_path_buf(),
         }
+    }
+
+    /// Read one namespaced secret from this explicit profile store without
+    /// initializing global keyring state, importing legacy files, or
+    /// quarantining corrupt data. Returns an error when no read-only key is
+    /// available, so callers can report the result as unavailable rather
+    /// than treating it as a missing credential.
+    pub fn get_profile_read_only(
+        &self,
+        namespaced_key: &str,
+    ) -> Result<Option<String>, SecretStorageError> {
+        let key =
+            key_source::profile_master_key_read_only(&self.workspace_dir)?.ok_or_else(|| {
+                SecretStorageError::Backend(
+                    "profile master key unavailable for read-only secret lookup".into(),
+                )
+            })?;
+        self.get_with_key_read_only(&key, namespaced_key)
     }
 
     fn key(&self) -> Option<Zeroizing<[u8; KEY_LEN]>> {
@@ -587,6 +606,19 @@ impl EncryptedFileBackend {
             let name = name.clone();
             async move { store.get(&name).await }
         })?;
+        adapter::utf8(namespaced_key, value)
+    }
+
+    fn get_with_key_read_only(
+        &self,
+        key: &[u8; KEY_LEN],
+        namespaced_key: &str,
+    ) -> Result<Option<String>, SecretStorageError> {
+        use tinystoragedrivers::secrets::SecretStore as _;
+        let name = namespaced_key.to_string();
+        let store = self.store(key);
+        let value = crate::storage::block_on(async move { store.get(&name).await })
+            .map_err(adapter::backend_error)?;
         adapter::utf8(namespaced_key, value)
     }
 

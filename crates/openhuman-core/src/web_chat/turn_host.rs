@@ -36,16 +36,18 @@ use super::web_errors::{
     inference_budget_exceeded_user_message, is_inference_budget_exceeded_error,
 };
 use crate::agent::queued_turn::QueuedPayload;
-use crate::agent::turn_origin::AgentTurnOrigin;
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
+use crate::security::turn_origin::AgentTurnOrigin;
 use tinyagents_harness::progress::AgentProgress;
 
 #[path = "turn_host_progress.rs"]
 mod progress_helpers;
 #[cfg(test)]
 use progress_helpers::spawn_heartbeat_with_interval;
-use progress_helpers::{settle_turn_snapshot, spawn_heartbeat, tap_progress, AbortOnDrop};
+use progress_helpers::{
+    settle_turn_snapshot, spawn_heartbeat, tap_progress, AbortOnDrop, LateSubagentSink,
+};
 
 /// How long a finished turn waits for its progress tap to forward every event
 /// the turn queued before the terminal `chat_done`/`chat_error` is published.
@@ -182,15 +184,9 @@ impl WebHost {
         .await?;
 
         // Stamp the resolved agent onto the metadata so the trace exporter can
-        // attribute the run, and hold the streamed answer for a TinyMemes
-        // treatment thread, which surfaces only the remixed reply.
+        // attribute the run.
         let mut metadata = payload.metadata.clone();
         metadata.agent_id = Some(checked.fingerprint.target_agent_id.clone());
-        #[cfg(feature = "tinymemes")]
-        {
-            metadata.hold_text_stream =
-                crate::tinymemes::holds_text_stream(&config, &request.thread_id);
-        }
         let projection = ProgressProjection::new(
             &ctx,
             TurnIds {
@@ -200,7 +196,7 @@ impl WebHost {
             },
             metadata,
             config.clone(),
-            crate::agent::session_store::turn_states_for(&config.workspace_dir),
+            crate::storage::sessions::turn_states_for(&config.workspace_dir),
         )
         .await;
         self.shared.with(id, |slot| {
@@ -258,8 +254,21 @@ impl WebHost {
             output: None,
         });
         let (drained_tx, mut drained_rx) = watch::channel(false);
-        let tap = tap_progress(&ctx, progress_rx, progress, activity, drained_tx);
-        let _tap = AbortOnDrop(tap);
+        // The tap outlives the turn on purpose: a detached sub-agent may still
+        // report through its sender clone after the parent finished, and the
+        // tap ends when the last sender drops.
+        let _tap = tap_progress(
+            &ctx,
+            progress_rx,
+            progress,
+            activity,
+            drained_tx,
+            Some(LateSubagentSink {
+                client_id: payload.client_id.clone(),
+                thread_id: thread_id.to_owned(),
+                request_id: id.to_owned(),
+            }),
+        );
         let _beat = AbortOnDrop(spawn_heartbeat(&ctx, projection.clone()));
 
         let origin = AgentTurnOrigin::WebChat {
@@ -322,8 +331,6 @@ impl WebHost {
 
         // `run_single`'s future is very large; box it so the origin scope holds
         // a pointer rather than inlining it into this frame.
-        #[cfg(feature = "tinymemes")]
-        let turn_started = std::time::Instant::now();
         let turn = Box::pin(crate::agent::turn_host::AgentTurnHost::run(
             agent,
             crate::agent::turn_host::AgentTurnRequest {
@@ -357,7 +364,7 @@ impl WebHost {
                 ops::clear_budget_signal(&ctx, thread_id).await;
                 Ok(WebChatTaskResult {
                     full_response: response,
-                    citations: crate::memory::tools::take_turn_citations(&ctx, thread_id),
+                    citations: crate::web_chat::citations::take_turn_citations(&ctx, thread_id),
                     usage: agent.take_last_turn_usage_totals(),
                     workspace_dir: config.workspace_dir.clone(),
                     timing: None,
@@ -374,32 +381,9 @@ impl WebHost {
                 .await
             }
         };
-        #[cfg(feature = "tinymemes")]
-        let mut result = result;
-        #[cfg(feature = "tinymemes")]
-        let turn_elapsed = turn_started.elapsed();
 
         if let Ok(task_result) = result.as_ref() {
             speak_and_publish(&ctx, &config, request, task_result).await;
-        }
-
-        // TinyMemes: remix the final reply (slang + memes) when the flag puts
-        // this thread in the treatment arm. Runs after reply speech so TTS
-        // reads the original wording, and skips the budget-exhausted
-        // placeholder. Fails open.
-        #[cfg(feature = "tinymemes")]
-        if let Ok(task_result) = result.as_mut() {
-            crate::tinymemes::remix_task_reply(
-                &ctx,
-                &config,
-                thread_id,
-                id,
-                &request.text,
-                &mut task_result.full_response,
-                inference_budget_exceeded_user_message(),
-                turn_elapsed,
-            )
-            .await;
         }
 
         // Test hook: wedge the turn after its run, as a stuck save would.
@@ -527,22 +511,16 @@ async fn speak_and_publish(
         metadata.source.as_deref(),
     );
     if speak_reply && !task_result.full_response.trim().is_empty() {
-        let opts = crate::voice::reply_speech::ReplySpeechOptions {
-            voice_id: config
-                .channel_voice
-                .resolve_voice("web")
-                .map(str::to_string),
-            ..Default::default()
-        };
-        match crate::voice::reply_speech::synthesize_reply(
+        match crate::voice::reply_synthesis::synthesize_reply(
             config,
             &task_result.full_response,
-            &opts,
+            config.channel_voice.resolve_voice("web"),
         )
         .await
         {
             Ok(outcome) => {
                 let stored = super::voice_notes::store_synthesized_reply(
+                    ctx,
                     &config.workspace_dir,
                     &request.request_id,
                     &outcome.value.audio_base64,
@@ -575,17 +553,8 @@ async fn speak_and_publish(
             ),
         }
     }
-    if metadata.source.as_deref() == Some("ptt") {
-        if let Some(session_id) = metadata.session_id {
-            crate::voice::publish_ptt_transcript_committed(
-                thread_id.to_string(),
-                session_id,
-                task_result.full_response.chars().count(),
-                0,
-                false,
-            );
-        }
-    }
+    // Upstream removed the push-to-talk `voice::bus` transcript-committed
+    // event; the PTT session no longer needs a host-side notification here.
 }
 
 #[async_trait]

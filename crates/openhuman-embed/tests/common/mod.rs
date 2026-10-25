@@ -5,6 +5,8 @@
 
 #![allow(dead_code)]
 
+pub mod gated_provider;
+
 use openhuman_core::config::Config;
 use openhuman_core::core::runtime::{AGENT_WORKER_STACK_BYTES, MAX_BLOCKING_THREADS};
 use serde_json::json;
@@ -57,12 +59,25 @@ pub fn offline_config() -> Config {
     config
 }
 
+/// Install an isolated SQLite backend for tests that exercise atomic storage
+/// capabilities. The basic in-memory testkit intentionally advertises none.
+pub async fn install_sqlite_storage() -> tempfile::TempDir {
+    let directory = tempfile::tempdir().expect("SQLite storage directory");
+    let url = openhuman_core::storage::config::default_url(directory.path());
+    let backend = openhuman_core::storage::open(&url)
+        .await
+        .expect("SQLite test backend opens");
+    openhuman_core::storage::install(backend);
+    directory
+}
+
 /// Serve the tinyflows module (scheduler runtime, job store, schedule maths)
 /// from the test binary instead of a downloaded release. The factory goes in
 /// through the core's `register_linked` seam and the module is resolved once,
 /// here, with a config that asks for `linked`: the resolution slot is
 /// process-wide, so every later caller (a profile's own config included) sees
 /// the linked module. Only this module changes source.
+#[cfg(feature = "modules")]
 pub fn link_tinyflows(runtime: &tokio::runtime::Runtime) {
     use openhuman_core::config::schema::{ModuleOverride, ModuleSourceMode};
     openhuman_embed::modules::register_linked("tinyflows", tinyflows_module::linked_module);
@@ -94,6 +109,7 @@ pub fn runtime_without_master_key() -> tokio::runtime::Runtime {
         .max_blocking_threads(MAX_BLOCKING_THREADS)
         .build()
         .expect("tokio runtime");
+    #[cfg(feature = "modules")]
     link_tinyflows(&runtime);
     runtime
 }
@@ -246,75 +262,77 @@ pub async fn eventually<T>(what: &str, mut check: impl FnMut() -> Option<T>) -> 
     panic!("timed out waiting for {what}");
 }
 
-/// A backend transport that sends managed inference to `base_url` (a mock)
-/// and answers every control-plane call as "no backend". For suites that run
-/// turns through the core's managed-inference path, such as SaaS profiles,
-/// whose configs name no inference endpoint of their own.
-pub struct PointedTransport {
-    base_url: String,
-    client: reqwest::Client,
-}
+/// Registers a managed chat-model provider that sends inference to `base_url`
+/// (a mock). For suites that run turns through the core's managed-inference
+/// path, such as SaaS profiles, whose configs name no inference endpoint of
+/// their own. The core carries no hosted provider, so the suite supplies one
+/// through the generic chat-model registry.
+pub struct PointedInference;
 
-impl PointedTransport {
+impl PointedInference {
     pub fn install(base_url: &str) {
-        openhuman_embed::install_backend_transport(std::sync::Arc::new(Self {
-            base_url: base_url.trim_end_matches('/').to_string(),
-            client: reqwest::Client::new(),
-        }));
-    }
-}
+        use openhuman_embed::__host::inference_registry::{
+            register_chat_model, ChatModelEntry, ChatModelRequest, ProviderContext,
+            ProviderModelMetadata, PROVIDER_OPENHUMAN,
+        };
+        use tinyinference_llm::providers::openai::OpenAiModel;
 
-#[async_trait::async_trait]
-impl openhuman_embed::BackendTransport for PointedTransport {
-    async fn send_json(
-        &self,
-        req: openhuman_embed::BackendRequest<'_>,
-    ) -> Result<serde_json::Value, openhuman_embed::BackendTransportError> {
-        // Forward inference requests to the pointed mock endpoint.
-        // This uses the same HTTP client as a real transport would.
-        let url = format!("{}/{}", self.base_url, req.path.trim_start_matches('/'));
-        let resp = self
-            .client
-            .post(&url)
-            .json(&req.body)
-            .send()
-            .await
-            .map_err(|_| openhuman_embed::BackendTransportError::Unavailable)?;
-        resp.json()
-            .await
-            .map_err(|_| openhuman_embed::BackendTransportError::Unavailable)
-    }
-
-    async fn send_multipart(
-        &self,
-        _req: openhuman_embed::BackendRequest<'_>,
-        _form: reqwest::multipart::Form,
-    ) -> Result<serde_json::Value, openhuman_embed::BackendTransportError> {
-        Err(openhuman_embed::BackendTransportError::Unavailable)
-    }
-
-    fn http_client(&self, _profile: openhuman_embed::TransportProfile) -> reqwest::Client {
-        reqwest::Client::new()
-    }
-
-    fn base_url(
-        &self,
-        _configured: Option<&str>,
-        _purpose: openhuman_embed::BaseUrlPurpose,
-    ) -> String {
-        self.base_url.clone()
-    }
-
-    fn product_identity(&self) -> String {
-        "openhuman-embed-test".to_string()
-    }
-
-    fn attribution_headers(&self) -> reqwest::header::HeaderMap {
-        reqwest::header::HeaderMap::new()
-    }
-
-    fn name(&self) -> &'static str {
-        "embed-test-pointed"
+        let base_url = base_url.trim_end_matches('/').to_string();
+        let build = move |request: &ChatModelRequest<'_, ProviderContext>| {
+            let model = request
+                .model_override
+                .or(request.default_model)
+                .unwrap_or("embed-test-model")
+                .to_string();
+            // Like the hosted provider: the acting profile's own credential
+            // rides as the bearer.
+            let token = openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential(&request.context.config)
+                .map(|credential| credential.secret().to_string())
+                .map_err(tinyinference_llm::Error::Model)?;
+            let wire =
+                OpenAiModel::compatible_provider("EmbedTest", token, base_url.clone(), &model)
+                    .with_native_tool_calling(request.native_tool_calling);
+            let wire: std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>> =
+                std::sync::Arc::new(wire);
+            Ok((wire, model))
+        };
+        register_chat_model(
+            PROVIDER_OPENHUMAN,
+            ChatModelEntry {
+                build: std::sync::Arc::new(build),
+                probe: None,
+                models: Some(ProviderModelMetadata {
+                    default_model: std::sync::Arc::new(|| Some("embed-test-model".to_string())),
+                    role_for_model: std::sync::Arc::new(|_| None),
+                    is_alias: std::sync::Arc::new(|_| false),
+                    is_raw_model: std::sync::Arc::new(|model| {
+                        !model.trim().is_empty() && !model.starts_with("hint:")
+                    }),
+                    supports_vision: std::sync::Arc::new(|_| false),
+                    resolve_model: std::sync::Arc::new(|_, config, model| {
+                        model
+                            .map(str::trim)
+                            .filter(|model| !model.is_empty() && !model.starts_with("hint:"))
+                            .map(str::to_string)
+                            .or_else(|| {
+                                config
+                                    .config
+                                    .default_model
+                                    .as_deref()
+                                    .map(str::trim)
+                                    .filter(|model| {
+                                        !model.is_empty() && !model.starts_with("hint:")
+                                    })
+                                    .map(str::to_string)
+                            })
+                            .or_else(|| Some("embed-test-model".to_string()))
+                    }),
+                    context_window: std::sync::Arc::new(|_| None),
+                    default_pricing: std::sync::Arc::new(|| None),
+                    without_reasoning: std::sync::Arc::new(|request| request),
+                }),
+            },
+        );
     }
 }
 

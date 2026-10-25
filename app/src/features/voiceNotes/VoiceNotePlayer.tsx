@@ -250,7 +250,7 @@ function VoiceNotePlayerBody({
         </span>
       </div>
       {error ? (
-        <p role="alert" className="text-danger text-xs">
+        <p role="alert" className="text-coral-600 text-xs">
           {t('voiceNote.loadFailed')}
         </p>
       ) : null}

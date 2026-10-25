@@ -9,7 +9,6 @@ use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::ChannelSystemPrompt;
 use crate::config::{MultimodalConfig, MultimodalFileConfig, ReliabilityConfig};
 use crate::core::events::DomainEvent;
-use crate::inference::provider::ProviderRuntimeOptions;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -17,8 +16,8 @@ use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tinychannels_bus::module_runtime::CHANNEL_MESSAGE_TIMEOUT_SECS;
 use tinychannels_bus::ChannelMessage;
-use tinychannels_bus::CHANNEL_MESSAGE_TIMEOUT_SECS;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
 use wiremock::matchers::{method, path};
@@ -324,11 +323,24 @@ pub(crate) fn bind_test_core_context_with_provider_endpoint(
         })
         .collect();
     context.config = Some(Arc::new(config.clone()));
+    let config_for_credential = config.clone();
     let core = CoreContext::for_test(DomainSet::none(), Some(workspace)).derive_with(
         ContextOverlay::new(config, DomainSet::full(), Default::default())
             .profile("channel-handle-test"),
     );
     context.core = Some(Arc::downgrade(&core));
+    // A standing API-key credential satisfies the backend session gate that
+    // building the host agent's model checks, without a signed-in user. Store
+    // it inside the context so a storage-backed secret store (installed by the
+    // module fixture) records it under the scope the turn later reads.
+    let stored_config = config_for_credential;
+    CoreContext::sync_scope(Arc::clone(&core), || {
+        crate::security::credentials::api_key::store_api_key(
+            &stored_config,
+            "test-session-fixture-key",
+        )
+    })
+    .expect("store channel test credential");
     core
 }
 
@@ -422,7 +434,7 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         .get()
         .expect("bus initialised")
         .receiver();
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
 
     let response_text = options
         .response_text
@@ -480,13 +492,12 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         api_url: None,
         inference_url: None,
         reliability: Arc::new(ReliabilityConfig::default()),
-        provider_runtime_options: ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(harness_workspace_dir),
         // Mirror the owning TinyChannels runtime's validated floor even when
         // a test supplies an undersized value directly.
         message_timeout_secs: options
             .timeout_secs
-            .max(tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS),
+            .max(tinychannels_bus::module_runtime::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS),
         multimodal: MultimodalConfig::default(),
         multimodal_files: MultimodalFileConfig::default(),
         config: None,

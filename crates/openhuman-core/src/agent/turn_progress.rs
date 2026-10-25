@@ -294,6 +294,12 @@ pub(crate) fn iteration_start(iteration: u32, max_iterations: u32) -> ChannelOut
     )
 }
 
+/// The session began summarizing earlier conversation. The TinyChannels web
+/// projection turns this lifecycle stage into `context_compacting`.
+pub(crate) fn context_compacting(round: Option<u32>) -> ChannelOutputEvent {
+    lifecycle("context_compacting", None, round, None)
+}
+
 /// A tool call of the parent turn, as it started.
 pub(crate) fn tool_started(
     call_id: String,

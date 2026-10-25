@@ -1,103 +1,55 @@
 use super::*;
 
-use std::sync::atomic::{AtomicUsize, Ordering};
-use tokio::sync::{oneshot, Notify};
+use serde_json::json;
 
-#[test]
-fn sandbox_callback_path_is_accepted_by_tinybus() {
-    let path = super::sandbox_callback_object_path(uuid::Uuid::new_v4())
-        .expect("generated callback path is a valid TinyBus object path");
-    assert!(path
-        .as_str()
-        .starts_with("/ai/tinyhumans/openhuman/FlowSandbox/"));
-}
-
-#[cfg(feature = "modules")]
-#[tokio::test]
-async fn sandbox_callback_serves_scoped_tool_preflight() {
-    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
-    use tinybus::{broker::Broker, transport::memory::MemoryBus, Connection};
-
-    let bus = MemoryBus::new();
-    Broker::new().spawn(bus.clone());
-    let service = Connection::connect(bus.connect().await.unwrap())
-        .await
-        .unwrap();
-    let caller = Connection::connect(bus.connect().await.unwrap())
-        .await
-        .unwrap();
-    let config = Arc::new(Config::default());
-    let dispatch = DispatchCtx::new(CoreContext::for_test_with_config(
-        DomainSet::full(),
-        (*config).clone(),
-    ));
-    let path = super::sandbox_callback_object_path(uuid::Uuid::new_v4()).unwrap();
-    service
-        .serve_at(path.clone(), SandboxToolPreflight { config, dispatch })
-        .await
-        .unwrap();
-    service.request_name(SANDBOX_CALLBACK_BUS).await.unwrap();
-    let proxy = caller
-        .proxy(
-            SANDBOX_CALLBACK_BUS,
-            path.as_str(),
-            "ai.tinyhumans.tinyflows.CapsHost",
-        )
-        .unwrap();
-
-    let output: serde_json::Value = proxy
-        .call(
-            tinyflows_bus::runs::caps::TOOL_INVOKE,
-            &(
-                "unknown-tool",
-                serde_json::json!({}),
-                Option::<String>::None,
-            ),
-        )
-        .await
-        .unwrap();
-    assert_eq!(output, serde_json::json!({"preflight": "passed"}));
-}
-
-struct DropNotice {
-    drops: Arc<AtomicUsize>,
-    completed: Arc<Notify>,
-}
-
-impl Drop for DropNotice {
-    fn drop(&mut self) {
-        self.drops.fetch_add(1, Ordering::SeqCst);
-        self.completed.notify_one();
+fn required_args_contract() -> crate::integrations::composio::catalog::ToolContract {
+    crate::integrations::composio::catalog::ToolContract {
+        slug: "PREFLIGHTCAPSHOST_SEND_EMAIL".into(),
+        toolkit: "preflightcapshost".into(),
+        description: None,
+        required_args: vec!["to".into()],
+        input_schema: None,
+        output_fields: Vec::new(),
+        output_schema: None,
+        primary_array_path: None,
+        is_curated: false,
     }
 }
 
 #[tokio::test]
-async fn canceled_waiter_releases_callback_registered_after_cancellation() {
-    let drops = Arc::new(AtomicUsize::new(0));
-    let completed = Arc::new(Notify::new());
-    let (started_tx, started_rx) = oneshot::channel();
-    let (finish_tx, finish_rx) = oneshot::channel();
-    let registration_drops = drops.clone();
-    let registration_completed = completed.clone();
+async fn mock_tool_preflight_rejects_missing_required_args_without_invoking_backend() {
+    crate::integrations::composio::catalog::seed_live_catalog_cache(
+        "preflightcapshost",
+        vec![required_args_contract()],
+    );
+    let config = Config::default();
 
-    let registration = tokio::spawn(async move {
-        let _ = started_tx.send(());
-        let _ = finish_rx.await;
-        Ok::<_, tinybus::Error>(DropNotice {
-            drops: registration_drops,
-            completed: registration_completed,
-        })
-    });
-    let waiter = tokio::spawn(await_registration(registration));
+    let error = preflight_mock_tool(
+        &config,
+        "PREFLIGHTCAPSHOST_SEND_EMAIL",
+        &json!({"to": null}),
+    )
+    .await
+    .expect_err("mock calls must not accept unwired required arguments");
+    assert!(error.contains("`to`"), "{error}");
+}
 
-    started_rx.await.expect("registration started");
-    waiter.abort();
-    let _ = waiter.await;
-    assert_eq!(drops.load(Ordering::SeqCst), 0);
+#[tokio::test]
+async fn mock_tool_preflight_accepts_wired_composio_and_native_arguments() {
+    crate::integrations::composio::catalog::seed_live_catalog_cache(
+        "preflightcapshost",
+        vec![required_args_contract()],
+    );
+    let config = Config::default();
 
-    let _ = finish_tx.send(());
-    tokio::time::timeout(std::time::Duration::from_secs(1), completed.notified())
+    preflight_mock_tool(
+        &config,
+        "PREFLIGHTCAPSHOST_SEND_EMAIL",
+        &json!({"to": "person@example.com"}),
+    )
+    .await
+    .unwrap();
+    preflight_mock_tool(&config, "oh:web_search", &json!({}))
         .await
-        .expect("late registration result is dropped and releases its lease");
-    assert_eq!(drops.load(Ordering::SeqCst), 1);
+        .unwrap();
 }

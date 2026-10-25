@@ -89,7 +89,7 @@ Answers are size-capped, and an unknown or evicted handle is an error. `juice_re
 
 The model's tool catalogue is recorded with each conversation and stays frozen when that thread resumes. If the transcript contains Juice tools, OpenHuman restores their recorded names and schemas even when current settings would not create new handles. The restored tools still use current host path authorization and module policy. A disabled or unavailable module returns an explicit unavailable result for a query; OpenHuman does not substitute a local CCR store or query implementation. Optional output compaction keeps its existing fail-open behavior and returns the unmodified result when the module cannot compact it.
 
-To turn off the whole feature, set `context.compaction_enabled = false` or `OPENHUMAN_COMPACTION=0`. To keep compaction but go back to one-blob compression and `juice_retrieve`, set `tokenjuice.repl_handle_enabled = false` (`OPENHUMAN_TOKENJUICE_REPL_HANDLE_ENABLED=0`). Set `tokenjuice.repl_save_enabled = true` to also write each stored original to `<workspace>/.tokenjuice/repl/<handle>.txt` (mode 0600) so an agent can script over it. That puts raw tool output on disk, and nothing prunes it.
+To turn off the whole feature, set `context.compaction_enabled = false` or `OPENHUMAN_COMPACTION=0`. To keep compaction but go back to one-blob compression and `juice_retrieve`, set `tokenjuice.repl_handle_enabled = false` (`OPENHUMAN_TOKENJUICE_REPL_HANDLE_ENABLED=0`).
 
 ## Nothing is lost: the CCR cache
 
@@ -104,7 +104,7 @@ The agent gets the cheap compacted view by default and can zoom in on the full t
 
 ## Savings tracking
 
-An OpenHuman savings callback meters every compression (`crates/openhuman-core/src/inference/tokenjuice/savings.rs`). TokenJuice reports events and token deltas. OpenHuman applies the configured default model's input pricing, aggregates `total`, `by_model` and `by_compressor`, and saves stats to `<workspace>/state/tokenjuice_savings.json`.
+An OpenHuman savings callback meters every compression (`crates/openhuman-core/src/inference/tokenjuice/savings.rs`). TokenJuice reports events and token deltas. OpenHuman applies the configured default model's input pricing, aggregates `total`, `by_model` and `by_compressor`, and the module saves stats in its `juice.savings` storage document (an older `<workspace>/state/tokenjuice_savings.json` is imported once).
 
 Read them over RPC with `openhuman.tokenjuice_savings_stats`; clear them with `openhuman.tokenjuice_savings_reset`.
 
@@ -125,7 +125,7 @@ Each rule names a command or tool pattern and a reduction strategy: skip and kee
 Everything lives under the `[tokenjuice]` config block (`crates/openhuman-core/src/config/schema/tokenjuice.rs`) and can be changed live.
 
 - Master switches: `context.compaction_enabled` (default `true`; `OPENHUMAN_COMPACTION=0` opts out) and `router_enabled` (default `true`).
-- Handle preview: `repl_handle_enabled` (default `true`) and `repl_save_enabled` (default `false`).
+- Handle preview: `repl_handle_enabled` (default `true`).
 - Thresholds: `min_bytes_to_compress` and `ccr_min_tokens`.
 - CCR: `ccr_enabled`, `ccr_disk_enabled`, `max_cache_entries`, `max_cache_bytes` and `ccr_ttl_secs`.
 - Per kind: `search_enabled`, `code_enabled`, `html_enabled`.

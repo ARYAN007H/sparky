@@ -29,13 +29,9 @@
 
 pub mod budget_gate;
 mod bundle;
-pub mod context_composer;
+mod copy;
 pub mod definition_registry;
-pub mod delegation;
-pub mod learning_sink;
-pub mod model_resolver;
 mod operation_context;
-pub mod progress_sink;
 pub mod run_context;
 pub mod security_gate;
 pub(crate) mod steering;
@@ -46,11 +42,8 @@ pub use bundle::{
     OpenHumanHostBase, OpenHumanHostBundle, OpenHumanHostBundleFactory, OpenHumanHostBundleInputs,
     OpenHumanHostInvocationInputs,
 };
-pub use context_composer::OpenHumanContextComposer;
+pub(crate) use copy::OpenHumanCopyProvider;
 pub use definition_registry::OpenHumanDefinitionRegistry;
-pub use learning_sink::OpenHumanLearningSink;
-pub use model_resolver::OpenHumanModelResolver;
-pub use progress_sink::OpenHumanProgressSink;
 pub use run_context::{
     decide_dispatch, DispatchDecision, DispatchInputs, LastTurnUsage, OpenHumanRunContext,
     OpenHumanRunExt, SubagentUsageEntry, TurnDispatchState,

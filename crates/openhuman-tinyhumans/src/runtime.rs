@@ -8,7 +8,6 @@
 //!
 //! | Piece | Embed option |
 //! |---|---|
-//! | the SDK transport ([`SdkBackendTransport`](crate::SdkBackendTransport)) | `backend_transport` (also the process global) |
 //! | the hosted RPC proxies ([`hosted::extension`](crate::hosted::extension)) | `controller_extension` |
 //! | the Jev `tool_search` ranker (`jev` feature) | `tool_ranker` |
 //!
@@ -25,13 +24,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use openhuman_embed::seams::{
-    ControllerExtension, PostTurnHook, SecurityPolicy, ServerLauncher, ToolHook,
+    ControllerExtension, LearningSink, OpenHumanRunContext, SecurityPolicy, ServerLauncher,
+    ToolHook,
 };
 use tinytools::ToolRanker;
 
 use openhuman_embed::{
-    Access, ApiKey, ConfigSource, DomainSet, HostKind, Provider, Runtime, RuntimeConfig,
-    ServiceSet, Session, SessionStoreProvider, TokenSource, ToolGroups, Workspace,
+    Access, ApiKey, ConfigSource, CoreBootMode, DomainSet, HostKind, Provider, Runtime,
+    RuntimeConfig, ServiceSet, Session, SessionStoreProvider, TokenSource, ToolGroups, Workspace,
 };
 
 use crate::install::{wiring, InstallError, InstallOptions};
@@ -139,6 +139,10 @@ impl RuntimeBuilder {
         config_source(source: ConfigSource)
     );
     forward!(
+        /// See [`openhuman_embed::RuntimeBuilder::boot_mode`].
+        boot_mode(mode: CoreBootMode)
+    );
+    forward!(
         /// See [`openhuman_embed::RuntimeBuilder::provider`].
         provider(provider: Provider)
     );
@@ -197,11 +201,11 @@ impl RuntimeBuilder {
     );
     forward!(
         /// See [`openhuman_embed::RuntimeBuilder::post_turn_hook`].
-        post_turn_hook(hook: Arc<dyn PostTurnHook>)
+        post_turn_hook(hook: Arc<dyn LearningSink>)
     );
     forward!(
         /// See [`openhuman_embed::RuntimeBuilder::tool_hook`].
-        tool_hook(hook: Arc<dyn ToolHook>)
+        tool_hook(hook: Arc<dyn ToolHook<OpenHumanRunContext>>)
     );
     forward!(
         /// See [`openhuman_embed::RuntimeBuilder::server_launcher`].
@@ -259,15 +263,18 @@ impl RuntimeBuilder {
     }
 
     /// The embed builder with the TinyHumans connection applied: product
-    /// identity set, the SDK transport installed as the process global and
-    /// bound with `backend_transport`, the hosted proxies added as a
+    /// identity set, the shared SDK transport built, the hosted proxies added as a
     /// controller extension and the Jev ranker as the tool ranker. For entry
     /// points that take an embed builder rather than this one.
     pub fn connect(self) -> Result<openhuman_embed::RuntimeBuilder, InstallError> {
-        let wiring = wiring(&self.install)?;
+        let Self { inner, install } = self;
+        let mut wiring_result = None;
+        let inner = inner.configure_core_extensions(|extensions| {
+            wiring_result = Some(wiring(&install, extensions));
+        });
+        let wiring = wiring_result.expect("core extensions are configured synchronously")?;
         log::debug!("[tinyhumans] connecting embed builder: {wiring:?}");
-        let transport: Arc<dyn openhuman_embed::BackendTransport> = wiring.transport;
-        let mut inner = self.inner.backend_transport(transport);
+        let mut inner = inner;
         if let Some(extension) = wiring.controllers {
             inner = inner.controller_extension(extension);
         }

@@ -48,8 +48,8 @@ pub(crate) async fn configured_agent(
     };
     let agent_id = crate::web_chat::pick_target_agent_id(&config);
     config.chat_provider = Some(
-        if route.provider == crate::inference::provider::INFERENCE_BACKEND_ID {
-            crate::inference::provider::INFERENCE_BACKEND_ID.to_string()
+        if route.provider == crate::inference::provider::factory::INFERENCE_BACKEND_ID {
+            crate::inference::provider::factory::INFERENCE_BACKEND_ID.to_string()
         } else {
             format!("{}:{}", route.provider, route.model)
         },
@@ -93,7 +93,7 @@ pub(crate) fn route(ctx: &ChannelRuntimeContext, channel: &str) -> HostRoute {
         if let (Some(context), Some(config), Some(definitions)) = (
             dispatch.core().cloned(),
             ctx.config.as_ref(),
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::current(),
+            crate::agent_registry::host_definition::AgentDefinitionRegistry::current(),
         ) {
             if let Some(definition) = definitions.get("orchestrator") {
                 let mut definition = definition.clone();

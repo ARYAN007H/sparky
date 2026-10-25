@@ -99,7 +99,7 @@ impl WebEventView {
             } => {
                 view.delta.clone_from(delta);
                 view.skill_id.clone_from(skill_id);
-                view.subagent = subagent.as_ref().map(&subagent_view);
+                view.subagent = subagent.as_ref().map(subagent_view);
             }
             E::IterationStart { message, .. } | E::RunModeChanged { message, .. } => {
                 view.message.clone_from(message);
@@ -133,7 +133,7 @@ impl WebEventView {
                 view.args.clone_from(args);
                 view.tool_call_id.clone_from(tool_call_id);
                 view.tool_display_label.clone_from(tool_display_label);
-                view.subagent = subagent.as_ref().map(&subagent_view);
+                view.subagent = subagent.as_ref().map(subagent_view);
             }
             E::ApprovalRequest {
                 tool_name,
@@ -214,7 +214,7 @@ impl WebEventView {
                 view.failure.clone_from(failure);
                 view.elapsed_ms.clone_from(elapsed_ms);
                 view.tool_display_label.clone_from(tool_display_label);
-                view.subagent = subagent.as_ref().map(&subagent_view);
+                view.subagent = subagent.as_ref().map(subagent_view);
             }
             E::ToolArgsDelta {
                 delta,
@@ -253,7 +253,7 @@ impl WebEventView {
                 view.tool_name.clone_from(tool_name);
                 view.skill_id.clone_from(skill_id);
                 view.message.clone_from(message);
-                view.subagent = subagent.as_ref().map(&subagent_view);
+                view.subagent = subagent.as_ref().map(subagent_view);
             }
             E::SubagentCompleted {
                 tool_name,
@@ -283,7 +283,7 @@ impl WebEventView {
                 view.skill_id.clone_from(skill_id);
                 view.message.clone_from(message);
                 view.success.clone_from(success);
-                view.subagent = subagent.as_ref().map(&subagent_view);
+                view.subagent = subagent.as_ref().map(subagent_view);
             }
             E::ArtifactReady {
                 tool_call_id, args, ..
@@ -303,3 +303,7 @@ impl WebEventView {
         view
     }
 }
+
+#[cfg(test)]
+#[path = "event_view_tests.rs"]
+mod tests;

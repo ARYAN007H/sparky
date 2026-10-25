@@ -61,7 +61,7 @@ export function VoiceNoteComposer({ disabled, onSend, onError }: VoiceNoteCompos
   if (phase === 'recording') {
     return (
       <div data-testid="voice-note-recording" className="flex items-center gap-1.5">
-        <span className="bg-danger size-2 animate-pulse rounded-full" aria-hidden="true" />
+        <span className="bg-coral-500 size-2 animate-pulse rounded-full" aria-hidden="true" />
         <span role="status" className="text-xs tabular-nums">
           {t('voiceNote.recording')} {formatDuration(elapsedMs)}
         </span>

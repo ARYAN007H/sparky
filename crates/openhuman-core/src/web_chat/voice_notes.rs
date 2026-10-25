@@ -1,8 +1,9 @@
 //! Durable audio for in-app voice notes.
 //!
-//! A voice note is an audio file the thread row points at. The user's
-//! recording and the assistant's spoken reply are both stored under
-//! `<workspace>/voice_notes/<note_id>.<ext>`; the row only carries
+//! A voice note is an audio blob the thread row points at. The user's
+//! recording and the assistant's spoken reply are both stored in the acting
+//! scope's storage-port `BlobStore` under `voice_notes/<note_id>.<ext>`; the
+//! row only carries
 //! `{ noteId, mime }` in its metadata, so a reload (or a second window) can
 //! fetch the bytes again through `channel.web_voice_note_read`.
 //!
@@ -10,11 +11,13 @@
 //! `request_id`, which is what lets reply persistence find the audio the turn
 //! synthesized without threading it through the turn result.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tinystoragedrivers::{CollectionSpec, Precondition};
+use tinystoragedrivers_api::BlobStore;
 
 use crate::storage::{self, documents::Repo};
 
@@ -30,7 +33,11 @@ struct ReplyVisemeTimeline {
     frames: Vec<Value>,
 }
 
-fn viseme_repo(ctx: &crate::core::runtime::DispatchCtx, workspace: &Path) -> Result<Repo, String> {
+/// Backend and acting scope for this call's tenant.
+fn backend_and_scope(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace: &Path,
+) -> Result<(Arc<dyn storage::StorageBackend>, storage::Scope), String> {
     let tenant = crate::core::runtime::tenant::tenant_in(
         crate::core::runtime::is_saas(),
         ctx.resolved().as_deref(),
@@ -44,10 +51,41 @@ fn viseme_repo(ctx: &crate::core::runtime::DispatchCtx, workspace: &Path) -> Res
         crate::core::runtime::mode::is_saas(),
     )
     .map_err(|error| format!("scope voice-note storage: {error}"))?;
+    Ok((backend, scope))
+}
+
+fn viseme_repo(ctx: &crate::core::runtime::DispatchCtx, workspace: &Path) -> Result<Repo, String> {
+    let (backend, scope) = backend_and_scope(ctx, workspace)?;
     Repo::on(&backend, &scope, VISEME_DOMAIN, || {
         vec![CollectionSpec::new(VISEME_COLLECTION)]
     })
     .map_err(|error| format!("open voice-note timeline collection: {error}"))
+}
+
+/// The acting scope's blob store, where the note audio lives.
+fn blob_store(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace: &Path,
+) -> Result<Arc<dyn BlobStore>, String> {
+    let (backend, scope) = backend_and_scope(ctx, workspace)?;
+    let scoped = backend
+        .for_scope(&scope)
+        .map_err(|error| format!("open voice-note blob scope: {error}"))?;
+    Ok(Arc::clone(scoped.blobs()))
+}
+
+fn blob_key(id: &str, ext: &str) -> String {
+    format!("{DIR}/{id}.{ext}")
+}
+
+/// Runs a blob call on the storage bridge.
+fn blob_call<T, F, Fut>(blobs: &Arc<dyn BlobStore>, call: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce(Arc<dyn BlobStore>) -> Fut,
+    Fut: std::future::Future<Output = Result<T, storage::StorageError>> + Send + 'static,
+{
+    storage::block_on(call(Arc::clone(blobs))).map_err(|error| error.to_string())
 }
 
 const VISEME_DOMAIN: &str = "web_chat::voice_notes";
@@ -104,13 +142,15 @@ fn extension_for_mime(mime: &str) -> &'static str {
     }
 }
 
-fn dir(workspace: &Path) -> PathBuf {
+/// Pre-blob-store location of notes written as files; read-only fallback.
+fn legacy_dir(workspace: &Path) -> std::path::PathBuf {
     workspace.join(DIR)
 }
 
-/// Writes `bytes` as note `id`, replacing any earlier file for that id.
+/// Stores `bytes` as note `id`, replacing any earlier blob for that id.
 /// Returns the stored mime type.
 pub(crate) fn store_note(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace: &Path,
     id: &str,
     mime: &str,
@@ -126,34 +166,62 @@ pub(crate) fn store_note(
         return Err(format!("voice note exceeds {MAX_NOTE_BYTES} bytes"));
     }
     let ext = extension_for_mime(mime);
-    let root = dir(workspace);
-    std::fs::create_dir_all(&root).map_err(|e| format!("create voice_notes dir: {e}"))?;
-    for (other, _) in KNOWN.iter().filter(|(e, _)| *e != ext) {
-        let _ = std::fs::remove_file(root.join(format!("{id}.{other}")));
-    }
-    let _ = std::fs::remove_file(root.join(format!("{id}.visemes.json")));
-    std::fs::write(root.join(format!("{id}.{ext}")), bytes)
-        .map_err(|e| format!("write voice note: {e}"))?;
+    let stored_mime = KNOWN
+        .iter()
+        .find(|(e, _)| *e == ext)
+        .map(|(_, m)| *m)
+        .unwrap_or("audio/webm");
+    let blobs = blob_store(ctx, workspace)?;
+    let others: Vec<String> = KNOWN
+        .iter()
+        .filter(|(e, _)| *e != ext)
+        .map(|(e, _)| blob_key(id, e))
+        .collect();
+    let key = blob_key(id, ext);
+    let body = bytes.to_vec();
+    blob_call(&blobs, move |blobs| async move {
+        for other in others {
+            blobs.delete(&other).await?;
+        }
+        blobs.put(&key, body, Some(stored_mime)).await?;
+        Ok(())
+    })
+    .map_err(|e| format!("write voice note: {e}"))?;
     log::debug!(
         "{LOG_PREFIX} stored id={id} ext={ext} bytes={}",
         bytes.len()
     );
-    Ok(KNOWN
-        .iter()
-        .find(|(e, _)| *e == ext)
-        .map(|(_, m)| *m)
-        .unwrap_or("audio/webm"))
+    Ok(stored_mime)
 }
 
-/// Reads note `id`; `Ok(None)` when no file exists.
+/// Reads note `id`; `Ok(None)` when none is stored. Notes written as files
+/// before the blob store existed are still served.
 pub(crate) fn read_note(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace: &Path,
     id: &str,
 ) -> Result<Option<(Vec<u8>, &'static str)>, String> {
     if !is_valid_note_id(id) {
         return Err("invalid voice note id".to_string());
     }
-    let root = dir(workspace);
+    let blobs = blob_store(ctx, workspace)?;
+    let keys: Vec<(String, &'static str)> = KNOWN
+        .iter()
+        .map(|(ext, mime)| (blob_key(id, ext), *mime))
+        .collect();
+    let found = blob_call(&blobs, move |blobs| async move {
+        for (key, mime) in keys {
+            if let Some(blob) = blobs.get(&key).await? {
+                return Ok(Some((blob.bytes, mime)));
+            }
+        }
+        Ok(None)
+    })
+    .map_err(|e| format!("read voice note: {e}"))?;
+    if found.is_some() {
+        return Ok(found);
+    }
+    let root = legacy_dir(workspace);
     for (ext, mime) in KNOWN {
         let path = root.join(format!("{id}.{ext}"));
         if path.is_file() {
@@ -164,11 +232,42 @@ pub(crate) fn read_note(
     Ok(None)
 }
 
+/// Whether any audio is stored for `id` (blob store, else legacy file).
+fn note_mime(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace: &Path,
+    id: &str,
+) -> Option<&'static str> {
+    let blobs = blob_store(ctx, workspace).ok()?;
+    let keys: Vec<(String, &'static str)> = KNOWN
+        .iter()
+        .map(|(ext, mime)| (blob_key(id, ext), *mime))
+        .collect();
+    let found = blob_call(&blobs, move |blobs| async move {
+        for (key, mime) in keys {
+            if blobs.head(&key).await?.is_some() {
+                return Ok(Some(mime));
+            }
+        }
+        Ok(None)
+    })
+    .ok()
+    .flatten();
+    found.or_else(|| {
+        let root = legacy_dir(workspace);
+        KNOWN
+            .iter()
+            .find(|(ext, _)| root.join(format!("{id}.{ext}")).is_file())
+            .map(|(_, mime)| *mime)
+    })
+}
+
 /// Ensure a typed chat attachment names and carries the already stored note.
 /// The RPC upload happens before chat submission; this comparison binds the
 /// following typed part to those durable bytes instead of resending audio or
 /// treating the opaque reference as model-visible attachment text.
 pub(crate) fn validate_typed_media(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace: &Path,
     note_id: &str,
     media: &tinychannels_bus::MediaReference,
@@ -182,7 +281,7 @@ pub(crate) fn validate_typed_media(
     if media.kind != tinychannels_bus::MediaKind::Audio {
         return Err("typed voice note reference must have audio kind".into());
     }
-    let (_, stored_mime) = read_note(workspace, note_id)?
+    let (_, stored_mime) = read_note(ctx, workspace, note_id)?
         .ok_or_else(|| "typed voice note has no stored audio".to_string())?;
     if media.content_type.as_deref().is_some_and(|content_type| {
         content_type
@@ -237,45 +336,42 @@ pub(crate) fn reply_note_metadata(
     request_id: &str,
 ) -> Option<Value> {
     let id = reply_note_id(request_id);
-    let root = dir(workspace);
-    KNOWN.iter().find_map(|(ext, mime)| {
-        if !root.join(format!("{id}.{ext}")).is_file() {
-            return None;
-        }
-        let mut metadata = json!({ "noteId": id.clone(), "mime": mime });
-        let timeline = viseme_repo(ctx, workspace).ok().and_then(|repo| {
-            repo.run(|docs| {
-                let id = id.clone();
-                async move { docs.get(VISEME_COLLECTION, &id).await }
-            })
+    let mime = note_mime(ctx, workspace, &id)?;
+    let mut metadata = json!({ "noteId": id.clone(), "mime": mime });
+    let timeline = viseme_repo(ctx, workspace).ok().and_then(|repo| {
+        repo.run(|docs| {
+            let id = id.clone();
+            async move { docs.get(VISEME_COLLECTION, &id).await }
+        })
+        .ok()
+        .flatten()
+    });
+    let frames = match timeline {
+        Some(record) => serde_json::from_value::<ReplyVisemeTimeline>(record.doc)
             .ok()
-            .flatten()
-        });
-        let frames = match timeline {
-            Some(record) => serde_json::from_value::<ReplyVisemeTimeline>(record.doc)
-                .ok()
-                .filter(|record| {
-                    crate::core::runtime::tenant::tenant_in(
-                        crate::core::runtime::is_saas(),
-                        ctx.resolved().as_deref(),
-                    )
-                    .is_ok_and(|tenant| tenant == record.tenant)
-                })
-                .map(|record| record.frames),
-            None => {
-                let bytes = std::fs::read(root.join(format!("{id}.visemes.json"))).ok();
-                bytes.and_then(|bytes| serde_json::from_slice::<Vec<Value>>(&bytes).ok())
-            }
-        };
-        if let Some(frames) = frames.filter(|frames| !frames.is_empty()) {
-            metadata["visemes"] = json!(frames);
+            .filter(|record| {
+                crate::core::runtime::tenant::tenant_in(
+                    crate::core::runtime::is_saas(),
+                    ctx.resolved().as_deref(),
+                )
+                .is_ok_and(|tenant| tenant == record.tenant)
+            })
+            .map(|record| record.frames),
+        None => {
+            let bytes =
+                std::fs::read(legacy_dir(workspace).join(format!("{id}.visemes.json"))).ok();
+            bytes.and_then(|bytes| serde_json::from_slice::<Vec<Value>>(&bytes).ok())
         }
-        Some(metadata)
-    })
+    };
+    if let Some(frames) = frames.filter(|frames| !frames.is_empty()) {
+        metadata["visemes"] = json!(frames);
+    }
+    Some(metadata)
 }
 
 /// `channel.web_voice_note_store`: decode and store a recorded note.
 pub(crate) fn store_from_rpc(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace: &Path,
     note_id: &str,
     mime: &str,
@@ -285,7 +381,7 @@ pub(crate) fn store_from_rpc(
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(audio_base64.trim())
         .map_err(|e| format!("audio_base64 is not valid base64: {e}"))?;
-    let stored = store_note(workspace, note_id, mime, &bytes)?;
+    let stored = store_note(ctx, workspace, note_id, mime, &bytes)?;
     Ok(crate::core::Outcome::single_log(
         json!({ "note_id": note_id, "mime": stored }),
         "voice note stored",
@@ -294,11 +390,12 @@ pub(crate) fn store_from_rpc(
 
 /// `channel.web_voice_note_read`: the note's audio, or null audio when absent.
 pub(crate) fn read_for_rpc(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace: &Path,
     note_id: &str,
 ) -> Result<crate::core::Outcome<Value>, String> {
     use base64::Engine as _;
-    let value = match read_note(workspace, note_id)? {
+    let value = match read_note(ctx, workspace, note_id)? {
         Some((bytes, mime)) => json!({
             "note_id": note_id,
             "mime": mime,
@@ -332,6 +429,7 @@ pub(crate) fn should_speak_reply(
 /// Decodes and stores the audio a turn synthesized. `false` when the backend
 /// returned no audio (or it could not be stored); the reply then stays text.
 pub(crate) fn store_synthesized_reply(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace: &Path,
     request_id: &str,
     audio_base64: &str,
@@ -349,7 +447,7 @@ pub(crate) fn store_synthesized_reply(
         }
     };
     let id = reply_note_id(request_id);
-    match store_note(workspace, &id, audio_mime, &bytes) {
+    match store_note(ctx, workspace, &id, audio_mime, &bytes) {
         Ok(_) => true,
         Err(err) => {
             log::warn!("{LOG_PREFIX} could not store reply audio request_id={request_id}: {err}");

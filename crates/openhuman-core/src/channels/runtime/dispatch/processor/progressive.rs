@@ -266,6 +266,7 @@ pub(crate) fn delivery_succeeded(
             outcomes,
             unsupported,
             failure,
+            ..
         } => {
             outcomes.iter().all(|outcome| outcome.error.is_none())
                 && unsupported.is_empty()
@@ -308,3 +309,7 @@ pub(crate) fn output_event(progress: AgentProgress) -> Option<ChannelOutputEvent
 #[cfg(test)]
 #[path = "progressive_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "progressive_flow_tests.rs"]
+mod flow_tests;

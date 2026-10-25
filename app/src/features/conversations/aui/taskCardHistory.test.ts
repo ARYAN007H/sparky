@@ -28,7 +28,7 @@ describe('turn task attachment', () => {
             tokenBudget: null,
             createdAtMs: 1,
             updatedAtMs: 1,
-            continuationSuppressed: false,
+            timeUsedSubsecNanos: 0,
           },
         },
         true

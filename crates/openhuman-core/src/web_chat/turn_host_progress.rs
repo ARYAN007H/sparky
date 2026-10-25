@@ -39,9 +39,12 @@ pub(super) fn settle_turn_snapshot(
         tinyagents_session::turn_state::TurnLifecycle::Interrupted
     };
     let now = chrono::Utc::now().to_rfc3339();
-    if let Err(err) = crate::agent::session_store::turn_states_for(&config.workspace_dir)
-        .settle_turn(&request.thread_id, &request.request_id, lifecycle, &now)
-    {
+    if let Err(err) = crate::storage::sessions::turn_states_for(&config.workspace_dir).settle_turn(
+        &request.thread_id,
+        &request.request_id,
+        lifecycle,
+        &now,
+    ) {
         log::warn!(
             "[web-channel] failed to settle turn snapshot client={} thread={} request_id={}: {err}",
             request.payload.client_id,
@@ -54,29 +57,56 @@ pub(super) fn settle_turn_snapshot(
 /// Forward the agent's progress to the runner, folding each event into the
 /// idle record and the work tracker on the way. Signals `drained` once the
 /// parent's `TurnCompleted` was forwarded or the stream ended.
+///
+/// A detached sub-agent can outlive its parent turn and still report (a
+/// cancelled child settles its card with `subagent_failed`). Once the runner has
+/// finished with the turn it no longer reads the stream, so with a `late` sink
+/// the tap keeps running and publishes only the sub-agent events straight to
+/// the web event stream, under the turn's ids; without one it stops, as before.
 pub(super) fn tap_progress(
     ctx: &DispatchCtx,
     mut rx: mpsc::Receiver<AgentProgress>,
     progress: mpsc::Sender<TurnSignal>,
     activity: TurnActivity,
     drained: watch::Sender<bool>,
+    late: Option<LateSubagentSink>,
 ) -> tokio::task::JoinHandle<()> {
+    let publish_ctx = ctx.clone();
     ctx.spawn(async move {
         let mut work = WorkTracker::default();
+        let mut runner_gone = false;
         while let Some(event) = rx.recv().await {
+            if runner_gone {
+                if let Some(late) = late.as_ref() {
+                    late.publish(&publish_ctx, event);
+                }
+                continue;
+            }
             activity.observe(&event);
             let completed = matches!(event, AgentProgress::TurnCompleted { .. });
             if let Some(signal) = work.observe(&event) {
                 if progress.send(signal).await.is_err() {
+                    runner_gone = true;
+                    if late.is_none() {
+                        break;
+                    }
+                }
+            }
+            if !runner_gone
+                && progress
+                    .send(TurnSignal::Progress(Box::new(event.clone())))
+                    .await
+                    .is_err()
+            {
+                runner_gone = true;
+                if late.is_none() {
                     break;
                 }
             }
-            if progress
-                .send(TurnSignal::Progress(Box::new(event)))
-                .await
-                .is_err()
-            {
-                break;
+            if runner_gone {
+                if let Some(late) = late.as_ref() {
+                    late.publish(&publish_ctx, event);
+                }
             }
             if completed {
                 let _ = drained.send(true);
@@ -84,6 +114,54 @@ pub(super) fn tap_progress(
         }
         let _ = drained.send(true);
     })
+}
+
+/// Where a finished turn's late sub-agent events go: the web event stream,
+/// addressed like the turn.
+#[derive(Clone)]
+pub(super) struct LateSubagentSink {
+    pub(super) client_id: String,
+    pub(super) thread_id: String,
+    pub(super) request_id: String,
+}
+
+impl LateSubagentSink {
+    fn publish(&self, ctx: &DispatchCtx, event: AgentProgress) {
+        // Only the event that settles a sub-agent card can matter after the
+        // turn: a child aborted by `subagent_cancel` (or one that failed late)
+        // still reports its failure. Everything else is turn-scoped output
+        // the finished turn no longer renders.
+        let AgentProgress::SubagentFailed {
+            agent_id,
+            task_id,
+            error,
+            ..
+        } = event
+        else {
+            return;
+        };
+        log::debug!(
+            "[web-channel] late subagent_failed task_id={task_id} request_id={}",
+            self.request_id
+        );
+        let context = super::super::event_context(
+            self.client_id.clone(),
+            self.thread_id.clone(),
+            self.request_id.clone(),
+        );
+        super::super::event_bus_channel::publish_web_channel_event_in(
+            ctx,
+            tinychannels_bus::web::WebChannelEvent::SubagentFailed {
+                context,
+                message: Some(error),
+                tool_name: Some(agent_id),
+                skill_id: Some(task_id),
+                success: Some(false),
+                subagent: None,
+                round: None,
+            },
+        );
+    }
 }
 
 /// The `inference_heartbeat` liveness beat for the turn's projection.

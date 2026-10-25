@@ -23,7 +23,7 @@ fn imported_history_gets_the_real_prefix_and_freezes_it_after_first_turn() {
 
 async fn run_imported_history_prefix_regression() {
     let root = tempfile::tempdir().expect("workspace");
-    let locator = crate::agent::session_store::splice_fixture::memory_locator();
+    let locator = crate::storage::sessions::splice_fixture_tests::memory_locator();
     let tool = || {
         Box::new(tinyagents_harness::testkit::FakeTool::returning(
             "relay_history_probe",
@@ -42,6 +42,7 @@ async fn run_imported_history_prefix_regression() {
     let mut first = SessionHostBuilder::new()
         .with_session_history_locator(Arc::clone(&locator))
         .chat_model(first_chat_model)
+        .model_name("test-model".to_owned())
         .tools(vec![tool()])
         .prompt_builder(crate::agent::prompts::SystemPromptBuilder::verbatim(
             "You are the relay assistant. Preserve this exact system prefix.".to_owned(),
@@ -142,6 +143,7 @@ async fn run_imported_history_prefix_regression() {
     let mut second = SessionHostBuilder::new()
         .with_session_history_locator(locator)
         .chat_model(second_chat_model)
+        .model_name("test-model".to_owned())
         .tools(vec![tool()])
         .prompt_builder(crate::agent::prompts::SystemPromptBuilder::verbatim(
             "This replacement prompt must not change an existing session.".to_owned(),
@@ -191,7 +193,7 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
     use tinyagents_session::transcript::{TranscriptMessage, TranscriptMeta};
 
     let root = tempfile::tempdir().expect("workspace");
-    let locator = crate::agent::session_store::splice_fixture::memory_locator();
+    let locator = crate::storage::sessions::splice_fixture_tests::memory_locator();
     let tool = || {
         Box::new(tinyagents_harness::testkit::FakeTool::returning(
             "legacy_history_probe",
@@ -205,6 +207,7 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
     let mut host = SessionHostBuilder::new()
         .with_session_history_locator(Arc::clone(&locator))
         .chat_model(chat_model)
+        .model_name("test-model".to_owned())
         .tools(vec![tool()])
         .workspace_dir(root.path().join("workspace"))
         .action_dir(root.path().to_path_buf())
@@ -305,6 +308,7 @@ async fn legacy_history_is_loaded_only_for_an_unwritten_bound_session() {
     let mut resumed = SessionHostBuilder::new()
         .with_session_history_locator(locator.clone())
         .chat_model(second_chat_model)
+        .model_name("test-model".to_owned())
         .tools(vec![tool()])
         .workspace_dir(second_root.path().join("workspace"))
         .action_dir(second_root.path().to_path_buf())

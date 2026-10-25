@@ -126,7 +126,7 @@ impl TurnHost<QueuedPayload> for NativeHost {
             return serde_json::Value::Null;
         };
         match &trusted.origin {
-            crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+            crate::security::turn_origin::AgentTurnOrigin::ExternalChannel {
                 channel,
                 sender,
                 reply_target,
@@ -340,8 +340,8 @@ fn render_classified_native_failure(
         |config| {
             config.render_native_channel_failure(
                 fallback,
-                classification.copy_key.as_deref(),
-                classification.copy_params.as_ref(),
+                crate::web_chat::failure_details::copy_key(classification).as_deref(),
+                crate::web_chat::failure_details::copy_params(classification).as_ref(),
             )
         },
     )
@@ -423,7 +423,6 @@ impl EventSink<QueuedPayload> for NativeEvents {
                 request_id,
                 message,
                 class,
-                error,
             } => {
                 let fallback = if classification.message.is_empty() {
                     message
@@ -445,7 +444,6 @@ impl EventSink<QueuedPayload> for NativeEvents {
                     request_id,
                     message: localized,
                     class,
-                    error,
                 }
             }
             other => other,
@@ -473,16 +471,22 @@ impl FailureClassifier for NativeFailures {
             return FailureClassification {
                 class: "channel_history_unavailable".to_owned(),
                 message: "Something went wrong. Please try again.".to_owned(),
-                copy_key: Some("chat_error.inference".to_owned()),
-                copy_params: None,
+                details: Some(crate::web_chat::failure_details::encode(
+                    Some("chat_error.inference".to_owned()),
+                    None,
+                    error,
+                )),
             };
         }
         let classified = crate::web_chat::classify_inference_error(error);
         FailureClassification {
             class: classified.error_type.to_owned(),
             message: classified.message,
-            copy_key: Some(classified.copy_key.to_owned()),
-            copy_params: classified.copy_params,
+            details: Some(crate::web_chat::failure_details::encode(
+                Some(classified.copy_key.to_owned()),
+                classified.copy_params,
+                error,
+            )),
         }
     }
 }
@@ -552,7 +556,8 @@ fn channel_turn_deadline(
     web_backstop: Option<std::time::Duration>,
 ) -> std::time::Duration {
     let channel_deadline = std::time::Duration::from_secs(
-        message_timeout_secs.max(tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS),
+        message_timeout_secs
+            .max(tinychannels_bus::module_runtime::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS),
     );
     web_backstop.map_or(channel_deadline, |backstop| backstop.min(channel_deadline))
 }
@@ -590,7 +595,7 @@ pub(crate) async fn run(
     runtime.shared.begin_delivery_wait(&request_id);
     let deadline = channel_turn_deadline(
         message_timeout_secs,
-        crate::agent::session_host::turn_backstop::configured_backstop(),
+        crate::web_chat::turn_guards::backstop::configured_backstop(),
     );
     let request = TurnRequest {
         scope: ScopeKey {

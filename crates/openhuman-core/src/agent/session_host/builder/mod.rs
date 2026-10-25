@@ -7,67 +7,27 @@
 //! [`super::turn`]; accessors and run-helpers live in [`super::runtime`].
 
 #[cfg(feature = "flows")]
-pub(crate) use factory::provider_role_for_definition;
+pub(crate) use factory_resolution::provider_role_for_definition;
 
 mod builder_build;
 mod factory;
-mod host_only;
+mod factory_resolution;
+mod host_policy;
 mod host_tools;
 mod iteration_cap;
 mod profile_factory;
 mod setters;
 
-pub use host_only::HostOnlyToolPolicy;
 pub use host_tools::{HostTools, HostTurnTools, TurnContext};
 
 #[cfg(test)]
 mod builder_tests;
 
-use crate::agent::harness::host_definition::AgentDefinition;
+use crate::agent_registry::host_definition::AgentDefinition;
 use std::sync::Arc;
 use tinyagents_definition::ToolScope;
 use tinytools::ToolPolicySession;
 use tinytools::{Tool, ToolSpec};
-
-/// Drop entries with duplicate `name` fields, first occurrence wins.
-///
-/// Anthropic (and other strict providers) rejects a chat/completions
-/// request that lists two tools with the same name — OpenHuman's own
-/// backend and OpenAI silently accept duplicates, which hid the
-/// underlying collision (a sub-agent's `delegate_name` shadowing a
-/// same-named skill tool) until #1710's
-/// per-role routing started sending the same tool list to Anthropic.
-///
-/// Called from every place that materialises the visible tool spec
-/// list — initial build, post-composio refresh, scope-filter change —
-/// so the request the provider sees is always name-unique regardless
-/// of which path produced it.
-///
-/// Generic over the element type so the two carriers of a spec list share one
-/// implementation: the main agent holds `Arc<ToolSpec>` (the three spec views
-/// share their leaves), while the sub-agent assembly still materialises owned
-/// `ToolSpec`s for the public `AgentTurnRequest`.
-pub(crate) fn dedup_visible_tool_specs<S: std::borrow::Borrow<ToolSpec>>(specs: Vec<S>) -> Vec<S> {
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let mut deduped: Vec<S> = Vec::with_capacity(specs.len());
-    let mut dropped: Vec<String> = Vec::new();
-    for spec in specs {
-        let name = spec.borrow().name.clone();
-        if seen.insert(name.clone()) {
-            deduped.push(spec);
-        } else {
-            dropped.push(name);
-        }
-    }
-    if !dropped.is_empty() {
-        log::warn!(
-            "[agent] dropped {} duplicate tool spec(s) before sending to provider: {:?}",
-            dropped.len(),
-            dropped
-        );
-    }
-    deduped
-}
 
 /// Drop every synthesised delegation tool whose name a durable tool already
 /// owns.
@@ -143,24 +103,24 @@ pub(super) fn visible_tool_specs_for_policy(
             // below already does the real per-tool narrowing via `is_callable`
             // (and drops the spec entirely when nothing survives), so this
             // filter only needs to gate *other* tools on the static ceiling.
-            spec.name == tinyagents_harness::tool::packs::USE_SKILL
+            spec.name == tinyagents_harness_tools::skills::USE_SKILL
                 || tool_policy.is_allowed(&spec.name)
         })
         .cloned()
         .filter_map(|mut spec| {
-            if spec.name == "spawn_async_subagent" {
+            if spec.name == "spawn_subagent" {
                 // Same narrowing for the spawn enum: advertise only the ids
                 // this agent's `[subagents]` allowlist lets `execute` dispatch.
                 let allowed = allowed_subagent_ids_for(&tool_policy.profile.agent_id);
                 if !allowed.is_empty() {
-                    crate::agent::orchestration::tools::scope_spawn_async_subagent_spec(
+                    crate::agent::orchestration::tools::scope_spawn_subagent_spec(
                         Arc::make_mut(&mut spec),
                         &allowed,
                     );
                 }
                 return Some(spec);
             }
-            if spec.name == tinyagents_harness::tool::packs::USE_SKILL {
+            if spec.name == tinyagents_harness_tools::skills::USE_SKILL {
                 // `false` means no pack has a callable tool: an empty index and
                 // an empty enum are not a tool, so drop it rather than ship one.
                 // `Arc::make_mut`, not `&mut spec`: the three spec views share
@@ -169,7 +129,7 @@ pub(super) fn visible_tool_specs_for_policy(
                 // `durable_tool_specs` is meant to stay the unscoped truth.
                 // This copies exactly the one spec being rewritten and leaves
                 // the other ~48 visible schemas shared.
-                return tinyagents_harness::tool::packs::scope_use_skill_spec(
+                return tinyagents_harness_tools::skills::scope_use_skill_spec(
                     &crate::tools::toolpacks::CATALOG,
                     Arc::make_mut(&mut spec),
                     &is_callable,
@@ -208,7 +168,7 @@ pub(super) fn ensure_recovery_tool_visible(
     // recovery tool has nothing to recover for one — there are no tool outputs
     // to truncate. Adding it would turn "no tools" into "one tool" and put a
     // schema back on a turn whose whole point is that it stays flat.
-    if !crate::agent::harness::host_definition::is_empty_tool_scope(visible) {
+    if !crate::agent_registry::host_definition::is_empty_tool_scope(visible) {
         for name in crate::inference::tokenjuice::RECOVERY_TOOL_VISIBLE {
             visible.insert((*name).to_string());
         }
@@ -245,7 +205,7 @@ pub(super) fn ensure_repl_tools_visible(
     if !handle_mode_active {
         return;
     }
-    if !crate::agent::harness::host_definition::is_empty_tool_scope(visible) {
+    if !crate::agent_registry::host_definition::is_empty_tool_scope(visible) {
         for name in tinyjuice_bus::tools::REPL_TOOLS {
             visible.insert((*name).to_string());
         }
@@ -272,7 +232,7 @@ pub(super) fn should_synthesize_delegation_tools(def: &AgentDefinition) -> bool 
 /// the name extends at an `_` boundary. Empty when the registry is not up or
 /// the id resolves to nothing, which leaves the schema untouched.
 fn allowed_subagent_ids_for(agent_id: &str) -> Vec<String> {
-    let Some(registry) = crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
+    let Some(registry) = crate::agent_registry::host_definition::AgentDefinitionRegistry::current()
     else {
         return Vec::new();
     };

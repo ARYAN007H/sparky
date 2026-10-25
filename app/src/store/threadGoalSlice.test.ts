@@ -14,7 +14,7 @@ const goal = {
   tokenBudget: 1000,
   createdAtMs: 1,
   updatedAtMs: 1,
-  continuationSuppressed: false,
+  timeUsedSubsecNanos: 0,
 };
 
 describe('threadGoalSlice', () => {

@@ -1,45 +1,24 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use tinyagents_harness::tool::ToolSnapshot;
 use tinyagents_runtime::{
-    DriverFailure, DriverOutcome, DriverRequest, PrefixSnapshot, ResumeMode, SessionDriver,
-    SessionTerminal, SessionTurnRequest, ToolSnapshot, TranscriptCodec, TranscriptTurnOptions,
+    DriverFailure, DriverOutcome, DriverRequest, PrefixSnapshot, ResumeMode, SessionBuilder,
+    SessionDriver, SessionTerminal, SessionTurnRequest, TranscriptCodec, TranscriptTurnOptions,
     TurnOptions,
 };
 use tinyagents_session::port::{InMemorySessionStores, SessionStoreProvider};
 use tinyagents_session::transcript::TranscriptMeta;
 use tinyinference_llm::message::Message;
 
-use super::announcement_notes::{
+use super::runtime_session::{account_committed_turn_against_goal, holistic_last_turn_usage};
+use super::{OpenHumanSessionHooks, OpenHumanTranscriptCodec};
+use crate::agent::tinyagents::host::OpenHumanRunContext;
+use crate::integrations::announcement_notes::{
     integration_announcement_note, mcp_announcement_note, skill_announcement_note,
 };
-use super::runtime_session::tool_surface::reconcile_synthesized_visibility;
-use super::runtime_session::{
-    account_committed_turn_against_goal, begin_turn_resume, holistic_last_turn_usage,
-    OpenHumanSessionState,
-};
-use super::{OpenHumanSessionFactory, OpenHumanSessionHooks, OpenHumanTranscriptCodec};
-use crate::agent::tinyagents::host::OpenHumanRunContext;
 
 struct RecordingDriver(Arc<Mutex<Vec<OpenHumanRunContext>>>);
-
-#[test]
-fn transcript_suppression_is_applied_before_resume() {
-    let mut state = OpenHumanSessionState::default();
-    state.pending_turn_overrides = super::TurnOverrides {
-        suppress_transcript_autoload: true,
-        suppress_tools: true,
-        ..Default::default()
-    };
-    let mut resume = ResumeMode::LatestForAgent;
-
-    begin_turn_resume(&mut state, &mut resume);
-
-    assert_eq!(resume, ResumeMode::Never);
-    assert!(state.pending_turn_overrides == super::TurnOverrides::default());
-    assert!(state.active_turn_overrides.suppress_transcript_autoload);
-    assert!(state.active_turn_overrides.suppress_tools);
-}
 
 #[async_trait]
 impl SessionDriver<OpenHumanRunContext> for RecordingDriver {
@@ -59,6 +38,7 @@ impl SessionDriver<OpenHumanRunContext> for RecordingDriver {
             partial: None,
             interrupted: false,
             outcome: None,
+            tool_outcomes: Vec::new(),
         })
     }
 }
@@ -214,20 +194,18 @@ fn last_turn_usage_reports_the_same_holistic_totals_as_transcript_billing() {
         last_call_output_tokens: 2,
         ..Default::default()
     };
-    sidecar
-        .subagents
-        .push(crate::agent::tinyagents::host::SubagentUsageEntry {
-            task_id: "child-ui".into(),
-            agent_id: "researcher".into(),
-            usage: tinyagents_harness::progress::SubagentUsage {
-                input_tokens: 5,
-                output_tokens: 2,
-                cached_input_tokens: 1,
-                charged_amount_usd: 0.001,
-                cost_source: tinyagents_harness::cost::CostSource::Charged,
-            },
-        });
-
+    let child = crate::agent::tinyagents::host::SubagentUsageEntry {
+        task_id: "child-ui".into(),
+        agent_id: "researcher".into(),
+        usage: crate::progress::SubagentUsage {
+            input_tokens: 5,
+            output_tokens: 2,
+            cached_input_tokens: 1,
+            charged_amount_usd: 0.001,
+            cost_source: tinyagents_harness::cost::CostSource::Charged,
+        },
+    };
+    sidecar.subagents.push(child.clone());
     let usage = holistic_last_turn_usage(&sidecar);
     assert_eq!(usage.input_tokens, 18);
     assert_eq!(usage.output_tokens, 10);
@@ -242,7 +220,7 @@ fn last_turn_usage_reports_the_same_holistic_totals_as_transcript_billing() {
 
 #[test]
 fn explicit_hidden_delegate_stays_hidden_across_dynamic_refreshes() {
-    let mut visible = ["read_file".to_string()]
+    let visible = ["read_file".to_string()]
         .into_iter()
         .collect::<std::collections::HashSet<_>>();
     let prior = [
@@ -258,25 +236,29 @@ fn explicit_hidden_delegate_stays_hidden_across_dynamic_refreshes() {
     .into_iter()
     .collect::<std::collections::HashSet<_>>();
 
-    reconcile_synthesized_visibility(&mut visible, &prior, &refreshed, false);
+    let mut managed = tinyagents_runtime::ManagedToolNames {
+        visible,
+        ..Default::default()
+    };
+    managed.refresh_synthesized(&prior, &refreshed, false);
 
     assert!(
-        !visible.contains("delegate_research"),
+        !managed.visible.contains("delegate_research"),
         "an explicitly hidden existing delegate remains hidden after refresh"
     );
     assert!(
-        !visible.contains("delegate_drive"),
+        !managed.visible.contains("delegate_drive"),
         "a new connection cannot bypass an explicit visibility restriction"
     );
     assert!(
-        !visible.contains("delegate_calendar"),
+        !managed.visible.contains("delegate_calendar"),
         "a revoked connection leaves the surface"
     );
 }
 
 #[test]
 fn wildcard_delegate_visibility_admits_new_connections_and_removes_revoked_ones() {
-    let mut visible = ["read_file".to_string(), "delegate_calendar".to_string()]
+    let visible = ["read_file".to_string(), "delegate_calendar".to_string()]
         .into_iter()
         .collect::<std::collections::HashSet<_>>();
     let prior = ["delegate_calendar".to_string()]
@@ -286,33 +268,48 @@ fn wildcard_delegate_visibility_admits_new_connections_and_removes_revoked_ones(
         .into_iter()
         .collect::<std::collections::HashSet<_>>();
 
-    reconcile_synthesized_visibility(&mut visible, &prior, &refreshed, true);
+    let mut managed = tinyagents_runtime::ManagedToolNames {
+        visible,
+        ..Default::default()
+    };
+    managed.refresh_synthesized(&prior, &refreshed, true);
 
-    assert!(visible.contains("delegate_drive"));
-    assert!(!visible.contains("delegate_calendar"));
-    assert!(visible.contains("read_file"));
+    assert!(managed.visible.contains("delegate_drive"));
+    assert!(!managed.visible.contains("delegate_calendar"));
+    assert!(managed.visible.contains("read_file"));
 }
 
 #[tokio::test]
 async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
     let workspace = tempfile::tempdir().unwrap();
-    crate::agent::goals::store::set(
-        workspace.path(),
-        "receipt-goal",
-        "finish migration",
-        Some(20),
-    )
-    .await
-    .unwrap();
-    let mut sidecar = crate::agent::tinyagents::host::run_context::SessionTurnSidecar {
-        input_tokens: 9,
-        output_tokens: 4,
-        duration: Some(std::time::Duration::from_secs(2)),
-        ..Default::default()
-    };
-    sidecar
-        .subagents
-        .push(crate::agent::tinyagents::host::SubagentUsageEntry {
+    let core = crate::core::runtime::CoreContext::for_test(
+        crate::core::runtime::DomainSet::full(),
+        Some(workspace.path().to_path_buf()),
+    );
+    crate::core::runtime::CoreContext::scope(core, async {
+        let goal_store = crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv;
+        tinyagents_harness_tools::goals::store::set(
+            &goal_store,
+            "receipt-goal",
+            "finish migration",
+            Some(20),
+        )
+        .await
+        .unwrap();
+        assert!(
+            tinyagents_harness_tools::goals::store::get(&goal_store, "receipt-goal")
+                .await
+                .unwrap()
+                .is_some(),
+            "the scoped goal store must contain the fixture before accounting"
+        );
+        let mut sidecar = crate::agent::tinyagents::host::run_context::SessionTurnSidecar {
+            input_tokens: 9,
+            output_tokens: 4,
+            duration: Some(std::time::Duration::from_secs(2)),
+            ..Default::default()
+        };
+        let child = crate::agent::tinyagents::host::SubagentUsageEntry {
             task_id: "child-goal".into(),
             agent_id: "researcher".into(),
             usage: tinyagents_harness::progress::SubagentUsage {
@@ -320,23 +317,31 @@ async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
                 output_tokens: 3,
                 ..Default::default()
             },
-        });
+        };
+        sidecar.subagents.push(child);
+        account_committed_turn_against_goal(
+            workspace.path(),
+            &crate::core::runtime::DispatchCtx::ambient(),
+            Some("receipt-goal"),
+            &sidecar,
+        )
+        .await;
 
-    account_committed_turn_against_goal(workspace.path(), Some("receipt-goal"), &sidecar).await;
-
-    let goal = crate::agent::goals::store::get(workspace.path(), "receipt-goal")
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(
-        goal.tokens_used, 21,
-        "receipt accounts direct + child usage"
-    );
-    assert_eq!(
-        goal.status,
-        tinyagents_graph::goals::ThreadGoalStatus::BudgetLimited,
-        "receipt-backed accounting advances continuation/budget state"
-    );
+        let goal = tinyagents_harness_tools::goals::store::get(&goal_store, "receipt-goal")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            goal.tokens_used, 21,
+            "receipt accounts direct + child usage"
+        );
+        assert_eq!(
+            goal.status,
+            tinyagents_harness_tools::goals::ThreadGoalStatus::BudgetLimited,
+            "receipt-backed accounting advances continuation/budget state"
+        );
+    })
+    .await;
 }
 
 fn meta() -> TranscriptMeta {
@@ -401,16 +406,14 @@ async fn runtime_adapter_passes_host_context_commits_before_finalize_and_emits_o
         .transcripts;
     let context = OpenHumanRunContext::new();
     let cancellation = context.cancellation.clone();
-    let mut session = OpenHumanSessionFactory::build(
-        Arc::new(RecordingDriver(Arc::clone(&seen_context))),
-        hooks,
-        PrefixSnapshot::default(),
-        ToolSnapshot::default(),
-        Arc::clone(&locator),
-        "adapter-test",
-        meta(),
-    )
-    .unwrap();
+    let mut session = SessionBuilder::new(Arc::new(RecordingDriver(Arc::clone(&seen_context))))
+        .codec(Arc::new(OpenHumanTranscriptCodec))
+        .hooks(hooks)
+        .prefix(PrefixSnapshot::default())
+        .tool_snapshot(ToolSnapshot::default())
+        .transcript(Arc::clone(&locator), "adapter-test", meta())
+        .build()
+        .unwrap();
 
     session
         .turn(
@@ -490,6 +493,7 @@ fn a_subagent_thread_binding_claims_no_session_identity() {
         ..crate::config::Config::default()
     };
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
 
     let ctx = crate::core::runtime::DispatchCtx::ambient();
     let mut root =
@@ -517,231 +521,5 @@ fn a_subagent_thread_binding_claims_no_session_identity() {
 /// The resume hook and builder must name the same transcript locator instance.
 /// A distinct locator for the same directory lets a new thread commit, then
 /// rejects a cold resumed thread before inference with InvalidSessionState (#6608).
-#[test]
-fn a_cold_resumed_thread_can_send_again() {
-    std::thread::Builder::new()
-        .stack_size(crate::core::runtime::AGENT_WORKER_STACK_BYTES)
-        .spawn(|| {
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .expect("test runtime")
-                .block_on(cold_resumed_thread_can_send_again());
-        })
-        .expect("test thread")
-        .join()
-        .expect("test thread panicked");
-}
-
-async fn cold_resumed_thread_can_send_again() {
-    let root = tempfile::tempdir().expect("tempdir");
-    let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
-        Arc::new(tinyagents_harness::testkit::ScriptedModel::new(vec![
-            tinyinference_llm::model::ModelResponse::assistant("first reply"),
-            tinyinference_llm::model::ModelResponse::assistant("second reply"),
-        ]));
-    let new_host = || {
-        crate::agent::SessionHostBuilder::new()
-            .chat_model(model.clone())
-            .tools(Vec::new())
-            .workspace_dir(root.path().join("workspace"))
-            .action_dir(root.path().to_path_buf())
-            .tool_dispatcher(Box::new(tinytools_agent::dialect::XmlDialect))
-            .build()
-            .expect("session build")
-    };
-    let mut host = new_host();
-    host.set_thread_id(Some("thread-resume-regression"));
-
-    assert_eq!(host.turn("first message").await.unwrap(), "first reply");
-    drop(host);
-    let mut host = new_host();
-    host.set_thread_id(Some("thread-resume-regression"));
-    assert_eq!(host.turn("second message").await.unwrap(), "second reply");
-}
-
-/// The PRODUCTION turn path must wire an artifact store, rooted outside the
-/// project the agent works in (#6408).
-///
-/// Two assertions, and both were dead code before this PR. The existing artifact
-/// tests construct `TurnContextMiddleware` with `artifact_store: Some(..)`
-/// themselves, so they prove the offload code works while saying nothing about
-/// whether production ever reaches it — and it did not: the production
-/// constructor hard-coded `None`, which is how a whole feature shipped dead.
-///
-/// The root matters as much as the wiring, and it is the workspace's
-/// `artifacts/tool-results`, never a directory the agent works in. Rooted at
-/// `action_dir` (or a descriptor's root) every oversized output was a stray file
-/// in the user's project, swept into its diff. The pointer is absolute, so it
-/// no longer has to match whichever root `file_read` resolves relative paths
-/// against (#6483). This drives a real host with a descriptor whose root is not
-/// `action_dir`, and pins that the store followed neither.
-#[tokio::test]
-async fn production_turn_path_wires_an_artifact_store_outside_the_project() {
-    let workspace = tempfile::tempdir().expect("workspace");
-    let action_dir = tempfile::tempdir().expect("tempdir");
-    let turn_root = tempfile::tempdir().expect("turn root");
-    assert_ne!(
-        action_dir.path(),
-        turn_root.path(),
-        "the two roots must differ or this test cannot tell them apart"
-    );
-
-    let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
-        Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
-    let mut host = crate::agent::SessionHostBuilder::new()
-        .chat_model(model)
-        .tools(Vec::new())
-        .workspace_dir(workspace.path().to_path_buf())
-        .action_dir(action_dir.path().to_path_buf())
-        .tool_dispatcher(Box::new(tinytools_agent::dialect::XmlDialect))
-        .workspace_descriptor(Some(
-            tinytools::WorkspaceDescriptor::new(turn_root.path().to_path_buf())
-                .with_policy_id("turn-workspace"),
-        ))
-        .build()
-        .expect("session build");
-
-    host.ensure_runtime_session()
-        .expect("ensure runtime session");
-
-    let state = host
-        .runtime_state
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let middleware = state
-        .context_middleware
-        .as_ref()
-        .expect("the turn path must retain its context middleware");
-    let store = middleware.artifact_store.as_ref().expect(
-        "the production turn path must wire an artifact store, or oversized \
-         tool results are truncated with their tail discarded (#6408)",
-    );
-    assert_eq!(
-        store.materialize_root(),
-        crate::security::policy::tool_result_artifacts_dir(workspace.path()),
-        "the store must live under the workspace, not in the project the agent edits"
-    );
-    assert!(!store.materialize_root().starts_with(action_dir.path()));
-    assert!(!store.materialize_root().starts_with(turn_root.path()));
-}
-
-/// Without a descriptor the answer is the same: the workspace, not
-/// `action_dir`. The mirror of the test above, so neither branch can regress
-/// back into the project.
-#[tokio::test]
-async fn artifact_store_stays_in_the_workspace_without_a_descriptor() {
-    let workspace = tempfile::tempdir().expect("workspace");
-    let action_dir = tempfile::tempdir().expect("tempdir");
-    let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
-        Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
-    let mut host = crate::agent::SessionHostBuilder::new()
-        .chat_model(model)
-        .tools(Vec::new())
-        .workspace_dir(workspace.path().to_path_buf())
-        .action_dir(action_dir.path().to_path_buf())
-        .tool_dispatcher(Box::new(tinytools_agent::dialect::XmlDialect))
-        .build()
-        .expect("session build");
-
-    host.ensure_runtime_session()
-        .expect("ensure runtime session");
-
-    let state = host
-        .runtime_state
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let store = state
-        .context_middleware
-        .as_ref()
-        .expect("context middleware")
-        .artifact_store
-        .as_ref()
-        .expect("artifact store");
-    assert_eq!(
-        store.materialize_root(),
-        crate::security::policy::tool_result_artifacts_dir(workspace.path())
-    );
-}
-
-/// The reply-language instruction reaches the MODEL, on the user message next
-/// to the clock line, and clearing it removes it from the next turn. Before
-/// this, the web channel computed the directive, logged "injecting", and
-/// dropped it: no request ever carried it.
-#[test]
-fn reply_language_directive_rides_each_user_message_until_cleared() {
-    std::thread::Builder::new()
-        .stack_size(crate::core::runtime::AGENT_WORKER_STACK_BYTES)
-        .spawn(|| {
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .expect("test runtime")
-                .block_on(reply_language_directive_rides_each_user_message_until_cleared_body());
-        })
-        .expect("test thread")
-        .join()
-        .expect("test thread panicked");
-}
-
-async fn reply_language_directive_rides_each_user_message_until_cleared_body() {
-    const DIRECTIVE: &str = "User language: respond in Spanish (test directive).";
-    let root = tempfile::tempdir().expect("tempdir");
-    let model = Arc::new(tinyagents_harness::testkit::ScriptedModel::new(vec![
-        tinyinference_llm::model::ModelResponse::assistant("hola"),
-        tinyinference_llm::model::ModelResponse::assistant("hello"),
-    ]));
-    let mut host = crate::agent::SessionHostBuilder::new()
-        .chat_model(model.clone() as Arc<dyn tinyinference_llm::model::ChatModel<()>>)
-        .tools(Vec::new())
-        .workspace_dir(root.path().join("workspace"))
-        .action_dir(root.path().to_path_buf())
-        .tool_dispatcher(Box::new(tinytools_agent::dialect::XmlDialect))
-        .build()
-        .expect("session build");
-    host.set_thread_id(Some("thread-reply-language"));
-    let last_user_text = |request: &tinyinference_llm::model::ModelRequest| {
-        request
-            .messages
-            .iter()
-            .rev()
-            .find(|m| matches!(m, Message::User(_)))
-            .map(|m| m.text())
-            .expect("a user message reached the model")
-    };
-
-    host.set_reply_language_directive(Some(DIRECTIVE.to_string()));
-    host.set_time_zone(Some("Pacific/Chatham".to_string()));
-    assert_eq!(host.turn("¿qué tal?").await.unwrap(), "hola");
-    host.set_reply_language_directive(None);
-    assert_eq!(host.turn("and now?").await.unwrap(), "hello");
-
-    let requests = model.requests();
-    assert_eq!(requests.len(), 2, "one model call per turn");
-    let first = last_user_text(&requests[0]);
-    assert!(
-        first.contains("Current Date & Time:"),
-        "fixture: the clock line is there: {first}"
-    );
-    assert!(
-        first.contains(DIRECTIVE),
-        "the directive must reach the model: {first}"
-    );
-    assert!(
-        first.contains(" Pacific/Chatham ("),
-        "the clock reads in the user's zone: {first}"
-    );
-    assert!(
-        first.find(DIRECTIVE) < first.find("¿qué tal?"),
-        "the directive leads the user's own words: {first}"
-    );
-    let second = last_user_text(&requests[1]);
-    assert!(
-        second.contains("and now?"),
-        "fixture: the second turn's text: {second}"
-    );
-    assert!(
-        !second.contains(DIRECTIVE),
-        "a cleared directive is gone next turn: {second}"
-    );
-}
+#[path = "runtime_adapter_continuation_tests.rs"]
+mod continuation_tests;

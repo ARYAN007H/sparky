@@ -18,7 +18,7 @@
 //! agent rather than the process default. A miss changes nothing: the driver
 //! falls back to the registries exactly as before.
 //!
-//! Like the session store ([`crate::agent::session_store`]) the slot is
+//! Like the session store ([`crate::storage::sessions`]) the slot is
 //! process-wide, because OpenHuman runs one runtime per process. The
 //! installer keeps the `Arc` it installed and removes it with [`clear_if`],
 //! which never removes a replacement someone else installed later.
@@ -30,8 +30,8 @@
 use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, LazyLock, PoisonError, RwLock};
 
-use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::{HostTools, OpenHumanSessionHost};
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::config::Config;
 use crate::core::runtime::CoreContext;
 
@@ -49,7 +49,10 @@ pub struct HostAgent {
     /// The context every read during the agent's turn must see.
     pub context: Arc<CoreContext>,
     /// Agent-owned callbacks inherited by core-scheduled turns.
-    pub hooks: crate::agent::hooks::HookScope,
+    pub hooks: tinyagents_hooks::scope::HookScope<
+        crate::agent::tinyagents::host::OpenHumanRunContext,
+        tinyagents_harness::cost::TurnCost,
+    >,
 }
 
 impl HostAgent {
@@ -93,9 +96,9 @@ impl HostAgent {
         channel: &str,
         message: &str,
         message_input: Option<tinyinference_llm::message::Message>,
-        origin: crate::agent::turn_origin::AgentTurnOrigin,
+        origin: crate::security::turn_origin::AgentTurnOrigin,
         approval: crate::security::approval::ApprovalTurnContext,
-        progress: Option<tokio::sync::mpsc::Sender<tinyagents_harness::progress::AgentProgress>>,
+        progress: Option<tokio::sync::mpsc::Sender<crate::progress::AgentProgress>>,
         run_queue: Option<
             std::sync::Arc<
                 tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>,
@@ -147,7 +150,7 @@ impl HostAgent {
                     core: Some(Arc::downgrade(&self.context)),
                     approval,
                     memory_identity: Some(
-                        crate::memory::scope::MemoryIdentity::root().child(&agent_id),
+                        tinymemory_tools::layout::identity::Identity::root().child(&agent_id),
                     ),
                     ..Default::default()
                 },

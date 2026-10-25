@@ -223,16 +223,20 @@ fn receipt_matches_scope(
     channel: Option<&tinychannels_bus::ChannelRef>,
     conversation: Option<&tinychannels_bus::ConversationRef>,
 ) -> bool {
-    receipt
-        .channel
+    receipt.channel.as_ref().is_some_and(|receipt_channel| {
+        // Provider adapters stamp receipts with the provider id only; a
+        // receipt that names an account must name the scoped one.
+        channel.is_some_and(|channel| {
+            receipt_channel.id == channel.id
+                && (receipt_channel.account_id.is_none()
+                    || receipt_channel.account_id == channel.account_id)
+        })
+    }) && receipt
+        .conversation
         .as_ref()
-        .is_some_and(|receipt_channel| channel.is_some_and(|channel| receipt_channel == channel))
-        && receipt
-            .conversation
-            .as_ref()
-            .is_some_and(|receipt_conversation| {
-                conversation.is_some_and(|conversation| receipt_conversation == conversation)
-            })
+        .is_some_and(|receipt_conversation| {
+            conversation.is_some_and(|conversation| receipt_conversation == conversation)
+        })
 }
 
 fn receipt_contains_message(receipt: &tinychannels_bus::channel::MessageReceipt, id: &str) -> bool {

@@ -20,7 +20,6 @@ use tinychannels_bus::web::{
 use super::progress_ledger::{for_turn, Ledger};
 use super::progress_map as map;
 use super::surface::{Surface, TurnIds};
-use crate::agent::progress_tracing::SpanCollector;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use crate::threads::turn_state::mirror::ObserveProgress;
@@ -71,7 +70,6 @@ pub(crate) struct ProgressProjection {
     metadata: ChatRequestMetadata,
     started: Instant,
     round: u32,
-    parent_max_iterations: u32,
     /// The parent's streamed narration for the current round, flushed as an
     /// interim bubble when a tool call closes the round.
     pending_narration: String,
@@ -79,7 +77,6 @@ pub(crate) struct ProgressProjection {
     cost_throttle: TurnCostThrottle,
     ledger: Ledger,
     turn_state: Option<TurnStateMirror>,
-    span_collector: Option<SpanCollector>,
     journal_trace_ctx: Option<tinyagents_harness::observability::trace_export::TraceContext>,
     timing_snapshot: Option<TurnTimingSnapshot>,
     /// Set once `TurnStarted` arrives and cleared at `TurnCompleted`: the
@@ -105,14 +102,13 @@ impl ProgressProjection {
             metadata.session_id,
             metadata.hold_text_stream,
         );
-        let (span_collector, journal_trace_ctx) = trace::span_collector(
+        let journal_trace_ctx = trace::trace_context(
             &config,
             &metadata,
             &ids.client_id,
             &ids.thread_id,
             &ids.request_id,
-        )
-        .unzip();
+        );
         let ledger = for_turn(
             &config.workspace_dir,
             &ids.client_id,
@@ -132,12 +128,10 @@ impl ProgressProjection {
             metadata,
             started: Instant::now(),
             round: 0,
-            parent_max_iterations: 0,
             pending_narration: String::new(),
             timing: TurnTimingState::default(),
             cost_throttle: TurnCostThrottle::default(),
             ledger,
-            span_collector,
             journal_trace_ctx,
             timing_snapshot: None,
             turn_active: false,
@@ -191,9 +185,6 @@ impl ProgressProjection {
         if let Some(mirror) = self.turn_state.as_mut() {
             mirror.observe(&event);
         }
-        if let Some(collector) = self.span_collector.as_mut() {
-            collector.record(&event, unix_epoch_ms());
-        }
         if let AgentProgress::ToolCallStarted { iteration, .. } = &event {
             if self.timing.tool_call(self.elapsed_ms()) {
                 log::info!(
@@ -215,7 +206,6 @@ impl ProgressProjection {
                 max_iterations,
             } => {
                 self.round = iteration;
-                self.parent_max_iterations = max_iterations;
                 self.surface
                     .output(map::iteration_start(iteration, max_iterations))
                     .await;
@@ -340,6 +330,10 @@ impl ProgressProjection {
                     self.ids.request_id
                 );
             }
+            AgentProgress::ContextCompacting => {
+                let round = (self.round > 0).then_some(self.round);
+                self.surface.output(map::context_compacting(round)).await;
+            }
             other => self.on_subagent_event(other, ledger_context).await,
         }
     }
@@ -397,35 +391,16 @@ impl ProgressProjection {
             mirror.finish();
         }
         self.ledger.finish().await;
-        if let Some(mut collector) = self.span_collector.take() {
-            collector.finish(unix_epoch_ms());
-            let live_spans = collector.spans().to_vec();
-            let journal_export = if let Some(trace_ctx) = self.journal_trace_ctx.take() {
-                super::journal_shadow::shadow_compare_journal_projection(
-                    &self.ctx,
-                    &self.ids.request_id,
-                    trace_ctx.clone(),
-                    self.parent_max_iterations,
-                    &live_spans,
-                )
-                .await
-                .map(|observations| (trace_ctx, observations))
-            } else {
-                None
-            };
-            if let Some((trace_ctx, observations)) = journal_export {
-                let run_telemetry = self.ledger.read_telemetry().await;
-                crate::agent::progress_tracing::export_run_trace_from_journal(
-                    &self.config,
-                    &trace_ctx,
-                    &observations,
-                    run_telemetry.as_ref(),
-                    &live_spans,
-                )
-                .await;
-            } else {
-                crate::agent::progress_tracing::export_run_trace(&self.config, &live_spans).await;
-            }
+        // #3886: hand the run's trace, reprojected from the durable journal,
+        // to the configured tracing sink.
+        if let Some(trace_ctx) = self.journal_trace_ctx.take() {
+            crate::core::observability::progress_tracing::export_run_trace_from_journal(
+                &self.ctx,
+                &self.config,
+                &self.ids.request_id,
+                trace_ctx,
+            )
+            .await;
         }
         log::debug!(
             "[web_channel][bridge] exit client_id={} thread_id={} request_id={} round={} events_seen={}",

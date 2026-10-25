@@ -377,7 +377,7 @@ impl EventHandler<DomainEvent> for ArtifactSurfaceSubscriber {
                     },
                     tool_call_id: tool_call_id.clone(),
                     args: Some(serde_json::json!(
-                        crate::agent::artifacts::types::ArtifactReadyPayload {
+                        crate::artifacts::types::ArtifactReadyPayload {
                             artifact_id: artifact_id.clone(),
                             kind: kind.clone(),
                             title: title.clone(),
@@ -417,7 +417,7 @@ impl EventHandler<DomainEvent> for ArtifactSurfaceSubscriber {
                     },
                     tool_call_id: tool_call_id.clone(),
                     args: Some(serde_json::json!(
-                        crate::agent::artifacts::types::ArtifactFailedPayload {
+                        crate::artifacts::types::ArtifactFailedPayload {
                             artifact_id: artifact_id.clone(),
                             kind: kind.clone(),
                             title: title.clone(),
@@ -455,7 +455,7 @@ impl EventHandler<DomainEvent> for ArtifactSurfaceSubscriber {
                     },
                     tool_call_id: tool_call_id.clone(),
                     args: Some(serde_json::json!(
-                        crate::agent::artifacts::types::ArtifactPendingPayload {
+                        crate::artifacts::types::ArtifactPendingPayload {
                             artifact_id: artifact_id.clone(),
                             kind: kind.clone(),
                             title: title.clone(),
@@ -696,3 +696,11 @@ impl EventHandler<DomainEvent> for ApprovalSurfaceSubscriber {
 #[cfg(test)]
 #[path = "event_bus_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "plan_review_event_tests.rs"]
+mod plan_review_event_tests;
+
+#[cfg(test)]
+#[path = "event_bus_surface_tests.rs"]
+mod surface_tests;

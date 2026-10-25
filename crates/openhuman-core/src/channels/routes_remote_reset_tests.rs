@@ -52,9 +52,11 @@ fn seed_session(
     agent_id: &str,
     store_agent_id: &str,
 ) -> SessionRef {
-    let session = SessionRef::scoped(key, agent_id);
+    // The session host resolves its identity through the tenant-aware
+    // admission, whose agent is the scoped store key, not the bare definition id.
+    let session = SessionRef::scoped(key, store_agent_id);
     let history =
-        crate::agent::session_store::transcripts_or_files_in(core, store_agent_id, workspace)
+        crate::storage::sessions::transcripts_or_files_in(core, store_agent_id, workspace)
             .open_session(&session, transcript_meta(key, agent_id))
             .unwrap();
     history
@@ -73,7 +75,7 @@ fn session_messages(
     session: &SessionRef,
 ) -> Vec<String> {
     let locator =
-        crate::agent::session_store::transcripts_or_files_in(core, store_agent_id, workspace);
+        crate::storage::sessions::transcripts_or_files_in(core, store_agent_id, workspace);
     let head = locator.head_generation(session);
     locator
         .read_session_transcript(&head)
@@ -112,6 +114,12 @@ fn tenant_runtime(
     let core = CoreContext::for_test(DomainSet::none(), Some(workspace.clone())).derive_with(
         ContextOverlay::new(config.clone(), DomainSet::full(), Default::default()).profile(profile),
     );
+    // Store a standing credential in the tenant's own scope so a storage-backed
+    // secret store records it where the host agent later reads it.
+    CoreContext::sync_scope(Arc::clone(&core), || {
+        crate::security::credentials::api_key::store_api_key(&config, "test-session-fixture-key")
+    })
+    .expect("store reset test credential");
     let mut runtime = runtime_context(workspace);
     runtime.config = Some(Arc::new(config));
     runtime.core = Some(Arc::downgrade(&core));
@@ -129,6 +137,7 @@ fn tenant_runtime(
 async fn remote_clear_resets_only_the_captured_tenant_session() {
     use tinychannels_bus::module_remote::{RemoteHostRequest, RemoteHostResult};
 
+    let _storage = crate::channels::module_fixture::install_memory_storage();
     let tmp = tempfile::TempDir::new().unwrap();
     let workspace = tmp.path();
     let (alice_core, alice_runtime) = tenant_runtime("remote-reset-alice", workspace);
@@ -172,12 +181,10 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
     let canonical = "channel-session:telegram:bot-a:group:room-1";
     let alice_key = crate::core::runtime::tenant::tenant_key(&alice_tenant, canonical);
     let bob_key = crate::core::runtime::tenant::tenant_key(&bob_tenant, canonical);
-    let alice_store_agent = crate::agent::session_store::current_agent_key_or(
-        &alice_dispatch,
-        &alice_agent.definition.id,
-    );
+    let alice_store_agent =
+        crate::storage::sessions::current_agent_key_or(&alice_dispatch, &alice_agent.definition.id);
     let bob_store_agent =
-        crate::agent::session_store::current_agent_key_or(&bob_dispatch, &bob_agent.definition.id);
+        crate::storage::sessions::current_agent_key_or(&bob_dispatch, &bob_agent.definition.id);
     assert_ne!(alice_key, bob_key);
     let alice_session = seed_session(
         &alice_core,
@@ -261,7 +268,7 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
         "reset should empty Alice's actual session: agent={}, session={alice_session:?}, \
          head={:?}, messages={alice_after:?}, history_len={}",
         alice_agent.definition.id,
-        crate::agent::session_store::transcripts_or_files_in(
+        crate::storage::sessions::transcripts_or_files_in(
             &alice_core,
             &alice_store_agent,
             workspace,
@@ -287,7 +294,7 @@ async fn remote_clear_resets_only_the_captured_tenant_session() {
         "a reset clears the durable status count",
     );
 
-    let alice_locator = crate::agent::session_store::transcripts_or_files_in(
+    let alice_locator = crate::storage::sessions::transcripts_or_files_in(
         &alice_core,
         &alice_store_agent,
         workspace,

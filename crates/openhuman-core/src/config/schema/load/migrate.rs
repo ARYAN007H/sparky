@@ -1,5 +1,16 @@
 use super::super::Config;
 
+/// Applies the in-memory migrations that normalize a parsed config before
+/// environment overlays and persistent schema migrations. This helper does
+/// not read config files or persist any of its changes.
+pub(crate) fn apply_loaded_config_migrations(config: &mut Config, raw: &str) {
+    migrate_legacy_inference_url(config);
+    migrate_legacy_memory_backend(config, raw);
+    migrate_components(config, raw);
+    migrate_cloud_provider_slugs(config);
+    migrate_search_settings(config);
+}
+
 pub(crate) fn migrate_legacy_inference_url(config: &mut Config) {
     if config.inference_url.is_some() {
         return;
@@ -11,8 +22,11 @@ pub(crate) fn migrate_legacy_inference_url(config: &mut Config) {
     if !trimmed.ends_with("/chat/completions") {
         return;
     }
-    let is_openhuman_backend = trimmed.starts_with("https://api.tinyhumans.ai/")
-        || trimmed.starts_with("https://staging-api.tinyhumans.ai/");
+    // The managed backend's own chat-completions URL is derived, not moved: it
+    // is recognised by the managed hosts the installed host resolved.
+    let hosts = crate::config::enrichers::managed_hosts_for(config);
+    let is_openhuman_backend = trimmed.starts_with("https://")
+        && crate::config::schema::resolved_endpoints::host_matches_any(trimmed, &hosts);
     let moved = if is_openhuman_backend {
         None
     } else {
@@ -28,6 +42,7 @@ pub(crate) fn migrate_legacy_inference_url(config: &mut Config) {
     );
     config.inference_url = moved;
     config.api_url = None;
+    config.load_diagnostics_mut().record_migrated_key("api_url");
 }
 
 /// Strip userinfo (basic-auth) and query string from a URL string for log
@@ -63,14 +78,26 @@ pub fn redact_url_for_log(raw: &str) -> String {
 /// untouched. Routing fields that already contain a `:` are assumed to be
 /// in the new `<slug>:<model>` form.
 pub(crate) fn migrate_cloud_provider_slugs(config: &mut Config) {
-    use super::super::cloud_providers::{builtin_cloud_provider, AuthStyle};
+    use super::super::cloud_providers::builtin_cloud_provider;
+
+    let legacy_provider_labels = config
+        .cloud_providers
+        .iter()
+        .any(|entry| entry.label.is_empty());
+    let previous_routes = [
+        config.reasoning_provider.clone(),
+        config.agentic_provider.clone(),
+        config.coding_provider.clone(),
+        config.vision_provider.clone(),
+        config.memory_provider.clone(),
+        config.embeddings_provider.clone(),
+    ];
 
     for entry in &mut config.cloud_providers {
         if entry.label.is_empty() {
             entry.label = builtin_cloud_provider(&entry.slug)
-                .map(|provider| provider.label)
-                .unwrap_or("Custom")
-                .to_string();
+                .map(|provider| provider.label.to_string())
+                .unwrap_or_else(|| "Custom".to_string());
         }
     }
 
@@ -79,6 +106,18 @@ pub(crate) fn migrate_cloud_provider_slugs(config: &mut Config) {
         .iter()
         .map(|e| (e.slug.clone(), e.id.clone()))
         .collect();
+
+    let managed_hosts = crate::config::enrichers::managed_hosts_for(config);
+    let looks_like_openhuman_provider_endpoint = |url: &str| {
+        crate::config::schema::resolved_endpoints::host_matches_any(url, &managed_hosts)
+    };
+
+    let is_openhuman_provider_entry =
+        |entry: &super::super::cloud_providers::CloudProviderCreds| {
+            crate::config::schema::cloud_providers::is_hosted_cloud_identity(&entry.slug)
+                || crate::config::schema::cloud_providers::is_hosted_auth_style(entry.auth_style)
+                || looks_like_openhuman_provider_endpoint(&entry.endpoint)
+        };
 
     let legacy_custom_slug = config
         .inference_url
@@ -179,29 +218,52 @@ pub(crate) fn migrate_cloud_provider_slugs(config: &mut Config) {
         rewrite(&mut config.embeddings_provider);
     }
 
+    if legacy_provider_labels {
+        config
+            .load_diagnostics_mut()
+            .record_migrated_key("cloud_providers[].label");
+    }
+    let changed_routes: Vec<&str> = [
+        (
+            "reasoning_provider",
+            &previous_routes[0],
+            &config.reasoning_provider,
+        ),
+        (
+            "agentic_provider",
+            &previous_routes[1],
+            &config.agentic_provider,
+        ),
+        (
+            "coding_provider",
+            &previous_routes[2],
+            &config.coding_provider,
+        ),
+        (
+            "vision_provider",
+            &previous_routes[3],
+            &config.vision_provider,
+        ),
+        (
+            "memory_provider",
+            &previous_routes[4],
+            &config.memory_provider,
+        ),
+        (
+            "embeddings_provider",
+            &previous_routes[5],
+            &config.embeddings_provider,
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(key, before, after)| (before != after).then_some(key))
+    .collect();
+    for key in changed_routes {
+        config.load_diagnostics_mut().record_migrated_key(key);
+    }
+
     fn normalize_provider_endpoint(url: &str) -> String {
         url.trim().trim_end_matches('/').to_ascii_lowercase()
-    }
-
-    fn looks_like_openhuman_provider_endpoint(url: &str) -> bool {
-        let lower = url.trim().to_ascii_lowercase();
-        let without_scheme = lower.split("://").nth(1).unwrap_or(&lower);
-        let authority = without_scheme.split('/').next().unwrap_or("");
-        let host = authority.split('@').next_back().unwrap_or(authority);
-        let host_no_port = host.split(':').next().unwrap_or(host);
-        matches!(
-            host_no_port,
-            "api.openhuman.ai" | "api.tinyhumans.ai" | "staging-api.tinyhumans.ai" | "openhuman"
-        ) || host_no_port.ends_with(".openhuman.ai")
-            || host_no_port.ends_with(".tinyhumans.ai")
-    }
-
-    fn is_openhuman_provider_entry(
-        entry: &super::super::cloud_providers::CloudProviderCreds,
-    ) -> bool {
-        entry.slug == "openhuman"
-            || matches!(entry.auth_style, AuthStyle::OpenhumanJwt)
-            || looks_like_openhuman_provider_endpoint(&entry.endpoint)
     }
 }
 
@@ -224,6 +286,7 @@ pub(crate) fn migrate_search_settings(config: &mut Config) {
         tinyfish_api_key: config.integrations.tinyfish.api_key.clone(),
     };
     config.search.migrate_legacy(legacy);
+    config.load_diagnostics_mut().record_migrated_key("search");
 }
 
 /// Migrates legacy v1 `[[memory_sources]]` into `[[memory.sources]]`, once:
@@ -232,7 +295,13 @@ pub(crate) fn migrate_search_settings(config: &mut Config) {
 /// legacy list is cleared either way, so it is never written back.
 pub(crate) fn migrate_legacy_memory_sources(config: &mut Config) {
     let legacy = std::mem::take(&mut config.legacy_memory_sources);
-    if legacy.is_empty() || !config.memory.sources.is_empty() {
+    if legacy.is_empty() {
+        return;
+    }
+    config
+        .load_diagnostics_mut()
+        .record_migrated_key("memory_sources");
+    if !config.memory.sources.is_empty() {
         return;
     }
     let migrated: Vec<_> = legacy
@@ -270,6 +339,9 @@ pub(crate) fn migrate_legacy_memory_backend(config: &mut Config, raw: &str) {
 
     config.memory.engine.clear();
     config.memory.legacy_backend_unsupported = true;
+    config
+        .load_diagnostics_mut()
+        .record_migrated_key("memory.backend");
     tracing::warn!(
         "[config] legacy memory backend is unsupported; select an explicit v2 memory engine"
     );
@@ -277,8 +349,7 @@ pub(crate) fn migrate_legacy_memory_backend(config: &mut Config, raw: &str) {
 
 /// One-shot migration of the legacy per-dependency switches into
 /// `[components]` (`hosting.enabled`, `search.enabled`, `mcp_client.enabled`,
-/// `memory.engine = "none"`, `OPENHUMAN_TINYMEMES`, `composio.mode =
-/// "disabled"`). `composio.enabled` was never read and is simply dropped with
+/// `memory.engine = "none"`, `composio.mode = "disabled"`). `composio.enabled` was never read and is simply dropped with
 /// its field; `composio.mode` stays as the route selector.
 ///
 /// A legacy switch is read from the raw TOML (so an unset key keeps its
@@ -286,14 +357,6 @@ pub(crate) fn migrate_legacy_memory_backend(config: &mut Config, raw: &str) {
 /// name, which makes the migration idempotent: once saved, the explicit
 /// `components.*` key wins and the legacy key is never consulted again.
 pub(crate) fn migrate_components(config: &mut Config, raw: &str) {
-    #[cfg(feature = "tinymemes")]
-    let tinymemes = std::env::var(crate::tinymemes::FLAG_ENV).ok();
-    #[cfg(not(feature = "tinymemes"))]
-    let tinymemes: Option<String> = None;
-    migrate_components_with(config, raw, tinymemes.as_deref());
-}
-
-pub(crate) fn migrate_components_with(config: &mut Config, raw: &str, tinymemes: Option<&str>) {
     let value = toml::from_str::<toml::Value>(raw).ok();
     let explicit = |name: &str| {
         value
@@ -334,14 +397,6 @@ pub(crate) fn migrate_components_with(config: &mut Config, raw: &str, tinymemes:
         .and_then(toml::Value::as_str)
         .is_some_and(|e| e.trim().eq_ignore_ascii_case("none"));
     disable(config, "memory", engine_none.then_some(false));
-    #[cfg(feature = "tinymemes")]
-    let memes_on = tinymemes
-        .filter(|v| !v.trim().is_empty())
-        .map(crate::tinymemes::flag_enabled);
-    // Without the `tinymemes` gate there is no legacy flag to migrate.
-    #[cfg(not(feature = "tinymemes"))]
-    let memes_on = tinymemes.and(None::<bool>);
-    disable(config, "memes", memes_on);
     // The old tool-output compaction master switch, `[tokenjuice]
     // router_enabled = false`, becomes `[components] juice = false`. The
     // switch stays as a sub-setting of the on state.
@@ -387,6 +442,26 @@ pub(crate) fn migrate_components_with(config: &mut Config, raw: &str, tinymemes:
     .contains(&Some(false));
     disable(config, "sandbox", sandbox_off.then_some(false));
     if !moved.is_empty() {
+        for component in &moved {
+            let keys: &[&str] = match *component {
+                "hosting" => &["hosting.enabled"],
+                "search" => &["search.enabled"],
+                "mcp" => &["mcp_client.enabled"],
+                "connectors" => &["composio.mode"],
+                "memory" => &["memory.engine"],
+                "juice" => &["tokenjuice.router_enabled"],
+                "voice" => &[
+                    "dictation.enabled",
+                    "voice_server.auto_start",
+                    "voice_server.always_on_enabled",
+                ],
+                "sandbox" => &["sandbox.enabled", "security.sandbox.enabled"],
+                _ => &[],
+            };
+            for key in keys {
+                config.load_diagnostics_mut().record_migrated_key(*key);
+            }
+        }
         tracing::info!(
             "[config][migrate] legacy switches moved to [components]: {}",
             moved.join(",")

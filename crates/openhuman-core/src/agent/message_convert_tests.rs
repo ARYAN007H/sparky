@@ -102,7 +102,7 @@ fn durable_upload_parts_survive_message_row_replay_without_inline_payloads() {
         ("video.mp4", "video/mp4"),
         ("archive.zip", "application/zip"),
     ] {
-        let attachment = crate::agent::attachments::Attachment {
+        let attachment = crate::attachments::Attachment {
             path: format!("uploads/thread/id/{name}"),
             name: name.into(),
             mime: mime.into(),
@@ -341,6 +341,29 @@ fn legacy_envelope_rows_lift_to_the_same_messages_as_typed_rows() {
 }
 
 #[test]
+fn typed_legacy_envelope_rows_replay_the_envelope_body_and_calls() {
+    let envelope =
+        r#"{"content":"checking","tool_calls":[{"id":"call-1","name":"echo","arguments":"{}"}]}"#;
+    let row = TranscriptMessage::assistant_with_calls(
+        envelope,
+        vec![TranscriptToolCall {
+            id: "call-1".into(),
+            name: "echo".into(),
+            arguments: "{}".into(),
+            extra_content: None,
+        }],
+    );
+
+    let replay = chat_message_to_message(&row);
+    let Message::Assistant(assistant) = &replay else {
+        panic!("expected assistant, got {replay:?}");
+    };
+    assert_eq!(replay.text(), "checking");
+    assert_eq!(assistant.tool_calls.len(), 1);
+    assert_eq!(assistant.tool_calls[0].id, "call-1");
+}
+
+#[test]
 fn user_text_with_ready_markers_is_stored_as_typed_image_parts() {
     let png = "data:image/png;base64,iVBORw0KGgo=";
     let text = format!("look [IMAGE:{png}] and [IMAGE:/local/path.png] please");
@@ -377,6 +400,14 @@ fn plain_assistant_prose_is_not_misread_as_a_tool_round() {
     };
     assert!(am.tool_calls.is_empty());
     assert_eq!(a.text(), "just a normal reply");
+}
+
+#[test]
+fn user_image_marker_text_preserves_whitespace_when_no_image_is_lifted() {
+    for text in ["  [IMAGE:]  ", "  dangling [IMAGE:data:x  "] {
+        let user = chat_message_to_message(&TranscriptMessage::user(text));
+        assert_eq!(user, Message::user(text));
+    }
 }
 
 #[test]

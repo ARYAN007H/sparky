@@ -276,7 +276,13 @@ export interface AgentRun {
   /**
    * What kind of run this is.
    */
-  kind: 'subagent' | 'worker_thread' | 'background_agent' | 'team_member' | 'workflow_child';
+  kind:
+    | 'subagent'
+    | 'worker_thread'
+    | 'background_agent'
+    | 'interactive_turn'
+    | 'team_member'
+    | 'workflow_child';
   /**
    * Arbitrary caller-supplied metadata.
    */
@@ -661,8 +667,9 @@ export interface MediaReference {
   kind: 'image' | 'video' | 'audio' | 'document' | 'unknown';
   localCachePath: string | null;
   /**
-   * Stable host-owned identifier for media stored outside the channel
-   * provider. It is safe to persist and does not imply a shared filesystem.
+   * Host-owned identifier for media stored outside the provider. It is
+   * opaque and only meaningful with the full channel, conversation, and
+   * turn scope used to store it.
    */
   opaqueId?: string | null;
   path: string | null;
@@ -698,8 +705,9 @@ export interface MediaReference1 {
   kind: 'image' | 'video' | 'audio' | 'document' | 'unknown';
   localCachePath: string | null;
   /**
-   * Stable host-owned identifier for media stored outside the channel
-   * provider. It is safe to persist and does not imply a shared filesystem.
+   * Host-owned identifier for media stored outside the provider. It is
+   * opaque and only meaningful with the full channel, conversation, and
+   * turn scope used to store it.
    */
   opaqueId?: string | null;
   path: string | null;
@@ -829,12 +837,6 @@ export interface DeleteConversationThreadResponse {
  */
 export interface ThreadGoal {
   /**
-   * Set when a continuation iteration produced **no progress**, to stop a
-   * continuation loop. Cleared on any user-initiated run or external
-   * mutation (e.g. a fresh `goal_set` or [`super::note_user_turn`]).
-   */
-  continuationSuppressed: boolean;
-  /**
    * Creation time (unix epoch milliseconds).
    */
   createdAtMs: number;
@@ -860,6 +862,10 @@ export interface ThreadGoal {
    * Cumulative wall-clock seconds accounted against this goal.
    */
   timeUsedSeconds: number;
+  /**
+   * Nanosecond remainder beyond `time_used_seconds`.
+   */
+  timeUsedSubsecNanos: number;
   /**
    * Optional token ceiling. When set and `tokens_used >= token_budget`, the
    * goal transitions to [`ThreadGoalStatus::BudgetLimited`].
@@ -925,10 +931,9 @@ export interface ConversationThreadsListResponse {
   threads: ConversationThreadSummary[];
 }
 /**
- * A recall citation attached to a chat reply so the UI can show where a
- * memory-informed answer came from. Same JSON shape the chat surface has
- * always rendered: `key` is the item kind, `namespace` its source kind,
- * `timestamp` when it was observed, `snippet` a short excerpt.
+ * A memory citation attached to a chat reply so the UI can show where an
+ * answer came from. `key` is the item kind, `namespace` its source kind,
+ * `timestamp` when it was observed, and `snippet` a short excerpt.
  */
 export interface TurnCitation {
   /**

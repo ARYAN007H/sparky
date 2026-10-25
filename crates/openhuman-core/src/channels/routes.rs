@@ -3,21 +3,38 @@
 use super::context::{ChannelRouteSelection, ChannelRuntimeContext};
 use super::runtime::ChannelHandle;
 use super::SendMessage;
-use crate::inference::provider;
 use std::sync::Arc;
 use tinychannels_bus as traits;
 use tinychannels_bus::module_control::{
     ChannelControlRequest, ChannelControlResult, ProviderDescriptor,
 };
 
-fn provider_descriptors() -> Vec<ProviderDescriptor> {
-    provider::list_providers()
-        .into_iter()
+fn provider_descriptors(config: &crate::config::Config) -> Vec<ProviderDescriptor> {
+    config
+        .cloud_providers
+        .iter()
         .map(|provider| ProviderDescriptor {
-            name: provider.name.to_string(),
-            aliases: provider.aliases.iter().map(ToString::to_string).collect(),
+            name: provider.slug.clone(),
+            aliases: if crate::config::schema::cloud_providers::is_hosted_cloud_identity(
+                &provider.slug,
+            ) || crate::config::schema::cloud_providers::is_hosted_auth_style(
+                provider.auth_style,
+            ) {
+                vec!["backend".to_string(), "openhuman-backend".to_string()]
+            } else {
+                Vec::new()
+            },
         })
         .collect()
+}
+
+#[cfg(test)]
+pub(crate) fn register_hosted_route_test_policy() {
+    use crate::config::schema::cloud_providers::AuthStyle;
+    crate::config::schema::cloud_providers::register_hosted_cloud_provider_policy(
+        Arc::new(|slug| slug == "openhuman"),
+        Arc::new(|style| style == AuthStyle::OpenhumanJwt),
+    );
 }
 
 fn default_route_selection(ctx: &ChannelRuntimeContext) -> ChannelRouteSelection {
@@ -219,6 +236,13 @@ where
                 (ChannelControlRequest::Route {
                     workspace_dir: ctx.workspace_dir.to_string_lossy().into_owned(),
                     message: Box::new(msg.clone()),
+                    capabilities: target_channel
+                        .map(|channel| Box::new(channel.capabilities()))
+                        .or_else(|| {
+                            configured_channel
+                                .as_ref()
+                                .map(|configured| Box::new(configured.capabilities.clone()))
+                        }),
                     route: tinychannels_bus::module_remote::RemoteRoute {
                         provider: current.provider,
                         model: current.model,
@@ -226,7 +250,11 @@ where
                     history_len,
                     session_scope: reset_scope.map(Box::new),
                     configured_channel,
-                    providers: provider_descriptors(),
+                    providers: ctx
+                        .config
+                        .as_deref()
+                        .map(provider_descriptors)
+                        .unwrap_or_default(),
                 },),
             )
             .await;
@@ -343,13 +371,15 @@ async fn durable_channel_history_len(
     let Some(core) = dispatch.resolved() else {
         return 0;
     };
-    let store_agent_id = crate::agent::session_store::current_agent_key_or(&dispatch, &agent_id);
-    let locator = crate::agent::session_store::transcripts_or_files_in(
+    let store_agent_id = crate::storage::sessions::current_agent_key_or(&dispatch, &agent_id);
+    let locator = crate::storage::sessions::transcripts_or_files_in(
         &core,
         &store_agent_id,
         &ctx.workspace_dir,
     );
-    let session = tinyagents_session::transcript::SessionRef::scoped(session_key, &agent_id);
+    // The runtime session addresses its transcript by the tenant-scoped store
+    // key (the session identity resolver's agent), not the bare definition id.
+    let session = tinyagents_session::transcript::SessionRef::scoped(session_key, &store_agent_id);
     let head = locator.head_generation(&session);
     let Some(read) = locator.read_session_transcript(&head) else {
         return 0;

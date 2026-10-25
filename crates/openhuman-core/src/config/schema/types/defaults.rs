@@ -6,7 +6,6 @@ use std::path::PathBuf;
 
 use super::config::default_temperature_unsupported_models;
 use super::config::DEFAULT_TEMPERATURE;
-use super::model_ids::DEFAULT_MODEL;
 use crate::config::schema::*;
 
 impl Default for Config {
@@ -25,6 +24,7 @@ impl Default for Config {
         });
 
         Self {
+            runtime_state: super::config::ConfigRuntimeState::default(),
             profile_providers: None,
             workspace_dir: openhuman_dir.join("workspace"),
             action_dir: crate::config::default_action_dir(),
@@ -39,7 +39,10 @@ impl Default for Config {
             api_key: None,
             inference_url: None,
             ephemeral_route: None,
-            default_model: Some(DEFAULT_MODEL.to_string()),
+            resolved_endpoints: Default::default(),
+            default_model: crate::inference::registry::provider_default_model(
+                crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+            ),
             default_temperature: DEFAULT_TEMPERATURE,
             output_language: None,
             channels_locale: None,
@@ -88,8 +91,7 @@ impl Default for Config {
             proxy: ProxyConfig::default(),
             cost: CostConfig::default(),
             legacy_memory_sources: Vec::new(),
-            agent_registry: crate::agent::registry::types::AgentRegistryConfig::default(),
-            agents: HashMap::new(),
+            agent_registry: crate::agent_registry::types::AgentRegistryConfig::default(),
             local_ai: LocalAiConfig::default(),
             claude_agent_sdk: ClaudeAgentSdkConfig::default(),
             cloud_providers: Vec::new(),
@@ -104,7 +106,8 @@ impl Default for Config {
             embeddings_provider: None,
             custom_embeddings: None,
             tokenjuice: TokenjuiceConfig::default(),
-            memes: MemesConfig::default(),
+            inbound: InboundConfig::default(),
+            inbound_debounce: InboundDebounceConfig::default(),
             components: ComponentsConfig::default(),
             hosting: HostingConfig::default(),
             storage: StorageConfig::default(),
@@ -115,7 +118,6 @@ impl Default for Config {
             tts_provider: None,
             integrations: IntegrationsConfig::default(),
             update: UpdateConfig::default(),
-            dictation: DictationConfig::default(),
             channel_voice: ChannelVoiceConfig::default(),
             onboarding_completed: false,
             chat_onboarding_completed: false,

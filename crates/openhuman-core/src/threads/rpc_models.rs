@@ -162,7 +162,7 @@ pub struct AppendConversationMessageRequest {
     pub message: ConversationMessageRecord,
     /// Typed attachments for a user message, staged with it. Folded into the
     /// message content as upload markers at the RPC edge
-    /// (`agent::attachments::parts`), so callers never build markers.
+    /// (`attachments::parts`), so callers never build markers.
     #[serde(default)]
     pub attachments: Vec<tinychannels_bus::ContentPart>,
 }

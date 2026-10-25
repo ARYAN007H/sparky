@@ -11,7 +11,7 @@
 //! [`ComposioActionTool::deferred`] builds the same tool as a
 //! `ToolExposure::Deferred` registration for a parent session:
 //! every action of every connected toolkit is synthesised beside the
-//! delegation tools (`tools::orchestrator_tools`), stays off the wire, and
+//! delegation tools (`integrations::composio::orchestrator_actions`), stays off the wire, and
 //! is found through the harness's `tool_search` bridge — so one clear action
 //! ("send Alex a Slack message") is a search and a call, not a sub-agent
 //! run. Those instances have no spawn-time config to anchor to and resolve
@@ -51,7 +51,7 @@ pub struct ComposioActionTool {
     /// the backend-bound handle at sub-agent spawn time. Toggling
     /// `composio.mode = "direct"` mid-session invalidated other caches
     /// but left these per-action tools still routing through
-    /// `staging-api.tinyhumans.ai/agent-integrations/composio/execute`
+    /// the managed backend's composio execute route
     /// — silently bypassing the direct-mode user's personal Composio
     /// tenant. Resolving the client per call via
     /// [`resolve_composio_route`] keeps dispatch in lockstep with the

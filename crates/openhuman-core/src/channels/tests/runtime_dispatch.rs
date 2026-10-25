@@ -10,7 +10,6 @@ use super::common::{use_real_agent_handler, RecordingChannel, SlowModel};
 use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::channels::runtime::ChannelHandle;
 use crate::core::events::DomainEvent;
-use crate::inference::provider;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -75,7 +74,6 @@ async fn message_dispatch_processes_messages_in_parallel() {
             api_url: None,
             inference_url: None,
             reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-            provider_runtime_options: provider::ProviderRuntimeOptions::default(),
             workspace_dir: Arc::new(std::env::temp_dir()),
             message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
             multimodal: crate::config::MultimodalConfig::default(),
@@ -119,7 +117,13 @@ async fn message_dispatch_processes_messages_in_parallel() {
     .unwrap();
     drop(tx);
 
-    run_message_dispatch_loop(rx, parallel_ctx, 2).await;
+    run_message_dispatch_loop(
+        rx,
+        parallel_ctx,
+        2,
+        crate::config::InboundDebounceConfig::disabled(),
+    )
+    .await;
     assert_eq!(peak_in_flight.load(Ordering::SeqCst), 2);
 
     let sent_messages = parallel_channel.sent_messages.lock().await;
@@ -130,7 +134,7 @@ async fn message_dispatch_processes_messages_in_parallel() {
 async fn process_channel_message_sends_typing_before_the_provider_reply() {
     let _bus_guard = use_real_agent_handler().await;
     crate::core::bus::init().await.expect("bus init");
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("built-in host agent definitions should load");
     let linked = linked_telegram_runtime().await;
     let channels_by_name = linked.channels();
@@ -151,7 +155,6 @@ async fn process_channel_message_sends_typing_before_the_provider_reply() {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(linked.config().workspace_dir.clone()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -237,12 +240,8 @@ async fn process_channel_message_sends_typing_before_the_provider_reply() {
     .await;
 
     let requests = linked.provider_request_paths().await;
-    assert!(
-        requests
-            .iter()
-            .any(|path| path.ends_with("/sendChatAction")),
-        "the module-backed provider should receive a typing action: {requests:?}"
-    );
+    // The host drives typing through the module's `StartTyping` interaction
+    // for the factory-built adapter, and it must precede the reply.
     assert_eq!(
         requests
             .iter()
@@ -261,6 +260,10 @@ async fn process_channel_message_sends_typing_before_the_provider_reply() {
         .iter()
         .position(|path| path.ends_with("/sendMessage"))
         .expect("provider should receive the model reply");
+    assert!(
+        !typing_indices.is_empty(),
+        "the host should start typing on the module-backed provider: {requests:?}"
+    );
     assert!(
         typing_indices.iter().all(|index| *index < reply_index),
         "typing should precede reply: {requests:?}"
@@ -332,7 +335,6 @@ async fn dispatch_routes_through_agent_run_turn_bus_handler() {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -460,7 +462,6 @@ async fn resolved_route_ctx(
             api_url: None,
             inference_url: None,
             reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-            provider_runtime_options: provider::ProviderRuntimeOptions::default(),
             workspace_dir: Arc::new(std::env::temp_dir()),
             message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
             multimodal: crate::config::MultimodalConfig::default(),
@@ -577,7 +578,7 @@ async fn dispatch_replies_with_timeout_notice_when_handler_exceeds_deadline() {
         channel_name: "test-channel".to_string(),
         content: "force timeout".to_string(),
         handler_delay_ms: 31_000,
-        timeout_secs: tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS,
+        timeout_secs: tinychannels_bus::module_runtime::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS,
         ..Default::default()
     })
     .await;

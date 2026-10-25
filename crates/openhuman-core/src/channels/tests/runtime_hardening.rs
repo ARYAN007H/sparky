@@ -5,7 +5,6 @@ use super::super::runtime::process_channel_message;
 use super::common::RecordingChannel;
 use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::channels::runtime::ChannelHandle;
-use crate::inference::provider;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tinychannels_bus as traits;
@@ -56,7 +55,6 @@ async fn process_channel_message_hardens_multimodal_files_against_smuggled_marke
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -143,7 +141,6 @@ async fn process_channel_message_hardens_against_relative_path_markers() {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),

@@ -18,12 +18,14 @@ import {
   ChatApprovalRequestEvent,
   ChatCancelledEvent,
   ChatChannelEventEvent,
+  ChatContextCompactingEvent,
   ChatDoneEvent,
   ChatErrorEvent,
   ChatInferenceHeartbeatEvent,
   ChatInferenceStartEvent,
   ChatInterimEvent,
   ChatIterationStartEvent,
+  ChatPlanReviewDecidedEvent,
   ChatPlanReviewRequestEvent,
   ChatRunModeChangedEvent,
   ChatSegmentEvent,
@@ -61,6 +63,8 @@ import { socketService } from './socketService';
 const chatLog = debug('realtime:chat');
 
 export type {
+  ChatContextCompactingEvent,
+  ChatPlanReviewDecidedEvent,
   ChatToolCallEvent,
   ChatToolResultEvent,
   SubagentUsageWire,
@@ -118,6 +122,7 @@ export interface ChatEventListeners {
   onInferenceHeartbeat?: (event: ChatInferenceHeartbeatEvent) => void;
   onChannelEvent?: (event: ChatChannelEventEvent) => void;
   onIterationStart?: (event: ChatIterationStartEvent) => void;
+  onContextCompacting?: (event: ChatContextCompactingEvent) => void;
   onToolCall?: (event: ChatToolCallEvent) => void;
   onToolResult?: (event: ChatToolResultEvent) => void;
   onSubagentSpawned?: (event: ChatSubagentSpawnedEventV2) => void;
@@ -137,6 +142,7 @@ export interface ChatEventListeners {
   onApprovalRequest?: (event: ChatApprovalRequestEvent) => void;
   onApprovalDecided?: (event: ChatApprovalDecidedEvent) => void;
   onPlanReviewRequest?: (event: ChatPlanReviewRequestEvent) => void;
+  onPlanReviewDecided?: (event: ChatPlanReviewDecidedEvent) => void;
   onThreadTodosChanged?: (event: ChatThreadTodosChangedEvent) => void;
   onThreadGoalUpdated?: (event: ChatThreadGoalUpdatedEvent) => void;
   onThreadGoalCleared?: (event: ChatThreadGoalClearedEvent) => void;
@@ -171,6 +177,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
     inferenceHeartbeat: 'inference_heartbeat',
     channelEvent: 'channel_event',
     iterationStart: 'iteration_start',
+    contextCompacting: 'context_compacting',
     toolCall: 'tool_call',
     toolResult: 'tool_result',
     subagentSpawned: 'subagent_spawned',
@@ -191,6 +198,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
     approvalRequest: 'approval_request',
     approvalDecided: 'approval_decided',
     planReviewRequest: 'plan_review_request',
+    planReviewDecided: 'plan_review_decided',
     threadTodosChanged: 'thread_todos_changed',
     threadGoalUpdated: 'thread_goal_updated',
     threadGoalCleared: 'thread_goal_cleared',
@@ -252,6 +260,22 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
     };
     socket.on(EVENTS.iterationStart, cb);
     handlers.push([EVENTS.iterationStart, cb]);
+  }
+
+  if (listeners.onContextCompacting) {
+    const cb = (payload: unknown) => {
+      const e = payload as ChatContextCompactingEvent;
+      chatLog(
+        '%s thread_id=%s request_id=%s round=%d',
+        EVENTS.contextCompacting,
+        e.thread_id,
+        e.request_id,
+        e.round
+      );
+      listeners.onContextCompacting?.(e);
+    };
+    socket.on(EVENTS.contextCompacting, cb);
+    handlers.push([EVENTS.contextCompacting, cb]);
   }
 
   if (listeners.onToolCall) {
@@ -585,6 +609,22 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
     handlers.push([EVENTS.planReviewRequest, cb]);
   }
 
+  if (listeners.onPlanReviewDecided) {
+    const cb = (payload: unknown) => {
+      const e = payload as ChatPlanReviewDecidedEvent;
+      chatLog(
+        '%s thread_id=%s request_id=%s resolution=%s',
+        EVENTS.planReviewDecided,
+        e.thread_id,
+        e.request_id,
+        e.cancel_reason
+      );
+      listeners.onPlanReviewDecided?.(e);
+    };
+    socket.on(EVENTS.planReviewDecided, cb);
+    handlers.push([EVENTS.planReviewDecided, cb]);
+  }
+
   if (listeners.onThreadTodosChanged) {
     const cb = (payload: unknown) => {
       const e = payload as ChatThreadTodosChangedEvent;
@@ -915,21 +955,6 @@ interface ChatSendParams {
    */
   locale?: string | null;
   /**
-   * When `true`, the core will synthesize the agent reply via TTS and
-   * stream audio back (push-to-talk reply flow).
-   */
-  speakReply?: boolean;
-  /**
-   * Originating input source — e.g. `'ptt'` for push-to-talk, `'keyboard'`
-   * for typed input. Forwarded to the core for analytics / routing.
-   */
-  source?: string;
-  /**
-   * PTT session ID — ties the chat turn to a specific push-to-talk recording
-   * session so the core can correlate audio and text events.
-   */
-  sessionId?: number;
-  /**
    * Queue mode for concurrent messages. When a turn is already in
    * flight: `steer` injects at the next iteration boundary, `followup`
    * queues for after the turn, `collect` adds as context. `interrupt`
@@ -1033,9 +1058,6 @@ export async function chatSendWithAck(params: ChatSendParams): Promise<ChatSendA
       attachments: params.attachments?.length ? params.attachments : undefined,
       model_override: params.model ?? undefined,
       locale: params.locale ?? undefined,
-      speak_reply: params.speakReply ?? undefined,
-      source: params.source ?? undefined,
-      session_id: params.sessionId ?? undefined,
       queue_mode: params.queueMode ?? undefined,
       reasoning_effort: params.reasoningEffort ?? undefined,
     },

@@ -99,6 +99,12 @@ export type ChatInferenceHeartbeatEvent = WireEvent<'inference_heartbeat'>;
 export type ChatIterationStartEvent = WireEvent<'iteration_start', 'round' | 'message'>;
 
 /**
+ * The turn started summarizing earlier conversation to fit the context window.
+ * The next `iteration_start` ends it.
+ */
+export type ChatContextCompactingEvent = WireEvent<'context_compacting', 'round'>;
+
+/**
  * Fields the schema does not carry and the current core never sends: they
  * exist only for the segmented-delivery path and the flat-token fallback in
  * the chat runtime, which read replayed/older-core events. Delete them with
@@ -209,6 +215,9 @@ export type ChatPlanReviewRequestEvent = Omit<
   WireEvent<'plan_review_request', 'message'>,
   'args'
 > & { args?: { steps?: string[] } };
+
+/** A parked plan-review gate resolved or was cancelled by the core. */
+export type ChatPlanReviewDecidedEvent = WireEvent<'plan_review_decided', 'message'>;
 
 // ── Thread state (goal, todos, run mode) ─────────────────────────────────────
 

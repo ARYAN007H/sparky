@@ -1,30 +1,43 @@
-//! [`DocumentLeases`]: leases as compare-and-swapped documents.
-//!
-//! One record per key in collection [`LEASE_COLLECTION`] of the scope the
-//! caller binds (normally [`CLUSTER_SCOPE`], see [`DocumentLeases::cluster`]).
-//! Every write carries a precondition (`Absent` for a fresh key, `Version`
-//! otherwise), so two nodes racing for a key can never both win, provided
-//! the driver's CAS holds across processes
-//! ([`super::driver_has_cross_process_cas`]).
+//! Host-owned cluster leases stored as versioned documents. Each mutation
+//! retries a compare-and-swap against the document revision; drivers must
+//! provide cross-process CAS for distributed exclusion.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition, Scope, Version};
+use serde::{Deserialize, Serialize};
+use tinystoragedrivers::{CollectionSpec, ErrorKind, Key, Precondition, Scope, StorageBackend};
+use tinystoragedrivers_api::DocumentStore;
+use tinystoragedrivers_types::{
+    Filter, Scope as DriverScope, Version, Versioned, WriteCondition, WriteOptions,
+};
 
 use super::lease::{
-    decide, validate_key, LeaseError, LeaseGrant, LeaseRecord, LeaseStore, Takeover, CLUSTER_SCOPE,
-    LEASE_COLLECTION,
+    validate_key, LeaseError, LeaseGrant, LeaseRecord, LeaseStore, CLUSTER_SCOPE, LEASE_COLLECTION,
 };
-use super::{DocumentStore, StorageBackend, StorageError};
+use super::StorageError;
 
-/// Acquire attempts before a key that keeps changing is reported as a
-/// storage conflict.
-const ACQUIRE_ATTEMPTS: usize = 16;
+/// The owner namespace of the host's process-placement lease documents.
+pub const LEASE_OWNER: &str = "profiles";
 
-/// Leases kept as documents. See the module docs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct LeaseBody {
+    holder: String,
+    epoch: u64,
+    expires_ms: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    endpoint: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    released: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+/// Host leases kept in [`LEASE_COLLECTION`]. See the module docs.
 pub struct DocumentLeases {
     docs: Arc<dyn DocumentStore>,
     /// The scope `docs` is bound to, when known ([`Self::cluster`]); a
@@ -32,14 +45,14 @@ pub struct DocumentLeases {
     scope: Option<Scope>,
     node: String,
     endpoint: Option<String>,
-    ttl_ms: u64,
-    /// The epoch this instance holds per key, which makes a repeated acquire
-    /// re-entrant and lets a restarted node (same id, fresh instance) see its
-    /// own leftover record as unclean.
-    held: Mutex<HashMap<String, u64>>,
-    /// Serializes `acquire` on this instance so an older completion cannot
-    /// overwrite newer held state.
-    acquire_gate: tokio::sync::Mutex<()>,
+    ttl_ms: i64,
+    /// The epoch this instance holds per key and the generation of its latest
+    /// grant (see the module docs): a superseded grant cannot renew.
+    held: Mutex<HashMap<String, (u64, Version)>>,
+    /// Serializes acquire, renew and release on this instance, so the
+    /// latest-grant check, the tsd call and the held-state update are one
+    /// step and an older completion cannot overwrite newer held state.
+    gate: tokio::sync::Mutex<()>,
     declared: tokio::sync::OnceCell<()>,
 }
 
@@ -70,9 +83,9 @@ impl DocumentLeases {
             endpoint,
             // A sub-millisecond TTL rounds up so a grant never expires at
             // the instant it is issued.
-            ttl_ms: u64::try_from(ttl.as_millis()).unwrap_or(u64::MAX).max(1),
+            ttl_ms: i64::try_from(ttl.as_millis()).unwrap_or(i64::MAX).max(1),
             held: Mutex::new(HashMap::new()),
-            acquire_gate: tokio::sync::Mutex::new(()),
+            gate: tokio::sync::Mutex::new(()),
             declared: tokio::sync::OnceCell::new(),
         }
     }
@@ -95,7 +108,7 @@ impl DocumentLeases {
 
     /// Records that the document store this was built over is bound to
     /// `scope`, so storage fences can name the lease record
-    /// ([`LeaseStore::record_scope`]).
+    /// ([`LeaseStore::write_condition`]).
     #[must_use]
     pub fn in_scope(mut self, scope: Scope) -> Self {
         self.scope = Some(scope);
@@ -123,18 +136,32 @@ impl DocumentLeases {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .get(key)
-            .copied()
+            .map(|(epoch, _)| *epoch)
     }
 
-    fn set_held(&self, key: &str, epoch: Option<u64>) {
+    /// Whether `grant` is the latest one this instance issued for its key.
+    fn is_latest(&self, grant: &LeaseGrant) -> bool {
+        self.held
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&grant.key)
+            == Some(&(grant.epoch, grant.version))
+    }
+
+    /// Issues the next generation of `epoch`'s grant for `key`.
+    fn next_version(&self, key: &str, epoch: u64) -> Result<Version, StorageError> {
         let mut held = self
             .held
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        match epoch {
-            Some(epoch) => held.insert(key.to_string(), epoch),
-            None => held.remove(key),
+        let version = match held.get(key) {
+            Some((held_epoch, version)) if *held_epoch == epoch => version
+                .next()
+                .ok_or_else(|| StorageError::backend("lease version space exhausted"))?,
+            _ => Version::FIRST,
         };
+        held.insert(key.to_string(), (epoch, version));
+        Ok(version)
     }
 
     /// Drops the held entry only while it still names `epoch`, so a release
@@ -144,83 +171,69 @@ impl DocumentLeases {
             .held
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if held.get(key) == Some(&epoch) {
+        if held.get(key).is_some_and(|(held, _)| *held == epoch) {
             held.remove(key);
         }
     }
 
-    fn record(&self, epoch: u64, expires_at_ms: u64, released: bool) -> LeaseRecord {
-        LeaseRecord {
-            owner: self.node.clone(),
-            endpoint: self.endpoint.clone(),
-            epoch,
-            expires_at_ms,
-            released,
-        }
+    fn id(key: &str) -> Result<String, StorageError> {
+        Ok(Key::new(format!("{LEASE_OWNER}/{key}"))?
+            .as_str()
+            .to_owned())
     }
 
-    async fn read(&self, key: &str) -> Result<Option<(Version, LeaseRecord)>, StorageError> {
-        let Some(stored) = self.docs.get(LEASE_COLLECTION, key).await? else {
+    async fn read(&self, key: &str) -> Result<Option<Versioned<LeaseBody>>, StorageError> {
+        let Some(found) = self.docs.get(LEASE_COLLECTION, &Self::id(key)?).await? else {
             return Ok(None);
         };
-        let record: LeaseRecord = serde_json::from_value(stored.doc)
-            .map_err(|error| StorageError::serialization(format!("lease record {key}: {error}")))?;
-        Ok(Some((stored.version, record)))
+        let body = serde_json::from_value(found.doc.clone()).map_err(|error| {
+            StorageError::backend("lease record is malformed").with_source(error)
+        })?;
+        Ok(Some(found.map(|_| body)))
     }
 
-    async fn write(
+    async fn write_cas(
         &self,
-        key: &str,
-        record: &LeaseRecord,
-        precondition: Precondition,
-    ) -> Result<Version, StorageError> {
-        let doc = serde_json::to_value(record)
-            .map_err(|error| StorageError::serialization(error.to_string()))?;
-        self.docs
-            .put(LEASE_COLLECTION, key, doc, precondition)
-            .await
-    }
-
-    /// The CAS write renew and release share: `Conflict` means the grant is
-    /// no longer current.
-    async fn rewrite(
-        &self,
-        grant: &LeaseGrant,
-        expires_at_ms: u64,
-        released: bool,
-    ) -> Result<Version, LeaseError> {
-        validate_key(&grant.key)?;
-        if self.held_epoch(&grant.key) != Some(grant.epoch) {
-            tracing::info!(
-                target: "openhuman::storage::lease",
-                key = %grant.key,
-                node = %self.node,
-                epoch = grant.epoch,
-                "[lease] grant lost: not held by this instance"
-            );
-            return Err(LeaseError::Lost);
-        }
-        self.declare().await?;
-        let record = self.record(grant.epoch, expires_at_ms, released);
+        id: &str,
+        old: Option<&Versioned<LeaseBody>>,
+        body: LeaseBody,
+    ) -> Result<bool, StorageError> {
+        let condition = old.map_or(Precondition::Absent, |found| {
+            Precondition::Version(found.version)
+        });
+        let value = serde_json::to_value(body).map_err(|error| {
+            StorageError::backend("could not encode lease record").with_source(error)
+        })?;
         match self
-            .write(&grant.key, &record, Precondition::Version(grant.version))
+            .docs
+            .put_with(
+                LEASE_COLLECTION,
+                id,
+                value,
+                condition,
+                WriteOptions::default(),
+            )
             .await
         {
-            Ok(version) => Ok(version),
-            Err(error) if error.kind() == ErrorKind::Conflict => {
-                // The held entry stays: it names an epoch the record has
-                // moved past, so it can never make a later acquire re-entrant.
-                tracing::info!(
-                    target: "openhuman::storage::lease",
-                    key = %grant.key,
-                    node = %self.node,
-                    epoch = grant.epoch,
-                    "[lease] grant lost: the record changed since it was written"
-                );
-                Err(LeaseError::Lost)
+            Ok(_) => Ok(true),
+            Err(error)
+                if error.kind() == tinystoragedrivers::ErrorKind::Conflict
+                    || error.kind() == tinystoragedrivers::ErrorKind::AlreadyExists =>
+            {
+                Ok(false)
             }
-            Err(error) => Err(error.into()),
+            Err(error) => Err(error),
         }
+    }
+}
+
+fn record_of(record: LeaseBody) -> LeaseRecord {
+    LeaseRecord {
+        owner: record.holder,
+        endpoint: record.endpoint,
+        epoch: record.epoch,
+        expires_at_ms: u64::try_from(record.expires_ms).unwrap_or_default(),
+        released: record.released,
     }
 }
 
@@ -229,106 +242,148 @@ impl LeaseStore for DocumentLeases {
     async fn acquire(&self, key: &str, now_ms: u64) -> Result<LeaseGrant, LeaseError> {
         validate_key(key)?;
         self.declare().await?;
-        let _gate = self.acquire_gate.lock().await;
-        let expires_at_ms = now_ms.saturating_add(self.ttl_ms);
-        for attempt in 0..ACQUIRE_ATTEMPTS {
-            let found = self.read(key).await?;
-            let (epoch, unclean) = match decide(
-                found.as_ref().map(|(_, r)| r),
-                &self.node,
-                self.held_epoch(key),
-                now_ms,
-            ) {
-                Takeover::Take { epoch, unclean } => (epoch, unclean),
-                Takeover::Exhausted => {
-                    return Err(StorageError::conflict(format!(
-                        "lease {key} epoch space exhausted"
-                    ))
-                    .into());
-                }
-                Takeover::Refuse => {
-                    let (_, record) = found.expect("refuse implies a record");
-                    tracing::debug!(
-                        target: "openhuman::storage::lease",
-                        key,
-                        node = %self.node,
-                        owner = %record.owner,
-                        epoch = record.epoch,
-                        "[lease] acquire refused: held elsewhere"
-                    );
-                    return Err(LeaseError::Held(record));
-                }
-            };
-            let precondition = found.as_ref().map_or(Precondition::Absent, |(version, _)| {
-                Precondition::Version(*version)
+        let _gate = self.gate.lock().await;
+        let id = Self::id(key)?;
+        for _ in 0..32 {
+            let current = self.read(key).await?;
+            let live = current.as_ref().is_some_and(|found| {
+                found.doc.expires_ms > i64::try_from(now_ms).unwrap_or(i64::MAX)
+                    && !found.doc.released
             });
-            let record = self.record(epoch, expires_at_ms, false);
-            match self.write(key, &record, precondition).await {
-                Ok(version) => {
-                    self.set_held(key, Some(epoch));
-                    tracing::debug!(
-                        target: "openhuman::storage::lease",
-                        key,
-                        node = %self.node,
-                        epoch,
-                        previous_unclean = unclean,
-                        "[lease] acquired"
-                    );
-                    return Ok(LeaseGrant {
-                        key: key.to_string(),
-                        epoch,
-                        version,
-                        expires_at_ms,
-                        previous_unclean: unclean,
-                    });
+            let was_held = self.held_epoch(key);
+            let (epoch, previous_unclean) = match current.as_ref() {
+                None => (1, false),
+                Some(found)
+                    if live
+                        && found.doc.holder == self.node
+                        && was_held == Some(found.doc.epoch) =>
+                {
+                    (found.doc.epoch, false)
                 }
-                Err(error) if error.kind() == ErrorKind::Conflict => {
-                    tracing::debug!(
-                        target: "openhuman::storage::lease",
-                        key,
-                        node = %self.node,
-                        attempt,
-                        "[lease] acquire raced another writer; re-reading"
-                    );
-                }
-                Err(error) => return Err(error.into()),
+                Some(found) if live && found.doc.holder == self.node && was_held.is_none() => (
+                    found
+                        .doc
+                        .epoch
+                        .checked_add(1)
+                        .ok_or_else(|| StorageError::backend("lease epoch overflow"))?,
+                    true,
+                ),
+                Some(found) if live => return Err(LeaseError::Held(record_of(found.doc.clone()))),
+                Some(found) => (
+                    found
+                        .doc
+                        .epoch
+                        .checked_add(1)
+                        .ok_or_else(|| StorageError::backend("lease epoch overflow"))?,
+                    !found.doc.released,
+                ),
+            };
+            let expires_ms = i64::try_from(now_ms)
+                .unwrap_or(i64::MAX)
+                .checked_add(self.ttl_ms)
+                .ok_or_else(|| StorageError::backend("lease deadline overflow"))?;
+            let body = LeaseBody {
+                holder: self.node.clone(),
+                epoch,
+                expires_ms,
+                endpoint: self.endpoint.clone(),
+                released: false,
+            };
+            if self.write_cas(&id, current.as_ref(), body.clone()).await? {
+                let version = self.next_version(key, epoch)?;
+                return Ok(LeaseGrant {
+                    key: key.to_string(),
+                    epoch,
+                    version,
+                    expires_at_ms: u64::try_from(expires_ms).unwrap_or_default(),
+                    previous_unclean,
+                });
             }
         }
-        Err(StorageError::conflict(format!(
-            "lease {key} kept changing under {ACQUIRE_ATTEMPTS} attempts"
-        ))
-        .into())
+        Err(LeaseError::Storage(StorageError::backend(
+            "lease acquire exceeded CAS retry budget",
+        )))
     }
 
     async fn renew(&self, grant: &LeaseGrant, now_ms: u64) -> Result<LeaseGrant, LeaseError> {
-        if now_ms >= grant.expires_at_ms {
+        validate_key(&grant.key)?;
+        let _gate = self.gate.lock().await;
+        if now_ms >= grant.expires_at_ms || !self.is_latest(grant) {
             tracing::info!(
                 target: "openhuman::storage::lease",
                 key = %grant.key,
                 node = %self.node,
                 epoch = grant.epoch,
-                "[lease] renew refused: grant already expired"
+                "[lease] renew refused: grant expired or superseded"
             );
             return Err(LeaseError::Lost);
         }
-        let expires_at_ms = now_ms.saturating_add(self.ttl_ms);
-        let version = self.rewrite(grant, expires_at_ms, false).await?;
-        tracing::trace!(
-            target: "openhuman::storage::lease",
-            key = %grant.key,
-            node = %self.node,
-            epoch = grant.epoch,
-            "[lease] renewed"
-        );
-        Ok(LeaseGrant {
-            version,
-            expires_at_ms,
-            ..grant.clone()
-        })
+        self.declare().await?;
+        let id = Self::id(&grant.key)?;
+        for _ in 0..32 {
+            let Some(current) = self.read(&grant.key).await? else {
+                return Err(LeaseError::Lost);
+            };
+            if current.doc.holder != self.node
+                || current.doc.epoch != grant.epoch
+                || current.doc.released
+                || current.doc.expires_ms <= i64::try_from(now_ms).unwrap_or(i64::MAX)
+            {
+                return Err(LeaseError::Lost);
+            }
+            let expires_ms = i64::try_from(now_ms)
+                .unwrap_or(i64::MAX)
+                .checked_add(self.ttl_ms)
+                .ok_or_else(|| StorageError::backend("lease deadline overflow"))?;
+            let mut body = current.doc.clone();
+            body.expires_ms = expires_ms;
+            if self.write_cas(&id, Some(&current), body).await? {
+                let version = self.next_version(&grant.key, grant.epoch)?;
+                return Ok(LeaseGrant {
+                    key: grant.key.clone(),
+                    epoch: grant.epoch,
+                    version,
+                    expires_at_ms: u64::try_from(expires_ms).unwrap_or_default(),
+                    previous_unclean: grant.previous_unclean,
+                });
+            }
+        }
+        Err(LeaseError::Storage(StorageError::backend(
+            "lease renew exceeded CAS retry budget",
+        )))
     }
 
     async fn release(&self, grant: LeaseGrant) -> Result<(), LeaseError> {
-        self.rewrite(&grant, grant.expires_at_ms, true).await?;
+        validate_key(&grant.key)?;
+        let _gate = self.gate.lock().await;
+        if !self.is_latest(&grant) {
+            return Err(LeaseError::Lost);
+        }
+        self.declare().await?;
+        let id = Self::id(&grant.key)?;
+        let mut released = false;
+        for _ in 0..32 {
+            let Some(current) = self.read(&grant.key).await? else {
+                return Err(LeaseError::Lost);
+            };
+            if current.doc.holder != self.node
+                || current.doc.epoch != grant.epoch
+                || current.doc.released
+            {
+                return Err(LeaseError::Lost);
+            }
+            let mut body = current.doc.clone();
+            body.released = true;
+            if self.write_cas(&id, Some(&current), body).await? {
+                released = true;
+                break;
+            }
+        }
+        if !released {
+            return Err(LeaseError::Storage(StorageError::backend(
+                "lease release exceeded CAS retry budget",
+            )));
+        }
         self.clear_held_if(&grant.key, grant.epoch);
         tracing::debug!(
             target: "openhuman::storage::lease",
@@ -343,11 +398,55 @@ impl LeaseStore for DocumentLeases {
     async fn holder(&self, key: &str) -> Result<Option<LeaseRecord>, LeaseError> {
         validate_key(key)?;
         self.declare().await?;
-        Ok(self.read(key).await?.map(|(_, record)| record))
+        Ok(self.read(key).await?.map(|record| record_of(record.doc)))
     }
 
-    fn record_scope(&self) -> Option<Scope> {
-        self.scope.clone()
+    async fn holder_readonly(&self, key: &str) -> Result<Option<LeaseRecord>, LeaseError> {
+        validate_key(key)?;
+        match self
+            .docs
+            .validate_collection_spec(&CollectionSpec::new(LEASE_COLLECTION))
+            .await
+        {
+            Ok(()) => {}
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                match self
+                    .docs
+                    .validate_collection_spec(&CollectionSpec::new("leases"))
+                    .await
+                {
+                    Ok(()) => {
+                        return Err(LeaseError::Storage(StorageError::backend(
+                            "legacy profile leases require explicit storage migration",
+                        )))
+                    }
+                    Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+                    Err(error) => return Err(LeaseError::Storage(error)),
+                }
+            }
+            Err(error) => return Err(LeaseError::Storage(error)),
+        }
+        self.read(key)
+            .await
+            .map(|record| record.map(|record| record_of(record.doc)))
+            .map_err(LeaseError::from)
+    }
+
+    fn write_condition(&self, key: &str, node: &str, epoch: u64) -> Option<WriteCondition> {
+        let scope = self.scope.clone()?;
+        let id = Key::new(format!("{LEASE_OWNER}/{key}")).ok()?;
+        let scope = DriverScope::new(scope.as_str()).ok()?;
+        WriteCondition::new(
+            scope,
+            LEASE_COLLECTION,
+            id.as_str().to_string(),
+            Filter::eq("epoch", epoch)
+                .and(Filter::eq("holder", node.to_string()))
+                .and(Filter::exists("released", false)),
+        )
+        .ok()?
+        .with_valid_until_field("expires_ms")
+        .ok()
     }
 }
 

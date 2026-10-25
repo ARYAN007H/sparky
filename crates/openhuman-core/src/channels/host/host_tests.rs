@@ -36,6 +36,10 @@ fn typed_channel_projection_uses_the_target_message_id_not_the_event_id() {
 
 #[tokio::test]
 async fn typed_channel_projection_uses_scoped_persisted_row_bindings_after_restart() {
+    // The default per-workspace memory backend is dropped by `forget`, which
+    // models a restart; installing one backend keeps the rows across it, the way
+    // a durable store does.
+    let _storage = crate::channels::module_fixture::install_memory_storage();
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
     use tinychannels_bus::{
         ChannelEvent, ChannelEventKind, ChannelReaction, ChannelRef, ConversationKind,

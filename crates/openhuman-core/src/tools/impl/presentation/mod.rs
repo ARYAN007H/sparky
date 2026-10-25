@@ -2,9 +2,9 @@
 //! structured slide spec via the native-Rust [`engine`] module.
 //!
 //! Flow:
-//! 1. Validate the JSON-Schema input early (`types::validate_input`)
-//!    so the agent gets a structured `InvalidInput` it can self-correct
-//!    on instead of a low-level error.
+//! 1. Validate source-agnostic request metadata through the bus contract before
+//!    touching image references, resolve readable images under host policy,
+//!    then validate the resolved bus spec before artifact production.
 //! 2. Start a [`Production`]: it reserves `<title>.pptx` in the files folder
 //!    (the card shows "generating…") and opens the versioned artifact — or,
 //!    with an `artifact_id` arg or a regenerate in scope, a new version of
@@ -35,8 +35,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde_json::{json, Value};
 
-use crate::agent::artifacts::production::Production;
-use crate::agent::artifacts::read_artifact_bytes;
+use crate::artifacts::production::Production;
+use crate::artifacts::read_artifact_bytes;
 use crate::security::SecurityPolicy;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
@@ -47,16 +47,17 @@ mod types;
 #[path = "presentation_tests.rs"]
 mod tests;
 
-use crate::tools::implementations::document::format::spec::SlideImage;
+use tinydocs_bus::spec::SlideImage;
 
 use self::types::{
-    validate_input, GeneratePresentationInput, GeneratePresentationOutput, SlideImageRequest,
-    SlideImageSource, MAX_IMAGE_BYTES,
+    to_bus_spec, validate_image_references, validate_request, GeneratePresentationInput,
+    GeneratePresentationOutput, PresentationError, SlideImageRequest, SlideImageSource,
+    MAX_IMAGE_BYTES,
 };
 
 /// Generation timeout. `ppt-rs` typically completes the full 64-slide
 /// cap in well under a second; the 30 s ceiling is a defensive bound
-/// against pathological inputs slipping past `validate_input` and
+/// against pathological inputs slipping past bus spec validation and
 /// the worst-case `spawn_blocking` thread-acquisition latency on a
 /// saturated runtime.
 const GENERATION_TIMEOUT: Duration = Duration::from_secs(30);
@@ -68,6 +69,30 @@ pub const TOOL_NAME: &str = "generate_presentation";
 #[async_trait]
 trait ImageInspector: Sync {
     async fn inspect(&self, bytes: &[u8]) -> Result<tinydocs_bus::ImageFacts, String>;
+}
+
+#[async_trait]
+trait ImageResolver: Sync {
+    async fn resolve(
+        &self,
+        tool: &PresentationTool,
+        input: &GeneratePresentationInput,
+        ctx: &DispatchCtx,
+    ) -> (Vec<Vec<SlideImage>>, Vec<String>);
+}
+
+struct HostImageResolver;
+
+#[async_trait]
+impl ImageResolver for HostImageResolver {
+    async fn resolve(
+        &self,
+        tool: &PresentationTool,
+        input: &GeneratePresentationInput,
+        ctx: &DispatchCtx,
+    ) -> (Vec<Vec<SlideImage>>, Vec<String>) {
+        tool.resolve_images(input, ctx).await
+    }
 }
 
 struct ModuleImageInspector<'a> {
@@ -107,7 +132,7 @@ impl ImageInspector for ModuleImageInspector<'_> {
 pub struct PresentationTool {
     workspace_dir: PathBuf,
     /// Visible folder the generated deck is written into (#5505).
-    files_dir: crate::agent::artifacts::FileRoots,
+    files_dir: crate::artifacts::FileRoots,
     /// Existing host config when the caller already owns the authoritative
     /// runtime snapshot. Keeping this optional preserves the ordinary agent
     /// constructor while avoiding a process-global config reload during
@@ -130,7 +155,7 @@ impl PresentationTool {
     /// active [`SecurityPolicy`] for validating `File`-source image paths.
     pub fn new(
         workspace_dir: PathBuf,
-        files_dir: impl Into<crate::agent::artifacts::FileRoots>,
+        files_dir: impl Into<crate::artifacts::FileRoots>,
         security: Arc<SecurityPolicy>,
     ) -> Self {
         Self {
@@ -147,7 +172,7 @@ impl PresentationTool {
     pub fn for_config(config: &crate::config::Config, security: Arc<SecurityPolicy>) -> Self {
         Self::with_config(
             config.workspace_dir.clone(),
-            crate::agent::artifacts::FileRoots::from_config(config),
+            crate::artifacts::FileRoots::from_config(config),
             security,
             config.clone(),
         )
@@ -156,7 +181,7 @@ impl PresentationTool {
     /// Construct the tool with an authoritative host config snapshot.
     pub(crate) fn with_config(
         workspace_dir: PathBuf,
-        files_dir: impl Into<crate::agent::artifacts::FileRoots>,
+        files_dir: impl Into<crate::artifacts::FileRoots>,
         security: Arc<SecurityPolicy>,
         config: crate::config::Config,
     ) -> Self {
@@ -323,6 +348,17 @@ impl PresentationTool {
         chat: Option<&crate::security::approval::ApprovalChatContext>,
         ctx: &DispatchCtx,
     ) -> anyhow::Result<ToolResult> {
+        self.run_with_resolver(args, chat, ctx, &HostImageResolver)
+            .await
+    }
+
+    async fn run_with_resolver(
+        &self,
+        args: Value,
+        chat: Option<&crate::security::approval::ApprovalChatContext>,
+        ctx: &DispatchCtx,
+        resolver: &impl ImageResolver,
+    ) -> anyhow::Result<ToolResult> {
         let input: GeneratePresentationInput = match serde_json::from_value(args.clone()) {
             Ok(v) => v,
             Err(err) => {
@@ -332,7 +368,29 @@ impl PresentationTool {
             }
         };
 
-        if let Err(err) = validate_input(&input) {
+        if let Err(err) = validate_request(&input).and_then(|()| validate_image_references(&input))
+        {
+            tracing::debug!(target: "presentation", err = %err, "[presentation] validation rejected input");
+            return Ok(ToolResult::error(err.to_string()));
+        }
+
+        // Resolve + validate per-slide images at the async boundary. A
+        // bad image is skipped with a warning (partial success) rather
+        // than failing the whole deck — mirrors the #3076 ethos.
+        let (resolved_images, image_warnings) = resolver.resolve(self, &input, ctx).await;
+        if !image_warnings.is_empty() {
+            tracing::info!(
+                target: "presentation",
+                warning_count = image_warnings.len(),
+                "[presentation] some images skipped with warnings"
+            );
+        }
+
+        let spec = match to_bus_spec(&input, resolved_images) {
+            Ok(spec) => spec,
+            Err(err) => return Ok(ToolResult::error(err.to_string())),
+        };
+        if let Err(err) = spec.validate().map_err(PresentationError::from) {
             tracing::debug!(target: "presentation", err = %err, "[presentation] validation rejected input");
             return Ok(ToolResult::error(err.to_string()));
         }
@@ -344,18 +402,6 @@ impl PresentationTool {
             slide_count = input.slides.len(),
             "[presentation] generation request accepted"
         );
-
-        // Resolve + validate per-slide images at the async boundary. A
-        // bad image is skipped with a warning (partial success) rather
-        // than failing the whole deck — mirrors the #3076 ethos.
-        let (resolved_images, image_warnings) = self.resolve_images(&input, ctx).await;
-        if !image_warnings.is_empty() {
-            tracing::info!(
-                target: "presentation",
-                warning_count = image_warnings.len(),
-                "[presentation] some images skipped with warnings"
-            );
-        }
 
         // Reserve the file and open the artifact: a new one, or a new version
         // of `artifact_id` / the regenerate target (same id, same file,
@@ -381,12 +427,9 @@ impl PresentationTool {
         // Retry can re-dispatch this exact spec deterministically (#3162).
         // Best-effort: a write failure only forfeits future regeneration,
         // it must not abort an otherwise-successful generation.
-        if let Err(err) = crate::agent::artifacts::store::save_artifact_args(
-            &self.workspace_dir,
-            production.id(),
-            &args,
-        )
-        .await
+        if let Err(err) =
+            crate::artifacts::store::save_artifact_args(&self.workspace_dir, production.id(), &args)
+                .await
         {
             tracing::warn!(
                 target: "presentation",
@@ -396,14 +439,7 @@ impl PresentationTool {
             );
         }
 
-        let bytes = match engine::generate(
-            &input,
-            &resolved_images,
-            GENERATION_TIMEOUT,
-            self.config.as_ref(),
-        )
-        .await
-        {
+        let bytes = match engine::generate(&spec, GENERATION_TIMEOUT, self.config.as_ref()).await {
             Ok(bytes) => bytes,
             Err(err) => {
                 production.fail(&err.to_string()).await;

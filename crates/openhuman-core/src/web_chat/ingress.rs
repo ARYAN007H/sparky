@@ -71,7 +71,7 @@ impl WebIngress {
                 .map_err(|error| format!("upload configuration unavailable: {error}"))?;
             // Stage where the turn will read: the thread's working folder when
             // one is bound (the turn applies the same folder), else action_dir.
-            let workspace = crate::agent::attachments::thread_action_dir(
+            let workspace = crate::attachments::thread_action_dir(
                 ctx,
                 &config,
                 &config.workspace_dir,
@@ -79,11 +79,11 @@ impl WebIngress {
             )
             .await
             .map_err(|error| format!("upload could not be saved: {error}"))?;
-            crate::agent::attachments::stage(
+            crate::attachments::stage(
                 &request.text,
                 &request.thread_id,
                 &config,
-                &crate::agent::attachments::AttachmentAccessScope {
+                &crate::attachments::AttachmentAccessScope {
                     external_channel: false,
                     workspace: Some(workspace),
                     ..Default::default()

@@ -22,7 +22,7 @@ async fn cancel_flow_run_cancels_when_flow_id_matches_the_owner() {
         &flow.id,
         json!({}),
         serde_json::Map::new(),
-        tinyflows_catalog::FlowRunTrigger::Rpc,
+        tinyflows_bus::runs::FlowRunTrigger::Rpc,
     )
     .await
     .unwrap();
@@ -148,6 +148,9 @@ async fn dry_run_workflow_by_flow_id_runs_the_saved_flow_graph() {
 
 #[tokio::test]
 async fn validate_workflow_by_draft_id_checks_the_draft_graph() {
+    // Reaches the connector module, whose route is process-wide: hold the module
+    // lock (before TEST_ENV_LOCK, the established order) for the whole test.
+    let _module = crate::integrations::composio::module_client::module_guard().await;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let draft = ops::flows_draft_create(
@@ -155,7 +158,7 @@ async fn validate_workflow_by_draft_id_checks_the_draft_graph() {
         None,
         "Draft".to_string(),
         valid_graph(),
-        tinyflows_catalog::DraftOrigin::Chat,
+        tinyflows_bus::catalog::DraftOrigin::Chat,
     )
     .unwrap()
     .value;
@@ -179,7 +182,7 @@ async fn save_workflow_by_draft_id_persists_the_draft_graph_onto_the_flow() {
         Some(flow_id.clone()),
         "Draft".to_string(),
         valid_graph(),
-        tinyflows_catalog::DraftOrigin::Chat,
+        tinyflows_bus::catalog::DraftOrigin::Chat,
     )
     .unwrap()
     .value;
@@ -197,7 +200,7 @@ async fn save_workflow_by_draft_id_persists_the_draft_graph_onto_the_flow() {
 
     // The draft's graph really landed on the flow.
     let saved = ops::flows_get(&config, &flow_id).await.unwrap().value;
-    assert_eq!(saved.graph.nodes.len(), 2);
+    assert_eq!(saved.graph["nodes"].as_array().unwrap().len(), 2);
 }
 
 #[tokio::test]
@@ -229,9 +232,11 @@ async fn revise_workflow_proposal_is_marked_unpersisted() {
 fn module_doc_tool_table_matches_registered_tools() {
     const SOURCE: &str = concat!(
         include_str!("builder_tools.rs"),
-        include_str!("builder_tools/catalog_search.rs"),
-        include_str!("builder_tools/connection_reads.rs"),
-        include_str!("builder_tools/tool_contract.rs"),
+        include_str!("../integrations/composio/builder_tools/mod.rs"),
+        include_str!("../integrations/composio/builder_tools/catalog_search.rs"),
+        include_str!("../integrations/composio/builder_tools/connection_reads.rs"),
+        include_str!("../integrations/composio/builder_tools/tool_contract.rs"),
+        include_str!("builder_tools_connection_reads.rs"),
     );
 
     let module_doc: String = SOURCE

@@ -9,6 +9,7 @@ fn config_with_rules(tmp: &tempfile::TempDir) -> crate::config::Config {
         ..crate::config::Config::default()
     };
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    crate::agent::session_host::test_support::install_managed_model_fixture(&config);
     config
 }
 
@@ -16,7 +17,7 @@ fn config_with_rules(tmp: &tempfile::TempDir) -> crate::config::Config {
 fn a_session_composes_the_operator_and_definition_layers() {
     let tmp = tempfile::TempDir::new().unwrap();
     let config = config_with_rules(&tmp);
-    let mut definition = crate::agent::registry::agents::load_builtins()
+    let mut definition = crate::agent_registry::agents::load_builtins()
         .unwrap()
         .into_iter()
         .find(|def| def.id == "orchestrator")
@@ -52,7 +53,7 @@ fn a_session_composes_the_operator_and_definition_layers() {
 /// A text-dialect session over the per-thread goal tools under `rules`,
 /// returning its rendered prompt and declared tool names.
 async fn goal_session_prompt(rules: serde_json::Value) -> (String, Vec<String>) {
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let action_dir = tempfile::tempdir().expect("tempdir");
     let config = crate::config::Config {
         tool_rules: serde_json::from_value(rules).expect("rules"),
@@ -62,6 +63,7 @@ async fn goal_session_prompt(rules: serde_json::Value) -> (String, Vec<String>) 
         std::sync::Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
     let mut host = crate::agent::SessionHostBuilder::new()
         .chat_model_with_config(model, std::sync::Arc::new(config))
+        .model_name("test/session-fixture".to_string())
         .tools(crate::agent::goals::goal_tools(action_dir.path()))
         .action_dir(action_dir.path().to_path_buf())
         .tool_dispatcher(Box::new(tinytools_agent::dialect::XmlDialect))

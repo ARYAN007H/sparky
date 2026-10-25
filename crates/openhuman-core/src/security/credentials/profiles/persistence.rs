@@ -21,7 +21,7 @@ use super::{
 /// The secret the profiles live in on a storage backend
 /// ([`crate::storage::secrets`]): the same JSON as `auth-profiles.json`,
 /// encrypted as one secret in the acting agent's scope.
-const STORAGE_SECRET_NAME: &str = "file:auth-profiles.json";
+pub(crate) const STORAGE_SECRET_NAME: &str = "file:auth-profiles.json";
 
 impl AuthProfilesStore {
     pub(super) fn save_locked(&self, data: &AuthProfilesData) -> Result<()> {
@@ -87,6 +87,18 @@ impl AuthProfilesStore {
                     updated_at: profile.updated_at.to_rfc3339(),
                 },
             );
+        }
+
+        if !self.use_keychain {
+            // Entries whose secrets are only in the unavailable keychain never
+            // reach `data`; keep them so they resolve once it reads again.
+            for (id, held) in self.read_persisted_locked()?.profiles {
+                if !persisted.profiles.contains_key(&id)
+                    && super::migration::keychain_held_oauth(&held)
+                {
+                    persisted.profiles.insert(id, held);
+                }
+            }
         }
 
         self.write_persisted_locked(&persisted)

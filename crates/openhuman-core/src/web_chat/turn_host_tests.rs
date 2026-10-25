@@ -53,6 +53,7 @@ async fn the_tap_forwards_in_order_brackets_open_work_and_signals_the_drain() {
         runner_tx,
         activity.clone(),
         drained_tx,
+        None,
     );
 
     for event in [
@@ -95,6 +96,7 @@ async fn the_drain_is_released_when_the_stream_ends_without_a_completion() {
         runner_tx,
         TurnActivity::default(),
         drained_tx,
+        None,
     );
     agent_tx.send(AgentProgress::TurnStarted).await.unwrap();
     assert_eq!(kind(&runner_rx.recv().await.unwrap()), "other");
@@ -117,6 +119,7 @@ async fn a_dropped_runner_stops_the_tap() {
         runner_tx,
         TurnActivity::default(),
         drained_tx,
+        None,
     );
     drop(runner_rx);
     agent_tx.send(AgentProgress::TurnStarted).await.unwrap();
@@ -125,6 +128,55 @@ async fn a_dropped_runner_stops_the_tap() {
         .expect("the tap ends with its consumer")
         .expect("no panic");
     assert!(*drained_rx.borrow());
+}
+
+/// A detached sub-agent that fails after its parent turn has finished (a child
+/// aborted by `subagent_cancel`) still settles its card: the tap keeps running
+/// past the runner and publishes the failure under the turn's ids.
+#[tokio::test]
+async fn a_late_subagent_failure_is_published_after_the_runner_is_gone() {
+    let mut bus = crate::web_chat::subscribe_web_channel_events();
+    let (agent_tx, agent_rx) = mpsc::channel(8);
+    let (runner_tx, runner_rx) = mpsc::channel(1);
+    let (drained_tx, _drained_rx) = watch::channel(false);
+    let _tap = tap_progress(
+        &DispatchCtx::ambient(),
+        agent_rx,
+        runner_tx,
+        TurnActivity::default(),
+        drained_tx,
+        Some(LateSubagentSink {
+            client_id: "late-client".into(),
+            thread_id: "late-thread".into(),
+            request_id: "late-request".into(),
+        }),
+    );
+    drop(runner_rx);
+    agent_tx.send(AgentProgress::TurnStarted).await.unwrap();
+    agent_tx
+        .send(AgentProgress::SubagentFailed {
+            agent_id: "researcher".into(),
+            task_id: "task-late".into(),
+            error: "cancelled".into(),
+        })
+        .await
+        .unwrap();
+    let event = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let event = bus.recv().await.expect("event bus");
+            if event.context().request_id == "late-request" {
+                return event;
+            }
+        }
+    })
+    .await
+    .expect("the late failure is published");
+    assert_eq!(event.event_name(), "subagent_failed");
+    assert_eq!(event.context().client_id, "late-client");
+    assert_eq!(event.context().thread_id, "late-thread");
+    let wire = serde_json::to_value(&event).expect("wire event");
+    assert_eq!(wire["skill_id"], "task-late");
+    assert_eq!(wire["success"], false);
 }
 
 #[tokio::test]

@@ -40,6 +40,8 @@ const IGNORED: &[&str] = &[
     "inference_start",
     "inference_heartbeat",
     "iteration_start",
+    // The web UI shows a summarizing indicator; the terminal has no such row.
+    "context_compacting",
     "turn_cost",
     "memory_activity",
     // `chat_error` already ends a cancelled turn (the core sends both for a

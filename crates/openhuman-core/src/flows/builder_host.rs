@@ -1,381 +1,367 @@
-//! The host half of the workflow-builder tool belt.
-//!
-//! The tools themselves (`edit_workflow`, `dry_run_workflow`, `save_workflow`,
-//! ...) live in `tinyflows_copilot::tools` and run over ports. [`FlowsHost`] is
-//! the one implementation of those ports for this process: it binds them to the
-//! workspace's draft and flow stores, the config-aware gate stack, the agent
-//! registry and the suggestion table, and adds no behaviour of its own.
-//! [`OverlayNodeKinds`] is the node-kind catalog with this host's caveats
-//! appended.
+//! Scope-bound host callbacks for TinyFlows Copilot over TinyBus.
 
+use std::future::Future;
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use serde_json::Value;
-use tinyflows::catalog::NodeKindContract;
-use tinyflows::model::WorkflowGraph;
-use tinyflows_catalog::types::FlowSuggestion;
-use tinyflows_catalog::{DraftOrigin, Flow, FlowDraft, FlowRevision, FlowRun, FlowValidation};
-use tinyflows_copilot::tools::ports::{
-    AgentDefinition, AgentDirectory, BuilderGates, DraftStore, FlowStore, NodeKindSource,
-    PortResult, SandboxRunRequest, SandboxRunner, SuggestionStore, Written,
-};
+use serde::de::DeserializeOwned;
+use serde_json::{json, Value};
+use tinybus::Result as BusResult;
+use tinyflows_bus::copilot::{self, CopilotHost, PortOperation};
 
 use crate::config::Config;
-use crate::flows::{ops, store};
+use crate::core::runtime::{CoreContext, DispatchCtx};
+use crate::modules::tinyflows as module;
 
-/// The workspace-bound implementation of every copilot tool port.
-pub struct FlowsHost {
+#[derive(Clone)]
+struct FlowsHost {
     config: Arc<Config>,
+    context: DispatchCtx,
+    runtime: Option<tokio::runtime::Handle>,
 }
 
 impl FlowsHost {
-    /// Binds the ports to `config`'s workspace.
-    pub fn new(config: Arc<Config>) -> Arc<Self> {
-        Arc::new(Self { config })
-    }
-
-    /// The context a port call runs under. The copilot ports carry none, so
-    /// this is the one place the host reads the calling task's ambient scope
-    /// (#7801) until the ports take a carrier.
-    fn ctx(&self) -> crate::core::runtime::DispatchCtx {
-        crate::core::runtime::DispatchCtx::ambient()
-    }
-}
-
-#[async_trait]
-impl DraftStore for FlowsHost {
-    async fn get(&self, id: &str) -> PortResult<FlowDraft> {
-        ops::flows_draft_get(&self.config, id).map(|o| o.value)
-    }
-
-    async fn create(
-        &self,
-        flow_id: Option<String>,
-        name: String,
-        graph: Value,
-        origin: DraftOrigin,
-    ) -> PortResult<FlowDraft> {
-        ops::flows_draft_create(&self.config, flow_id, name, graph, origin).map(|o| o.value)
-    }
-
-    async fn update(
-        &self,
-        id: &str,
-        name: Option<String>,
-        graph: Option<Value>,
-    ) -> PortResult<FlowDraft> {
-        ops::flows_draft_update(&self.config, id, name, graph, None).map(|o| o.value)
-    }
-}
-
-#[async_trait]
-impl FlowStore for FlowsHost {
-    async fn get(&self, id: &str) -> PortResult<Flow> {
-        ops::flows_get(&self.config, id).await.map(|o| o.value)
-    }
-
-    async fn list(&self) -> PortResult<Vec<Flow>> {
-        ops::flows_list(&self.config).await.map(|o| o.value)
-    }
-
-    async fn load_graph(&self, id: &str) -> PortResult<Option<WorkflowGraph>> {
-        ops::load_flow_graph(&self.config, id)
-    }
-
-    async fn create(&self, name: String, graph: Value, require_approval: bool) -> PortResult<Flow> {
-        ops::flows_create(&self.config, name, graph, require_approval)
-            .await
-            .map(|o| o.value)
-    }
-
-    async fn update(
-        &self,
-        id: &str,
-        name: Option<String>,
-        graph: Option<Value>,
-    ) -> PortResult<Written<Flow>> {
-        ops::flows_update(&self.config, id, name, graph, None, None)
-            .await
-            .map(|o| Written {
-                value: o.value,
-                logs: o.logs,
-            })
-    }
-
-    async fn set_enabled(&self, id: &str, enabled: bool) -> PortResult<Flow> {
-        ops::flows_set_enabled(&self.config, id, enabled)
-            .await
-            .map(|o| o.value)
-    }
-
-    async fn duplicate(&self, id: &str) -> PortResult<Flow> {
-        ops::flows_duplicate(&self.config, id)
-            .await
-            .map(|o| o.value)
-    }
-
-    async fn history(&self, id: &str, limit: usize) -> PortResult<Vec<FlowRevision>> {
-        ops::flows_get_history(&self.config, id, limit).map(|o| o.value)
-    }
-
-    async fn list_runs(&self, flow_id: &str, limit: usize) -> PortResult<Vec<FlowRun>> {
-        ops::flows_list_runs(&self.config, flow_id, limit)
-            .await
-            .map(|o| o.value)
-    }
-
-    async fn get_run(&self, run_id: &str) -> PortResult<FlowRun> {
-        ops::flows_get_run(&self.config, run_id)
-            .await
-            .map(|o| o.value)
-    }
-
-    async fn resume(
-        &self,
-        flow_id: &str,
-        run_id: &str,
-        approve: Vec<String>,
-        reject: Vec<String>,
-    ) -> PortResult<Value> {
-        let ctx = self.ctx();
-        ops::flows_resume(&ctx, &self.config, flow_id, run_id, approve, reject)
-            .await
-            .map(|o| o.value)
-    }
-
-    async fn cancel_run(&self, run_id: &str) -> PortResult<Value> {
-        ops::flows_cancel_run(&self.config, run_id)
-            .await
-            .map(|o| o.value)
-    }
-}
-
-#[async_trait]
-impl SandboxRunner for FlowsHost {
-    async fn run(&self, request: SandboxRunRequest) -> PortResult<Value> {
-        use tinybus::Proxy;
-        use tinyflows_bus::runs::{self, SandboxRun, SandboxRunResponse};
-
-        // Loading the module first applies the normal component/registry gate.
-        let _schedule = crate::modules::tinyflows::proxy(&self.config)
-            .await
-            .map_err(|error| error.to_string())?;
-        let runtime = crate::modules::runtime::runtime()
-            .await
-            .map_err(|error| error.to_string())?;
-        let connection = runtime.connection().clone();
-        let object_path = sandbox_callback_object_path(uuid::Uuid::new_v4())
-            .map_err(|error| error.to_string())?;
-        let path = object_path.to_string();
-        let served_path = object_path.clone();
-        let callback = SandboxToolPreflight {
-            config: self.config.clone(),
-            dispatch: crate::core::runtime::DispatchCtx::ambient(),
-        };
-        // The registration task owns the lease it returns. If this caller is
-        // canceled while request_name/serve_at is pending, dropping its
-        // JoinHandle detaches the task; the returned lease is then dropped
-        // when registration completes and unregisters the callback.
-        let callback_lease = await_registration(runtime.spawn(async move {
-            connection.request_name(SANDBOX_CALLBACK_BUS).await?;
-            connection.serve_at(served_path.clone(), callback).await?;
-            Ok::<_, tinybus::Error>(SandboxCallbackLease {
-                runtime,
-                path: Some(served_path),
-            })
-        }))
-        .await
-        .map_err(|error| error.to_string())?
-        .map_err(|error| error.to_string())?;
-
-        let response = async {
-            let proxy: Proxy = runtime
-                .connection()
-                .proxy(tinyflows_bus::BUS_NAME, runs::OBJECT_PATH, runs::INTERFACE)
-                .map_err(|error| error.to_string())?;
-            let report: SandboxRunResponse = proxy
-                .with_timeout(std::time::Duration::from_secs(60))
-                .call(
-                    runs::methods::SANDBOX_RUN,
-                    (SandboxRun {
-                        graph: request.graph,
-                        input: request.input,
-                        tool_invoker: runs::CallbackAddress {
-                            destination: SANDBOX_CALLBACK_BUS.to_string(),
-                            object_path: path.clone(),
-                        },
-                        permissions_manifest: request.permissions_manifest,
-                    },),
-                )
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok::<_, String>(report.result)
-        }
-        .await;
-        drop(callback_lease);
-        response
-    }
-}
-
-const SANDBOX_CALLBACK_BUS: &str = "ai.tinyhumans.openhuman.FlowSandboxHost";
-
-fn sandbox_callback_object_path(id: uuid::Uuid) -> Result<tinybus::ObjectPath, tinybus::Error> {
-    tinybus::ObjectPath::new(format!(
-        "/ai/tinyhumans/openhuman/FlowSandbox/{}",
-        id.simple()
-    ))
-}
-
-struct SandboxToolPreflight {
-    config: Arc<Config>,
-    dispatch: crate::core::runtime::DispatchCtx,
-}
-
-#[tinybus::interface(name = "ai.tinyhumans.tinyflows.CapsHost")]
-impl SandboxToolPreflight {
-    async fn tool_invoke(
-        &self,
-        slug: String,
-        args: Value,
-        _connection: Option<String>,
-    ) -> tinybus::Result<Value> {
-        let Some(core) = self.dispatch.resolved() else {
-            return Err(tinybus::Error::failed(
-                "the workflow sandbox lost its calling context",
-            ));
-        };
-        let config = self.config.clone();
-        crate::core::runtime::CoreContext::scope(core, async move {
-            if let Some(backend) = crate::flows::tinyflows::caps::tools::backend_for(&slug) {
-                backend
-                    .preflight(&config, &slug, &args)
-                    .await
-                    .map_err(tinybus::Error::failed)?;
+    async fn in_context<T, F>(&self, work: F) -> Result<T, String>
+    where
+        T: Send + 'static,
+        F: Future<Output = Result<T, String>> + Send + 'static,
+    {
+        let context = self.context.clone();
+        let work = async move {
+            if let Some(core) = context.core().cloned() {
+                CoreContext::scope(core, work).await
+            } else {
+                work.await
             }
-            Ok(serde_json::json!({"preflight": "passed"}))
+        };
+        match &self.runtime {
+            Some(runtime) => runtime
+                .spawn(work)
+                .await
+                .map_err(|error| format!("the Copilot host callback did not finish: {error}"))?,
+            None => work.await,
+        }
+    }
+
+    async fn dispatch_call_port(&self, request: copilot::PortCallRequest) -> Result<Value, String> {
+        let config = Arc::clone(&self.config);
+        let context = self.context.clone();
+        self.in_context(async move {
+            let payload = request.payload;
+            macro_rules! wire {
+                ($value:expr) => {
+                    serde_json::to_value($value).map_err(|error| error.to_string())?
+                };
+            }
+            let value = match request.operation {
+                PortOperation::DraftGet => {
+                    wire!(ops::flows_draft_get(&config, &required::<String>(&payload, "id")?)?.value)
+                }
+                PortOperation::DraftCreate => {
+                    ops::flows_draft_create_from_copilot(
+                        &config,
+                        optional_field(&payload, "flow_id")?,
+                        required(&payload, "name")?,
+                        required(&payload, "graph")?,
+                        required(&payload, "origin")?,
+                    )?
+                }
+                PortOperation::DraftUpdate => {
+                    wire!(ops::flows_draft_update(
+                        &config,
+                        &required::<String>(&payload, "id")?,
+                        optional_field(&payload, "name")?,
+                        optional_field(&payload, "graph")?,
+                        None,
+                    )?
+                    .value)
+                }
+                PortOperation::FlowsGet => {
+                    wire!(ops::flows_get(&config, &required::<String>(&payload, "id")?)
+                        .await?
+                        .value)
+                }
+                PortOperation::FlowsList => wire!(ops::flows_list(&config).await?.value),
+                PortOperation::FlowsLoadGraph => {
+                    wire!(ops::load_flow_graph(&config, &required::<String>(&payload, "id")?)?)
+                }
+                PortOperation::FlowsCreate => {
+                    wire!(ops::flows_create_with_context(
+                        &context,
+                        &config,
+                        required(&payload, "name")?,
+                        required(&payload, "graph")?,
+                        optional_field::<bool>(&payload, "require_approval")?.unwrap_or(true),
+                    )
+                    .await?
+                    .value)
+                }
+                PortOperation::FlowsUpdate => {
+                    let outcome = ops::flows_update_with_context(
+                        &context,
+                        &config,
+                        &required::<String>(&payload, "id")?,
+                        optional_field(&payload, "name")?,
+                        optional_field(&payload, "graph")?,
+                        None,
+                        None,
+                    )
+                    .await?;
+                    json!({"value": outcome.value, "logs": outcome.logs})
+                }
+                PortOperation::FlowsSetEnabled => {
+                    wire!(ops::flows_set_enabled(
+                        &config,
+                        &required::<String>(&payload, "id")?,
+                        required(&payload, "enabled")?,
+                    )
+                    .await?
+                    .value)
+                }
+                PortOperation::FlowsDuplicate => {
+                    wire!(ops::flows_duplicate(&config, &required::<String>(&payload, "id")?)
+                        .await?
+                        .value)
+                }
+                PortOperation::FlowsHistory => wire!(ops::flows_get_history(
+                    &config,
+                    &required::<String>(&payload, "id")?,
+                    optional_field::<usize>(&payload, "limit")?.unwrap_or(20),
+                )?
+                .value),
+                PortOperation::FlowsListRuns => wire!(ops::flows_list_runs(
+                    &config,
+                    &required::<String>(&payload, "flow_id")?,
+                    optional_field::<usize>(&payload, "limit")?.unwrap_or(20),
+                )
+                .await?
+                .value),
+                PortOperation::FlowsGetRun => {
+                    wire!(ops::flows_get_run(&config, &required::<String>(&payload, "run_id")?)
+                        .await?
+                        .value)
+                }
+                PortOperation::FlowsResume => {
+                    wire!(ops::flows_resume(
+                        &context,
+                        &config,
+                        &required::<String>(&payload, "flow_id")?,
+                        &required::<String>(&payload, "run_id")?,
+                        optional_field(&payload, "approve")?.unwrap_or_default(),
+                        optional_field(&payload, "reject")?.unwrap_or_default(),
+                    )
+                    .await?
+                    .value)
+                }
+                PortOperation::FlowsCancelRun => {
+                    wire!(ops::flows_cancel_run(&config, &required::<String>(&payload, "run_id")?)
+                        .await?
+                        .value)
+                }
+                PortOperation::AgentsList => {
+                    let agents = crate::agent_registry::list_agents(&context, false)
+                        .await
+                        .map_err(|error| error.to_string())?;
+                    wire!(agents
+                        .iter()
+                        .map(|agent| {
+                            json!({
+                                "id": agent.id,
+                                "name": agent.name,
+                                "description": agent.description,
+                                "model": serde_json::to_value(&agent.model).unwrap_or(Value::Null),
+                                "tools": serde_json::to_value(&agent.tool_allowlist).unwrap_or(Value::Null),
+                                "tags": serde_json::to_value(&agent.tags).unwrap_or(Value::Null),
+                            })
+                        })
+                        .collect::<Vec<_>>())
+                }
+                PortOperation::SuggestionsUpsert => {
+                    json!(ops::flows_suggestions_upsert_from_copilot(
+                        &config, payload
+                    )?)
+                }
+                PortOperation::GatesValidate => wire!(ops::flows_validate(&context, &config, payload).await.value),
+                PortOperation::GatesRun => {
+                    wire!(ops::run_builder_gates_json(&context, &config, payload).await?)
+                }
+                PortOperation::GatesStrict => {
+                    ops::strict_gate(&context, &config, &payload).await?;
+                    json!(true)
+                }
+                PortOperation::GatesEngineCompatibility => {
+                    wire!(ops::engine_compatibility_errors_json(&context, &config, payload).await?)
+                }
+                PortOperation::GatesWiringWarnings => {
+                    wire!(ops::wiring_warnings_json(&context, &config, payload).await?)
+                }
+                PortOperation::GatesApprovalManifest => {
+                    wire!(ops::approval_manifest_json(&context, &config, payload).await?)
+                }
+            };
+            Ok(value)
+        })
+        .await
+    }
+
+    async fn dispatch_build_proposal(
+        &self,
+        request: copilot::BuildProposalRequest,
+    ) -> Result<Value, String> {
+        let config = Arc::clone(&self.config);
+        let context = self.context.clone();
+        self.in_context(async move {
+            ops::build_builder_proposal_json(
+                &context,
+                &config,
+                request.retry_tool,
+                request.name,
+                request.graph,
+                request.require_approval,
+                request.revision,
+                request.instruction,
+                request.draft_id,
+                request.flow_id,
+            )
+            .await
+        })
+        .await
+    }
+
+    async fn dispatch_run_flow(&self, request: copilot::RunFlowRequest) -> Result<Value, String> {
+        let config = Arc::clone(&self.config);
+        let context = self.context.clone();
+        self.in_context(async move {
+            ops::flows_run_copilot(
+                &context,
+                &config,
+                &request.flow_id,
+                request.input,
+                request.inputs,
+            )
+            .await
+            .map(|outcome| outcome.value)
+        })
+        .await
+    }
+
+    async fn preflight_tool(&self, slug: String, args: Value) -> Result<Value, String> {
+        let config = Arc::clone(&self.config);
+        self.in_context(async move {
+            preflight_mock_tool(&config, &slug, &args).await?;
+            // The module discards this acknowledgement and returns only its
+            // deterministic MockTools result. Never invoke the real backend.
+            Ok(Value::Null)
         })
         .await
     }
 }
 
-struct SandboxCallbackLease {
-    runtime: &'static tinybus::module::ModuleRuntime,
-    path: Option<tinybus::ObjectPath>,
-}
-
-async fn await_registration<T>(
-    task: tokio::task::JoinHandle<Result<T, tinybus::Error>>,
-) -> Result<Result<T, tinybus::Error>, tokio::task::JoinError> {
-    task.await
-}
-
-impl Drop for SandboxCallbackLease {
-    fn drop(&mut self) {
-        let Some(path) = self.path.take() else {
-            return;
-        };
-        let connection = self.runtime.connection().clone();
-        self.runtime.spawn(async move {
-            let _ = connection.unserve(&path).await;
-        });
-    }
-}
-
-#[async_trait]
-impl BuilderGates for FlowsHost {
-    async fn validate(&self, graph: Value) -> FlowValidation {
-        ops::flows_validate(graph).value
-    }
-
-    async fn run_gates(&self, graph: &WorkflowGraph) -> Vec<String> {
-        ops::run_builder_gates(&self.ctx(), &self.config, graph).await
-    }
-
-    async fn strict_gate(&self, graph: &Value) -> PortResult<()> {
-        ops::strict_gate(&self.ctx(), &self.config, graph).await
-    }
-
-    async fn engine_compatibility_errors(&self, graph: &WorkflowGraph) -> Vec<String> {
-        ops::config_aware_engine_compatibility_errors(&self.config, graph)
-    }
-
-    async fn wiring_warnings(&self, graph: &WorkflowGraph) -> Vec<String> {
-        ops::graph_wiring_warnings(&self.config, graph).await
-    }
-
-    async fn approval_manifest(&self, graph: &WorkflowGraph) -> Vec<Value> {
-        ops::compute_approval_manifest(&self.config, graph).await
-    }
-
-    async fn build_proposal(
-        &self,
-        retry_tool: &str,
-        name: &str,
-        graph: &WorkflowGraph,
-        require_approval: bool,
-        revision: bool,
-        instruction: Option<String>,
-        draft_id: Option<String>,
-        flow_id: Option<String>,
-    ) -> Result<Value, String> {
-        ops::build_builder_proposal(
-            &self.ctx(),
-            &self.config,
-            retry_tool,
-            name,
-            graph,
-            require_approval,
-            revision,
-            instruction,
-            draft_id,
-            flow_id,
-        )
-        .await
-    }
-}
-
-#[async_trait]
-impl AgentDirectory for FlowsHost {
-    async fn list(&self) -> PortResult<Vec<AgentDefinition>> {
-        let agents = crate::agent::registry::list_agents(&self.ctx(), false)
+async fn preflight_mock_tool(config: &Config, slug: &str, args: &Value) -> Result<(), String> {
+    if let Some(backend) = crate::flows::caps_host::tools::backend_for(slug) {
+        backend
+            .preflight(config, slug, args)
             .await
-            .map_err(|e| e.to_string())?;
-        Ok(agents
-            .iter()
-            .map(|a| AgentDefinition {
-                id: a.id.clone(),
-                name: a.name.clone(),
-                description: a.description.clone(),
-                model: serde_json::to_value(&a.model).unwrap_or(Value::Null),
-                tools: serde_json::to_value(&a.tool_allowlist).unwrap_or(Value::Null),
-                tags: serde_json::to_value(&a.tags).unwrap_or(Value::Null),
-            })
-            .collect())
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn required<T: DeserializeOwned>(value: &Value, key: &str) -> Result<T, String> {
+    optional_field(value, key)?.ok_or_else(|| format!("missing `{key}`"))
+}
+
+fn optional_field<T: DeserializeOwned>(value: &Value, key: &str) -> Result<Option<T>, String> {
+    match value.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => serde_json::from_value(value.clone())
+            .map(Some)
+            .map_err(|error| format!("bad `{key}`: {error}")),
     }
 }
 
-#[async_trait]
-impl SuggestionStore for FlowsHost {
-    async fn upsert(&self, suggestions: &[FlowSuggestion]) -> PortResult<usize> {
-        store::upsert_suggestions(&self.config, suggestions).map_err(|e| e.to_string())
+fn bus_error(member: &str, error: impl std::fmt::Display) -> tinybus::Error {
+    tracing::debug!(callback = member, %error, "[flows:copilot] host callback failed");
+    tinybus::Error::failed(error)
+}
+
+struct CopilotCapsHost(FlowsHost);
+
+#[tinybus::interface(name = "ai.tinyhumans.tinyflows.CopilotHost")]
+impl FlowsHost {
+    async fn call_port(&self, request: copilot::PortCallRequest) -> BusResult<Value> {
+        self.dispatch_call_port(request)
+            .await
+            .map_err(|error| bus_error("CallPort", error))
+    }
+
+    async fn build_proposal(&self, request: copilot::BuildProposalRequest) -> BusResult<Value> {
+        self.dispatch_build_proposal(request)
+            .await
+            .map_err(|error| bus_error("BuildProposal", error))
+    }
+
+    async fn run_flow(&self, request: copilot::RunFlowRequest) -> BusResult<Value> {
+        self.dispatch_run_flow(request)
+            .await
+            .map_err(|error| bus_error("RunFlow", error))
     }
 }
 
-/// The portable node-kind catalog with this host's overlay applied
-/// ([`node_contracts`](super::node_contracts)).
-pub struct OverlayNodeKinds;
-
-impl NodeKindSource for OverlayNodeKinds {
-    fn all(&self) -> Vec<NodeKindContract> {
-        super::node_contracts::all_node_kind_contracts()
+#[tinybus::interface(name = "ai.tinyhumans.tinyflows.CapsHost")]
+impl CopilotCapsHost {
+    /// Validate mock tool arguments only; sandbox results stay module-owned.
+    async fn tool_invoke(
+        &self,
+        slug: String,
+        args: Value,
+        _connection: Option<String>,
+    ) -> BusResult<Value> {
+        self.0
+            .preflight_tool(slug, args)
+            .await
+            .map_err(|error| bus_error("ToolInvoke", error))
     }
+}
 
-    fn get(&self, kind: &str) -> Option<NodeKindContract> {
-        super::node_contracts::node_kind_contract(kind)
+/// A served Copilot host callback. Its address is passed in the invocation
+/// envelope and remains fixed for the entire tool call.
+pub(crate) struct HostRegistration {
+    _registration: module::ServedObjectRegistration,
+    address: CopilotHost,
+}
+
+impl HostRegistration {
+    pub(crate) fn address(&self) -> CopilotHost {
+        self.address.clone()
     }
+}
+
+pub(crate) async fn register(
+    config: Arc<Config>,
+    context: DispatchCtx,
+) -> Result<HostRegistration, String> {
+    let path = format!(
+        "/ai/tinyhumans/openhuman/CopilotHost/h{}",
+        uuid::Uuid::new_v4().simple()
+    );
+    let host = FlowsHost {
+        config,
+        context,
+        runtime: tokio::runtime::Handle::try_current().ok(),
+    };
+    let registration =
+        module::serve_pair(path.clone(), host.clone(), CopilotCapsHost(host)).await?;
+    Ok(HostRegistration {
+        _registration: registration,
+        address: CopilotHost {
+            bus_name: module::HOST_BUS_NAME.to_string(),
+            object_path: path,
+        },
+    })
 }
 
 #[cfg(test)]
 #[path = "builder_host_tests.rs"]
 mod tests;
+
+use super::ops;

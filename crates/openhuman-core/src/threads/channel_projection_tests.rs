@@ -34,7 +34,8 @@ fn key(
 
 #[test]
 fn provider_receipt_maps_to_the_exact_thread_and_row_after_restart() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(crate::storage::MemoryStorage::new());
+    let backend: Arc<dyn StorageBackend> =
+        Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
     let first = repo(&backend);
     let binding = key(
         "tenant-agent-a",
@@ -65,7 +66,8 @@ fn provider_receipt_maps_to_the_exact_thread_and_row_after_restart() {
 
 #[test]
 fn provider_receipts_are_scoped_by_tenant_account_and_full_conversation() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(crate::storage::MemoryStorage::new());
+    let backend: Arc<dyn StorageBackend> =
+        Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
     let repo = repo(&backend);
     let original = key(
         "tenant-agent-a",
@@ -120,7 +122,8 @@ fn provider_receipts_are_scoped_by_tenant_account_and_full_conversation() {
 
 #[test]
 fn sender_scoped_threads_can_share_a_conversation_without_overwriting() {
-    let backend: Arc<dyn StorageBackend> = Arc::new(crate::storage::MemoryStorage::new());
+    let backend: Arc<dyn StorageBackend> =
+        Arc::new(tinystoragedrivers_testkit::MemoryBackend::new());
     let repo = repo(&backend);
     let alice = key(
         "tenant",
@@ -251,6 +254,9 @@ fn channel_activity_emits_atomic_keyed_merge_patches() {
 
 #[tokio::test]
 async fn persisted_activity_merges_concurrent_events_for_the_exact_scoped_row() {
+    // `forget` below models a restart; one installed backend keeps the rows
+    // across it, as a durable store does.
+    let _storage = crate::channels::module_fixture::install_memory_storage();
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
     use crate::threads::store::{self, ConversationMessage, CreateConversationThread};
     use tinychannels_bus::{

@@ -551,3 +551,7 @@ pub(crate) fn drop_media_read_lease_for_test(
 #[cfg(test)]
 #[path = "native_media_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_media_flow_tests.rs"]
+pub(in crate::channels::runtime::dispatch::processor) mod flow_tests;

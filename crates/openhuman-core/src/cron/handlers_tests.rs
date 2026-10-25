@@ -1,5 +1,6 @@
 use super::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use tinyflows_bus::schedule::types::Schedule;
 
 /// Answers jobs whose command starts with `handlers-test:` and hands every
 /// other job to the handler it replaced, so parallel tests keep the defaults.
@@ -44,6 +45,7 @@ fn every_job_kind_has_a_default_handler() {
 
 #[test]
 fn a_later_registration_wins_and_dropping_restores_in_order() {
+    let _kinds = KIND_REGISTRY_TEST_LOCK.blocking_lock();
     let default = kind_handler(&JobType::Flow).unwrap();
     let first: Arc<dyn JobKindHandler> = tagged("first");
     let second: Arc<dyn JobKindHandler> = tagged("second");
@@ -66,6 +68,7 @@ fn a_later_registration_wins_and_dropping_restores_in_order() {
 
 #[tokio::test]
 async fn the_registered_handler_decides_the_outcome() {
+    let _kinds = KIND_REGISTRY_TEST_LOCK.lock().await;
     let handler = tagged("custom");
     let calls = Arc::clone(&handler.calls);
     let _guard = register_kind(JobType::Flow, handler);
@@ -84,7 +87,12 @@ async fn the_registered_handler_decides_the_outcome() {
             &config.action_dir,
         )),
     );
-    let job = crate::cron::scheduler::run_delivery::stand_in_for_test("handlers-test:x");
+    let job = crate::cron::add_flow_schedule_job(
+        &config,
+        "handlers-test:x",
+        Schedule::Every { every_ms: 60_000 },
+    )
+    .unwrap();
     let outcome = registry
         .run(&JobRunContext::new(binding), &job, "run-1")
         .await;

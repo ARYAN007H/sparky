@@ -5,13 +5,10 @@
 //! (module gate, removed-agent context, shutdown) and performs the bus calls.
 
 use super::*;
-use std::sync::OnceLock;
 use tinymcp_bus::client_lifecycle::{AdmitError, CleanupReservation, ClientTable};
 
-static CLIENTS: OnceLock<ClientTable<McpConfiguredClient>> = OnceLock::new();
-
 pub(super) fn table() -> &'static ClientTable<McpConfiguredClient> {
-    CLIENTS.get_or_init(ClientTable::new)
+    super::super::host_cleanup::table()
 }
 
 impl McpConfiguredClient {
@@ -52,6 +49,54 @@ impl McpConfiguredClient {
     /// The supervisor only drains open objects; it never creates a workspace.
     pub(crate) fn open_clients() -> Vec<(PathBuf, Arc<Self>)> {
         table().snapshot()
+    }
+
+    /// Observes an already-open MCP client for this exact workspace and
+    /// configuration. This path never creates a client or drives its
+    /// lifecycle, so an absent or stale runtime is reported as `None`.
+    pub(crate) async fn existing_status_for_config(
+        config: &Config,
+    ) -> Result<Option<Vec<tinymcp_bus::ConnStatus>>, ModuleCallError> {
+        let data_dir = crate::core::runtime::agent_scope_dir(config);
+        let key = client_key(&data_dir);
+        let Some(client) = table()
+            .snapshot()
+            .into_iter()
+            .find(|(candidate, _)| candidate == &key)
+            .map(|(_, client)| client)
+        else {
+            return Ok(None);
+        };
+        client
+            .existing_status_if_open(&super::super::host::client_config(config))
+            .await
+    }
+
+    async fn existing_status_if_open(
+        &self,
+        selected_config: &McpClientConfig,
+    ) -> Result<Option<Vec<tinymcp_bus::ConnStatus>>, ModuleCallError> {
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retiring.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        let state = self.state.lock().await;
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retiring.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        let Some(object) = state.open_object() else {
+            return Ok(None);
+        };
+        if object.config != *selected_config {
+            return Ok(None);
+        }
+        let args = serde_json::to_value(()).map_err(|_| ModuleCallError::ModuleFault)?;
+        let reply = self
+            .port
+            .call_object_if_ready(&object.object_path, names::methods::STATUS, args, false)
+            .await?;
+        serde_json::from_value(reply)
+            .map(Some)
+            .map_err(|_| ModuleCallError::ModuleFault)
     }
 
     /// Drain observations from the module-owned supervisor for an open child.
@@ -115,9 +160,10 @@ impl McpConfiguredClient {
             .to_owned();
         Ok(Self::with_port(
             data_dir,
-            Box::new(TinyMcpPort {
-                root: crate::modules::client(config.clone()),
-            }),
+            Box::new(
+                TinyMcpPort::new(crate::modules::client(config.clone()))
+                    .with_host_config(config.clone()),
+            ),
         ))
     }
 
@@ -253,7 +299,7 @@ impl McpConfiguredClient {
 /// same folder (symlinks, `..`, case on case-insensitive volumes). The longest
 /// existing ancestor is canonicalized and the rest re-appended, so a directory
 /// that a purge has already removed keeps the key it was admitted under.
-fn client_key(data_dir: &std::path::Path) -> PathBuf {
+pub(crate) fn client_key(data_dir: &std::path::Path) -> PathBuf {
     let mut missing = Vec::new();
     let mut ancestor = data_dir;
     loop {

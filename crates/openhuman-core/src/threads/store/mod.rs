@@ -38,7 +38,9 @@ pub mod blocking;
 mod bus;
 mod legacy_import;
 mod storage_schema;
-pub use storage_schema::storage_schema;
+pub(crate) use storage_schema::collection_specs;
+#[cfg(feature = "legacy-import")]
+pub(crate) use storage_schema::upgrade_records;
 pub(crate) use storage_schema::{CHANNEL_MESSAGES, REPLY_VISEME_TIMELINES, STAGED_ATTACHMENTS};
 #[cfg(test)]
 #[path = "legacy_import_tests.rs"]

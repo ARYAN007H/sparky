@@ -81,8 +81,7 @@ async fn failed_subagent_run_keeps_its_unanswered_round_out_of_history() {
     let mut history = vec![TranscriptMessage::user("please echo twice")];
     let workspace = tempfile::TempDir::new().expect("temp workspace");
     let stem = "root-session__failed_run";
-    let locator =
-        crate::agent::session_store::transcripts_or_files("orchestrator", workspace.path());
+    let locator = crate::storage::sessions::transcripts_or_files("orchestrator", workspace.path());
     let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     run_context.transcripts = Some(locator.clone());
 
@@ -96,7 +95,7 @@ async fn failed_subagent_run_keeps_its_unanswered_round_out_of_history() {
         vec![],
         allowed,
         10,
-        None,
+        (None, None),
         None,
         "researcher",
         "task-failed",
@@ -111,6 +110,7 @@ async fn failed_subagent_run_keeps_its_unanswered_round_out_of_history() {
         stem,
         "mock-channel",
         AgentTokenjuiceCompression::Off,
+        None,
         None,
     )
     .await;

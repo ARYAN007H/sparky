@@ -11,13 +11,13 @@ use tokio::sync::mpsc;
 
 use crate::{
     agent::{
-        host_agents::HostAgent,
-        queued_turn::QueuedTurn,
-        session_host::OpenHumanSessionHost,
+        host_agents::HostAgent, queued_turn::QueuedTurn, session_host::OpenHumanSessionHost,
         turn_env::HostTurnEnv,
+    },
+    security::{
+        approval::ApprovalTurnContext,
         turn_origin::{with_origin, AgentTurnOrigin},
     },
-    security::approval::ApprovalTurnContext,
 };
 
 /// Trusted identity and authority selected at an inbound host boundary.

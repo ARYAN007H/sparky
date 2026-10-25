@@ -30,6 +30,7 @@ mod common;
 mod host_pipeline;
 mod identity;
 mod prompt;
+mod runtime_debounce;
 mod runtime_dispatch;
 mod runtime_hardening;
 mod runtime_tool_calls;

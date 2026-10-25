@@ -11,23 +11,22 @@
 //!   openhuman agent prompt-size [--agent <id>] [--workspace <path>] [--json] [-v]
 //!   openhuman agent list [--json] [-v]
 //!
-//! `dump-prompt` is the main tool: it renders the exact system prompt the
-//! context engine would hand to the LLM when that agent is spawned. The
-//! dump routes through [`OpenHumanSessionHost::from_config_for_agent`] and calls
-//! [`OpenHumanSessionHost::build_system_prompt`] on the live session, so the output is
-//! byte-identical to what the LLM sees on turn 1. Pass
+//! `dump-prompt` is the main tool: it renders the current-turn system prompt
+//! through the same prelude builder the runtime uses for a cold model request.
+//! Pass
 //! `--agent orchestrator` for the orchestrator prompt; otherwise pass
-//! any built-in or workspace-custom agent id (e.g. `planner`,
-//! `critic`).
+//! any built-in or workspace-custom agent id (e.g. `orchestrator`, `researcher`).
 
 use anyhow::{anyhow, Result};
 use std::path::PathBuf;
 
-use crate::agent::debug::prompt_size::{render_text, PromptSizeReport};
-use crate::agent::debug::{
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
+use crate::core::agent_cli::debug::prompt_size::{render_text, PromptSizeReport};
+use crate::core::agent_cli::debug::{
     dump_agent_prompt, dump_all_agent_prompts, write_prompt_dumps, DumpPromptOptions, DumpedPrompt,
 };
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+
+pub(crate) mod debug;
 
 /// Entry point for `openhuman agent <subcommand>`.
 pub fn run_agent_command(args: &[String]) -> Result<()> {
@@ -295,7 +294,9 @@ fn parse_dump_all_flags(args: &[String]) -> Result<DumpAllFlags> {
                 i += 1;
             }
             "-h" | "--help" => {
-                println!("Usage: openhuman agent dump-all --out <dir> [--workspace <path>] [--model <name>] [-v]");
+                println!(
+                    "Usage: openhuman agent dump-all --out <dir> [--workspace <path>] [--model <name>] [-v]"
+                );
                 println!();
                 println!("Render every registered agent's turn-1 system prompt into <dir>.");
                 std::process::exit(0);
@@ -423,9 +424,10 @@ fn parse_dump_flags(args: &[String]) -> Result<DumpFlags> {
 
 fn run_dump_prompt(args: &[String]) -> Result<()> {
     let flags = parse_dump_flags(args)?;
-    let agent = flags.agent.clone().ok_or_else(|| {
-        anyhow!("--agent <id> is required (e.g. `orchestrator`, `planner`, `critic`)")
-    })?;
+    let agent = flags
+        .agent
+        .clone()
+        .ok_or_else(|| anyhow!("--agent <id> is required (e.g. `orchestrator`, `researcher`)"))?;
 
     init_quiet_logging(flags.verbose);
 
@@ -466,7 +468,10 @@ fn run_dump_prompt(args: &[String]) -> Result<()> {
         // and splitting the header onto stderr the way `print_human` does
         // would make `> turn.txt` drop the byte counts that give the payload
         // its meaning.
-        print!("{}", crate::agent::debug::render_wire_dump(&dumped));
+        print!(
+            "{}",
+            crate::core::agent_cli::debug::render_wire_dump(&dumped)
+        );
     } else if flags.json {
         print_json(&dumped, flags.with_tools)?;
     } else {
@@ -588,7 +593,9 @@ fn run_list(args: &[String]) -> Result<()> {
             "-h" | "--help" => {
                 println!("Usage: openhuman agent list [--workspace <path>] [--json] [-v]");
                 println!();
-                println!("  List every built-in agent plus any custom `<workspace>/agents/*.toml` overrides.");
+                println!(
+                    "  List every built-in agent plus any custom `<workspace>/agents/*.toml` overrides."
+                );
                 return Ok(());
             }
             other => return Err(anyhow!("unknown list arg: {other}")),
@@ -660,7 +667,9 @@ fn print_agent_help() {
     println!();
     println!("Usage:");
     println!("  openhuman agent list [--workspace <path>] [--json]");
-    println!("  openhuman agent dump-prompt --agent <id> [--workspace <path>] [--model <name>] [--with-tools] [--wire] [--json] [-v]");
+    println!(
+        "  openhuman agent dump-prompt --agent <id> [--workspace <path>] [--model <name>] [--with-tools] [--wire] [--json] [-v]"
+    );
     println!("  openhuman agent dump-all --out <dir> [--workspace <path>] [--model <name>] [-v]");
     println!("  openhuman agent prompt-size [--agent <id>] [--workspace <path>] [--json] [-v]");
     println!();
@@ -675,7 +684,7 @@ fn print_dump_prompt_help() {
     println!();
     println!("Required:");
     println!("  --agent, -a <id>     Target agent id — any built-in or workspace-custom id");
-    println!("                       (e.g. `orchestrator`, `planner`, `critic`).");
+    println!("                       (e.g. `orchestrator`, `researcher`).");
     println!();
     println!("Options:");
     println!("  --workspace, -w <p>  Override the workspace directory (defaults to");
@@ -697,8 +706,8 @@ fn print_dump_prompt_help() {
     println!("  # Orchestrator prompt, JSON for scripting.");
     println!("  openhuman agent dump-prompt --agent orchestrator --json");
     println!();
-    println!("  # Planner prompt with its tool list.");
-    println!("  openhuman agent dump-prompt --agent planner --with-tools");
+    println!("  # Orchestrator prompt with its tool list.");
+    println!("  openhuman agent dump-prompt --agent orchestrator --with-tools");
 }
 
 fn is_help(value: &str) -> bool {

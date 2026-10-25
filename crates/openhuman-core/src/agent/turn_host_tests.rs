@@ -34,6 +34,7 @@ fn session_with_workspace(path: &str) -> OpenHumanSessionHost {
     let chat_model: std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>> = model;
     crate::agent::SessionHostBuilder::new()
         .chat_model(chat_model)
+        .model_name("test-model".to_owned())
         .tools(Vec::new())
         .workspace_dir(root.path().join("workspace"))
         .action_dir(root.path().to_path_buf())

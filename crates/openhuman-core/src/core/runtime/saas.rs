@@ -158,8 +158,10 @@ impl std::fmt::Debug for SaasConfig {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SaasCronConfig {
-    /// Allow only agent jobs bound to the conversation that created them:
-    /// no shell or flow jobs, no chosen delivery destination.
+    /// Allow agent jobs bound to their creating conversation and the memory
+    /// domain's two code-owned maintenance jobs. Shell and user-owned flow
+    /// jobs remain disabled; delivery is limited to `origin` and `none`, the
+    /// recurrence interval still applies, and memory jobs consume the cap.
     #[serde(default)]
     pub agent_jobs_only: bool,
     /// With `agent_jobs_only`: seconds between runs of a recurring job, at least.
@@ -483,7 +485,7 @@ pub async fn build_with_profile_capabilities(
     // first initialiser wins, so seed it before the core builds: a lazy init
     // during the build would otherwise load one user's workspace definitions
     // for everyone.
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()?;
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()?;
 
     let mut builder = CoreBuilder::new(HostKind::Saas)
         .token(TokenSource::Fixed(Arc::new(bearer)))
@@ -501,7 +503,7 @@ pub async fn build_with_profile_capabilities(
     // Whoever initialised first won; refuse to serve users from a registry
     // that holds anything but the built-ins.
     verify_builtin_definitions(
-        crate::agent::harness::host_definition::AgentDefinitionRegistry::global(),
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::global(),
     )?;
     // A relayed platform message (`channel_relay_inbound`) runs through the
     // channel dispatch pipeline, which asks the native bus for an
@@ -523,9 +525,13 @@ pub async fn build_with_profile_capabilities(
         );
     }
     let host = Arc::new(
-        crate::profiles::ProfileHost::with_backend(config, runtime.context().clone(), backend)
-            .map_err(|e| anyhow::anyhow!("[saas] {e}"))?
-            .with_capabilities(capabilities),
+        crate::profiles::ProfileHost::with_fenced_backend(
+            config,
+            runtime.context().clone(),
+            backend,
+        )
+        .map_err(|e| anyhow::anyhow!("[saas] {e}"))?
+        .with_capabilities(capabilities),
     );
     crate::profiles::host::install(Arc::clone(&host));
     crate::profiles::lease::heartbeat(Arc::clone(&host), runtime.context().clone());
@@ -539,7 +545,7 @@ pub async fn build_with_profile_capabilities(
 /// Refuse boot unless the process-wide agent definition registry is seeded and
 /// holds the built-ins only.
 pub(crate) fn verify_builtin_definitions(
-    registry: Option<&crate::agent::harness::host_definition::AgentDefinitionRegistry>,
+    registry: Option<&crate::agent_registry::host_definition::AgentDefinitionRegistry>,
 ) -> anyhow::Result<()> {
     let Some(registry) = registry else {
         anyhow::bail!("[saas] the agent definition registry was not seeded");

@@ -504,18 +504,31 @@ impl ModuleChannel {
                 tracing::warn!("channel reply preparation failed in the compiled module");
                 anyhow::Error::new(error)
             })?;
+        let mut intent = prepared.intent;
+        // The module prepares a plain reply as legacy native channel data; the
+        // provider adapters send typed text, so project it to a text payload
+        // (identity, addressing and idempotency key are unchanged).
+        if let tinychannels_bus::channel::OutboundPayload::NativeChannelData { data } =
+            &intent.payload
+        {
+            if let Some(text) = data.get("content").and_then(serde_json::Value::as_str) {
+                intent.payload = tinychannels_bus::channel::OutboundPayload::Text {
+                    text: text.to_owned(),
+                };
+            }
+        }
         let delivery = if let Some(relay) = self.relay.as_ref().filter(|_| self.relay_fronted) {
             self.object
                 .call_confidential::<tinychannels_bus::controllers::ChannelSendMessageResult>(
                     tinychannels_bus::methods::SEND_RELAY_INTENT,
-                    (relay.clone(), prepared.intent),
+                    (relay.clone(), intent),
                 )
                 .await
         } else {
             self.object
                 .call_confidential::<tinychannels_bus::controllers::ChannelSendMessageResult>(
                     tinychannels_bus::methods::SEND_CHANNEL_INTENT,
-                    (self.name.clone(), prepared.intent),
+                    (self.name.clone(), intent),
                 )
                 .await
         };

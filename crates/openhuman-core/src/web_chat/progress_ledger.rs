@@ -9,7 +9,7 @@ pub(super) fn for_turn(
     thread_id: &str,
     request_id: &str,
 ) -> Ledger {
-    let store = crate::agent::session_store::ledger_for(workspace_dir);
+    let store = crate::storage::sessions::ledger_for(workspace_dir);
     Ledger::new(
         store,
         tinyagents_orchestration::run_progress_ledger::RunProgressIdentity {

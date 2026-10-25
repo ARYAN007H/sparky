@@ -58,7 +58,6 @@ pub(super) fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::inference::provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(workspace_dir),
         message_timeout_secs: 60,
         multimodal: crate::config::MultimodalConfig::default(),
@@ -208,6 +207,11 @@ async fn module_route_help_response(
 
     let request = ChannelControlRequest::Route {
         workspace_dir: workspace_dir.to_string_lossy().into_owned(),
+        capabilities: Some(Box::new({
+            let mut capabilities = tinychannels_bus::ChannelCapabilities::unknown();
+            capabilities.remote_control = true;
+            capabilities
+        })),
         message: Box::new(ChannelMessage {
             reply_to_id: None,
             topic_id: None,
@@ -280,19 +284,17 @@ fn route_selection_round_trip() {
 
 #[cfg(feature = "modules")]
 #[tokio::test]
-async fn cached_models_and_help_responses_render_expected_text() {
+async fn module_route_help_ignores_stale_model_cache_and_projects_providers() {
     let tempdir = tempfile::tempdir().unwrap();
     let state_dir = tempdir.path().join("state");
     std::fs::create_dir_all(&state_dir).unwrap();
     std::fs::write(
         state_dir.join("models_cache.json"),
         serde_json::json!({
-            "entries": [
-                {
-                    "provider": "openai",
-                    "models": ["gpt-5", "gpt-5-mini", "gpt-4.1"]
-                }
-            ]
+            "entries": [{
+                "provider": "openai",
+                "models": ["stale-model"]
+            }]
         })
         .to_string(),
     )
@@ -300,8 +302,13 @@ async fn cached_models_and_help_responses_render_expected_text() {
 
     let models = module_route_help_response(tempdir.path(), "/model", Vec::new()).await;
     assert!(models.contains("Current provider: `openai`"));
-    assert!(models.contains("Cached model IDs"));
-    assert!(models.contains("- `gpt-5-mini`"));
+    // The module no longer reads `models_cache.json` (tinychannels 0.1.38):
+    // a catalog-less channel points the user at the web UI instead of listing
+    // a possibly stale workspace file.
+    assert!(models.contains("Model catalog is unavailable in this channel"));
+    assert!(!models.contains("stale-model"));
+    assert!(!models.contains("gpt-5-mini"));
+    assert!(!models.contains("Cached model IDs"));
 
     let providers = module_route_help_response(
         tempdir.path(),
@@ -406,7 +413,7 @@ async fn load_cached_model_preview_returns_empty_when_cache_json_is_invalid() {
     .unwrap();
 
     let response = module_route_help_response(tempdir.path(), "/model", Vec::new()).await;
-    assert!(response.contains("No cached model list found for `openai`"));
+    assert!(response.contains("Model catalog is unavailable in this channel for `openai`"));
 }
 
 #[tokio::test]

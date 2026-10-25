@@ -145,6 +145,16 @@ export type WebChannelEvent =
       turn_request_id?: string | null;
     }
   | {
+      client_id: string;
+      event: 'context_compacting';
+      request_id: string;
+      round?: number | null;
+      seq?: number | null;
+      thread_id: string;
+      ts?: number | null;
+      turn_request_id?: string | null;
+    }
+  | {
       args?: any;
       client_id: string;
       event: 'tool_call';
@@ -725,20 +735,10 @@ export type ButtonStyle = 'primary' | 'secondary' | 'danger';
  */
 export type OutboundVoice =
   | {
-      /**
-       * Optional bounded inline payload for one native upload. The durable
-       * reference remains the canonical media identity.
-       */
-      audioBase64?: string | null;
       codec: string | null;
       durationMs: number | null;
       kind: 'media';
       media: MediaReference;
-      /**
-       * Normalised 0.0-1.0 loudness preview for providers that draw one
-       * (WhatsApp push-to-talk). Absent when the codec path produced none.
-       */
-      waveform?: number[] | null;
     }
   | {
       kind: 'synthesize';
@@ -856,8 +856,9 @@ export interface MediaReference {
   kind: 'image' | 'video' | 'audio' | 'document' | 'unknown';
   localCachePath: string | null;
   /**
-   * Stable host-owned identifier for media stored outside the channel
-   * provider. It is safe to persist and does not imply a shared filesystem.
+   * Host-owned identifier for media stored outside the provider. It is
+   * opaque and only meaningful with the full channel, conversation, and
+   * turn scope used to store it.
    */
   opaqueId?: string | null;
   path: string | null;
@@ -893,8 +894,9 @@ export interface MediaReference1 {
   kind: 'image' | 'video' | 'audio' | 'document' | 'unknown';
   localCachePath: string | null;
   /**
-   * Stable host-owned identifier for media stored outside the channel
-   * provider. It is safe to persist and does not imply a shared filesystem.
+   * Host-owned identifier for media stored outside the provider. It is
+   * opaque and only meaningful with the full channel, conversation, and
+   * turn scope used to store it.
    */
   opaqueId?: string | null;
   path: string | null;

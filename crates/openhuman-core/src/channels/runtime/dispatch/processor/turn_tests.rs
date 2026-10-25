@@ -2,6 +2,7 @@ use super::*;
 
 #[tokio::test]
 async fn native_inbound_preparation_preserves_image_envelope_for_typed_turns() {
+    let _storage = crate::channels::module_fixture::install_memory_storage();
     use tinychannels_bus::{
         channel::{
             ChannelRef, ContentPart, ConversationKind, ConversationRef, MediaKind, MediaReference,
@@ -81,6 +82,7 @@ async fn native_inbound_preparation_preserves_image_envelope_for_typed_turns() {
 
 #[tokio::test]
 async fn native_typed_preparation_preserves_ordered_voice_and_file_parts() {
+    let _storage = crate::channels::module_fixture::install_memory_storage();
     use tinychannels_bus::{
         channel::{
             ChannelRef, ContentPart, ConversationKind, ConversationRef, MediaKind, MediaReference,

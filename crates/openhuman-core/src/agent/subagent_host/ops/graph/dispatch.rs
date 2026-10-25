@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use crate::agent::subagent_host::types::SubagentRunError;
 use crate::agent::tinyagents::{SubagentScope, TurnSpec};
-use tinyagents_harness::progress::AgentProgress;
-use tinyagents_harness::run_queue::RunQueue;
+use crate::progress::AgentProgress;
+use tinyagents_harness::run_queue::{RunQueue, RunQueueHandle};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyjuice_bus::types::AgentTokenjuiceCompression;
 use tinytools::WorkspaceDescriptor;
@@ -17,7 +17,15 @@ use tinytools::{Tool, ToolSpec};
 use tinytools_agent::dialect::TranscriptEntry;
 
 use super::transcript::persist_subagent_transcript;
-use super::worker_mirror::mirror_worker_thread;
+use crate::agent::subagent_host::ops::mirror_worker_thread;
+
+#[path = "dispatch_helpers.rs"]
+mod helpers;
+pub(crate) use helpers::inherited_thread_id;
+use helpers::{
+    build_subagent_context_mw, cap_tool_results, map_tinyagents_subagent_error,
+    spawn_subagent_trace_export,
+};
 
 /// Cumulative usage stats gathered across a sub-agent graph run.
 #[derive(Debug, Clone, Default)]
@@ -44,7 +52,10 @@ pub(in super::super) async fn run_subagent_via_graph(
     specs: Vec<ToolSpec>,
     allowed_names: HashSet<String>,
     max_iterations: usize,
-    run_queue: Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
+    queues: (
+        Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
+        Option<RunQueueHandle>,
+    ),
     on_progress: Option<tokio::sync::mpsc::Sender<AgentProgress>>,
     agent_id: &str,
     task_id: &str,
@@ -73,6 +84,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     // TinyAgents, where there is no config file. `None` yields the safe
     // byte-cap-only defaults.
     config: Option<&crate::config::Config>,
+    native_subagent: Option<crate::agent::tinyagents::NativeSubagentRunContext>,
 ) -> Result<
     (
         String,
@@ -84,18 +96,22 @@ pub(in super::super) async fn run_subagent_via_graph(
         // repeat-progress circuit breaker stopped the run; the caller reports
         // `Incomplete` instead of `Completed`.
         Option<String>,
+        // Typed cause is carried beside the display reason so callers do not
+        // need to reconstruct failure class or operation from prose.
+        Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
     ),
     SubagentRunError,
 > {
+    let (run_queue, message_run_queue) = queues;
+    let trace_session_group = run_context.thread_id.clone().or_else(|| thread_id.clone());
     // One resolved thread identity drives every child-facing boundary. An
     // explicit worker/task thread deliberately replaces the inherited parent;
     // otherwise a child remains in its parent's conversation. Do this before
     // constructing *any* model so managed requests, transcript metadata, and
     // the child carrier cannot disagree.
-    let trace_session_group = run_context.thread_id.clone().or_else(|| thread_id.clone());
     let thread_id = inherited_thread_id(run_context.thread_id.clone(), thread_id);
     // Where this child's transcript is written: its turn tree's store.
-    let transcripts = super::transcript::subagent_transcripts(&run_context, &workspace_dir);
+    let transcripts = super::transcript::subagent_transcripts(&run_context, &workspace_dir)?;
     tracing::info!(
         model,
         max_iterations,
@@ -116,12 +132,10 @@ pub(in super::super) async fn run_subagent_via_graph(
     // seam this is a sub-agent turn, so the unknown-tool recovery uses the
     // sub-agent wording. With no progress sink the scoped events simply have
     // nowhere to go, which is harmless.
-    let child_journal_run_id = std::sync::Arc::new(std::sync::Mutex::new(None));
     let subagent_scope = Some(SubagentScope {
         agent_id: agent_id.to_string(),
         task_id: task_id.to_string(),
         extended_policy,
-        journal_run_id: Some(child_journal_run_id.clone()),
     });
 
     // A standalone summarizer model for the cap-hit checkpoint call below (the
@@ -193,14 +207,25 @@ pub(in super::super) async fn run_subagent_via_graph(
     // parent-ledger link; forking again here would hide nested child usage in a
     // second, unreachable ledger.
     let dispatch = run_context.dispatch_ctx();
+    let child_tool_policy = child_tool_policy(
+        run_context.tool_policy.as_ref(),
+        agent_id,
+        &allowed_names,
+        &dynamic_tools
+            .iter()
+            .chain(parent_tools.iter())
+            .map(|tool| tool.as_ref())
+            .collect::<Vec<_>>(),
+    );
     let mut child_context = run_context;
+    child_context.tool_policy = child_tool_policy.clone();
     // A parallel task may omit `thread_id`; that means inherit the parent
     // conversation, not erase it. Only an explicit task thread may replace
     // the typed carrier's inherited affinity.
     child_context.thread_id = thread_id.clone();
     child_context.progress = on_progress.clone().or(child_context.progress);
     child_context.workspace = workspace_descriptor.clone().or(child_context.workspace);
-    let run_result = TurnSpec {
+    let turn_spec = TurnSpec {
         run_context: child_context,
         turn_models,
         provider_id,
@@ -208,8 +233,8 @@ pub(in super::super) async fn run_subagent_via_graph(
         history: dispatch_history,
         // Dynamic (per-spawn) tools first so a dynamic tool that intentionally
         // shadows a parent-registry tool of the same name is the one that
-        // *executes* — matching the advertisement order (`dedup_tool_specs_by_name`
-        // lists dynamic specs before parent specs in `runner.rs`). The shared
+        // *executes* — matching the advertisement order (`dedup_visible_tool_specs`
+        // keeps the first dynamic spec before parent specs in `runner.rs`). The shared
         // adapter resolves a name by scanning the sets in order, so a
         // parent-first order would run the parent impl for a shadowed name.
         tool_sets: vec![Arc::new(dynamic_tools), parent_tools],
@@ -226,6 +251,7 @@ pub(in super::super) async fn run_subagent_via_graph(
         context_window,
         // Mid-flight steering: forward queued steer messages into the run.
         run_queue,
+        message_run_queue,
         // Pause + checkpoint when the child asks the user a clarifying question.
         early_exit_tools: &["ask_user_clarification"],
         // Pause gracefully at the model-call cap so we can summarize a resumable
@@ -241,9 +267,9 @@ pub(in super::super) async fn run_subagent_via_graph(
             mw.transcript_snapshot = Some(transcript_snapshot.clone());
             mw
         },
-        // Sub-agents gate via their own SubagentToolSource policy path, not the
-        // session `.tool_policy()`; no enforcement threaded here.
-        tool_policy: None,
+        // Preserve the parent session's channel boundary for this child. The
+        // host gate also enforces its autonomy and turn-origin rules.
+        tool_policy: child_tool_policy,
         // Sub-agent turns run tools with external effects; not a deterministic
         // internal run, so response caching stays off (safe default).
         deterministic_cacheable: false,
@@ -251,34 +277,14 @@ pub(in super::super) async fn run_subagent_via_graph(
         // `subagent_scope`, so the seam never emits a top-level `TurnCompleted`
         // (they report via `Subagent*` events). Pass `false` for clarity.
         defer_turn_completed_to_caller: false,
-    }
-    .run()
-    .await;
-
-    if let Some(config) = config.filter(|config| config.observability.share_usage_data) {
-        let journal_run_id = child_journal_run_id
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        if let Some(journal_run_id) = journal_run_id {
-            let config = config.clone();
-            let thread_id = trace_session_group.clone();
-            let agent_id = agent_id.to_string();
-            let task_id = task_id.to_string();
-            let dispatch = dispatch.clone();
-            tokio::spawn(async move {
-                crate::agent::progress_tracing::export_subagent_journal_trace(
-                    &dispatch,
-                    &config,
-                    &journal_run_id,
-                    thread_id.as_deref(),
-                    &agent_id,
-                    &task_id,
-                )
-                .await;
-            });
-        }
-    }
+    };
+    let child_journal_run_id = native_subagent
+        .as_ref()
+        .map(|native| native.config.run_id.as_str().to_string());
+    let run_result = match native_subagent.as_ref() {
+        Some(native) => turn_spec.run_with_native_subagent(native.clone()).await,
+        None => turn_spec.run().await,
+    };
 
     let mut outcome = match run_result {
         Ok(outcome) => outcome,
@@ -338,6 +344,17 @@ pub(in super::super) async fn run_subagent_via_graph(
                 worker_thread_id.as_deref(),
                 &mapped,
             );
+            if let Some(native) = &native_subagent {
+                native.finalize_failed_boundary();
+            }
+            spawn_subagent_trace_export(
+                config,
+                &dispatch,
+                child_journal_run_id.as_deref(),
+                trace_session_group.as_deref(),
+                agent_id,
+                task_id,
+            );
             return Err(mapped);
         }
     };
@@ -378,10 +395,11 @@ pub(in super::super) async fn run_subagent_via_graph(
     // checkpoint (the delegating agent continues from partial progress) rather
     // than surfacing an empty/partial answer — the legacy `SubagentCheckpoint`.
     if outcome.hit_cap {
-        let digest = build_cap_digest(&outcome.conversation, &outcome.tool_outcomes);
+        let results = cap_tool_results(&outcome.conversation, &outcome.tool_outcomes);
         let strategy = checkpoint::SubagentCheckpoint {
             chat_model: summary_model.clone(),
             agent_id: agent_id.to_string(),
+            model: model.to_string(),
             // The checkpoint summary call's output cap. #4469 item 5: honour this
             // sub-agent definition's own per-call output budget (the same
             // `max_output_tokens` bounding every task model call above) instead of
@@ -389,8 +407,21 @@ pub(in super::super) async fn run_subagent_via_graph(
             // definition that raised or lowered its output cap is respected by the
             // cap-summary call too.
             max_output_tokens,
+            trace: native_subagent.as_ref().and_then(|native| {
+                native
+                    .child_events
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .clone()
+                    .map(|events| {
+                        crate::agent::tinyagents::SupplementalTrace::new(
+                            events,
+                            native.config.run_id.clone(),
+                        )
+                    })
+            }),
         };
-        match strategy.summarize_cap_hit(&digest, max_iterations).await {
+        match strategy.summarize_cap_hit(&results, max_iterations).await {
             Ok(co) => {
                 if let Some(u) = co.usage {
                     // Fold ALL four token fields (the legacy cap-summary folded
@@ -405,7 +436,7 @@ pub(in super::super) async fn run_subagent_via_graph(
                     usage.cached_input_tokens += u.cached_input_tokens();
                     let call_cost = crate::agent::cost::call_cost(model, &u);
                     usage.cost.add(call_cost);
-                    let billed = crate::inference::provider::BilledUsage::from_counts(
+                    let billed = tinyinference_llm::usage::BilledUsage::from_counts(
                         u.input_tokens,
                         u.output_tokens,
                     )
@@ -506,6 +537,39 @@ pub(in super::super) async fn run_subagent_via_graph(
         );
     }
 
+    // The child run's own loop ends before OpenHuman persists its transcript
+    // and any cap checkpoint. Finish the native journal only after that durable
+    // host boundary, then acknowledge it on the parent stream so the linked
+    // sub-agent span cannot close ahead of its child record.
+    if let Some(terminal) = outcome.deferred_terminal.take() {
+        let stop = crate::agent::session_host::stop_policy::classify_stop_with_cause(
+            outcome.breaker_halt.as_deref(),
+            outcome.failure_cause.clone(),
+            false,
+            outcome.hit_cap,
+        );
+        terminal
+            .finish(stop, (outcome.model_calls as u32).max(1))
+            .await;
+    }
+    if let Some(native) = &native_subagent {
+        native.parent_events.emit(
+            tinyagents_harness::events::AgentEvent::SubAgentRunCompleted {
+                run_id: native.config.run_id.clone(),
+            },
+        );
+    }
+    // Export only after the child journal's finalization and status flush so a
+    // detached reader cannot race ahead and force-close its spans at wall time.
+    spawn_subagent_trace_export(
+        config,
+        &dispatch,
+        child_journal_run_id.as_deref(),
+        trace_session_group.as_deref(),
+        agent_id,
+        task_id,
+    );
+
     // On an early-exit (`ask_user_clarification`), `outcome.text` is the question
     // and the runner checkpoints + returns AwaitingUser. `None` = ran to a final
     // answer (or a cap-hit checkpoint summary).
@@ -517,128 +581,72 @@ pub(in super::super) async fn run_subagent_via_graph(
         outcome.hit_cap,
         // #4466: propagate a circuit-breaker halt so the runner reports Incomplete.
         outcome.breaker_halt,
+        outcome.failure_cause,
     ))
 }
 
-/// A task-specific thread explicitly routes a worker; an absent task thread
-/// leaves the parent run's transcript affinity intact.
-pub(crate) fn inherited_thread_id(
-    parent_thread_id: Option<String>,
-    task_thread_id: Option<String>,
-) -> Option<String> {
-    task_thread_id.or(parent_thread_id)
-}
+/// Rebuilds the inherited channel ceiling for the child's callable tool set.
+/// A parent's `HideFromPrompt` entries describe only that parent's projection;
+/// carrying them forward would hide tools explicitly granted by the child
+/// definition. Explicit denials and approval requirements still narrow the
+/// child when they refer to tools in its resolved allowlist.
+pub(super) fn child_tool_policy(
+    parent: Option<&crate::agent::tinyagents::ToolPolicyEnforcement>,
+    child_agent_id: &str,
+    child_allowed_names: &HashSet<String>,
+    child_tools: &[&dyn Tool],
+) -> Option<crate::agent::tinyagents::ToolPolicyEnforcement> {
+    let parent = parent?;
+    let profile = &parent.session.profile;
+    let channel_permissions = [(
+        profile.channel.clone(),
+        profile.allowed_permission.to_string(),
+    )]
+    .into_iter()
+    .collect();
+    let mut session = tinytools::agent_policy::ToolPolicyEngine::build_session_from_refs(
+        child_agent_id,
+        profile.channel.clone(),
+        profile.entrypoint.clone(),
+        &channel_permissions,
+        child_tools,
+        child_allowed_names,
+    );
 
-/// Build the sub-agent turn's [`TurnContextMiddleware`] from the live
-/// `[context]` config and the agent's TokenJuice profile (#4466), mirroring the
-/// chat path (`session/turn/core.rs`). Falls back to
-/// [`TurnContextMiddleware::defaults`] when the config can't be loaded so a
-/// config glitch degrades to the safe (byte-cap-only) behavior rather than
-/// erroring the run.
-fn build_subagent_context_mw(
-    tokenjuice_compression: AgentTokenjuiceCompression,
-    config: Option<&crate::config::Config>,
-) -> crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware {
-    let mut mw =
-        crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware::defaults();
-    // Always thread the agent's compression profile — even on the config-default
-    // path — so the definition's TokenJuice choice is honored.
-    mw.tokenjuice_compression = tokenjuice_compression;
-    match config {
-        Some(config) => {
-            mw.runtime_config = Some(Arc::new(config.clone()));
-            let ctx = &config.context;
-            // TokenJuice content-aware compaction gates on the same master
-            // `[context].compaction_enabled` the chat path reads
-            // (`ContextManager::compaction_enabled`).
-            mw.tokenjuice_compaction_enabled =
-                ctx.compaction_enabled && crate::inference::tokenjuice::enabled(config);
-            mw.tool_result_budget_bytes = ctx.tool_result_budget_bytes;
-            // Microcompact keep-recent is `0` (disabled) unless microcompact is on.
-            mw.microcompact_keep_recent = if ctx.microcompact_enabled {
-                ctx.microcompact_keep_recent
-            } else {
-                0
-            };
-            // Summarization step honors the `[context].enabled` + autocompact
-            // opt-outs, same as `ContextManager::autocompact_enabled`.
-            mw.autocompact_enabled = ctx.enabled && ctx.autocompact_enabled;
-            mw.compaction = ctx.compaction_settings();
-            tracing::debug!(
-                tokenjuice_compaction_enabled = mw.tokenjuice_compaction_enabled,
-                compression = ?mw.tokenjuice_compression,
-                tool_result_budget_bytes = mw.tool_result_budget_bytes,
-                microcompact_keep_recent = mw.microcompact_keep_recent,
-                autocompact_enabled = mw.autocompact_enabled,
-                "[subagent_host:graph] built sub-agent context middleware from config (#4466)"
-            );
+    for name in child_allowed_names {
+        let Some(decision) = parent.session.decisions.get(name) else {
+            continue;
+        };
+        if !matches!(
+            decision.action,
+            tinytools::ToolPolicyAction::Deny | tinytools::ToolPolicyAction::RequireApproval
+        ) {
+            continue;
         }
-        None => {
-            tracing::debug!(
-                "[subagent_host:graph] no config available building sub-agent context mw; using defaults + compression profile"
-            );
+        // The parent closes the packs of the specialists it can hand off to
+        // (`close_handed_off_packs`) so it uses the hand-off instead of the raw
+        // tools. That denial is the parent's own route policy: inheriting it
+        // would strip the specialist of its own belt (`skill_setup` could neither
+        // search nor install). Every other denial narrows the child.
+        if decision.action == tinytools::ToolPolicyAction::Deny
+            && crate::tools::toolpacks::pack_for_tool(name)
+                .is_some_and(|pack| pack.is_owner(child_agent_id))
+        {
+            continue;
         }
-    }
-    mw
-}
-
-fn map_tinyagents_subagent_error(err: anyhow::Error) -> SubagentRunError {
-    match err.downcast::<SubagentRunError>() {
-        Ok(run_err) => run_err,
-        Err(err) => SubagentRunError::Provider(err),
-    }
-}
-
-/// Build the `tool → outcome` digest the cap-hit summary call summarizes, in the
-/// legacy `- {name} [{ok|failed}]: {output}` format (engine `run_tool_digest`),
-/// pairing each tool result back to its call by id. Per-tool success is derived
-/// from the turn's captured [`ToolCallOutcome`]s (#4467, item 7) rather than
-/// reported optimistically as `ok`: a result whose call has no captured outcome
-/// — e.g. a hallucinated/unknown tool the crate recovered without running
-/// `after_tool` — is marked `failed`, so the summary no longer tells the model
-/// every call succeeded.
-fn build_cap_digest(
-    conversation: &[TranscriptEntry],
-    tool_outcomes: &[tinyagents_harness::turn_outcome::ToolCallOutcome],
-) -> String {
-    use std::collections::HashMap;
-    use std::fmt::Write as _;
-
-    // call_id -> tool name, from this turn's assistant tool-call rounds.
-    let mut names: HashMap<&str, &str> = HashMap::new();
-    for msg in conversation {
-        if let TranscriptEntry::AssistantToolCalls { tool_calls, .. } = msg {
-            for call in tool_calls {
-                names.insert(call.id.as_str(), call.name.as_str());
-            }
-        }
+        session.decisions.insert(name.clone(), decision.clone());
+        session.allowed_tool_names.remove(name);
+        session.blocked_tool_names.insert(name.clone());
     }
 
-    // call_id -> success, from the captured per-call outcomes.
-    let success_by_id: HashMap<&str, bool> = tool_outcomes
-        .iter()
-        .map(|o| (o.call_id.as_str(), o.success))
-        .collect();
-
-    let mut out = String::new();
-    for msg in conversation {
-        if let TranscriptEntry::ToolResults(results) = msg {
-            for r in results {
-                let name = names
-                    .get(r.tool_call_id.as_str())
-                    .copied()
-                    .unwrap_or("tool");
-                // Missing outcome → `false` (unknown/hallucinated tool): honest
-                // failed status rather than an optimistic `[ok]`.
-                let ok = success_by_id
-                    .get(r.tool_call_id.as_str())
-                    .copied()
-                    .unwrap_or(false);
-                let tag = if ok { "ok" } else { "failed" };
-                let body = crate::util::truncate_with_ellipsis(&r.content, 800);
-                let _ = writeln!(out, "- {name} [{tag}]: {body}");
-            }
-        }
-    }
-    out.trim_end().to_string()
+    Some(crate::agent::tinyagents::ToolPolicyEnforcement {
+        policy: parent.policy.clone(),
+        session,
+        channel: parent.channel.clone(),
+        agent_definition_id: child_agent_id.to_string(),
+    })
 }
+
+#[cfg(test)]
+#[path = "dispatch_policy_tests.rs"]
+mod policy_tests;

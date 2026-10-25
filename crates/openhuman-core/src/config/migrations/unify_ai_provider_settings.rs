@@ -1,5 +1,5 @@
 //! Migration 1 → 2: unify the scattered AI provider settings into the new
-//! per-workload provider-string fields, and seed the `cloud_providers` list.
+//! per-workload provider-string fields and preserve legacy custom endpoints.
 //!
 //! ## What this migration consolidates
 //!
@@ -36,14 +36,10 @@
 //!   successful run is a no-op.
 //! - Never touches keys / secrets. API keys remain in
 //!   `auth-profiles.json` via [`crate::security::credentials::AuthService`].
-//! - Always seeds an `Openhuman` entry into `cloud_providers` (idempotent —
-//!   only when the list is empty).
 //! - Migrates `inference_url` into a `Custom` cloud provider entry when the
-//!   URL doesn't look like the OpenHuman backend.
+//!   URL doesn't look like a registered managed backend.
 
-use crate::config::schema::cloud_providers::{
-    builtin_cloud_provider, generate_provider_id, AuthStyle, CloudProviderCreds,
-};
+use crate::config::schema::cloud_providers::{generate_provider_id, AuthStyle, CloudProviderCreds};
 use crate::config::Config;
 
 /// Counters returned by [`run`] for diagnostics. Logged at INFO once per
@@ -63,7 +59,7 @@ pub struct MigrationStats {
 pub fn run(config: &mut Config) -> anyhow::Result<MigrationStats> {
     let mut stats = MigrationStats::default();
 
-    seed_cloud_providers(config, &mut stats);
+    seed_legacy_custom_provider(config, &mut stats);
     set_primary_cloud(config, &mut stats);
     derive_workload_providers(config, &mut stats);
 
@@ -76,43 +72,9 @@ pub fn run(config: &mut Config) -> anyhow::Result<MigrationStats> {
     Ok(stats)
 }
 
-/// Seed `cloud_providers` with an OpenHuman entry (and optionally a Custom
-/// entry derived from a legacy `inference_url`).
-pub(super) fn seed_cloud_providers(config: &mut Config, stats: &mut MigrationStats) {
-    if !config.cloud_providers.is_empty() {
-        log::debug!(
-            "[migrations][unify-ai] cloud_providers already populated ({} entries), skipping seed",
-            config.cloud_providers.len()
-        );
-        return;
-    }
-
-    // Always seed the OpenHuman entry — even if api_url is None, the factory
-    // resolves a sensible default at runtime.
-    let oh_endpoint = config
-        .api_url
-        .clone()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| {
-            builtin_cloud_provider("openhuman")
-                .expect("managed builtin")
-                .endpoint
-                .to_string()
-        });
-    let oh_default_model = config
-        .default_model
-        .clone()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| crate::config::MODEL_MANAGED_DEFAULT.to_string());
-    config.cloud_providers.push(CloudProviderCreds {
-        id: generate_provider_id("openhuman"),
-        slug: "openhuman".to_string(),
-        label: "OpenHuman".to_string(),
-        endpoint: oh_endpoint,
-        auth_style: AuthStyle::OpenhumanJwt,
-        default_model: Some(oh_default_model),
-    });
-    stats.cloud_providers_seeded += 1;
+/// Preserve a custom endpoint from the legacy `inference_url` field.
+fn seed_legacy_custom_provider(config: &mut Config, stats: &mut MigrationStats) {
+    let hosts = crate::config::enrichers::managed_hosts_for(config);
 
     // If there's a legacy `inference_url` pointing at a non-OpenHuman
     // endpoint, surface it as a Custom entry so the user keeps their
@@ -121,7 +83,16 @@ pub(super) fn seed_cloud_providers(config: &mut Config, stats: &mut MigrationSta
     // doesn't apply here; users will re-enter via the new UI).
     if let Some(raw) = config.inference_url.as_deref() {
         let trimmed = raw.trim();
-        if !trimmed.is_empty() && !looks_like_openhuman(trimmed) {
+        if !trimmed.is_empty()
+            && !looks_like_managed_backend(&hosts, trimmed)
+            && !config.cloud_providers.iter().any(|entry| {
+                entry
+                    .endpoint
+                    .trim()
+                    .trim_end_matches('/')
+                    .eq_ignore_ascii_case(trimmed.trim_end_matches('/'))
+            })
+        {
             // Derive a sensible default model from the legacy model_routes
             // (prefer "reasoning" hint, fall back to whatever is set).
             let default_model = config
@@ -149,28 +120,27 @@ pub(super) fn seed_cloud_providers(config: &mut Config, stats: &mut MigrationSta
 }
 
 /// Default `primary_cloud` to the legacy custom inference entry when one was
-/// present; otherwise use the OpenHuman entry. This preserves pre-migration
-/// behavior where a configured `inference_url` handled chat instead of the
-/// hosted OpenHuman budget.
+/// present. Hosted fallback selection belongs to the installed host
+/// normalizer, which can supply its own provider identity and endpoint policy.
 fn set_primary_cloud(config: &mut Config, stats: &mut MigrationStats) {
     if config.primary_cloud.is_some() {
         return;
     }
+    let hosts = crate::config::enrichers::managed_hosts_for(config);
     let legacy_custom = config
         .inference_url
         .as_deref()
         .map(str::trim)
-        .filter(|url| !url.is_empty() && !looks_like_openhuman(url))
+        .filter(|url| !url.is_empty() && !looks_like_managed_backend(&hosts, url))
         .and_then(|url| {
             let normalized = url.trim_end_matches('/').to_ascii_lowercase();
             config.cloud_providers.iter().find(|entry| {
-                entry.slug != "openhuman"
-                    && entry
-                        .endpoint
-                        .trim()
-                        .trim_end_matches('/')
-                        .to_ascii_lowercase()
-                        == normalized
+                entry
+                    .endpoint
+                    .trim()
+                    .trim_end_matches('/')
+                    .to_ascii_lowercase()
+                    == normalized
             })
         });
     if let Some(entry) = legacy_custom {
@@ -178,20 +148,6 @@ fn set_primary_cloud(config: &mut Config, stats: &mut MigrationStats) {
         stats.primary_cloud_set = true;
         log::debug!(
             "[migrations][unify-ai] primary_cloud set to legacy custom entry id={}",
-            entry.id
-        );
-        return;
-    }
-
-    let oh = config
-        .cloud_providers
-        .iter()
-        .find(|e| e.slug == "openhuman");
-    if let Some(entry) = oh {
-        config.primary_cloud = Some(entry.id.clone());
-        stats.primary_cloud_set = true;
-        log::debug!(
-            "[migrations][unify-ai] primary_cloud set to openhuman entry id={}",
             entry.id
         );
     }
@@ -230,29 +186,17 @@ fn derive_workload_providers(config: &mut Config, stats: &mut MigrationStats) {
     // legacy config for chat, so there's nothing to derive.
 }
 
-/// Heuristic: does the URL look like a configured OpenHuman backend?
+/// Heuristic: does the URL look like a configured managed backend?
 ///
 /// Used to decide whether a non-empty `inference_url` should be migrated
-/// into a Custom cloud provider entry. The default OpenHuman backend lives
-/// at api.openhuman.ai; staging and dev URLs use the same host pattern.
+/// into a Custom cloud provider entry. `hosts` are the managed-host patterns
+/// the installed host resolved (`ResolvedEndpoints::managed_hosts`); with none
+/// registered nothing matches.
 ///
 /// Matches only on the host component to avoid false positives from custom
-/// endpoints that happen to contain "openhuman" in a path or query string.
-fn looks_like_openhuman(url: &str) -> bool {
-    let lower = url.trim().to_ascii_lowercase();
-    // Strip scheme if present.
-    let without_scheme = lower.split("://").nth(1).unwrap_or(&lower);
-    // Strip userinfo and take only the host[:port] part before any path.
-    let authority = without_scheme.split('/').next().unwrap_or("");
-    let host = authority.split('@').next_back().unwrap_or(authority);
-    let host_no_port = host.split(':').next().unwrap_or(host);
-    host_no_port == "api.openhuman.ai"
-        || host_no_port.ends_with(".openhuman.ai")
-        || host_no_port == "api.tinyhumans.ai"
-        || host_no_port == "staging-api.tinyhumans.ai"
-        || host_no_port.ends_with(".tinyhumans.ai")
-        // Allow bare "openhuman" for local/dev names (e.g. Docker compose service names).
-        || host_no_port == "openhuman"
+/// endpoints that happen to contain a managed name in a path or query string.
+fn looks_like_managed_backend(hosts: &[String], url: &str) -> bool {
+    crate::config::schema::resolved_endpoints::host_matches_any(url, hosts)
 }
 
 #[cfg(test)]

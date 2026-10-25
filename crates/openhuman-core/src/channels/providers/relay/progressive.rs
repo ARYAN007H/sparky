@@ -48,8 +48,9 @@ impl RelayProgressiveTransport {
         channel_ref: Option<&tinychannels_bus::ChannelRef>,
         conversation: Option<&tinychannels_bus::ConversationRef>,
     ) -> tinybus::Result<()> {
-        let expected_route = format!("{}:{}", self.channel_ref.id, self.conversation.id);
-        if route != expected_route
+        // The module keys a scoped output by the provider id; the conversation
+        // is verified separately through the full scope below.
+        if route != self.channel_ref.id
             || turn_id != Some(self.turn_id.as_str())
             || channel_ref != Some(&self.channel_ref)
             || conversation != Some(&self.conversation)
@@ -69,8 +70,8 @@ impl RelayProgressiveTransport {
                 turn_id,
                 channel_ref,
                 conversation,
+                sequence,
                 event,
-                ..
             } => {
                 self.check_scope(
                     &channel,
@@ -78,10 +79,28 @@ impl RelayProgressiveTransport {
                     channel_ref.as_ref(),
                     conversation.as_ref(),
                 )?;
+                // Typed deliveries (final message, media, voice note) are the
+                // hosted delivery: the gateway owns the provider send, so the
+                // callback accepts each one (no provider receipt) and the
+                // module does not resend it.
+                let delivery = outbound_delivery(event.as_ref());
                 // Project canonical events through the same compiled web
-                // adapter used by desktop and TUI turns. Provider delivery is
-                // still performed only by the typed terminal send below.
+                // adapter used by desktop and TUI turns.
                 self.projection.output(*event).await;
+                if let Some((parts, text)) = delivery {
+                    self.channel.publish_typed_reply(
+                        &self.ctx,
+                        &self.channel_ref,
+                        &self.conversation,
+                        &self.turn_id,
+                        sequence,
+                        0,
+                        &format!("{}:{sequence}:0", self.turn_id),
+                        &parts,
+                        &text,
+                    );
+                    return Ok(ProgressiveTransportResult::Accepted);
+                }
                 Ok(ProgressiveTransportResult::Acknowledged)
             }
             ProgressiveTransportRequest::SendTyped {
@@ -141,5 +160,61 @@ impl RelayProgressiveTransport {
         Ok(ChannelBackendResult::ProgressiveTransport(Box::new(
             self.dispatch(*request).await?,
         )))
+    }
+}
+
+/// The ordered provider parts and plain text a delivery-bearing output event
+/// carries, mirroring the module's own typed projection. Other events carry no
+/// provider delivery.
+fn outbound_delivery(
+    event: &tinychannels_bus::module_progressive::ChannelOutputEvent,
+) -> Option<(Vec<tinychannels_bus::OutboundContentPart>, String)> {
+    use tinychannels_bus::module_progressive::ChannelOutputEvent as Event;
+    use tinychannels_bus::{ContentPart, OutboundContentPart, OutboundVoice};
+    let text_part = |text: &str| OutboundContentPart::Content {
+        part: ContentPart::Text {
+            text: text.to_owned(),
+            markdown_dialect: None,
+        },
+    };
+    match event {
+        Event::FinalMessage { text, parts, .. } => {
+            let parts = if parts.is_empty() {
+                vec![text_part(text)]
+            } else {
+                parts.clone()
+            };
+            Some((parts, text.clone()))
+        }
+        Event::Media { text, parts } => {
+            let mut outbound: Vec<OutboundContentPart> =
+                text.iter().map(|text| text_part(text)).collect();
+            outbound.extend(
+                parts
+                    .iter()
+                    .cloned()
+                    .map(|part| OutboundContentPart::Content { part }),
+            );
+            Some((outbound, text.clone().unwrap_or_default()))
+        }
+        Event::VoiceNote { text, voice } => {
+            let text = text.clone().or_else(|| {
+                voice
+                    .transcript
+                    .as_ref()
+                    .map(|transcript| transcript.text.clone())
+            });
+            let mut outbound: Vec<OutboundContentPart> =
+                text.iter().map(|text| text_part(text)).collect();
+            outbound.push(OutboundContentPart::Voice {
+                voice: OutboundVoice::Media {
+                    media: voice.media.clone(),
+                    codec: voice.codec.clone(),
+                    duration_ms: voice.duration_ms,
+                },
+            });
+            Some((outbound, text.unwrap_or_default()))
+        }
+        _ => None,
     }
 }

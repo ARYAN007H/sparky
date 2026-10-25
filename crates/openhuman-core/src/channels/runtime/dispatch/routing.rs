@@ -6,14 +6,14 @@
 //!   agent and synthesise its delegation tool surface.
 //! * [`build_visible_tool_set`] — union of named tools + extra (delegation) tools.
 
-use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use crate::agent::prompts::ConnectedIntegration;
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::config::Config;
+use crate::integrations::composio::orchestrator_actions;
 use crate::integrations::composio::{
     cached_active_integrations, fetch_connected_integrations_status,
     FetchConnectedIntegrationsStatus,
 };
-use crate::tools::orchestrator_tools;
+use crate::integrations::ConnectedIntegration;
 use std::collections::HashSet;
 use std::time::Duration;
 use tinyagents_definition::ToolScope;
@@ -152,7 +152,7 @@ pub(super) async fn resolve_target_agent(channel: &str) -> AgentScoping {
             connected_integration_count = connected.len(),
             "[dispatch::routing] fetched connected integrations for delegation expansion"
         );
-        orchestrator_tools::collect_orchestrator_tools(definition, &registry, &connected)
+        orchestrator_actions::collect_orchestrator_tools(definition, &connected)
     } else {
         Vec::new()
     };

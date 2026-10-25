@@ -1,6 +1,6 @@
 use super::*;
 use crate::config::schema::ChannelVoiceOverride;
-use tinychannels_bus::{ChannelRef, ConversationRef, VoiceNote};
+use tinychannels_bus::{ChannelRef, ConversationRef};
 
 fn scope(channel: &str, conversation: &str, turn: &str) -> HostVoiceScope {
     HostVoiceScope {
@@ -17,205 +17,34 @@ fn scope(channel: &str, conversation: &str, turn: &str) -> HostVoiceScope {
     }
 }
 
-fn envelope(conversation: &str, message: &str, voice: bool) -> ChannelInboundEnvelope {
-    let mut envelope = ChannelInboundEnvelope {
-        message_id: message.into(),
-        channel: ChannelRef {
-            id: "telegram".into(),
-            account_id: Some("telegram".into()),
-        },
-        conversation: ConversationRef {
-            id: conversation.into(),
-            ..ConversationRef::default()
-        },
-        ..ChannelInboundEnvelope::default()
-    };
-    envelope.parts.push(if voice {
-        ContentPart::VoiceNote {
-            voice_note: VoiceNote::default(),
-        }
-    } else {
-        ContentPart::Text {
-            text: "hi".into(),
-            markdown_dialect: None,
-        }
-    });
-    envelope
+fn policy_request(
+    scope: HostVoiceScope,
+    voice: bool,
+    explicit: bool,
+) -> HostVoiceReplyPolicyRequest {
+    HostVoiceReplyPolicyRequest {
+        scope,
+        inbound_has_voice: voice,
+        explicitly_requested: explicit,
+    }
 }
 
 #[test]
-fn mirror_policy_reports_inbound_voice_from_recorded_envelope() {
-    let tenant = crate::core::runtime::Tenant::default();
-    record_inbound_envelope(&envelope("c-voice", "m1", true), &tenant, "m1");
-    record_inbound_envelope(&envelope("c-text", "m2", false), &tenant, "m2");
+fn policy_mode_ignores_module_supplied_inbound_facts() {
     let cfg = ChannelVoiceConfig::default();
-    let voice = resolve_policy(&cfg, &scope("telegram", "c-voice", "m1"), &tenant);
+    let voice = resolve_policy(
+        &cfg,
+        &policy_request(scope("telegram", "c", "t"), true, true),
+    );
+    let text = resolve_policy(
+        &cfg,
+        &policy_request(scope("telegram", "c", "t"), false, false),
+    );
     assert_eq!(voice.mode, HostVoiceReplyMode::Mirror);
-    assert!(voice.inbound_has_voice);
-    let text = resolve_policy(&cfg, &scope("telegram", "c-text", "m2"), &tenant);
-    assert!(!text.inbound_has_voice);
-}
-
-#[test]
-fn voice_facts_are_correlated_with_the_runner_request_id() {
-    let tenant = crate::core::runtime::Tenant::default();
-    let inbound = envelope("voice-conversation", "provider-message-id", true);
-    record_inbound_envelope(
-        &inbound,
-        &tenant,
-        "telegram:provider-message-id:runner-uuid",
+    assert_eq!(
+        voice, text,
+        "the module applies the facts; the host owns the mode"
     );
-
-    let policy = resolve_policy(
-        &ChannelVoiceConfig::default(),
-        &scope(
-            "telegram",
-            "voice-conversation",
-            "telegram:provider-message-id:runner-uuid",
-        ),
-        &tenant,
-    );
-
-    assert!(
-        policy.inbound_has_voice,
-        "reply policy is queried with the runner request ID, not the provider message ID"
-    );
-    assert!(
-        !resolve_policy(
-            &ChannelVoiceConfig::default(),
-            &scope("telegram", "voice-conversation", "provider-message-id"),
-            &tenant,
-        )
-        .inbound_has_voice,
-        "a provider message ID is not an alias for the runner request ID"
-    );
-    assert!(
-        !resolve_policy(
-            &ChannelVoiceConfig::default(),
-            &scope(
-                "telegram",
-                "other-conversation",
-                "telegram:provider-message-id:runner-uuid"
-            ),
-            &tenant,
-        )
-        .inbound_has_voice,
-        "voice facts remain bound to the full conversation scope"
-    );
-}
-
-#[test]
-fn same_conversation_and_turn_ids_do_not_cross_voice_facts_between_accounts() {
-    let mut voice = envelope("shared-conversation", "shared-turn", true);
-    voice.channel = ChannelRef {
-        id: "telegram".into(),
-        account_id: Some("telegram:alice".into()),
-    };
-    let mut text = envelope("shared-conversation", "shared-turn", false);
-    text.channel = ChannelRef {
-        id: "telegram".into(),
-        account_id: Some("telegram:bob".into()),
-    };
-
-    let tenant = crate::core::runtime::Tenant::default();
-    record_inbound_envelope(&voice, &tenant, "shared-turn");
-    record_inbound_envelope(&text, &tenant, "shared-turn");
-
-    let alice = resolve_policy(
-        &ChannelVoiceConfig::default(),
-        &scope("telegram:alice", "shared-conversation", "shared-turn"),
-        &tenant,
-    );
-    let bob = resolve_policy(
-        &ChannelVoiceConfig::default(),
-        &scope("telegram:bob", "shared-conversation", "shared-turn"),
-        &tenant,
-    );
-    assert!(
-        alice.inbound_has_voice,
-        "Alice's voice turn was overwritten by Bob's text turn"
-    );
-    assert!(!bob.inbound_has_voice);
-}
-
-#[test]
-fn voice_facts_require_matching_configured_account_and_full_conversation() {
-    let tenant = crate::core::runtime::Tenant {
-        profile: Some("voice-scope-profile".into()),
-        agent: None,
-    };
-    let mut voice = envelope("shared", "same-turn", true);
-    voice.conversation.thread_id = Some("thread-a".into());
-    voice.conversation.topic_id = Some("topic-a".into());
-    record_inbound_envelope(&voice, &tenant, "same-turn");
-
-    let config = ChannelVoiceConfig::default();
-    let matching = HostVoiceScope {
-        conversation: voice.conversation.clone(),
-        ..scope("telegram", "shared", "same-turn")
-    };
-    assert!(resolve_policy(&config, &matching, &tenant).inbound_has_voice);
-
-    let mut other_thread = matching.clone();
-    other_thread.conversation.thread_id = Some("thread-b".into());
-    assert!(!resolve_policy(&config, &other_thread, &tenant).inbound_has_voice);
-
-    let mut other_topic = matching.clone();
-    other_topic.conversation.topic_id = Some("topic-b".into());
-    assert!(!resolve_policy(&config, &other_topic, &tenant).inbound_has_voice);
-
-    let mut mismatched_account = matching.clone();
-    mismatched_account.configured_instance = "telegram:other".into();
-    assert!(!resolve_policy(&config, &mismatched_account, &tenant).inbound_has_voice);
-
-    let mut mismatched_channel = matching;
-    mismatched_channel.channel.id = "discord".into();
-    assert!(!resolve_policy(&config, &mismatched_channel, &tenant).inbound_has_voice);
-}
-
-#[test]
-fn same_channel_account_and_turn_ids_do_not_cross_voice_facts_between_tenants() {
-    let alice = crate::core::runtime::Tenant {
-        profile: Some("profile-alice".into()),
-        agent: None,
-    };
-    let bob = crate::core::runtime::Tenant {
-        profile: Some("profile-bob".into()),
-        agent: None,
-    };
-    let envelope_voice = envelope("same-conversation", "same-turn", true);
-    let envelope_text = envelope("same-conversation", "same-turn", false);
-
-    record_inbound_envelope(&envelope_voice, &alice, "same-turn");
-    record_inbound_envelope(&envelope_text, &bob, "same-turn");
-
-    assert!(
-        resolve_policy(
-            &ChannelVoiceConfig::default(),
-            &scope("telegram", "same-conversation", "same-turn"),
-            &alice,
-        )
-        .inbound_has_voice
-    );
-    assert!(
-        !resolve_policy(
-            &ChannelVoiceConfig::default(),
-            &scope("telegram", "same-conversation", "same-turn"),
-            &bob,
-        )
-        .inbound_has_voice
-    );
-}
-
-#[test]
-fn unknown_turn_defaults_to_no_voice() {
-    let policy = resolve_policy(
-        &ChannelVoiceConfig::default(),
-        &scope("t", "nope", "nope"),
-        &crate::core::runtime::Tenant::default(),
-    );
-    assert!(!policy.inbound_has_voice);
-    assert!(!policy.explicitly_requested);
 }
 
 #[test]
@@ -231,8 +60,7 @@ fn policy_mode_follows_thread_then_channel_overrides() {
     assert_eq!(
         resolve_policy(
             &cfg,
-            &scope("telegram", "c", "t"),
-            &crate::core::runtime::Tenant::default()
+            &policy_request(scope("telegram", "c", "t"), false, false)
         )
         .mode,
         HostVoiceReplyMode::Always
@@ -241,8 +69,7 @@ fn policy_mode_follows_thread_then_channel_overrides() {
     assert_eq!(
         resolve_policy(
             &cfg,
-            &scope("telegram", "c", "t"),
-            &crate::core::runtime::Tenant::default()
+            &policy_request(scope("telegram", "c", "t"), false, false)
         )
         .mode,
         HostVoiceReplyMode::Never
@@ -250,33 +77,11 @@ fn policy_mode_follows_thread_then_channel_overrides() {
     assert_eq!(
         resolve_policy(
             &cfg,
-            &scope("slack", "other", "t"),
-            &crate::core::runtime::Tenant::default()
+            &policy_request(scope("slack", "other", "t"), false, false)
         )
         .mode,
         HostVoiceReplyMode::Mirror
     );
-}
-
-#[test]
-fn registry_is_bounded() {
-    let tenant = crate::core::runtime::Tenant::default();
-    for index in 0..(MAX_TRACKED_TURNS + 10) {
-        let conversation = ConversationRef {
-            id: "bounded".into(),
-            ..ConversationRef::default()
-        };
-        record_turn(
-            turn_key(
-                &tenant,
-                &ChannelRef::default(),
-                &conversation,
-                &index.to_string(),
-            ),
-            VoiceTurnFacts::default(),
-        );
-    }
-    assert!(TURNS.lock().len() <= MAX_TRACKED_TURNS);
 }
 
 #[test]
@@ -330,4 +135,162 @@ async fn overlong_reply_is_rejected_without_calling_the_backend() {
         .await
         .unwrap_err();
     assert!(err.to_string().contains("maximum spoken duration"));
+}
+
+mod stt {
+    use super::*;
+    use crate::core::Outcome;
+    use crate::voice::factory::registry::{register_stt_provider, unregister_stt_provider};
+    use crate::voice::factory::{SttProvider, SttResult};
+
+    struct EchoStt {
+        fail: bool,
+    }
+
+    #[async_trait::async_trait]
+    impl SttProvider for EchoStt {
+        fn name(&self) -> &'static str {
+            "channel-voice-test"
+        }
+
+        async fn transcribe(
+            &self,
+            _config: &Config,
+            audio_base64: &str,
+            mime_type: Option<&str>,
+            file_name: Option<&str>,
+            language: Option<&str>,
+        ) -> Result<Outcome<SttResult>, String> {
+            if self.fail {
+                return Err("backend refused the audio".into());
+            }
+            Ok(Outcome::new(
+                SttResult {
+                    text: format!(
+                        "{audio_base64}|{}|{}|{}",
+                        mime_type.unwrap_or("-"),
+                        file_name.unwrap_or("-"),
+                        language.unwrap_or("-")
+                    ),
+                    provider: "channel-voice-test".into(),
+                },
+                vec![],
+            ))
+        }
+    }
+
+    fn host(slug: &str) -> ChannelVoiceHost {
+        let mut config = Config::default();
+        config.stt_provider = Some(slug.into());
+        ChannelVoiceHost {
+            config: Arc::new(config),
+        }
+    }
+
+    #[tokio::test]
+    async fn unscoped_transcription_runs_the_configured_provider_with_the_request_hints() {
+        register_stt_provider("channel-voice-test-ok", |_, _| {
+            Ok(Box::new(EchoStt { fail: false }))
+        });
+        let result = host("channel-voice-test-ok")
+            .transcribe_host(HostTranscriptionRequest {
+                scope: None,
+                audio_base64: "QUJD".into(),
+                mime_type: Some("audio/ogg".into()),
+                file_name: Some("note.ogg".into()),
+                language: Some("en".into()),
+            })
+            .await;
+        unregister_stt_provider("channel-voice-test-ok");
+        let result = result.unwrap();
+        assert_eq!(result.text, "QUJD|audio/ogg|note.ogg|en");
+        assert_eq!(result.language.as_deref(), Some("en"));
+        assert_eq!(result.duration_secs, None);
+    }
+
+    #[tokio::test]
+    async fn scoped_transcription_validates_the_scope_then_delegates() {
+        register_stt_provider("channel-voice-test-scoped", |_, _| {
+            Ok(Box::new(EchoStt { fail: false }))
+        });
+        let host = host("channel-voice-test-scoped");
+        let result = host
+            .transcribe_voice(HostVoiceTranscriptionRequest {
+                scope: scope("telegram", "chat-1", "turn-1"),
+                audio_base64: "REVG".into(),
+                mime_type: None,
+                file_name: None,
+                language: None,
+            })
+            .await;
+        unregister_stt_provider("channel-voice-test-scoped");
+        assert_eq!(result.unwrap().text, "REVG|-|-|-");
+    }
+
+    #[tokio::test]
+    async fn provider_failure_and_unknown_provider_surface_as_errors() {
+        register_stt_provider("channel-voice-test-fail", |_, _| {
+            Ok(Box::new(EchoStt { fail: true }))
+        });
+        let err = host("channel-voice-test-fail")
+            .transcribe_host(HostTranscriptionRequest {
+                audio_base64: "QQ==".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap_err();
+        unregister_stt_provider("channel-voice-test-fail");
+        assert!(
+            err.to_string().contains("backend refused the audio"),
+            "{err}"
+        );
+
+        let err = host("channel-voice-test-never-registered")
+            .transcribe_host(HostTranscriptionRequest::default())
+            .await;
+        assert!(err.is_err());
+    }
+}
+
+#[tokio::test]
+async fn synthesis_fails_cleanly_when_the_voice_module_cannot_be_loaded() {
+    let mut config = Config::default();
+    config.modules.allow_download = false;
+    config.modules.source = crate::config::schema::ModuleSourceMode::Release;
+    let host = ChannelVoiceHost {
+        config: Arc::new(config),
+    };
+    let err = host
+        .synthesize_speech(HostSpeechSynthesisRequest {
+            scope: scope("telegram", "c", "t"),
+            text: "short reply".into(),
+            voice: Some("alloy".into()),
+            format: None,
+        })
+        .await;
+    assert!(err.is_err(), "no voice module is available offline");
+}
+
+#[test]
+fn reply_policy_reports_the_configured_mode_for_the_scoped_turn() {
+    let mut config = Config::default();
+    config
+        .channel_voice
+        .threads
+        .insert("chat-9".into(), VoiceReplyMode::SpeakReply);
+    let host = ChannelVoiceHost {
+        config: Arc::new(config),
+    };
+    let policy = host.reply_policy(&policy_request(
+        scope("telegram", "chat-9", "t"),
+        true,
+        false,
+    ));
+    assert_eq!(policy.mode, HostVoiceReplyMode::SpeakReply);
+    let default = host.reply_policy(&policy_request(
+        scope("telegram", "other", "t"),
+        false,
+        true,
+    ));
+    assert_eq!(default.mode, HostVoiceReplyMode::Mirror);
 }

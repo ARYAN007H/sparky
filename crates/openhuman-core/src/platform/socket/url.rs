@@ -13,15 +13,13 @@ pub(super) fn is_safe_socket_endpoint(endpoint: &str) -> bool {
             if url.set_scheme("http").is_err() {
                 return false;
             }
-            crate::inference::provider::openhuman_backend_model::is_safe_endpoint_for_managed_bearer(
-                url.as_str(),
-            )
+            crate::security::transport::is_safe_endpoint_for_bearer(url.as_str())
         }
         _ => false,
     }
 }
 
-/// Build a Socket.IO WebSocket URL from an HTTP(S) API base (e.g. `https://api.tinyhumans.ai`).
+/// Build a Socket.IO WebSocket URL from an HTTP(S) API base (e.g. `https://api.example.com`).
 pub fn websocket_url(http_or_https_base: &str) -> String {
     let Ok(mut url) = Url::parse(http_or_https_base) else {
         return http_or_https_base.to_string();

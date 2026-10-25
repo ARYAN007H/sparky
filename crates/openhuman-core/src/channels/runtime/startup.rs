@@ -3,7 +3,21 @@
 mod callback;
 mod chat_workload;
 mod credentials;
+#[cfg(feature = "legacy-import")]
 mod delivery_import;
+#[cfg(not(feature = "legacy-import"))]
+mod delivery_import {
+    use std::path::Path;
+
+    pub(super) async fn import_legacy_delivery(
+        _ctx: &crate::core::runtime::DispatchCtx,
+        _workspace: &Path,
+    ) -> anyhow::Result<()> {
+        anyhow::bail!(
+            "legacy delivery import is unavailable without `legacy-import`; legacy data was not inspected or migrated"
+        )
+    }
+}
 mod module_providers;
 mod progressive_transport;
 mod prompt;
@@ -80,7 +94,17 @@ impl ChannelHandle {
             Self::Module(channel) => channel.capabilities(),
             Self::Relay(_) => tinychannels_bus::ChannelCapabilities::unknown(),
             #[cfg(test)]
-            Self::Test(_channel) => tinychannels_bus::ChannelCapabilities::unknown(),
+            Self::Test(channel) => {
+                // A test channel stands in for a chat provider: the module only
+                // parses remote commands for channels that advertise them.
+                let mut capabilities = tinychannels_bus::ChannelCapabilities::unknown();
+                capabilities.remote_control = true;
+                capabilities.chat_approvals = true;
+                capabilities.history_key_ignores_thread =
+                    tinychannels_bus::provider_id(&channel.name) == "telegram";
+                capabilities.reactions = channel.supports_reactions;
+                capabilities
+            }
         }
     }
 
@@ -121,13 +145,9 @@ impl ChannelHandle {
 
     pub(crate) async fn start_typing(&self, recipient: &str) -> anyhow::Result<()> {
         match self {
-            Self::Module(channel) => {
-                channel
-                    .interact(tinychannels_bus::ChannelInteraction::StartTyping {
-                        recipient: recipient.to_owned(),
-                    })
-                    .await
-            }
+            // Factory-built adapters serve `StartTyping` through their typing
+            // port, so the host drives the indicator again.
+            Self::Module(module) => module.start_typing(recipient).await,
             Self::Relay(_) => Ok(()),
             #[cfg(test)]
             Self::Test(channel) => {
@@ -142,13 +162,7 @@ impl ChannelHandle {
 
     pub(crate) async fn stop_typing(&self, recipient: &str) -> anyhow::Result<()> {
         match self {
-            Self::Module(channel) => {
-                channel
-                    .interact(tinychannels_bus::ChannelInteraction::StopTyping {
-                        recipient: recipient.to_owned(),
-                    })
-                    .await
-            }
+            Self::Module(module) => module.stop_typing(recipient).await,
             Self::Relay(_) => Ok(()),
             #[cfg(test)]
             Self::Test(channel) => {
@@ -167,7 +181,7 @@ impl ChannelHandle {
         interval_secs: u64,
     ) -> anyhow::Result<Option<String>> {
         match self {
-            Self::Module(channel) => channel.begin_typing_refresh(recipient, interval_secs).await,
+            Self::Module(module) => module.begin_typing_refresh(recipient, interval_secs).await,
             Self::Relay(_) => Ok(None),
             #[cfg(test)]
             Self::Test(channel) => match &channel.begin_typing_refresh {
@@ -179,7 +193,7 @@ impl ChannelHandle {
 
     pub(crate) async fn end_typing_refresh(&self, handle: &str) -> anyhow::Result<()> {
         match self {
-            Self::Module(channel) => channel.end_typing_refresh(handle).await,
+            Self::Module(module) => module.end_typing_refresh(handle).await,
             Self::Relay(_) => Ok(()),
             #[cfg(test)]
             Self::Test(channel) => match &channel.end_typing_refresh {
@@ -261,7 +275,7 @@ pub(crate) async fn prepare_runtime_limits(
         ChannelControlResult::RuntimeLimits {
             timeout_secs,
             max_in_flight,
-        } if timeout_secs >= tinychannels_bus::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS
+        } if timeout_secs >= tinychannels_bus::module_runtime::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS
             && max_in_flight > 0 =>
         {
             Ok((timeout_secs, max_in_flight))
@@ -274,7 +288,6 @@ pub(crate) async fn prepare_runtime_limits(
     }
 }
 
-pub(crate) use credentials::hydrate_channel_credentials;
 pub use start_channels::start_channels;
 pub(crate) use start_channels::start_channels_with_session;
 pub(crate) use turn_parts::{build_channel_turn_parts, runtime_context, PromptToolDescs};
