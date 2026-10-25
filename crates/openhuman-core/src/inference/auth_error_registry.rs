@@ -183,9 +183,8 @@ fn origins() -> &'static Mutex<HashMap<String, ErrorOrigins>> {
 }
 
 fn current_scope() -> CurrentScope {
-    let Some(context) = crate::core::runtime::tenant::context_in(
-        crate::core::runtime::is_saas(),
-    ) else {
+    let Some(context) = crate::core::runtime::tenant::context_in(crate::core::runtime::is_saas())
+    else {
         return CurrentScope::Unbound;
     };
     match context.workspace_config_binding() {
