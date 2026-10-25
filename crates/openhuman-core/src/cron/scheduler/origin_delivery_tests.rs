@@ -8,7 +8,7 @@ use {
     tinyflows_bus::schedule::types::Schedule, tinyflows_bus::schedule::types::SessionTarget,
 };
 
-fn config(tmp: &tempfile::TempDir) -> Config {
+pub(super) fn config(tmp: &tempfile::TempDir) -> Config {
     let config = Config {
         workspace_dir: tmp.path().join("workspace"),
         action_dir: tmp.path().join("workspace"),
@@ -19,7 +19,7 @@ fn config(tmp: &tempfile::TempDir) -> Config {
     config
 }
 
-fn job(origin: Option<JobOrigin>) -> CronJob {
+pub(super) fn job(origin: Option<JobOrigin>) -> CronJob {
     CronJob {
         claim_generation: 0,
         policy: Default::default(),
