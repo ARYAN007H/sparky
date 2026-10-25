@@ -25,6 +25,7 @@ host_key="${OH_MODULE_HOST_KEY:-ubuntu-22.04-x86_64}"
 blobs="${CI_CACHE_DIR:+${CI_CACHE_DIR}/blobs}"
 blobs="${blobs:-${dest}/.blobs}"
 mkdir -p "${blobs}" "${dest}"
+dest="$(cd "${dest}" && pwd -P)"
 
 verify() { echo "$1  $2" | sha256sum --check --status; }
 
