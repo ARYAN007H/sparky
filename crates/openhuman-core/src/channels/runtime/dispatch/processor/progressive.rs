@@ -309,3 +309,7 @@ pub(crate) fn output_event(progress: AgentProgress) -> Option<ChannelOutputEvent
 #[cfg(test)]
 #[path = "progressive_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "progressive_flow_tests.rs"]
+mod flow_tests;

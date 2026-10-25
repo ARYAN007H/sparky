@@ -554,4 +554,4 @@ mod tests;
 
 #[cfg(test)]
 #[path = "native_media_flow_tests.rs"]
-mod flow_tests;
+pub(in crate::channels::runtime::dispatch::processor) mod flow_tests;
