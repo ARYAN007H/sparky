@@ -160,6 +160,7 @@
     {
       "scope": "hosts",
       "package": "tinyflows",
+      "parent": "openhuman",
       "reason": "OpenHuman still uses TinyFlows graph types and compatibility helpers in the flows and run projection adapters while its implementation remains behind tinyflows-bus. Moving the remaining adapter surface and legacy import path is part of the openhuman core shrink tracked in #7390 (including the cron importer decision in #8055)."
     }
   ],
