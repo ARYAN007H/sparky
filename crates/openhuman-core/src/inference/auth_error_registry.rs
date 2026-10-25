@@ -63,6 +63,13 @@ pub fn record(provider: &str, status: u16) -> bool {
 }
 
 fn record_in_scope(provider: &str, status: u16, scope: CurrentScope) -> bool {
+    if let CurrentScope::Unresolved(error) = scope {
+        log::warn!(
+            "[auth-errors] record provider={provider} skipped: scope unresolved ({error})"
+        );
+        return false;
+    }
+
     let timestamp_ms = now_ms();
     let changed = registry().record(ProviderAuthError {
         provider: provider.to_string(),
@@ -88,11 +95,7 @@ fn record_in_scope(provider: &str, status: u16, scope: CurrentScope) -> bool {
         CurrentScope::Unbound => {
             origins.entry(provider.to_owned()).or_default().unscoped = true;
         }
-        CurrentScope::Unresolved(error) => {
-            log::warn!(
-                "[auth-errors] record provider={provider} skipped: scope unresolved ({error})"
-            );
-        }
+        CurrentScope::Unresolved(_) => unreachable!("unresolved scope returned before recording"),
     }
     changed
 }
