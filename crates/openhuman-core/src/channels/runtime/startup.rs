@@ -180,10 +180,8 @@ impl ChannelHandle {
         recipient: &str,
         interval_secs: u64,
     ) -> anyhow::Result<Option<String>> {
-        let _ = (recipient, interval_secs);
         match self {
-            // Typing refresh runs inside the module's progressive worker.
-            Self::Module(_) => Ok(None),
+            Self::Module(module) => module.begin_typing_refresh(recipient, interval_secs).await,
             Self::Relay(_) => Ok(None),
             #[cfg(test)]
             Self::Test(channel) => match &channel.begin_typing_refresh {
@@ -194,9 +192,8 @@ impl ChannelHandle {
     }
 
     pub(crate) async fn end_typing_refresh(&self, handle: &str) -> anyhow::Result<()> {
-        let _ = handle;
         match self {
-            Self::Module(_) => Ok(()),
+            Self::Module(module) => module.end_typing_refresh(handle).await,
             Self::Relay(_) => Ok(()),
             #[cfg(test)]
             Self::Test(channel) => match &channel.end_typing_refresh {
