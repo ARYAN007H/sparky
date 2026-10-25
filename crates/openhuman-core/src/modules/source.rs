@@ -94,7 +94,7 @@ pub fn local_artifact(id: &str) -> Option<PathBuf> {
 pub fn staged_artifact(id: &str) -> Option<PathBuf> {
     super::registry::find(id)?;
     let dirs = std::env::var_os("OPENHUMAN_MODULE_PATH")?;
-    std::env::split_paths(&dirs).find_map(|dir| released_artifact_in(&dir, id))
+    std::env::split_paths(&dirs).find_map(|dir| module_artifact_in(&dir, id))
 }
 
 /// Find either a locally built library or a released TinyBus module in one
