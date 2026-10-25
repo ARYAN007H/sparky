@@ -465,3 +465,6 @@ async fn discarding_claimed_attachment_preserves_row_owned_file() {
 
 #[path = "attachments_staged_tests.rs"]
 mod staged_tests;
+
+#[path = "attachments_native_tests.rs"]
+mod native_tests;
