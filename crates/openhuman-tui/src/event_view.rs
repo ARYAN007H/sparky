@@ -303,3 +303,7 @@ impl WebEventView {
         view
     }
 }
+
+#[cfg(test)]
+#[path = "event_view_tests.rs"]
+mod tests;
