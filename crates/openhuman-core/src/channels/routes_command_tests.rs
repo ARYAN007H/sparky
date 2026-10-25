@@ -1,5 +1,24 @@
 use super::*;
 
+struct RouteRuntimeHostCallback;
+
+#[tinybus::interface(name = "ai.tinyhumans.tinychannels.ChannelsHost")]
+impl RouteRuntimeHostCallback {
+    async fn dispatch_controller_backend(
+        &self,
+        _request: tinychannels_bus::ChannelBackendRequest,
+    ) -> tinybus::Result<tinychannels_bus::ChannelBackendResult> {
+        Err(tinybus::Error::failed("unused route test callback"))
+    }
+}
+
+async fn open_route_test_runtime() -> crate::modules::channel_runtime::ChannelRuntimeLease {
+    let client = crate::channels::module_fixture::client().await;
+    crate::modules::channel_runtime::ChannelRuntimeLease::open(client, RouteRuntimeHostCallback)
+        .await
+        .expect("retain the host callback for remote-control persistence")
+}
+
 #[tokio::test]
 async fn handle_runtime_command_set_model_clears_sender_history_and_persists_route_override() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
@@ -162,6 +181,7 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 #[tokio::test]
 async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     let _storage = crate::channels::module_fixture::install_memory_storage();
+    let _runtime = open_route_test_runtime().await;
     let tempdir = tempfile::tempdir().unwrap();
     let ctx = runtime_context(tempdir.path().to_path_buf());
     let channel_impl = Arc::new(RecordingChannel::default());
@@ -210,7 +230,15 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         },
     );
 
-    let subscriber = ChannelTurnStateSubscriber::new(tempdir.path().to_path_buf());
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = tempdir.path().to_path_buf();
+    config.modules.allow_download = false;
+    config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
+    let channel: Arc<dyn Channel> = channel_impl.clone();
+    let subscriber = ChannelTurnStateSubscriber::with_config(
+        Arc::new(HashMap::from([("telegram".to_string(), channel)])),
+        Arc::new(config),
+    );
     subscriber
         .handle(&DomainEvent::ChannelMessageReceived {
             channel: "telegram".into(),
