@@ -345,7 +345,7 @@ async fn a_command_arriving_inside_the_window_runs_as_its_own_turn_after_the_tex
     run.send("alice", "tell me about tokio").await;
     sleep_ms(500).await;
     assert_eq!(turns.count(), 0, "the text is still held by the quiet window");
-    run.send("alice", "/new").await;
+    run.send("alice", "/summarize").await;
     sleep_ms(3000).await;
 
     // A slash command never merges: the buffered text and the command are two
@@ -354,8 +354,8 @@ async fn a_command_arriving_inside_the_window_runs_as_its_own_turn_after_the_tex
     let first = turns.user(0);
     let second = turns.user(1);
     assert!(first.ends_with("tell me about tokio"), "{first}");
-    assert!(!first.contains("/new"), "{first}");
-    assert!(second.ends_with("/new"), "{second}");
+    assert!(!first.contains("/summarize"), "{first}");
+    assert!(second.ends_with("/summarize"), "{second}");
     assert!(!second.contains("tokio"), "{second}");
     run.finish().await;
 }
