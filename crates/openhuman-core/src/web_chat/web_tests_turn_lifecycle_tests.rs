@@ -181,6 +181,7 @@ async fn a_refused_message_publishes_no_turn_events() {
 /// context with its own config, the local provider receives the inference
 /// request and rejects it, and the turn ends in exactly one classified
 /// `chat_error` after which the thread is free and no session is cached.
+#[cfg(feature = "flows")]
 #[tokio::test]
 async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_error() {
     use crate::core::runtime::{context::CoreContext, DomainSet};
