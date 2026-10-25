@@ -73,6 +73,7 @@ export function auditGraph(metadata, roots, policy, contract = null) {
   const { packages, edges } = graph(metadata);
   const violations = [];
   const exceptions = [];
+  const reportedEdges = new Set();
   for (const root of roots) {
     const candidates = [...packages.values()].filter(pkg => pkg.name === root);
     if (candidates.length !== 1) throw new Error(`expected exactly one root package ${root}`);
@@ -105,7 +106,9 @@ export function auditGraph(metadata, roots, policy, contract = null) {
             (!item.parent || item.parent === parent));
           const finding = { scope, package: name, path: path.map(id => packages.get(id).name) };
           const findings = exemption ? exceptions : violations;
-          if (!findings.some(item => item.scope === scope && item.package === name)) {
+          const reportKey = `${exemption ? 'exception' : 'violation'}:${scope}:${id}`;
+          if (!reportedEdges.has(reportKey)) {
+            reportedEdges.add(reportKey);
             findings.push(finding);
           }
           // Contract exceptions pin the first unsafe dependency. Its implementation
