@@ -283,6 +283,13 @@ fn orchestrator_routes_every_registered_specialist_through_spawn_subagent() {
                 );
                 continue;
             }
+            if agent_id == "skill_setup" && !cfg!(feature = "skills") {
+                assert!(
+                    registry.get(agent_id).is_none(),
+                    "skill_setup is intentionally absent without skills"
+                );
+                continue;
+            }
             assert!(
                 registry.get(agent_id).is_some(),
                 "orchestrator specialist `{agent_id}` must be registered"
