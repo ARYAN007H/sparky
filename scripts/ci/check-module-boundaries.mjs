@@ -81,8 +81,6 @@ export function auditGraph(metadata, roots, policy, contract = null) {
     for (let at = 0; at < queue.length; at++) {
       const path = queue[at];
       const id = path.at(-1);
-      if (seen.has(id)) continue;
-      seen.add(id);
       const name = packages.get(id).name;
       // The one crate that may link module implementations (local development
       // only). It is a legitimate edge only directly under an allowed host
@@ -113,6 +111,11 @@ export function auditGraph(metadata, roots, policy, contract = null) {
           if (contract) continue;
         }
       }
+      // Exceptions apply to incoming edges, not to package identities. A
+      // second path can have a different parent and must be checked even when
+      // this package's descendants have already been traversed.
+      if (seen.has(id)) continue;
+      seen.add(id);
       for (const next of edges(id)) {
         if (!contract && packages.get(next).name === policy.linkedHost?.package) {
           const parent = packages.get(id).name;
