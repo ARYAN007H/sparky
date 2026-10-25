@@ -28,7 +28,11 @@ fn context_fields_and_event_name_are_projected() {
     let v = view(json!({"event": "text_delta", "delta": "hi"}));
     assert_eq!(v.event, "text_delta");
     assert_eq!(
-        (v.client_id.as_str(), v.thread_id.as_str(), v.request_id.as_str()),
+        (
+            v.client_id.as_str(),
+            v.thread_id.as_str(),
+            v.request_id.as_str()
+        ),
         ("c1", "t1", "r1")
     );
     assert_eq!(v.seq, Some(7));
@@ -37,13 +41,25 @@ fn context_fields_and_event_name_are_projected() {
 
 #[test]
 fn final_response_variants_expose_full_response() {
-    for name in ["chat_done", "chat_interim", "chat_message", "chat_segment", "proactive_message", "voice_speak", "channel_outbound"] {
+    for name in [
+        "chat_done",
+        "chat_interim",
+        "chat_message",
+        "chat_segment",
+        "proactive_message",
+        "voice_speak",
+        "channel_outbound",
+    ] {
         let parsed = serde_json::from_value::<WebChannelEvent>(json!({
             "event": name, "client_id": "c", "thread_id": "t", "request_id": "r",
             "full_response": "answer"
         }));
         let event = parsed.unwrap_or_else(|e| panic!("{name}: {e}"));
-        assert_eq!(WebEventView::from_event(&event).full_response.as_deref(), Some("answer"), "{name}");
+        assert_eq!(
+            WebEventView::from_event(&event).full_response.as_deref(),
+            Some("answer"),
+            "{name}"
+        );
     }
     let v = view(json!({"event": "chat_done", "full_response": "answer"}));
     assert_eq!(v.full_response.as_deref(), Some("answer"));
@@ -51,8 +67,10 @@ fn final_response_variants_expose_full_response() {
 
 #[test]
 fn chat_error_and_cancel_expose_retry_metadata() {
-    let v = view(json!({"event": "chat_error", "message": "boom", "error_type": "network",
-        "error_retryable": true, "error_retry_after_ms": 1500}));
+    let v = view(
+        json!({"event": "chat_error", "message": "boom", "error_type": "network",
+        "error_retryable": true, "error_retry_after_ms": 1500}),
+    );
     assert_eq!(v.message.as_deref(), Some("boom"));
     assert_eq!(v.error_type.as_deref(), Some("network"));
     assert_eq!(v.error_retryable, Some(true));
@@ -67,16 +85,31 @@ fn chat_error_and_cancel_expose_retry_metadata() {
 
 #[test]
 fn deltas_and_iteration_messages_are_projected() {
-    assert_eq!(view(json!({"event": "thinking_delta", "delta": "hm"})).delta.as_deref(), Some("hm"));
-    assert_eq!(view(json!({"event": "iteration_start", "message": "round 2"})).message.as_deref(), Some("round 2"));
-    let v = view(json!({"event": "tool_args_delta", "delta": "{\"a\"", "tool_name": "t",
-        "skill_id": "s", "tool_call_id": "tc"}));
+    assert_eq!(
+        view(json!({"event": "thinking_delta", "delta": "hm"}))
+            .delta
+            .as_deref(),
+        Some("hm")
+    );
+    assert_eq!(
+        view(json!({"event": "iteration_start", "message": "round 2"}))
+            .message
+            .as_deref(),
+        Some("round 2")
+    );
+    let v = view(
+        json!({"event": "tool_args_delta", "delta": "{\"a\"", "tool_name": "t",
+        "skill_id": "s", "tool_call_id": "tc"}),
+    );
     assert_eq!(v.delta.as_deref(), Some("{\"a\""));
     assert_eq!(v.tool_name.as_deref(), Some("t"));
     assert_eq!(v.skill_id.as_deref(), Some("s"));
     assert_eq!(v.tool_call_id.as_deref(), Some("tc"));
     let v = view(json!({"event": "tool_progress", "tool_call_id": "tc", "message": "50%"}));
-    assert_eq!((v.tool_call_id.as_deref(), v.message.as_deref()), (Some("tc"), Some("50%")));
+    assert_eq!(
+        (v.tool_call_id.as_deref(), v.message.as_deref()),
+        (Some("tc"), Some("50%"))
+    );
 }
 
 #[test]
@@ -91,14 +124,18 @@ fn subagent_deltas_carry_subagent_detail() {
 
 #[test]
 fn tool_call_and_result_variants_project_all_fields() {
-    let v = view(json!({"event": "tool_call", "tool_name": "read", "skill_id": "s",
-        "args": {"p": 1}, "tool_call_id": "tc", "tool_display_label": "Reading"}));
+    let v = view(
+        json!({"event": "tool_call", "tool_name": "read", "skill_id": "s",
+        "args": {"p": 1}, "tool_call_id": "tc", "tool_display_label": "Reading"}),
+    );
     assert_eq!(v.tool_name.as_deref(), Some("read"));
     assert_eq!(v.args, Some(json!({"p": 1})));
     assert_eq!(v.tool_display_label.as_deref(), Some("Reading"));
 
-    let v = view(json!({"event": "subagent_tool_call", "tool_name": "read", "skill_id": "s",
-        "args": {"p": 1}, "tool_call_id": "tc", "tool_display_label": "Reading", "subagent": sub()}));
+    let v = view(
+        json!({"event": "subagent_tool_call", "tool_name": "read", "skill_id": "s",
+        "args": {"p": 1}, "tool_call_id": "tc", "tool_display_label": "Reading", "subagent": sub()}),
+    );
     assert_eq!(v.tool_call_id.as_deref(), Some("tc"));
     assert_sub(&v);
 
@@ -126,14 +163,18 @@ fn tool_call_and_result_variants_project_all_fields() {
 #[test]
 fn approval_and_plan_review_variants_project_prompt_fields() {
     for name in ["approval_request", "plan_review_request"] {
-        let v = view(json!({"event": name, "tool_name": "shell", "args": {"cmd": "ls"},
-            "tool_call_id": "tc", "message": "allow?"}));
+        let v = view(
+            json!({"event": name, "tool_name": "shell", "args": {"cmd": "ls"},
+            "tool_call_id": "tc", "message": "allow?"}),
+        );
         assert_eq!(v.tool_name.as_deref(), Some("shell"), "{name}");
         assert_eq!(v.message.as_deref(), Some("allow?"), "{name}");
         assert_eq!(v.args, Some(json!({"cmd": "ls"})), "{name}");
     }
     for name in ["approval_decided", "plan_review_decided"] {
-        let v = view(json!({"event": name, "tool_name": "shell", "message": "approved", "tool_call_id": "tc"}));
+        let v = view(
+            json!({"event": name, "tool_name": "shell", "message": "approved", "tool_call_id": "tc"}),
+        );
         assert_eq!(v.message.as_deref(), Some("approved"), "{name}");
         assert_eq!(v.tool_call_id.as_deref(), Some("tc"), "{name}");
     }
@@ -142,14 +183,22 @@ fn approval_and_plan_review_variants_project_prompt_fields() {
 #[test]
 fn subagent_lifecycle_events_project_status() {
     for name in ["subagent_spawned", "subagent_iteration_start"] {
-        let v = view(json!({"event": name, "tool_name": "Explore", "skill_id": "s",
-            "message": "go", "subagent": sub()}));
+        let v = view(
+            json!({"event": name, "tool_name": "Explore", "skill_id": "s",
+            "message": "go", "subagent": sub()}),
+        );
         assert_eq!(v.message.as_deref(), Some("go"), "{name}");
         assert_sub(&v);
     }
-    for name in ["subagent_completed", "subagent_failed", "subagent_awaiting_user"] {
-        let v = view(json!({"event": name, "tool_name": "Explore", "skill_id": "s",
-            "message": "m", "success": true, "subagent": sub()}));
+    for name in [
+        "subagent_completed",
+        "subagent_failed",
+        "subagent_awaiting_user",
+    ] {
+        let v = view(
+            json!({"event": name, "tool_name": "Explore", "skill_id": "s",
+            "message": "m", "success": true, "subagent": sub()}),
+        );
         assert_eq!(v.success, Some(true), "{name}");
         assert_eq!(v.tool_name.as_deref(), Some("Explore"), "{name}");
         assert_sub(&v);

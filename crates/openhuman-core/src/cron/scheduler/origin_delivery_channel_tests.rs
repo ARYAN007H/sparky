@@ -46,7 +46,9 @@ fn channel_origin(identity: Option<ChannelSessionIdentity>) -> JobOrigin {
     }
 }
 
-fn account_of(objects: &std::collections::HashMap<String, tinybus::module::ModuleObjectClient>) -> String {
+fn account_of(
+    objects: &std::collections::HashMap<String, tinybus::module::ModuleObjectClient>,
+) -> String {
     objects
         .keys()
         .find(|key| tinychannels_bus::provider_id(key) == "telegram")
@@ -130,7 +132,10 @@ async fn channel_origin_reply_reaches_the_provider_and_the_durable_session() {
         .await
         .iter()
         .any(|p| p.ends_with("/sendMessage")));
-    assert_eq!(assistant_messages(&ctx, &cfg, &ident), ["Scheduled.", "Drink water!"]);
+    assert_eq!(
+        assistant_messages(&ctx, &cfg, &ident),
+        ["Scheduled.", "Drink water!"]
+    );
 }
 
 #[tokio::test]
@@ -139,8 +144,13 @@ async fn channel_origin_without_a_session_identity_is_rejected_before_sending() 
     let cfg = config(&tmp);
     let ctx = ctx_for(&cfg);
     let j = job(Some(channel_origin(None)));
-    let err = deliver_to_origin(&ctx, &cfg, &j, "run-x", "hi").await.unwrap_err();
-    assert!(err.to_string().contains("no durable session identity"), "{err}");
+    let err = deliver_to_origin(&ctx, &cfg, &j, "run-x", "hi")
+        .await
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("no durable session identity"),
+        "{err}"
+    );
 }
 
 #[tokio::test]
@@ -151,17 +161,29 @@ async fn channel_origin_captured_under_another_tenant_or_agent_is_rejected() {
 
     let mut foreign = identity(&ctx, &cfg, "telegram");
     foreign.tenant_key = "another-tenant".into();
-    let err = deliver_to_origin(&ctx, &cfg, &job(Some(channel_origin(Some(foreign)))), "r", "hi")
-        .await
-        .unwrap_err();
+    let err = deliver_to_origin(
+        &ctx,
+        &cfg,
+        &job(Some(channel_origin(Some(foreign)))),
+        "r",
+        "hi",
+    )
+    .await
+    .unwrap_err();
     assert!(err.to_string().contains("invalid channel origin"), "{err}");
     assert!(err.to_string().contains("different tenant"), "{err}");
 
     let mut stale_agent = identity(&ctx, &cfg, "telegram");
     stale_agent.agent_id = "no-such-agent".into();
-    let err = deliver_to_origin(&ctx, &cfg, &job(Some(channel_origin(Some(stale_agent)))), "r", "hi")
-        .await
-        .unwrap_err();
+    let err = deliver_to_origin(
+        &ctx,
+        &cfg,
+        &job(Some(channel_origin(Some(stale_agent)))),
+        "r",
+        "hi",
+    )
+    .await
+    .unwrap_err();
     assert!(err.to_string().contains("no longer matches"), "{err}");
 }
 
@@ -172,10 +194,19 @@ async fn channel_origin_fails_when_the_channel_runtime_is_not_running() {
     let cfg = config(&tmp);
     let ctx = ctx_for(&cfg);
     let ident = identity(&ctx, &cfg, "telegram");
-    let err = deliver_to_origin(&ctx, &cfg, &job(Some(channel_origin(Some(ident.clone())))), "r", "hi")
-        .await
-        .unwrap_err();
-    assert!(err.to_string().contains("channel runtime is not running"), "{err}");
+    let err = deliver_to_origin(
+        &ctx,
+        &cfg,
+        &job(Some(channel_origin(Some(ident.clone())))),
+        "r",
+        "hi",
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        err.to_string().contains("channel runtime is not running"),
+        "{err}"
+    );
     assert!(assistant_messages(&ctx, &cfg, &ident).is_empty());
 }
 
@@ -222,6 +253,12 @@ async fn host_routed_channel_origin_reply_is_also_recorded_in_the_session_transc
     let replies = sink.0.lock().unwrap().clone();
     assert_eq!(replies.len(), 1);
     assert_eq!(replies[0].text, "Host reply");
-    assert_eq!(replies[0].profile_id.as_deref(), Some("cron-origin-profile"));
-    assert_eq!(assistant_messages(&ctx, &cfg, &ident), ["Scheduled.", "Host reply"]);
+    assert_eq!(
+        replies[0].profile_id.as_deref(),
+        Some("cron-origin-profile")
+    );
+    assert_eq!(
+        assistant_messages(&ctx, &cfg, &ident),
+        ["Scheduled.", "Host reply"]
+    );
 }

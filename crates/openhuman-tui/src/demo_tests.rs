@@ -16,16 +16,21 @@ fn sample_transcript_has_user_turn_tools_subagent_and_final_answer() {
         .unwrap()
         .contains("offline preview; no model or account calls"));
     assert!(!state.is_streaming());
-    assert!(state.entries().iter().any(|e| e.activity.as_ref().is_some_and(|a| a.child)));
-    assert!(state.entries().iter().any(|e| e.activity.as_ref().is_some_and(|a| !a.child)));
+    assert!(state
+        .entries()
+        .iter()
+        .any(|e| e.activity.as_ref().is_some_and(|a| a.child)));
+    assert!(state
+        .entries()
+        .iter()
+        .any(|e| e.activity.as_ref().is_some_and(|a| !a.child)));
 }
 
 #[test]
 fn sample_renders_on_the_production_renderer() {
     let state = sample();
     let mut ui = ui();
-    let mut terminal =
-        ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).unwrap();
+    let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).unwrap();
     terminal
         .draw(|f| crate::render::draw(f, &state, &mut ui))
         .unwrap();
@@ -48,7 +53,12 @@ fn sending_in_preview_explains_it_is_offline_and_clears_the_composer() {
     ui.composer.insert_str("hello there");
     assert!(!act(Action::Send, &mut state, &mut ui));
     assert_eq!(state.entries().len(), before + 1);
-    assert!(state.entries().last().unwrap().text.contains("Offline preview"));
+    assert!(state
+        .entries()
+        .last()
+        .unwrap()
+        .text
+        .contains("Offline preview"));
     assert_eq!(ui.composer.text(), "");
     assert_eq!(ui.scroll_from_bottom, 0);
     // An empty composer sends nothing.
@@ -118,7 +128,12 @@ fn commands_open_overlays_tabs_and_reset_the_conversation() {
     let before = state.entries().len();
     command("compact", &mut state, &mut ui);
     assert_eq!(state.entries().len(), before + 1);
-    assert!(state.entries().last().unwrap().text.contains("needs live mode"));
+    assert!(state
+        .entries()
+        .last()
+        .unwrap()
+        .text
+        .contains("needs live mode"));
     command("new", &mut state, &mut ui);
     assert!(state.entries().is_empty());
 }

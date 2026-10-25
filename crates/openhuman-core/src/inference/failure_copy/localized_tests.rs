@@ -123,7 +123,13 @@ fn catalog_rejects_unknown_locale_or_key() {
 #[test]
 fn every_locale_renders_each_retry_hint_bucket() {
     for locale in chat_error_catalog::SUPPORTED_LOCALES {
-        for (secs, expect_n) in [(0u64, None), (1, None), (30, Some("30")), (60, None), (150, Some("3"))] {
+        for (secs, expect_n) in [
+            (0u64, None),
+            (1, None),
+            (30, Some("30")),
+            (60, None),
+            (150, Some("3")),
+        ] {
             let out = render_channel_failure(
                 locale,
                 "fallback",

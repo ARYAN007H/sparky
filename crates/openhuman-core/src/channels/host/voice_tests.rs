@@ -189,7 +189,9 @@ mod stt {
 
     #[tokio::test]
     async fn unscoped_transcription_runs_the_configured_provider_with_the_request_hints() {
-        register_stt_provider("channel-voice-test-ok", |_, _| Ok(Box::new(EchoStt { fail: false })));
+        register_stt_provider("channel-voice-test-ok", |_, _| {
+            Ok(Box::new(EchoStt { fail: false }))
+        });
         let result = host("channel-voice-test-ok")
             .transcribe_host(HostTranscriptionRequest {
                 scope: None,
@@ -208,7 +210,9 @@ mod stt {
 
     #[tokio::test]
     async fn scoped_transcription_validates_the_scope_then_delegates() {
-        register_stt_provider("channel-voice-test-scoped", |_, _| Ok(Box::new(EchoStt { fail: false })));
+        register_stt_provider("channel-voice-test-scoped", |_, _| {
+            Ok(Box::new(EchoStt { fail: false }))
+        });
         let host = host("channel-voice-test-scoped");
         let result = host
             .transcribe_voice(HostVoiceTranscriptionRequest {
@@ -225,7 +229,9 @@ mod stt {
 
     #[tokio::test]
     async fn provider_failure_and_unknown_provider_surface_as_errors() {
-        register_stt_provider("channel-voice-test-fail", |_, _| Ok(Box::new(EchoStt { fail: true })));
+        register_stt_provider("channel-voice-test-fail", |_, _| {
+            Ok(Box::new(EchoStt { fail: true }))
+        });
         let err = host("channel-voice-test-fail")
             .transcribe_host(HostTranscriptionRequest {
                 audio_base64: "QQ==".into(),
@@ -234,7 +240,10 @@ mod stt {
             .await
             .unwrap_err();
         unregister_stt_provider("channel-voice-test-fail");
-        assert!(err.to_string().contains("backend refused the audio"), "{err}");
+        assert!(
+            err.to_string().contains("backend refused the audio"),
+            "{err}"
+        );
 
         let err = host("channel-voice-test-never-registered")
             .transcribe_host(HostTranscriptionRequest::default())
@@ -265,12 +274,23 @@ async fn synthesis_fails_cleanly_when_the_voice_module_cannot_be_loaded() {
 #[test]
 fn reply_policy_reports_the_configured_mode_for_the_scoped_turn() {
     let mut config = Config::default();
-    config.channel_voice.threads.insert("chat-9".into(), VoiceReplyMode::SpeakReply);
+    config
+        .channel_voice
+        .threads
+        .insert("chat-9".into(), VoiceReplyMode::SpeakReply);
     let host = ChannelVoiceHost {
         config: Arc::new(config),
     };
-    let policy = host.reply_policy(&policy_request(scope("telegram", "chat-9", "t"), true, false));
+    let policy = host.reply_policy(&policy_request(
+        scope("telegram", "chat-9", "t"),
+        true,
+        false,
+    ));
     assert_eq!(policy.mode, HostVoiceReplyMode::SpeakReply);
-    let default = host.reply_policy(&policy_request(scope("telegram", "other", "t"), false, true));
+    let default = host.reply_policy(&policy_request(
+        scope("telegram", "other", "t"),
+        false,
+        true,
+    ));
     assert_eq!(default.mode, HostVoiceReplyMode::Mirror);
 }

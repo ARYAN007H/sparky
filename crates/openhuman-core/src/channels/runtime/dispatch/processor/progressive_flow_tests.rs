@@ -16,8 +16,13 @@ async fn native_target_resolves_only_a_configured_account_of_the_envelope_provid
 
     let mut wrong_provider = envelope(Vec::new());
     wrong_provider.channel.account_id = Some("slack:work".into());
-    let err = native_target(&ctx, &wrong_provider).err().expect("provider mismatch");
-    assert!(err.to_string().contains("no configured account identity"), "{err}");
+    let err = native_target(&ctx, &wrong_provider)
+        .err()
+        .expect("provider mismatch");
+    assert!(
+        err.to_string().contains("no configured account identity"),
+        "{err}"
+    );
 
     let mut no_account = envelope(Vec::new());
     no_account.channel.account_id = None;
@@ -25,7 +30,9 @@ async fn native_target_resolves_only_a_configured_account_of_the_envelope_provid
 
     let mut unconfigured = envelope(Vec::new());
     unconfigured.channel.account_id = Some("telegram:other".into());
-    let err = native_target(&ctx, &unconfigured).err().expect("unknown account");
+    let err = native_target(&ctx, &unconfigured)
+        .err()
+        .expect("unknown account");
     assert!(err.to_string().contains("not configured"), "{err}");
 }
 
@@ -34,7 +41,12 @@ async fn progress_is_streamed_and_the_final_reply_is_delivered_to_the_provider()
     let linked = linked_telegram_runtime().await;
     let ctx = runtime_context(linked.module_objects());
     let target = native_target(&ctx, &envelope(Vec::new())).unwrap().unwrap();
-    let reply = Some(target.open("turn-progress-1").await.expect("module opens the turn"));
+    let reply = Some(
+        target
+            .open("turn-progress-1")
+            .await
+            .expect("module opens the turn"),
+    );
 
     let (tx, rx) = mpsc::channel(8);
     let worker = spawn_native_progress(rx, reply.clone().unwrap());
@@ -57,7 +69,9 @@ async fn progress_is_streamed_and_the_final_reply_is_delivered_to_the_provider()
     assert!(finish_native_reply(&reply, "all done").await);
     let paths = linked.provider_request_paths().await;
     assert!(
-        paths.iter().any(|p| p.ends_with("/sendMessage") || p.ends_with("/editMessageText")),
+        paths
+            .iter()
+            .any(|p| p.ends_with("/sendMessage") || p.ends_with("/editMessageText")),
         "the provider received the output: {paths:?}"
     );
 }
@@ -107,24 +121,41 @@ fn delivery_counts_report_outcomes_and_unsupported_parts() {
         ChannelSendError, ChannelSendOutcome, ContentPart, MessageReceipt, OutboundContentPart,
         SendErrorKind,
     };
-    let ok = ChannelSendOutcome { receipt: MessageReceipt::default(), error: None };
+    let ok = ChannelSendOutcome {
+        receipt: MessageReceipt::default(),
+        error: None,
+    };
     let failed = ChannelSendOutcome {
         receipt: MessageReceipt::default(),
-        error: Some(ChannelSendError { kind: SendErrorKind::Transient, ..Default::default() }),
+        error: Some(ChannelSendError {
+            kind: SendErrorKind::Transient,
+            ..Default::default()
+        }),
     };
     let unsupported = vec![OutboundContentPart::Content {
-        part: ContentPart::Text { text: "x".into(), markdown_dialect: None },
+        part: ContentPart::Text {
+            text: "x".into(),
+            markdown_dialect: None,
+        },
     }];
 
-    let single = ProgressiveResult::DeliveryOutcome { outcome: Box::new(ok.clone()) };
+    let single = ProgressiveResult::DeliveryOutcome {
+        outcome: Box::new(ok.clone()),
+    };
     assert_eq!(delivery_outcome_count(&single), 1);
     assert_eq!(delivery_unsupported_count(&single), 0);
 
-    let many = ProgressiveResult::DeliveryOutcomes { outcomes: vec![ok.clone(), failed.clone()] };
+    let many = ProgressiveResult::DeliveryOutcomes {
+        outcomes: vec![ok.clone(), failed.clone()],
+    };
     assert_eq!(delivery_outcome_count(&many), 2);
     assert!(!delivery_succeeded(&many));
-    assert!(delivery_succeeded(&ProgressiveResult::DeliveryOutcomes { outcomes: vec![ok.clone()] }));
-    assert!(!delivery_succeeded(&ProgressiveResult::DeliveryOutcome { outcome: Box::new(failed) }));
+    assert!(delivery_succeeded(&ProgressiveResult::DeliveryOutcomes {
+        outcomes: vec![ok.clone()]
+    }));
+    assert!(!delivery_succeeded(&ProgressiveResult::DeliveryOutcome {
+        outcome: Box::new(failed)
+    }));
 
     let batch = ProgressiveResult::DeliveryBatch {
         outcomes: vec![ok],
@@ -134,11 +165,16 @@ fn delivery_counts_report_outcomes_and_unsupported_parts() {
     };
     assert_eq!(delivery_outcome_count(&batch), 1);
     assert_eq!(delivery_unsupported_count(&batch), 1);
-    assert!(!delivery_succeeded(&batch), "unsupported parts are not a complete delivery");
+    assert!(
+        !delivery_succeeded(&batch),
+        "unsupported parts are not a complete delivery"
+    );
 
     let unsupported_only = ProgressiveResult::DeliveryUnsupported { parts: unsupported };
     assert_eq!(delivery_unsupported_count(&unsupported_only), 1);
     assert_eq!(delivery_outcome_count(&unsupported_only), 0);
-    assert!(delivery_succeeded(&ProgressiveResult::DeliveryUnsupported { parts: Vec::new() }));
+    assert!(delivery_succeeded(
+        &ProgressiveResult::DeliveryUnsupported { parts: Vec::new() }
+    ));
     assert!(delivery_succeeded(&ProgressiveResult::Updated));
 }
