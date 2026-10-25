@@ -257,7 +257,7 @@ fn legacy_fixture() -> std::path::PathBuf {
         .join("src/storage/import/fixtures/tinyflows/workspace/cron/jobs.db")
 }
 
-#[cfg(feature = "storage-sqlite")]
+#[cfg(all(feature = "storage-sqlite", feature = "legacy-import"))]
 #[test]
 fn a_legacy_jobs_db_is_imported_by_the_storage_importer_and_left_untouched() {
     let tmp = TempDir::new().unwrap();

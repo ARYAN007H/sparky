@@ -407,6 +407,7 @@ async fn run_job_now_reports_an_unknown_job() {
     .is_err());
 }
 
+#[cfg(feature = "channels")]
 #[tokio::test]
 async fn run_job_now_records_required_delivery_failure_as_error() {
     let tmp = TempDir::new().unwrap();
