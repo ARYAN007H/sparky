@@ -499,7 +499,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           // Dev profile: the release-declared linux_fleet measurement then
           // shares the plain dev build instead of a thin-LTO one nothing else
           // can reuse (and that would need cleaning afterwards).
-          run: "node scripts/run-embed-examples.mjs --profile dev",
+          run: withModules("node scripts/run-embed-examples.mjs --profile dev"),
         },
         {
           name: "tinyhumans-clippy",

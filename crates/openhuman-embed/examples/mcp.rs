@@ -4,7 +4,7 @@
 //! Feature: mcp,storage-sqlite
 
 mod support;
-use openhuman_core::config::schema::{ModuleOverride, ModuleSourceMode};
+use openhuman_core::config::schema::ModuleOverride;
 use openhuman_embed::{AgentSpec, Runtime, RuntimeModule, ServiceSet, Workspace};
 
 fn main() -> anyhow::Result<()> {
@@ -14,16 +14,16 @@ fn main() -> anyhow::Result<()> {
 async fn run() -> anyhow::Result<()> {
     let backend = support::stub_backend().await;
     let provider = support::provider("hello from the stub").await;
-    // MCP runs in the tinymcp module. A released build downloads it; this
-    // offline example links it in instead, and the module keeps its state in
-    // the workspace's default (SQLite) storage.
-    openhuman_embed::modules::register_linked("tinymcp", tinymcp::linked_module);
+    // The test runner stages the released TinyMCP module and passes its path.
+    // TinyMCP needs a host storage callback, which requires a verified module
+    // artifact rather than an in-process linked module.
     let mut config = support::offline_config();
     config.modules.allow_download = false;
-    config.modules.overrides.push(ModuleOverride::with_source(
-        "tinymcp",
-        ModuleSourceMode::Linked,
-    ));
+    let module_path = std::env::var("OPENHUMAN_TINYMCP_TEST_MODULE")?;
+    config
+        .modules
+        .overrides
+        .push(ModuleOverride::with_path("tinymcp", module_path));
     // TinyMCP needs a host storage callback even when linked into this example.
     let storage_dir = tempfile::tempdir()?;
     let storage_url = openhuman_core::storage::config::default_url(storage_dir.path());
