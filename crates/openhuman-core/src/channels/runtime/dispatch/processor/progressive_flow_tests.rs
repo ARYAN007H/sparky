@@ -1,7 +1,7 @@
 //! Progressive output against the linked TinyChannels module and a mocked
 //! Telegram endpoint: target resolution, opening, feeding and finishing.
 
-use super::native_media::flow_tests::{envelope, runtime_context};
+use super::super::native_media::flow_tests::{envelope, runtime_context};
 use super::*;
 use crate::channels::runtime::test_support::linked_telegram_runtime;
 use tinychannels_bus::module_progressive::ProgressiveResult;
