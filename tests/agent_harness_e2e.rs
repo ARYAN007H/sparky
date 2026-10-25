@@ -2028,7 +2028,7 @@ async fn delegated_background_task_completion_flow_inner() {
     );
     assert!(
         requests.len() >= 5,
-        "expected ≥5 upstream requests (spawn, ack, child pause, relay, turn-2), got {};\n\
+        "expected ≥5 upstream requests (spawn, ack, child, delivery, turn-2), got {};\n\
          all requests: {}",
         requests.len(),
         serde_json::to_string_pretty(&requests).unwrap_or_default()
@@ -2048,7 +2048,7 @@ async fn delegated_background_task_completion_flow_inner() {
     let relay_request = requests.get(3).map(Value::to_string).unwrap_or_default();
     assert!(
         relay_request.contains("TASK_MANAGER_RESULT_CANARY"),
-        "request[3] did not carry the awaiting-user envelope with the child's question; \
+        "request[3] did not carry the child's best-effort result; \
          request: {relay_request}"
     );
 
@@ -2061,8 +2061,8 @@ async fn delegated_background_task_completion_flow_inner() {
         .unwrap_or(false);
     assert!(
         turn2_contains_result,
-        "WHICH_VERSION_CANARY not found in the turn-2 request — the clarification \
-         question was not persisted in thread history; requests: {}",
+        "TASK_MANAGER_RESULT_CANARY not found in the turn-2 request — the child result \
+         was not persisted in thread history; requests: {}",
         serde_json::to_string_pretty(&requests).unwrap_or_default()
     );
 
@@ -3691,7 +3691,6 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
     // The hand-off is a `spawn_subagent` (asynchronous): the parent's
     // acknowledgement is answered before the child's first call, and the child's
     // result is delivered to a later parent turn that loads the skill.
-    serialize_children_after_parent(2, 3);
     reset_script(vec![
         tool_call_completion(
             "spawn_subagent",
@@ -3713,6 +3712,7 @@ async fn agent_installs_a_registry_skill_then_runs_it_inner() {
         // to `workflow_builder`, so it does not load the skill itself.)
         text_completion("The skill is installed."),
     ]);
+    serialize_children_after_parent(2, 3);
     let stack = boot_stack().await;
 
     let mut events = spawn_sse_collector(format!(
