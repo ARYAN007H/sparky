@@ -95,6 +95,23 @@ test('parent-scoped host exceptions do not allow direct implementation dependenc
   const core = auditGraph(m, ['openhuman'], policy);
   assert.deepEqual(core.exceptions.map(item => item.path), [['openhuman', 'tinyflows']]);
 });
+test('parent-scoped exceptions are evaluated for every incoming edge', () => {
+  const edgePolicy = {
+    ...strict,
+    implementationPackages: ['tinyflows'],
+    implementationPrefixes: [],
+    exceptions: [{ scope: 'hosts', package: 'tinyflows', parent: 'tinyflows-import', reason: 'import bridge' }],
+  };
+  const m = metadata({
+    openhuman: [['tinyflows'], ['tinyflows-import']],
+    'tinyflows-import': [['tinyflows']],
+  });
+  const result = auditGraph(m, ['openhuman'], edgePolicy);
+  assert.deepEqual(result.violations.map(item => item.path), [['openhuman', 'tinyflows']]);
+  assert.deepEqual(result.exceptions.map(item => item.path), [
+    ['openhuman', 'tinyflows-import', 'tinyflows'],
+  ]);
+});
 test('cycles terminate and versions preserve distinct package identities', () => {
   const m = metadata({ host: [['juice-old'], ['juice-new']], 'juice-old': [['host']] }, { 'juice-old': 'tinyjuice', 'juice-new': 'tinyjuice' });
   assert.equal(auditGraph(m, ['host'], strict).violations.length, 2);
