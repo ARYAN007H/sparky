@@ -88,6 +88,13 @@ test('exceptions retain findings and do not hide new host descendants', () => {
   assert.equal(result.exceptions.length, 1);
   assert.equal(result.violations[0].package, 'tinyjuice-new-engine');
 });
+test('parent-scoped host exceptions do not allow direct implementation dependencies', () => {
+  const m = metadata({ openhuman: [['tinyflows']], cli: [['tinyflows'], ['openhuman']] });
+  const direct = auditGraph(m, ['cli'], policy);
+  assert.deepEqual(direct.violations.map(item => item.path), [['cli', 'tinyflows']]);
+  const core = auditGraph(m, ['openhuman'], policy);
+  assert.deepEqual(core.exceptions.map(item => item.path), [['openhuman', 'tinyflows']]);
+});
 test('cycles terminate and versions preserve distinct package identities', () => {
   const m = metadata({ host: [['juice-old'], ['juice-new']], 'juice-old': [['host']] }, { 'juice-old': 'tinyjuice', 'juice-new': 'tinyjuice' });
   assert.equal(auditGraph(m, ['host'], strict).violations.length, 2);
