@@ -288,3 +288,102 @@ fn committed_message_selects_only_the_staged_parts_it_references() {
     assert_eq!(native_parts_in_committed_message(&all, &message), vec![image, file]);
     assert!(native_parts_in_committed_message(&all, &Message::assistant("text")).is_empty());
 }
+
+fn stored_file(name: &str, mime: &str, size: usize) -> Attachment {
+    Attachment {
+        name: name.into(),
+        path: format!("uploads/{name}"),
+        mime: mime.into(),
+        size_bytes: size,
+        ..Default::default()
+    }
+}
+
+#[test]
+fn typed_parts_pair_with_staged_files_and_drop_provider_locations() {
+    let located = |kind| MediaReference {
+        kind,
+        opaque_id: Some("provider-id".into()),
+        path: Some("/provider/path".into()),
+        url: Some("https://provider.invalid/x".into()),
+        local_cache_path: Some("/cache/x".into()),
+        ..Default::default()
+    };
+    let parts = vec![
+        ContentPart::Text { text: "hello".into(), markdown_dialect: None },
+        ContentPart::Image { media: located(MediaKind::Image), caption: Some("c".into()), alt_text: Some("a".into()) },
+        ContentPart::Audio {
+            media: located(MediaKind::Audio),
+            codec: Some("opus".into()),
+            duration_ms: Some(1200),
+            title: Some("song".into()),
+            transcript: None,
+        },
+        ContentPart::Video {
+            media: located(MediaKind::Video),
+            caption: None,
+            duration_ms: Some(900),
+            thumbnail: Some(located(MediaKind::Image)),
+        },
+        ContentPart::File { media: located(MediaKind::Document), file_name: Some("report.pdf".into()), caption: None },
+    ];
+    let files = vec![
+        stored_file("a.png", "image/png", 11),
+        stored_file("b.opus", "audio/ogg", 22),
+        stored_file("c.mp4", "video/mp4", 33),
+        stored_file("d.pdf", "application/pdf", 44),
+    ];
+    let entries = from_staged_parts(&parts, &files).unwrap();
+    assert_eq!(entries.len(), 4);
+    assert_eq!(
+        entries.iter().map(|(_, path)| path.as_str()).collect::<Vec<_>>(),
+        ["uploads/a.png", "uploads/b.opus", "uploads/c.mp4", "uploads/d.pdf"]
+    );
+    for ((part, _), (mime, size)) in entries.iter().zip([
+        ("image/png", 11u64),
+        ("audio/ogg", 22),
+        ("video/mp4", 33),
+        ("application/pdf", 44),
+    ]) {
+        let media = opaque_media(part).unwrap();
+        assert_ne!(media.opaque_id.as_deref(), Some("provider-id"), "fresh opaque id");
+        assert!(media.path.is_none() && media.url.is_none() && media.local_cache_path.is_none());
+        assert_eq!(media.content_type.as_deref(), Some(mime));
+        assert_eq!(media.size_bytes, Some(size));
+    }
+    assert!(matches!(&entries[0].0, ContentPart::Image { caption: Some(c), alt_text: Some(a), .. } if c == "c" && a == "a"));
+    assert!(matches!(&entries[1].0, ContentPart::Audio { codec: Some(c), duration_ms: Some(1200), .. } if c == "opus"));
+    match &entries[2].0 {
+        ContentPart::Video { thumbnail: Some(thumb), duration_ms: Some(900), .. } => {
+            assert!(thumb.path.is_none() && thumb.url.is_none());
+            assert!(thumb.local_cache_path.is_none() && thumb.opaque_id.is_none());
+        }
+        other => panic!("video expected: {other:?}"),
+    }
+    match &entries[3].0 {
+        ContentPart::File { media, file_name: Some(name), .. } => {
+            assert_eq!(name, "report.pdf");
+            assert_eq!(media.file_name.as_deref(), Some("report.pdf"));
+        }
+        other => panic!("file expected: {other:?}"),
+    }
+
+    // The private path map round-trips through message metadata, and the
+    // public projection never exposes it.
+    let mut metadata = serde_json::json!(null);
+    let public = save(&mut metadata, entries.clone());
+    assert_eq!(public.len(), 4);
+    assert_eq!(public_refs(&metadata), public);
+    strip_private_metadata(&mut metadata);
+    assert!(public_refs(&metadata).is_empty());
+}
+
+#[test]
+fn typed_part_pairing_rejects_count_mismatches_and_unsupported_kinds() {
+    let image = source(MediaKind::Image);
+    let err = from_staged_parts(&[image.clone()], &[]).unwrap_err();
+    assert!(err.contains("media ordering"), "{err}");
+    // Voice notes carry no staged file and are skipped.
+    let voice = ContentPart::VoiceNote { voice_note: Default::default() };
+    assert!(from_staged_parts(&[voice], &[]).unwrap().is_empty());
+}
