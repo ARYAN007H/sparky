@@ -1091,7 +1091,10 @@ test("offline examples build in the dev profile so no release artifacts need cle
   for (const plan of plans()) {
     const lint = plan.lanes.find((lane) => lane.name === "rust-lint");
     const examples = lint.checks.find((c) => c.name === "embed-offline-examples");
-    assert.equal(examples.run, "node scripts/run-embed-examples.mjs --profile dev");
+    assert.equal(
+      examples.run,
+      "set -a && . ci-out/test-modules.env && set +a && node scripts/run-embed-examples.mjs --profile dev",
+    );
     assert.equal(
       lint.checks.some((c) => c.name === "release-example-cleanup"),
       false,
