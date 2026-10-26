@@ -576,6 +576,6 @@ fn tinysearch_registry_matches_bus_contract_and_published_release() {
     assert_eq!(tinysearch_bus::CONTRACT_VERSION, (2, 2));
     assert_eq!(
         search.asset_for("ubuntu-24.04-x86_64").unwrap().sha256,
-        "78b5632d9c207f9b78ee83627bf35ae73172d0fb1fb7ea47273058f4c1f4c0b1"
+        "44fc5fe514416063542253f3f3dd3ff5c68042eaba29de5777a2bf0a4b33f100"
     );
 }
