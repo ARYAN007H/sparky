@@ -4954,6 +4954,7 @@ async fn collect_turn_tool_results_request(
                 {
                     continue;
                 }
+                eprintln!("DBGEVT {}", v.to_string().chars().take(400).collect::<String>());
                 match v.get("event").and_then(Value::as_str) {
                     Some("tool_result") => results.push(v),
                     Some("chat_done") | Some("chat_error") => return (v, results),
