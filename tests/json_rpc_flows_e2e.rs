@@ -2413,13 +2413,13 @@ async fn json_rpc_flows_list_connections_aggregates_secret_free() {
     rpc_join.abort();
 }
 
-/// Task 4 / #3090: when a web-chat request is sent with
-/// `speak_reply: true`, `run_chat_task` should drive the agent's final text
-/// through `voice::reply_speech::synthesize_reply` after the turn completes.
-///
-/// We activate the [`reply_speech::test_seam`] short-circuit via the
-/// `OPENHUMAN_TEST_REPLY_SPEECH_SEAM` env var so the call is recorded
-/// without contacting the ElevenLabs proxy.
+// Task 4 / #3090: when a web-chat request is sent with
+// `speak_reply: true`, `run_chat_task` should drive the agent's final text
+// through `voice::reply_speech::synthesize_reply` after the turn completes.
+//
+// We activate the [`reply_speech::test_seam`] short-circuit via the
+// `OPENHUMAN_TEST_REPLY_SPEECH_SEAM` env var so the call is recorded
+// without contacting the ElevenLabs proxy.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // #5846 — the two authoring-gate behaviour changes, driven end-to-end through
