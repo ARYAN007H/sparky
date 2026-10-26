@@ -25,11 +25,13 @@ stage_release_module() {
   if ! compgen -G "$dir/*.$ext" >/dev/null; then
     echo "Downloading the checksum-pinned ${id} test module ..." >&2
     mkdir -p "$dir"
-    curl --fail --location --silent --show-error "$url" --output "$archive"
+    # Callers run this in $(...), where errexit does not apply: a failed
+    # download or digest check must stop here, never fall through to tar.
+    curl --fail --location --silent --show-error "$url" --output "$archive" || return 1
     if command -v shasum >/dev/null 2>&1; then
-      echo "${sha}  $archive" | shasum -a 256 -c >&2
+      echo "${sha}  $archive" | shasum -a 256 -c >&2 || { rm -f "$archive"; return 1; }
     else
-      echo "${sha}  $archive" | sha256sum --check >&2
+      echo "${sha}  $archive" | sha256sum --check >&2 || { rm -f "$archive"; return 1; }
     fi
     tar --no-same-owner -xzf "$archive" -C "$dir"
   fi
@@ -41,7 +43,7 @@ stage_release_module() {
 # OPENHUMAN_MODULE_PATH.
 stage_release_artifact() {
   local id="$1" dir
-  dir="$(stage_release_module "$id" "$2" "$3")"
+  dir="$(stage_release_module "$id" "$2" "$3")" || return 1
   if [ "$3" = "dll" ]; then
     printf '%s\n' "$dir/${id}_module.dll"
   else

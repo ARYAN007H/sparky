@@ -458,6 +458,9 @@ fn test_modules(voice: bool) -> TestModules {
                          OPENHUMAN_TEST_MODULE_SOURCE_DIR to scripts/modules/build.mjs output"
                     )
                 });
+            // The child runs from its own home, so a relative path must not reach it.
+            let path = std::fs::canonicalize(&path)
+                .unwrap_or_else(|error| panic!("{var}={}: {error}", path.display()));
             assert!(path.is_file(), "{var} names no file: {}", path.display());
             (id, path)
         })
