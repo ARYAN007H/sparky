@@ -253,7 +253,7 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         .unwrap_or_else(|| {
             panic!("TinyFlows is listed after the released cdylib loaded: {module_list}")
         });
-    assert_eq!(tinyflows["version"], "0.9.0");
+    assert_eq!(tinyflows["version"], "0.9.3");
 
     let name = format!("published-manual-{}", uuid::Uuid::new_v4().simple());
     let job = openhuman_core::cron::system_jobs::ensure_system_job(
