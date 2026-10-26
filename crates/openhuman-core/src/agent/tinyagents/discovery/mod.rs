@@ -1,7 +1,7 @@
 //! What ranks a `tool_search` in this process.
 //!
 //! The tinyagents harness owns tool discovery — the intrinsic `tool_search` /
-//! `tool_call` bridge over every `ToolExposure::Deferred` registration, a BM25
+//! bridge over every `ToolExposure::Deferred` registration (called by name once found), a BM25
 //! catalogue, and a slot for a host ranker (`tool::discover`). This module is
 //! the host's side of that slot: which [`ToolRanker`] the process installed
 //! (a decision model such as Jev, installed by `openhuman-tinyhumans`; the
@@ -9,7 +9,7 @@
 //! to use it. [`discovery_policy`] turns the two into the
 //! [`ToolDiscoveryPolicy`] every turn harness runs with.
 //!
-//! Process-wide, like the backend transport, because the credential a
+//! Process-wide, like the other host registrations, because the credential a
 //! decision-model ranker needs is a property of the process's signed-in
 //! user, and the harness is assembled per turn without a config in hand.
 
@@ -101,6 +101,13 @@ pub fn tool_search_config() -> ToolSearchConfig {
 pub(crate) fn discovery_policy() -> ToolDiscoveryPolicy {
     let settings = tool_search_config();
     let mut policy = ToolDiscoveryPolicy::default();
+    // No per-tool manifest in `tool_search`'s description, on any dialect.
+    // The harness default (4,000 tokens) listed every deferred tool — 175
+    // lines, ~3.9k tokens on a workspace with a few integrations connected —
+    // on every request, which is the cost deferral exists to avoid. The
+    // prompt's Connected Integrations / MCP sections already name what can be
+    // searched for; the description keeps only the count.
+    policy.manifest_token_budget = 0;
     policy.default_limit = settings.top_k.clamp(1, policy.max_limit);
     let mode = match settings.ranker.trim().to_ascii_lowercase().as_str() {
         "auto" | "jev" | "ranker" => DiscoveryRankMode::Ranker,
@@ -122,19 +129,34 @@ pub(crate) fn discovery_policy() -> ToolDiscoveryPolicy {
     policy
 }
 
-/// The `tool_search` / `tool_call` bridge, rendered for a TEXT dialect's
-/// prompt catalogue.
+/// What a turn's `tool_search` tells its ranker about the search: the chat the
+/// turn runs in, so a ranker that discloses the query off the machine (a cloud
+/// embedder) can show the disclosure in that chat. A turn with no chat behind
+/// it (CLI, cron, a detached sub-agent) gets an empty context.
+pub(crate) fn rank_context_for(
+    chat: Option<&crate::security::approval::ApprovalChatContext>,
+) -> tinytools::RankContext {
+    let Some(chat) = chat else {
+        return tinytools::RankContext::empty();
+    };
+    let mut routed = tinytools::RankChat::new(chat.thread_id.clone(), chat.client_id.clone());
+    if let Some(request_id) = &chat.request_id {
+        routed = routed.with_request_id(request_id.clone());
+    }
+    tinytools::RankContext::empty().with_chat(routed)
+}
+
+/// The `tool_search` bridge, rendered for a TEXT dialect's prompt catalogue.
 ///
-/// The harness mints these two schemas onto `request.tools` whenever a run
-/// has a deferred catalogue, which is all a native-tool-calling provider
-/// needs. A text dialect (P-Format / code) never sees that set: the dialect
-/// folds the catalogue into the system prompt and clears `request.tools`,
-/// and because OpenHuman sets `host_renders_tool_catalogue` the harness
-/// appends nothing of its own. So on those dialects the bridge only reaches
-/// the model if the host's own catalogue carries it — otherwise the model
-/// reads "invoke a match with `tool_call`" in a search result naming a tool
-/// no signature in its catalogue describes, and answers with intent instead
-/// of a call.
+/// The harness mints this schema onto `request.tools` whenever a run has a
+/// deferred catalogue, which is all a native-tool-calling provider needs. A
+/// text dialect (P-Format / code) never sees that set: the dialect folds the
+/// catalogue into the system prompt and clears `request.tools`, and because
+/// OpenHuman sets `host_renders_tool_catalogue` the harness appends nothing of
+/// its own. So on those dialects the bridge only reaches the model if the
+/// host's own catalogue carries it — otherwise the model has no way to search
+/// for a tool that is not in its catalogue, and answers with intent instead of
+/// a call. A found tool is then called by its own name; there is no wrapper.
 ///
 /// Built from [`tinyagents_harness::tool::discover::bridge_schemas`] rather
 /// than hand-written prose, so the signature the model reads is the one
@@ -149,11 +171,10 @@ pub(crate) fn bridge_prompt_tools(
         return Vec::new();
     }
     use tinyagents_harness::tool::discover::{bridge_schemas, DeferredCatalog};
-    let mut policy = discovery_policy();
-    // A zero budget renders the manifest as a bare count instead of naming
-    // every deferred tool — the prompt advertises that a search exists, not
-    // what it would find.
-    policy.manifest_token_budget = 0;
+    // `discovery_policy` zeroes the manifest budget, so the manifest renders
+    // as a bare count: the prompt advertises that a search exists, not what
+    // it would find.
+    let policy = discovery_policy();
     bridge_schemas(&DeferredCatalog::build(Vec::new()), &policy)
         .into_iter()
         .map(|schema| {
@@ -214,7 +235,9 @@ impl ToolRanker for OverlapRanker {
 
 mod embedding_ranker;
 
-pub use embedding_ranker::EmbeddingToolRanker;
+pub use embedding_ranker::{
+    embedding_provider_is_usable, embedding_tool_ranker, embedding_tool_ranker_in,
+};
 
 #[cfg(test)]
 #[path = "discovery_tests.rs"]

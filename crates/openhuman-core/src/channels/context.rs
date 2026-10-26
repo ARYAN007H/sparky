@@ -1,39 +1,44 @@
-//! Shared channel runtime state and memory helpers.
+//! Shared channel runtime state and history helpers.
+//!
+//! Channel turns carry no per-turn memory recall: memory v2 reaches a new
+//! session through `context.md`, injected by the session host, and committed
+//! turns are ingested from the `ConversationTurnCommitted` bus event.
 
-use crate::agent::messages::ChatMessage;
 use crate::agent::tinyagents::TurnModelSource;
-use crate::util::truncate_with_ellipsis;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tinytools::Tool;
 
-pub(crate) use tinychannels::context::{
-    effective_channel_message_timeout_secs, should_skip_memory_context_entry,
-    ChannelRouteSelection, CHANNEL_HISTORY_COMPACT_CONTENT_CHARS,
-    CHANNEL_HISTORY_COMPACT_KEEP_MESSAGES, CHANNEL_MESSAGE_TIMEOUT_SECS,
-    CHANNEL_TYPING_REFRESH_INTERVAL_SECS, DEFAULT_CHANNEL_INITIAL_BACKOFF_SECS,
-    DEFAULT_CHANNEL_MAX_BACKOFF_SECS, MAX_CHANNEL_HISTORY, MEMORY_CONTEXT_ENTRY_MAX_CHARS,
-    MEMORY_CONTEXT_MAX_CHARS, MEMORY_CONTEXT_MAX_ENTRIES,
+pub(crate) use tinychannels_bus::context::{
+    clear_sender_history, compact_sender_history, ChannelRouteSelection, ConversationHistoryMap,
+    CHANNEL_MESSAGE_TIMEOUT_SECS, CHANNEL_TYPING_REFRESH_INTERVAL_SECS,
+    DEFAULT_CHANNEL_INITIAL_BACKOFF_SECS, DEFAULT_CHANNEL_MAX_BACKOFF_SECS, MAX_CHANNEL_HISTORY,
 };
 
 #[cfg(test)]
-pub(crate) use tinychannels::context::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS;
+pub(crate) use tinychannels_bus::context::{
+    CHANNEL_HISTORY_COMPACT_CONTENT_CHARS, CHANNEL_HISTORY_COMPACT_KEEP_MESSAGES,
+};
 
-/// Per-sender conversation history for channel messages.
-pub(crate) type ConversationHistoryMap = Arc<Mutex<HashMap<String, Vec<ChatMessage>>>>;
+#[cfg(test)]
+pub(crate) use tinychannels::context::{
+    effective_channel_message_timeout_secs, MIN_CHANNEL_MESSAGE_TIMEOUT_SECS,
+};
 
 pub(crate) type TurnModelSourceCacheMap = Arc<Mutex<HashMap<String, TurnModelSource>>>;
 pub(crate) type RouteSelectionMap = Arc<Mutex<HashMap<String, ChannelRouteSelection>>>;
 
 #[derive(Clone)]
 pub(crate) struct ChannelRuntimeContext {
+    /// Explicit durable conversation for a hosted relay; ordinary channels
+    /// use their existing per-sender history and have no relay thread.
+    pub(crate) relay_thread: Option<String>,
     pub(crate) channels_by_name: Arc<HashMap<String, Arc<dyn super::Channel>>>,
     /// Injected model source used only by tests and bespoke channel hosts.
     /// Production contexts carry `config` and construct crate-native sources.
     pub(crate) turn_model_source: Option<TurnModelSource>,
     pub(crate) default_provider: Arc<String>,
-    pub(crate) memory: Arc<crate::memory::guard::MemoryGuard>,
     pub(crate) tools_registry: Arc<Vec<Box<dyn Tool>>>,
     /// Seeds every turn's history. Production uses the refreshing variant so
     /// the active profile and identity-file edits reach the next message
@@ -41,16 +46,13 @@ pub(crate) struct ChannelRuntimeContext {
     pub(crate) system_prompt: super::ChannelSystemPrompt,
     pub(crate) model: Arc<String>,
     pub(crate) temperature: f64,
-    pub(crate) auto_save_memory: bool,
     pub(crate) max_tool_iterations: usize,
-    pub(crate) min_relevance_score: f64,
     pub(crate) conversation_histories: ConversationHistoryMap,
     pub(crate) turn_model_source_cache: TurnModelSourceCacheMap,
     pub(crate) route_overrides: RouteSelectionMap,
     pub(crate) api_url: Option<String>,
     pub(crate) inference_url: Option<String>,
     pub(crate) reliability: Arc<crate::config::ReliabilityConfig>,
-    pub(crate) provider_runtime_options: crate::inference::provider::ProviderRuntimeOptions,
     pub(crate) workspace_dir: Arc<PathBuf>,
     pub(crate) message_timeout_secs: u64,
     pub(crate) multimodal: crate::config::MultimodalConfig,
@@ -58,119 +60,60 @@ pub(crate) struct ChannelRuntimeContext {
     /// Full config for building crate-native turn models (Phase 3 P3-B). `Some` in
     /// production; `None` lets tests inject a model source directly.
     pub(crate) config: Option<Arc<crate::config::Config>>,
+    /// The core context this channel runtime was built under. Held weakly: a
+    /// channel runtime outlives no tenant. `None` in tests and bespoke hosts
+    /// that never bound one.
+    pub(crate) core: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
 }
 
-pub(crate) fn conversation_memory_key(msg: &super::traits::ChannelMessage) -> String {
-    tinychannels::context::conversation_memory_key(msg)
-}
-
-pub(crate) fn conversation_history_key(msg: &super::traits::ChannelMessage) -> String {
-    tinychannels::context::conversation_history_key(msg)
-}
-
-pub(crate) fn clear_sender_history(ctx: &ChannelRuntimeContext, sender_key: &str) {
-    ctx.conversation_histories
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .remove(sender_key);
-}
-
-pub(crate) fn compact_sender_history(ctx: &ChannelRuntimeContext, sender_key: &str) -> bool {
-    let mut histories = ctx
-        .conversation_histories
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
-
-    let Some(turns) = histories.get_mut(sender_key) else {
-        return false;
-    };
-
-    if turns.is_empty() {
-        return false;
+impl ChannelRuntimeContext {
+    /// The dispatch context this runtime's work runs under.
+    pub(crate) fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
+        crate::core::runtime::DispatchCtx::from_weak(self.core.as_ref())
     }
+}
 
-    let keep_from = turns
-        .len()
-        .saturating_sub(CHANNEL_HISTORY_COMPACT_KEEP_MESSAGES);
-    let mut compacted = turns[keep_from..].to_vec();
-
-    for turn in &mut compacted {
-        if turn.content.chars().count() > CHANNEL_HISTORY_COMPACT_CONTENT_CHARS {
-            turn.content =
-                truncate_with_ellipsis(&turn.content, CHANNEL_HISTORY_COMPACT_CONTENT_CHARS);
-        }
+/// Resolve the configured module client; unit tests use an attested bus fixture.
+pub(crate) async fn module_client(ctx: &ChannelRuntimeContext) -> tinybus::module::ModuleClient {
+    #[cfg(test)]
+    if ctx.config.is_none() {
+        return super::module_fixture::client().await;
     }
-
-    *turns = compacted;
-    true
+    crate::modules::client(ctx.config.as_deref().cloned().unwrap_or_default())
 }
 
-pub(crate) fn is_context_window_overflow_error(err: &anyhow::Error) -> bool {
-    tinychannels::context::is_context_window_overflow_message(&err.to_string())
+#[cfg(test)]
+pub(crate) fn conversation_history_key(msg: &tinychannels_bus::ChannelInboundEnvelope) -> String {
+    tinychannels::context::conversation_history_key_parts(
+        &msg.channel.id,
+        &msg.sender.id,
+        &msg.conversation.id,
+        msg.conversation.thread_id.as_deref(),
+    )
 }
 
-use tinymemory_api::provider::MemoryRecall as _;
-
-pub(crate) async fn build_memory_context(
-    mem: &crate::memory::guard::MemoryGuard,
-    user_msg: &str,
-    min_relevance_score: f64,
-) -> String {
-    let mut context = String::new();
-
-    if let Ok(entries) = mem
-        .recall(
-            user_msg,
-            5,
-            &tinymemory_api::recall::OwnedRecallOpts::default(),
-            // Unrestricted: a channel turn carries no ambient source scope, and
-            // the guard narrows against its own allowlist regardless.
-            None,
-        )
+pub(crate) async fn is_context_window_overflow_error(
+    ctx: &ChannelRuntimeContext,
+    err: &anyhow::Error,
+) -> Result<bool, tinybus::module::ModuleCallError> {
+    use tinychannels_bus::module_control::{ChannelControlRequest, ChannelControlResult};
+    match module_client(ctx)
         .await
+        .call_confidential(
+            "tinychannels",
+            tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL,
+            (ChannelControlRequest::Overflow {
+                message: err.to_string(),
+            },),
+        )
+        .await?
     {
-        let mut included = 0usize;
-        let mut used_chars = 0usize;
-
-        for entry in entries.iter().filter(|e| match e.score {
-            Some(score) => score >= min_relevance_score,
-            None => true, // keep entries without a score (e.g. non-vector backends)
-        }) {
-            if included >= MEMORY_CONTEXT_MAX_ENTRIES {
-                break;
-            }
-
-            if should_skip_memory_context_entry(&entry.key, &entry.content) {
-                continue;
-            }
-
-            let content = if entry.content.chars().count() > MEMORY_CONTEXT_ENTRY_MAX_CHARS {
-                truncate_with_ellipsis(&entry.content, MEMORY_CONTEXT_ENTRY_MAX_CHARS)
-            } else {
-                entry.content.clone()
-            };
-
-            let line = format!("- {}: {}\n", entry.key, content);
-            let line_chars = line.chars().count();
-            if used_chars + line_chars > MEMORY_CONTEXT_MAX_CHARS {
-                break;
-            }
-
-            if included == 0 {
-                context.push_str("[Memory context]\n");
-            }
-
-            context.push_str(&line);
-            used_chars += line_chars;
-            included += 1;
-        }
-
-        if included > 0 {
-            context.push('\n');
+        ChannelControlResult::Overflow(overflow) => Ok(overflow),
+        _ => {
+            crate::modules::report::malformed_reply("tinychannels");
+            Err(tinybus::module::ModuleCallError::ModuleFault)
         }
     }
-
-    context
 }
 
 #[cfg(test)]

@@ -1,52 +1,73 @@
 //! OpenHuman discovery context around `tinyskills` resource reads.
 
-use super::api::load_workflow_metadata;
-use std::path::{Component, Path};
-
-fn reject_symlink_components(root: &Path, relative_path: &Path) -> Result<(), String> {
-    let mut current = root.to_path_buf();
-    for component in relative_path.components() {
-        current.push(component.as_os_str());
-        let metadata = std::fs::symlink_metadata(&current)
-            .map_err(|error| format!("failed to stat resource {}: {error}", current.display()))?;
-        if metadata.file_type().is_symlink() {
-            return Err("resource path is a symlink".to_owned());
-        }
-    }
-    Ok(())
-}
-
-fn validate_relative_path(relative_path: &Path) -> Result<(), String> {
-    if relative_path.as_os_str().is_empty() {
-        return Err("relative_path must not be empty".to_owned());
-    }
-    if relative_path.is_absolute() {
-        return Err("relative_path must not be absolute".to_owned());
-    }
-    if relative_path
-        .components()
-        .any(|component| !matches!(component, Component::Normal(_)))
-    {
-        return Err("relative_path must not contain '..' or escape the skill directory".to_owned());
-    }
-    Ok(())
-}
+use super::api::{load_workflow_metadata_with_gate, DiscoveryGate};
+use std::path::Path;
 
 pub fn read_workflow_resource(
     workspace_dir: &Path,
     skill_id: &str,
     relative_path: &Path,
 ) -> Result<String, String> {
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    read_workflow_resource_with_gate(
+        workspace_dir,
+        skill_id,
+        relative_path,
+        DiscoveryGate::from_dispatch(&ctx),
+        super::api::discovery_home_dir(),
+    )
+}
+
+/// Read a skill resource under the caller's explicit Config and dispatch
+/// identity. Host adapters that already own these inputs use this path so a
+/// workspace shared by several profiles cannot reuse another profile's view.
+pub fn read_workflow_resource_for(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &crate::config::Config,
+    skill_id: &str,
+    relative_path: &Path,
+) -> Result<String, String> {
+    let home = match ctx.resolved() {
+        Some(core) if core.user_skill_roots() => dirs::home_dir(),
+        Some(_) => None,
+        None => super::api::discovery_home_dir(),
+    };
+    read_workflow_resource_with_gate(
+        &config.workspace_dir,
+        skill_id,
+        relative_path,
+        DiscoveryGate::from_config(ctx, config, None),
+        home,
+    )
+}
+
+fn read_workflow_resource_with_gate(
+    workspace_dir: &Path,
+    skill_id: &str,
+    relative_path: &Path,
+    gate: DiscoveryGate,
+    home: Option<std::path::PathBuf>,
+) -> Result<String, String> {
     if skill_id.trim().is_empty() {
         return Err("skill_id must not be empty".to_string());
     }
-    validate_relative_path(relative_path)?;
-    let skill = tinyskills::resolve_skill(load_workflow_metadata(workspace_dir), skill_id)?;
-    let root = skill
-        .location
-        .as_deref()
-        .and_then(Path::parent)
-        .ok_or_else(|| format!("skill '{skill_id}' has no on-disk location"))?;
-    reject_symlink_components(root, relative_path)?;
+    let skills = load_workflow_metadata_with_gate(workspace_dir, home, gate.clone());
+    let skill = tinyskills::resolve_skill(skills, skill_id)?;
+    #[cfg(feature = "flows")]
+    if skill.scope == tinyskills::SkillScope::Builtin && skill.id() == "flow-authoring" {
+        if !gate.flow_authoring_enabled() {
+            return Err("flow-authoring is unavailable in this context".to_string());
+        }
+        let generation =
+            crate::skills::bundled::flow_authoring::generation_if_current(workspace_dir, &gate)
+                .ok_or_else(|| "flow-authoring resources are unavailable".to_string())?;
+        return crate::skills::bundled::flow_authoring::read_resource(
+            workspace_dir,
+            &gate,
+            generation,
+            &skill,
+            relative_path,
+        );
+    }
     tinyskills::read_resource(&skill, relative_path).map_err(|error| error.to_string())
 }

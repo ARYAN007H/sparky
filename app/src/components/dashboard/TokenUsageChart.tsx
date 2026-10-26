@@ -32,6 +32,8 @@ const TokenUsageChart = ({ days }: TokenUsageChartProps) => {
     total: d.total_tokens,
   }));
 
+  const hasTokens = data.some(point => point.total > 0);
+
   return (
     <div data-testid="token-usage-chart" className="w-full h-56">
       <ResponsiveContainer width="100%" height="100%">
@@ -61,6 +63,8 @@ const TokenUsageChart = ({ days }: TokenUsageChartProps) => {
             axisLine={false}
             width={52}
             tick={{ fill: 'currentColor', opacity: 0.7 }}
+            allowDecimals={false}
+            domain={[0, hasTokens ? 'auto' : 1000]}
             tickFormatter={(v: number) => formatTokens(v)}
           />
           <Tooltip

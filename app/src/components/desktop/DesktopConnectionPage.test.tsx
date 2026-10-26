@@ -82,6 +82,22 @@ describe('Desktop connection', () => {
     expect(screen.queryByRole('button', { name: 'Enable' })).not.toBeInTheDocument();
   });
 
+  it('says desktop control is not available on Windows yet', async () => {
+    vi.mocked(callCoreRpc).mockResolvedValue({
+      ...enabled,
+      supported: false,
+      enabled: false,
+      platform: 'windows',
+    });
+    renderWithProviders(<DesktopConnectionPage />);
+    expect(
+      await screen.findByText(
+        "Desktop control isn't available on Windows yet. Browser Control works on Windows today."
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Enable' })).not.toBeInTheDocument();
+  });
+
   it('does not offer a remote or browser client control over its core host', async () => {
     vi.mocked(isLocalDesktopHost).mockResolvedValue(false);
     renderWithProviders(<DesktopConnectionPage />);
@@ -145,5 +161,29 @@ describe('Desktop connection', () => {
     expect(
       await screen.findByText('Could not load pending desktop approvals. Refresh to try again.')
     ).toBeInTheDocument();
+  });
+
+  it('treats not_required accessibility as ready on Windows and suppresses the settings button', async () => {
+    const windowsReady: DesktopStatus = {
+      ...enabled,
+      platform: 'windows',
+      accessibility: 'not_required',
+      screen_recording: 'not_required',
+    };
+    vi.mocked(callCoreRpc).mockImplementation(async ({ method }) => {
+      if (method === 'openhuman.desktop_status') return windowsReady as never;
+      if (method === 'openhuman.desktop_pending') return [] as never;
+      if (method === 'openhuman.desktop_probe') return { ok: true, app_count: 1 } as never;
+      throw new Error(`Unexpected method: ${method}`);
+    });
+    renderWithProviders(<DesktopConnectionPage />);
+
+    // "Not required" is a success state — the status badge should report connected.
+    expect(await screen.findByText('Connected')).toBeInTheDocument();
+    // No "Open settings" button should appear for permissions that are not_required.
+    expect(screen.queryByRole('button', { name: 'Open settings' })).not.toBeInTheDocument();
+    // The probe should succeed.
+    fireEvent.click(screen.getByRole('button', { name: 'Test desktop access' }));
+    expect(await screen.findByText('Desktop access works.')).toBeInTheDocument();
   });
 });

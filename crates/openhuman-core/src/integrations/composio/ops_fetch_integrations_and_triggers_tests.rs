@@ -2,7 +2,7 @@ use super::*;
 
 #[tokio::test]
 async fn offline_local_session_never_fetches_hosted_integrations() {
-    let _guard = cache_guard();
+    let _guard = cache_guard_async().await;
     let tmp = tempfile::tempdir().unwrap();
     let mut config = Config::default();
     config.workspace_dir = tmp.path().join("workspace");
@@ -27,7 +27,9 @@ async fn offline_local_session_never_fetches_hosted_integrations() {
 
 #[tokio::test]
 async fn fetch_connected_integrations_via_mock_aggregates_tools() {
-    let _guard = cache_guard();
+    // The connection list asks the module, which keeps preferences in storage.
+    let _serialised = module_guard().await;
+    let _guard = cache_guard_async().await;
     // Connections: gmail + notion. Tools: filtered to those toolkits
     // and prefixed with the uppercased slug. The toolkits route
     // backs the `list_toolkits()` allowlist gate that
@@ -90,7 +92,9 @@ async fn fetch_connected_integrations_via_mock_aggregates_tools() {
 
 #[tokio::test]
 async fn fetch_connected_integrations_treats_slack_and_telegram_status_like_ui() {
-    let _guard = cache_guard();
+    // The connection list asks the module, which keeps preferences in storage.
+    let _serialised = module_guard().await;
+    let _guard = cache_guard_async().await;
     let app = Router::new()
         .route(
             "/agent-integrations/composio/toolkits",
@@ -161,7 +165,7 @@ async fn fetch_connected_integrations_treats_slack_and_telegram_status_like_ui()
 
 #[tokio::test]
 async fn fetch_connected_integrations_via_mock_returns_empty_with_no_active() {
-    let _guard = cache_guard();
+    let _guard = cache_guard_async().await;
     let app = Router::new().route(
         "/agent-integrations/composio/connections",
         get(|| async {
@@ -185,7 +189,10 @@ fn sync_cache_invalidates_when_connection_becomes_active() {
     // not connected. This is exactly the state the chat runtime
     // gets stuck in on Windows when the user completes OAuth
     // after the event-bus 60 s readiness poll times out.
-    let key = "windows-regression-1";
+    let tmp = tempfile::tempdir().unwrap();
+    let config = test_config(&tmp);
+    let key_string = cache_key(&config);
+    let key = key_string.as_str();
     clear_cache_key(key);
     seed_cache(
         key,
@@ -215,7 +222,10 @@ fn sync_cache_invalidates_when_connection_is_removed() {
     // Cache remembers gmail as connected. The user just
     // disconnected it from Settings; the next UI poll returns an
     // empty list. Chat must forget gmail within one poll.
-    let key = "windows-regression-2";
+    let tmp = tempfile::tempdir().unwrap();
+    let config = test_config(&tmp);
+    let key_string = cache_key(&config);
+    let key = key_string.as_str();
     clear_cache_key(key);
     seed_cache(key, vec![integration("gmail", true)]);
 
@@ -234,7 +244,10 @@ fn sync_cache_noop_when_backend_matches_cached_state() {
     // Steady state: UI polls confirm cache is accurate. No
     // invalidation — we must not thrash the chat runtime's tool
     // registry on every 5 s UI poll.
-    let key = "windows-regression-3";
+    let tmp = tempfile::tempdir().unwrap();
+    let config = test_config(&tmp);
+    let key_string = cache_key(&config);
+    let key = key_string.as_str();
     clear_cache_key(key);
     seed_cache(
         key,
@@ -261,7 +274,10 @@ fn sync_cache_ignores_non_active_connection_rows() {
     // while the OAuth handshake is in flight, which is wasteful
     // and would also clear `tools` vecs for real active
     // integrations already on disk.
-    let key = "windows-regression-4";
+    let tmp = tempfile::tempdir().unwrap();
+    let config = test_config(&tmp);
+    let key_string = cache_key(&config);
+    let key = key_string.as_str();
     clear_cache_key(key);
     seed_cache(key, vec![integration("gmail", true)]);
 
@@ -286,7 +302,10 @@ fn sync_cache_treats_connected_status_equivalent_to_active() {
     // `fetch_connected_integrations_uncached` filter). Make sure
     // the new diff path matches that convention so it doesn't
     // produce a false-positive invalidation.
-    let key = "windows-regression-5";
+    let tmp = tempfile::tempdir().unwrap();
+    let config = test_config(&tmp);
+    let key_string = cache_key(&config);
+    let key = key_string.as_str();
     clear_cache_key(key);
     seed_cache(key, vec![integration("gmail", true)]);
 
@@ -302,7 +321,7 @@ fn sync_cache_treats_connected_status_equivalent_to_active() {
 
 #[tokio::test]
 async fn cache_entries_survive_idle_time_until_connection_change() {
-    let _guard = cache_guard();
+    let _guard = cache_guard_async().await;
     let tmp = tempfile::TempDir::new().unwrap();
     let config = test_config(&tmp);
     let key = crate::integrations::composio::connected_integrations::cache_key(&config);
@@ -326,7 +345,7 @@ async fn cache_entries_survive_idle_time_until_connection_change() {
 }
 
 #[test]
-fn fallback_reader_matches_main_reader_without_time_based_expiry() {
+fn cached_integrations_remain_available_after_a_long_idle_period() {
     let _guard = cache_guard();
     let tmp = tempfile::TempDir::new().unwrap();
     let config = test_config(&tmp);
@@ -339,9 +358,8 @@ fn fallback_reader_matches_main_reader_without_time_based_expiry() {
         let mut guard = INTEGRATIONS_CACHE.write().unwrap();
         guard.get_mut(&key).unwrap().cached_at = Instant::now() - Duration::from_secs(3600);
     }
-    assert!(cached_active_integrations(&config).is_some());
-    let stale = cached_active_integrations_including_expired(&config)
-        .expect("expired entry should still be returned by the fallback read");
+    let stale = cached_active_integrations(&config)
+        .expect("a long idle period must not expire the last-known snapshot");
     assert_eq!(stale.len(), 1);
     assert_eq!(stale[0].toolkit, "gmail");
 
@@ -393,7 +411,7 @@ async fn composio_list_available_triggers_omits_connection_when_none() {
         "/agent-integrations/composio/triggers/available",
         get(|Query(q): Query<HashMap<String, String>>| async move {
             assert!(
-                q.get("connectionId").is_none(),
+                !q.contains_key("connectionId"),
                 "should not forward connectionId"
             );
             Json(json!({"success": true, "data": {"triggers": []}}))
@@ -493,6 +511,56 @@ async fn composio_enable_trigger_via_mock() {
 }
 
 #[tokio::test]
+async fn enabling_trigger_makes_it_visible_in_list_triggers() {
+    let _serialised = module_guard().await;
+    let active = std::sync::Arc::new(std::sync::Mutex::new(Vec::<Value>::new()));
+    let list_state = active.clone();
+    let enable_state = active.clone();
+    let app = Router::new()
+        .route(
+            "/agent-integrations/composio/triggers",
+            get(move || {
+                let triggers = list_state.lock().unwrap().clone();
+                async move { Json(json!({"success": true, "data": {"triggers": triggers}})) }
+            })
+            .post(move |Json(body): Json<Value>| {
+                let enable_state = enable_state.clone();
+                async move {
+                    let trigger = json!({
+                        "id": "ti_enabled",
+                        "slug": body["slug"],
+                        "toolkit": "gmail",
+                        "connectionId": body["connectionId"],
+                        "state": "active"
+                    });
+                    enable_state.lock().unwrap().push(trigger);
+                    Json(json!({
+                        "success": true,
+                        "data": {"triggerId": "ti_enabled", "slug": body["slug"], "connectionId": body["connectionId"]}
+                    }))
+                }
+            }),
+        );
+    let base = start_mock_backend(app).await;
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_with_backend(&tmp, base);
+
+    assert!(composio_list_triggers(&config, None)
+        .await
+        .unwrap()
+        .value
+        .triggers
+        .is_empty());
+    composio_enable_trigger(&config, "c1", "GMAIL_NEW_GMAIL_MESSAGE", None)
+        .await
+        .unwrap();
+    let listed = composio_list_triggers(&config, None).await.unwrap();
+    assert_eq!(listed.value.triggers.len(), 1);
+    assert_eq!(listed.value.triggers[0].id, "ti_enabled");
+    assert_eq!(listed.value.triggers[0].slug, "GMAIL_NEW_GMAIL_MESSAGE");
+}
+
+#[tokio::test]
 async fn composio_disable_trigger_via_mock() {
     let _serialised = module_guard().await;
     let app = Router::new().route(
@@ -555,7 +623,7 @@ async fn composio_list_toolkits_returns_empty_in_direct_mode() {
 #[tokio::test]
 async fn composio_list_connections_routes_through_direct_mode() {
     let _serialised = module_guard().await;
-    let _guard = cache_guard();
+    let _guard = cache_guard_async().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = direct_mode_config(&tmp);
     // [composio-direct] After commit 2 of #1710, direct mode actually
@@ -564,7 +632,8 @@ async fn composio_list_connections_routes_through_direct_mode() {
     // remote will reject the test request, so we assert on the error
     // shape: it must reference `composio` AND must NOT reference the
     // backend-session path (proving the factory routed us to direct).
-    let result = composio_list_connections(&config).await;
+    let result =
+        composio_list_connections(&crate::core::runtime::DispatchCtx::ambient(), &config).await;
     match result {
         Ok(outcome) => {
             // Some sandboxes resolve OK with an empty list — accept
@@ -632,7 +701,7 @@ async fn composio_list_connections_returns_empty_when_direct_mode_no_key() {
     // RC of TAURI-RUST-R4: this MUST be Ok(empty), not Err — no error is
     // constructed, so nothing reaches Sentry and the 5 s poll stops
     // churning.
-    let outcome = composio_list_connections(&config)
+    let outcome = composio_list_connections(&crate::core::runtime::DispatchCtx::ambient(), &config)
         .await
         .expect("direct mode with no key must return an empty list, not an error");
     assert!(
@@ -644,82 +713,4 @@ async fn composio_list_connections_returns_empty_when_direct_mode_no_key() {
         "log must explain the empty list is the no-key setup state, got {:?}",
         outcome.logs
     );
-}
-
-// ── sync stage-event contracts (#5932) ───────────────────────────────────────
-
-/// The completed-stage detail is a parse contract with the Sources UI, which
-/// extracts the count via `/ingested\s+(\d+)\s+item/i` and shows a generic
-/// "up to date" when the pattern misses (#3295). This is the exact regex,
-/// ported, against the exact producer.
-#[test]
-fn completed_sync_detail_matches_the_ui_parse_contract() {
-    let re = regex::Regex::new(r"(?i)ingested\s+(\d+)\s+item").expect("ui parse regex");
-    for count in [0u64, 1, 200, 25_000] {
-        let detail = crate::integrations::composio::ops::completed_sync_detail(count, false, None);
-        let caps = re
-            .captures(&detail)
-            .unwrap_or_else(|| panic!("detail must parse: {detail}"));
-        assert_eq!(
-            caps[1].parse::<u64>().unwrap(),
-            count,
-            "count survives: {detail}"
-        );
-    }
-}
-
-/// Every parsed sync reason is a distinct event trigger — the stage events
-/// must not collapse periodic and connection-created syncs into "manual"
-/// (review finding on #5932).
-#[test]
-fn sync_reasons_map_to_distinct_triggers() {
-    use crate::integrations::composio::providers::SyncReason;
-    let all = [
-        SyncReason::Manual,
-        SyncReason::Periodic,
-        SyncReason::ConnectionCreated,
-    ];
-    let mut seen = std::collections::HashSet::new();
-    for reason in all {
-        assert!(
-            seen.insert(reason.as_str().to_string()),
-            "duplicate trigger"
-        );
-    }
-    assert_eq!(seen.len(), 3);
-}
-
-/// The budgeted loop's arithmetic, held still: unlimited slices at the pass
-/// ceiling, a cap slices to min(remaining, ceiling), a spent cap ends the run
-/// (review finding on #5932 — this is the PR's core behavioural change).
-#[test]
-fn next_pass_budget_slices_and_exhausts_the_configured_cap() {
-    use crate::integrations::composio::ops::{next_pass_budget, SYNC_PASS_MAX_ITEMS};
-    // Unlimited: every pass gets the ceiling.
-    assert_eq!(next_pass_budget(None, 0), Some(SYNC_PASS_MAX_ITEMS));
-    assert_eq!(next_pass_budget(None, 1_000_000), Some(SYNC_PASS_MAX_ITEMS));
-    // A cap below the ceiling (200 since openhuman#6025) is one exact slice,
-    // then exhaustion.
-    assert_eq!(next_pass_budget(Some(50), 0), Some(50));
-    assert_eq!(next_pass_budget(Some(50), 50), None);
-    // A cap above the ceiling slices pass by pass and ends on the remainder —
-    // a remainder smaller than the ceiling, so the two cannot be confused.
-    assert_eq!(next_pass_budget(Some(1_100), 0), Some(SYNC_PASS_MAX_ITEMS));
-    assert_eq!(next_pass_budget(Some(1_100), 1_000), Some(100));
-    assert_eq!(next_pass_budget(Some(1_100), 1_100), None);
-    // Over-written past the cap (dedupe drift) still ends, never underflows.
-    assert_eq!(next_pass_budget(Some(100), 150), None);
-}
-
-/// Both detail variants keep the UI parse contract; the remainder text rides
-/// after the count, never inside it.
-#[test]
-fn completed_detail_keeps_the_contract_with_a_remainder() {
-    let re = regex::Regex::new(r"(?i)ingested\s+(\d+)\s+item").expect("ui parse regex");
-    let capped = crate::integrations::composio::ops::completed_sync_detail_for_test(7, true);
-    assert!(
-        re.captures(&capped).is_some(),
-        "capped detail parses: {capped}"
-    );
-    assert!(capped.contains("more pending"));
 }

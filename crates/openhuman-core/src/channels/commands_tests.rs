@@ -1,123 +1,32 @@
 use super::*;
 
 #[test]
-fn classify_health_result_maps_all_outcomes() {
-    assert_eq!(
-        classify_health_result(&Ok(true)),
-        ChannelHealthState::Healthy
-    );
-    assert_eq!(
-        classify_health_result(&Ok(false)),
-        ChannelHealthState::Unhealthy
-    );
-}
-
-#[tokio::test]
-async fn classify_health_result_maps_timeout() {
-    let elapsed = tokio::time::timeout(
-        std::time::Duration::from_millis(1),
-        std::future::pending::<()>(),
-    )
-    .await
-    .unwrap_err();
-    assert_eq!(
-        classify_health_result(&Err(elapsed)),
-        ChannelHealthState::Timeout
-    );
-}
-
-#[tokio::test]
-async fn doctor_channels_returns_ok_when_no_channels_are_configured() {
+fn provider_selection_ignores_cli_and_relay_only_configuration() {
     let mut config = Config::default();
-    config.channels_config = crate::config::ChannelsConfig::default();
-    doctor_channels(config).await.unwrap();
+    config.channels_config.relay = Some(Default::default());
+    assert!(configured_providers(&config).is_empty());
+    config.channels_config.imessage = Some(tinychannels_bus::config::IMessageConfig {
+        allowed_contacts: vec![],
+    });
+    assert_eq!(configured_providers(&config), vec!["imessage"]);
 }
 
-#[tokio::test]
-async fn doctor_channels_runs_with_telegram_config() {
-    use crate::config::{StreamMode, TelegramConfig};
+#[test]
+fn listener_configuration_includes_channels_and_nonempty_relays_but_not_push_webhooks() {
     let mut config = Config::default();
-    config.channels_config = crate::config::ChannelsConfig::default();
-    config.channels_config.telegram = Some(TelegramConfig {
-        bot_token: "fake:token".into(),
-        chat_id: None,
-        allowed_users: vec!["user1".into()],
-        stream_mode: StreamMode::default(),
-        draft_update_interval_ms: 2000,
-        silent_streaming: true,
-        mention_only: false,
+    config.channels_config.webhook = Some(tinychannels_bus::config::WebhookConfig {
+        port: 0,
+        secret: None,
     });
-    let _ = doctor_channels(config).await;
-}
+    assert!(!has_listener_configuration(&config));
 
-#[tokio::test]
-async fn doctor_channels_runs_with_discord_config() {
-    use crate::config::DiscordConfig;
-    let mut config = Config::default();
-    config.channels_config = crate::config::ChannelsConfig::default();
-    config.channels_config.discord = Some(DiscordConfig {
-        bot_token: "fake".into(),
-        guild_id: Some("123".into()),
-        channel_id: Some("456".into()),
-        allowed_users: vec![],
-        listen_to_bots: false,
-        mention_only: true,
+    config.channels_config.relay = Some(tinychannels_bus::config::RelayRuntimeConfig {
+        url: "https://relay.example.invalid".into(),
+        identities: vec![tinychannels_bus::config::RelayRuntimeIdentityConfig {
+            platform: "discord".into(),
+            bot_id: "doctor-test-bot".into(),
+        }],
+        ..Default::default()
     });
-    let _ = doctor_channels(config).await;
-}
-
-#[tokio::test]
-async fn doctor_channels_runs_with_slack_config() {
-    use crate::config::SlackConfig;
-    let mut config = Config::default();
-    config.channels_config = crate::config::ChannelsConfig::default();
-    config.channels_config.slack = Some(SlackConfig {
-        bot_token: "fake".into(),
-        app_token: None,
-        channel_id: Some("C123".into()),
-        allowed_users: vec![],
-    });
-    let _ = doctor_channels(config).await;
-}
-
-#[tokio::test]
-async fn doctor_channels_runs_with_imessage_config() {
-    use crate::config::IMessageConfig;
-    let mut config = Config::default();
-    config.channels_config = crate::config::ChannelsConfig::default();
-    config.channels_config.imessage = Some(IMessageConfig {
-        allowed_contacts: vec!["a@b.com".into()],
-    });
-    let _ = doctor_channels(config).await;
-}
-
-#[tokio::test]
-async fn doctor_channels_runs_with_multiple_channels() {
-    use crate::config::{DiscordConfig, SlackConfig, StreamMode, TelegramConfig};
-    let mut config = Config::default();
-    config.channels_config = crate::config::ChannelsConfig::default();
-    config.channels_config.telegram = Some(TelegramConfig {
-        bot_token: "fake".into(),
-        chat_id: None,
-        allowed_users: vec![],
-        stream_mode: StreamMode::default(),
-        draft_update_interval_ms: 2000,
-        silent_streaming: true,
-        mention_only: false,
-    });
-    config.channels_config.discord = Some(DiscordConfig {
-        bot_token: "fake".into(),
-        guild_id: Some("123".into()),
-        channel_id: Some("456".into()),
-        allowed_users: vec![],
-        listen_to_bots: false,
-        mention_only: false,
-    });
-    config.channels_config.slack = Some(SlackConfig {
-        bot_token: "fake".into(),
-        app_token: None,
-        channel_id: Some("C123".into()),
-        allowed_users: vec![],
-    });
-    let _ = doctor_channels(config).await;
+    assert!(has_listener_configuration(&config));
 }

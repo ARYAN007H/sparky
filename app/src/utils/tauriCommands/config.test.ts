@@ -47,7 +47,6 @@ describe('tauriCommands/config', () => {
         model_id: 'local-model',
         chat_model_id: 'local-model',
         usage_embeddings: true,
-        usage_subconscious: false,
       };
       await openhumanUpdateLocalAiSettings(patch);
       expect(mockCallCoreRpc).toHaveBeenCalledWith({

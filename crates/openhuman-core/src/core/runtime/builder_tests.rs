@@ -1,5 +1,14 @@
-use super::{DomainSet, ServiceSet};
+use super::{CoreBootMode, CoreBuilder, DomainSet, ServiceSet};
 use crate::core::all::DomainGroup;
+use crate::core::types::HostKind;
+
+#[test]
+fn core_builder_defaults_to_normal_boot_mode() {
+    assert_eq!(
+        CoreBuilder::new(HostKind::Library).boot_mode,
+        CoreBootMode::Normal
+    );
+}
 
 #[test]
 fn domain_set_presets_have_expected_flags() {
@@ -140,9 +149,7 @@ fn embedded_service_set_binds_no_transport() {
 
     // But a long-lived operator session still wants background work.
     assert!(services.cron);
-    assert!(services.heartbeat);
-    assert!(services.memory_queue);
-    assert!(services.harness_init);
+    assert!(services.login_gated);
     assert!(services.memory_sync);
 }
 
@@ -150,18 +157,14 @@ fn embedded_service_set_binds_no_transport() {
 fn boot_jobs_are_independent_from_runtime_service_flags() {
     let mut custom = ServiceSet::none();
     custom.rpc_http = true;
-    custom.heartbeat = true;
+    custom.login_gated = true;
     custom.update_scheduler = true;
-    assert!(!custom.memory_queue);
-    assert!(!custom.harness_init);
     assert!(!custom.skill_catalog_refresh);
     assert!(!custom.mcp_boot);
     assert!(!custom.integrations);
     assert!(!custom.memory_sync);
 
     let desktop = ServiceSet::desktop();
-    assert!(desktop.memory_queue);
-    assert!(desktop.harness_init);
     assert!(desktop.skill_catalog_refresh);
     assert!(desktop.mcp_boot);
     assert!(desktop.integrations);
@@ -171,4 +174,26 @@ fn boot_jobs_are_independent_from_runtime_service_flags() {
     let headless = ServiceSet::headless_api();
     assert!(!headless.integrations);
     assert!(!headless.memory_sync);
+}
+
+/// Inspection boot refuses to start without a caller-supplied config and a
+/// fixed bearer, before it touches any process state.
+#[tokio::test]
+async fn inspection_boot_rejects_missing_config_and_env_token() {
+    let refusal = |result: anyhow::Result<super::CoreRuntime>| match result {
+        Ok(_) => panic!("inspection boot must refuse"),
+        Err(error) => error.to_string(),
+    };
+    let inspection = || CoreBuilder::new(HostKind::Cli).boot_mode(CoreBootMode::Inspection);
+
+    let error = refusal(inspection().build().await);
+    assert!(error.contains("caller-supplied config"), "{error}");
+
+    let error = refusal(
+        inspection()
+            .config(crate::config::Config::default())
+            .build()
+            .await,
+    );
+    assert!(error.contains("fixed RPC bearer"), "{error}");
 }

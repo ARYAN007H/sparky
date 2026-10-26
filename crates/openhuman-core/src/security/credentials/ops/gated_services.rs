@@ -1,5 +1,5 @@
-//! Login-gated background services (local AI, voice) started on session
-//! store and stopped on session clear, plus the embedder-host detection
+//! Login-gated background services (local AI) started on session store and
+//! stopped on session clear, plus the embedder-host detection
 //! that gates global (operator-wide) activation side effects.
 
 use crate::config::Config;
@@ -12,7 +12,7 @@ use crate::config::Config;
 /// that config's path and never touch the operator's global
 /// `~/.openhuman/active_user.toml` / `users/` tree.
 pub(super) fn is_embedder_host() -> bool {
-    crate::core::runtime::context::CoreContext::current_embedder_config().is_some()
+    crate::core::runtime::context::CoreContext::with_current_embedder_config(|_| ()).is_some()
 }
 
 /// Populate the process cache away from the next chat turn after startup or a
@@ -40,10 +40,16 @@ pub(super) fn spawn_integrations_cache_warm(config: &Config) {
     });
 }
 
-/// Start all login-gated background services (local AI and voice). Called both
+/// Start login-gated background services. Called both
 /// from the initial boot path (when an existing
 /// session is detected) and from `set_credential()` when a credential is installed.
-pub async fn start_credential_gated_services(config: &Config) {
+pub async fn start_credential_gated_services(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+) {
+    // Optional TinyFlows resources warm in the background and must never hold
+    // credential activation or ordinary chat startup on module availability.
+    crate::skills::schedule_flow_authoring_prewarm(ctx, config, None);
     // These login-gated services are mutually independent — the ONLY ordering
     // constraint is voice-server → standalone-dictation-listener (they contend
     // for the single rdev global listener on macOS). Previously each was
@@ -63,8 +69,7 @@ pub async fn start_credential_gated_services(config: &Config) {
     // panic in one service is logged on join and never aborts the others.
 
     // Unit tests must not launch the real login-gated background services: they
-    // include detached, long-lived continuous audio capture that outlives the
-    // test that spawned it and interleaves with the
+    // include detached listeners that outlive the test that spawned them and interleave with the
     // shared process state (HOME / active_user.toml) of the parallel `cargo
     // test` run. Once startup became concurrent (#3490) that interleaving made
     // the session-isolation tests order-dependent. `cfg!(test)` is compiled out
@@ -76,17 +81,6 @@ pub async fn start_credential_gated_services(config: &Config) {
         return;
     }
 
-    // An embedder's task-local user-root policy does not cross spawn_blocking;
-    // its first agent build warms the correctly scoped cache instead.
-    if !is_embedder_host() {
-        let skills_workspace = config.workspace_dir.clone();
-        // Detached on purpose: the warm-up must not delay startup.
-        tokio::task::spawn_blocking(move || {
-            let count = crate::skills::load_workflow_metadata(&skills_workspace).len();
-            log::debug!("[services] skill metadata cache warmed entries={count}");
-        });
-    }
-
     spawn_integrations_cache_warm(config);
 
     let started = std::time::Instant::now();
@@ -94,8 +88,9 @@ pub async fn start_credential_gated_services(config: &Config) {
     // the specific stage rather than an anonymous "a service failed".
     let mut tasks: Vec<(&'static str, tokio::task::JoinHandle<()>)> = Vec::new();
 
-    // 1. Local AI (Ollama, embeddings) — the heaviest single warm-up,
-    //    so keeping it off the critical path for the others is the biggest win.
+    // 1. Local AI — a read-only probe of the user's own runtime endpoint
+    //    (`bootstrap` never spawns a runtime or pulls a model). Kept off the
+    //    critical path so a slow endpoint cannot delay the other services.
     {
         let config = config.clone();
         tasks.push((
@@ -103,62 +98,18 @@ pub async fn start_credential_gated_services(config: &Config) {
             tokio::spawn(async move {
                 if config.local_ai.runtime_enabled {
                     let step = std::time::Instant::now();
-                    log::debug!("[services] local AI bootstrap starting");
+                    log::debug!("[services] local AI endpoint probe starting");
                     let runtime = crate::inference::local_runtime_config(&config);
                     crate::inference::host_runtime::global(&config)
                         .bootstrap(&runtime)
                         .await;
                     log::debug!(
-                        "[services] local AI bootstrapped after login ({} ms)",
+                        "[services] local AI endpoint probed after login ({} ms)",
                         step.elapsed().as_millis()
                     );
                 } else {
                     log::debug!("[services] local AI disabled — skipping bootstrap");
                 }
-            }),
-        ));
-    }
-
-    // 2+3. Voice hotkey services — the user-facing command registration. The
-    //      embedded voice server owns the single rdev listener; the standalone
-    //      dictation listener only starts when the server is NOT auto-starting,
-    //      so keep these two ordered *relative to each other* (but concurrent
-    //      with everything else).
-    {
-        let config = config.clone();
-        tasks.push((
-            "voice_hotkey",
-            tokio::spawn(async move {
-                let step = std::time::Instant::now();
-                crate::voice::server::start_if_enabled(&config).await;
-                if !config.voice_server.auto_start {
-                    crate::voice::dictation_listener::start_if_enabled(&config).await;
-                }
-                log::debug!(
-                    "[services] voice hotkey services registered ({} ms)",
-                    step.elapsed().as_millis()
-                );
-            }),
-        ));
-    }
-
-    // 3b. Always-on listening (Phase 2): continuous mic + VAD → STT → agent.
-    //     Its cold WASAPI init (`always_on::spawn_capture_thread`) is the
-    //     Windows-specific blocker; it now runs the blocking capture-readiness
-    //     handshake on the blocking pool (see `always_on::start_if_enabled`), so
-    //     on its own task it neither stalls an async worker nor the hotkey /
-    //     command registration above.
-    {
-        let config = config.clone();
-        tasks.push((
-            "always_on",
-            tokio::spawn(async move {
-                let step = std::time::Instant::now();
-                crate::voice::always_on::start_if_enabled(&config).await;
-                log::debug!(
-                    "[services] always-on listening started ({} ms)",
-                    step.elapsed().as_millis()
-                );
             }),
         ));
     }
@@ -185,16 +136,14 @@ pub async fn start_credential_gated_services(config: &Config) {
 
 /// Stop all login-gated background services.  Called from `clear_credential()`
 /// on logout so orphan processes don't consume resources.
-pub async fn stop_credential_gated_services(config: &Config) {
-    // 2. Voice server
-    if let Some(server) = crate::voice::server::try_global_server() {
-        server.stop().await;
-        log::info!("[services] voice server stopped on logout");
-    }
-
-    // 4. Local AI — reset state to idle. We don't kill the Ollama process
-    //    (it may be serving other clients or mid-download), but we clear
-    //    the internal state so it re-bootstraps on next login.
+pub async fn stop_credential_gated_services(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+) {
+    // 4. Local AI — reset state to idle. OpenHuman never owns the local
+    //    runtime process (the user runs Ollama / LM Studio / MLX), so there is
+    //    nothing to stop; we only clear the cached probe verdict so the
+    //    endpoint is re-probed on next login.
     if config.local_ai.runtime_enabled {
         let service = crate::inference::host_runtime::global(config);
         let runtime = crate::inference::local_runtime_config(config);
@@ -202,18 +151,9 @@ pub async fn stop_credential_gated_services(config: &Config) {
         log::info!("[services] local AI reset to idle on logout");
     }
 
-    // 5. Dictation listener — abort the hotkey forwarder task so it doesn't
-    //    accumulate duplicate rdev listeners across logout → login cycles.
-    crate::voice::dictation_listener::stop();
-
-    // 6. Always-on listening — disable the runtime gate so the mic capture loop
-    //    stops transcribing/delivering after logout (no audio processed while
-    //    logged out). Symmetric with start_login_gated_services step 3b.
-    crate::voice::always_on::stop();
+    if let Err(error) = crate::integrations::composio::trigger_history::close_global(ctx).await {
+        log::warn!("[composio][history] archive release failed on sign-out: {error}");
+    }
 
     log::info!("[services] all login-gated services stopped");
 }
-
-/// Historical names, kept for call sites outside this module.
-pub use start_credential_gated_services as start_login_gated_services;
-pub use stop_credential_gated_services as stop_login_gated_services;

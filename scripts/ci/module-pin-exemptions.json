@@ -7,22 +7,11 @@
     "silence the gate: `expect` pins the exact `git describe --tags` output, so a",
     "record already exempt cannot drift FURTHER without failing. Widening the drift",
     "is a deliberate edit to this file, which is a reviewable diff.",
+    "A `sourceParity` proof binds one exact candidate commit to a release tree",
+    "except for its explicitly named test file(s); it does not accept descendants.",
     "",
     "Delete an entry the moment the pins are reconciled. An exemption that has",
-    "stopped being true fails the gate too \u2014 `expect` must still match."
+    "stopped being true fails the gate too — `expect` must still match."
   ],
-  "exemptions": [
-    {
-      "id": "tinyruntime-nodejs",
-      "submodule": "vendor/tinyruntime",
-      "expect": "v0.2.7",
-      "reason": "The provider is published independently at v0.2.3 while the shared source pin is tinyruntime v0.2.7. v0.2.3 was built against tinyruntime 09f9646 (v0.2.4-5); git diff 09f9646..v0.2.7 changes no crate source (only CI, toolchain, versions, Cargo.lock and the tinybus pin), and the tinybus module ABI is revision 1 on both. Registry retains its matching published v0.2.3 provider artifact."
-    },
-    {
-      "id": "tinyruntime-python",
-      "submodule": "vendor/tinyruntime",
-      "expect": "v0.2.7",
-      "reason": "The provider is published independently at v0.2.3 while the shared source pin is tinyruntime v0.2.7. v0.2.3 was built against tinyruntime 09f9646 (v0.2.4-5); git diff 09f9646..v0.2.7 changes no crate source (only CI, toolchain, versions, Cargo.lock and the tinybus pin), and the tinybus module ABI is revision 1 on both. Registry retains its matching published v0.2.3 provider artifact."
-    }
-  ]
+  "exemptions": []
 }

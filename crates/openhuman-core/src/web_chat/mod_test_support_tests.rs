@@ -22,20 +22,12 @@ pub fn classify_error_for_test(err: &str) -> ClassifiedErrorSnapshot {
     }
 }
 
-pub fn extracted_provider_detail_for_test(err: &str) -> Option<String> {
-    super::extract_provider_error_detail(err)
-}
-
-pub fn retry_after_secs_for_test(err: &str) -> Option<u64> {
-    super::parse_retry_after_secs_from_str(err)
-}
-
 pub fn is_non_retryable_rate_limit_for_test(lower: &str) -> bool {
     super::is_non_retryable_rate_limit_text(lower)
 }
 
 pub fn key_for_test(thread_id: &str) -> String {
-    super::key_for(thread_id)
+    super::key_for(&crate::core::runtime::DispatchCtx::ambient(), thread_id)
 }
 
 pub fn event_session_id_for_test(client_id: &str, thread_id: &str) -> String {

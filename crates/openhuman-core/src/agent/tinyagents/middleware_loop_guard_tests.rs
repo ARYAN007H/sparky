@@ -1,4 +1,21 @@
 use super::*;
+use crate::agent::tinyagents::middleware::repeated_failure::{
+    user_actionable_escalation, RepeatedToolFailureMiddleware,
+};
+
+#[test]
+fn repeated_tool_failure_middleware_observes_outcomes_after_control_requests() {
+    let mw = RepeatedToolFailureMiddleware::new(
+        SteeringHandle::allow_all(),
+        3,
+        std::sync::Arc::new(std::sync::Mutex::new(None)),
+    );
+
+    // The harness consults this contract when an earlier middleware has
+    // requested control; this observer must still receive failures so its
+    // no-progress accounting and corrective nudge remain active.
+    assert!(Middleware::is_observer(&mw));
+}
 
 #[tokio::test]
 async fn sampling_tool_output_still_hits_the_byte_budget_backstop() {
@@ -10,7 +27,7 @@ async fn sampling_tool_output_still_hits_the_byte_budget_backstop() {
     let mw = truncation_probe_mw();
     let payload = large_sample_response_json(400);
     assert!(
-        payload.len() > DEFAULT_TOOL_RESULT_BUDGET_BYTES,
+        payload.len() > tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes,
         "test payload must exceed the shared byte budget: {} bytes",
         payload.len()
     );
@@ -64,52 +81,6 @@ fn compaction_and_truncation_exempt_sets_are_distinct() {
     assert!(!is_truncation_exempt("some_other_tool"));
 }
 
-// ── CostBudgetMiddleware ────────────────────────────────────────────────
-
-#[tokio::test]
-async fn cost_budget_is_a_noop_without_a_global_tracker() {
-    // No global CostTracker is installed in the unit-test process, so the
-    // gate self-disables and the model call proceeds.
-    let mw = CostBudgetMiddleware::new();
-    let mut req = ModelRequest::new(vec![TaMessage::user("hi")]);
-    assert!(mw.before_model(&mut ctx(), &(), &mut req).await.is_ok());
-}
-
-// ── CostBudgetMiddleware shadow (W2-budget-dedupe) ──────────────────────
-
-/// The shadow comparison at `after_agent` logs parity when the crate
-/// `BudgetMiddleware`'s tracker matches the runtime `AgentRun.usage`, and
-/// never fails the run — in both the matching and diverging cases. It also
-/// must be inert (no panic, `Ok`) when no shadow tracker is installed.
-#[tokio::test]
-async fn cost_budget_shadow_after_agent_never_fails_the_run() {
-    use tinyinference_llm::usage::Usage;
-
-    // No shadow tracker: after_agent is a silent no-op.
-    let plain = CostBudgetMiddleware::new();
-    let mut run = AgentRun::new();
-    run.usage.record(Usage::new(100, 40));
-    assert!(plain.after_agent(&mut ctx(), &(), &mut run).await.is_ok());
-
-    // Matching tracker (parity): the crate tracker accumulated the same
-    // single call's usage the runtime recorded into `run.usage`.
-    let tracker = BudgetTracker::new();
-    tracker.record(Usage::new(100, 40), Default::default());
-    let shadow = CostBudgetMiddleware::with_shadow(tracker.clone());
-    let mut run = AgentRun::new();
-    run.usage.record(Usage::new(100, 40));
-    assert!(shadow.after_agent(&mut ctx(), &(), &mut run).await.is_ok());
-
-    // Diverging tracker (crate missed a call): still only logs, never fails.
-    let mut diverged_run = AgentRun::new();
-    diverged_run.usage.record(Usage::new(100, 40));
-    diverged_run.usage.record(Usage::new(10, 5));
-    assert!(shadow
-        .after_agent(&mut ctx(), &(), &mut diverged_run)
-        .await
-        .is_ok());
-}
-
 #[tokio::test]
 async fn repeated_tool_failure_pauses_only_after_the_threshold() {
     let handle = SteeringHandle::allow_all();
@@ -118,11 +89,12 @@ async fn repeated_tool_failure_pauses_only_after_the_threshold() {
         3,
         std::sync::Arc::new(std::sync::Mutex::new(None)),
     );
+    let mut context = ctx();
     // Two identical failures: below the halt threshold. The crate ladder
     // nudges (Redirect) on the second, but must NOT pause (halt) yet.
     for _ in 0..2 {
         let mut r = failing_result("flaky", "boom");
-        mw.after_tool(&mut ctx(), &(), &invocation("flaky", "flaky"), &mut r)
+        mw.after_tool(&mut context, &(), &invocation("flaky", "flaky"), &mut r)
             .await
             .unwrap();
     }
@@ -133,7 +105,7 @@ async fn repeated_tool_failure_pauses_only_after_the_threshold() {
     );
     // Third identical failure exhausts the same-strategy retries → halt.
     let mut r = failing_result("flaky", "boom");
-    mw.after_tool(&mut ctx(), &(), &invocation("flaky", "flaky"), &mut r)
+    mw.after_tool(&mut context, &(), &invocation("flaky", "flaky"), &mut r)
         .await
         .unwrap();
     assert_eq!(
@@ -141,6 +113,54 @@ async fn repeated_tool_failure_pauses_only_after_the_threshold() {
         1,
         "the third identical failure should pause (halt) the run"
     );
+}
+
+#[tokio::test]
+async fn ordinary_web_fetch_status_ignores_timeout_words_in_body_excerpt() {
+    let handle = SteeringHandle::allow_all();
+    let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut context = ctx();
+    let error = "HTTP 404 Not Found from example.com; the page could not be fetched.\nResponse excerpt: request timed out while rendering";
+
+    for index in 0..2 {
+        let mut result = failing_result("web_fetch", error);
+        mw.after_tool(
+            &mut context,
+            &(),
+            &invocation(format!("fetch-{index}"), "web_fetch"),
+            &mut result,
+        )
+        .await
+        .unwrap();
+    }
+    assert_eq!(
+        drain_pause_count(&handle),
+        0,
+        "the ordinary site failure should remain below the exact-repeat halt threshold"
+    );
+
+    let mut result = failing_result("web_fetch", error);
+    mw.after_tool(
+        &mut context,
+        &(),
+        &invocation("fetch-2", "web_fetch"),
+        &mut result,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        drain_pause_count(&handle),
+        1,
+        "the body excerpt must not divert an ordinary site error into transient-failure handling"
+    );
+    let summary = slot
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("exact-repeat halt summary");
+    assert!(summary.contains("404") && summary.contains("timed out"));
 }
 
 #[tokio::test]
@@ -244,15 +264,21 @@ async fn halt_on_missing_connection_asks_the_user_instead_of_reporting_back() {
     let handle = SteeringHandle::allow_all();
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
     let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut context = ctx();
     // Three identical not-connected failures → halt.
     for _ in 0..3 {
         let mut r = failing_result(
             "slack_post",
             "Slack is not connected — connect it in Connections.",
         );
-        mw.after_tool(&mut ctx(), &(), &invocation("slack", "slack_post"), &mut r)
-            .await
-            .unwrap();
+        mw.after_tool(
+            &mut context,
+            &(),
+            &invocation("slack", "slack_post"),
+            &mut r,
+        )
+        .await
+        .unwrap();
     }
     let summary = slot
         .lock()
@@ -286,21 +312,32 @@ async fn repeated_tool_failure_nudges_change_of_strategy_before_the_halt() {
         3,
         std::sync::Arc::new(std::sync::Mutex::new(None)),
     );
+    let mut context = ctx();
     // First identical failure: not a loop yet — no steering.
     let mut r = failing_result("read_file", "file not found");
-    mw.after_tool(&mut ctx(), &(), &invocation("read-1", "read_file"), &mut r)
-        .await
-        .unwrap();
+    mw.after_tool(
+        &mut context,
+        &(),
+        &invocation("read-1", "read_file"),
+        &mut r,
+    )
+    .await
+    .unwrap();
     assert!(
         handle.drain().is_empty(),
         "a single failure is never a loop"
     );
     // Second identical failure: the nudge fires, still no halt.
     let mut r = failing_result("read_file", "file not found");
-    mw.after_tool(&mut ctx(), &(), &invocation("read-2", "read_file"), &mut r)
-        .await
-        .unwrap();
-    let nudges = drain_nudge_messages(&mw);
+    mw.after_tool(
+        &mut context,
+        &(),
+        &invocation("read-2", "read_file"),
+        &mut r,
+    )
+    .await
+    .unwrap();
+    let nudges = drain_nudge_messages(&mw, &mut context).await;
     assert_eq!(
         nudges.len(),
         1,
@@ -364,6 +401,7 @@ async fn repeated_validate_workflow_ok_false_trips_the_breaker() {
         3,
         std::sync::Arc::new(std::sync::Mutex::new(None)),
     );
+    let mut context = ctx();
     let mut halted = false;
     // Same invalid graph re-validated repeatedly (same content each time, no
     // `error` field): well within the varied-failure any-failure backstop
@@ -375,7 +413,7 @@ async fn repeated_validate_workflow_ok_false_trips_the_breaker() {
         );
         assert!(!r.is_error, "the tool call itself did not error");
         mw.after_tool(
-            &mut ctx(),
+            &mut context,
             &(),
             &invocation("validate", "validate_workflow"),
             &mut r,
@@ -452,9 +490,10 @@ async fn existing_error_is_some_behavior_is_unchanged_by_body_level_check() {
         3,
         std::sync::Arc::new(std::sync::Mutex::new(None)),
     );
+    let mut context = ctx();
     for _ in 0..2 {
         let mut r = failing_result("flaky", "boom");
-        mw.after_tool(&mut ctx(), &(), &invocation("flaky", "flaky"), &mut r)
+        mw.after_tool(&mut context, &(), &invocation("flaky", "flaky"), &mut r)
             .await
             .unwrap();
     }
@@ -464,7 +503,7 @@ async fn existing_error_is_some_behavior_is_unchanged_by_body_level_check() {
         "no halt before the threshold"
     );
     let mut r = failing_result("flaky", "boom");
-    mw.after_tool(&mut ctx(), &(), &invocation("flaky", "flaky"), &mut r)
+    mw.after_tool(&mut context, &(), &invocation("flaky", "flaky"), &mut r)
         .await
         .unwrap();
     assert_eq!(
@@ -481,11 +520,12 @@ async fn existing_error_is_some_behavior_is_unchanged_by_body_level_check() {
         3,
         std::sync::Arc::new(std::sync::Mutex::new(None)),
     );
+    let mut context2 = ctx();
     for _ in 0..2 {
         let mut r = body_failure_result("validate_workflow", json!({}));
         r = TaToolResult::error(result_text(&r));
         mw2.after_tool(
-            &mut ctx(),
+            &mut context2,
             &(),
             &invocation("validate", "validate_workflow"),
             &mut r,
@@ -501,7 +541,7 @@ async fn existing_error_is_some_behavior_is_unchanged_by_body_level_check() {
     let mut r = body_failure_result("validate_workflow", json!({}));
     r = TaToolResult::error(result_text(&r));
     mw2.after_tool(
-        &mut ctx(),
+        &mut context2,
         &(),
         &invocation("validate", "validate_workflow"),
         &mut r,
@@ -516,170 +556,45 @@ async fn existing_error_is_some_behavior_is_unchanged_by_body_level_check() {
 }
 
 #[tokio::test]
-async fn successful_repeat_tracker_halt_maps_to_summary_and_pause() {
+async fn shared_failure_middleware_keeps_distinct_run_contexts_isolated() {
     let handle = SteeringHandle::allow_all();
-    let summary = std::sync::Arc::new(std::sync::Mutex::new(None));
-    let mw = RepeatProgressMiddleware::new(handle.clone(), summary.clone());
-
-    for _ in 0..DEFAULT_REPEAT_CALL_THRESHOLD - 1 {
-        run_successful_repeat_cycle(&mw, "lookup", json!({"id": 1}), "ok", None).await;
-        assert_eq!(drain_pause_count(&handle), 0);
-    }
-    run_successful_repeat_cycle(&mw, "lookup", json!({"id": 1}), "ok", None).await;
-
-    assert_eq!(drain_pause_count(&handle), 1);
-    assert!(
-        summary
-            .lock()
-            .unwrap()
-            .as_deref()
-            .is_some_and(|text| text.contains("successful tool-call batch")),
-        "crate halt summary should be preserved for the host turn result"
-    );
-}
-
-#[tokio::test]
-async fn successful_repeat_tracker_resets_failed_and_exempt_batches() {
-    let handle = SteeringHandle::allow_all();
-    let mw = RepeatProgressMiddleware::new(
+    let middleware = RepeatedToolFailureMiddleware::new(
         handle.clone(),
+        3,
         std::sync::Arc::new(std::sync::Mutex::new(None)),
     );
+    let mut first_run = ctx();
+    let mut second_run = ctx();
 
-    // Distinct outputs keep the run-wide recurrence ledger out of this test: it
-    // pins the adjacent-batch streak, which a failure resets.
-    for i in 0..DEFAULT_REPEAT_CALL_THRESHOLD - 1 {
-        let output = format!("before-{i}");
-        run_successful_repeat_cycle(&mw, "lookup", json!({"id": 1}), &output, None).await;
+    for (context, id) in [(&mut first_run, "first"), (&mut second_run, "second")] {
+        for attempt in 0..2 {
+            let mut result = failing_result("flaky", "same failure");
+            middleware
+                .after_tool(
+                    context,
+                    &(),
+                    &invocation(format!("{id}-{attempt}"), "flaky"),
+                    &mut result,
+                )
+                .await
+                .unwrap();
+        }
     }
-    run_successful_repeat_cycle(
-        &mw,
-        "lookup",
-        json!({"id": 1}),
-        "ok",
-        Some("temporary failure"),
-    )
-    .await;
-    for i in 0..DEFAULT_REPEAT_CALL_THRESHOLD - 1 {
-        let output = format!("after-{i}");
-        run_successful_repeat_cycle(&mw, "lookup", json!({"id": 1}), &output, None).await;
-    }
+    assert_eq!(drain_pause_count(&handle), 0);
+
+    let mut result = failing_result("flaky", "same failure");
+    middleware
+        .after_tool(
+            &mut first_run,
+            &(),
+            &invocation("first-third", "flaky"),
+            &mut result,
+        )
+        .await
+        .unwrap();
     assert_eq!(
         drain_pause_count(&handle),
-        0,
-        "a failed batch resets the successful-repeat streak"
-    );
-
-    for _ in 0..DEFAULT_REPEAT_OUTPUT_THRESHOLD + 1 {
-        run_successful_repeat_cycle(&mw, "wait_subagent", json!({"task_id": "t"}), "ok", None)
-            .await;
-    }
-    assert_eq!(
-        drain_pause_count(&handle),
-        0,
-        "polling tools remain exempt from successful-repeat halts"
-    );
-}
-
-#[tokio::test]
-async fn memory_write_without_index_read_gets_a_corrective_note() {
-    let mw = MemoryProtocolMiddleware::new();
-    let result = run_cycle(&mw, "memory_store", json!({}), "stored entry 42", None).await;
-    assert!(
-        result_text(&result).contains(MEMORY_PROTOCOL_MARKER),
-        "a write with no preceding dedupe read should be annotated: {}",
-        result_text(&result)
-    );
-    assert!(result_text(&result).contains("without first reading the memory index"));
-    assert!(result_text(&result).contains("update_memory_md"));
-    // The original tool output is preserved, guidance is appended.
-    assert!(result_text(&result).starts_with("stored entry 42"));
-}
-
-#[tokio::test]
-async fn memory_write_without_index_tool_still_gets_dedupe_guidance() {
-    let mw = MemoryProtocolMiddleware::with_index_update_tool(false);
-    let result = run_cycle(&mw, "memory_store", json!({}), "stored entry", None).await;
-    let text = result_text(&result);
-    assert!(text.contains("without first reading the memory index"));
-    assert!(!text.contains("update_memory_md"));
-
-    run_cycle(&mw, "memory_recall", json!({}), "found entry", None).await;
-    let after_read = run_cycle(&mw, "memory_store", json!({}), "stored another", None).await;
-    assert!(!result_text(&after_read).contains("update_memory_md"));
-}
-
-#[tokio::test]
-async fn full_cycle_read_then_write_then_update_only_reminds_on_the_write() {
-    let mw = MemoryProtocolMiddleware::new();
-
-    let read = run_cycle(&mw, "memory_recall", json!({}), "no dupes", None).await;
-    assert!(
-        !result_text(&read).contains(MEMORY_PROTOCOL_MARKER),
-        "a read is not annotated"
-    );
-
-    let write = run_cycle(&mw, "memory_store", json!({}), "stored", None).await;
-    assert!(result_text(&write).contains(MEMORY_PROTOCOL_MARKER));
-    // The read preceded the write, so no missing-read complaint — just the
-    // forward "sync the index" reminder.
-    assert!(!result_text(&write).contains("without first reading the memory index"));
-
-    let update = run_cycle(
-        &mw,
-        "update_memory_md",
-        json!({ "file": "MEMORY.md" }),
-        "index updated",
-        None,
-    )
-    .await;
-    assert!(
-        !result_text(&update).contains(MEMORY_PROTOCOL_MARKER),
-        "closing the cycle needs no guidance"
-    );
-}
-
-#[tokio::test]
-async fn skill_md_update_does_not_close_the_memory_cycle() {
-    let mw = MemoryProtocolMiddleware::new();
-    run_cycle(&mw, "memory_recall", json!({}), "checked", None).await;
-    run_cycle(&mw, "memory_store", json!({}), "stored", None).await;
-    // update_memory_md targeting SKILL.md must NOT reconcile the MEMORY.md
-    // index, so the stale-index warning is still owed at run end.
-    run_cycle(
-        &mw,
-        "update_memory_md",
-        json!({ "file": "SKILL.md" }),
-        "skill updated",
-        None,
-    )
-    .await;
-    let mut run = AgentRun::new();
-    // Still pending → after_agent takes its warn path without erroring.
-    mw.after_agent(&mut ctx(), &(), &mut run).await.unwrap();
-    // A following write reports drift, proving pending was not cleared.
-    let next = run_cycle(&mw, "memory_store", json!({}), "again", None).await;
-    assert!(
-        result_text(&next).contains("drifting"),
-        "SKILL.md update must not mask the stale MEMORY.md index: {}",
-        result_text(&next)
-    );
-}
-
-#[tokio::test]
-async fn consolidated_memory_tree_ingest_is_treated_as_a_write() {
-    let mw = MemoryProtocolMiddleware::new();
-    let ingest = run_cycle(
-        &mw,
-        "memory_tree",
-        json!({ "mode": "ingest_document" }),
-        "ingested",
-        None,
-    )
-    .await;
-    assert!(
-        result_text(&ingest).contains(MEMORY_PROTOCOL_MARKER),
-        "memory_tree ingest_document is a write and must be annotated: {}",
-        result_text(&ingest)
+        1,
+        "only the first run's third failure reaches its own halt threshold"
     );
 }

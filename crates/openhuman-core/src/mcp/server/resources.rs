@@ -1,8 +1,8 @@
-//! Static MCP resource catalog for bundled prompt assets.
+//! MCP resource catalog for bundled and module-owned prompt assets.
 //!
-//! Exposes `IDENTITY.md`, `SOUL.md`, `USER.md` and the `prompt.md` template
-//! for each built-in subagent as MCP resources. The content is
-//! embedded at compile time via `include_str!`.
+//! Static prompt assets are embedded at compile time via `include_str!`.
+//! The two TinyFlows archetypes are read through Copilot's `GetPrompt` bus
+//! method using the current dispatch config.
 //!
 //! ## URI scheme
 //!
@@ -11,15 +11,18 @@
 //! | `IDENTITY.md`       | `openhuman://prompts/identity`           |
 //! | `SOUL.md`           | `openhuman://prompts/soul`               |
 //! | `USER.md`           | `openhuman://prompts/user`               |
-//! | `<id>/prompt.md`    | `openhuman://prompts/agents/<id>`        |
+//! | Agent archetype    | `openhuman://prompts/agents/<id>`        |
 //!
 //! ## Catalog parity
 //!
-//! The unit test `catalog_mirrors_builtins` cross-references this catalog
-//! against `BUILTINS` in `loader.rs`. Adding a new built-in subagent without
-//! a matching catalog entry fails that test and therefore CI.
+//! The unit test `catalog_mirrors_builtins` cross-references the exposed
+//! resources against `BUILTINS` in `loader.rs`.
 
 use serde_json::{json, Value};
+use tinymcp_bus::{ResourceSpec, ToolCallError};
+
+/// Every bundled prompt is markdown.
+const MIME_TYPE: &str = "text/markdown";
 
 struct PromptResource {
     uri: &'static str,
@@ -53,118 +56,61 @@ const RESOURCE_CATALOG: &[PromptResource] = &[
         uri: "openhuman://prompts/agents/orchestrator",
         name: "orchestrator",
         description: "Chat-tier orchestrator that routes tasks to specialist subagents.",
-        content: include_str!("../../agent/registry/agents/orchestrator/prompt.md"),
-    },
-    PromptResource {
-        uri: "openhuman://prompts/agents/planner",
-        name: "planner",
-        description: "Read-only reasoning worker that decomposes and researches a question for workflow runs.",
-        content: include_str!("../../agent/registry/agents/planner/prompt.md"),
-    },
-    PromptResource {
-        uri: "openhuman://prompts/agents/critic",
-        name: "critic",
-        description: "Read-only worker that cross-checks claims and reviews changes for workflow runs.",
-        content: include_str!("../../agent/registry/agents/critic/prompt.md"),
+        content: include_str!("../../agent_registry/agents/orchestrator/prompt.md"),
     },
     PromptResource {
         uri: "openhuman://prompts/agents/vision_agent",
         name: "vision_agent",
         description: "Multimodal worker that analyses attached images for the vision tier.",
-        content: include_str!("../../agent/registry/agents/vision_agent/prompt.md"),
+        content: include_str!("../../agent_registry/agents/vision_agent/prompt.md"),
     },
     PromptResource {
         uri: "openhuman://prompts/agents/image_agent",
         name: "image_agent",
-        description: "Worker that generates or edits images via GMI and saves them to the workspace.",
-        content: include_str!("../../agent/registry/agents/image_agent/prompt.md"),
+        description: "Worker that generates or edits images via GMI and saves them to the configured Files folder.",
+        content: include_str!("../../agent_registry/agents/image_agent/prompt.md"),
     },
     PromptResource {
         uri: "openhuman://prompts/agents/video_agent",
         name: "video_agent",
-        description: "Worker that generates short videos via GMI and saves them to the workspace.",
-        content: include_str!("../../agent/registry/agents/video_agent/prompt.md"),
-    },
-    PromptResource {
-        uri: "openhuman://prompts/agents/archivist",
-        name: "archivist",
-        description: "Background worker that distils conversations into persistent memory.",
-        content: include_str!("../../agent/registry/agents/archivist/prompt.md"),
-    },
-    PromptResource {
-        uri: "openhuman://prompts/agents/goals_agent",
-        name: "goals_agent",
-        description: "Background curator that keeps the user's long-term goals list fresh.",
-        content: include_str!("../../agent/registry/agents/goals_agent/prompt.md"),
+        description: "Worker that generates short videos via GMI and saves them to the configured Files folder.",
+        content: include_str!("../../agent_registry/agents/video_agent/prompt.md"),
     },
     PromptResource {
         uri: "openhuman://prompts/agents/trigger_triage",
         name: "trigger_triage",
         description: "Read-only worker that classifies incoming automation triggers.",
-        content: include_str!("../../agent/registry/agents/trigger_triage/prompt.md"),
+        content: include_str!("../../agent_registry/agents/trigger_triage/prompt.md"),
     },
     PromptResource {
         uri: "openhuman://prompts/agents/trigger_reactor",
         name: "trigger_reactor",
         description: "Worker that executes actions in response to classified triggers.",
-        content: include_str!("../../agent/registry/agents/trigger_reactor/prompt.md"),
+        content: include_str!("../../agent_registry/agents/trigger_reactor/prompt.md"),
     },
     PromptResource {
         uri: "openhuman://prompts/agents/morning_briefing",
         name: "morning_briefing",
         description: "Read-only worker that assembles a personalised morning briefing.",
-        content: include_str!("../../agent/registry/agents/morning_briefing/prompt.md"),
+        content: include_str!("../../agent_registry/agents/morning_briefing/prompt.md"),
     },
     PromptResource {
         uri: "openhuman://prompts/agents/summarizer",
         name: "summarizer",
         description: "The extraction contract oversized tool results are summarized against.",
-        content: crate::agent::registry::agents::summarizer::prompt::ARCHETYPE,
+        content: crate::agent_registry::agents::summarizer::ARCHETYPE,
     },
     PromptResource {
         uri: "openhuman://prompts/agents/presentation_agent",
         name: "presentation_agent",
         description: "Specialist worker for evidence-grounded presentation generation.",
-        content: include_str!("../../agent/registry/agents/presentation_agent/prompt.md"),
+        content: include_str!("../../agent_registry/agents/presentation_agent/prompt.md"),
     },
     PromptResource {
         uri: "openhuman://prompts/agents/task_manager_agent",
         name: "task_manager_agent",
         description: "Specialist worker for task-source feeds, workflow bundles, and artifacts.",
-        content: include_str!("../../agent/registry/agents/task_manager_agent/prompt.md"),
-    },
-    PromptResource {
-        uri: "openhuman://prompts/agents/profile_memory_agent",
-        name: "profile_memory_agent",
-        description: "Specialist worker for profile and long-term memory updates.",
-        content: include_str!("../../agent/registry/agents/profile_memory_agent/prompt.md"),
-    },
-    #[cfg(feature = "flows")]
-    PromptResource {
-        uri: "openhuman://prompts/agents/flow_discovery",
-        name: "flow_discovery",
-        description: "Flow Scout — read-only workflow discovery agent that suggests automations from memory, threads, and integrations.",
-        content: tinyflows_copilot::prompts::FLOW_DISCOVERY,
-    },
-    #[cfg(feature = "flows")]
-    PromptResource {
-        uri: "openhuman://prompts/agents/workflow_builder",
-        name: "workflow_builder",
-        description: "Workflow authoring specialist that builds tinyflows automation graphs and returns proposals for review.",
-        content: tinyflows_copilot::prompts::WORKFLOW_BUILDER,
-    },
-    #[cfg(feature = "flows")]
-    PromptResource {
-        uri: "openhuman://prompts/agents/flow_memory_agent",
-        name: "flow_memory_agent",
-        description: "Flow Memory Agent — read-only context and memory retrieval specialist a flow's `agent` node routes to for run-time context, style, history, or people lookups.",
-        content: include_str!("../../agent/registry/agents/flow_memory_agent/prompt.md"),
-    },
-    PromptResource {
-        uri: "openhuman://prompts/agents/agent_memory",
-        name: "agent_memory",
-        description: "Dedicated memory retrieval subagent using smart-walk strategies.",
-        content: include_str!("../../memory/agent/agent/prompt.md"),
+        content: include_str!("../../agent_registry/agents/task_manager_agent/prompt.md"),
     },
     #[cfg(feature = "skills")]
     PromptResource {
@@ -175,62 +121,68 @@ const RESOURCE_CATALOG: &[PromptResource] = &[
     },
 ];
 
-/// Returns the `resources/list` result payload listing every catalog entry.
-pub fn list_resources_result() -> Value {
-    let resources: Vec<Value> = RESOURCE_CATALOG
+/// The catalog as `resources/list` advertises it.
+pub fn resource_specs() -> Vec<ResourceSpec> {
+    let resources = RESOURCE_CATALOG
         .iter()
         .map(|r| {
-            json!({
-                "uri": r.uri,
-                "name": r.name,
-                "description": r.description,
-                "mimeType": "text/markdown"
-            })
+            ResourceSpec::new(r.uri, r.name)
+                .with_description(r.description)
+                .with_mime_type(MIME_TYPE)
         })
-        .collect();
-    log::debug!("[mcp_server] resources/list count={}", resources.len());
-    json!({ "resources": resources })
-}
-
-/// Returns the `resources/templates/list` result payload.
-///
-/// The catalog is fully static — every URI is concrete, none are templated —
-/// so the response is always an empty `resourceTemplates` array. The handler
-/// exists so MCP clients that probe `resources/templates/list` after seeing
-/// the `resources` capability get a well-formed result instead of
-/// `-32601 Method not found`.
-pub fn list_resource_templates_result() -> Value {
-    log::debug!("[mcp_server] resources/templates/list count=0 (catalog is static)");
-    json!({ "resourceTemplates": [] })
-}
-
-/// Returns the `resources/read` result payload for the given URI, or a JSON-RPC
-/// error value when the URI is unknown (`-32002`) or missing (`-32602`).
-pub fn read_resource_result(params: &Value) -> Result<Value, (i64, &'static str, String)> {
-    let uri = params
-        .as_object()
-        .and_then(|obj| obj.get("uri"))
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|uri| !uri.is_empty())
-        .ok_or_else(|| {
-            (
-                -32602_i64,
-                "Invalid params",
-                "resources/read params.uri must be a non-empty string".to_string(),
+        .collect::<Vec<_>>();
+    #[cfg(feature = "flows")]
+    let resources = {
+        let mut resources = resources;
+        resources.extend([
+            ResourceSpec::new(
+                "openhuman://prompts/agents/flow_discovery",
+                "flow_discovery",
             )
-        })?;
+            .with_description(
+                "Flow Scout — read-only workflow discovery agent that suggests automations from memory, threads, and integrations.",
+            )
+            .with_mime_type(MIME_TYPE),
+            ResourceSpec::new(
+                "openhuman://prompts/agents/workflow_builder",
+                "workflow_builder",
+            )
+            .with_description(
+                "Workflow authoring specialist that builds tinyflows automation graphs and returns proposals for review.",
+            )
+            .with_mime_type(MIME_TYPE),
+        ]);
+        resources
+    };
+    log::debug!("[mcp_server] resources/list count={}", resources.len());
+    resources
+}
 
+/// The `resources/read` result for `uri`, or
+/// [`ToolCallError::ResourceNotFound`] (`-32002`) when the catalog has no such
+/// entry. TinyMCP has already rejected a missing or blank `uri`.
+pub async fn read_resource(
+    _ctx: &crate::core::runtime::DispatchCtx,
+    uri: &str,
+) -> Result<Value, ToolCallError> {
+    #[cfg(feature = "flows")]
+    if let Some(agent_id) = flow_prompt_agent_id(uri) {
+        let config = _ctx.load_config().await.map_err(|_| {
+            ToolCallError::Internal("TinyFlows prompt config is unavailable".into())
+        })?;
+        return read_flow_prompt(&config, uri, agent_id).await;
+    }
+
+    read_static_resource(uri)
+}
+
+fn read_static_resource(uri: &str) -> Result<Value, ToolCallError> {
     let resource = RESOURCE_CATALOG
         .iter()
         .find(|r| r.uri == uri)
         .ok_or_else(|| {
             log::debug!("[mcp_server] resources/read unknown uri={uri}");
-            (
-                -32002_i64,
-                "Resource not found",
-                format!("no resource with uri `{uri}`"),
-            )
+            ToolCallError::ResourceNotFound(format!("no resource with uri `{uri}`"))
         })?;
 
     log::debug!(
@@ -238,13 +190,38 @@ pub fn read_resource_result(params: &Value) -> Result<Value, (i64, &'static str,
         resource.content.len()
     );
 
-    Ok(json!({
+    Ok(resource_contents(uri, resource.content))
+}
+
+#[cfg(feature = "flows")]
+fn flow_prompt_agent_id(uri: &str) -> Option<&'static str> {
+    match uri {
+        "openhuman://prompts/agents/flow_discovery" => Some("flow_discovery"),
+        "openhuman://prompts/agents/workflow_builder" => Some("workflow_builder"),
+        _ => None,
+    }
+}
+
+#[cfg(feature = "flows")]
+async fn read_flow_prompt(
+    config: &crate::config::Config,
+    uri: &str,
+    agent_id: &str,
+) -> Result<Value, ToolCallError> {
+    let text = crate::agent::prompts::flow_archetype::fetch_prompt(config, agent_id)
+        .await
+        .map_err(|_| ToolCallError::Internal("TinyFlows prompt is unavailable".into()))?;
+    Ok(resource_contents(uri, &text))
+}
+
+fn resource_contents(uri: &str, text: &str) -> Value {
+    json!({
         "contents": [{
-            "uri": resource.uri,
-            "mimeType": "text/markdown",
-            "text": resource.content
+            "uri": uri,
+            "mimeType": MIME_TYPE,
+            "text": text
         }]
-    }))
+    })
 }
 
 #[cfg(test)]

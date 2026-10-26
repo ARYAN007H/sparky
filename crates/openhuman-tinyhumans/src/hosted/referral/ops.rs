@@ -7,18 +7,18 @@
 use serde_json::Value;
 use tinyhumans_sdk::api::types::ClaimReferralRequest;
 
-use openhuman_core::config::Config;
-use openhuman_core::rpc::RpcOutcome;
+use openhuman_embed::__host::config::Config;
+use openhuman_embed::__host::core::Outcome;
 
 use crate::hosted::client::HostedClient;
 
-pub async fn get_stats(config: &Config) -> Result<RpcOutcome<Value>, String> {
+pub async fn get_stats(config: &Config) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "GET /referral/stats",
         client.sdk().referral().get_referral_stats().await,
     )?;
-    Ok(RpcOutcome::single_log(
+    Ok(Outcome::single_log(
         data,
         "referral stats fetched from backend GET /referral/stats",
     ))
@@ -28,7 +28,7 @@ pub async fn claim_referral(
     config: &Config,
     code: &str,
     device_fingerprint: Option<&str>,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let request = ClaimReferralRequest {
         code: code.trim().to_string(),
@@ -41,7 +41,7 @@ pub async fn claim_referral(
         "POST /referral/claim",
         client.sdk().referral().claim_referral(&request).await,
     )?;
-    Ok(RpcOutcome::single_log(
+    Ok(Outcome::single_log(
         data,
         "referral claim accepted by backend POST /referral/claim",
     ))

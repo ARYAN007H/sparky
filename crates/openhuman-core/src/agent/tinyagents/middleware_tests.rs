@@ -1,34 +1,28 @@
 use super::approval::approval_tool_name;
-use super::artifact_index_toc::NO_WINDOW_ALLOWANCE;
-use super::message_trim::{estimate_message_tokens, estimate_text_tokens, IMAGE_MARKER_TOKEN_COST};
-use super::repeated_failure::{is_body_level_failure, user_actionable_escalation};
+use super::repeated_failure::is_body_level_failure;
 use super::tool_output::{
     is_compaction_exempt, is_truncation_exempt, COMPACTION_EXEMPT_TOOLS, SAMPLING_TOOLS,
 };
-use super::turn_context::DEFAULT_TOOL_RESULT_BUDGET_BYTES;
-use super::*;
+use crate::agent::tinyagents::middleware::repeated_failure::RepeatedToolFailureMiddleware;
+use crate::agent::tinyagents::middleware::tool_outcome_capture::ToolOutcomeCaptureMiddleware;
 use crate::agent::tinyagents::middleware::tool_output::ToolOutputMiddleware;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tinyagents_harness::config::TurnConfig;
 
 use async_trait::async_trait;
 
-use tinyagents_harness::middleware::{AgentRun, BudgetTracker, Middleware, ToolInvocationIdentity};
+use tinyagents_harness::middleware::{AgentRun, Middleware, ToolInvocationIdentity};
 use tinyagents_harness::steering::{SteeringCommand, SteeringHandle};
-use tinyinference_llm::message::{ContentBlock, Message as TaMessage};
-use tinyinference_llm::model::{ModelResponse, SegmentRole};
-use tinyinference_llm::tool::{ToolCall as TaToolCall, ToolSchema};
+use tinyinference_llm::message::Message as TaMessage;
+use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::{ToolPolicy as TaToolPolicy, ToolResult as TaToolResult};
 
-use crate::agent::context::CLEARED_PLACEHOLDER;
-use crate::agent::tinyagents::payload_summarizer::PayloadSummarizer;
-use crate::inference::tokenjuice::AgentTokenjuiceCompression;
+use crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer;
 use tinyagents_harness::context::{RunConfig, RunContext};
-use tinyagents_harness::no_progress::{
-    DEFAULT_REPEAT_CALL_THRESHOLD, DEFAULT_REPEAT_OUTPUT_THRESHOLD,
-};
 use tinyinference_llm::model::ModelRequest;
+use tinyjuice_bus::types::AgentTokenjuiceCompression;
 use tinytools::Tool;
 
 fn ctx() -> RunContext<crate::agent::tinyagents::host::OpenHumanRunContext> {
@@ -68,7 +62,14 @@ impl StubSummarizer {
     }
 }
 
-impl PayloadSummarizer for StubSummarizer {
+impl
+    tinyagents_harness::summarization::payload_summarizer::PayloadSummarizer<
+        crate::agent::tinyagents::host::OpenHumanRunContext,
+    > for StubSummarizer
+{
+    type Prepared = crate::inference::tokenjuice::generate::PreparedGenerate;
+    type Error = anyhow::Error;
+
     fn prepare(
         &self,
         _parent_ctx: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
@@ -92,7 +93,7 @@ fn summarizing_config() -> Arc<crate::config::Config> {
     Arc::new(config)
 }
 
-fn summarizer_mw(ps: Arc<dyn PayloadSummarizer>) -> ToolOutputMiddleware {
+fn summarizer_mw(ps: Arc<DynPayloadSummarizer>) -> ToolOutputMiddleware {
     ToolOutputMiddleware {
         // Large enough that the byte-budget backstop never fires, so these
         // tests observe the summary stage alone.
@@ -100,7 +101,7 @@ fn summarizer_mw(ps: Arc<dyn PayloadSummarizer>) -> ToolOutputMiddleware {
         payload_summarizer: Some(ps),
         artifact_store: None,
         tokenjuice_compaction_enabled: false,
-        tokenjuice_compression: crate::inference::tokenjuice::AgentTokenjuiceCompression::Full,
+        tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Full,
         runtime_config: Some(summarizing_config()),
         tool_policies: HashMap::new(),
         artifact_reads: Default::default(),
@@ -108,16 +109,14 @@ fn summarizer_mw(ps: Arc<dyn PayloadSummarizer>) -> ToolOutputMiddleware {
         // `web_fetch` declares `summary_focus` in production.
         summary_focus_tools: ["web_fetch".to_string()].into(),
         raw_fetches: Default::default(),
+        file_reads: Default::default(),
     }
 }
 
 /// Run `fut` against a stubbed TinyJuice module, returning what it was sent.
 async fn with_module<F: std::future::Future>(
     fut: F,
-) -> (
-    F::Output,
-    Vec<crate::inference::tokenjuice::types::CompactRequest>,
-) {
+) -> (F::Output, Vec<tinyjuice_bus::wire::CompactRequest>) {
     use crate::inference::tokenjuice::module_stub;
     let recorded = Arc::new(std::sync::Mutex::new(Vec::new()));
     let output = module_stub::with_stub(module_stub::summarizing(recorded.clone()), fut).await;
@@ -222,6 +221,7 @@ fn compaction_enabled_mw() -> ToolOutputMiddleware {
         focus_by_call: Default::default(),
         summary_focus_tools: Default::default(),
         raw_fetches: Default::default(),
+        file_reads: Default::default(),
     }
 }
 
@@ -229,7 +229,7 @@ fn compaction_enabled_mw() -> ToolOutputMiddleware {
 
 /// A `workflow_proposal` payload with `node_count` nodes, each padded with
 /// a 500-byte `note`, so the caller can force the serialized size past the
-/// ~16 KiB shared byte-budget backstop (`DEFAULT_TOOL_RESULT_BUDGET_BYTES`)
+/// ~16 KiB configured byte-budget backstop
 /// — the size class a real ≥10-node graph proposal routinely reaches, and
 /// exactly what used to get UTF-8-boundary-truncated into unparseable JSON
 /// before the truncation exemption existed.
@@ -256,13 +256,13 @@ fn oversized_workflow_proposal_json(node_count: usize) -> String {
 }
 
 /// Middleware config isolating the byte-cap stages (3+4): tokenjuice off,
-/// no tool-declared char cap, the real `DEFAULT_TOOL_RESULT_BUDGET_BYTES`
-/// (~16 KiB) as the shared backstop, and no artifact store (so an
+/// no tool-declared char cap, the configured default (~16 KiB) as the shared
+/// backstop, and no artifact store (so an
 /// over-budget non-exempt tool falls straight to inline truncation instead
 /// of being persisted — deterministic to assert on).
 fn truncation_probe_mw() -> ToolOutputMiddleware {
     ToolOutputMiddleware {
-        budget_bytes: DEFAULT_TOOL_RESULT_BUDGET_BYTES,
+        budget_bytes: TurnConfig::default().tool_result_budget_bytes,
         payload_summarizer: None,
         artifact_store: None,
         tokenjuice_compaction_enabled: false,
@@ -273,6 +273,7 @@ fn truncation_probe_mw() -> ToolOutputMiddleware {
         focus_by_call: Default::default(),
         summary_focus_tools: Default::default(),
         raw_fetches: Default::default(),
+        file_reads: Default::default(),
     }
 }
 
@@ -318,8 +319,30 @@ fn drain_pause_count(handle: &SteeringHandle) -> usize {
 
 /// Collect the nudge texts queued for the next model request. Nudges are
 /// request-scoped (#6725): they never ride a steering command.
-fn drain_nudge_messages(mw: &RepeatedToolFailureMiddleware) -> Vec<String> {
-    mw.take_pending_nudges()
+async fn drain_nudge_messages(
+    mw: &RepeatedToolFailureMiddleware,
+    context: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+) -> Vec<String> {
+    let injector = mw.nudge_injector();
+    let mut request = ModelRequest {
+        messages: vec![TaMessage::user("request")],
+        ..Default::default()
+    };
+    injector
+        .before_model_dispatch(context, &(), &mut request)
+        .await
+        .expect("queued correction is injected into the model request");
+    let messages = request
+        .messages
+        .iter()
+        .skip(1)
+        .map(|message| message.text().to_owned())
+        .collect();
+    injector
+        .after_model_dispatch(context, &(), true)
+        .await
+        .expect("request delivery consumes the staged correction");
+    messages
 }
 
 // ── RepeatedToolFailureMiddleware body-level ok:false (flows breaker) ────
@@ -335,154 +358,26 @@ fn body_failure_result(name: &str, extra: serde_json::Value) -> TaToolResult {
     tool_result(name, &serde_json::to_string_pretty(&body).unwrap())
 }
 
-// ── RepeatProgressMiddleware / crate SuccessfulRepeatTracker ───────────
-
-fn repeated_success_response(tool: &str, args: serde_json::Value) -> ModelResponse {
-    ModelResponse {
-        message: tinyinference_llm::message::AssistantMessage {
-            id: None,
-            content: vec![ContentBlock::Text("working".to_string())],
-            tool_calls: vec![TaToolCall::new("repeat-1", tool, args)],
-            usage: None,
-            origin: None,
-        },
-        usage: None,
-        finish_reason: Some("tool_calls".to_string()),
-        raw: None,
-        resolved_model: None,
-        continue_turn: None,
-        served_from_cache: false,
-        correlation: None,
-        resolved_route: None,
-    }
-}
-
-async fn run_successful_repeat_cycle(
-    mw: &RepeatProgressMiddleware,
-    tool: &str,
-    args: serde_json::Value,
-    output: &str,
-    error: Option<&str>,
-) {
-    let mut response = repeated_success_response(tool, args);
-    mw.after_model(&mut ctx(), &(), &mut response)
-        .await
-        .unwrap();
-    let mut result = match error {
-        Some(error) => TaToolResult::error(error),
-        None => tool_result(tool, output),
-    };
-    let invocation = ToolInvocationIdentity::new("repeat-1", tool);
-    mw.after_tool(&mut ctx(), &(), &invocation, &mut result)
-        .await
-        .unwrap();
-}
-
-// ── MemoryProtocolMiddleware (issue #4116) ──────────────────────────────
-
-use crate::agent::harness::memory_protocol::MEMORY_PROTOCOL_MARKER;
-
-/// Drive one full tool cycle through the middleware: `before_tool` (captures
-/// the arguments the result won't carry) then `after_tool`, correlated by a
-/// shared call id. Returns the (possibly annotated) result.
-async fn run_cycle(
-    mw: &MemoryProtocolMiddleware,
-    name: &str,
-    args: serde_json::Value,
-    content: &str,
-    error: Option<&str>,
-) -> TaToolResult {
-    let mut call = TaToolCall {
-        id: "c1".into(),
-        name: name.into(),
-        arguments: args,
-        invalid: None,
-    };
-    mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
-    let mut result = match error {
-        Some(error) => TaToolResult::error(error),
-        None => tool_result(name, content),
-    };
-    let invocation = ToolInvocationIdentity::new("c1", name);
-    mw.after_tool(&mut ctx(), &(), &invocation, &mut result)
-        .await
-        .unwrap();
-    result
-}
-
-// ── EmbedderToolHooksMiddleware ──────────────────────────────────────────
-
-/// Records lifecycle notifications for a test hook, optionally vetoing every
-/// pre-tool call so the veto path can be exercised.
-struct RecordingToolHook {
-    name: &'static str,
-    pre: std::sync::Arc<std::sync::Mutex<Vec<(String, serde_json::Value)>>>,
-    post: std::sync::Arc<
-        std::sync::Mutex<Vec<(String, serde_json::Value, Option<bool>, Option<u64>)>>,
-    >,
-    veto: bool,
-}
-
-#[async_trait]
-impl crate::agent::hooks::ToolHook for RecordingToolHook {
-    fn name(&self) -> &str {
-        self.name
-    }
-    async fn before_tool(
-        &self,
-        context: &crate::agent::hooks::ToolHookContext,
-    ) -> anyhow::Result<()> {
-        self.pre
-            .lock()
-            .unwrap()
-            .push((context.tool_name.clone(), context.arguments.clone()));
-        if self.veto {
-            anyhow::bail!("vetoed by test hook");
-        }
-        Ok(())
-    }
-    async fn after_tool(
-        &self,
-        context: &crate::agent::hooks::ToolHookContext,
-    ) -> anyhow::Result<()> {
-        self.post.lock().unwrap().push((
-            context.tool_name.clone(),
-            context.arguments.clone(),
-            context.success,
-            context.duration_ms,
-        ));
-        Ok(())
-    }
-}
-
-fn embedder_hook_mw(
-    pre: std::sync::Arc<std::sync::Mutex<Vec<(String, serde_json::Value)>>>,
-    post: std::sync::Arc<
-        std::sync::Mutex<Vec<(String, serde_json::Value, Option<bool>, Option<u64>)>>,
-    >,
-    veto: bool,
-) -> EmbedderToolHooksMiddleware {
-    EmbedderToolHooksMiddleware::new(vec![std::sync::Arc::new(RecordingToolHook {
-        name: "recording",
-        pre,
-        post,
-        veto,
-    })])
-}
-
 #[path = "middleware_approval_guard_tests.rs"]
 mod approval_guard_tests;
+#[path = "middleware_classified_failure_fetch_tests.rs"]
+mod classified_failure_fetch_tests;
 #[path = "middleware_classified_failure_tests.rs"]
 mod classified_failure_tests;
+#[path = "middleware_command_exit_failure_tests.rs"]
+mod command_exit_failure_tests;
+#[path = "middleware_failure_effect_tests.rs"]
+mod failure_effect_tests;
+#[path = "middleware_failure_policy_class_tests.rs"]
+mod failure_policy_class_tests;
 #[path = "middleware_loop_guard_tests.rs"]
 mod loop_guard_tests;
-#[path = "middleware_prompt_cache_tests.rs"]
-mod prompt_cache_tests;
-#[path = "middleware_repeat_progress_tests.rs"]
-mod repeat_progress_tests;
-
-#[path = "middleware_research_budget_tests.rs"]
-mod research_budget_tests;
+#[path = "middleware_memory_budget_tests.rs"]
+mod memory_budget_tests;
+#[path = "middleware_stop_cause_tests.rs"]
+mod stop_cause_tests;
+#[path = "middleware_terminal_inference_halt_tests.rs"]
+mod terminal_inference_halt_tests;
 
 #[path = "middleware_tool_output_artifact_tests.rs"]
 mod tool_output_artifact_tests;
@@ -490,7 +385,3 @@ mod tool_output_artifact_tests;
 mod tool_output_tests;
 #[path = "middleware_tool_policy_tests.rs"]
 mod tool_policy_tests;
-#[path = "middleware_wrap_up_final_write_tests.rs"]
-mod wrap_up_final_write_tests;
-#[path = "middleware_wrap_up_toc_tests.rs"]
-mod wrap_up_toc_tests;

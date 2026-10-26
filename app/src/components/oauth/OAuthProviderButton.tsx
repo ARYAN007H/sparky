@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useT } from '../../lib/i18n/I18nContext';
 import { checkBackendHealthy } from '../../services/backendHealth';
 import {
+  beginAwaitingAuthCallback,
   beginDeepLinkAuthProcessing,
   completeDeepLinkAuthProcessing,
+  endAwaitingAuthCallback,
   getDeepLinkAuthState,
 } from '../../store/deepLinkAuthState';
 import type { OAuthProviderConfig } from '../../types/oauth';
@@ -15,12 +17,23 @@ import { startLoopbackOauthListener } from '../../utils/loopbackOauthListener';
 import { prepareOAuthLoginLaunch } from '../../utils/oauthAppVersionGate';
 import { openUrl } from '../../utils/openUrl';
 import { isTauri } from '../../utils/tauriCommands';
+import {
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogRoot,
+  AlertDialogTitle,
+} from '../ui/AlertDialog';
 
 interface OAuthProviderButtonProps {
   provider: OAuthProviderConfig;
   className?: string;
   disabled?: boolean;
   onClickOverride?: () => void;
+  /** Local profile whose data will remain on this device after cloud sign-in. */
+  localProfileId?: string | null;
 }
 
 // Reset the loading state if the OAuth round-trip never completes — covers
@@ -108,10 +121,12 @@ const OAuthProviderButton = ({
   className = '',
   disabled: externalDisabled = false,
   onClickOverride,
+  localProfileId,
 }: OAuthProviderButtonProps) => {
   const { t } = useT();
   const [isLoading, setIsLoading] = useState(false);
   const [startupError, setStartupError] = useState<string | null>(null);
+  const [confirmProfileSwitch, setConfirmProfileSwitch] = useState(false);
   // Tracks whether the user actually got dispatched to the system browser on
   // this attempt. Lets the focus/visibility handlers distinguish "user came
   // back from the browser" (probe for backend health) from "click never even
@@ -190,8 +205,13 @@ const OAuthProviderButton = ({
     const timer = window.setTimeout(() => {
       log('[%s] timeout -> reset isLoading', provider.id);
       reset();
-      // 90s with no deep-link is a strong "something went wrong" signal even
-      // if the user never refocused the app. Probe so we can attribute it.
+      // Stop holding the hand-off screen: after this long the browser is not
+      // coming back on its own, and a spinner with no end is worse than a
+      // screen that says so.
+      endAwaitingAuthCallback();
+      // Five minutes with no deep-link is a strong "something went wrong"
+      // signal even if the user never refocused the app. Probe so we can
+      // attribute it.
       probeBackendOnReturn('timeout');
     }, OAUTH_LOADING_TIMEOUT_MS);
 
@@ -205,7 +225,7 @@ const OAuthProviderButton = ({
     };
   }, [isLoading, provider.id]);
 
-  const handleOAuthLogin = async () => {
+  const startOAuthLogin = async () => {
     if (onClickOverride) {
       onClickOverride();
       return;
@@ -340,7 +360,12 @@ const OAuthProviderButton = ({
         window.location.href = loginUrl;
       }
       browserOpenedRef.current = true;
+      // The launch step is done, but the sign-in is not: the user is now in
+      // another window. Mark that explicitly so the UI can hold a hand-off
+      // screen until the callback lands, instead of snapping back to the
+      // sign-in buttons a second after the browser opens.
       completeDeepLinkAuthProcessing();
+      beginAwaitingAuthCallback();
     } catch (error) {
       completeDeepLinkAuthProcessing();
       const message = getOAuthStartupFailureMessage(provider, error);
@@ -353,6 +378,14 @@ const OAuthProviderButton = ({
       setStartupError(message);
       setIsLoading(false);
     }
+  };
+
+  const handleOAuthLogin = async () => {
+    if (localProfileId?.startsWith('local-')) {
+      setConfirmProfileSwitch(true);
+      return;
+    }
+    await startOAuthLogin();
   };
 
   const isDisabled = externalDisabled || isLoading;
@@ -378,6 +411,26 @@ const OAuthProviderButton = ({
           {startupError}
         </p>
       ) : null}
+      <AlertDialogRoot open={confirmProfileSwitch} onOpenChange={setConfirmProfileSwitch}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogTitle>{t('auth.profileSwitch.title')}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t('auth.profileSwitch.body').replace('{profileId}', localProfileId ?? '')}
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              tone="default"
+              onClick={event => {
+                event.preventDefault();
+                setConfirmProfileSwitch(false);
+                void startOAuthLogin();
+              }}>
+              {t('auth.profileSwitch.continue')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialogRoot>
     </div>
   );
 };

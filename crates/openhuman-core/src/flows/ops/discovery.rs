@@ -1,4 +1,15 @@
 use super::*;
+use crate::core::runtime::DispatchCtx;
+
+/// Persist suggestions received through the Copilot bus's portable wire shape.
+pub(crate) fn flows_suggestions_upsert_from_copilot(
+    config: &Config,
+    suggestions: Value,
+) -> Result<usize, String> {
+    let suggestions: Vec<FlowSuggestion> = serde_json::from_value(suggestions)
+        .map_err(|error| format!("invalid Copilot suggestions: {error}"))?;
+    store::upsert_suggestions(config, &suggestions).map_err(|error| error.to_string())
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Flow Scout — workflow discovery + suggestion lifecycle
@@ -36,11 +47,12 @@ const FLOW_DISCOVER_PROMPT: &str = "Discover the most useful automations you cou
 /// Turning a suggestion into a real flow is the user's separate "Build this"
 /// action, which routes to `workflow_builder`.
 pub async fn flows_discover(
+    ctx: &DispatchCtx,
     config: &Config,
     stream: Option<FlowStreamTarget>,
-) -> Result<RpcOutcome<Vec<FlowSuggestion>>, String> {
-    use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
+) -> Result<Outcome<Vec<FlowSuggestion>>, String> {
     use crate::agent::OpenHumanSessionHost;
+    use crate::security::turn_origin::{with_origin, AgentTurnOrigin};
 
     tracing::info!(
         target: "flows",
@@ -51,10 +63,12 @@ pub async fn flows_discover(
     // The registry must be initialised before building a named builtin agent
     // (mirrors `agent_registry::ops::available_tools`); it is idempotent, so a
     // second call from an already-booted core is a cheap no-op.
-    crate::agent::harness::AgentDefinitionRegistry::init_global(&config.workspace_dir)
-        .map_err(|e| format!("failed to initialise agent registry: {e}"))?;
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
+        &config.workspace_dir,
+    )
+    .map_err(|e| format!("failed to initialise agent registry: {e}"))?;
 
-    let mut agent = OpenHumanSessionHost::from_config_for_agent(config, "flow_discovery")
+    let mut agent = OpenHumanSessionHost::from_config_for_agent(ctx, config, "flow_discovery")
         .map_err(|e| format!("failed to build flow_discovery agent: {e:#}"))?;
     agent.set_agent_definition_name("flow_discovery".to_string());
 
@@ -62,7 +76,7 @@ pub async fn flows_discover(
     // an interactive turn (see `FlowStreamTarget`). Best-effort — with no target
     // the run stays headless, exactly as before.
     if let Some(target) = &stream {
-        attach_flow_progress_bridge(&mut agent, target, "flows_discover", config);
+        attach_flow_progress_bridge(ctx, &mut agent, target, "flows_discover", config);
         agent.set_thread_id(Some(target.thread_id.as_str()));
     }
 
@@ -106,7 +120,7 @@ pub async fn flows_discover(
     // Emit the terminal chat event so a client viewing the thread finalizes the
     // assistant bubble instead of spinning (the bridge only streams deltas).
     if let Some(target) = &stream {
-        finalize_flow_stream(target, &outcome, FLOW_DISCOVER_PROMPT).await;
+        finalize_flow_stream(ctx, target, &outcome, FLOW_DISCOVER_PROMPT, config).await;
     }
 
     let suggestions = store::list_suggestions(config, Some(SuggestionStatus::New), 50)
@@ -116,10 +130,7 @@ pub async fn flows_discover(
         count = suggestions.len(),
         "[flows] flows_discover: returning active suggestions"
     );
-    Ok(RpcOutcome::single_log(
-        suggestions,
-        "flow discovery complete",
-    ))
+    Ok(Outcome::single_log(suggestions, "flow discovery complete"))
 }
 
 /// Lists persisted workflow suggestions. `status` filters to one lifecycle
@@ -128,20 +139,17 @@ pub async fn flows_discover(
 pub async fn flows_list_suggestions(
     config: &Config,
     status: Option<SuggestionStatus>,
-) -> Result<RpcOutcome<Vec<FlowSuggestion>>, String> {
+) -> Result<Outcome<Vec<FlowSuggestion>>, String> {
     let suggestions = store::list_suggestions(config, status, 100).map_err(|e| e.to_string())?;
-    Ok(RpcOutcome::single_log(suggestions, "suggestions listed"))
+    Ok(Outcome::single_log(suggestions, "suggestions listed"))
 }
 
 /// Marks a suggestion `dismissed` (the user rejected the card). The row is kept
 /// so a later discovery run dedupes against it and won't re-surface the idea.
-pub async fn flows_dismiss_suggestion(
-    config: &Config,
-    id: &str,
-) -> Result<RpcOutcome<Value>, String> {
+pub async fn flows_dismiss_suggestion(config: &Config, id: &str) -> Result<Outcome<Value>, String> {
     let found = store::set_suggestion_status(config, id, SuggestionStatus::Dismissed)
         .map_err(|e| e.to_string())?;
-    Ok(RpcOutcome::single_log(
+    Ok(Outcome::single_log(
         json!({ "id": id, "dismissed": found }),
         "suggestion dismissed",
     ))
@@ -152,10 +160,10 @@ pub async fn flows_dismiss_suggestion(
 pub async fn flows_mark_suggestion_built(
     config: &Config,
     id: &str,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     let found = store::set_suggestion_status(config, id, SuggestionStatus::Built)
         .map_err(|e| e.to_string())?;
-    Ok(RpcOutcome::single_log(
+    Ok(Outcome::single_log(
         json!({ "id": id, "built": found }),
         "suggestion marked built",
     ))

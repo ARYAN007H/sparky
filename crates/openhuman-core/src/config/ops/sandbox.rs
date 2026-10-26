@@ -1,9 +1,10 @@
 //! Sandbox / Docker runtime config operations.
 
 use crate::config::Config;
-use crate::rpc::RpcOutcome;
+use crate::core::runtime::DispatchCtx;
+use crate::core::Outcome;
 
-use super::loader::{load_config_with_timeout, snapshot_config_json};
+use super::loader::snapshot_config_json;
 
 /// Partial update for the `[security.sandbox]` + `[runtime.docker]` blocks.
 #[derive(Debug, Clone, Default)]
@@ -16,12 +17,19 @@ pub struct SandboxSettingsPatch {
     pub env_passthrough: Option<Vec<String>>,
 }
 
-pub async fn get_sandbox_settings() -> Result<RpcOutcome<serde_json::Value>, String> {
-    let config = load_config_with_timeout().await?;
+pub async fn get_sandbox_settings(ctx: &DispatchCtx) -> Result<Outcome<serde_json::Value>, String> {
+    let config = ctx.load_config().await?;
     let sandbox = &config.sandbox;
     let docker = &config.runtime.docker;
 
-    let docker_available = is_docker_available().await;
+    // The daemon probe has no timeout of its own; bound it so a wedged
+    // daemon cannot hang the settings read.
+    let docker_available = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        crate::sandbox::docker::is_docker_available(&config),
+    )
+    .await
+    .map_err(|_| "Docker status probe timed out".to_owned())??;
 
     let backend_str = match sandbox.backend {
         crate::config::SandboxBackend::Auto => "auto",
@@ -35,7 +43,8 @@ pub async fn get_sandbox_settings() -> Result<RpcOutcome<serde_json::Value>, Str
     let detected_backend = detect_os_sandbox_backend();
 
     let value = serde_json::json!({
-        "enabled": sandbox.enabled.unwrap_or(true),
+        "enabled": sandbox.enabled.unwrap_or(true)
+            && crate::core::runtime::ComponentSet::from_config(&config.components).sandbox,
         "backend": backend_str,
         "docker_image": docker.image,
         "docker_memory_limit_mb": docker.memory_limit_mb,
@@ -44,14 +53,16 @@ pub async fn get_sandbox_settings() -> Result<RpcOutcome<serde_json::Value>, Str
         "detected_backend": detected_backend,
         "env_passthrough": crate::sandbox::ops::SANDBOX_ENV_PASSTHROUGH,
     });
-    log::debug!("[config][sandbox] get_sandbox_settings: backend={backend_str}, docker_available={docker_available}");
-    Ok(RpcOutcome::single_log(value, "sandbox settings read"))
+    log::debug!(
+        "[config][sandbox] get_sandbox_settings: backend={backend_str}, docker_available={docker_available}"
+    );
+    Ok(Outcome::single_log(value, "sandbox settings read"))
 }
 
 pub async fn apply_sandbox_settings(
     config: &mut Config,
     update: SandboxSettingsPatch,
-) -> Result<RpcOutcome<serde_json::Value>, String> {
+) -> Result<Outcome<serde_json::Value>, String> {
     if let Some(ref backend) = update.backend {
         config.sandbox.backend = match backend.as_str() {
             "auto" => crate::config::SandboxBackend::Auto,
@@ -94,14 +105,14 @@ pub async fn apply_sandbox_settings(
         );
     }
 
-    config.save().await.map_err(|e| e.to_string())?;
+    config.save().await.map_err(super::config_save_error)?;
 
     log::debug!(
         "[config][sandbox] sandbox settings saved to {}",
         config.config_path.display()
     );
     let snapshot = snapshot_config_json(config)?;
-    Ok(RpcOutcome::new(
+    Ok(Outcome::new(
         snapshot,
         vec![format!(
             "sandbox settings saved to {}",
@@ -111,22 +122,11 @@ pub async fn apply_sandbox_settings(
 }
 
 pub async fn load_and_apply_sandbox_settings(
+    ctx: &DispatchCtx,
     update: SandboxSettingsPatch,
-) -> Result<RpcOutcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout().await?;
+) -> Result<Outcome<serde_json::Value>, String> {
+    let mut config = ctx.load_config().await?;
     apply_sandbox_settings(&mut config, update).await
-}
-
-async fn is_docker_available() -> bool {
-    let fut = tokio::process::Command::new("docker")
-        .arg("info")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status();
-    match tokio::time::timeout(std::time::Duration::from_secs(5), fut).await {
-        Ok(Ok(status)) => status.success(),
-        _ => false,
-    }
 }
 
 fn detect_os_sandbox_backend() -> &'static str {

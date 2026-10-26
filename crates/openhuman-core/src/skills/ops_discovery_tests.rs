@@ -1,101 +1,6 @@
 use super::*;
 
 #[test]
-fn init_skills_dir_creates_dir_and_readme() {
-    let dir = tempfile::tempdir().unwrap();
-    init_workflows_dir(dir.path()).unwrap();
-    let skills_dir = dir.path().join("skills");
-    assert!(skills_dir.is_dir());
-    let readme = skills_dir.join("README.md");
-    assert!(readme.exists());
-}
-
-#[test]
-fn load_skills_legacy_json_still_works() {
-    let dir = tempfile::tempdir().unwrap();
-    init_workflows_dir(dir.path()).unwrap();
-    let skill_dir = dir.path().join("skills").join("my-skill");
-    std::fs::create_dir_all(&skill_dir).unwrap();
-    write(
-        &skill_dir.join("skill.json"),
-        r#"{"name":"My Workflow","description":"A test","version":"1.0"}"#,
-    );
-    let skills = load_skills_ws(dir.path());
-    assert_eq!(skills.len(), 1);
-    assert_eq!(skills[0].name, "My Workflow");
-    assert_eq!(skills[0].description, "A test");
-    assert!(skills[0].legacy);
-    assert_eq!(skills[0].scope, WorkflowScope::Legacy);
-}
-
-#[test]
-fn load_skills_parses_skill_md_frontmatter() {
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    // Trust marker enables project-scope loading.
-    write(&ws.join(".openhuman").join("trust"), "");
-    let skill_dir = ws.join(".openhuman").join("skills").join("hello-world");
-    write(
-        &skill_dir.join("SKILL.md"),
-        "---\nname: hello-world\ndescription: Say hi\nmetadata:\n  version: 0.1.0\n  tags: [demo, greeting]\n---\n\nSay hello to the user.\n",
-    );
-    let skills = load_skills_ws(ws);
-    assert_eq!(skills.len(), 1);
-    let s = &skills[0];
-    assert_eq!(s.name, "hello-world");
-    assert_eq!(s.description, "Say hi");
-    assert_eq!(s.version, "0.1.0");
-    assert_eq!(s.tags, vec!["demo", "greeting"]);
-    assert_eq!(s.scope, WorkflowScope::Project);
-    assert!(!s.legacy);
-    assert!(s.warnings.is_empty(), "warnings: {:?}", s.warnings);
-}
-
-#[test]
-fn deprecated_top_level_fields_load_with_migration_warning() {
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    write(&ws.join(".openhuman").join("trust"), "");
-    let skill_dir = ws.join(".openhuman").join("skills").join("legacy-fm");
-    write(
-        &skill_dir.join("SKILL.md"),
-        "---\nname: legacy-fm\ndescription: uses deprecated top-level fields\nversion: 0.2.0\nauthor: Jane\ntags: [old, school]\n---\n",
-    );
-    let skills = load_skills_ws(ws);
-    assert_eq!(skills.len(), 1);
-    let s = &skills[0];
-    assert_eq!(s.version, "0.2.0");
-    assert_eq!(s.author.as_deref(), Some("Jane"));
-    assert_eq!(s.tags, vec!["old", "school"]);
-    let warnings = s.warnings.join("\n");
-    assert!(warnings.contains("'version' is deprecated"), "{}", warnings);
-    assert!(warnings.contains("'author' is deprecated"), "{}", warnings);
-    assert!(warnings.contains("'tags' is deprecated"), "{}", warnings);
-}
-
-#[test]
-fn spec_compliant_fields_parse_into_metadata_map() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("SKILL.md");
-    write(
-        &path,
-        "---\nname: s\ndescription: d\nlicense: MIT\ncompatibility: \"node>=18\"\nmetadata:\n  version: 1.0.0\n  author: Alice\n  tags: [a, b]\n---\n",
-    );
-    let (fm, _body, _warnings) = parse_workflow_md(&path).unwrap();
-    assert_eq!(fm.license.as_deref(), Some("MIT"));
-    assert_eq!(fm.compatibility.as_deref(), Some("node>=18"));
-    assert_eq!(
-        fm.metadata.get("version").and_then(|v| v.as_str()),
-        Some("1.0.0")
-    );
-    assert_eq!(
-        fm.metadata.get("author").and_then(|v| v.as_str()),
-        Some("Alice")
-    );
-    assert!(fm.extra.is_empty(), "extras leaked: {:?}", fm.extra);
-}
-
-#[test]
 fn project_skills_skipped_when_not_trusted() {
     let dir = tempfile::tempdir().unwrap();
     let ws = dir.path();
@@ -107,58 +12,6 @@ fn project_skills_skipped_when_not_trusted() {
     );
     let skills = load_skills_ws(ws);
     assert!(skills.is_empty(), "got {skills:?}");
-}
-
-#[test]
-fn frontmatter_missing_name_warns_and_falls_back() {
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    write(&ws.join(".openhuman").join("trust"), "");
-    let skill_dir = ws.join(".openhuman").join("skills").join("mystery");
-    write(
-        &skill_dir.join("SKILL.md"),
-        "---\ndescription: no name here\n---\n\nbody\n",
-    );
-    let skills = load_skills_ws(ws);
-    assert_eq!(skills.len(), 1);
-    assert_eq!(skills[0].name, "mystery");
-    assert!(skills[0]
-        .warnings
-        .iter()
-        .any(|w| w.contains("missing 'name'")));
-}
-
-#[test]
-fn frontmatter_missing_description_uses_first_body_line() {
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    write(&ws.join(".openhuman").join("trust"), "");
-    let skill_dir = ws.join(".openhuman").join("skills").join("s");
-    write(
-        &skill_dir.join("SKILL.md"),
-        "---\nname: s\n---\n\n# Heading\n\nActual first line.\n",
-    );
-    let skills = load_skills_ws(ws);
-    assert_eq!(skills[0].description, "Actual first line.");
-}
-
-#[test]
-fn directory_name_mismatch_warns_but_loads() {
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    write(&ws.join(".openhuman").join("trust"), "");
-    let skill_dir = ws.join(".openhuman").join("skills").join("dir-name");
-    write(
-        &skill_dir.join("SKILL.md"),
-        "---\nname: other-name\ndescription: mismatch\n---\n",
-    );
-    let skills = load_skills_ws(ws);
-    assert_eq!(skills.len(), 1);
-    assert_eq!(skills[0].name, "other-name");
-    assert!(skills[0]
-        .warnings
-        .iter()
-        .any(|w| w.contains("does not match directory")));
 }
 
 #[test]
@@ -194,156 +47,6 @@ fn project_scope_shadows_user_scope_on_collision() {
 }
 
 #[test]
-fn inventory_resources_lists_scripts_and_assets() {
-    let dir = tempfile::tempdir().unwrap();
-    let skill = dir.path().join("s");
-    write(
-        &skill.join("SKILL.md"),
-        "---\nname: s\ndescription: d\n---\n",
-    );
-    write(&skill.join("scripts").join("run.sh"), "echo hi");
-    write(&skill.join("references").join("notes.md"), "notes");
-    write(&skill.join("assets").join("logo.png"), "");
-    write(&skill.join("unrelated").join("x.txt"), "ignored");
-
-    let mut res = inventory_resources(&skill);
-    res.sort();
-    assert_eq!(res.len(), 3);
-    assert!(res.iter().any(|p| p.ends_with("run.sh")));
-    assert!(res.iter().any(|p| p.ends_with("notes.md")));
-    assert!(res.iter().any(|p| p.ends_with("logo.png")));
-    assert!(!res.iter().any(|p| p.ends_with("x.txt")));
-}
-
-#[test]
-fn inventory_resources_lists_hermes_resource_dirs() {
-    let dir = tempfile::tempdir().unwrap();
-    let skill = dir.path().join("s");
-    write(
-        &skill.join("SKILL.md"),
-        "---\nname: s\ndescription: d\n---\n",
-    );
-    write(&skill.join("templates").join("page.html"), "<html></html>");
-    write(&skill.join("examples").join("demo.md"), "demo");
-    write(&skill.join("prompts").join("system.md"), "prompt");
-
-    let mut res = inventory_resources(&skill);
-    res.sort();
-    assert_eq!(res.len(), 3);
-    assert!(res.iter().any(|p| p.ends_with("page.html")));
-    assert!(res.iter().any(|p| p.ends_with("demo.md")));
-    assert!(res.iter().any(|p| p.ends_with("system.md")));
-}
-
-#[test]
-fn nested_hermes_skill_tree_discovers_metadata_and_resources() {
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    write(&ws.join(".openhuman").join("trust"), "");
-    let skill_dir = ws
-        .join(".openhuman")
-        .join("skills")
-        .join("creative")
-        .join("concept-diagrams");
-    write(
-        &skill_dir.join("SKILL.md"),
-        "---\nname: concept-diagrams\ndescription: Generate diagrams\nversion: 0.1.0\nauthor: Nous\nplatforms: [linux, macos, windows]\nmetadata:\n  hermes:\n    tags: [diagrams, svg]\n    related_skills: [architecture-diagram]\n---\n",
-    );
-    write(
-        &skill_dir.join("templates").join("template.html"),
-        "<html></html>",
-    );
-    write(&skill_dir.join("examples").join("flow.md"), "flow");
-
-    let skills = load_skills_ws(ws);
-    assert_eq!(skills.len(), 1);
-    let s = &skills[0];
-    assert_eq!(s.name, "concept-diagrams");
-    assert_eq!(s.version, "0.1.0");
-    assert_eq!(s.author.as_deref(), Some("Nous"));
-    assert_eq!(s.platforms, vec!["linux", "macos", "windows"]);
-    assert_eq!(s.tags, vec!["diagrams", "svg"]);
-    assert_eq!(s.related_skills, vec!["architecture-diagram"]);
-    assert_eq!(s.source_format, "hermes");
-    assert!(s.resources.iter().any(|p| p.ends_with("template.html")));
-    assert!(s.resources.iter().any(|p| p.ends_with("flow.md")));
-}
-
-#[test]
-fn parse_skill_md_without_frontmatter_returns_body() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("SKILL.md");
-    write(&path, "just a markdown body\n");
-    let (fm, body, _warnings) = parse_workflow_md(&path).unwrap();
-    assert!(fm.name.is_empty());
-    assert!(body.contains("markdown body"));
-}
-
-#[test]
-fn parse_skill_md_unterminated_frontmatter_returns_none() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("SKILL.md");
-    write(&path, "---\nname: bad\n\nbody without closing marker\n");
-    assert!(parse_workflow_md(&path).is_none());
-}
-
-#[cfg(unix)]
-#[test]
-fn symlinked_skill_dirs_are_skipped() {
-    use std::os::unix::fs::symlink;
-
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    write(&ws.join(".openhuman").join("trust"), "");
-
-    // A real out-of-tree skill that would load fine if linked.
-    let external = tempfile::tempdir().unwrap();
-    let external_skill = external.path().join("evil");
-    write(
-        &external_skill.join("SKILL.md"),
-        "---\nname: evil\ndescription: should not load via symlink\n---\n",
-    );
-
-    // Symlink <ws>/.openhuman/skills/evil -> external/evil
-    let skills_root = ws.join(".openhuman").join("skills");
-    std::fs::create_dir_all(&skills_root).unwrap();
-    symlink(&external_skill, skills_root.join("evil")).unwrap();
-
-    let skills = load_skills_ws(ws);
-    assert!(
-        skills.is_empty(),
-        "symlinked skill dir should be skipped, got: {skills:?}"
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn symlinked_resource_roots_are_rejected() {
-    use std::os::unix::fs::symlink;
-
-    let dir = tempfile::tempdir().unwrap();
-    let skill = dir.path().join("s");
-    write(
-        &skill.join("SKILL.md"),
-        "---\nname: s\ndescription: d\n---\n",
-    );
-
-    // External directory that must not be inventoried.
-    let external = tempfile::tempdir().unwrap();
-    write(&external.path().join("leaked.txt"), "should not appear");
-
-    // Symlink <skill>/assets -> external
-    std::fs::create_dir_all(&skill).unwrap();
-    symlink(external.path(), skill.join("assets")).unwrap();
-
-    let res = inventory_resources(&skill);
-    assert!(
-        res.is_empty(),
-        "symlinked resource root must be rejected, got: {res:?}"
-    );
-}
-
-#[test]
 fn load_skills_surfaces_user_scope() {
     // load_workflow_metadata now delegates to discover_workflows with dirs::home_dir(),
     // so user-scope skills reach production callers that still hit the
@@ -371,20 +74,6 @@ fn load_skills_surfaces_user_scope() {
     assert_eq!(skills.len(), 1);
     assert_eq!(skills[0].name, "user-only");
     assert_eq!(skills[0].scope, WorkflowScope::User);
-}
-
-#[test]
-fn hidden_dirs_are_skipped() {
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    write(&ws.join(".openhuman").join("trust"), "");
-    let hidden = ws.join(".openhuman").join("skills").join(".hidden");
-    write(
-        &hidden.join("SKILL.md"),
-        "---\nname: hidden\ndescription: nope\n---\n",
-    );
-    let skills = load_skills_ws(ws);
-    assert!(skills.is_empty());
 }
 
 #[test]
@@ -446,145 +135,6 @@ fn read_skill_resource_rejects_directory_name_collision() {
 }
 
 #[test]
-fn read_skill_resource_rejects_parent_dir_traversal() {
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    let skill_dir = make_legacy_skill(ws, "demo");
-    // Put a secret *outside* the skill root.
-    write(&ws.join("secret.txt"), "top secret");
-    // Put a resource file inside so the skill has at least one bundled
-    // asset (makes the test realistic).
-    write(&skill_dir.join("scripts").join("ok.sh"), "ok");
-
-    let err = read_workflow_resource(ws, "demo", Path::new("../../secret.txt"))
-        .expect_err("parent-dir traversal must be rejected");
-    assert!(
-        err.contains("..") || err.to_lowercase().contains("escape"),
-        "unexpected error: {err}"
-    );
-}
-
-#[test]
-fn read_skill_resource_rejects_absolute_paths() {
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    make_legacy_skill(ws, "demo");
-
-    let absolute = if cfg!(windows) {
-        Path::new("C:\\Windows\\System32\\drivers\\etc\\hosts")
-    } else {
-        Path::new("/etc/passwd")
-    };
-    let err =
-        read_workflow_resource(ws, "demo", absolute).expect_err("absolute path must be rejected");
-    assert!(
-        err.to_lowercase().contains("absolute"),
-        "unexpected error: {err}"
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn read_skill_resource_rejects_symlinked_leaf() {
-    use std::os::unix::fs::symlink;
-
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    let skill_dir = make_legacy_skill(ws, "demo");
-
-    // Target lives outside the skill root.
-    let external = tempfile::tempdir().unwrap();
-    write(&external.path().join("leaked.txt"), "leaked content");
-
-    // Symlink <skill>/scripts/leak.txt -> external/leaked.txt
-    std::fs::create_dir_all(skill_dir.join("scripts")).unwrap();
-    symlink(
-        external.path().join("leaked.txt"),
-        skill_dir.join("scripts/leak.txt"),
-    )
-    .unwrap();
-
-    let err = read_workflow_resource(ws, "demo", Path::new("scripts/leak.txt"))
-        .expect_err("symlinked leaf must be rejected");
-    assert!(
-        err.to_lowercase().contains("symlink") || err.to_lowercase().contains("escape"),
-        "unexpected error: {err}"
-    );
-}
-
-/// The leaf-symlink pre-check (`symlink_metadata` on the requested path) only
-/// catches a symlinked *file*. A symlinked *intermediate directory component*
-/// slips past it — `leaf_meta.file_type().is_symlink()` is false because the
-/// leaf itself is a plain file, just reached through a symlinked ancestor.
-/// This is what the second, full-path `canonicalize` + `starts_with` check
-/// exists to catch, and is untested independently of the leaf-symlink case.
-#[cfg(unix)]
-#[test]
-fn read_skill_resource_rejects_an_intermediate_symlinked_directory() {
-    use std::os::unix::fs::symlink;
-
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    let skill_dir = make_legacy_skill(ws, "demo");
-
-    // Target lives outside the skill root, and the leaf inside it is an
-    // ordinary file — nothing about the leaf itself is a symlink.
-    let external = tempfile::tempdir().unwrap();
-    write(&external.path().join("leaked.txt"), "leaked content");
-
-    // <skill>/scripts -> external, so <skill>/scripts/leaked.txt resolves to
-    // a real, non-symlink file that nonetheless lives outside the skill root.
-    symlink(external.path(), skill_dir.join("scripts")).unwrap();
-
-    let err = read_workflow_resource(ws, "demo", Path::new("scripts/leaked.txt"))
-        .expect_err("an intermediate symlinked directory must not leak a file outside the root");
-    assert!(
-        err.to_lowercase().contains("symlink")
-            || err.to_lowercase().contains("escape")
-            || err.to_lowercase().contains("outside"),
-        "unexpected error: {err}"
-    );
-}
-
-#[test]
-fn read_skill_resource_rejects_oversized_file() {
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    let skill_dir = make_legacy_skill(ws, "demo");
-    // Write MAX + 1 bytes.
-    let oversize = vec![b'a'; (MAX_WORKFLOW_RESOURCE_BYTES as usize) + 1];
-    let target = skill_dir.join("references").join("big.txt");
-    std::fs::create_dir_all(target.parent().unwrap()).unwrap();
-    std::fs::write(&target, &oversize).unwrap();
-
-    let err = read_workflow_resource(ws, "demo", Path::new("references/big.txt"))
-        .expect_err("oversized file must be rejected");
-    assert!(
-        err.to_lowercase().contains("exceeds") || err.to_lowercase().contains("limit"),
-        "unexpected error: {err}"
-    );
-}
-
-#[test]
-fn read_skill_resource_rejects_non_utf8_bytes() {
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    let skill_dir = make_legacy_skill(ws, "demo");
-    // 0xFF is never valid UTF-8 (invalid start byte in any multi-byte
-    // sequence).
-    let target = skill_dir.join("assets").join("binary.bin");
-    std::fs::create_dir_all(target.parent().unwrap()).unwrap();
-    std::fs::write(&target, [0xFFu8, 0xFE, 0xFD, 0xFC]).unwrap();
-
-    let err = read_workflow_resource(ws, "demo", Path::new("assets/binary.bin"))
-        .expect_err("non-UTF-8 content must be rejected");
-    assert!(
-        err.to_lowercase().contains("utf-8"),
-        "unexpected error: {err}"
-    );
-}
-
-#[test]
 fn read_skill_resource_rejects_unknown_skill() {
     let dir = tempfile::tempdir().unwrap();
     let ws = dir.path();
@@ -593,21 +143,6 @@ fn read_skill_resource_rejects_unknown_skill() {
         .expect_err("unknown skill must be rejected");
     assert!(
         err.to_lowercase().contains("not found"),
-        "unexpected error: {err}"
-    );
-}
-
-#[test]
-fn read_skill_resource_rejects_directory_target() {
-    let dir = tempfile::tempdir().unwrap();
-    let ws = dir.path();
-    let skill_dir = make_legacy_skill(ws, "demo");
-    std::fs::create_dir_all(skill_dir.join("scripts").join("nested")).unwrap();
-
-    let err = read_workflow_resource(ws, "demo", Path::new("scripts/nested"))
-        .expect_err("directory target must be rejected");
-    assert!(
-        err.to_lowercase().contains("not a regular file"),
         "unexpected error: {err}"
     );
 }
@@ -624,10 +159,7 @@ fn read_skill_resource_rejects_empty_inputs() {
 
     let err = read_workflow_resource(ws, "demo", Path::new(""))
         .expect_err("empty relative_path must be rejected");
-    assert!(
-        err.to_lowercase().contains("relative_path"),
-        "unexpected: {err}"
-    );
+    assert!(err.contains("non-empty relative path"), "unexpected: {err}");
 }
 
 // ── `discovery_home_dir`: the per-agent "no user roots" switch ───────────
@@ -645,7 +177,7 @@ async fn discovery_home_dir_is_hidden_by_a_context_without_user_skill_roots() {
 
     let mut config = crate::config::Config::default();
     config.workspace_dir = std::path::PathBuf::from("/tmp/discovery-home-dir-test");
-    let parent = CoreContext::for_test(DomainSet::full(), None, None);
+    let parent = CoreContext::for_test(DomainSet::full(), None);
     let hidden = parent.derive_with(
         ContextOverlay::new(config.clone(), DomainSet::full(), Default::default())
             .without_user_skill_roots(),
@@ -679,7 +211,7 @@ async fn load_workflow_metadata_skips_user_roots_under_a_hidden_context() {
 
     let mut config = crate::config::Config::default();
     config.workspace_dir = ws_dir.path().to_path_buf();
-    let hidden = CoreContext::for_test(DomainSet::full(), None, None).derive_with(
+    let hidden = CoreContext::for_test(DomainSet::full(), None).derive_with(
         ContextOverlay::new(config, DomainSet::full(), Default::default())
             .without_user_skill_roots(),
     );
@@ -702,24 +234,43 @@ async fn load_workflow_metadata_skips_user_roots_under_a_hidden_context() {
     );
 }
 
-#[test]
-fn workflow_metadata_is_reused_until_invalidated() {
+#[tokio::test]
+async fn workflow_metadata_is_reused_until_invalidated() {
+    // Scope an explicit skills-on context: the process default context other
+    // tests install may have the component off.
+    let ctx = crate::core::runtime::CoreContext::for_test_with_components(
+        crate::core::runtime::ComponentSet::all(),
+    );
+    crate::core::runtime::CoreContext::scope(ctx, async {
+        workflow_metadata_is_reused_body();
+    })
+    .await;
+}
+
+fn workflow_metadata_is_reused_body() {
     let workspace = tempfile::tempdir().unwrap();
     let skill = workspace.path().join("skills").join("cached-skill");
-    write(
-        &skill.join("SKILL.md"),
-        "---\nname: cached-skill\ndescription: first version\n---\n",
-    );
-    let first = load_workflow_metadata(workspace.path());
-    assert!(first.iter().any(|item| item.name == "cached-skill"));
-
-    std::fs::remove_dir_all(&skill).unwrap();
-    assert!(
-        load_workflow_metadata(workspace.path())
+    // The metadata cache is process-global and other tests invalidate it
+    // concurrently, so retry the prime-then-reuse phase until one attempt
+    // runs without an interleaved invalidation.
+    let mut reused = false;
+    for _ in 0..50 {
+        write(
+            &skill.join("SKILL.md"),
+            "---\nname: cached-skill\ndescription: first version\n---\n",
+        );
+        let first = load_workflow_metadata(workspace.path());
+        assert!(first.iter().any(|item| item.name == "cached-skill"));
+        std::fs::remove_dir_all(&skill).unwrap();
+        if load_workflow_metadata(workspace.path())
             .iter()
-            .any(|item| item.name == "cached-skill"),
-        "a turn reuses the startup snapshot"
-    );
+            .any(|item| item.name == "cached-skill")
+        {
+            reused = true;
+            break;
+        }
+    }
+    assert!(reused, "a turn reuses the startup snapshot");
 
     crate::skills::ops_discover::invalidate_workflow_metadata_cache();
     assert!(
@@ -728,4 +279,342 @@ fn workflow_metadata_is_reused_until_invalidated() {
             .any(|item| item.name == "cached-skill"),
         "a skill change refreshes the snapshot"
     );
+}
+
+#[tokio::test]
+async fn skills_component_off_yields_no_catalogue_and_skips_bundled_install() {
+    use crate::core::runtime::{ComponentSet, CoreContext};
+
+    let ws_dir = tempfile::tempdir().unwrap();
+    write(
+        &ws_dir
+            .path()
+            .join("skills")
+            .join("ws-only")
+            .join("SKILL.md"),
+        "---\nname: ws-only\ndescription: workspace skill\n---\n",
+    );
+    let mut off = ComponentSet::all();
+    off.skills = false;
+    let ctx = CoreContext::for_test_with_components(off);
+
+    let ws = ws_dir.path().to_path_buf();
+    let (names, installed) = CoreContext::scope(ctx, async move {
+        crate::skills::install_bundled_skills(&ws);
+        (
+            load_workflow_metadata(&ws).len(),
+            crate::skills::bundled::builtin_root(&ws).exists(),
+        )
+    })
+    .await;
+    assert_eq!(names, 0, "disabled skills expose no catalogue");
+    assert!(!installed, "disabled skills materialize no bundled skills");
+}
+
+#[cfg(all(feature = "flows", feature = "skills"))]
+#[tokio::test]
+async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
+    use crate::core::runtime::{ComponentSet, ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+
+    let workspace = tempfile::tempdir().unwrap();
+    let profile = |profile_id: &str, enabled: bool| {
+        let mut components = ComponentSet::all();
+        let mut domains = DomainSet::full();
+        let mut config = crate::config::Config::default();
+        config.workspace_dir = workspace.path().to_path_buf();
+        if !enabled {
+            components.flows = false;
+            components.tinyflows = false;
+            config.components.flows = false;
+            config.components.tinyflows = false;
+            domains.flows = false;
+        }
+        let context = CoreContext::for_test_with_components(components).derive_with(
+            ContextOverlay::new(config.clone(), domains, ToolGroups::none())
+                .profile(profile_id)
+                .without_user_skill_roots(),
+        );
+        (context, config, domains)
+    };
+
+    let (enabled_ctx, enabled_config, enabled_domains) = profile("enabled", true);
+    crate::modules::tinyflows::copilot_proxy(&enabled_config)
+        .await
+        .expect("linked TinyFlows fixture is admitted and serving");
+    let visible = CoreContext::scope(enabled_ctx, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        let gate = crate::skills::ops_discover::DiscoveryGate::from_config(
+            &dispatch,
+            &enabled_config,
+            Some(enabled_domains),
+        );
+        assert!(
+            gate.flow_authoring_enabled(),
+            "unexpected flow gate: {gate:?}"
+        );
+        crate::skills::bundled::flow_authoring::prewarm(
+            &dispatch,
+            &enabled_config,
+            Some(enabled_domains),
+        )
+        .await;
+        assert!(crate::modules::runtime::is_module_serving(
+            crate::modules::tinyflows::MODULE_ID
+        ));
+        crate::skills::load_workflow_metadata_for(&dispatch, &enabled_config)
+    })
+    .await;
+    let (disabled_ctx, disabled_config, _) = profile("disabled", false);
+    let hidden = CoreContext::scope(disabled_ctx, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::load_workflow_metadata_for(&dispatch, &disabled_config)
+    })
+    .await;
+
+    assert!(
+        visible.iter().any(|skill| skill.id() == "flow-authoring"),
+        "the enabled profile sees its module-backed flow-authoring skill"
+    );
+    assert!(
+        !hidden.iter().any(|skill| skill.id() == "flow-authoring"),
+        "a profile with flows, TinyFlows, and the Flows domain disabled must not inherit another profile's flow-authoring builtin"
+    );
+}
+
+#[cfg(all(feature = "flows", feature = "skills"))]
+#[tokio::test]
+async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
+    use crate::core::runtime::{ComponentSet, ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+
+    let workspace = tempfile::tempdir().unwrap();
+    let mut enabled_config = crate::config::Config::default();
+    enabled_config.workspace_dir = workspace.path().to_path_buf();
+    let all = ComponentSet::all();
+    let base = CoreContext::for_test_with_components(all);
+    let enabled_context = base.derive_with(
+        ContextOverlay::new(
+            enabled_config.clone(),
+            DomainSet::full(),
+            ToolGroups::none(),
+        )
+        .profile("shared")
+        .without_user_skill_roots(),
+    );
+
+    let enabled = CoreContext::scope(enabled_context, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::bundled::flow_authoring::prewarm(&dispatch, &enabled_config, None).await;
+        crate::skills::load_workflow_metadata_for(&dispatch, &enabled_config)
+    })
+    .await;
+    assert!(enabled.iter().any(|skill| skill.id() == "flow-authoring"));
+
+    let mut context_components = all;
+    context_components.tinyflows = false;
+    let context_component_context = CoreContext::for_test_with_components(context_components)
+        .derive_with(
+            ContextOverlay::new(
+                enabled_config.clone(),
+                DomainSet::full(),
+                ToolGroups::none(),
+            )
+            .profile("shared")
+            .without_user_skill_roots(),
+        );
+    let context_component_hidden = CoreContext::scope(context_component_context, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::load_workflow_metadata_for(&dispatch, &enabled_config)
+    })
+    .await;
+    assert!(
+        !context_component_hidden
+            .iter()
+            .any(|skill| skill.id() == "flow-authoring"),
+        "an all-enabled Config cannot widen a context with TinyFlows disabled"
+    );
+
+    let mut narrowed_domains = DomainSet::full();
+    narrowed_domains.flows = false;
+    let context_domain_context = CoreContext::for_test_with_components(all).derive_with(
+        ContextOverlay::new(enabled_config.clone(), narrowed_domains, ToolGroups::none())
+            .profile("shared")
+            .without_user_skill_roots(),
+    );
+    let context_domain_hidden = CoreContext::scope(context_domain_context, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::ops_discover::load_workflow_metadata_for_domains(
+            &dispatch,
+            &enabled_config,
+            Some(DomainSet::full()),
+        )
+    })
+    .await;
+    assert!(
+        !context_domain_hidden
+            .iter()
+            .any(|skill| skill.id() == "flow-authoring"),
+        "an all-enabled Config cannot widen a context without the Flows domain"
+    );
+
+    let mut disabled_config = enabled_config.clone();
+    disabled_config.components.tinyflows = false;
+    let config_hidden = CoreContext::scope(
+        CoreContext::for_test_with_components(all).derive_with(
+            ContextOverlay::new(
+                enabled_config.clone(),
+                DomainSet::full(),
+                ToolGroups::none(),
+            )
+            .profile("shared")
+            .without_user_skill_roots(),
+        ),
+        async {
+            let dispatch = crate::core::runtime::DispatchCtx::ambient();
+            crate::skills::load_workflow_metadata_for(&dispatch, &disabled_config)
+        },
+    )
+    .await;
+    assert!(
+        !config_hidden
+            .iter()
+            .any(|skill| skill.id() == "flow-authoring"),
+        "a narrower supplied Config hides resources from an enabled parent context"
+    );
+
+    let mut modules_disabled = enabled_config.clone();
+    modules_disabled.modules.enabled = false;
+    let modules_hidden = CoreContext::scope(
+        CoreContext::for_test_with_components(all).derive_with(
+            ContextOverlay::new(
+                enabled_config.clone(),
+                DomainSet::full(),
+                ToolGroups::none(),
+            )
+            .profile("shared")
+            .without_user_skill_roots(),
+        ),
+        async {
+            let dispatch = crate::core::runtime::DispatchCtx::ambient();
+            crate::skills::load_workflow_metadata_for(&dispatch, &modules_disabled)
+        },
+    )
+    .await;
+    assert!(
+        !modules_hidden
+            .iter()
+            .any(|skill| skill.id() == "flow-authoring"),
+        "a profile with modules disabled cannot reuse another profile's warmed snapshot"
+    );
+
+    let mut skills_disabled = all;
+    skills_disabled.skills = false;
+    let skills_context_hidden = CoreContext::scope(
+        CoreContext::for_test_with_components(skills_disabled).derive_with(
+            ContextOverlay::new(
+                enabled_config.clone(),
+                DomainSet::full(),
+                ToolGroups::none(),
+            )
+            .profile("shared")
+            .without_user_skill_roots(),
+        ),
+        async {
+            let dispatch = crate::core::runtime::DispatchCtx::ambient();
+            crate::skills::load_workflow_metadata_for(&dispatch, &enabled_config)
+        },
+    )
+    .await;
+    assert!(
+        !skills_context_hidden
+            .iter()
+            .any(|skill| skill.id() == "flow-authoring"),
+        "an all-enabled Config cannot widen a context with Skills disabled"
+    );
+
+    // Separate tenants can share one workspace. Tampering with and clearing
+    // one tenant's snapshot must not evict or authorize the other's bytes.
+    let tenant_snapshot = |profile_id: &'static str| {
+        let config = enabled_config.clone();
+        let ctx = CoreContext::for_test_with_components(all).derive_with(
+            ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::none())
+                .profile(profile_id)
+                .without_user_skill_roots(),
+        );
+        (ctx, config)
+    };
+    let (tenant_a_ctx, tenant_a_config) = tenant_snapshot("tenant-a");
+    let tenant_a = CoreContext::scope(tenant_a_ctx.clone(), async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::bundled::flow_authoring::prewarm(&dispatch, &tenant_a_config, None).await;
+        crate::skills::load_workflow_metadata_for(&dispatch, &tenant_a_config)
+    })
+    .await;
+    let (tenant_b_ctx, tenant_b_config) = tenant_snapshot("tenant-b");
+    let tenant_b = CoreContext::scope(tenant_b_ctx.clone(), async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::bundled::flow_authoring::prewarm(&dispatch, &tenant_b_config, None).await;
+        crate::skills::load_workflow_metadata_for(&dispatch, &tenant_b_config)
+    })
+    .await;
+    let flow_a = tenant_a
+        .iter()
+        .find(|skill| skill.id() == "flow-authoring")
+        .expect("tenant A has its own warmed snapshot");
+    let flow_b = tenant_b
+        .iter()
+        .find(|skill| skill.id() == "flow-authoring")
+        .expect("tenant B has its own warmed snapshot");
+    assert_eq!(flow_a.scope, tinyskills::SkillScope::Builtin);
+    assert_eq!(flow_b.scope, tinyskills::SkillScope::Builtin);
+    let flow_a_document = flow_a.location.as_deref().expect("tenant A document");
+    assert!(
+        flow_a_document.starts_with(workspace.path()),
+        "tamper target must be inside the isolated temp workspace: {}",
+        flow_a_document.display()
+    );
+    let flow_b_document = flow_b.location.as_deref().expect("tenant B document");
+    assert!(flow_b_document.starts_with(workspace.path()));
+    let flow_a_file = flow_a
+        .location
+        .as_deref()
+        .expect("tenant A skill document")
+        .parent()
+        .expect("tenant A skill directory")
+        .join(&flow_a.resources[0]);
+    std::fs::write(&flow_a_file, "tampered tenant A snapshot").unwrap();
+    let tenant_a_after_tamper = CoreContext::scope(tenant_a_ctx, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::load_workflow_metadata_for(&dispatch, &tenant_a_config)
+    })
+    .await;
+    assert!(!tenant_a_after_tamper
+        .iter()
+        .any(|skill| skill.id() == "flow-authoring"));
+    let tenant_b_after_tamper = CoreContext::scope(tenant_b_ctx, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        let latest = crate::skills::load_workflow_metadata_for(&dispatch, &tenant_b_config);
+        let skill = latest
+            .iter()
+            .find(|skill| skill.id() == "flow-authoring")
+            .expect("tenant B snapshot remains visible");
+        crate::skills::read_workflow_resource_for(
+            &dispatch,
+            &tenant_b_config,
+            "flow-authoring",
+            &skill.resources[0],
+        )
+    })
+    .await;
+    assert!(
+        tenant_b_after_tamper.is_ok(),
+        "tenant A tampering must not evict tenant B"
+    );
+    let _ = flow_b;
+}
+
+#[test]
+fn skills_component_enabled_without_context_is_on() {
+    assert!(crate::skills::skills_component_enabled());
 }

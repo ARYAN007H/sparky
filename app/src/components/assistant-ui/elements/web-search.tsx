@@ -12,7 +12,13 @@
  *   so the host decides how an external link opens. A result's `url` is
  *   provider-supplied, so the host must only pass vetted http(s) URLs.
  * - Result keys include the URL: two hits often share a domain.
- * - The empty-results floor (`min-h`) applies only while hits are expected.
+ * - No empty-results floor. Upstream reserves `min-h-[5.75rem]` while
+ *   searching because its hits stream in one by one; here they arrive all
+ *   at once with the settled result, so the floor was only a ~92px hole
+ *   under every in-flight search (and a stack of them under parallel
+ *   searches). The results list renders only when there is a hit.
+ * - The query pill renders only once there is a query: while the call's
+ *   arguments are still streaming it was an empty search-icon capsule.
  */
 import { cn } from '@/components/assistant-ui/lib/utils';
 import { SearchIcon } from 'lucide-react';
@@ -54,21 +60,24 @@ export function WebSearch({
   statusLabel: string;
   renderLink?: (props: { href: string; className: string; children: ReactNode }) => ReactNode;
 }) {
+  const shown = take(results, visibleResults);
   return (
     <div
       data-slot="web-search"
-      className={cn('flex w-full max-w-sm flex-col gap-2.5', className)}
+      className={cn('flex w-full flex-col gap-2.5', className)}
       {...props}>
-      <span
-        data-slot="web-search-query"
-        className={cn(
-          field,
-          'text-foreground/70 inline-flex w-fit max-w-full items-center gap-1.5 rounded-full px-3.5 py-2 text-xs'
-        )}>
-        <SearchIcon className="text-foreground/40 size-3 shrink-0" />
-        <span className="truncate">{query}</span>
-      </span>
-      <div data-slot="web-search-status" className="text-foreground/45 text-xs">
+      {query.trim() ? (
+        <span
+          data-slot="web-search-query"
+          className={cn(
+            field,
+            'text-muted-foreground inline-flex w-fit items-center gap-1.5 rounded-full px-3.5 py-2 text-xs'
+          )}>
+          <SearchIcon className="text-muted-foreground size-3 shrink-0" />
+          <span className="truncate">{query}</span>
+        </span>
+      ) : null}
+      <div data-slot="web-search-status" className="text-muted-foreground text-xs">
         {searching ? (
           <ShimmerLabel className="relative inline-block leading-none">
             {searchingLabel}
@@ -77,31 +86,33 @@ export function WebSearch({
           <span className="fade-in animate-in duration-300">{statusLabel}</span>
         )}
       </div>
-      <div className={cn('flex flex-col', searching && 'min-h-[5.75rem]')}>
-        {take(results, visibleResults).map(result => {
-          const content = (
-            <>
-              <span className="bg-foreground/[0.06] text-foreground/45 flex size-4 shrink-0 items-center justify-center rounded text-[9px] font-medium">
-                {result.domain.charAt(0).toUpperCase()}
+      {shown.length > 0 ? (
+        <div data-slot="web-search-results" className="flex min-h-[5.75rem] flex-col">
+          {shown.map(result => {
+            const content = (
+              <>
+                <span className="bg-foreground/[0.06] text-muted-foreground flex size-4 shrink-0 items-center justify-center rounded text-[9px] font-medium">
+                  {result.domain.charAt(0).toUpperCase()}
+                </span>
+                <span className="text-foreground/90 min-w-0 flex-1 truncate text-[13.5px]">
+                  {result.title}
+                </span>
+                <span className={cn(mono, 'text-muted-foreground shrink-0')}>{result.domain}</span>
+              </>
+            );
+            const key = `${cycle}-${result.url ?? result.domain}-${result.title}`;
+            return result.url && renderLink ? (
+              <span key={key} data-slot="web-search-result" className="contents">
+                {renderLink({ href: result.url, className: rowClass, children: content })}
               </span>
-              <span className="text-foreground/90 min-w-0 flex-1 truncate text-[13.5px]">
-                {result.title}
-              </span>
-              <span className={cn(mono, 'text-foreground/35 shrink-0')}>{result.domain}</span>
-            </>
-          );
-          const key = `${cycle}-${result.url ?? result.domain}-${result.title}`;
-          return result.url && renderLink ? (
-            <span key={key} data-slot="web-search-result" className="contents">
-              {renderLink({ href: result.url, className: rowClass, children: content })}
-            </span>
-          ) : (
-            <div key={key} data-slot="web-search-result" className={rowClass}>
-              {content}
-            </div>
-          );
-        })}
-      </div>
+            ) : (
+              <div key={key} data-slot="web-search-result" className={rowClass}>
+                {content}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

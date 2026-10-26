@@ -1,4 +1,5 @@
 use super::*;
+use crate::agent::tinyagents::middleware::approval::ApprovalSecurityMiddleware;
 
 // ── ApprovalSecurityMiddleware ──────────────────────────────────────────
 
@@ -42,7 +43,7 @@ fn desktop_external_effect_keeps_metadata_but_skips_approval_when_disabled() {
 
 #[cfg(feature = "modules")]
 async fn desktop_external_effect_inner() {
-    let _guard = crate::config::TEST_ENV_LOCK.lock().unwrap();
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
     let previous = std::env::var_os("OPENHUMAN_WORKSPACE");
     let temp = tempfile::tempdir().unwrap();
     std::fs::write(
@@ -68,10 +69,22 @@ async fn desktop_external_effect_inner() {
     assert!(middleware.has_external_effect("desktop_goal", &json!({})));
     assert!(
         !middleware
-            .requires_approval("desktop_goal", &json!({}))
+            .requires_approval(
+                &crate::core::runtime::DispatchCtx::ambient(),
+                "desktop_goal",
+                &json!({})
+            )
             .await
     );
-    assert!(middleware.requires_approval("send_email", &json!({})).await);
+    assert!(
+        middleware
+            .requires_approval(
+                &crate::core::runtime::DispatchCtx::ambient(),
+                "send_email",
+                &json!({})
+            )
+            .await
+    );
     match previous {
         Some(value) => unsafe { std::env::set_var("OPENHUMAN_WORKSPACE", value) },
         None => unsafe { std::env::remove_var("OPENHUMAN_WORKSPACE") },

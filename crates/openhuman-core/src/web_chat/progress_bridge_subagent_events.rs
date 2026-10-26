@@ -14,11 +14,11 @@ use tinyagents_session::run_ledger::{
     AgentRunKind, AgentRunStatus, AgentRunUpsert, RunEventAppend, RunTelemetryUpsert,
 };
 
-use crate::core::socketio::{SubagentProgressDetail, WebChannelEvent};
+use crate::web_chat::{SubagentProgressDetail, WebChannelEvent};
 
 use super::{
     cap_wire_args, cap_wire_output, ledger_append_event, ledger_upsert_agent_run,
-    ledger_upsert_telemetry, publish_seq_stamped, subagent_worktree_detail,
+    ledger_upsert_telemetry, publish_seq_stamped,
 };
 
 /// Bundles the progress bridge's per-turn identity fields (read-only for the
@@ -29,6 +29,25 @@ pub(super) struct BridgeCtx<'a> {
     pub(super) thread_id: &'a str,
     pub(super) request_id: &'a str,
     pub(super) config: &'a crate::config::Config,
+    pub(super) dispatch: &'a crate::core::runtime::DispatchCtx,
+}
+
+impl<'a> BridgeCtx<'a> {
+    pub(super) fn new(
+        client_id: &'a str,
+        thread_id: &'a str,
+        request_id: &'a str,
+        config: &'a crate::config::Config,
+        dispatch: &'a crate::core::runtime::DispatchCtx,
+    ) -> Self {
+        Self {
+            client_id,
+            thread_id,
+            request_id,
+            config,
+            dispatch,
+        }
+    }
 }
 
 pub(super) fn on_subagent_spawned(
@@ -101,6 +120,7 @@ pub(super) fn on_subagent_spawned(
         },
     );
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_spawned".to_string(),
@@ -139,9 +159,6 @@ pub(super) fn on_subagent_completed(
     output_chars: usize,
     output: String,
     usage: Option<crate::agent::subagent_host::SubagentUsage>,
-    worktree_path: Option<String>,
-    changed_files: Vec<String>,
-    dirty_status: Option<bool>,
 ) {
     let parent_call_id = subagent_parent_call_ids.remove(&task_id).flatten();
     let capped_output = cap_wire_output(output);
@@ -187,14 +204,12 @@ pub(super) fn on_subagent_completed(
                 "elapsedMs": elapsed_ms,
                 "iterations": iterations,
                 "outputChars": output_chars,
-                "worktreePath": worktree_path,
-                "changedFiles": changed_files,
-                "dirtyStatus": dirty_status,
                 "parentCallId": parent_call_id
             }),
         },
     );
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_completed".to_string(),
@@ -222,11 +237,9 @@ pub(super) fn on_subagent_completed(
                 input_tokens: usage.as_ref().map(|u| u.input_tokens),
                 output_tokens: usage.as_ref().map(|u| u.output_tokens),
                 cached_input_tokens: usage.as_ref().map(|u| u.cached_input_tokens),
-                cost_usd: usage.as_ref().map(|u| u.charged_amount_usd),
-                // Worktree isolation metadata (#3376) — drives the inline
-                // subagent worktree row's open/diff/remove actions. All
-                // `None`/absent for non-isolated workers.
-                ..subagent_worktree_detail(worktree_path, changed_files, dirty_status)
+                // `None` also when the child's cost is unknown (never a guess).
+                cost_usd: usage.as_ref().and_then(|u| u.cost().usd()),
+                ..Default::default()
             }),
             ..Default::default()
         },
@@ -287,6 +300,7 @@ pub(super) fn on_subagent_failed(
         },
     );
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_failed".to_string(),
@@ -347,7 +361,6 @@ pub(super) fn on_subagent_awaiting_user(
             // written (#5928).
             checkpoint_path: checkpoint_path.clone(),
             checkpoint: Some(json!({
-                "resumeTool": "continue_subagent",
                 "taskId": task_id,
                 "agentId": agent_id,
                 "question": question,
@@ -375,6 +388,7 @@ pub(super) fn on_subagent_awaiting_user(
         },
     );
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_awaiting_user".to_string(),
@@ -407,6 +421,7 @@ pub(super) fn on_subagent_iteration_started(
     extended_policy: bool,
 ) {
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_iteration_start".to_string(),
@@ -474,6 +489,7 @@ pub(super) fn on_subagent_tool_call_started(
         },
     );
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_tool_call".to_string(),
@@ -520,7 +536,7 @@ pub(super) fn on_subagent_tool_call_completed(
     arguments: Option<serde_json::Value>,
     elapsed_ms: u64,
     iteration: u32,
-    failure: Option<crate::tools::status::ClassifiedFailure>,
+    failure: Option<tinytools::status::ClassifiedFailure>,
     display_label: Option<String>,
     display_detail: Option<String>,
     structured: Option<serde_json::Value>,
@@ -547,6 +563,7 @@ pub(super) fn on_subagent_tool_call_completed(
         },
     );
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_tool_result".to_string(),
@@ -592,6 +609,7 @@ pub(super) fn on_subagent_text_delta(
     iteration: u32,
 ) {
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_text_delta".to_string(),
@@ -623,6 +641,7 @@ pub(super) fn on_subagent_thinking_delta(
     iteration: u32,
 ) {
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_thinking_delta".to_string(),

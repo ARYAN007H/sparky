@@ -2,7 +2,8 @@
 
 set -euo pipefail
 
-APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$APP_DIR/.." && pwd)"
 cd "$APP_DIR"
 
@@ -18,8 +19,11 @@ E2E_WEB_CORE_TARGET_DIR="${E2E_WEB_CORE_TARGET_DIR:-$REPO_ROOT/target/e2e-web-${
 # Preserve explicit harness ports before loading a developer .env. That file
 # may configure normal development, but must not change an E2E bundle's baked
 # endpoint or its E2E-only affordances.
-SELECTED_E2E_MOCK_PORT="${E2E_MOCK_PORT:-18473}"
-SELECTED_OPENHUMAN_CORE_PORT="${OPENHUMAN_CORE_PORT:-17788}"
+# shellcheck source=./e2e-ports.sh
+source "$SCRIPT_DIR/e2e-ports.sh"
+e2e_resolve_ports
+SELECTED_E2E_MOCK_PORT="$E2E_MOCK_PORT"
+SELECTED_OPENHUMAN_CORE_PORT="$OPENHUMAN_CORE_PORT"
 
 if [ -f "$REPO_ROOT/.env" ]; then
   # shellcheck source=/dev/null
@@ -60,8 +64,8 @@ MARKER
 # contract before serving: a web bundle cannot change its backend at runtime.
 cat >"$APP_DIR/dist-web/.e2e-build-ports.json" <<JSON
 {
-  "e2e_mock_port": "${E2E_MOCK_PORT:-18473}",
-  "openhuman_core_port": "${OPENHUMAN_CORE_PORT:-17788}",
+  "e2e_mock_port": "${SELECTED_E2E_MOCK_PORT}",
+  "openhuman_core_port": "${SELECTED_OPENHUMAN_CORE_PORT}",
   "vite_backend_url": "${VITE_BACKEND_URL}"
 }
 JSON
@@ -71,4 +75,5 @@ echo "Building standalone openhuman-core for web E2E into ${E2E_WEB_CORE_TARGET_
 # The web suite exercises the shipped desktop surface, so compile the same
 # explicit product gates that the Tauri shell and product CI lanes forward.
 PRODUCT_FEATURES="$(bash "$REPO_ROOT/scripts/ci/product-features.sh")"
-CARGO_TARGET_DIR="$E2E_WEB_CORE_TARGET_DIR" bash "$REPO_ROOT/scripts/ci-cancel-aware.sh" "$CARGO_BIN" build --manifest-path "$REPO_ROOT/Cargo.toml" --bin openhuman-core --features "$PRODUCT_FEATURES"
+E2E_FEATURES="${PRODUCT_FEATURES},e2e-test-support"
+bash "$REPO_ROOT/scripts/ci-cancel-aware.sh" "$CARGO_BIN" build --manifest-path "$REPO_ROOT/Cargo.toml" --target-dir "$E2E_WEB_CORE_TARGET_DIR" --bin openhuman-core --features "$E2E_FEATURES"

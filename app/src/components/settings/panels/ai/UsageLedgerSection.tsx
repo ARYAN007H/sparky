@@ -31,9 +31,7 @@ export const UsageLedgerSection = ({
   formatSpendAmount,
   backgroundApiReadsPerWeek,
   backgroundWakeupsPerWeek,
-  calendarPlannerCallsPerWeek,
   composioConnectionScansPerWeek,
-  memoryPollsPerWeek,
   estimatedRowsLeft,
   estimatedRowsPerBudget,
   projectedExhaustAt,
@@ -56,9 +54,7 @@ export const UsageLedgerSection = ({
   formatSpendAmount: (tx: CreditTransaction) => number;
   backgroundApiReadsPerWeek: number;
   backgroundWakeupsPerWeek: number;
-  calendarPlannerCallsPerWeek: number;
   composioConnectionScansPerWeek: number;
-  memoryPollsPerWeek: number;
   estimatedRowsLeft: number | null;
   estimatedRowsPerBudget: number | null;
   projectedExhaustAt: string;
@@ -121,17 +117,14 @@ export const UsageLedgerSection = ({
             '{count}',
             formatCount(backgroundApiReadsPerWeek)
           )}
-          detail={t('settings.ai.plannerSyncBreakdown')
-            .replace('{planner}', formatCount(calendarPlannerCallsPerWeek))
-            .replace('{sync}', formatCount(composioConnectionScansPerWeek))}
+          detail={t('settings.ai.connectionSyncBreakdown').replace(
+            '{sync}',
+            formatCount(composioConnectionScansPerWeek)
+          )}
         />
         <MetricTile
           label={t('settings.ai.backgroundWakeups')}
           value={t('settings.ai.perWeek').replace('{count}', formatCount(backgroundWakeupsPerWeek))}
-          detail={t('settings.ai.memoryPollsDetail').replace(
-            '{count}',
-            formatCount(memoryPollsPerWeek)
-          )}
         />
       </div>
       {latestSpend && (
@@ -240,11 +233,6 @@ export const UsageLedgerSection = ({
             formatCount(backgroundApiReadsPerWeek)
           )}
           detail={t('settings.ai.totalApiReadBudgetDetail')}
-        />
-        <FormulaRow
-          label={t('settings.ai.memoryWorkerPolls')}
-          value={t('settings.ai.perWeekMax').replace('{count}', formatCount(memoryPollsPerWeek))}
-          detail={t('settings.ai.memoryWorkerPollsDetail')}
         />
       </Card>
     </div>

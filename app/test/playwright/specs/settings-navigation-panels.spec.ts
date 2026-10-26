@@ -68,15 +68,11 @@ const PANELS = [
     marker: null,
     text: 'View approval history',
   },
-  // Sandbox is a desktop-only panel: in the web lane its body is the
-  // desktop-only notice, not the Docker fields. Asserting what this build
-  // actually renders, rather than what the Tauri build would.
   {
     id: 'sandbox-settings',
     route: 'sandbox-settings',
     heading: 'Sandbox execution',
-    marker: null,
-    text: 'only available in the desktop app',
+    marker: 'sandbox-status',
   },
   { id: 'about', route: 'about', heading: 'About', marker: 'github-star-cta' },
 ] as const;

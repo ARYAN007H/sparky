@@ -1,13 +1,14 @@
 # Cron tools
 
 Agent-facing tools over the `cron` domain. Six per-operation tools
-(`add.rs`, `list.rs`, `update.rs`, `remove.rs`, `run.rs`, `runs.rs`) are the
-implementation; `collapsed.rs` wraps them into a single action-dispatched
-`CronTool`. All seven are re-exported wholesale by `crate::tools` (`pub use
-crate::cron::tools::*` in `tools/mod.rs`).
+([`add.rs`](./add.rs), [`list.rs`](./list.rs), [`update.rs`](./update.rs), [`remove.rs`](./remove.rs), [`run.rs`](./run.rs), [`runs.rs`](./runs.rs)) are the
+implementation; [`collapsed.rs`](./collapsed.rs) wraps them into a single action-dispatched
+`CronTool`. The cron tool types are re-exported from `crate::cron::tools`; `tools/ops.rs`
+assembles the registered tool set.
 
-Every tool first checks `config.cron.enabled` and returns an error result
-when cron is disabled.
+The cron-domain tools first check `config.cron.enabled` and return an error
+result when cron is disabled. The separate `schedule` tool exposes its own
+one-shot and recurring schedule actions.
 
 ## Registration state
 
@@ -25,7 +26,7 @@ model's tool list with six near-duplicate schemas.
 field (`list` / `add` / `update` / `remove` / `run` / `runs`) instead of six
 near-duplicate schemas: four of the six take only `job_id`. Each action
 forwards to the matching per-operation tool through
-`crate::tools::implementations::meta::collapse` (`merge_action_schemas`,
+`tinytools::collapse` (`merge_action_schemas`,
 `resolve`, `args_without_action`), so schedule parsing, the `SecurityPolicy`
 check and delivery validation live in exactly one place.
 `permission_level_with_args` / `external_effect_with_args` resolve the real
@@ -43,7 +44,7 @@ strictest values.
 | `CronListTool` | `cron_list` | trait default (`ReadOnly`) | trait default (`false`) | `cron::list_jobs` |
 | `CronUpdateTool` | `cron_update` | `Execute` | `true` | `cron::update_job` (after `SecurityPolicy::is_command_allowed` on `patch.command`) |
 | `CronRemoveTool` | `cron_remove` | `Write` | `true` | `cron::remove_job` |
-| `CronRunTool` | `cron_run` | `Execute` | `true` | `cron::get_job` + `cron::scheduler::execute_job_now`, then `cron::record_run` / `cron::record_last_run` |
+| `CronRunTool` | `cron_run` | `Execute` | `true` | `cron::get_job` + Schedule v6 manual worker lifecycle; the module owns run history and completion |
 | `CronRunsTool` | `cron_runs` | trait default (`ReadOnly`) | trait default (`false`) | `cron::list_runs` (output truncated to `MAX_RUN_OUTPUT_CHARS = 500`) |
 
 The mutating tools (`add`, `update`, `remove`, `run`) set
@@ -75,17 +76,17 @@ or immediately execute a stored command or agent prompt on the host.
 
 - `cron` domain: [`../README.md`](../README.md): job/run model, scheduler,
   delivery modes, agent-job minimum interval.
-- `crates/openhuman-core/src/tools/impl/system/schedule.rs`: the separate
-  one-shot `schedule` tool built on `cron::add_once` / `cron::add_once_at`;
-  not part of the collapse above.
+- [`schedule.rs`](./schedule.rs): the separate `schedule` tool for recurring and
+  one-shot jobs; it is not part of the collapse above.
 - `crates/openhuman-core/src/tools/impl/meta/collapse.rs` (module path
-  `crate::tools::implementations::meta::collapse`): the generic
+  `tinytools::collapse`): the generic
   action-collapsing helper `collapsed.rs` builds on.
+- [Cron and scheduling](../../../../../docs/gitbooks/en/features/native-tools/cron.md)
 
 ## Tests
 
-`add_tests.rs`, `list_tests.rs`, `update_tests.rs`, `remove_tests.rs`,
-`run_tests.rs`, `runs_tests.rs` cover each per-operation tool;
-`collapsed_tests.rs` covers the merged schema, per-action versus fallback
+[`add_tests.rs`](./add_tests.rs), [`list_tests.rs`](./list_tests.rs), [`update_tests.rs`](./update_tests.rs), [`remove_tests.rs`](./remove_tests.rs),
+[`run_tests.rs`](./run_tests.rs), [`runs_tests.rs`](./runs_tests.rs) cover each per-operation tool;
+[`collapsed_tests.rs`](./collapsed_tests.rs) covers the merged schema, per-action versus fallback
 permission levels, the unknown-action error, and that every member is
 `Hidden`.

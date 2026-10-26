@@ -1,6 +1,8 @@
 //! Docker-backed sandbox execution backend.
 //!
-//! Runs agent tool commands inside ephemeral Docker containers with:
+//! Policy mapping for the Docker sandbox; TinyBox owns one-shot container
+//! creation, execution, and bounded output collection. Commands run inside
+//! ephemeral containers with:
 //! - Controlled workspace mounts (host `action_dir` → `/workspace`)
 //! - Network isolation (default: `none`)
 //! - Resource limits (memory, CPU)
@@ -16,227 +18,192 @@ use super::types::{
     SandboxBackendHandle, SandboxBackendKind, SandboxExecRequest, SandboxExecResult, SandboxPolicy,
     SandboxStatus,
 };
-use std::process::Stdio;
-use tokio::process::Command;
+use crate::config::Config;
+#[cfg(feature = "modules")]
+use crate::modules::tinybox::{self, contract};
 
 /// Label applied to all sandbox containers for orphan cleanup.
 const CONTAINER_LABEL: &str = "openhuman.sandbox=true";
 
-/// Maximum output size in bytes (1MB), matching shell tool limit.
-const MAX_OUTPUT_BYTES: usize = 1_048_576;
+#[cfg(feature = "modules")]
+fn status_request() -> contract::DockerStatusRequest {
+    contract::DockerStatusRequest {
+        timeout_ms: contract::DEFAULT_DOCKER_CONTROL_TIMEOUT_MS,
+    }
+}
+
+#[cfg(feature = "modules")]
+fn cleanup_request() -> contract::CleanupDockerRequest {
+    contract::CleanupDockerRequest {
+        label: CONTAINER_LABEL.to_owned(),
+        timeout_ms: contract::DEFAULT_DOCKER_CONTROL_TIMEOUT_MS,
+    }
+}
 
 /// Check whether Docker is available and responsive.
-pub async fn is_docker_available() -> bool {
-    let result = Command::new("docker")
-        .args(["info", "--format", "{{.ServerVersion}}"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .output()
-        .await;
-    match result {
-        Ok(output) => output.status.success(),
-        Err(_) => false,
-    }
+#[cfg(feature = "modules")]
+pub async fn is_docker_available(config: &Config) -> Result<bool, String> {
+    let status = tinybox::docker_status(config, status_request()).await?;
+    Ok(status.available)
+}
+
+#[cfg(not(feature = "modules"))]
+pub async fn is_docker_available(_config: &Config) -> Result<bool, String> {
+    Err("TinyBox module support is disabled; Docker status is unavailable".to_owned())
 }
 
 /// Execute a command inside an ephemeral Docker container.
 ///
-/// The container is created with `docker run --rm` so it self-cleans on
-/// exit. Resource limits, network policy, and mounts are derived from
-/// the `SandboxPolicy`.
+/// Policy stays here (which image, network, limits and mounts the
+/// `SandboxPolicy` asks for); TinyBox owns the one-shot container operation.
+/// There is no local Docker execution fallback when the module is unavailable.
+#[cfg(feature = "modules")]
 pub async fn docker_exec(
+    config: &crate::config::Config,
     policy: &SandboxPolicy,
     request: &SandboxExecRequest,
 ) -> anyhow::Result<SandboxExecResult> {
-    let overrides = policy.docker_overrides.as_ref();
-    let image = overrides
-        .and_then(|o| o.image.as_deref())
-        .unwrap_or("alpine:3.20");
-    let network = overrides
-        .and_then(|o| o.network.as_deref())
-        .unwrap_or("none");
+    let run = build_docker_request(policy, request)?;
 
-    let mut cmd = Command::new("docker");
-    cmd.arg("run").arg("--rm");
+    tracing::debug!("[sandbox:docker] launching container");
 
-    // Container identification for orphan cleanup.
-    cmd.arg("--label").arg(CONTAINER_LABEL);
-
-    // Network isolation.
-    cmd.arg("--network").arg(network);
-
-    // Drop all capabilities by default.
-    cmd.arg("--cap-drop").arg("ALL");
-
-    // Additional capability drops.
-    if let Some(ov) = overrides {
-        for cap in &ov.extra_caps_drop {
-            cmd.arg("--cap-drop").arg(cap);
-        }
-    }
-
-    // Resource limits.
-    let memory_mb = overrides.and_then(|o| o.memory_limit_mb).unwrap_or(512);
-    cmd.arg("-m").arg(format!("{memory_mb}m"));
-
-    let cpu = overrides.and_then(|o| o.cpu_limit).unwrap_or(1.0);
-    cmd.arg("--cpus").arg(cpu.to_string());
-
-    // Read-only rootfs.
-    let read_only = overrides.and_then(|o| o.read_only_rootfs).unwrap_or(true);
-    if read_only {
-        cmd.arg("--read-only");
-        // tmpfs mounts so the container can still write to /tmp and /var/tmp.
-        cmd.arg("--tmpfs").arg("/tmp:rw,noexec,nosuid,size=64m");
-        cmd.arg("--tmpfs").arg("/var/tmp:rw,noexec,nosuid,size=64m");
-    }
-
-    // No new privileges (prevent setuid/setgid escalation inside container).
-    cmd.arg("--security-opt").arg("no-new-privileges");
-
-    // Workspace mount.
-    let workspace = policy
-        .workspace_root
-        .canonicalize()
-        .unwrap_or_else(|_| policy.workspace_root.clone());
-    let mount = format!("{}:/workspace", workspace.display());
-    cmd.arg("-v").arg(mount);
-    cmd.arg("-w").arg("/workspace");
-
-    // Read-only mounts.
-    for ro_path in &policy.read_only_mounts {
-        let canonical = ro_path.canonicalize().unwrap_or_else(|_| ro_path.clone());
-        let ro_mount = format!("{}:{}:ro", canonical.display(), canonical.display());
-        cmd.arg("-v").arg(ro_mount);
-    }
-
-    // Environment passthrough.
-    for var_name in &policy.env_passthrough {
-        if let Ok(val) = std::env::var(var_name) {
-            cmd.arg("-e").arg(format!("{var_name}={val}"));
-        }
-    }
-    // Inject request-specific environment.
-    for (k, v) in &request.env {
-        let mut assignment = k.clone();
-        assignment.push("=");
-        assignment.push(v);
-        cmd.arg("-e").arg(assignment);
-    }
-
-    cmd.arg(image);
-    cmd.arg("sh").arg("-c").arg(&request.command);
-
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
-
-    tracing::debug!(
-        image = image,
-        network = network,
-        memory_mb = memory_mb,
-        cpu = cpu,
-        workspace = %workspace.display(),
-        command = %request.command,
-        "[sandbox:docker] launching container"
-    );
-
-    let result = tokio::time::timeout(request.timeout, cmd.output()).await;
-
-    match result {
-        Ok(Ok(output)) => {
-            let mut stdout = String::from_utf8_lossy(&output.stdout).to_string();
-            let mut stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-            if stdout.len() > MAX_OUTPUT_BYTES {
-                stdout.truncate(MAX_OUTPUT_BYTES);
-                stdout.push_str("\n... [output truncated at 1MB]");
-            }
-            if stderr.len() > MAX_OUTPUT_BYTES {
-                stderr.truncate(MAX_OUTPUT_BYTES);
-                stderr.push_str("\n... [stderr truncated at 1MB]");
-            }
-
-            let exit_code = output.status.code().unwrap_or(-1);
-            tracing::debug!(
-                exit_code = exit_code,
-                stdout_len = stdout.len(),
-                stderr_len = stderr.len(),
-                "[sandbox:docker] container exited"
-            );
-
-            Ok(SandboxExecResult {
-                exit_code,
-                stdout,
-                stderr,
-                timed_out: false,
-            })
-        }
-        Ok(Err(e)) => {
-            tracing::error!(error = %e, "[sandbox:docker] failed to spawn container");
-            anyhow::bail!("Docker execution failed: {e}")
-        }
-        Err(_) => {
+    match crate::modules::tinybox::run_docker(config, run).await {
+        Ok(out) if out.timed_out => {
             tracing::warn!(
                 timeout_secs = request.timeout.as_secs(),
                 "[sandbox:docker] container timed out, killing"
             );
             Ok(SandboxExecResult {
-                exit_code: -1,
-                stdout: String::new(),
-                stderr: format!(
-                    "Command timed out after {}s and was killed",
-                    request.timeout.as_secs()
-                ),
+                exit_code: out.exit_code,
+                stdout: out.stdout,
+                stderr: out.stderr,
                 timed_out: true,
             })
         }
+        Ok(out) => {
+            tracing::debug!(
+                exit_code = out.exit_code,
+                stdout_len = out.stdout.len(),
+                stderr_len = out.stderr.len(),
+                "[sandbox:docker] container exited"
+            );
+            Ok(SandboxExecResult {
+                exit_code: out.exit_code,
+                stdout: out.stdout,
+                stderr: out.stderr,
+                timed_out: false,
+            })
+        }
+        Err(error) => anyhow::bail!("Docker execution failed: {error}"),
     }
 }
 
-/// Clean up orphaned sandbox containers (those labeled with
-/// `openhuman.sandbox=true` that are still running).
-pub async fn cleanup_orphaned_containers() -> anyhow::Result<u32> {
-    let output = Command::new("docker")
-        .args(["ps", "-q", "--filter", &format!("label={CONTAINER_LABEL}")])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .output()
-        .await?;
+#[cfg(not(feature = "modules"))]
+pub async fn docker_exec(
+    _config: &crate::config::Config,
+    _policy: &SandboxPolicy,
+    _request: &SandboxExecRequest,
+) -> anyhow::Result<SandboxExecResult> {
+    anyhow::bail!("TinyBox module support is disabled; Docker sandbox execution is unavailable")
+}
 
-    let ids: Vec<&str> = std::str::from_utf8(&output.stdout)
-        .unwrap_or("")
-        .lines()
-        .filter(|l| !l.is_empty())
-        .collect();
+#[cfg(feature = "modules")]
+fn build_docker_request(
+    policy: &SandboxPolicy,
+    request: &SandboxExecRequest,
+) -> anyhow::Result<crate::modules::tinybox::contract::DockerRunRequest> {
+    use crate::modules::tinybox::contract::{DockerRunRequest, MAX_DOCKER_RUN_TIMEOUT_MS};
+    use std::collections::BTreeMap;
 
-    if ids.is_empty() {
-        tracing::debug!("[sandbox:docker] no orphaned containers found");
-        return Ok(0);
+    let workspace = path_string(&policy.workspace_root, "workspace")?;
+    let read_only_mounts = policy
+        .read_only_mounts
+        .iter()
+        .map(|path| path_string(path, "read-only mount"))
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    // Keep the existing allowlist as the only inherited environment surface.
+    // Per-request values override inherited values with the same name.
+    let mut env = BTreeMap::new();
+    for name in &policy.env_passthrough {
+        if let Ok(value) = std::env::var(name) {
+            env.insert(name.clone(), value);
+        }
+    }
+    for (name, value) in &request.env {
+        let name = name
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Docker environment name is not UTF-8"))?;
+        let value = value
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Docker environment value is not UTF-8"))?;
+        env.insert(name.to_owned(), value.to_owned());
     }
 
-    let count = ids.len() as u32;
-    tracing::info!(
-        count = count,
-        "[sandbox:docker] cleaning up orphaned containers"
-    );
-
-    let mut kill_cmd = Command::new("docker");
-    kill_cmd.arg("kill");
-    for id in &ids {
-        kill_cmd.arg(id);
+    let timeout_ms = request
+        .timeout
+        .as_nanos()
+        .saturating_add(999_999)
+        .checked_div(1_000_000)
+        .unwrap_or(0)
+        .max(1);
+    let timeout_ms = u64::try_from(timeout_ms)
+        .map_err(|_| anyhow::anyhow!("Docker timeout exceeds the supported limit"))?;
+    if timeout_ms > MAX_DOCKER_RUN_TIMEOUT_MS {
+        anyhow::bail!("Docker timeout exceeds the supported limit");
     }
-    let _ = kill_cmd
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await;
 
+    let overrides = policy.docker_overrides.as_ref();
+    Ok(DockerRunRequest {
+        workspace,
+        image: overrides.and_then(|config| config.image.clone()),
+        command: request.command.clone(),
+        login_shell: false,
+        network: overrides.and_then(|config| config.network.clone()),
+        memory_limit_mb: overrides.and_then(|config| config.memory_limit_mb),
+        cpus: overrides.and_then(|config| config.cpu_limit),
+        read_only_rootfs: overrides.and_then(|config| config.read_only_rootfs),
+        read_only_mounts,
+        extra_cap_drops: overrides
+            .map(|config| config.extra_caps_drop.clone())
+            .unwrap_or_default(),
+        env,
+        label: Some(CONTAINER_LABEL.to_owned()),
+        timeout_ms,
+    })
+}
+
+#[cfg(feature = "modules")]
+fn path_string(path: &std::path::Path, kind: &str) -> anyhow::Result<String> {
+    path.to_str()
+        .map(str::to_owned)
+        .ok_or_else(|| anyhow::anyhow!("Docker {kind} path is not UTF-8"))
+}
+
+/// Clean up orphaned sandbox containers owned by TinyBox and carrying the
+/// OpenHuman label.
+#[cfg(feature = "modules")]
+pub async fn cleanup_orphaned_containers(config: &Config) -> anyhow::Result<u32> {
+    let output = tinybox::cleanup_docker(config, cleanup_request())
+        .await
+        .map_err(|error| anyhow::anyhow!("{error}"))?;
+    let count = output.containers_stopped;
+    tracing::debug!(count = count, "[sandbox:docker] orphan cleanup finished");
     Ok(count)
 }
 
+#[cfg(not(feature = "modules"))]
+pub async fn cleanup_orphaned_containers(_config: &Config) -> anyhow::Result<u32> {
+    anyhow::bail!("TinyBox module support is disabled; Docker cleanup is unavailable")
+}
+
 /// Create a handle representing the Docker backend state.
-pub async fn docker_backend_handle() -> SandboxBackendHandle {
-    let available = is_docker_available().await;
+pub async fn docker_backend_handle(config: &Config) -> Result<SandboxBackendHandle, String> {
+    let available = is_docker_available(config).await?;
+    Ok(docker_handle_for_status(available))
+}
+
+fn docker_handle_for_status(available: bool) -> SandboxBackendHandle {
     SandboxBackendHandle {
         kind: SandboxBackendKind::Docker,
         status: if available {
@@ -245,49 +212,58 @@ pub async fn docker_backend_handle() -> SandboxBackendHandle {
             SandboxStatus::Error
         },
         backend_id: None,
+        isolation: None,
     }
 }
 
-/// Validate that a sandbox policy's Docker configuration doesn't have
-/// dangerous settings (host network, privileged mounts, etc.).
-pub fn validate_docker_policy(policy: &SandboxPolicy) -> Result<(), Vec<String>> {
-    let mut issues = Vec::new();
-
-    if let Some(overrides) = &policy.docker_overrides {
-        if overrides.network.as_deref() == Some("host") {
-            issues.push("Docker sandbox uses host network — defeats network isolation".into());
-        }
+/// The parts of a sandbox policy the module's Docker run policy judges.
+#[cfg(feature = "modules")]
+pub(crate) fn policy_request(policy: &SandboxPolicy) -> contract::DockerPolicyRequest {
+    contract::DockerPolicyRequest {
+        network: policy
+            .docker_overrides
+            .as_ref()
+            .and_then(|overrides| overrides.network.clone()),
+        workspace: Some(policy.workspace_root.to_string_lossy().into_owned()),
+        read_only_mounts: policy
+            .read_only_mounts
+            .iter()
+            .map(|mount| mount.to_string_lossy().into_owned())
+            .collect(),
     }
+}
 
-    // Check for dangerous mount paths.
-    let dangerous_mounts = ["/", "/etc", "/var/run/docker.sock", "/proc", "/sys"];
-    for mount in &policy.read_only_mounts {
-        let path_str = mount.to_string_lossy();
-        for &dangerous in &dangerous_mounts {
-            if path_str == dangerous {
-                issues.push(format!(
-                    "Dangerous read-only mount: {path_str} — could leak host secrets"
-                ));
-            }
-        }
-    }
+/// Ask TinyBox whether a sandbox policy's Docker configuration has dangerous
+/// settings (host network, privileged mounts, ...).
+///
+/// The verdict is the module's: the same check `RunDocker` enforces before it
+/// creates a container. `Ok` carries the findings (empty means safe); an `Err`
+/// means no verdict could be obtained, which callers must not read as safe.
+#[cfg(feature = "modules")]
+pub async fn validate_docker_policy(
+    config: &Config,
+    policy: &SandboxPolicy,
+) -> Result<Vec<String>, String> {
+    let report = tinybox::validate_docker_policy(config, policy_request(policy)).await?;
+    tracing::debug!(
+        issues = report.issues.len(),
+        "[sandbox:docker] TinyBox validated the policy"
+    );
+    Ok(report.issues)
+}
 
-    let workspace_str = policy.workspace_root.to_string_lossy();
-    for &dangerous in &dangerous_mounts {
-        if workspace_str == dangerous {
-            issues.push(format!(
-                "Workspace root is a dangerous path: {workspace_str}"
-            ));
-        }
-    }
-
-    if issues.is_empty() {
-        Ok(())
-    } else {
-        Err(issues)
-    }
+#[cfg(not(feature = "modules"))]
+pub async fn validate_docker_policy(
+    _config: &Config,
+    _policy: &SandboxPolicy,
+) -> Result<Vec<String>, String> {
+    Err("TinyBox module support is disabled; policy validation is unavailable".to_owned())
 }
 
 #[cfg(test)]
 #[path = "docker_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "docker_exec_tests.rs"]
+mod exec_tests;

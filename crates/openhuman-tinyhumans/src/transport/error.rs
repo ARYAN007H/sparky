@@ -3,11 +3,40 @@
 //! the integrations client see exactly the shapes they saw when they called
 //! the SDK directly.
 
-use openhuman_core::backend::transport::BackendTransportError;
+use super::port::BackendTransportError;
+use reqwest::Method;
+use tinyhumans_sdk::classify::channel_message_path;
 use tinyhumans_sdk::Error as SdkError;
 
-/// Map the SDK's error onto the core-owned transport error.
-pub fn map_sdk_error(error: SdkError) -> BackendTransportError {
+/// Map the SDK's error for `method path` onto the core-owned transport error.
+///
+/// A `404` on a channel-message route becomes a typed variant here, because
+/// only this backend's wire behaviour says what it means: a handler's JSON
+/// 404 is a message that no longer exists, while an unmatched-route 404
+/// (Express `finalhandler` HTML) on `PATCH` is the edit route the backend never
+/// implemented (#5230) — the message is still there. The core recovers from
+/// the two differently and never inspects the body itself.
+pub fn map_sdk_error(error: SdkError, method: &Method, path: &str) -> BackendTransportError {
+    if let SdkError::Status { status: 404, .. } = &error {
+        if let Some((provider, message_id)) = channel_message_path(path) {
+            let (provider, message_id) = (provider.to_owned(), message_id.to_owned());
+            if *method == Method::PATCH && error.is_unmatched_route_404() {
+                log::debug!(
+                    "[tinyhumans-transport] {method} {path}: 404 with no matching route; \
+                     channel edit route missing"
+                );
+                return BackendTransportError::ChannelMessageRouteMissing {
+                    provider,
+                    message_id,
+                };
+            }
+            log::debug!("[tinyhumans-transport] {method} {path}: channel message not found");
+            return BackendTransportError::ChannelMessageNotFound {
+                provider,
+                message_id,
+            };
+        }
+    }
     match error {
         SdkError::Url(e) => BackendTransportError::Url(e.to_string()),
         SdkError::Http(e) => BackendTransportError::Http(e),

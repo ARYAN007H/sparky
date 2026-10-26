@@ -28,15 +28,16 @@
  *    (`ChatDoneEvent.citations` / `ChatSegmentEvent.citations`) renders
  *    alongside the `url` sources as a `document` source badge, with no href.
  *
- * Every row now renders through the vendored `sources.aui` element's
- * primitives directly (no collapsible disclosure — see `ChatSources.tsx`),
- * so there is no "expand" step left to drive.
+ * Every row renders through the vendored `sources.aui` element's primitives
+ * directly. A short list (up to `MAX_INLINE_SOURCES`) is inline with no expand
+ * step; a longer one is grouped behind a single "N sources" toggle — a
+ * research turn's twenty-odd badges used to wrap across half the screen.
  *
  * Only the RPC is stubbed — the boundary a unit test should stub. Everything
  * between it and the DOM is production code.
  */
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -44,10 +45,13 @@ import { threadApi } from '../../../../services/api/threadApi';
 import chatRuntimeReducer from '../../../../store/chatRuntimeSlice';
 import mascotReducer from '../../../../store/mascotSlice';
 import runModeReducer from '../../../../store/runModeSlice';
+import threadGoalReducer from '../../../../store/threadGoalSlice';
 import threadReducer from '../../../../store/threadSlice';
+import threadTodosReducer from '../../../../store/threadTodosSlice';
 import type { DerivedDisplayItem } from '../../../../types/derivedTranscript';
 import type { ThreadMessage } from '../../../../types/thread';
 import { AssistantUiChat } from '../AssistantUiChat';
+import { ChatSources, MAX_INLINE_SOURCES, sourceDomain } from './ChatSources';
 
 const THREAD_ID = 't-sources';
 const REQUEST_ID = 'req-sources';
@@ -85,6 +89,8 @@ function buildStore(message: ThreadMessage = agentMessage()) {
   return configureStore({
     reducer: combineReducers({
       thread: threadReducer,
+      threadGoal: threadGoalReducer,
+      threadTodos: threadTodosReducer,
       chatRuntime: chatRuntimeReducer,
       mascot: mascotReducer,
       runMode: runModeReducer,
@@ -233,5 +239,76 @@ describe('inline turn sources', () => {
     // The fetch card may show the raw argument as text; it must never be a link.
     const hrefs = Array.from(document.querySelectorAll('a[href]')).map(a => a.getAttribute('href'));
     expect(hrefs.some(href => href?.startsWith('javascript:'))).toBe(false);
+  });
+
+  it('groups a long source list behind one summary toggle', async () => {
+    const urls = Array.from(
+      { length: MAX_INLINE_SOURCES + 3 },
+      (_, i) => `https://site${i}.example.com/page`
+    );
+    vi.spyOn(threadApi, 'getDerivedTranscript').mockResolvedValue(
+      page(...urls.map((url, i) => toolCall(`c${i}`, url)).reverse()) as never
+    );
+
+    renderChat();
+
+    const toggle = await screen.findByTestId('turn-sources-toggle');
+    // Collapsed: one summary chip, not a wall of badges.
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(toggle.textContent).toContain(`${urls.length} sources`);
+    expect(sourceHrefs()).toEqual([]);
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(sourceHrefs()).toEqual(urls);
+
+    fireEvent.click(toggle);
+    expect(sourceHrefs()).toEqual([]);
+  });
+
+  it('keeps a short source list inline with no toggle', async () => {
+    vi.spyOn(threadApi, 'getDerivedTranscript').mockResolvedValue(
+      page(toolCall('c1', 'https://example.com/a')) as never
+    );
+
+    renderChat();
+
+    await waitFor(() => expect(screen.getByTestId('turn-sources')).toBeTruthy());
+    expect(screen.queryByTestId('turn-sources-toggle')).toBeNull();
+    expect(sourceHrefs()).toEqual(['https://example.com/a']);
+  });
+});
+
+describe('source favicons', () => {
+  const REDIRECT = 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/AbC123';
+
+  it('keys the favicon on a grounding redirect target domain, not the redirect host', () => {
+    render(
+      <ChatSources
+        sources={[
+          { id: 's1', sourceType: 'url', url: REDIRECT, title: 'reddit.com' },
+          { id: 's2', sourceType: 'url', url: 'https://www.docs.rs/x', title: 'A page title' },
+        ]}
+      />
+    );
+
+    const icons = Array.from(
+      document.querySelectorAll<HTMLImageElement>('[data-slot="source-icon"]')
+    ).map(img => img.getAttribute('src'));
+    expect(icons).toEqual([
+      'https://icons.duckduckgo.com/ip3/reddit.com.ico',
+      'https://icons.duckduckgo.com/ip3/docs.rs.ico',
+    ]);
+    // The link itself still goes where the source said.
+    expect(sourceHrefs()).toEqual([REDIRECT, 'https://www.docs.rs/x']);
+  });
+
+  it('falls back to the url host when the title is not a hostname', () => {
+    expect(
+      sourceDomain({ id: 'a', sourceType: 'url', url: 'https://www.x.org/p', title: 'X' })
+    ).toBe('x.org');
+    expect(
+      sourceDomain({ id: 'b', sourceType: 'url', url: REDIRECT, title: 'WWW.Reddit.com' })
+    ).toBe('reddit.com');
   });
 });

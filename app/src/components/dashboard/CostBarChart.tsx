@@ -38,10 +38,12 @@ const CostBarChart = ({ days, currency }: CostBarChartProps) => {
     date: day.date,
     label: shortDayLabel(day.date),
     dayNumber: dayOfMonth(day.date),
-    cost: Number(day.cost_usd.toFixed(4)),
+    cost: day.cost_usd || 0,
     requestCount: day.request_count,
     isToday: day.date === todayDate,
   }));
+
+  const hasSpend = chartData.some(point => point.cost > 0);
 
   return (
     <div data-testid="cost-bar-chart" className="w-full">
@@ -73,7 +75,8 @@ const CostBarChart = ({ days, currency }: CostBarChartProps) => {
               axisLine={false}
               width={52}
               tick={{ fill: 'currentColor', opacity: 0.7 }}
-              tickFormatter={(v: number) => formatCurrency(v, currency)}
+              domain={[0, hasSpend ? 'auto' : 1]}
+              tickFormatter={(v: number) => formatCurrency(v, currency, { precise: true })}
             />
             <Tooltip
               cursor={{ fill: 'rgba(150,150,150,0.10)' }}

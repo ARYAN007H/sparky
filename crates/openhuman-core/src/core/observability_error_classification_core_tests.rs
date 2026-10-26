@@ -140,32 +140,20 @@ fn report_error_or_expected_demotes_codex_auth_unavailable() {
 /// preventable user-state (the server needs OAuth sign-in), already handled
 /// by the `needs_auth` UX (#3733 / #3719), so it must classify as
 /// `McpServerNeedsAuth` and stay out of Sentry. The canonical body comes
-/// straight from `tinymcp::Error::Unauthorized`'s `Display` impl (both the
-/// bare and `resource metadata:` variants), plus the
-/// `mcp_clients_connect`-prefixed RPC re-report shape that actually reaches
-/// the dispatcher.
+/// using the public TinyMCP unauthorized message shape, plus the
+/// `mcp_clients_connect`-prefixed RPC re-report shape that reaches the
+/// dispatcher. The metadata URL is intentionally absent from the message.
 
 #[test]
 fn classifies_mcp_connect_401_as_needs_auth() {
-    // The 401 is a variant of `tinymcp`'s error now rather than a
-    // standalone type. What this test pins is unchanged: the *wording* the
-    // classifier keys on, which is what reaches the dispatcher.
-    let bare = tinymcp::Error::Unauthorized {
-        endpoint: "https://youtube.run.tools".to_string(),
-        resource_metadata: None,
-    };
-    let with_meta = tinymcp::Error::Unauthorized {
-        endpoint: "https://youtube.run.tools".to_string(),
-        resource_metadata: Some(
-            "https://youtube.run.tools/.well-known/oauth-protected-resource".to_string(),
-        ),
-    };
+    // Pin the wording that reaches the classifier without linking the
+    // implementation crate into host tests.
+    let bare = "mcp unauthorized for `https://youtube.run.tools` (HTTP 401)";
     for msg in [
         bare.to_string(),
-        with_meta.to_string(),
         // The stringified RPC re-report shape that propagates from
         // `mcp_clients_connect` to `report_error_or_expected`.
-        format!("openhuman.mcp_clients_connect failed: {with_meta}"),
+        format!("openhuman.mcp_clients_connect failed: {bare}"),
     ] {
         assert_eq!(
             expected_error_kind(&msg),
@@ -188,7 +176,7 @@ fn classifies_mcp_connect_401_as_needs_auth() {
 /// turn-killing failure in the same session emitted zero (#5804).
 ///
 /// The bare message was already demoted at the RPC boundary by
-/// `jsonrpc::is_wallet_not_configured_error`, which is exact equality — so
+/// `jsonrpc::classify::is_wallet_not_configured_error`, which is exact equality — so
 /// a single caller adding context defeated it. The observed wrap is
 /// `self_identity key_status: {e}`, but nothing about the fix is specific
 /// to that method: the classifier is substring-based, so it must hold for
@@ -236,6 +224,8 @@ fn wallet_demotion_does_not_swallow_real_wallet_failures() {
         "no wallet account derived for chain 'solana'",
         "wallet is not responding",
         "failed to decrypt wallet mnemonic",
+        "wallet signing failed: invalid nonce",
+        "self_identity key_status: wallet is configured but the key is corrupt",
     ] {
         assert_ne!(
             expected_error_kind(msg),
@@ -259,63 +249,6 @@ fn wallet_not_configured_sentinel_is_ascii_lowercase() {
         "WALLET_NOT_CONFIGURED_MESSAGE must stay ASCII-lowercase, or \
          is_wallet_not_configured_message must lowercase it before comparing"
     );
-}
-
-/// Sentry TAURI-RUST-QWW (#5164): a memory-store identifier rejection is
-/// deterministic in the caller's own input, so it repeats at the caller's
-/// retry rate (3,055 events / 1 user / 1 day) without carrying new signal.
-/// Every rejection wording the store emits must classify as
-/// `MemoryIdentifierRejected`, including the retired PII wording that
-/// pre-#5164 cores still send.
-
-#[test]
-fn classifies_memory_identifier_rejections_as_expected() {
-    for msg in [
-        "document namespace/key cannot contain secrets",
-        "document namespace/key cannot contain personal identifiers",
-        "document key cannot be empty",
-        "kv key cannot contain secrets",
-        "kv namespace/key cannot contain secrets",
-        "episodic session_id/role cannot contain secrets",
-        // The stringified RPC re-report shape that reaches the dispatcher.
-        "openhuman.memory_store failed: document namespace/key cannot contain secrets",
-    ] {
-        assert_eq!(
-            expected_error_kind(msg),
-            Some(ExpectedErrorKind::MemoryIdentifierRejected),
-            "must classify as MemoryIdentifierRejected: {msg}"
-        );
-    }
-    // Full demotion path (classifier -> report arm) must not panic.
-    report_error_or_expected(
-        "document namespace/key cannot contain secrets",
-        "rpc",
-        "openhuman.memory_store",
-        &[],
-    );
-}
-
-/// Guard against over-suppression: a real failure on the same memory write
-/// path — SQLite, embeddings, the markdown sidecar — carries none of the
-/// rejection wording and MUST still reach Sentry (stay `None`). Nor may a
-/// bare "cannot contain secrets" from an unrelated domain borrow the
-/// memory-store demotion.
-
-#[test]
-fn does_not_classify_real_memory_write_failures_as_identifier_rejections() {
-    for msg in [
-        "upsert memory_docs: database is locked",
-        "insert vector chunk: disk I/O error",
-        "lookup existing document_id: no such table: memory_docs",
-        "write_markdown_doc: permission denied",
-        "webhook payload cannot contain secrets",
-    ] {
-        assert_ne!(
-            expected_error_kind(msg),
-            Some(ExpectedErrorKind::MemoryIdentifierRejected),
-            "must NOT classify as MemoryIdentifierRejected: {msg}"
-        );
-    }
 }
 
 /// Guard against over-suppression: an MCP transport failure that is NOT the

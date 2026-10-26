@@ -1,12 +1,15 @@
 //! Controller schemas and handler registrations for the embeddings domain.
 
+use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-use crate::config::ops as config_rpc;
 use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use crate::rpc::RpcOutcome;
+use crate::inference::schema_fields::{
+    json_output, optional_string, optional_u64, required_string,
+};
 
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
     vec![
@@ -55,19 +58,24 @@ pub fn schemas(function: &str) -> ControllerSchema {
             function: "get_settings",
             description: "Get current embedding settings and provider catalog.",
             inputs: vec![],
-            outputs: vec![json_output("settings", "Embedding settings and provider catalog.")],
+            outputs: vec![json_output(
+                "settings",
+                "Embedding settings and provider catalog.",
+            )],
         },
         "update_settings" => ControllerSchema {
             namespace: "embeddings",
             function: "update_settings",
-            description: "Update embedding provider, model, or dimensions. Requires confirm_wipe when signature changes.",
+            description: "Update embedding provider, model, or dimensions.",
             inputs: vec![
                 optional_string("provider", "Embedding provider slug."),
                 optional_string("model", "Model identifier."),
                 optional_u64("dimensions", "Output vector dimensions."),
-                optional_string("custom_endpoint", "Custom endpoint URL (for custom provider)."),
+                optional_string(
+                    "custom_endpoint",
+                    "Custom endpoint URL (for custom provider).",
+                ),
                 optional_u64("rate_limit_per_min", "Rate limit in requests per minute."),
-                optional_bool("confirm_wipe", "Confirm memory wipe on signature change."),
             ],
             outputs: vec![json_output("result", "Updated settings.")],
         },
@@ -76,7 +84,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
             function: "set_api_key",
             description: "Store an API key for an embedding provider.",
             inputs: vec![
-                required_string("provider", "Provider slug (e.g. voyage, openai, cohere, custom)."),
+                required_string(
+                    "provider",
+                    "Provider slug (e.g. voyage, openai, cohere, custom).",
+                ),
                 required_string("api_key", "The API key to store."),
             ],
             outputs: vec![json_output("result", "Storage confirmation.")],
@@ -85,9 +96,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
             namespace: "embeddings",
             function: "clear_api_key",
             description: "Remove the stored API key for an embedding provider.",
-            inputs: vec![
-                required_string("provider", "Provider slug."),
-            ],
+            inputs: vec![required_string("provider", "Provider slug.")],
             outputs: vec![json_output("result", "Removal confirmation.")],
         },
         "embed" => ControllerSchema {
@@ -137,8 +146,6 @@ struct UpdateSettingsParams {
     dimensions: Option<usize>,
     custom_endpoint: Option<String>,
     rate_limit_per_min: Option<u32>,
-    #[serde(default)]
-    confirm_wipe: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -166,58 +173,58 @@ struct TestConnectionParams {
 
 // ── Handlers ───────────────────────────────────────────────
 
-fn handle_get_settings(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_settings(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(super::rpc::get_settings(&config).await?)
     })
 }
 
-fn handle_update_settings(params: Map<String, Value>) -> ControllerFuture {
+fn handle_update_settings(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<UpdateSettingsParams>(params)?;
         to_json(
             super::rpc::update_settings(
+                &ctx,
                 p.provider,
                 p.model,
                 p.dimensions,
                 p.custom_endpoint,
                 p.rate_limit_per_min,
-                p.confirm_wipe,
             )
             .await?,
         )
     })
 }
 
-fn handle_set_api_key(params: Map<String, Value>) -> ControllerFuture {
+fn handle_set_api_key(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<SetApiKeyParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(super::rpc::set_api_key(&config, &p.provider, &p.api_key).await?)
     })
 }
 
-fn handle_clear_api_key(params: Map<String, Value>) -> ControllerFuture {
+fn handle_clear_api_key(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<ClearApiKeyParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(super::rpc::clear_api_key(&config, &p.provider).await?)
     })
 }
 
-fn handle_embed(params: Map<String, Value>) -> ControllerFuture {
+fn handle_embed(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<EmbedParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(super::rpc::embed(&config, &p.inputs).await?)
     })
 }
 
-fn handle_test_connection(params: Map<String, Value>) -> ControllerFuture {
+fn handle_test_connection(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<TestConnectionParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(
             super::rpc::test_connection(
                 &config,
@@ -232,7 +239,7 @@ fn handle_test_connection(params: Map<String, Value>) -> ControllerFuture {
 
 // ── Helpers ────────────────────────────────────────────────
 
-fn to_json<T: serde::Serialize>(outcome: RpcOutcome<T>) -> Result<Value, String> {
+fn to_json<T: serde::Serialize>(outcome: Outcome<T>) -> Result<Value, String> {
     outcome.into_cli_compatible_json()
 }
 
@@ -240,51 +247,6 @@ fn deserialize_params<T: serde::de::DeserializeOwned>(
     params: Map<String, Value>,
 ) -> Result<T, String> {
     serde_json::from_value(Value::Object(params)).map_err(|e| format!("invalid params: {e}"))
-}
-
-fn required_string(name: &'static str, comment: &'static str) -> FieldSchema {
-    FieldSchema {
-        name,
-        ty: TypeSchema::String,
-        comment,
-        required: true,
-    }
-}
-
-fn optional_string(name: &'static str, comment: &'static str) -> FieldSchema {
-    FieldSchema {
-        name,
-        ty: TypeSchema::Option(Box::new(TypeSchema::String)),
-        comment,
-        required: false,
-    }
-}
-
-fn optional_bool(name: &'static str, comment: &'static str) -> FieldSchema {
-    FieldSchema {
-        name,
-        ty: TypeSchema::Option(Box::new(TypeSchema::Bool)),
-        comment,
-        required: false,
-    }
-}
-
-fn optional_u64(name: &'static str, comment: &'static str) -> FieldSchema {
-    FieldSchema {
-        name,
-        ty: TypeSchema::Option(Box::new(TypeSchema::U64)),
-        comment,
-        required: false,
-    }
-}
-
-fn json_output(name: &'static str, comment: &'static str) -> FieldSchema {
-    FieldSchema {
-        name,
-        ty: TypeSchema::Json,
-        comment,
-        required: true,
-    }
 }
 
 #[cfg(test)]

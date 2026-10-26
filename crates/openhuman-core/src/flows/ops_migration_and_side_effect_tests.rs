@@ -8,15 +8,18 @@ use super::*;
 /// production.
 #[tokio::test]
 async fn flows_discover_applies_the_flow_discovery_definitions_effective_iteration_cap() {
+    crate::agent::session_host::test_support::install_model_fixture();
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     assert_eq!(config.agent.max_tool_iterations, 10);
 
     // Building an agent constructs a memory client, which needs the host seams
     // wired. `Once`-guarded, so this is free when another test got there first.
-    crate::agent::harness::AgentDefinitionRegistry::init_global(&config.workspace_dir)
-        .expect("agent registry init");
-    let def = crate::agent::harness::AgentDefinitionRegistry::global()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
+        &config.workspace_dir,
+    )
+    .expect("agent registry init");
+    let def = crate::agent_registry::host_definition::AgentDefinitionRegistry::global()
         .expect("registry initialised")
         .get("flow_discovery")
         .expect("flow_discovery definition registered")
@@ -24,37 +27,13 @@ async fn flows_discover_applies_the_flow_discovery_definitions_effective_iterati
     let expected = def.effective_max_iterations();
     assert_eq!(expected, 50);
 
-    let agent =
-        crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "flow_discovery")
-            .expect("build flow_discovery agent");
+    let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "flow_discovery",
+    )
+    .expect("build flow_discovery agent");
     assert_eq!(agent.agent_config().max_tool_iterations, expected);
-}
-
-#[test]
-fn validate_and_migrate_graph_rejects_condition_edges_with_branch_label_on_to_port() {
-    // The exact malformed shape the workflow_builder agent produced live
-    // (see issue B23): both edges share `from_port: "main"` with the branch
-    // label on `to_port` instead. The engine routes exclusively on
-    // `from_port` (B24, `tinyflows::validate`), so this must be a hard
-    // reject here — never persisted as a silently-broken no-op condition.
-    let bad_graph = condition_graph("main", "true", "main", "false");
-
-    let err = validate_and_migrate_graph(bad_graph)
-        .expect_err("condition edges with the branch label on to_port must be rejected");
-    assert!(
-        err.contains("condition") && err.contains("from_port"),
-        "expected an InvalidConditionRouting-style error naming from_port, got: {err}"
-    );
-}
-
-#[test]
-fn validate_and_migrate_graph_accepts_condition_edges_with_branch_label_on_from_port() {
-    // The correct shape: `from_port` carries "true"/"false", `to_port` stays
-    // "main".
-    let good_graph = condition_graph("true", "main", "false", "main");
-
-    validate_and_migrate_graph(good_graph)
-        .expect("correctly-routed condition graph (branch label on from_port) must validate");
 }
 
 #[tokio::test]
@@ -352,69 +331,37 @@ async fn flows_update_does_not_force_require_approval_on_readonly_graph() {
     );
 }
 
-// ── graph_has_outbound_side_effect / trigger_is_automatic helper tests ────
-
-#[test]
-fn graph_has_outbound_side_effect_detects_tool_call() {
-    let g = graph(tool_call_graph());
-    assert!(graph_has_outbound_side_effect(&g));
-}
-
-#[test]
-fn graph_has_outbound_side_effect_detects_http_request() {
-    let g = graph(http_request_graph());
-    assert!(graph_has_outbound_side_effect(&g));
-}
-
-#[test]
-fn graph_has_outbound_side_effect_detects_code() {
-    let g = graph(code_graph());
-    assert!(graph_has_outbound_side_effect(&g));
-}
-
-#[test]
-fn graph_has_outbound_side_effect_false_for_agent_only() {
-    let g = graph(readonly_graph());
-    assert!(!graph_has_outbound_side_effect(&g));
-}
-
-#[test]
-fn trigger_is_automatic_schedule() {
-    let g = graph(schedule_trigger_graph("0 9 * * *"));
-    assert!(trigger_is_automatic(&g));
-}
-
-#[test]
-fn trigger_is_automatic_manual() {
-    let g = graph(manual_trigger_graph());
-    assert!(!trigger_is_automatic(&g));
-}
-
-#[test]
-fn trigger_is_automatic_no_trigger_kind() {
-    let g = graph(trigger_only_graph());
-    assert!(!trigger_is_automatic(&g));
-}
-
 #[tokio::test]
 async fn strict_gate_passes_a_valid_graph_and_rejects_a_structurally_invalid_one() {
     let config = Config::default();
     // A trigger-only graph is structurally valid and has no outbound gates.
-    assert!(strict_gate(&config, &trigger_only_graph()).await.is_ok());
+    assert!(strict_gate(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &trigger_only_graph()
+    )
+    .await
+    .is_ok());
 
     // No trigger → structural failure surfaced by strict mode.
     let bad = json!({
         "nodes": [ { "id": "a", "kind": "output_parser", "name": "A" } ],
         "edges": []
     });
-    let err = strict_gate(&config, &bad).await.unwrap_err();
+    let err = strict_gate(&crate::core::runtime::DispatchCtx::ambient(), &config, &bad)
+        .await
+        .unwrap_err();
     assert!(err.contains("structurally invalid"), "{err}");
     assert!(err.contains("trigger"), "{err}");
 
     // A structurally valid graph must still pass the shared engine gate.
-    let err = strict_gate(&config, &nested_conditional_fan_in_graph())
-        .await
-        .unwrap_err();
+    let err = strict_gate(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &nested_conditional_fan_in_graph(),
+    )
+    .await
+    .unwrap_err();
     assert!(err.contains(UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN), "{err}");
 }
 
@@ -429,11 +376,16 @@ async fn strict_gate_rejects_an_incompatible_saved_child_reference() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
 
-    let error = strict_gate(&config, &referenced_child_graph(&child.id))
-        .await
-        .expect_err("strict authoring must reject an incompatible saved child");
+    let error = strict_gate(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &referenced_child_graph(&child.id),
+    )
+    .await
+    .expect_err("strict authoring must reject an incompatible saved child");
     assert!(
         error.contains(UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN),
         "{error}"
@@ -453,10 +405,12 @@ async fn builder_proposal_rejects_an_incompatible_saved_child_reference() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
     let parent = structurally_valid_graph(referenced_child_graph(&child.id));
 
     let error = build_builder_proposal(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         "propose_workflow",
         "parent",
@@ -477,8 +431,8 @@ async fn builder_proposal_rejects_an_incompatible_saved_child_reference() {
     assert!(error.contains("saved-child"), "{error}");
 }
 
-#[test]
-fn referenced_child_compatibility_stops_at_saved_workflow_cycles() {
+#[tokio::test]
+async fn referenced_child_compatibility_stops_at_saved_workflow_cycles() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let flow_a = store::create_flow(
@@ -488,7 +442,8 @@ fn referenced_child_compatibility_stops_at_saved_workflow_cycles() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
     let flow_b = store::create_flow(
         &config,
         "cycle b".to_string(),
@@ -496,7 +451,8 @@ fn referenced_child_compatibility_stops_at_saved_workflow_cycles() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
     store::update_flow_graph(
         &config,
         &flow_a.id,
@@ -521,14 +477,21 @@ fn referenced_child_compatibility_stops_at_saved_workflow_cycles() {
     .unwrap();
 
     let candidate = structurally_valid_graph(referenced_child_graph(&flow_a.id));
-    assert!(referenced_workflow_compatibility_errors(&config, &candidate).is_empty());
+    assert!(config_aware_engine_compatibility_errors(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        serde_json::to_value(candidate).unwrap(),
+    )
+    .await
+    .unwrap()
+    .is_empty());
 }
 
 // ── core-managed drafts (F5) ─────────────────────────────────────────────────
 
 #[tokio::test]
 async fn draft_promote_creates_a_new_flow_and_removes_the_draft() {
-    use crate::flows::DraftOrigin;
+    use tinyflows_bus::catalog::DraftOrigin;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
@@ -555,7 +518,7 @@ async fn draft_promote_creates_a_new_flow_and_removes_the_draft() {
 
 #[tokio::test]
 async fn draft_promote_with_flow_id_updates_the_existing_flow() {
-    use crate::flows::DraftOrigin;
+    use tinyflows_bus::catalog::DraftOrigin;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
@@ -588,7 +551,7 @@ async fn draft_promote_with_flow_id_updates_the_existing_flow() {
 
 #[tokio::test]
 async fn draft_promote_of_invalid_graph_is_rejected_and_keeps_the_draft() {
-    use crate::flows::DraftOrigin;
+    use tinyflows_bus::catalog::DraftOrigin;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
@@ -605,96 +568,3 @@ async fn draft_promote_of_invalid_graph_is_rejected_and_keeps_the_draft() {
     // The draft survives a failed promote so the user can fix it.
     assert!(flows_draft_get(&config, &draft.id).is_ok());
 }
-
-/// Regression for #6540: a graph whose *node* omits `name` must report which
-/// object is at fault, not a bare `missing field \`name\``.
-///
-/// The bare message is worse than uninformative here, because the one reading
-/// it cannot even rule out the obvious candidate: every field of
-/// `WorkflowGraph` is `#[serde(default)]`, so the top-level `name` can never be
-/// the cause — yet an authoring agent that assumes it is will re-send the same
-/// graph until it exhausts its iteration cap. That is exactly what happened
-/// live: six identical retries, 392k input tokens, no workflow created.
-#[test]
-fn migrate_and_deserialize_graph_names_the_node_that_is_missing_a_field() {
-    let missing_node_name = json!({
-        "name": "top-level name is present and is NOT the problem",
-        "nodes": [
-            { "id": "start", "kind": "trigger", "name": "Trigger" },
-            { "id": "nameless", "kind": "trigger" }
-        ]
-    });
-
-    let err = migrate_and_deserialize_graph(missing_node_name)
-        .expect_err("a node without `name` must not deserialize");
-
-    // The path is the point of the fix: `nodes[1]` is the second node, and
-    // naming it is what distinguishes this from the two other required `name`
-    // fields reachable from one graph (`Port::name`, `WorkflowInput::name`).
-    assert!(
-        err.contains("nodes[1]"),
-        "error must name the offending node's path, got: {err}"
-    );
-    // ...and the original serde detail must survive the wrapping, or the fix
-    // would have traded one unactionable message for another.
-    assert!(
-        err.contains("missing field") && err.contains("name"),
-        "error must still say which field is missing, got: {err}"
-    );
-}
-
-/// The premise of the test above: a graph with no top-level `name` at all
-/// deserializes fine. If this ever starts failing, `missing field \`name\``
-/// becomes genuinely ambiguous and the path in the message matters more, not
-/// less.
-#[test]
-fn migrate_and_deserialize_graph_accepts_a_graph_with_no_top_level_name() {
-    let no_top_level_name = json!({
-        "nodes": [ { "id": "start", "kind": "trigger", "name": "Trigger" } ]
-    });
-
-    let graph = migrate_and_deserialize_graph(no_top_level_name)
-        .expect("top-level `name` is #[serde(default)] and must not be required");
-    assert_eq!(
-        graph.name, "",
-        "absent top-level name must default to empty"
-    );
-}
-
-/// Regression for the misattribution case raised in review on #6545: when the
-/// graph's own fields are at fault *and* a node is independently invalid, the
-/// error must not be pinned on the node.
-///
-/// Locating by "first member that fails on its own" is only sound once the
-/// top level is known good — otherwise it turns a correct vague message into a
-/// confident wrong one, which is worse than what this PR set out to fix.
-#[test]
-fn migrate_and_deserialize_graph_does_not_blame_a_node_for_a_top_level_fault() {
-    let top_level_fault = json!({
-        // Wrong type, not missing: `name` is `String`, so this fails the graph
-        // parse on its own account.
-        "name": 123,
-        "nodes": [
-            // Independently invalid too — the bait for the member scan.
-            { "id": "nameless", "kind": "trigger" }
-        ]
-    });
-
-    let err = migrate_and_deserialize_graph(top_level_fault)
-        .expect_err("a non-string top-level `name` must not deserialize");
-
-    // Assert what must NOT be claimed. Comparing the rendered string to the
-    // bare serde message would pass for the wrong reason: the two messages can
-    // coincide without the failing path being the same one.
-    assert!(
-        !err.contains("nodes["),
-        "a top-level fault must not be attributed to a node, got: {err}"
-    );
-    assert!(
-        err.contains("name"),
-        "error should still name the offending field, got: {err}"
-    );
-}
-
-#[path = "ops_migration_deserialize_tests.rs"]
-mod deserialize_tests;

@@ -4,58 +4,104 @@
 
 use crate::config::Config;
 use crate::core::runtime::context::CoreContext;
-use crate::memory::conversations;
-use crate::memory::conversations::{ConversationMessage, ConversationThread};
-use crate::memory::{
-    ApiEnvelope, ApiMeta, ConversationMessageRecord, ConversationThreadSummary, PaginationMeta,
-};
-use crate::rpc::RpcOutcome;
-use crate::threads::title::{
-    title_from_user_message, title_log_fingerprint, THREAD_TITLE_LOG_PREFIX,
-};
-use serde::Serialize;
-use std::collections::BTreeMap;
+use crate::core::runtime::DispatchCtx;
+use crate::threads::store as conversations;
+use crate::threads::store::{ConversationMessage, ConversationThread};
+use crate::threads::THREAD_TITLE_LOG_PREFIX;
+use crate::threads::{ConversationMessageRecord, ConversationThreadSummary};
 use std::path::PathBuf;
+use tinyagents_harness::title::{title_from_user_message, title_log_fingerprint};
 
-pub(super) fn request_id() -> String {
-    uuid::Uuid::new_v4().to_string()
-}
-
-pub(super) fn counts(
-    entries: impl IntoIterator<Item = (&'static str, usize)>,
-) -> BTreeMap<String, usize> {
-    entries
-        .into_iter()
-        .map(|(k, v)| (k.to_string(), v))
-        .collect()
-}
-
-pub(super) fn envelope<T: Serialize>(
-    data: T,
-    counts: Option<BTreeMap<String, usize>>,
-    pagination: Option<PaginationMeta>,
-) -> RpcOutcome<ApiEnvelope<T>> {
-    RpcOutcome::new(
-        ApiEnvelope {
-            data: Some(data),
-            error: None,
-            meta: ApiMeta {
-                request_id: request_id(),
-                latency_seconds: None,
-                cached: None,
-                counts,
-                pagination,
-            },
-        },
-        vec![],
-    )
-}
+// One envelope/counts implementation for every ApiEnvelope-returning domain.
+pub(super) use crate::core::envelope::{counts, envelope};
 
 pub(super) async fn workspace_dir() -> Result<PathBuf, String> {
     Config::load_or_init()
         .await
         .map(|c| c.workspace_dir)
         .map_err(|e| format!("load config: {e}"))
+}
+
+/// Where a thread's session transcripts live for one request: the workspace
+/// and the agent key the session host stored them under.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TranscriptStore {
+    pub workspace_dir: PathBuf,
+    /// The store key ([`agent_key_for`](crate::storage::sessions::agent_key_for)):
+    /// `<profile>~<agent>` for a SaaS profile, else the agent, else the chat agent id.
+    pub key: String,
+}
+
+impl TranscriptStore {
+    /// The transcript port for this key: the installed session store, else
+    /// the workspace's own store.
+    pub(crate) fn locator(
+        &self,
+    ) -> std::sync::Arc<dyn tinyagents_session::transcript::TranscriptLocator> {
+        crate::storage::sessions::transcripts_or_files(&self.key, &self.workspace_dir)
+    }
+}
+
+/// The transcript store of `thread_id` for the request `ctx` carries: the key
+/// the thread's transcripts were first written under, recorded with the thread
+/// ([`ConversationStore::record_transcript_key`](crate::threads::store::ConversationStore::record_transcript_key)),
+/// so a later `chat_agent_id` change cannot strand its earlier turns. A thread
+/// with no record resolves as the session host would today: the config's chat
+/// agent as the fallback id, and the request's own tenant (never the ambient
+/// one), so a SaaS profile's key keeps its profile prefix.
+///
+/// # Errors
+///
+/// The config cannot be loaded, the request has no tenant in SaaS mode, or the
+/// recorded key cannot be read.
+pub(crate) async fn transcript_store(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+) -> Result<TranscriptStore, String> {
+    let config = ctx
+        .load_config()
+        .await
+        .map_err(|e| format!("load config: {e}"))?;
+    let tenant = crate::core::runtime::tenant::tenant_in(
+        crate::core::runtime::is_saas(),
+        ctx.resolved().as_deref(),
+    )
+    .map_err(|no_tenant| no_tenant.to_string())?;
+    let mut store = transcript_store_for(&config, &tenant);
+    let recorded = crate::threads::store::blocking::transcript_key(
+        ctx.clone(),
+        config.workspace_dir.clone(),
+        thread_id.to_string(),
+    )
+    .await?;
+    if let Some(key) = recorded {
+        log::debug!(
+            "[threads] transcript store key from the thread's recorded key (differs_from_current_rule={})",
+            key != store.key
+        );
+        store.key = key;
+    }
+    Ok(store)
+}
+
+/// [`transcript_store`] for an already-resolved config and tenant.
+pub(crate) fn transcript_store_for(
+    config: &Config,
+    tenant: &crate::core::runtime::Tenant,
+) -> TranscriptStore {
+    let key = crate::storage::sessions::agent_key_for(
+        tenant,
+        &crate::web_chat::pick_target_agent_id(config),
+    );
+    log::debug!(
+        "[threads] transcript store key resolved profile={} agent={}",
+        tenant.profile.is_some(),
+        tenant.agent.is_some()
+    );
+    TranscriptStore {
+        workspace_dir: config.workspace_dir.clone(),
+        key,
+    }
 }
 
 /// Run a destructive sequence to completion even if the caller's future is
@@ -74,16 +120,20 @@ pub(super) async fn workspace_dir() -> Result<PathBuf, String> {
 /// to hold.
 ///
 /// Owning the mutation *and* its cleanup in one spawned task decouples the
-/// sequence from the caller's lifetime. The ambient [`CoreContext`] is carried
-/// across explicitly: a bare `tokio::spawn` drops the `task_local` scope, and
-/// `CoreContext::current` then silently falls back to the process default —
-/// which under multi-tenant scoped dispatch is the wrong workspace.
-pub(super) async fn run_to_completion<T, F>(operation: &'static str, fut: F) -> Result<T, String>
+/// sequence from the caller's lifetime. The caller's [`CoreContext`] is moved
+/// into the task explicitly: a bare `tokio::spawn` drops the `task_local` scope,
+/// and the task would silently fall back to the process default — which under
+/// multi-tenant scoped dispatch is the wrong workspace.
+pub(super) async fn run_to_completion<T, F>(
+    dispatch: &crate::core::runtime::DispatchCtx,
+    operation: &'static str,
+    fut: F,
+) -> Result<T, String>
 where
     F: std::future::Future<Output = Result<T, String>> + Send + 'static,
     T: Send + 'static,
 {
-    let ctx = CoreContext::current();
+    let ctx = dispatch.core().cloned();
     tokio::spawn(async move {
         match ctx {
             Some(ctx) => CoreContext::scope(ctx, fut).await,
@@ -113,6 +163,7 @@ pub(super) fn thread_to_summary(thread: ConversationThread) -> ConversationThrea
         parent_thread_id: thread.parent_thread_id,
         labels: thread.labels,
         personality_id: thread.personality_id,
+        action_dir: thread.working_dir,
     }
 }
 
@@ -160,6 +211,7 @@ pub(super) fn fallback_title_from_user_message(
 }
 
 pub(super) async fn update_thread_with_fallback_title(
+    ctx: &DispatchCtx,
     dir: PathBuf,
     thread: ConversationThread,
     user_message: &str,
@@ -171,6 +223,7 @@ pub(super) async fn update_thread_with_fallback_title(
         return Ok(thread);
     }
     conversations::blocking::update_thread_title(
+        ctx.clone(),
         dir,
         thread.id.clone(),
         title,

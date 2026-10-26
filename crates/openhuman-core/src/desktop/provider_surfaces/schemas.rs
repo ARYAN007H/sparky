@@ -3,12 +3,13 @@
 //! The first cut exposes normalized provider event ingestion plus a queue
 //! listing endpoint suitable for local-first assistive UI surfaces.
 
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
 use crate::core::all::RegisteredController;
+use crate::core::envelope::EmptyRequest;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use crate::memory::EmptyRequest;
 
 use super::ops;
 use super::types::ProviderEvent;
@@ -83,14 +84,20 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_ingest_event(params: Map<String, Value>) -> crate::core::all::ControllerFuture {
+fn handle_ingest_event(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> crate::core::all::ControllerFuture {
     Box::pin(async move {
         let payload: ProviderEvent = parse_params(params)?;
         ops::ingest_event(payload).await?.into_cli_compatible_json()
     })
 }
 
-fn handle_list_queue(params: Map<String, Value>) -> crate::core::all::ControllerFuture {
+fn handle_list_queue(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> crate::core::all::ControllerFuture {
     Box::pin(async move {
         let payload: EmptyRequest = parse_params(params)?;
         ops::list_queue(payload).await?.into_cli_compatible_json()

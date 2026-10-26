@@ -1,4 +1,6 @@
 use super::*;
+use crate::test_env::env_lock;
+use openhuman_rpc::embed::artifacts::FileRoots;
 
 #[test]
 fn sanitize_rejects_path_separators() {
@@ -21,44 +23,164 @@ fn sanitize_accepts_plain_names() {
 }
 
 #[test]
-fn validate_source_rejects_relative_and_empty() {
-    assert!(validate_source("").is_err());
-    assert!(validate_source("relative/path.pptx").is_err());
-    assert!(validate_source("/definitely/not/here.pptx").is_err());
+fn sanitize_maps_windows_special_names_to_one_plain_component() {
+    for (input, expected) in [
+        ("C:evil.dll", "C_evil.dll"),
+        ("notes.txt:hidden", "notes.txt_hidden"),
+        ("Q3: plan <draft>?.pptx", "Q3_ plan _draft__.pptx"),
+        ("a\"b|c*.txt", "a_b_c_.txt"),
+        ("tab\there.txt", "tab_here.txt"),
+        ("evil.dll. . ", "evil.dll"),
+        ("CON", "_CON"),
+        ("nul.txt", "_nul.txt"),
+        ("com1.log", "_com1.log"),
+        ("LPT9", "_LPT9"),
+        ("CON .txt", "_CON .txt"),
+        ("conin$", "_conin$"),
+        ("CONOUT$.log", "_CONOUT$.log"),
+        ("COM¹.txt", "_COM¹.txt"),
+        ("lpt³.pdf", "_lpt³.pdf"),
+        ("COM⁴.txt", "COM⁴.txt"),
+        ("COM10.log", "COM10.log"),
+        ("Console.txt", "Console.txt"),
+    ] {
+        let out = sanitize_filename(input).unwrap();
+        assert_eq!(out, expected, "{input:?}");
+        assert_eq!(
+            std::path::Path::new(&out).components().count(),
+            1,
+            "{input:?}"
+        );
+    }
+    assert!(sanitize_filename("...").is_err());
 }
 
-#[test]
-fn assert_artifact_source_accepts_file_under_artifacts_root() {
+async fn ready_artifact(workspace: &Path, files_dir: &Path) -> String {
+    use openhuman_rpc::embed::artifacts::{create_artifact, finalize_artifact, ArtifactKind};
+    let (meta, path) = create_artifact(
+        workspace,
+        files_dir,
+        ArtifactKind::Presentation,
+        "Deck",
+        "pptx",
+        None,
+    )
+    .await
+    .unwrap();
+    std::fs::write(&path, b"deck").unwrap();
+    finalize_artifact(workspace, &meta.id, 4, None)
+        .await
+        .unwrap();
+    meta.id
+}
+
+// Keep the shared environment lock across the async storage reads so tests
+// that change process-wide backend configuration cannot race this lookup.
+#[allow(clippy::await_holding_lock)]
+#[tokio::test]
+async fn resolve_source_returns_the_file_in_the_files_folder() {
+    // Core-process tests can install a process-global storage backend while
+    // the artifact API resolves the record. Keep both operations on the same
+    // stable host context, as in the other workspace-bound shell tests.
+    let _env_lock = env_lock();
     let temp = tempfile::tempdir().unwrap();
-    let root = temp.path();
-    let art = root.join("users/u1/workspace/artifacts/a-1");
-    std::fs::create_dir_all(&art).unwrap();
-    let file = art.join("deck.pptx");
-    std::fs::write(&file, b"x").unwrap();
-    assert!(assert_artifact_source(&file, root).is_ok());
+    let files_dir = temp.path().join("Files");
+    let id = ready_artifact(temp.path(), &files_dir).await;
+    assert_eq!(
+        resolve_source(temp.path(), &FileRoots::new(&files_dir), &id)
+            .await
+            .unwrap(),
+        files_dir.join("deck.pptx")
+    );
 }
 
-#[test]
-fn assert_artifact_source_rejects_file_without_artifacts_component() {
+#[tokio::test]
+async fn resolve_source_rejects_unknown_ids_and_paths() {
     let temp = tempfile::tempdir().unwrap();
-    let root = temp.path();
-    let other = root.join("users/u1/secrets");
-    std::fs::create_dir_all(&other).unwrap();
-    let file = other.join("token.txt");
-    std::fs::write(&file, b"x").unwrap();
-    assert!(assert_artifact_source(&file, root).is_err());
+    assert!(
+        resolve_source(temp.path(), &FileRoots::new(temp.path()), "")
+            .await
+            .is_err()
+    );
+    assert!(resolve_source(
+        temp.path(),
+        &FileRoots::new(temp.path()),
+        "no-such-artifact"
+    )
+    .await
+    .is_err());
+    // A path is not an id: the store's id validation refuses separators.
+    assert!(
+        resolve_source(temp.path(), &FileRoots::new(temp.path()), "/etc/passwd")
+            .await
+            .is_err()
+    );
 }
 
-#[test]
-fn assert_artifact_source_rejects_file_outside_root() {
-    let root_dir = tempfile::tempdir().unwrap();
-    let outside_dir = tempfile::tempdir().unwrap();
-    // Even with an `artifacts` segment, a path outside the root is denied.
-    let art = outside_dir.path().join("artifacts");
-    std::fs::create_dir_all(&art).unwrap();
-    let file = art.join("evil.pptx");
-    std::fs::write(&file, b"x").unwrap();
-    assert!(assert_artifact_source(&file, root_dir.path()).is_err());
+#[tokio::test]
+async fn resolve_source_refuses_a_file_the_store_does_not_vouch_for() {
+    use openhuman_rpc::embed::artifacts::{ArtifactKind, ArtifactMeta, ArtifactStatus};
+    let temp = tempfile::tempdir().unwrap();
+    let secret = temp.path().join("secret.txt");
+    std::fs::write(&secret, b"private").unwrap();
+    let meta = ArtifactMeta {
+        id: "tampered".to_string(),
+        kind: ArtifactKind::Other,
+        title: "x".to_string(),
+        path: "secret.txt".to_string(),
+        file: Some(secret.to_string_lossy().into_owned()),
+        file_root: Some(temp.path().join("Files").to_string_lossy().into_owned()),
+        size_bytes: 7,
+        status: ArtifactStatus::Ready,
+        created_at: chrono::Utc::now(),
+        error: None,
+        thread_id: None,
+        tool_call_id: None,
+    };
+    let dir = temp.path().join("artifacts").join("tampered");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("meta.json"), serde_json::to_vec(&meta).unwrap()).unwrap();
+    assert!(resolve_source(
+        temp.path(),
+        &FileRoots::new(temp.path().join("Files")),
+        "tampered"
+    )
+    .await
+    .is_err());
+}
+
+/// Download-by-id does not take a record's `file_root` on its own say-so: a
+/// record claiming a home-directory root for a private file inside it is
+/// refused because that root is not one of the vouched-for files folders.
+#[tokio::test]
+async fn resolve_source_refuses_a_record_that_claims_its_own_root() {
+    use openhuman_rpc::embed::artifacts::{ArtifactKind, ArtifactMeta, ArtifactStatus};
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path().join("home");
+    std::fs::create_dir_all(&home).unwrap();
+    let private = home.join("private.pdf");
+    std::fs::write(&private, b"private").unwrap();
+    let meta = ArtifactMeta {
+        id: "claims-home".to_string(),
+        kind: ArtifactKind::Other,
+        title: "x".to_string(),
+        path: "private.pdf".to_string(),
+        file: Some(private.to_string_lossy().into_owned()),
+        file_root: Some(home.to_string_lossy().into_owned()),
+        size_bytes: 7,
+        status: ArtifactStatus::Ready,
+        created_at: chrono::Utc::now(),
+        error: None,
+        thread_id: None,
+        tool_call_id: None,
+    };
+    let dir = temp.path().join("artifacts").join("claims-home");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("meta.json"), serde_json::to_vec(&meta).unwrap()).unwrap();
+    let files = FileRoots::new(temp.path().join("Files"));
+    assert!(resolve_source(temp.path(), &files, "claims-home")
+        .await
+        .is_err());
 }
 
 #[tokio::test]
@@ -82,7 +204,7 @@ async fn download_rejects_bad_source() {
             .is_err()
     );
     assert!(
-        download_artifact_to_downloads("relative".to_string(), "x.pptx".to_string())
+        download_artifact_to_downloads("   ".to_string(), "x.pptx".to_string())
             .await
             .is_err()
     );
@@ -161,4 +283,59 @@ async fn download_rejects_invalid_inputs() {
             .await
             .is_err()
     );
+}
+
+#[tokio::test]
+async fn save_as_refuses_before_the_dialog_opens() {
+    let temp = tempfile::tempdir().unwrap();
+    let files_dir = temp.path().join("Files");
+    let id = ready_artifact(temp.path(), &files_dir).await;
+    let roots = FileRoots::new(&files_dir);
+    let never = |_: String| async { panic!("the dialog must not open") };
+
+    for (bad_id, filename) in [
+        ("", "Deck.pptx"),
+        ("   ", "Deck.pptx"),
+        ("no-such-id", "Deck.pptx"),
+    ] {
+        assert!(
+            save_to_chosen_path(temp.path(), &roots, bad_id, filename, never)
+                .await
+                .is_err(),
+            "id {bad_id:?} must be refused"
+        );
+    }
+    for bad_name in ["../escape.pptx", "a/b.pptx", ""] {
+        assert!(
+            save_to_chosen_path(temp.path(), &roots, &id, bad_name, never)
+                .await
+                .is_err(),
+            "filename {bad_name:?} must be refused"
+        );
+    }
+}
+
+#[tokio::test]
+async fn save_as_copies_to_the_chosen_path_and_reports_a_cancel() {
+    let temp = tempfile::tempdir().unwrap();
+    let files_dir = temp.path().join("Files");
+    let id = ready_artifact(temp.path(), &files_dir).await;
+    let roots = FileRoots::new(&files_dir);
+
+    let cancelled = save_to_chosen_path(temp.path(), &roots, &id, "Deck.pptx", |_| async { None })
+        .await
+        .unwrap();
+    assert_eq!(cancelled, None);
+
+    let dest = temp.path().join("chosen").join("Deck.pptx");
+    std::fs::create_dir_all(dest.parent().unwrap()).unwrap();
+    let chosen = dest.clone();
+    let saved = save_to_chosen_path(temp.path(), &roots, &id, "Deck.pptx", |name| async move {
+        assert_eq!(name, "Deck.pptx");
+        Some(chosen)
+    })
+    .await
+    .unwrap();
+    assert_eq!(saved.as_deref(), Some(dest.display().to_string().as_str()));
+    assert_eq!(std::fs::read(&dest).unwrap(), b"deck");
 }

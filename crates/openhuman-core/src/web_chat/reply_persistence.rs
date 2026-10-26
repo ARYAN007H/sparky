@@ -18,12 +18,13 @@
 //! what makes the second write a no-op rather than a duplicate bubble: the
 //! conversation store is idempotent for exactly this id shape.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::Path;
 
 use serde_json::json;
 
-use crate::memory::agent::memory_loader::MemoryCitation;
-use crate::memory::conversations::{self, run_reply_message_id, ConversationMessage};
+use crate::threads::store::{self as conversations, run_reply_message_id, ConversationMessage};
+use crate::web_chat::TurnCitation;
 
 /// Metadata scope stamped on a reply persisted by the web-channel delivery path.
 ///
@@ -50,11 +51,12 @@ const REPLY_SCOPE: &str = "web_chat_reply";
 /// shape `chatDoneExtraMetadata` builds, and any field added to that helper
 /// belongs here too.
 pub(crate) fn persist_delivered_reply(
+    ctx: &DispatchCtx,
     workspace_dir: &Path,
     thread_id: &str,
     request_id: &str,
     full_response: &str,
-    citations: &[MemoryCitation],
+    citations: &[TurnCitation],
 ) -> Result<bool, String> {
     let content = full_response.trim();
     if content.is_empty() {
@@ -70,6 +72,7 @@ pub(crate) fn persist_delivered_reply(
         extra_metadata["citations"] = json!(citations);
     }
     conversations::append_message(
+        ctx,
         workspace_dir.to_path_buf(),
         thread_id,
         ConversationMessage {

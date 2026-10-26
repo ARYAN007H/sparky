@@ -1,11 +1,12 @@
 //! Tool execution op.
 
 use crate::config::Config;
-use crate::rpc::RpcOutcome;
+use crate::core::Outcome;
 
-use super::super::module_client::{self as connectors, methods};
+use super::super::module_client::{self as connectors};
 use super::super::types::{ComposioExecuteRequest, ComposioExecuteResponse};
 use super::error_utils::{report_composio_op_error, OpResult};
+use tinyconnectors_bus::names::methods;
 
 /// The prefix the module puts on an error it has already classified.
 ///
@@ -32,7 +33,7 @@ pub async fn composio_execute(
     tool: &str,
     arguments: Option<serde_json::Value>,
     connection_id: Option<&str>,
-) -> OpResult<RpcOutcome<ComposioExecuteResponse>> {
+) -> OpResult<Outcome<ComposioExecuteResponse>> {
     tracing::debug!(tool = %tool, connection_id = ?connection_id, "[composio] rpc execute");
     let started = std::time::Instant::now();
     let result = connectors::call::<_, ComposioExecuteResponse>(
@@ -62,7 +63,7 @@ pub async fn composio_execute(
                     elapsed_ms,
                 },
             );
-            Ok(RpcOutcome::new(
+            Ok(Outcome::new(
                 resp,
                 vec![format!("composio: executed {tool} ({elapsed_ms}ms)")],
             ))

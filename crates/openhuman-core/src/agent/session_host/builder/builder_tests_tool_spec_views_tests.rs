@@ -12,12 +12,17 @@ use super::*;
 /// One spec is exempt by design — see the `use_skill` branch below.
 #[test]
 fn the_three_spec_views_share_their_leaf_schemas() {
-    crate::agent::harness::AgentDefinitionRegistry::init_global_builtins().unwrap();
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
+        .unwrap();
     let tmp = tempfile::TempDir::new().unwrap();
     let config = test_config(&tmp);
 
-    let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "orchestrator")
-        .expect("orchestrator session build");
+    let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "orchestrator",
+    )
+    .expect("orchestrator session build");
 
     let durable = agent.durable_tool_specs_arc();
     let all = agent.tool_specs_arc();
@@ -57,7 +62,7 @@ fn the_three_spec_views_share_their_leaf_schemas() {
     // rewrite mutate in place would silently scope the durable set, and a
     // change that deep-copied everything again would still pass an
     // exclusion-only test.
-    let use_skill = crate::tools::toolpacks::USE_SKILL;
+    let use_skill = tinyagents_harness_tools::skills::USE_SKILL;
     let mut saw_scoped_use_skill = false;
     let mut saw_scoped_spawn = false;
 
@@ -76,10 +81,10 @@ fn the_three_spec_views_share_their_leaf_schemas() {
         }
         // Same exception, same reason: the spawn enum is narrowed to this
         // agent's `[subagents]` allowlist, so it is a per-session copy.
-        if spec.name == "spawn_async_subagent" {
+        if spec.name == "spawn_subagent" {
             assert!(
                 !shared,
-                "`spawn_async_subagent` must be scoped into its own allocation"
+                "`spawn_subagent` must be scoped into its own allocation"
             );
             let ids = spec
                 .parameters
@@ -112,7 +117,7 @@ fn the_three_spec_views_share_their_leaf_schemas() {
     );
     assert!(
         saw_scoped_spawn,
-        "the orchestrator advertises `spawn_async_subagent`, so its enum must have been narrowed"
+        "the orchestrator advertises `spawn_subagent`, so its enum must have been narrowed"
     );
 }
 
@@ -155,13 +160,13 @@ fn dedup_keeps_the_original_allocation_of_the_winning_spec() {
 fn spec_views_stay_consistent_for_a_tool_less_agent() {
     let model: std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         std::sync::Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
-    let agent = crate::agent::SessionHostBuilder::new()
-        .chat_model(model)
-        .tools(Vec::new())
-        .memory(crate::memory::test_support::noop_memory())
-        .tool_dispatcher(Box::new(tinytools_agent::dialect::XmlDialect))
-        .build()
-        .expect("a tool-less agent is a legal build");
+    let agent = crate::agent::session_host::test_support::with_fixture_model_name(
+        crate::agent::SessionHostBuilder::new().chat_model(model),
+    )
+    .tools(Vec::new())
+    .tool_dispatcher(Box::new(tinytools_agent::dialect::XmlDialect))
+    .build()
+    .expect("a tool-less agent is a legal build");
 
     assert!(agent.tool_specs().is_empty());
     assert!(agent.durable_tool_specs_arc().is_empty());

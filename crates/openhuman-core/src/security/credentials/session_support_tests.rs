@@ -14,6 +14,79 @@ fn test_config(tmp: &TempDir) -> Config {
     }
 }
 
+#[test]
+fn bound_session_token_release_requires_issuing_backend() {
+    let tmp = TempDir::new().unwrap();
+    let mut config = test_config(&tmp);
+    config.api_url = Some("https://issuer.example/".into());
+    config.resolved_endpoints.control_plane_url = Some("https://issuer.example".into());
+    let mut metadata = std::collections::HashMap::new();
+    metadata.insert(
+        SESSION_ISSUING_BACKEND_META.into(),
+        "https://issuer.example".into(),
+    );
+    AuthService::from_config(&config)
+        .store_provider_token(
+            APP_SESSION_PROVIDER,
+            DEFAULT_AUTH_PROFILE_NAME,
+            "synthetic-session",
+            metadata,
+            true,
+        )
+        .unwrap();
+    assert_eq!(
+        get_session_token(&config).unwrap().as_deref(),
+        Some("synthetic-session")
+    );
+    assert!(matches!(
+        resolve_backend_credential(&config).unwrap(),
+        BackendCredential::Session(_)
+    ));
+    let state = build_session_state(&config).unwrap();
+    assert_eq!(
+        state.issuing_backend.as_deref(),
+        Some("https://issuer.example")
+    );
+    config.api_url = Some("https://different.example".into());
+    config.resolved_endpoints.control_plane_url = Some("https://different.example".into());
+    assert!(get_session_token(&config)
+        .unwrap_err()
+        .starts_with("SESSION_BACKEND_MISMATCH"));
+    assert!(resolve_backend_credential(&config)
+        .unwrap_err()
+        .starts_with("SESSION_BACKEND_MISMATCH"));
+    assert!(direct_backend_credential(&config, "test").is_none());
+    crate::security::credentials::api_key::store_api_key(&config, "synthetic-key").unwrap();
+    assert!(matches!(
+        resolve_backend_credential(&config).unwrap(),
+        BackendCredential::ApiKey(_)
+    ));
+}
+
+#[test]
+fn issuing_backend_normalizes_origin_and_rejects_url_secrets() {
+    assert_eq!(
+        normalize_session_backend("HTTPS://ISSUER.EXAMPLE:443/path/").unwrap(),
+        "https://issuer.example"
+    );
+    for invalid in [
+        "https://operator:secret@issuer.example",
+        "https://issuer.example?token=secret",
+        "https://issuer.example#secret",
+        "file:///private",
+    ] {
+        assert_eq!(
+            normalize_session_backend(invalid).unwrap_err(),
+            "invalid issuing backend"
+        );
+    }
+    let legacy: AuthStateResponse = serde_json::from_value(
+        json!({"isAuthenticated":false,"userId":null,"user":null,"profileId":null}),
+    )
+    .unwrap();
+    assert!(legacy.issuing_backend.is_none());
+}
+
 // ── profile_name_or_default ────────────────────────────────────
 
 #[test]
@@ -449,7 +522,7 @@ fn direct_backend_credential_skips_without_a_usable_credential() {
 #[test]
 fn direct_backend_credential_returns_a_live_session() {
     let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
+    let mut config = test_config(&tmp);
     AuthService::from_config(&config)
         .store_provider_token(
             APP_SESSION_PROVIDER,
@@ -459,8 +532,8 @@ fn direct_backend_credential_returns_a_live_session() {
             true,
         )
         .unwrap();
-    // Unit tests resolve the plain test transport, so the transport gate passes.
-    assert!(crate::backend::transport::is_installed());
+    // The gate is "a control plane was resolved onto the config".
+    config.resolved_endpoints.control_plane_url = Some("https://api.example.test".into());
     assert_eq!(
         direct_backend_credential(&config, "test"),
         Some(BackendCredential::Session("raw-session-token".into()))

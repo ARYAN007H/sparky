@@ -25,6 +25,8 @@ const repoRoot = path.join(
   "..",
 );
 const MARKER = "openhuman-e2e-bundle.marker";
+const TEST_PORT_BASE = 20_000 + (process.pid % 40_000);
+const BUNDLE_INPUTS = ["src/App.tsx", "public/favicon.ico", "index.html", "vite.config.ts"];
 
 function writeExecutable(file, body) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -40,11 +42,23 @@ function makeTree(script) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "e2e-web-bundle-guard-"));
   const bin = path.join(root, "bin");
   const log = path.join(root, "calls.log");
+  const mockStarted = path.join(root, "mock-started");
   fs.mkdirSync(path.join(root, "app", "scripts"), { recursive: true });
-  fs.copyFileSync(
-    path.join(repoRoot, "app", "scripts", script),
-    path.join(root, "app", "scripts", script),
-  );
+  // Both scripts source the shared port helper (#5918).
+  for (const file of [script, "e2e-ports.sh"]) {
+    fs.copyFileSync(
+      path.join(repoRoot, "app", "scripts", file),
+      path.join(root, "app", "scripts", file),
+    );
+  }
+  // e2e-web-session.sh checks these paths before starting the mock or core.
+  // The fixture needs the same bundle inputs as the port-guard tests so this
+  // suite reaches the guard under test instead of failing on its test tree.
+  for (const rel of BUNDLE_INPUTS) {
+    const file = path.join(root, "app", rel);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, "");
+  }
   fs.mkdirSync(path.join(root, "scripts"), { recursive: true });
   fs.copyFileSync(
     path.join(repoRoot, "scripts", "load-dotenv.sh"),
@@ -57,14 +71,24 @@ function makeTree(script) {
   // The mock backend "starts" and exits at once. Its launch is a background
   // job, so the health probe waits for the stub to record the launch before
   // reporting ready; otherwise a fast runner can race the child process.
-  writeExecutable(path.join(bin, "node"), `#!/usr/bin/env bash\n${record("node")}\n`);
+  writeExecutable(
+    path.join(bin, "node"),
+    `#!/usr/bin/env bash
+${record("node")}
+if [[ "$*" == *"randomBytes"* ]]; then
+  printf '%064d' 0
+else
+  touch "${mockStarted}"
+fi
+`,
+  );
   writeExecutable(
     path.join(bin, "curl"),
     `#!/usr/bin/env bash
 ${record("curl")}
-if [[ "$1" == *"/__admin/health" ]]; then
-  for _ in {1..100}; do
-    grep -q 'mock-api-server.mjs' "${log}" && exit 0
+if [[ "$*" == *"/__admin/health"* ]]; then
+  for _ in {1..500}; do
+    [ -f "${mockStarted}" ] && exit 0
     sleep 0.01
   done
   exit 1
@@ -85,6 +109,9 @@ fi
   );
   writeExecutable(path.join(bin, "rustc"), `#!/usr/bin/env bash\necho 'host: test-triple'\n`);
   writeExecutable(path.join(bin, "cargo"), `#!/usr/bin/env bash\n${record("cargo")}\n`);
+  // Port availability belongs to e2e-web-port-guard.test.mjs. This fixture
+  // starts no real listeners, so its probes must not inspect other sessions.
+  writeExecutable(path.join(bin, "python3"), `#!/usr/bin/env bash\n${record("python3")}\nexit 0\n`);
 
   // The repo-level helpers e2e-web-build.sh shells out to.
   writeExecutable(
@@ -104,18 +131,21 @@ fi
   return { root, bin, calls, cleanup };
 }
 
-function run(tree, script) {
+function run(tree, script, extraEnv = {}) {
   const env = {
     ...process.env,
     PATH: `${tree.bin}:${process.env.PATH}`,
-    // Do not let a developer's shell select real build tools or different
-    // harness ports; the assertions exercise the fixed contract below.
+    // Keep these fixtures isolated from live E2E sessions in other worktrees.
     CARGO_BIN: path.join(tree.bin, "cargo"),
-    E2E_MOCK_PORT: "18473",
-    OPENHUMAN_CORE_PORT: "17788",
+    E2E_PORT_BASE: String(TEST_PORT_BASE),
+    E2E_MOCK_PORT: String(TEST_PORT_BASE),
+    OPENHUMAN_CORE_PORT: String(TEST_PORT_BASE + 1),
+    E2E_WEB_PORT: String(TEST_PORT_BASE + 2),
     RUST_HOST_TRIPLE: "test-triple",
     OPENHUMAN_WORKSPACE: path.join(tree.root, "workspace"),
+    OPENHUMAN_KEYRING_MASTER_KEY: "11".repeat(32),
     E2E_WEB_CORE_TARGET_DIR: path.join(tree.root, "target"),
+    ...extraEnv,
   };
   const file = path.join(tree.root, "app", "scripts", script);
   try {
@@ -154,6 +184,53 @@ test("the session refuses a dist-web that e2e-web-build.sh did not produce", () 
   }
 });
 
+test("an explicit workspace requires its own keyring key", () => {
+  const tree = makeTree("e2e-web-session.sh");
+  try {
+    const workspace = path.join(tree.root, "persistent-workspace");
+    const res = run(tree, "e2e-web-session.sh", {
+      OPENHUMAN_WORKSPACE: workspace,
+      OPENHUMAN_E2E_ALLOW_EPHEMERAL_KEY: "",
+      OPENHUMAN_KEYRING_MASTER_KEY: "",
+      OPENHUMAN_KEYRING_MASTER_KEY_FILE: "",
+    });
+
+    assert.equal(res.status, 2, res.output);
+    assert.match(res.output, /explicit OPENHUMAN_WORKSPACE requires/);
+    assert.equal(fs.existsSync(workspace), false, "refuse before creating the supplied workspace");
+  } finally {
+    tree.cleanup();
+  }
+});
+
+test("an ephemeral explicit workspace can generate a private key", () => {
+  const tree = makeTree("e2e-web-session.sh");
+  try {
+    const distWeb = path.join(tree.root, "app", "dist-web");
+    fs.mkdirSync(distWeb, { recursive: true });
+    fs.writeFileSync(path.join(distWeb, MARKER), "VITE_OPENHUMAN_TARGET=web\n");
+    fs.writeFileSync(
+      path.join(distWeb, ".e2e-build-ports.json"),
+      `${JSON.stringify({ e2e_mock_port: String(TEST_PORT_BASE), openhuman_core_port: String(TEST_PORT_BASE + 1) })}\n`,
+    );
+
+    const res = run(tree, "e2e-web-session.sh", {
+      OPENHUMAN_WORKSPACE: path.join(tree.root, "ci-workspace"),
+      OPENHUMAN_E2E_ALLOW_EPHEMERAL_KEY: "1",
+      OPENHUMAN_KEYRING_MASTER_KEY: "",
+      OPENHUMAN_KEYRING_MASTER_KEY_FILE: "/host/master.key",
+    });
+
+    assert.match(res.output, /standalone core binary is missing/);
+    assert.ok(
+      tree.calls().some((call) => call.includes("randomBytes")),
+      "an explicitly marked ephemeral workspace gets a fresh key",
+    );
+  } finally {
+    tree.cleanup();
+  }
+});
+
 test("the session accepts a marked bundle and proceeds past the guard", () => {
   // Pins that the guard is not simply always-fail. With the marker present the
   // session starts the mock backend and reaches its next precondition — the
@@ -165,13 +242,21 @@ test("the session accepts a marked bundle and proceeds past the guard", () => {
     fs.writeFileSync(path.join(distWeb, MARKER), "VITE_OPENHUMAN_TARGET=web\n");
     fs.writeFileSync(
       path.join(distWeb, ".e2e-build-ports.json"),
-      '{"e2e_mock_port":"18473","openhuman_core_port":"17788"}\n',
+      `${JSON.stringify({ e2e_mock_port: String(TEST_PORT_BASE), openhuman_core_port: String(TEST_PORT_BASE + 1) })}\n`,
     );
 
-    const res = run(tree, "e2e-web-session.sh");
+    const res = run(tree, "e2e-web-session.sh", {
+      OPENHUMAN_WORKSPACE: "",
+      OPENHUMAN_KEYRING_MASTER_KEY: "",
+      OPENHUMAN_KEYRING_MASTER_KEY_FILE: "/host/master.key",
+    });
 
     assert.doesNotMatch(res.output, /was not built for E2E/);
     assert.match(res.output, /standalone core binary is missing/);
+    assert.ok(
+      tree.calls().some((call) => call.includes("randomBytes")),
+      "a disposable workspace gets a fresh key",
+    );
     assert.ok(
       tree.calls().some((c) => c.includes("mock-api-server.mjs")),
       `expected the mock backend to be started:\n${tree.calls().join("\n")}`,
@@ -179,6 +264,66 @@ test("the session accepts a marked bundle and proceeds past the guard", () => {
   } finally {
     tree.cleanup();
   }
+});
+
+test("CI Full refreshes the E2E marker after restoring its content-keyed artifact", () => {
+  const workflow = fs.readFileSync(
+    path.join(repoRoot, ".github/workflows/ci-full.yml"),
+    "utf8",
+  );
+  const restoreStep = workflow.match(
+    /- name: Restore Playwright E2E artifact([\s\S]*?)(?=\n      - name: |\n    [a-zA-Z_-]+:|$)/,
+  )?.[1];
+
+  assert.ok(restoreStep, "CI Full must keep a Playwright artifact restore step");
+  assert.match(restoreStep, /cp -a repo\/app\/dist-web app\//);
+  assert.match(restoreStep, /touch app\/dist-web\/openhuman-e2e-bundle\.marker/);
+
+  const cacheStep = workflow.match(
+    /- name: Restore cached Playwright E2E artifact([\s\S]*?)(?=\n      - name: |\n    [a-zA-Z_-]+:|$)/,
+  )?.[1];
+  assert.ok(cacheStep, "CI Full must keep a Playwright artifact cache step");
+  assert.match(cacheStep, /\.github\/workflows\/ci-full\.yml/);
+  assert.match(
+    cacheStep,
+    /e2e-playwright-linux-c3c20d625bcc9f75e50c3c2c2b75c88d3e60a3f4352b0f19f5327b490438722d-/,
+  );
+  const jobBlock = (id, nextId) => {
+    const start = workflow.indexOf(`  ${id}:\n`);
+    const end = workflow.indexOf(`\n  ${nextId}:\n`, start);
+    return start < 0 || end < 0
+      ? undefined
+      : workflow.slice(start, end);
+  };
+  const pinnedImage =
+    "image: ghcr.io/tinyhumansai/openhuman_ci:latest@sha256:c3c20d625bcc9f75e50c3c2c2b75c88d3e60a3f4352b0f19f5327b490438722d";
+  const producerJob = jobBlock("build-playwright-e2e-artifact", "playwright-e2e");
+  const consumerJob = jobBlock("playwright-e2e", "e2e-desktop");
+  assert.ok(producerJob, "Playwright artifact producer job must exist");
+  assert.ok(consumerJob, "Playwright artifact consumer job must exist");
+  assert.ok(
+    producerJob.includes(pinnedImage),
+    "Playwright artifact producer must use the cache-key CI image",
+  );
+  assert.ok(
+    consumerJob.includes(pinnedImage),
+    "Playwright artifact consumer must use the cache-key CI image",
+  );
+  assert.equal(
+    producerJob.match(/container:\n\s+image: .+/)?.[0],
+    consumerJob.match(/container:\n\s+image: .+/)?.[0],
+    "Playwright artifact producer and consumer must use the same pinned CI image",
+  );
+  assert.match(cacheStep, /crates\/\*\*/);
+  assert.match(cacheStep, /vendor\/\*\*/);
+  assert.match(cacheStep, /build\.rs/);
+  assert.match(cacheStep, /\.cargo\/\*\*/);
+  assert.match(cacheStep, /scripts\/ci\/product-features\.\*/);
+  assert.match(cacheStep, /app\/tsconfig\*\.json/);
+  assert.match(cacheStep, /packages\/\*\*/);
+  assert.match(cacheStep, /pnpm-workspace\.yaml/);
+  assert.match(cacheStep, /'package\.json'/);
+  assert.match(cacheStep, /app\/scripts\/e2e-ports\.sh/);
 });
 
 test("e2e-web-build.sh marks the bundle it builds, recording the E2E settings", () => {
@@ -196,8 +341,16 @@ test("e2e-web-build.sh marks the bundle it builds, recording the E2E settings", 
     const recorded = fs.readFileSync(marker, "utf8");
     assert.match(recorded, /^VITE_OPENHUMAN_TARGET=web$/m);
     assert.match(recorded, /^VITE_OPENHUMAN_E2E_DEFAULT_CORE_MODE=cloud$/m);
-    assert.match(recorded, /^VITE_BACKEND_URL=http:\/\/127\.0\.0\.1:18473$/m);
-    assert.match(recorded, /^VITE_OPENHUMAN_CORE_RPC_URL=http:\/\/127\.0\.0\.1:17788\/rpc$/m);
+    assert.ok(recorded.includes(`VITE_BACKEND_URL=http://127.0.0.1:${TEST_PORT_BASE}\n`));
+    assert.ok(recorded.includes(`VITE_OPENHUMAN_CORE_RPC_URL=http://127.0.0.1:${TEST_PORT_BASE + 1}/rpc\n`));
+    const cargoBuild = tree.calls().find((call) => call.startsWith("cargo "));
+    assert.ok(cargoBuild, "web E2E build invokes Cargo for the standalone core");
+    assert.ok(
+      cargoBuild.includes(`--target-dir ${path.join(tree.root, "target")}`),
+      `web E2E build should honor E2E_WEB_CORE_TARGET_DIR: ${cargoBuild}`,
+    );
+    assert.match(cargoBuild, /--features voice,e2e-test-support/);
+    assert.doesNotMatch(cargoBuild, /CARGO_TARGET_DIR=/);
   } finally {
     tree.cleanup();
   }

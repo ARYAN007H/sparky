@@ -80,7 +80,7 @@ async fn check_flows_read_auth_me_and_store_the_marker_when_linked() {
     let tg = telegram_login_check(&config, "lt").await.unwrap().value;
     assert!(tg.linked);
     assert_eq!(tg.details.unwrap()["telegramId"], json!("tg-42"));
-    let stored = openhuman_core::security::credentials::ops::list_provider_credentials(
+    let stored = openhuman_embed::__host::security::credentials::ops::list_provider_credentials(
         &config,
         Some("channel:telegram:managed_dm".to_string()),
     )
@@ -110,4 +110,23 @@ async fn local_session_is_backend_unavailable_for_every_flow() {
     ] {
         assert!(err.starts_with("BACKEND_UNAVAILABLE:"), "{err}");
     }
+}
+
+#[test]
+fn channel_credential_keys_preserve_existing_profiles_for_every_auth_mode() {
+    for (mode, suffix) in [
+        (ChannelAuthMode::ApiKey, "api_key"),
+        (ChannelAuthMode::BotToken, "bot_token"),
+        (ChannelAuthMode::OAuth, "oauth"),
+        (ChannelAuthMode::ManagedDm, "managed_dm"),
+    ] {
+        assert_eq!(
+            channel_credential_provider("telegram", mode),
+            format!("channel:telegram:{suffix}")
+        );
+    }
+    assert_eq!(
+        channel_credential_provider("discord", ChannelAuthMode::ManagedDm),
+        "channel:discord:managed_dm"
+    );
 }

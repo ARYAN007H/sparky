@@ -5,11 +5,10 @@ use crate::core::ControllerSchema;
 
 use super::super::schema_defs::schemas;
 use super::agent::{
-    handle_get_agent_settings, handle_get_autonomy_settings, handle_get_memory_sync_settings,
-    handle_get_privacy_mode, handle_get_sandbox_settings, handle_set_browser_allow_all,
-    handle_set_privacy_mode, handle_update_agent_settings, handle_update_autonomy_settings,
-    handle_update_browser_settings, handle_update_computer_settings,
-    handle_update_memory_sync_settings, handle_update_sandbox_settings,
+    handle_get_agent_settings, handle_get_autonomy_settings, handle_get_privacy_mode,
+    handle_get_sandbox_settings, handle_set_browser_allow_all, handle_set_privacy_mode,
+    handle_update_agent_settings, handle_update_autonomy_settings, handle_update_browser_settings,
+    handle_update_computer_settings, handle_update_sandbox_settings,
 };
 use super::inference::{
     handle_get_client_config, handle_get_config, handle_get_runtime_flags, handle_resolve_api_url,
@@ -20,16 +19,12 @@ use super::integrations::{
     handle_get_composio_trigger_settings, handle_get_search_settings,
     handle_update_composio_trigger_settings, handle_update_search_settings,
 };
-use super::voice::{
-    handle_get_dictation_settings, handle_get_voice_server_settings,
-    handle_update_dictation_settings, handle_update_voice_server_settings,
-};
 use super::workspace::{
     handle_agent_server_status, handle_get_agent_paths, handle_get_analytics_settings,
     handle_get_dashboard_settings, handle_get_data_paths, handle_get_onboarding_completed,
-    handle_reset_local_data, handle_set_onboarding_completed, handle_update_agent_paths,
-    handle_update_analytics_settings, handle_workspace_onboarding_flag_exists,
-    handle_workspace_onboarding_flag_set,
+    handle_get_user_timezone, handle_reset_local_data, handle_set_onboarding_completed,
+    handle_update_agent_paths, handle_update_analytics_settings, handle_update_user_timezone,
+    handle_workspace_onboarding_flag_exists, handle_workspace_onboarding_flag_set,
 };
 
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
@@ -49,6 +44,8 @@ pub fn all_controller_schemas() -> Vec<ControllerSchema> {
         schemas("workspace_onboarding_flag_set"),
         schemas("update_analytics_settings"),
         schemas("get_analytics_settings"),
+        schemas("update_user_timezone"),
+        schemas("get_user_timezone"),
         schemas("get_dashboard_settings"),
         schemas("agent_server_status"),
         schemas("reset_local_data"),
@@ -57,10 +54,6 @@ pub fn all_controller_schemas() -> Vec<ControllerSchema> {
         schemas("update_agent_paths"),
         schemas("get_onboarding_completed"),
         schemas("set_onboarding_completed"),
-        schemas("get_dictation_settings"),
-        schemas("update_dictation_settings"),
-        schemas("get_voice_server_settings"),
-        schemas("update_voice_server_settings"),
         schemas("update_composio_trigger_settings"),
         schemas("get_composio_trigger_settings"),
         schemas("get_autonomy_settings"),
@@ -71,8 +64,6 @@ pub fn all_controller_schemas() -> Vec<ControllerSchema> {
         schemas("update_agent_settings"),
         schemas("update_search_settings"),
         schemas("get_search_settings"),
-        schemas("get_memory_sync_settings"),
-        schemas("update_memory_sync_settings"),
         schemas("get_sandbox_settings"),
         schemas("update_sandbox_settings"),
     ]
@@ -141,6 +132,14 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
             handler: handle_get_analytics_settings,
         },
         RegisteredController {
+            schema: schemas("update_user_timezone"),
+            handler: handle_update_user_timezone,
+        },
+        RegisteredController {
+            schema: schemas("get_user_timezone"),
+            handler: handle_get_user_timezone,
+        },
+        RegisteredController {
             schema: schemas("get_dashboard_settings"),
             handler: handle_get_dashboard_settings,
         },
@@ -171,22 +170,6 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
         RegisteredController {
             schema: schemas("set_onboarding_completed"),
             handler: handle_set_onboarding_completed,
-        },
-        RegisteredController {
-            schema: schemas("get_dictation_settings"),
-            handler: handle_get_dictation_settings,
-        },
-        RegisteredController {
-            schema: schemas("update_dictation_settings"),
-            handler: handle_update_dictation_settings,
-        },
-        RegisteredController {
-            schema: schemas("get_voice_server_settings"),
-            handler: handle_get_voice_server_settings,
-        },
-        RegisteredController {
-            schema: schemas("update_voice_server_settings"),
-            handler: handle_update_voice_server_settings,
         },
         RegisteredController {
             schema: schemas("update_composio_trigger_settings"),
@@ -227,14 +210,6 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
         RegisteredController {
             schema: schemas("get_search_settings"),
             handler: handle_get_search_settings,
-        },
-        RegisteredController {
-            schema: schemas("get_memory_sync_settings"),
-            handler: handle_get_memory_sync_settings,
-        },
-        RegisteredController {
-            schema: schemas("update_memory_sync_settings"),
-            handler: handle_update_memory_sync_settings,
         },
         RegisteredController {
             schema: schemas("get_sandbox_settings"),

@@ -149,8 +149,8 @@ fn classify_inference_error_rate_limited_returns_structured_retry_after_ms() {
         classified.source, "provider",
         "upstream 429 must classify source=provider, not openhuman_budget"
     );
-    assert_eq!(
-        classified.retryable, true,
+    assert!(
+        classified.retryable,
         "transient upstream 429 must allow same-thread retry"
     );
     assert_eq!(
@@ -167,7 +167,7 @@ async fn start_chat_chat_error_event_serializes_structured_fields_to_json_wire()
     let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
     // The JSON-RPC SSE endpoint emits chat_error by running
     // `serde_json::to_value(&event)` over the WebChannelEvent struct
-    // (see `core/socketio.rs::emit_web_channel_event`). This pins the
+    // (see `openhuman-rpc/src/server/socketio.rs::emit_web_channel_event`). This pins the
     // resulting JSON keys so the frontend contract stays stable: the
     // FE reads exactly `error_source`, `error_retryable`,
     // `error_retry_after_ms`, `error_provider`, `error_fallback_available`
@@ -185,6 +185,7 @@ async fn start_chat_chat_error_event_serializes_structured_fields_to_json_wire()
 
     let mut rx = subscribe_web_channel_events();
     let request_id = start_chat(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "wire-shape-client",
         "wire-shape-thread",
         "Please summarize this in one line.",
@@ -241,7 +242,7 @@ async fn start_chat_chat_error_event_serializes_structured_fields_to_json_wire()
 
     // Pin the additive contract: serializing a default (no error)
     // event must NOT introduce any of the new keys.
-    let empty = crate::core::socketio::WebChannelEvent {
+    let empty = crate::web_chat::WebChannelEvent {
         event: "chat_done".to_string(),
         ..Default::default()
     };
@@ -279,6 +280,7 @@ async fn start_chat_emits_structured_rate_limit_metadata_on_chat_error_event() {
 
     let mut rx = subscribe_web_channel_events();
     let request_id = start_chat(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "rate-limit-client",
         "rate-limit-thread",
         "Please summarize this in one line.",
@@ -422,7 +424,7 @@ fn classify_inference_error_retryable_429_keeps_retry_flag() {
 #[test]
 fn classify_inference_error_extracts_provider_name_lowercase() {
     // The "<provider> API error" envelope from
-    // inference::provider::ops::api_error is the canonical source we
+    // inference::provider::http_error::api_error is the canonical source we
     // pull the provider name from. Lowercased so the wire value is
     // stable across providers' own capitalisation.
     let cases: &[(&str, Option<&str>)] = &[

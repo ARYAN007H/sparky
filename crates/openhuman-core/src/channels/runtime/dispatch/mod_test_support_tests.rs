@@ -2,10 +2,13 @@
 
 use super::*;
 
-pub fn build_channel_context_block_for_test(msg: &traits::ChannelMessage) -> String {
+pub fn build_channel_context_block_for_test(
+    msg: &tinychannels_bus::ChannelInboundEnvelope,
+) -> String {
     build_channel_context_block(msg)
 }
 
+#[cfg(test)]
 pub fn select_acknowledgment_reaction_for_test(content: &str) -> &'static str {
     select_acknowledgment_reaction(content)
 }

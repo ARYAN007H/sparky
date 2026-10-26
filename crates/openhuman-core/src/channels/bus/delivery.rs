@@ -1,281 +1,176 @@
-//! Building the backend REST client, sending/deleting channel messages, and
-//! finalizing a turn's reply (replacing or deleting any draft in flight).
+//! Transport for module-owned progressive replies: delivery goes through the
+//! registered channel callback (`channels::callback_slot`).
+use crate::modules::channel_runtime::ChannelRuntimeLease;
+#[cfg(test)]
+use serde_json::Value;
+use tinybus::module::ModuleCallError;
+use tinychannels_bus::module_progressive::{
+    ProgressiveCommand, ProgressiveEvent, ProgressiveResult, ProgressiveTransportRequest,
+    ProgressiveTransportResult,
+};
+use tinychannels_bus::{methods, ChannelBackendRequest, ChannelBackendResult};
 
-use super::progressive_ui::{channel_edits_unsupported, classify_edit_failure, EditFailure};
-use super::streaming_state::StreamingState;
-use serde_json::{json, Value};
+fn request_channel(request: &ProgressiveTransportRequest) -> &str {
+    match request {
+        ProgressiveTransportRequest::OutputEvent { channel, .. }
+        | ProgressiveTransportRequest::Send { channel, .. }
+        | ProgressiveTransportRequest::SendTyped { channel, .. }
+        | ProgressiveTransportRequest::Edit { channel, .. }
+        | ProgressiveTransportRequest::Delete { channel, .. }
+        | ProgressiveTransportRequest::Typing { channel, .. } => channel,
+    }
+}
 
-/// Attach a deterministic idempotency key to an outbound channel message
-/// body, derived from the channel and message content.
+/// The transport progressive delivery runs through: a registered channel
+/// callback ([`crate::channels::callback_slot`]). Transport refusals are typed
+/// facts the callback maps itself; recovery and retry budgets belong to the
+/// module.
+#[derive(Clone)]
+struct SlotTransport {
+    callback: crate::channels::callback_slot::ChannelCallback,
+    config: crate::config::Config,
+    channel: String,
+    session: tokio_util::sync::CancellationToken,
+}
+
+#[tinybus::interface(name = "ai.tinyhumans.tinychannels.ChannelsHost")]
+impl SlotTransport {
+    async fn dispatch_controller_backend(
+        &self,
+        request: ChannelBackendRequest,
+    ) -> tinybus::Result<ChannelBackendResult> {
+        let ChannelBackendRequest::ProgressiveTransport(request) = request else {
+            return Err(tinybus::Error::failed("callback capability unavailable"));
+        };
+        if request_channel(&request) != self.channel {
+            return Ok(ChannelBackendResult::ProgressiveTransport(
+                ProgressiveTransportResult::Failed,
+            ));
+        }
+        let ctx = crate::channels::callback_slot::ChannelCallbackCtx {
+            config: self.config.clone(),
+            channel: Some(self.channel.clone()),
+            session: self.session.clone(),
+        };
+        let call = (self.callback)(ctx, ChannelBackendRequest::ProgressiveTransport(request));
+        tokio::select! {
+            biased;
+            _ = self.session.cancelled() => Ok(ChannelBackendResult::ProgressiveTransport(
+                ProgressiveTransportResult::Unavailable,
+            )),
+            result = call => match result {
+                Ok(result) => Ok(result),
+                Err(error) => {
+                    tracing::debug!(%error, "[channels][delivery] registered callback failed");
+                    Ok(ChannelBackendResult::ProgressiveTransport(
+                        ProgressiveTransportResult::Failed,
+                    ))
+                }
+            },
+        }
+    }
+}
+
+/// The host projects ordered turn facts; the module owns timers and delivery state.
+pub(super) struct ModuleProgressiveReply {
+    runtime: ChannelRuntimeLease,
+    handle: String,
+}
+
+impl ModuleProgressiveReply {
+    pub(super) async fn open(
+        config: crate::config::Config,
+        channel: String,
+        session: tokio_util::sync::CancellationToken,
+    ) -> anyhow::Result<Self> {
+        let Some(callback) = crate::channels::callback_slot::current() else {
+            tracing::debug!("[channels][delivery] no channel callback registered");
+            anyhow::bail!(
+                "{} no channel transport registered",
+                crate::core::observability::BACKEND_UNAVAILABLE_PREFIX
+            );
+        };
+        tracing::debug!("[channels][delivery] progressive delivery via the registered callback");
+        anyhow::ensure!(!session.is_cancelled(), "Channel session closed");
+        let transport = SlotTransport {
+            callback,
+            config: config.clone(),
+            channel: channel.clone(),
+            session,
+        };
+        Self::open_with(config, channel, transport).await
+    }
+
+    async fn open_with(
+        config: crate::config::Config,
+        channel: String,
+        callback: impl tinybus::service::Interface + 'static,
+    ) -> anyhow::Result<Self> {
+        let runtime = ChannelRuntimeLease::open(crate::modules::client(config), callback).await?;
+        let result: ProgressiveResult = runtime
+            .object()
+            .call_confidential(
+                methods::EXECUTE_PROGRESSIVE,
+                (ProgressiveCommand::Open { channel },),
+            )
+            .await?;
+        match result {
+            ProgressiveResult::Opened { handle } if !handle.is_empty() && handle.len() <= 128 => {
+                Ok(Self { runtime, handle })
+            }
+            _ => {
+                crate::modules::report::malformed_reply("tinychannels");
+                Err(ModuleCallError::ModuleFault.into())
+            }
+        }
+    }
+
+    pub(super) async fn feed(&self, events: Vec<ProgressiveEvent>) -> Result<(), ModuleCallError> {
+        let result: ProgressiveResult = self
+            .runtime
+            .object()
+            .call_confidential(
+                methods::EXECUTE_PROGRESSIVE,
+                (ProgressiveCommand::Feed {
+                    handle: self.handle.clone(),
+                    events,
+                },),
+            )
+            .await?;
+        if result != ProgressiveResult::Updated {
+            crate::modules::report::malformed_reply("tinychannels");
+            return Err(ModuleCallError::ModuleFault);
+        }
+        Ok(())
+    }
+
+    pub(super) async fn finalize(&self, text: &str) -> Result<(), ModuleCallError> {
+        let result: ProgressiveResult = self
+            .runtime
+            .object()
+            .call_confidential(
+                methods::EXECUTE_PROGRESSIVE,
+                (ProgressiveCommand::Finish {
+                    handle: self.handle.clone(),
+                    text: text.into(),
+                },),
+            )
+            .await?;
+        if result != ProgressiveResult::Closed {
+            crate::modules::report::malformed_reply("tinychannels");
+            return Err(ModuleCallError::ModuleFault);
+        }
+        self.runtime.close().await
+    }
+}
+
+// Compatibility fixtures exercise the owning library only in test builds.
+#[cfg(test)]
 pub(super) fn channel_message_body_with_idempotency(channel: &str, body: Value) -> Value {
     let intent = tinychannels::outbound_intent_from_legacy_message(channel, body);
     tinychannels::legacy_message_value_from_outbound_intent(&intent)
 }
 
-/// Delete a previously sent message from the channel. Used to clean
-/// up ephemeral thinking messages once the final response is ready.
-pub(super) async fn delete_channel_message(channel: &str, message_id: &str) {
-    let Some((client, jwt)) = build_channel_client().await else {
-        return;
-    };
-    match client.send_channel_delete(channel, message_id, &jwt).await {
-        Ok(_) => {
-            tracing::info!(
-                "[channel-inbound] deleted ephemeral msg channel='{}' msg_id={}",
-                channel,
-                message_id,
-            );
-        }
-        Err(err) => {
-            if let Some(crate::backend::BackendApiError::MessageNotFound { .. }) =
-                err.downcast_ref::<crate::backend::BackendApiError>()
-            {
-                tracing::info!(
-                    "[channel-inbound] delete channel='{}' msg_id={} — message already gone provider-side (404), nothing to clean up",
-                    channel,
-                    message_id,
-                );
-            } else {
-                tracing::warn!(
-                    "[channel-inbound] failed to delete ephemeral msg channel='{}' msg_id={} err={}",
-                    channel,
-                    message_id,
-                    err,
-                );
-            }
-        }
-    }
-}
-
-/// Deliver the final canonical reply.
-///
-/// **Invariant**: if a draft message has already been posted to the
-/// channel (`state.draft_sent == true`), we MUST NOT post a second
-/// message — that would duplicate the visible bubble on the user's
-/// side. When we have an id we attempt one last edit; when the id was
-/// lost we leave the draft in place silently. The only path that
-/// creates a fresh outbound message is when no draft has been posted
-/// at all.
-pub(super) async fn finalize_channel_reply(
-    channel: &str,
-    state: &mut StreamingState,
-    final_text: &str,
-) {
-    // Deliver the canonical reply FIRST, then clean up the ephemeral
-    // "💭 Thinking:" bubble. Deleting before the reply would leave the
-    // chat empty for a beat; this order keeps something visible at all
-    // times (#600).
-    'send: {
-        if let Some(ref message_id) = state.message_id {
-            // Once this process knows the backend serves no edit route, the
-            // "one last edit" below is a guaranteed 404 — go straight to
-            // replacing the draft. Deleting it first matters: it is still on
-            // screen showing partial text, so leaving it would strand a stale
-            // "_working…_" bubble next to the real answer (#5230).
-            if channel_edits_unsupported(channel) {
-                tracing::info!(
-                    "[channel-inbound] final edit skipped channel='{}' msg_id={} — no edit route on this backend, replacing the draft with a fresh atomic reply",
-                    channel,
-                    message_id,
-                );
-                let orphan = message_id.clone();
-                delete_channel_message(channel, &orphan).await;
-                send_channel_reply(channel, final_text).await;
-                break 'send;
-            }
-            // We committed to a draft earlier in the turn. Always attempt
-            // to edit it with the canonical reply, even when we'd
-            // previously latched `edit_disabled` during the streaming
-            // phase — the user is already looking at that message, so a
-            // late edit attempt is still the right call. If the edit
-            // fails, delete the orphan draft and send the final reply
-            // as a fresh atomic message so the user always sees it.
-            if let Some((client, jwt)) = build_channel_client().await {
-                let body = json!({ "text": final_text });
-                match client
-                    .send_channel_edit(channel, message_id, &jwt, body)
-                    .await
-                {
-                    Ok(_) => {
-                        tracing::info!(
-                            "[channel-inbound] final edit ok channel='{}' msg_id={} chars={}",
-                            channel,
-                            message_id,
-                            final_text.len(),
-                        );
-                    }
-                    Err(err) => match classify_edit_failure(&err) {
-                        EditFailure::MessageGone => {
-                            tracing::info!(
-                                "[channel-inbound] final edit channel='{}' msg_id={} — draft already gone provider-side (404), sending fresh atomic reply",
-                                channel,
-                                message_id,
-                            );
-                            send_channel_reply(channel, final_text).await;
-                        }
-                        // Route absent (or any other failure): the draft is
-                        // still on screen showing partial text, so it has to be
-                        // deleted before the canonical reply lands — otherwise
-                        // the user keeps a stale "_working…_" bubble alongside
-                        // the real answer (#5230).
-                        EditFailure::RouteUnsupported => {
-                            tracing::warn!(
-                                "[channel-inbound] final edit channel='{}' msg_id={} — backend has no edit route, deleting the draft and sending a fresh atomic reply",
-                                channel,
-                                message_id,
-                            );
-                            super::progressive_ui::mark_channel_edits_unsupported(channel);
-                            let orphan = message_id.clone();
-                            delete_channel_message(channel, &orphan).await;
-                            send_channel_reply(channel, final_text).await;
-                        }
-                        EditFailure::Transient => {
-                            tracing::warn!(
-                                "[channel-inbound] final edit failed channel='{}' msg_id={} err={} — deleting orphan draft and sending fresh atomic reply so user still sees the canonical response",
-                                channel,
-                                message_id,
-                                err,
-                            );
-                            let orphan = message_id.clone();
-                            delete_channel_message(channel, &orphan).await;
-                            send_channel_reply(channel, final_text).await;
-                        }
-                    },
-                }
-            } else {
-                tracing::warn!(
-                    "[channel-inbound] cannot finalize channel='{}' msg_id={} — backend client unavailable, draft left in place",
-                    channel,
-                    message_id,
-                );
-            }
-            break 'send;
-        }
-        if state.draft_sent {
-            // A draft was posted but the backend didn't return an id, so
-            // we have nothing to edit. Since the draft only contains a
-            // clean text prefix (or "_working…_" placeholder), sending the
-            // final response as a second bubble is acceptable — leaving
-            // the user without the canonical reply is worse (#600).
-            tracing::warn!(
-                "[channel-inbound] sending fresh reply on channel='{}' — id-less draft exists but user needs the final response",
-                channel,
-            );
-            send_channel_reply(channel, final_text).await;
-            break 'send;
-        }
-        // No draft exists — this is the first (and only) message for the
-        // turn. Safe to send atomically.
-        send_channel_reply(channel, final_text).await;
-    }
-
-    // ── Clean up ephemeral filler + thinking messages ───────────
-    // Delete after the canonical reply is already on screen so the
-    // chat is never momentarily empty between the two operations.
-    // Fillers first (more of them, oldest-first), then the thinking
-    // bubble — purely cosmetic ordering.
-    let fillers = std::mem::take(&mut state.filler_message_ids);
-    for id in fillers {
-        delete_channel_message(channel, &id).await;
-    }
-    if let Some(thinking_id) = state.thinking_message_id.take() {
-        delete_channel_message(channel, &thinking_id).await;
-    }
-}
-
-/// Construct the REST client + backend credential (API key or session JWT)
-/// shared by every outbound channel call on this turn. Returns `None` and logs if either is
-/// unavailable so the caller can bail quietly.
-pub(super) async fn build_channel_client() -> Option<(
-    crate::backend::BackendClient,
-    crate::security::credentials::session_support::BackendCredential,
-)> {
-    let config = match crate::config::rpc::load_config_with_timeout().await {
-        Ok(c) => c,
-        Err(e) => {
-            tracing::error!("[channel-inbound] failed to load config: {}", e);
-            return None;
-        }
-    };
-    let jwt = match crate::security::credentials::session_support::get_session_token(&config) {
-        Ok(Some(token))
-            if !crate::security::credentials::session_support::is_local_session_token(&token) =>
-        {
-            crate::security::credentials::session_support::BackendCredential::Session(token)
-        }
-        Ok(_) => {
-            tracing::error!("[channel-inbound] no hosted user session — cannot send");
-            return None;
-        }
-        Err(e) => {
-            tracing::error!(
-                "[channel-inbound] no backend credential — cannot send: {}",
-                e
-            );
-            return None;
-        }
-    };
-    match crate::backend::BackendClient::from_config(&config) {
-        Ok(c) => Some((c, jwt)),
-        Err(e) => {
-            tracing::error!("[channel-inbound] failed to create API client: {}", e);
-            None
-        }
-    }
-}
-
-/// Send a text reply back to a channel via the backend REST API.
-pub(super) async fn send_channel_reply(channel: &str, text: &str) {
-    let config = match crate::config::rpc::load_config_with_timeout().await {
-        Ok(c) => c,
-        Err(e) => {
-            tracing::error!("[channel-inbound] failed to load config: {}", e);
-            return;
-        }
-    };
-
-    let jwt = match crate::security::credentials::session_support::get_session_token(&config) {
-        Ok(Some(token))
-            if !crate::security::credentials::session_support::is_local_session_token(&token) =>
-        {
-            crate::security::credentials::session_support::BackendCredential::Session(token)
-        }
-        Ok(_) => {
-            tracing::error!("[channel-inbound] no hosted user session — cannot send");
-            return;
-        }
-        Err(e) => {
-            tracing::error!(
-                "[channel-inbound] no backend credential — cannot reply: {}",
-                e
-            );
-            return;
-        }
-    };
-
-    let client = match crate::backend::BackendClient::from_config(&config) {
-        Ok(c) => c,
-        Err(e) => {
-            tracing::error!("[channel-inbound] failed to create API client: {}", e);
-            return;
-        }
-    };
-
-    let body = channel_message_body_with_idempotency(channel, json!({ "text": text }));
-    match client.send_channel_message(channel, &jwt, body).await {
-        Ok(resp) => {
-            tracing::info!(
-                "[channel-inbound] reply sent to channel='{}' response={:?}",
-                channel,
-                resp
-            );
-        }
-        Err(e) => {
-            tracing::error!(
-                "[channel-inbound] failed to send reply to channel='{}': {}",
-                channel,
-                e
-            );
-        }
-    }
-}
+#[cfg(test)]
+#[path = "delivery_tests.rs"]
+mod tests;

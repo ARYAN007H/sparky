@@ -9,11 +9,12 @@
 //! user's directory, persist the profile, rebind its process globals, start
 //! the credential-gated services, open the scheduler gate and scope Sentry.
 
+use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::config::Config;
-use crate::rpc::RpcOutcome;
+use crate::core::Outcome;
 use crate::security::credentials::jwt::decode_jwt_exp;
 use crate::security::credentials::responses::AuthStateResponse;
 use crate::security::credentials::session_support::{
@@ -66,6 +67,9 @@ pub struct SetCredentialRequest {
     /// The user payload (the host's `/auth/me` answer, or the local user).
     #[serde(default)]
     pub user: Option<Value>,
+    /// Normalized backend used by the host to validate this session.
+    #[serde(default)]
+    pub issuing_backend: Option<String>,
 }
 
 fn sanitize_user(user: Option<Value>) -> Option<Value> {
@@ -178,10 +182,21 @@ fn resolve(request: SetCredentialRequest) -> Result<Resolved, String> {
 /// signed out first so `active_user.toml` never points at one user while
 /// another's profile exists.
 pub async fn set_credential(
+    ctx: &DispatchCtx,
     config: &Config,
     request: SetCredentialRequest,
-) -> Result<RpcOutcome<AuthStateResponse>, String> {
+) -> Result<Outcome<AuthStateResponse>, String> {
+    refuse_process_credential_in_saas("set_credential")?;
+    let issuing_backend = request.issuing_backend.clone();
     let resolved = resolve(request)?;
+    let issuing_backend = if resolved.kind == CredentialKind::Session {
+        issuing_backend
+            .as_deref()
+            .map(crate::security::credentials::session_support::normalize_session_backend)
+            .transpose()?
+    } else {
+        None
+    };
     let _mutation = CREDENTIAL_MUTATION_LOCK.lock().await;
 
     if resolved.kind == CredentialKind::ApiKey {
@@ -194,19 +209,21 @@ pub async fn set_credential(
         identity::clear_current_user();
         sentry_scope::clear();
         if !was_authenticated {
-            start_credential_gated_services(config).await;
+            start_credential_gated_services(ctx, config).await;
         } else {
             spawn_integrations_cache_warm(config);
         }
-        crate::cron::scheduler_gate::set_signed_out(false);
+        crate::platform::llm_gate::set_signed_out(false);
+        #[cfg(feature = "channels")]
+        crate::channels::session::resume_channel_service();
         tracing::info!(
             domain = "credentials",
             operation = "set_credential",
             "{LOG_PREFIX} api key stored"
         );
         let state = build_session_state(config)?;
-        publish_credential_changed(CredentialKind::ApiKey.as_str());
-        return Ok(RpcOutcome::single_log(state, "api key stored"));
+        publish_credential_changed(ctx, CredentialKind::ApiKey.as_str());
+        return Ok(Outcome::single_log(state, "api key stored"));
     }
 
     let user_id = resolved
@@ -225,17 +242,38 @@ pub async fn set_credential(
     let same_user = existing_user_id.as_deref() == Some(user_id.as_str());
     let refresh = same_token && same_user;
 
+    let mut metadata = std::collections::HashMap::new();
+    if resolved.kind == CredentialKind::Session {
+        let previous_backend = existing
+            .as_ref()
+            .filter(|_| same_token)
+            .and_then(|profile| {
+                profile.metadata.get(
+                    crate::security::credentials::session_support::SESSION_ISSUING_BACKEND_META,
+                )
+            });
+        if let (Some(previous), Some(issuing)) = (previous_backend, issuing_backend.as_ref()) {
+            if previous != issuing {
+                return Err("SESSION_BACKEND_MISMATCH: cannot rebind a stored session to a different backend".into());
+            }
+        }
+        if let Some(backend) = previous_backend.cloned().or(issuing_backend) {
+            metadata.insert(
+                crate::security::credentials::session_support::SESSION_ISSUING_BACKEND_META
+                    .to_string(),
+                backend,
+            );
+        }
+    }
     if existing_token.is_some() && !same_user {
         tracing::info!(
             domain = "credentials",
             operation = "set_credential",
             "{LOG_PREFIX} credential names a different user than the stored one; clearing the previous session first"
         );
-        let cleared = clear_session_credential(config).await?;
+        let cleared = clear_session_credential(ctx, config).await?;
         logs.extend(cleared.logs);
     }
-
-    let mut metadata = std::collections::HashMap::new();
     metadata.insert("user_id".to_string(), user_id.clone());
     if let Some(user) = &resolved.user {
         metadata.insert("user_json".to_string(), user.to_string());
@@ -257,12 +295,12 @@ pub async fn set_credential(
         logs.push("credential refreshed (same secret, same user)".to_string());
         config.clone()
     } else {
-        logs.extend(activate_user_scope(&user_id)?);
+        logs.extend(activate_user_scope(ctx, &user_id)?);
         // Reload so auth-profiles.json, the encryption key and the workspace
         // resolve to the user-scoped location before the profile is written.
-        let effective = reload_config_or(config).await?;
+        let effective = reload_config_or(ctx, config).await?;
         if resolved.kind == CredentialKind::Local {
-            match crate::config::ops::set_onboarding_completed(false).await {
+            match crate::config::ops::set_onboarding_completed(ctx, false).await {
                 Ok(_) => {
                     logs.push("onboarding left incomplete for local session setup".to_string())
                 }
@@ -300,19 +338,15 @@ pub async fn set_credential(
             return Err(error);
         }
         logs.push("process globals rebound after credential install".to_string());
-        start_credential_gated_services(&effective_config).await;
+        start_credential_gated_services(ctx, &effective_config).await;
         logs.push("credential-gated services started".to_string());
-        crate::memory::ops::maintenance::reembed_best_effort(
-            &effective_config,
-            "credential stored",
-        )
-        .await;
-        logs.push("memory re-embed backfill checked".to_string());
     }
 
     // Open the scheduler gate now that a live credential is in place; workers
     // sleeping in the paused poll loop resume at their next iteration.
-    crate::cron::scheduler_gate::set_signed_out(false);
+    crate::platform::llm_gate::set_signed_out(false);
+    #[cfg(feature = "channels")]
+    crate::channels::session::resume_channel_service();
     // An API key wins over a session for every backend request. Keep the
     // process identity aligned with that effective credential.
     if api_key::has_api_key(&effective_config) {
@@ -337,17 +371,19 @@ pub async fn set_credential(
     );
 
     let state = build_session_state(&effective_config)?;
-    publish_credential_changed(resolved.kind.as_str());
-    Ok(RpcOutcome::new(state, logs))
+    publish_credential_changed(ctx, resolved.kind.as_str());
+    Ok(Outcome::new(state, logs))
 }
 
 /// Remove the stored credential of `kind` — or every credential when `None`.
 /// A session (or local) removal runs the sign-out teardown; an API-key removal
 /// only closes the scheduler gate when no other credential remains.
 pub async fn clear_credential(
+    ctx: &DispatchCtx,
     config: &Config,
     kind: Option<CredentialKind>,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
+    refuse_process_credential_in_saas("clear_credential")?;
     let _mutation = CREDENTIAL_MUTATION_LOCK.lock().await;
     let mut logs = Vec::new();
     let mut removed_session = false;
@@ -374,18 +410,19 @@ pub async fn clear_credential(
 
     let mut effective_config = config.clone();
     let mut cleared_source_api_key = false;
+    let mut carried_api_key = false;
     if matches!(
         kind,
         None | Some(CredentialKind::Session) | Some(CredentialKind::Local)
     ) {
-        let outcome = clear_session_credential(config).await?;
+        let outcome = clear_session_credential(ctx, config).await?;
         removed_session = outcome.value;
         logs.extend(outcome.logs);
 
         if removed_session {
             // Follow the same process globals the teardown just rebound to,
             // so the api-key checks below agree with `auth.get_state`.
-            effective_config = reload_config_or(config).await?;
+            effective_config = reload_config_or(ctx, config).await?;
             if let Some(key) = source_api_key.as_deref() {
                 if matches!(
                     kind,
@@ -401,16 +438,28 @@ pub async fn clear_credential(
                     // the effective credential a moment ago (#6318).
                     api_key::store_api_key(&effective_config, key).map_err(|e| e.to_string())?;
                     logs.push("api key carried forward to the signed-out workspace".to_string());
+                    carried_api_key = true;
                 }
-                // Either the key was just moved to the post-teardown config
-                // above, or `kind` is `None` and it must be removed outright.
-                // `config` here is still the pre-teardown, user-scoped
-                // reference, so this clears the *source* location — never
-                // leave that copy behind, or a later login to the same
-                // account (or an api-key clear against the wrong location)
-                // would silently resurrect it (#6318).
-                cleared_source_api_key =
-                    api_key::clear_api_key(config).map_err(|e| e.to_string())?;
+                // With a storage backend the auth profiles are one secret in
+                // the acting scope (`profiles::persistence::STORAGE_SECRET_NAME`),
+                // not a file per state directory, so the source and the
+                // destination above are the same record: clearing the
+                // "source" would delete the key just carried forward.
+                let shares_store =
+                    carried_api_key && matches!(crate::storage::secrets::current(), Ok(Some(_)));
+                if shares_store {
+                    log::debug!("[credentials] api key kept: the storage profile store is shared");
+                } else {
+                    // Either the key was just moved to the post-teardown config
+                    // above, or `kind` is `None` and it must be removed outright.
+                    // `config` here is still the pre-teardown, user-scoped
+                    // reference, so this clears the *source* location — never
+                    // leave that copy behind, or a later login to the same
+                    // account (or an api-key clear against the wrong location)
+                    // would silently resurrect it (#6318).
+                    cleared_source_api_key =
+                        api_key::clear_api_key(config).map_err(|e| e.to_string())?;
+                }
             }
         }
     }
@@ -424,7 +473,7 @@ pub async fn clear_credential(
             logs.push("api key cleared".to_string());
         }
         if !crate::security::credentials::session_support::has_backend_credential(config) {
-            crate::cron::scheduler_gate::set_signed_out(true);
+            crate::platform::llm_gate::set_signed_out(true);
         } else if removed_api_key {
             // Clearing the preferred API key exposes the surviving session.
             // Restore the session's process identity immediately.
@@ -447,17 +496,17 @@ pub async fn clear_credential(
     // deliberately stops the gated services and closes the scheduler gate, so
     // restore the surviving key's runtime after that teardown has completed.
     if removed_session && api_key::has_api_key(config) {
-        start_credential_gated_services(config).await;
-        crate::cron::scheduler_gate::set_signed_out(false);
+        start_credential_gated_services(ctx, config).await;
+        crate::platform::llm_gate::set_signed_out(false);
         sentry_scope::clear();
         identity::clear_current_user();
         logs.push("credential-gated services restarted for api key".to_string());
     }
 
     if removed_session || removed_api_key {
-        publish_credential_changed("cleared");
+        publish_credential_changed(ctx, "cleared");
     }
-    Ok(RpcOutcome::new(
+    Ok(Outcome::new(
         json!({
             "removed": removed_session || removed_api_key,
             "removedSession": removed_session,
@@ -472,9 +521,27 @@ pub async fn clear_credential(
 /// teardown, user-dir deactivation, service stop, rebind to the signed-out
 /// workspace, and Sentry / identity clear. Callers hold
 /// [`CREDENTIAL_MUTATION_LOCK`].
-async fn clear_session_credential(config: &Config) -> Result<RpcOutcome<bool>, String> {
+async fn clear_session_credential(
+    ctx: &DispatchCtx,
+    config: &Config,
+) -> Result<Outcome<bool>, String> {
     let mut logs = Vec::new();
-    crate::cron::scheduler_gate::set_signed_out(true);
+    crate::platform::llm_gate::set_signed_out(true);
+    #[cfg(feature = "web3")]
+    if let Err(error) = crate::modules::web3_service::close_service(config).await {
+        tracing::warn!(%error, "{LOG_PREFIX} failed to close Web3 service during sign-out");
+        logs.push("Web3 service cleanup will retry on replacement or shutdown".into());
+    }
+    #[cfg(feature = "web3")]
+    if let Err(error) = crate::modules::x402_service::close_service(config).await {
+        tracing::warn!(%error, "{LOG_PREFIX} failed to close x402 service during sign-out");
+        logs.push("x402 service cleanup will retry on replacement or shutdown".into());
+    }
+    #[cfg(feature = "web3")]
+    if let Err(error) = crate::modules::wallet_service::close_native_wallet_service().await {
+        tracing::warn!(%error, "{LOG_PREFIX} failed to close native wallet service during sign-out");
+        logs.push("native wallet service cleanup will retry on replacement or shutdown".into());
+    }
     identity::clear_current_user();
     // Local/CLI model authentication can outlive an OpenHuman account. The old
     // account's listeners and workspace-bound channel state cannot.
@@ -498,12 +565,12 @@ async fn clear_session_credential(config: &Config) -> Result<RpcOutcome<bool>, S
     }
 
     deactivate_user_scope()?;
-    stop_credential_gated_services(config).await;
+    stop_credential_gated_services(ctx, config).await;
 
     // Every process-global store must follow the now-active pre-login
     // workspace, or a signed-out caller keeps reading the previous account's
     // context until the process restarts.
-    match crate::config::load_config_with_timeout().await {
+    match ctx.load_config().await {
         Ok(signed_out_config) => {
             logs.extend(rebind_after_credential_change(
                 &signed_out_config,
@@ -519,24 +586,27 @@ async fn clear_session_credential(config: &Config) -> Result<RpcOutcome<bool>, S
 
     sentry_scope::clear();
     logs.push("session cleared".to_string());
-    Ok(RpcOutcome::new(removed, logs))
+    Ok(Outcome::new(removed, logs))
 }
 
 /// Historical entry point: install a session (or local) credential from a
 /// bare token. Same as [`set_credential`] with the kind classified by shape.
 pub async fn store_session(
+    ctx: &DispatchCtx,
     config: &Config,
     token: &str,
     user_id: Option<String>,
     user: Option<Value>,
-) -> Result<RpcOutcome<AuthStateResponse>, String> {
+) -> Result<Outcome<AuthStateResponse>, String> {
     set_credential(
+        ctx,
         config,
         SetCredentialRequest {
             token: token.to_string(),
             kind: None,
             user_id,
             user,
+            issuing_backend: None,
         },
     )
     .await
@@ -544,15 +614,42 @@ pub async fn store_session(
 
 /// Historical entry point: sign the session out. Same as
 /// [`clear_credential`] for the session kind.
-pub async fn clear_session(config: &Config) -> Result<RpcOutcome<Value>, String> {
-    clear_credential(config, Some(CredentialKind::Session)).await
+pub async fn clear_session(ctx: &DispatchCtx, config: &Config) -> Result<Outcome<Value>, String> {
+    clear_credential(ctx, config, Some(CredentialKind::Session)).await
+}
+
+/// A process-wide credential is a single-user concept: installing one
+/// activates a user directory and rebinds process globals. A SaaS process
+/// keeps one credential per profile instead (`profiles.set_credential`).
+fn refuse_process_credential_in_saas(operation: &str) -> Result<(), String> {
+    process_credential_refusal(crate::core::runtime::is_saas(), operation)
+}
+
+pub(crate) fn process_credential_refusal(saas: bool, operation: &str) -> Result<(), String> {
+    if saas {
+        tracing::warn!(
+            domain = "credentials",
+            operation,
+            "{LOG_PREFIX} refused: process-wide credentials are not used in SaaS mode"
+        );
+        return Err(format!(
+            "{operation} is not available in SaaS mode; the gateway installs each user's \
+             credential through profiles.set_credential"
+        ));
+    }
+    Ok(())
 }
 
 /// Tell credential-derived caches (the search module's managed routes) to
 /// refresh. Carries only the kind, never the credential.
-fn publish_credential_changed(kind: &str) {
+fn publish_credential_changed(ctx: &DispatchCtx, kind: &str) {
     tracing::debug!(kind, "{LOG_PREFIX} publishing CredentialChanged");
     crate::core::bus::BUS.publish(crate::core::events::DomainEvent::CredentialChanged {
         kind: kind.to_string(),
+        tenant: ctx.event_tenant(),
     });
 }
+
+#[cfg(test)]
+#[path = "credential_tests.rs"]
+mod tests;

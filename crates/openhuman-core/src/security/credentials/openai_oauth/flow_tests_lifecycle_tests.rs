@@ -5,7 +5,7 @@ fn start_openai_oauth_returns_authorize_url() {
     let tmp = tempdir().unwrap();
     let config = test_config(&tmp);
 
-    let start = start_openai_oauth(&config).unwrap();
+    let start = runtime().block_on(start_openai_oauth(&config)).unwrap();
     assert!(start.auth_url.contains("auth.openai.com"));
     assert!(start.auth_url.contains("code_challenge="));
     assert_eq!(start.redirect_uri, "http://127.0.0.1:1455/auth/callback");
@@ -48,14 +48,6 @@ fn build_authorize_url_includes_codex_pkce_and_extra_params() {
 }
 
 #[test]
-fn parse_callback_input_accepts_full_redirect_url() {
-    let url = "http://127.0.0.1:1455/auth/callback?code=abc&state=xyz";
-    let (code, state) = parse_callback_input(url).unwrap();
-    assert_eq!(code, "abc");
-    assert_eq!(state, "xyz");
-}
-
-#[test]
 fn parse_callback_input_accepts_raw_query_string() {
     let (code, state) = parse_callback_input("code=abc%20123&state=xyz").unwrap();
     assert_eq!(code, "abc 123");
@@ -63,18 +55,9 @@ fn parse_callback_input_accepts_raw_query_string() {
 }
 
 #[test]
-fn parse_callback_input_rejects_missing_code() {
-    let err = parse_callback_input("http://127.0.0.1:1455/auth/callback?state=xyz").unwrap_err();
-    assert!(err.contains("code"));
-}
-
-#[test]
-fn parse_callback_input_rejects_blank_invalid_and_missing_state() {
+fn parse_callback_input_rejects_blank_and_missing_state() {
     let blank = parse_callback_input("   ").unwrap_err();
     assert!(blank.contains("required"));
-
-    let invalid = parse_callback_input("not-a-callback").unwrap_err();
-    assert!(invalid.contains("invalid"));
 
     let missing_state =
         parse_callback_input("http://127.0.0.1:1455/auth/callback?code=abc").unwrap_err();
@@ -98,33 +81,84 @@ fn complete_openai_oauth_rejects_missing_pending_session() {
 fn complete_openai_oauth_rejects_expired_pending_session() {
     let tmp = tempdir().unwrap();
     let config = test_config(&tmp);
-    std::fs::write(
-        tmp.path().join("openai-oauth-pending.json"),
-        serde_json::json!({
-            "state": "state",
-            "verifier": "verifier",
-            "redirect_uri": "http://127.0.0.1:1455/auth/callback",
-            "created_at": 1_u64,
-        })
-        .to_string(),
-    )
-    .unwrap();
+    let pending = pending::store(&config).unwrap();
+    runtime().block_on(async {
+        pending
+            .set(
+                "openai-oauth-pending",
+                serde_json::json!({
+                    "state": "state",
+                    "verifier": "verifier",
+                    "redirect_uri": "http://127.0.0.1:1455/auth/callback",
+                    "created_at": 1_u64,
+                })
+                .to_string()
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+        let err = complete_openai_oauth(
+            &config,
+            "http://127.0.0.1:1455/auth/callback?code=fake&state=state",
+        )
+        .await
+        .unwrap_err();
+        assert!(err.contains("no pending OAuth session"));
+        assert!(pending.get("openai-oauth-pending").await.unwrap().is_none());
+    });
+}
 
+#[test]
+fn start_openai_oauth_keeps_the_pending_session_in_the_secret_store_not_a_file() {
+    let tmp = tempdir().unwrap();
+    let config = test_config(&tmp);
+    let start = runtime().block_on(start_openai_oauth(&config)).unwrap();
+
+    assert!(!tmp.path().join("openai-oauth-pending.json").exists());
+    let pending = pending::store(&config).unwrap();
+    let stored = runtime()
+        .block_on(pending.get("openai-oauth-pending"))
+        .unwrap()
+        .expect("the session is stored");
+    let doc: serde_json::Value = serde_json::from_slice(&stored).unwrap();
+    assert_eq!(doc["state"], start.state);
+}
+
+#[test]
+fn a_legacy_pending_file_started_before_the_upgrade_still_completes_its_flow() {
+    let tmp = tempdir().unwrap();
+    let config = test_config(&tmp);
+    let legacy = tmp.path().join("openai-oauth-pending.json");
+    let created_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let bytes = serde_json::json!({
+        "state": "legacy-state",
+        "verifier": "legacy-verifier",
+        "redirect_uri": "http://127.0.0.1:1455/auth/callback",
+        "created_at": created_at,
+    })
+    .to_string();
+    std::fs::write(&legacy, &bytes).unwrap();
+
+    // A wrong state is rejected as a mismatch, which only happens when the
+    // legacy session was found.
     let err = runtime()
         .block_on(complete_openai_oauth(
             &config,
-            "http://127.0.0.1:1455/auth/callback?code=fake&state=state",
+            "http://127.0.0.1:1455/auth/callback?code=fake&state=wrong",
         ))
         .unwrap_err();
-    assert!(err.contains("no pending OAuth session"));
-    assert!(!tmp.path().join("openai-oauth-pending.json").exists());
+    assert!(err.contains("state mismatch"), "{err}");
+    assert_eq!(std::fs::read_to_string(&legacy).unwrap(), bytes);
 }
 
 #[test]
 fn complete_openai_oauth_rejects_state_mismatch() {
     let tmp = tempdir().unwrap();
     let config = test_config(&tmp);
-    let start = start_openai_oauth(&config).unwrap();
+    let start = runtime().block_on(start_openai_oauth(&config)).unwrap();
     let callback = format!(
         "http://127.0.0.1:1455/auth/callback?code=fake&state=not-{}",
         start.state
@@ -440,9 +474,7 @@ fn codex_import_user_state_errors_classify_as_expected() {
 /// RPC surfaces the actionable error.
 #[tokio::test]
 async fn inference_import_codex_cli_surfaces_error_when_auth_missing() {
-    let _env_lock = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = tempdir().unwrap();
     let config = test_config(&tmp);
     let _env_guard = EnvVarGuard::set("CODEX_HOME", tmp.path());
@@ -517,7 +549,7 @@ fn codex_routing_reaches_backend_for_oauth_only_openai_even_after_token_rotation
     // backend regardless of the bearer string passed in — here a deliberately
     // *different* token, standing in for a post-refresh rotation.
     use crate::inference::provider::factory::openai_bearer_is_oauth;
-    use crate::inference::provider::openai_codex::resolve_openai_codex_routing;
+    use crate::inference::provider::factory::resolve_codex_routing;
 
     let tmp = tempdir().unwrap();
     let config = test_config(&tmp);
@@ -544,10 +576,10 @@ fn codex_routing_reaches_backend_for_oauth_only_openai_even_after_token_rotation
         "OAuth is the only openai credential, so the bearer is OAuth"
     );
 
-    let routing = resolve_openai_codex_routing(
+    let routing = resolve_codex_routing(
         &config,
         "openai",
-        "https://api.openai.com/v1",
+        "https://api.openai.com/v1/",
         // A stale bearer that does NOT equal the stored access token: the pre-fix
         // equality check mis-routed on exactly this.
         "oauth-access-stale",
@@ -556,7 +588,7 @@ fn codex_routing_reaches_backend_for_oauth_only_openai_even_after_token_rotation
     .unwrap();
     assert!(routing.using_oauth, "OAuth-only openai must route to Codex");
     assert_ne!(
-        routing.endpoint, "https://api.openai.com/v1",
+        routing.endpoint, "https://api.openai.com/v1/",
         "must re-target the Codex backend, not standard OpenAI"
     );
 
@@ -569,10 +601,10 @@ fn codex_routing_reaches_backend_for_oauth_only_openai_even_after_token_rotation
         )
         .unwrap();
     assert!(!openai_bearer_is_oauth(&config));
-    let routing = resolve_openai_codex_routing(
+    let routing = resolve_codex_routing(
         &config,
         "openai",
-        "https://api.openai.com/v1",
+        "https://api.openai.com/v1/",
         "sk-api-key",
         openai_bearer_is_oauth(&config),
     )
@@ -581,7 +613,7 @@ fn codex_routing_reaches_backend_for_oauth_only_openai_even_after_token_rotation
         !routing.using_oauth,
         "a stored API key routes to standard OpenAI"
     );
-    assert_eq!(routing.endpoint, "https://api.openai.com/v1");
+    assert_eq!(routing.endpoint, "https://api.openai.com/v1/");
 }
 
 #[test]

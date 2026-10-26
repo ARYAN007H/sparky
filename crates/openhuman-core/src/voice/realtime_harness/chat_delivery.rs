@@ -9,12 +9,12 @@ use crate::platform::socket::manager::global_socket_manager;
 
 /// Chat thread + client id the voice turn scopes as its approval / routing
 /// surface, mirroring `deliver_voice_result_to_chat`. Setting these around the
-/// turn (via `APPROVAL_CHAT_CONTEXT` plus the explicit agent thread) is what makes the voice
+/// turn (via the chat approval context plus the explicit agent thread) is what makes the voice
 /// orchestrator behave like the chat path for tools that need a *routable*
 /// approval surface:
 ///
 /// - `composio_connect` fails closed with a `[policy-denied] … needs an
-///   interactive chat turn` message whenever `APPROVAL_CHAT_CONTEXT` is absent
+///   interactive chat turn` message whenever the turn has no chat approval context
 ///   (see `integrations/composio/tools.rs`). On voice that message got
 ///   paraphrased back to the user as "your Gmail connection is throwing an auth
 ///   error, reconnect it" — the exact voice-only Gmail-summary failure — even
@@ -24,15 +24,15 @@ use crate::platform::socket::manager::global_socket_manager;
 /// - external_effect tool approvals raised on the `ExternalChannel` turn now
 ///   have a thread card to route to (the same `proactive:voice` thread where
 ///   deferred voice answers land) rather than silently TTL-denying.
-/// - The explicit run context gives async delegation (`spawn_async_subagent`) the
+/// - The explicit run context gives async delegation (`spawn_subagent`) the
 ///   `parent_thread_id` it requires and aligns inference logs / KV-cache with
 ///   the voice thread.
 pub(super) const VOICE_CHAT_THREAD_ID: &str = "proactive:voice";
 pub(super) const VOICE_CHAT_CLIENT_ID: &str = "system";
 
 /// Deliver a deferred voice turn's answer into the user's in-app chat. Publishes
-/// a `proactive_message` on the web-channel event bus — the same seam cron and the
-/// subconscious use — which the frontend renders as an assistant message in a
+/// a `proactive_message` on the web-channel event bus — the same seam cron
+/// uses — which the frontend renders as an assistant message in a
 /// visible thread. Web-only: it does not fan out to external channels (#5399).
 pub(super) fn deliver_voice_result_to_chat(
     correlation_id: &str,
@@ -51,7 +51,7 @@ pub(super) fn deliver_voice_result_to_chat(
         "[voice-harness] delivering deferred result to chat correlation={correlation_id} chars={} speak_back={allow_speak_back}",
         spoken.chars().count()
     );
-    crate::web_chat::publish_web_channel_event(crate::core::socketio::WebChannelEvent {
+    crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent {
         event: "proactive_message".to_string(),
         client_id: VOICE_CHAT_CLIENT_ID.to_string(),
         thread_id: VOICE_CHAT_THREAD_ID.to_string(),
@@ -66,7 +66,7 @@ pub(super) fn deliver_voice_result_to_chat(
     // session (a fast read-back turn). Skipped for read-back turns themselves to
     // avoid a loop; harmless if the call already ended (nobody is subscribed).
     if allow_speak_back {
-        crate::web_chat::publish_web_channel_event(crate::core::socketio::WebChannelEvent {
+        crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent {
             event: "voice_speak".to_string(),
             client_id: VOICE_CHAT_CLIENT_ID.to_string(),
             full_response: Some(spoken.to_string()),
@@ -91,7 +91,7 @@ pub(super) fn deliver_voice_failure_to_chat(correlation_id: &str) {
     info!(
         "[voice-harness] delivering deferred failure notice to chat correlation={correlation_id}"
     );
-    crate::web_chat::publish_web_channel_event(crate::core::socketio::WebChannelEvent {
+    crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent {
         event: "proactive_message".to_string(),
         client_id: VOICE_CHAT_CLIENT_ID.to_string(),
         thread_id: VOICE_CHAT_THREAD_ID.to_string(),

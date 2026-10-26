@@ -13,8 +13,6 @@ import DeveloperOptionsPanel from './panels/DeveloperOptionsPanel';
 import EventLogPanel from './panels/EventLogPanel';
 import FeedbackPanel from './panels/FeedbackPanel';
 import MascotPanel from './panels/MascotPanel';
-import MemoryDataPanel from './panels/MemoryDataPanel';
-import MemoryDebugPanel from './panels/MemoryDebugPanel';
 import MigrationPanel from './panels/MigrationPanel';
 import PermissionsPanel from './panels/PermissionsPanel';
 import PersonaPanel from './panels/PersonaPanel';
@@ -115,8 +113,7 @@ export function settingsRouteElements(): ReactNode {
       {/* The Agents list and editor were removed; old links land on Connections → Tools. */}
       <Route path="agents/*" element={<Navigate to="/connections?tab=agent-tools" replace />} />
       <Route path="agent-access" element={wrapSettingsPage(<AgentAccessPanel />)} />
-      {/* Agent activity level (medulla/subconscious background-AI knob) was
-          retired along with medulla/subconscious themselves. The slug
+      {/* The agent activity level (background-AI knob) was retired. The slug
           redirects so any old deep link lands on Connections → Tools rather than falling
           through to the settings index. */}
       <Route
@@ -127,8 +124,11 @@ export function settingsRouteElements(): ReactNode {
       <Route path="approval-history" element={wrapSettingsPage(<ApprovalHistoryPanel />)} />
 
       {/* ── Data ────────────────────────────────────────────────── */}
-      {/* Data Sync is a first-class surface on the Brain page now. */}
-      <Route path="memory-sync" element={<Navigate to="/brain?tab=sync" replace />} />
+      {/* Data Sync is the Memory page's Brain chip now. */}
+      <Route
+        path="memory-sync"
+        element={<Navigate to="/connections?tab=brain&brain=brain" replace />}
+      />
       {/* Wallet balances moved to the Connections page (Integrations group). */}
       <Route path="wallet-balances" element={<Navigate to="/connections?tab=wallet" replace />} />
       <Route path="recovery-phrase" element={wrapSettingsPage(<RecoveryPhrasePanel />)} />
@@ -168,8 +168,8 @@ export function settingsRouteElements(): ReactNode {
       <Route path="agent-chat" element={<Navigate to="/connections?tab=llm" replace />} />
       {/* Schedules live on the Workflows page now (`/flows?view=schedules`). */}
       <Route path="cron-jobs" element={<Navigate to="/flows?view=schedules" replace />} />
-      {/* Tasks are represented by goals on the Brain page. */}
-      <Route path="tasks" element={<Navigate to="/brain?tab=goals" replace />} />
+      {/* Tasks were goals on the v1 Brain page; asking memory is the closest v2 surface. */}
+      <Route path="tasks" element={<Navigate to="/connections?tab=brain&brain=ask" replace />} />
       {/* Workflows is a first-level module now — /settings/automations bounces
           to /flows (the Workflows page). */}
       <Route path="automations" element={<Navigate to="/flows" replace />} />
@@ -187,12 +187,22 @@ export function settingsRouteElements(): ReactNode {
       <Route path="event-log" element={wrapSettingsPage(<EventLogPanel />)} />
       {/* Model Health page retired. */}
       <Route path="model-health" element={<SettingsRedirect to="/settings/developer-options" />} />
-      {/* Memory inspection remains the configuration surface for the memory
-          window, vault health, and connected-source controls. */}
-      <Route path="memory-data" element={wrapSettingsPage(<MemoryDataPanel />)} />
-      <Route path="memory-debug" element={wrapSettingsPage(<MemoryDebugPanel />)} />
-      <Route path="analysis-views" element={<Navigate to="/brain" replace />} />
-      <Route path="intelligence" element={<Navigate to="/brain" replace />} />
+      {/* Memory v2: the engine picker, synced sources and the memory
+          inspector all live on the Memory page (Connections → Memory). */}
+      <Route
+        path="memory-engine"
+        element={<Navigate to="/connections?tab=brain&brain=engine" replace />}
+      />
+      <Route
+        path="memory-data"
+        element={<Navigate to="/connections?tab=brain&brain=brain" replace />}
+      />
+      <Route
+        path="memory-debug"
+        element={<Navigate to="/connections?tab=brain&brain=ask" replace />}
+      />
+      <Route path="analysis-views" element={<Navigate to="/connections?tab=brain" replace />} />
+      <Route path="intelligence" element={<Navigate to="/connections?tab=brain" replace />} />
       {/* Composio trigger-triage config merged into the Connections Composio page. */}
       <Route
         path="composio-triggers"
@@ -212,10 +222,6 @@ export function settingsRouteElements(): ReactNode {
       {/* Composio (API key + routing) moved to Connections → API keys. */}
       <Route path="composio" element={<Navigate to="/connections?tab=composio-key" replace />} />
       {/* Merged Usage & Limits surface (now on Connections) */}
-      <Route
-        path="heartbeat"
-        element={<Navigate to="/connections?tab=usage#background" replace />}
-      />
       <Route
         path="ledger-usage"
         element={<Navigate to="/connections?tab=usage#background" replace />}

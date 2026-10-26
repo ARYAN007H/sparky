@@ -6,8 +6,8 @@
 
 use serde_json::Value;
 
-use openhuman_core::config::Config;
-use openhuman_core::rpc::RpcOutcome;
+use openhuman_embed::__host::config::Config;
+use openhuman_embed::__host::core::Outcome;
 
 use crate::hosted::client::HostedClient;
 
@@ -39,14 +39,11 @@ pub(super) async fn link_token_payload(
 pub async fn auth_create_channel_link_token(
     config: &Config,
     channel: &str,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     let channel = normalize_channel(channel)?;
     let client = HostedClient::from_config(config)?;
     let payload = link_token_payload(&client, &channel).await?;
-    Ok(RpcOutcome::single_log(
-        payload,
-        "channel link token created",
-    ))
+    Ok(Outcome::single_log(payload, "channel link token created"))
 }
 
 #[cfg(test)]

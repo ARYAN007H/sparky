@@ -25,7 +25,7 @@ struct ToolFamily {
 const TOOL_FAMILIES: &[ToolFamily] = &[
     ToolFamily {
         id: "shell",
-        rust_names: &["shell"],
+        rust_names: &["shell", "shell_process"],
         default_enabled: true,
     },
     // detect_tools / install_tool are filterable but not surfaced in the
@@ -52,7 +52,7 @@ const TOOL_FAMILIES: &[ToolFamily] = &[
     },
     ToolFamily {
         id: "file_write",
-        rust_names: &["file_write", "update_memory_md"],
+        rust_names: &["file_write"],
         default_enabled: true,
     },
     ToolFamily {
@@ -81,18 +81,8 @@ const TOOL_FAMILIES: &[ToolFamily] = &[
         default_enabled: true,
     },
     ToolFamily {
-        id: "memory_store",
-        rust_names: &["memory_store"],
-        default_enabled: true,
-    },
-    ToolFamily {
-        id: "memory_recall",
-        rust_names: &["memory_recall"],
-        default_enabled: true,
-    },
-    ToolFamily {
-        id: "memory_forget",
-        rust_names: &["memory_forget"],
+        id: "memory",
+        rust_names: &["memory"],
         default_enabled: true,
     },
     ToolFamily {
@@ -130,6 +120,8 @@ const TOOL_FAMILIES: &[ToolFamily] = &[
         ],
         default_enabled: false,
     },
+    // keep until v0.66 (review after 2027-01-11): persisted opt-in snapshots need
+    // a one-shot skill_manage -> workflow_manage migration before retirement.
     // Legacy alias: pre-rename `enabled_tool_names` snapshots stored this
     // family as `skill_manage`. Retain it (same rust_names) so users who had
     // already opted in keep these default-OFF tools enabled after the
@@ -170,24 +162,10 @@ const TOOL_FAMILIES: &[ToolFamily] = &[
         ],
         default_enabled: false,
     },
-    ToolFamily {
-        id: "learning_manage",
-        rust_names: &[
-            "learning_update_facet",
-            "learning_pin_facet",
-            "learning_unpin_facet",
-            "learning_forget_facet",
-            "learning_rebuild_cache",
-            "learning_reset_cache",
-            "learning_save_profile",
-            "learning_enrich_profile",
-        ],
-        default_enabled: false,
-    },
     // Task & workflow productivity — overextending tools (agent-tool
     // expansion). Only the destructive/persistent-config mutators are listed
     // here so the onboarding toggle surface can default them OFF and let users
-    // opt in; the read-only + bounded-write siblings (e.g. `artifact_list`,
+    // opt in; the read-only + bounded-write siblings (e.g. `list_artifacts`,
     // `task_source_fetch`) are intentionally NOT listed, so they
     // are always-retained infrastructure. Grouped one toggle per risk family.
     ToolFamily {
@@ -195,9 +173,11 @@ const TOOL_FAMILIES: &[ToolFamily] = &[
         rust_names: &["agent_workflow_uninstall"],
         default_enabled: false,
     },
+    // The toggle id predates the tool's rename to `delete_artifact`; it stays
+    // so a user's saved choice keeps applying.
     ToolFamily {
         id: "artifact_delete",
-        rust_names: &["artifact_delete"],
+        rust_names: &["delete_artifact"],
         default_enabled: false,
     },
     ToolFamily {
@@ -235,6 +215,8 @@ fn family_for_rust_name(name: &str) -> Option<&'static ToolFamily> {
 /// - UI toggle IDs (legacy / partial-rollout format)
 ///
 /// Unknown entries are ignored.
+// keep until v0.66 (review after 2027-01-11): persisted app-state opt-in keys
+// need a one-shot rename before this alias can be removed safely.
 const LEGACY_ALIASES: &[(&str, &str)] = &[("skill_manage", "workflow_manage")];
 
 fn expand_enabled_tool_names(enabled_tool_names: &[String]) -> HashSet<String> {

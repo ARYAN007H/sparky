@@ -1,7 +1,7 @@
 //! Async wrapper around the `tinydocs` module's `.pptx` writer.
 //!
 //! The synthesis itself — the slide mapping, the single-column image layout, the
-//! EMU geometry — lives in `crate::tools::implementations::document::format::pptx` and runs inside the loaded module.
+//! EMU geometry is implemented by the loaded module; its wire spec is shared through the document format alias.
 //! What is left here is the policy only a host can supply:
 //!
 //! 1. a deadline, because the module holds no opinion about how long a caller
@@ -24,12 +24,11 @@
 
 use std::time::Duration;
 
-use crate::tools::implementations::document::format::spec::{
-    WirePresentationSpec, WireSlideImage, WireSlideSpec,
-};
+use tinydocs_bus::spec::presentation::PresentationSpec;
+use tinydocs_bus::spec::{WirePresentationSpec, WireSlideImage, WireSlideSpec};
 use tokio::time::timeout;
 
-use super::types::{GeneratePresentationInput, PresentationError, ResolvedSlideImage};
+use super::types::PresentationError;
 use crate::modules::documents;
 
 /// Run the synthesis. Returns the serialised `.pptx` bytes ready to be written
@@ -38,12 +37,11 @@ use crate::modules::documents;
 /// The `deadline` covers the whole call, including the image transfer. Hitting
 /// it surfaces as [`PresentationError::GenerationTimeout`].
 pub(super) async fn generate(
-    input: &GeneratePresentationInput,
-    images: &[Vec<ResolvedSlideImage>],
+    spec: &PresentationSpec,
     deadline: Duration,
     config: Option<&crate::config::Config>,
 ) -> Result<Vec<u8>, PresentationError> {
-    let (deck, payload) = build_request(input, images);
+    let (deck, payload) = build_request(spec);
     let started = std::time::Instant::now();
     let slide_count = deck.slides.len();
     let deadline_secs = deadline.as_secs();
@@ -54,7 +52,7 @@ pub(super) async fn generate(
         deadline_secs,
         slide_count,
         image_bytes,
-        title_chars = input.title.chars().count(),
+        title_chars = spec.title.chars().count(),
         "[presentation:engine] generate:start"
     );
 
@@ -132,17 +130,13 @@ pub(super) async fn generate(
 /// corresponding slice in `payload`, in the same order, and the module refuses
 /// the call if they do not add up. Building both here, in one pass, is what
 /// keeps them consistent.
-fn build_request(
-    input: &GeneratePresentationInput,
-    images: &[Vec<ResolvedSlideImage>],
-) -> (WirePresentationSpec, Vec<u8>) {
+fn build_request(spec: &PresentationSpec) -> (WirePresentationSpec, Vec<u8>) {
     let mut payload = Vec::new();
-    let mut slides = Vec::with_capacity(input.slides.len());
+    let mut slides = Vec::with_capacity(spec.slides.len());
 
-    for (index, slide) in input.slides.iter().enumerate() {
-        let resolved = images.get(index).map(Vec::as_slice).unwrap_or(&[]);
-        let mut wire_images = Vec::with_capacity(resolved.len());
-        for image in resolved {
+    for slide in &spec.slides {
+        let mut wire_images = Vec::with_capacity(slide.images.len());
+        for image in &slide.images {
             payload.extend_from_slice(&image.bytes);
             wire_images.push(WireSlideImage {
                 byte_len: image.bytes.len() as u64,
@@ -160,9 +154,9 @@ fn build_request(
 
     (
         WirePresentationSpec {
-            title: input.title.clone(),
-            author: input.author.clone(),
-            theme: input.theme.clone(),
+            title: spec.title.clone(),
+            author: spec.author.clone(),
+            theme: spec.theme.clone(),
             slides,
         },
         payload,

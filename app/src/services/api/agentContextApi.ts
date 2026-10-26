@@ -39,7 +39,7 @@ function isSection(value: unknown): value is ContextBreakdownSection {
   return typeof section.label === 'string' && typeof section.est_tokens === 'number';
 }
 
-/** Accept the bare response or the `{ result, logs }` RpcOutcome envelope. */
+/** Accept the bare response or the `{ result, logs }` Outcome envelope. */
 function unwrap(response: unknown): Record<string, unknown> | null {
   if (!response || typeof response !== 'object') return null;
   const record = response as Record<string, unknown>;

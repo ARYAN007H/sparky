@@ -1,5 +1,6 @@
 //! Local desktop enablement and permission-aware status.
 
+use crate::core::runtime::DispatchCtx;
 use std::fs;
 use std::io::Write;
 use std::sync::{
@@ -25,11 +26,11 @@ const DESKTOP_AGENT_TOOLS: &[&str] = &[
 /// A registered desktop tool skips only approval parks when its explicit
 /// desktop setting is off. Permission caps, denies, enabled state, OS grants,
 /// and the action budget still run at their normal gates.
-pub(crate) async fn approvals_disabled_for(tool: &dyn tinytools::Tool) -> bool {
+pub(crate) async fn approvals_disabled_for(ctx: &DispatchCtx, tool: &dyn tinytools::Tool) -> bool {
     if tool.family() != Some("desktop") || !DESKTOP_AGENT_TOOLS.contains(&tool.name()) {
         return false;
     }
-    crate::config::rpc::load_config_with_timeout()
+    ctx.load_config()
         .await
         .is_ok_and(|config| approval_bypass_decision(&config, tool))
 }
@@ -108,6 +109,11 @@ struct LocalState {
     enabled: bool,
 }
 
+// Deliberately local, not on the storage port: this is the one machine's own
+// consent to let the agent drive its desktop. A shared backend would let a
+// flag set on one host enable control on another that never consented, and
+// corrupt or missing state must keep failing closed. Allowlisted in
+// `scripts/ci/check-storage-bypass.mjs`.
 fn state_path(config: &Config) -> std::path::PathBuf {
     config
         .workspace_dir
@@ -115,8 +121,13 @@ fn state_path(config: &Config) -> std::path::PathBuf {
         .join("desktop-control.json")
 }
 
+/// Effective desktop control: the `[components] computer` ceiling AND this
+/// machine's local consent. The flag can only remove access, never grant it.
 /// Corrupt or unreadable local state fails closed, never enabling desktop access.
 pub fn enabled(config: &Config) -> bool {
+    if !config.components.computer {
+        return false;
+    }
     let _lock = STATE_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -160,17 +171,24 @@ fn save(config: &Config, value: bool) -> Result<(), String> {
 
 pub async fn set_enabled(config: &Config, value: bool) -> Result<DesktopStatus, String> {
     if value && !supported() {
-        return Err(
-            "desktop control requires macOS or Windows and a loopback core listener".to_owned(),
-        );
+        return Err(UNSUPPORTED_REASON.to_owned());
     }
     save(config, value)?;
     tracing::info!(enabled = value, "[desktop] local enablement changed");
     Ok(status(config).await)
 }
 
+const UNSUPPORTED_REASON: &str = "desktop control requires macOS and a loopback core listener";
+
+/// macOS only. The Windows and Linux backends in the pinned TinyComputer
+/// engine implement no desktop surfaces yet, so every call there would fail
+/// with `PLATFORM_NOT_SUPPORTED` (#7164).
+pub(super) const fn platform_supported() -> bool {
+    cfg!(target_os = "macos")
+}
+
 fn supported() -> bool {
-    cfg!(any(target_os = "macos", target_os = "windows")) && listener_is_loopback()
+    platform_supported() && listener_is_loopback()
 }
 
 fn permission(data: &serde_json::Value, field: &str) -> String {
@@ -180,8 +198,21 @@ fn permission(data: &serde_json::Value, field: &str) -> String {
         .and_then(serde_json::Value::as_str)
         .unwrap_or("unknown");
     match raw {
-        "granted" | "denied" | "not_required" => raw.to_owned(),
+        "granted" | "denied" | "not_required" | "unknown" => raw.to_owned(),
         _ => "unknown".to_owned(),
+    }
+}
+
+/// On platforms without a per-app permission model for the given kind (e.g.
+/// Windows has no macOS-style Accessibility or Screen Recording toggle),
+/// treat an `unknown` report from the module as `not_required` so the UI
+/// does not show a misleading "Not determined" state or send the user to
+/// a generic settings page that has no relevant toggle.
+pub(super) fn normalize_permission_for_platform(state: &str, platform: &str) -> String {
+    if platform == "windows" && state == "unknown" {
+        "not_required".to_owned()
+    } else {
+        state.to_owned()
     }
 }
 
@@ -215,15 +246,19 @@ where
         reason: None,
     };
     if !result.supported {
-        reason = Some(
-            "desktop control requires macOS or Windows and a loopback core listener".to_owned(),
-        );
+        reason = Some(UNSUPPORTED_REASON.to_owned());
     } else if local_enabled {
         match permissions().await {
             Ok(response) if response.ok => {
                 if let Some(data) = response.data.as_ref() {
-                    result.accessibility = permission(data, "accessibility");
-                    result.screen_recording = permission(data, "screen_recording");
+                    result.accessibility = normalize_permission_for_platform(
+                        &permission(data, "accessibility"),
+                        result.platform,
+                    );
+                    result.screen_recording = normalize_permission_for_platform(
+                        &permission(data, "screen_recording"),
+                        result.platform,
+                    );
                 }
                 result.module_state = "ready".to_owned();
             }
@@ -289,13 +324,17 @@ where
             }
         }
     };
-    if permissions
+    let accessibility_state = permissions
         .data
         .as_ref()
-        .map(|data| permission(data, "accessibility"))
-        .as_deref()
-        != Some("granted")
-    {
+        .map(|data| {
+            normalize_permission_for_platform(
+                &permission(data, "accessibility"),
+                std::env::consts::OS,
+            )
+        })
+        .unwrap_or_else(|| "unknown".to_owned());
+    if accessibility_state != "granted" && accessibility_state != "not_required" {
         return DesktopProbe {
             ok: false,
             app_count: None,

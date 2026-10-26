@@ -4,7 +4,6 @@ mod boot_env;
 mod composio;
 mod credential;
 mod gated_services;
-mod oauth;
 mod provider_credentials;
 mod secrets;
 mod session_query;
@@ -21,11 +20,7 @@ pub use credential::{
     clear_credential, clear_session, set_credential, store_session, SetCredentialRequest,
     PENDING_BACKEND_VALIDATION_FIELD,
 };
-pub use gated_services::{
-    start_credential_gated_services, start_login_gated_services, stop_credential_gated_services,
-    stop_login_gated_services,
-};
-pub use oauth::oauth_fetch_client_key;
+pub use gated_services::{start_credential_gated_services, stop_credential_gated_services};
 pub use provider_credentials::{
     list_provider_credentials, list_provider_credentials_by_prefix, remove_provider_credentials,
     store_provider_credentials,

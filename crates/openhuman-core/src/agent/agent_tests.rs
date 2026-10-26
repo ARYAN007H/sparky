@@ -18,23 +18,25 @@
 //!  13. Multi-tool batch in a single response
 //!  14. System prompt generation & tool instructions
 //!  15. Context enrichment from memory loader
-//!  16. ConversationMessage serialization round-trip
+//!  16. TranscriptEntry serialization round-trip
 //!  17. Tool call with stringified JSON arguments
 //!  18. Conversation history fidelity (tool call → tool result → assistant)
 //!  19. Builder validation (missing required fields)
 //!  20. Idempotent system prompt insertion
 
-use crate::agent::messages::{ChatMessage, ConversationMessage};
 use crate::agent::session_host::OpenHumanSessionHost;
 use crate::config::AgentConfig;
-use crate::inference::provider::{ChatResponse, ToolCall};
-use crate::memory::Memory;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
+use tinyinference_llm::usage::BilledUsage;
 use tinytools::{Tool, ToolResult};
+use tinytools_agent::dialect::NativeToolCall;
+use tinytools_agent::dialect::TranscriptEntry;
 use tinytools_agent::dialect::{NativeDialect, ToolDialect, XmlDialect};
+
+type ChatResponse = tinyinference_llm::model::ChatResponse<BilledUsage, NativeToolCall>;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Test Helpers — Mock Provider, Mock Tool, Mock Memory
@@ -83,11 +85,14 @@ impl ChatModel<()> for ScriptedProvider {
                 tool_calls: vec![],
                 usage: None,
                 reasoning_content: None,
+                finish_reason: None,
             }
         } else {
             guard.remove(0)
         };
-        Ok(crate::agent::tinyagents::model::native_model_response_for_request(&response, &request))
+        Ok(tinyinference_llm::model::response_to_model_response(
+            &response, &request,
+        ))
     }
 }
 
@@ -221,32 +226,6 @@ impl Tool for CountingTool {
     }
 }
 
-/// Create an isolated memory instance with its own temp directory.
-/// The returned `TempDir` must be held alive for the duration of the test
-/// to prevent the directory (and its SQLite database) from being deleted.
-fn make_memory() -> (Arc<dyn Memory>, tempfile::TempDir) {
-    // `backend: "none"` is what this fixture used to ask the engine's factory
-    // for, and a no-op store is exactly what that produced — so the config is
-    // gone rather than kept as an unused binding that reads like it still
-    // selects something.
-    let tmp = tempfile::TempDir::new().unwrap();
-    let mem = crate::memory::test_support::noop_memory();
-    (mem, tmp)
-}
-
-/// A memory that **retains**, for the two auto-save tests that read it back.
-///
-/// This was `make_sqlite_memory` and asked the engine's factory for a
-/// `backend = "sqlite"` store. The name went with the engine: nothing in
-/// either caller is about SQL — they write through the agent and then assert
-/// on `count()` — so what they need is a store that keeps things, and the
-/// rename says which of the two properties is load-bearing.
-fn make_retaining_memory() -> (Arc<dyn Memory>, tempfile::TempDir) {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let mem = crate::memory::test_support::retaining_memory();
-    (mem, tmp)
-}
-
 /// Build an agent with an isolated temp workspace.
 /// Returns `(OpenHumanSessionHost, TempDir)` — hold `_tmp` in the test to keep the dir alive.
 fn build_agent_with(
@@ -254,32 +233,13 @@ fn build_agent_with(
     tools: Vec<Box<dyn Tool>>,
     dispatcher: Box<dyn ToolDialect>,
 ) -> (OpenHumanSessionHost, tempfile::TempDir) {
-    let (mem, tmp) = make_memory();
-    let agent = OpenHumanSessionHost::builder()
-        .chat_model(provider)
-        .tools(tools)
-        .memory(mem)
-        .tool_dispatcher(dispatcher)
-        .workspace_dir(tmp.path().to_path_buf())
-        .build()
-        .unwrap();
-    (agent, tmp)
-}
-
-fn build_agent_with_memory(
-    provider: Arc<dyn ChatModel<()>>,
-    tools: Vec<Box<dyn Tool>>,
-    mem: Arc<dyn Memory>,
-    auto_save: bool,
-) -> (OpenHumanSessionHost, tempfile::TempDir) {
     let tmp = tempfile::TempDir::new().unwrap();
     let agent = OpenHumanSessionHost::builder()
         .chat_model(provider)
+        .model_name("agent-test/mock".into())
         .tools(tools)
-        .memory(mem)
-        .tool_dispatcher(Box::new(NativeDialect))
+        .tool_dispatcher(dispatcher)
         .workspace_dir(tmp.path().to_path_buf())
-        .auto_save(auto_save)
         .build()
         .unwrap();
     (agent, tmp)
@@ -290,11 +250,11 @@ fn build_agent_with_config(
     tools: Vec<Box<dyn Tool>>,
     config: AgentConfig,
 ) -> (OpenHumanSessionHost, tempfile::TempDir) {
-    let (mem, tmp) = make_memory();
+    let tmp = tempfile::TempDir::new().unwrap();
     let agent = OpenHumanSessionHost::builder()
         .chat_model(provider)
+        .model_name("agent-test/mock".into())
         .tools(tools)
-        .memory(mem)
         .tool_dispatcher(Box::new(NativeDialect))
         .workspace_dir(tmp.path().to_path_buf())
         .config(config)
@@ -304,12 +264,13 @@ fn build_agent_with_config(
 }
 
 /// Helper: create a ChatResponse with tool calls (native format).
-fn tool_response(calls: Vec<ToolCall>) -> ChatResponse {
+fn tool_response(calls: Vec<NativeToolCall>) -> ChatResponse {
     ChatResponse {
         text: Some(String::new()),
         tool_calls: calls,
         usage: None,
         reasoning_content: None,
+        finish_reason: None,
     }
 }
 
@@ -320,6 +281,7 @@ fn text_response(text: &str) -> ChatResponse {
         tool_calls: vec![],
         usage: None,
         reasoning_content: None,
+        finish_reason: None,
     }
 }
 
@@ -332,18 +294,15 @@ fn xml_tool_response(name: &str, args: &str) -> ChatResponse {
         tool_calls: vec![],
         usage: None,
         reasoning_content: None,
+        finish_reason: None,
     }
 }
 
-#[path = "agent_memory_attribution_tests.rs"]
-mod agent_memory_attribution_tests;
 #[path = "agent_turn_loop_nudge_tests.rs"]
 mod agent_turn_loop_nudge_tests;
 #[path = "agent_turn_loop_packed_tool_tests.rs"]
 mod agent_turn_loop_packed_tool_tests;
 #[path = "agent_turn_loop_tests.rs"]
 mod agent_turn_loop_tests;
-#[path = "messages_tests.rs"]
-mod messages_tests;
-#[path = "pformat_tests.rs"]
-mod pformat_tests;
+#[path = "agent_turn_progress_release_tests.rs"]
+mod agent_turn_progress_release_tests;

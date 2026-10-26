@@ -1,42 +1,18 @@
 use super::*;
-use crate::channels::email_channel::EmailConfig;
-use crate::channels::providers::yuanbao::YuanbaoConfig;
 use crate::config::schema::{DiscordConfig, IMessageConfig};
-use chrono::{TimeZone, Utc};
+use crate::core::Outcome;
 use tempfile::tempdir;
-use tinymemory_api::chunks::{chunk_id, Chunk, Metadata, SourceKind, SourceRef};
+use tinychannels_bus::config::{EmailConfig, YuanbaoConfig};
+use tinychannels_bus::controllers::{ChannelAuthMode, ChannelConnectionResult};
 
 fn isolated_test_config() -> (tempfile::TempDir, Config) {
     let tmp = tempdir().expect("failed to create temp dir");
     let mut config = Config::default();
+    config.modules.allow_download = false;
     config.workspace_dir = tmp.path().join("workspace");
     config.config_path = tmp.path().join("config.toml");
     std::fs::create_dir_all(&config.workspace_dir).expect("failed to create workspace dir");
     (tmp, config)
-}
-
-fn sample_chat_chunk(source_id: &str, seq: u32) -> Chunk {
-    let ts = Utc
-        .timestamp_millis_opt(1_700_000_000_000 + i64::from(seq))
-        .unwrap();
-    Chunk {
-        id: chunk_id(SourceKind::Chat, source_id, seq, "channel memory"),
-        content: format!("channel memory {source_id} {seq}"),
-        metadata: Metadata {
-            source_kind: SourceKind::Chat,
-            source_id: source_id.to_string(),
-            owner: "alice@example.com".to_string(),
-            timestamp: ts,
-            time_range: (ts, ts),
-            tags: vec!["channel".to_string()],
-            source_ref: Some(SourceRef::new(format!("discord://{source_id}/{seq}"))),
-            path_scope: None,
-        },
-        token_count: 12,
-        seq_in_source: seq,
-        created_at: ts,
-        partial_message: false,
-    }
 }
 
 /// Read the persisted Discord `allowed_users` array from the saved config.toml.
@@ -70,24 +46,34 @@ fn seed_discord_with_allowlist(config: &mut Config) {
     });
 }
 
-// ── Yuanbao channel credential verification ────────────────────
-// Issue: connect_channel for yuanbao previously stored creds and returned
-// "connected" without ever calling the upstream sign-token endpoint, so
-// random input (e.g. app_key=12) showed as Connected in the UI. The fix
-// calls `/api/v5/robotLogic/sign-token` and propagates the API error.
-
-/// Build a Config pre-pointed at a mock `api_domain` so the verification
-/// step hits the wiremock server instead of the live prod URL.
-fn yuanbao_test_config(mock_uri: &str) -> (tempfile::TempDir, Config) {
-    let (tmp, mut config) = isolated_test_config();
-    config.channels_config.yuanbao = Some(YuanbaoConfig {
-        api_domain: mock_uri.to_string(),
-        ..Default::default()
-    });
-    (tmp, config)
-}
-
 #[path = "ops_connect_status_tests.rs"]
 mod connect_status_tests;
 #[path = "ops_yuanbao_email_tests.rs"]
 mod yuanbao_email_tests;
+
+/// A recorded module result fixture: host tests exercise custody/persistence,
+/// while native verification and provider defaults are tested in TinyChannels.
+async fn persist_module_fixture(
+    config: &Config,
+    channel: &str,
+    mode: ChannelAuthMode,
+    credentials: serde_json::Value,
+    update: tinychannels_bus::module_controller::ChannelConfigUpdate,
+) -> Result<Outcome<ChannelConnectionResult>, String> {
+    connect::persist_prepared_connection(
+        config,
+        channel,
+        mode,
+        credentials,
+        tinychannels_bus::module_controller::PreparedChannelConnection {
+            result: ChannelConnectionResult {
+                status: "connected".into(),
+                restart_required: true,
+                auth_action: None,
+                message: Some("verified by module fixture".into()),
+            },
+            config_update: Some(update),
+        },
+    )
+    .await
+}

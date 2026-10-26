@@ -8,11 +8,11 @@ use serde_json::{json, Value};
 use tinyhumans_sdk::api::types::IntegrationTokenRequest;
 
 use super::handoff::decrypt_handoff_blob;
-use openhuman_core::config::Config;
-use openhuman_core::rpc::RpcOutcome;
+use openhuman_embed::__host::config::Config;
+use openhuman_embed::__host::core::Outcome;
 
 use super::types::{IntegrationSummary, IntegrationTokensHandoff};
-use crate::hosted::client::HostedClient;
+use crate::hosted::client::{CredentialKind, HostedClient};
 
 const LOG_PREFIX: &str = "[hosted][oauth]";
 
@@ -43,7 +43,7 @@ pub async fn oauth_connect(
     skill_id: Option<&str>,
     response_type: Option<&str>,
     encryption_mode: Option<&str>,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     let provider = require_provider(provider)?;
     let client = HostedClient::from_config(config)?;
     let query = [
@@ -67,14 +67,14 @@ pub async fn oauth_connect(
         .and_then(Value::as_str)
         .filter(|state| !state.is_empty())
         .ok_or_else(|| "auth connect request: missing state".to_string())?;
-    Ok(RpcOutcome::single_log(
+    Ok(Outcome::single_log(
         json!({ "oauthUrl": oauth_url, "state": state }),
         "oauth connect URL ready",
     ))
 }
 
 /// `GET /auth/integrations` — the user's active integrations.
-pub async fn oauth_list_integrations(config: &Config) -> Result<RpcOutcome<Value>, String> {
+pub async fn oauth_list_integrations(config: &Config) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let value = client.finish_value(
         "GET /auth/integrations",
@@ -86,7 +86,7 @@ pub async fn oauth_list_integrations(config: &Config) -> Result<RpcOutcome<Value
         .unwrap_or_else(|| value.clone());
     let list: Vec<IntegrationSummary> = serde_json::from_value(integrations)
         .map_err(|e| format!("parse integrations response: {e}"))?;
-    Ok(RpcOutcome::single_log(
+    Ok(Outcome::single_log(
         serde_json::to_value(&list).map_err(|e| e.to_string())?,
         "integrations listed",
     ))
@@ -100,7 +100,7 @@ pub async fn oauth_fetch_integration_tokens(
     config: &Config,
     integration_id: &str,
     encryption_key: &str,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     let id = require_integration_id(integration_id)?;
     let client = HostedClient::from_config(config)?;
     let request = IntegrationTokenRequest {
@@ -122,7 +122,7 @@ pub async fn oauth_fetch_integration_tokens(
         .map_err(|e| format!("integration tokens handoff: {e:#}"))?;
     let tokens: IntegrationTokensHandoff =
         serde_json::from_str(&plaintext).map_err(|e| format!("parse decrypted token JSON: {e}"))?;
-    Ok(RpcOutcome::single_log(
+    Ok(Outcome::single_log(
         serde_json::to_value(&tokens).map_err(|e| e.to_string())?,
         "integration tokens retrieved",
     ))
@@ -132,7 +132,7 @@ pub async fn oauth_fetch_integration_tokens(
 pub async fn oauth_revoke_integration(
     config: &Config,
     integration_id: &str,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     let id = integration_id.trim();
     if id.is_empty() {
         return Err("integration id is required".to_string());
@@ -142,9 +142,47 @@ pub async fn oauth_revoke_integration(
         "DELETE /auth/integrations/{integrationId}",
         client.sdk().auth().delete_integration(id).await,
     )?;
-    Ok(RpcOutcome::single_log(
+    Ok(Outcome::single_log(
         json!({ "revoked": true, "integrationId": integration_id }),
         "integration revoked",
+    ))
+}
+
+/// `POST /auth/integrations/{id}/client-key` — the one-time client key share
+/// for an encrypted integration. The backend deletes it from temporary storage
+/// once read.
+///
+/// The route has no typed SDK method and is absent from the backend's
+/// published contract, so it rides the SDK's raw primitive (which still
+/// applies the SDK's route policy). Session-only, as it always was: a
+/// library-mode API key has no integrations to hand off.
+pub async fn oauth_fetch_client_key(
+    config: &Config,
+    integration_id: &str,
+) -> Result<Outcome<Value>, String> {
+    let id = require_integration_id(integration_id)?;
+    let client = HostedClient::from_config(config)?;
+    if client.kind() != CredentialKind::Session {
+        return Err("session JWT required".to_string());
+    }
+    let path = format!("/auth/integrations/{}/client-key", tinyhumans_sdk::enc(id));
+    log::debug!("{LOG_PREFIX} fetching client key for integration {id}");
+    let value = client.finish(
+        "POST /auth/integrations/{integrationId}/client-key",
+        client
+            .sdk()
+            .raw()
+            .send(reqwest::Method::POST, &path, &[], None, true)
+            .await,
+    )?;
+    let client_key = value
+        .get("clientKey")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "fetch client key: missing clientKey in response".to_string())?;
+    log::debug!("{LOG_PREFIX} client key retrieved for integration {id}");
+    Ok(Outcome::single_log(
+        json!({ "clientKey": client_key, "integrationId": id }),
+        "client key retrieved (one-time handoff)",
     ))
 }
 

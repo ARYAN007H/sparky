@@ -12,6 +12,7 @@
 
 use super::*;
 use crate::config::UpdateRestartStrategy;
+use crate::core::runtime::DispatchCtx;
 use crate::platform::update::types::{UpdateApplyResult, UpdateInfo};
 
 // ── update_version ────────────────────────────────────────────────────────────
@@ -218,7 +219,7 @@ async fn supervisor_strategy_message_mentions_supervisor() {
 #[tokio::test]
 async fn update_run_rejected_when_rpc_mutations_disabled() {
     use crate::config::TEST_ENV_LOCK;
-    let _lock = TEST_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _lock = TEST_ENV_LOCK.lock().await;
     let tmp = tempfile::TempDir::new().unwrap();
 
     // Write a config with mutations disabled.
@@ -235,7 +236,7 @@ async fn update_run_rejected_when_rpc_mutations_disabled() {
     cfg.save().await.expect("save config");
     std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path());
 
-    let outcome = update_run().await;
+    let outcome = update_run(&DispatchCtx::process_default()).await;
 
     std::env::remove_var("OPENHUMAN_WORKSPACE");
 

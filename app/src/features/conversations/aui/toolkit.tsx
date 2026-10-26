@@ -5,11 +5,15 @@ import {
 } from '@assistant-ui/react';
 import { useMemo } from 'react';
 
-import { MemoryHybridSearchCall, MemoryRecallCall, MemoryStoreCall } from './ChatMemoryChips';
+import {
+  MemoryHybridSearchCall,
+  MemoryRecallCall,
+  MemoryStoreCall,
+  MemoryToolCall,
+} from './ChatMemoryChips';
 import { CronAddOrUpdateCall, CronListCall, CronRunsCall } from './ChatScheduleCard';
 import { GoalToolLine } from './GoalToolLine';
 import { DocumentArtifactCall, MediaGenerationCall } from './MediaAndDocumentCalls';
-import { ParallelAgentsCard } from './ParallelAgentsCard';
 import { PlanReviewPart } from './PlanReviewPart';
 import { SubagentTaskCard } from './SubagentTaskCard';
 import { TodoListPart } from './TodoListPart';
@@ -64,19 +68,11 @@ export function openHumanToolEntries(): Record<string, OpenHumanToolEntry> {
      * A sub-agent delegation. Never approval-gated (the orchestrator spawns
      * it directly), so its render skips the gate check every other entry
      * would need and goes straight to `SubagentTaskCard`, over the vendored
-     * `task-card` element — nested `messages` transcript, worktree actions,
-     * and the awaiting-user reply box all live there now (`AssistantUiSubagentCall`
+     * `task-card` element — nested `messages` transcript and the awaiting-user
+     * reply box all live there now (`AssistantUiSubagentCall`
      * / `SubagentDrawer` are deleted).
      */
-    task: { type: 'backend', display: 'inline', render: SubagentTaskCard },
-
-    /**
-     * `spawn_parallel_agents`: two or more independent sub-agent workers fanned
-     * out concurrently. Rendered as the vendored `SubagentList` progress board
-     * above each worker's own `TaskCard` row (`ParallelAgentsCard.tsx`),
-     * grouped by `subagent.parentCallId === toolCallId`.
-     */
-    spawn_parallel_agents: { type: 'backend', display: 'inline', render: ParallelAgentsCard },
+    task: { type: 'backend', display: 'standalone', render: SubagentTaskCard },
 
     /**
      * Image / video generation: the `elements-image-generation` placeholder
@@ -98,6 +94,7 @@ export function openHumanToolEntries(): Record<string, OpenHumanToolEntry> {
      * Memory writes/reads, rendered as `memory-chips` instead of the raw
      * JSON `ToolDataView` fallback (`ChatMemoryChips.tsx`).
      */
+    memory: { type: 'backend', display: 'inline', render: MemoryToolCall },
     memory_store: { type: 'backend', display: 'inline', render: MemoryStoreCall },
     memory_recall: { type: 'backend', display: 'inline', render: MemoryRecallCall },
     memory_hybrid_search: { type: 'backend', display: 'inline', render: MemoryHybridSearchCall },

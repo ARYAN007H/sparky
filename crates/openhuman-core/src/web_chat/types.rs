@@ -59,6 +59,9 @@ impl std::fmt::Display for QueueMode {
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) struct SessionCacheFingerprint {
     pub(super) model_override: Option<String>,
+    /// Resolved model selected by the effective configuration, including a
+    /// persisted managed default when no per-turn override was sent.
+    pub(super) effective_model: String,
     pub(super) temperature: Option<f64>,
     pub(super) target_agent_id: String,
     pub(super) provider_binding: String,
@@ -69,6 +72,12 @@ pub(crate) struct SessionCacheFingerprint {
     /// change) — without this the stale session would be reused. Mirrors
     /// [`Self::autonomy_signature`].
     pub(super) model_registry_signature: String,
+    /// The workspace the agent was built against. A cached agent carries its
+    /// workspace's transcripts, memory binding and identity; reusing it after
+    /// the workspace changed (a different user signed in, or another embedded
+    /// agent asked for the same thread id) would hand one owner another's
+    /// conversation.
+    pub(super) workspace_dir: std::path::PathBuf,
 }
 
 pub(super) struct SessionEntry {
@@ -79,6 +88,9 @@ pub(super) struct SessionEntry {
 #[derive(Debug)]
 pub(super) struct InFlightEntry {
     pub(super) request_id: String,
+    /// The client that started the turn, so a teardown that no client asked
+    /// for (a lost profile lease) still resolves that client's stream.
+    pub(super) client_id: String,
     pub(super) handle: tokio::task::JoinHandle<()>,
     pub(super) run_queue: std::sync::Arc<
         tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>,
@@ -99,6 +111,8 @@ pub(super) struct InFlightEntry {
 #[derive(Debug)]
 pub(super) struct ParallelEntry {
     pub(super) thread_id: String,
+    /// The client that started the turn (see [`InFlightEntry::client_id`]).
+    pub(super) client_id: String,
     pub(super) handle: tokio::task::JoinHandle<()>,
     pub(super) cancel_token: tokio_util::sync::CancellationToken,
 }
@@ -106,7 +120,7 @@ pub(super) struct ParallelEntry {
 #[derive(Debug, Clone)]
 pub(super) struct WebChatTaskResult {
     pub(super) full_response: String,
-    pub(super) citations: Vec<crate::memory::agent::memory_loader::MemoryCitation>,
+    pub(super) citations: Vec<crate::web_chat::TurnCitation>,
     /// Holistic token/cost/context totals for the turn (parent + sub-agents),
     /// forwarded to the frontend on `chat_done`. `None` for synthetic results
     /// (e.g. budget-exhausted placeholders) that never ran a real turn.
@@ -177,6 +191,10 @@ pub(crate) struct WebChatParams {
     /// ignored (logged), not rejected.
     #[serde(default)]
     pub(super) run_mode: Option<String>,
+    /// Optional reasoning effort for this thread (`inference::reasoning`).
+    /// Omitted leaves the thread's prior choice; `"default"` clears it.
+    #[serde(default)]
+    pub(super) reasoning_effort: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -14,7 +14,7 @@
  *  2. The only writer of that metadata is `ChatRuntimeProvider`'s
  *     `chatErrorExtraMetadata`, fed by a **`chat_error` socket event**.
  *  3. The only emitter of a `chat_error` carrying a guardrail payload is
- *     `core/socketio.rs:886`, inside the `socket.on("chat", …)` handler.
+ *     `openhuman-rpc/src/server/socketio.rs:886`, inside the `socket.on("chat", …)` handler.
  *  4. The renderer never emits a socket `chat` event. Every turn is sent over
  *     RPC — `chatService.sendChatMessage` calls `openhuman.channel_web_chat`
  *     (`chatService.ts:1631`), and that file's own header says so.

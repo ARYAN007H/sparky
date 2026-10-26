@@ -1,43 +1,25 @@
 use super::*;
 
 #[tokio::test]
-async fn intercept_with_trusted_subconscious_origin_allows_without_prompt() {
-    // Subconscious ticks on internal-only memory are trusted automation
-    // and run unprompted (preserves pre-PR behavior for the safe case).
+async fn intercept_with_trusted_background_origin_allows_without_prompt() {
+    // Internal background jobs over local data are trusted automation and
+    // run unprompted.
     let (gate, _dir) = test_gate();
     let origin = AgentTurnOrigin::TrustedAutomation {
-        job_id: "subconscious-tick".into(),
-        source: TrustedAutomationSource::Subconscious,
+        job_id: "memory_goals:enrich:1".into(),
+        source: TrustedAutomationSource::Background,
     };
     let outcome = turn_origin::with_origin(
         origin,
-        gate.intercept("shell", "run ls", serde_json::json!({})),
+        gate.intercept(
+            &ApprovalTurnContext::default(),
+            "shell",
+            "run ls",
+            serde_json::json!({}),
+        ),
     )
     .await;
     assert!(matches!(outcome, GateOutcome::Allow));
-}
-
-#[tokio::test]
-async fn intercept_with_subconscious_tainted_origin_denies() {
-    // A subconscious tick whose memory context contains external-sync
-    // chunks is rejected for external_effect tools — external text in
-    // memory could otherwise steer the tick into a tool call.
-    let (gate, _dir) = test_gate();
-    let origin = AgentTurnOrigin::TrustedAutomation {
-        job_id: "subconscious-tainted".into(),
-        source: TrustedAutomationSource::SubconsciousTainted,
-    };
-    let outcome = turn_origin::with_origin(
-        origin,
-        gate.intercept("send_email", "send", serde_json::json!({})),
-    )
-    .await;
-    match outcome {
-        GateOutcome::Deny { reason } => {
-            assert!(reason.contains("external-sync"), "reason was: {reason}")
-        }
-        other => panic!("expected deny, got {other:?}"),
-    }
 }
 
 #[tokio::test]
@@ -49,7 +31,12 @@ async fn intercept_with_cli_origin_allows_without_prompt() {
     let (gate, _dir) = test_gate();
     let outcome = turn_origin::with_origin(
         AgentTurnOrigin::Cli,
-        gate.intercept("shell", "run ls", serde_json::json!({})),
+        gate.intercept(
+            &ApprovalTurnContext::default(),
+            "shell",
+            "run ls",
+            serde_json::json!({}),
+        ),
     )
     .await;
     assert!(matches!(outcome, GateOutcome::Allow));
@@ -66,7 +53,12 @@ async fn intercept_with_direct_chat_origin_allows_without_prompt() {
     let (gate, _dir) = test_gate();
     let outcome = turn_origin::with_origin(
         AgentTurnOrigin::DirectChat,
-        gate.intercept("shell", "run ls", serde_json::json!({})),
+        gate.intercept(
+            &ApprovalTurnContext::default(),
+            "shell",
+            "run ls",
+            serde_json::json!({}),
+        ),
     )
     .await;
     assert!(
@@ -101,8 +93,13 @@ async fn cron_add_on_a_turnless_spawn_resolves_to_a_real_origin_not_unknown_deni
     // `Unknown`, and the scheduling tool is refused as "no origin label".
     let g = gate.clone();
     let denied = tokio::spawn(async move {
-        g.intercept("cron_add", "schedule a job", serde_json::json!({}))
-            .await
+        g.intercept(
+            &ApprovalTurnContext::default(),
+            "cron_add",
+            "schedule a job",
+            serde_json::json!({}),
+        )
+        .await
     })
     .await
     .expect("spawned task panicked");
@@ -119,8 +116,13 @@ async fn cron_add_on_a_turnless_spawn_resolves_to_a_real_origin_not_unknown_deni
     // Master-chat gate) instead of being denied as unlabelled.
     let g = gate.clone();
     let allowed = tokio::spawn(turn_origin::with_origin(AgentTurnOrigin::Cli, async move {
-        g.intercept("cron_add", "schedule a job", serde_json::json!({}))
-            .await
+        g.intercept(
+            &ApprovalTurnContext::default(),
+            "cron_add",
+            "schedule a job",
+            serde_json::json!({}),
+        )
+        .await
     }))
     .await
     .expect("spawned task panicked");
@@ -136,20 +138,27 @@ async fn intercept_with_external_channel_origin_persists_and_ttl_denies() {
     // Non-web channel inbound (Telegram / Discord / Slack / etc.):
     // persist an audit row but TTL-deny — there is no channel-routed
     // approval surface yet, and the input is remote-attacker text.
-    let (gate, _dir, env) = expiry_gate();
+    let (gate, _dir, env) = expiry_gate().await;
     let gate = Arc::new(gate);
     let origin = AgentTurnOrigin::ExternalChannel {
+        sender_name: None,
         channel: "telegram".into(),
         sender: Some("tg-user-1".into()),
         reply_target: "tg-chat-1".into(),
         message_id: "msg-1".into(),
+        history_key: None,
     };
 
     let g = gate.clone();
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             origin,
-            g.intercept("shell", "run ls", serde_json::json!({})),
+            g.intercept(
+                &ApprovalTurnContext::default(),
+                "shell",
+                "run ls",
+                serde_json::json!({}),
+            ),
         )
         .await
     });
@@ -193,9 +202,11 @@ async fn intercept_audited_returns_request_id_only_when_allowed_and_persisted() 
         // turn whose origin labels it as web-routable.
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                g.intercept_audited("composio", "send slack", serde_json::json!({})),
+            g.intercept_audited(
+                &ApprovalTurnContext::chat(chat_ctx()),
+                "composio",
+                "send slack",
+                serde_json::json!({}),
             ),
         )
         .await
@@ -231,9 +242,11 @@ async fn intercept_audited_id_is_none_for_denied_some_for_approved() {
     let denied = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                g.intercept_audited("composio", "send slack", serde_json::json!({})),
+            g.intercept_audited(
+                &ApprovalTurnContext::chat(chat_ctx()),
+                "composio",
+                "send slack",
+                serde_json::json!({}),
             ),
         )
         .await
@@ -255,9 +268,11 @@ async fn intercept_audited_id_is_none_for_denied_some_for_approved() {
     let first = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                g.intercept_audited("pushover", "first send", serde_json::json!({})),
+            g.intercept_audited(
+                &ApprovalTurnContext::chat(chat_ctx()),
+                "pushover",
+                "first send",
+                serde_json::json!({}),
             ),
         )
         .await
@@ -292,7 +307,7 @@ async fn intercept_audited_id_is_none_for_denied_some_for_approved() {
 async fn flow_origin_park_populates_source_context_with_flow_and_run_id() {
     // A `require_approval: true` flow still parks (same shape as before
     // this change) but the persisted row must now carry the flow/run
-    // correlation the `APPROVAL_FLOW_RUN_CONTEXT` task-local supplies —
+    // correlation the turn's `flow_run` supplies —
     // the origin alone only carries `flow_id`, not `run_id`.
     let (gate, _dir) = test_gate();
     let gate = Arc::new(gate);
@@ -301,12 +316,14 @@ async fn flow_origin_park_populates_source_context_with_flow_and_run_id() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             flow_origin("flow-1", true),
-            APPROVAL_FLOW_RUN_CONTEXT.scope(
-                FlowRunContext {
+            g.intercept_audited(
+                &ApprovalTurnContext::default().with_flow_run(FlowRunContext {
                     flow_id: "flow-1".to_string(),
                     run_id: "run-1".to_string(),
-                },
-                g.intercept_audited("composio", "post to slack", serde_json::json!({})),
+                }),
+                "composio",
+                "post to slack",
+                serde_json::json!({}),
             ),
         )
         .await
@@ -352,9 +369,11 @@ async fn chat_origin_park_has_no_source_context() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                g.intercept_audited("composio", "send slack", serde_json::json!({})),
+            g.intercept_audited(
+                &ApprovalTurnContext::chat(chat_ctx()),
+                "composio",
+                "send slack",
+                serde_json::json!({}),
             ),
         )
         .await
@@ -386,18 +405,20 @@ async fn flow_tool_trust_auto_allows_before_parking() {
     //
     // The second half of this test *does* wait a park out, so it needs the
     // short window even though it never inspects the "timed out" reason.
-    let (gate, _dir, env) = expiry_gate();
+    let (gate, _dir, env) = expiry_gate().await;
     let gate = Arc::new(gate);
     store::insert_flow_trust(&gate.config, "flow-trusted", "composio").unwrap();
 
     let outcome = turn_origin::with_origin(
         flow_origin("flow-trusted", true),
-        APPROVAL_FLOW_RUN_CONTEXT.scope(
-            FlowRunContext {
+        gate.intercept(
+            &ApprovalTurnContext::default().with_flow_run(FlowRunContext {
                 flow_id: "flow-trusted".to_string(),
                 run_id: "run-1".to_string(),
-            },
-            gate.intercept("composio", "post to slack", serde_json::json!({})),
+            }),
+            "composio",
+            "post to slack",
+            serde_json::json!({}),
         ),
     )
     .await;
@@ -415,12 +436,14 @@ async fn flow_tool_trust_auto_allows_before_parking() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             flow_origin("flow-trusted", true),
-            APPROVAL_FLOW_RUN_CONTEXT.scope(
-                FlowRunContext {
+            g.intercept(
+                &ApprovalTurnContext::default().with_flow_run(FlowRunContext {
                     flow_id: "flow-trusted".to_string(),
                     run_id: "run-1".to_string(),
-                },
-                g.intercept("pushover", "send push", serde_json::json!({})),
+                }),
+                "pushover",
+                "send push",
+                serde_json::json!({}),
             ),
         )
         .await
@@ -460,12 +483,14 @@ async fn decide_approve_always_for_flow_then_insert_flow_trust_composes_to_auto_
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             flow_origin("flow-2", true),
-            APPROVAL_FLOW_RUN_CONTEXT.scope(
-                FlowRunContext {
+            g.intercept_audited(
+                &ApprovalTurnContext::default().with_flow_run(FlowRunContext {
                     flow_id: "flow-2".to_string(),
                     run_id: "run-2".to_string(),
-                },
-                g.intercept_audited("composio", "post to slack", serde_json::json!({})),
+                }),
+                "composio",
+                "post to slack",
+                serde_json::json!({}),
             ),
         )
         .await
@@ -504,7 +529,7 @@ async fn flow_origin_park_publishes_flow_approval_request_and_notification() {
     // no chat thread/client, so the generic `ApprovalRequested` event's
     // web-channel bridge silently drops it. This test asserts the two new
     // surfaces fire instead — the `flow_approval_request` DomainEvent
-    // (bridged to a broadcast Socket.IO event by `core::socketio`) and
+    // (bridged to a broadcast Socket.IO event by `openhuman_rpc::server::socketio`) and
     // the `flow-gate-approval` CoreNotification with its three actions.
     crate::core::bus::init().await.expect("bus init");
     let mut event_rx = crate::core::bus::BUS
@@ -520,12 +545,14 @@ async fn flow_origin_park_publishes_flow_approval_request_and_notification() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             flow_origin("flow-9", true),
-            APPROVAL_FLOW_RUN_CONTEXT.scope(
-                FlowRunContext {
+            g.intercept_audited(
+                &ApprovalTurnContext::default().with_flow_run(FlowRunContext {
                     flow_id: "flow-9".to_string(),
                     run_id: "run-9".to_string(),
-                },
-                g.intercept_audited("composio", "post to slack", serde_json::json!({})),
+                }),
+                "composio",
+                "post to slack",
+                serde_json::json!({}),
             ),
         )
         .await

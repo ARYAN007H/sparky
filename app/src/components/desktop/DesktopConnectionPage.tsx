@@ -70,9 +70,9 @@ function permissionSettingsUrl(kind: PermissionKind, platform: string): string |
   if (platform === 'macos') {
     return `x-apple.systempreferences:com.apple.preference.security?Privacy_${kind === 'accessibility' ? 'Accessibility' : 'ScreenCapture'}`;
   }
-  if (platform === 'windows') {
-    return 'ms-settings:privacy';
-  }
+  // Windows has no per-app accessibility or screen-recording permission toggle
+  // analogous to macOS TCC. Opening the generic Privacy settings page sends
+  // the user to a dead end, so return null to suppress the button.
   return null;
 }
 
@@ -249,7 +249,7 @@ export default function DesktopConnectionPage({
     !!status &&
     status.enabled &&
     status.module_state === 'ready' &&
-    status.accessibility === 'granted' &&
+    (status.accessibility === 'granted' || status.accessibility === 'not_required') &&
     status.jev_ready;
   const statusBadge = status?.supported ? (
     <Badge
@@ -291,7 +291,11 @@ export default function DesktopConnectionPage({
 
       {status && !status.supported && (
         <Alert variant="info" density="compact">
-          <AlertDescription>{t('desktop.unsupported')}</AlertDescription>
+          <AlertDescription>
+            {t(
+              status.platform === 'windows' ? 'desktop.unsupportedWindows' : 'desktop.unsupported'
+            )}
+          </AlertDescription>
         </Alert>
       )}
 

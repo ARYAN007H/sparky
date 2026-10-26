@@ -1,51 +1,38 @@
 //! Top-level sub-agent run entry points.
 //!
-//! [`run_subagent`] is the primary entry point for agent delegation and
-//! dispatches to [`run_typed_mode`] which builds a brand-new system prompt
+//! The registered dispatcher reaches this adapter, which dispatches to
+//! [`run_typed_mode`] to build a brand-new system prompt
 //! and a filtered tool list for the requested archetype, then drives provider
 //! calls and tool execution until the model returns without further tool calls
 //! (or the iteration budget is exhausted).
 
 use std::collections::HashSet;
-use std::sync::Arc;
 use std::time::Instant;
 
-use crate::agent::file_state::with_file_state_agent_id;
-use crate::agent::harness::agent_graph::{AgentTurnRequest, AgentTurnUsage};
-use crate::agent::harness::artifact_offload::{
-    effective_offload_threshold, extract_artifact_paths, new_artifact_offload,
-    note_artifact_handoff, offload_oversized_result, DEFAULT_OFFLOAD_THRESHOLD_BYTES,
-    HANDOFF_STAGE_RECORDED,
-};
-use crate::agent::harness::definition::{
-    validate_tier_transition, AgentDefinition, AgentDefinitionRegistry, AgentTier, IterationPolicy,
-    PromptSource, SandboxMode as AgentSandboxMode,
-};
-use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::harness::{
-    spawn_depth_context::current_spawn_depth, with_current_sandbox_mode, with_spawn_depth,
-    MAX_SPAWN_DEPTH,
-};
-use crate::agent::prompts::{
-    render_subagent_system_prompt_with_format, PromptContext, PromptTool, SubagentRenderOptions,
-};
-use crate::agent::subagent_host::subagent_iter_cap_with_autonomous_lift;
+use crate::agent::prompts::render_subagent_system_prompt_with_format;
+use crate::agent::prompts::{PromptContext, SubagentRenderOptions};
+use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::subagent_host::tool_prep::{
-    filter_tool_indices, is_subagent_spawn_tool, load_prompt_source, subagent_prompt_protocol,
+    dedup_owned_tool_specs, filter_definition_tool_indices, subagent_prompt_protocol,
 };
 use crate::agent::subagent_host::types::{
-    SubagentMode, SubagentRunError, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus,
-    SubagentUsage,
+    SubagentMode, SubagentRunError, SubagentRunOptions, SubagentRunOutcome,
 };
-use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
-use crate::memory::api::provider::retrieval::{FastRetrieveQuery, RetrievalResponse};
-use crate::memory::source_scope::as_bus_scope;
-use tinytools::{SandboxMode as TinyagentsSandboxMode, ToolSpec, WorkspaceDescriptor};
+use crate::agent::subagent_host::ParentExecutionContext;
+use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use tinyagents_definition::{validate_tier_transition, AgentTier, IterationPolicy, PromptSource};
+use tinyagents_harness::context::{current_run_depth, with_run_depth, RunConfig, RunDepth};
+use tinyagents_harness::turn_policy::AGENT_TURN_MAX_OUTPUT_TOKENS;
+use tinyagents_harness_tools::fs::file_state::with_file_state_agent_id;
+use tinytools::{Tool, ToolSpec};
 
-use super::prompt::{
-    append_artifact_offload_contract, append_subagent_role_contract, dedup_tool_specs_by_name,
-};
-use super::provider::{resolve_subagent_source, user_is_signed_in_to_composio};
+use super::prompt::compose_subagent_system_prompt;
+use super::provider::resolve_subagent_source;
+
+#[path = "runner_prompt.rs"]
+mod runner_prompt;
+use runner_prompt::load_typed_prompt_source;
 
 /// Runtime spawn-hierarchy gate decision for one delegation hop.
 ///
@@ -98,283 +85,28 @@ pub(super) fn tier_gate_decision(
     Ok(())
 }
 
-/// Definition id of the pure-retrieval memory agent, reached from chat as the
-/// `retrieve_memory` delegate and from other agents as `call_memory_agent`.
-const AGENT_MEMORY_ID: &str = "agent_memory";
-
-/// How many deterministic hits the memory fast path returns (#4677).
-const MEMORY_FAST_PATH_LIMIT: usize = 8;
-
-/// Whether the deterministic memory fast path (#4677) is enabled. Default on;
-/// `OPENHUMAN_MEMORY_FAST_PATH=0` (or `false`/`no`/`off`) forces the full
-/// model-driven walk, e.g. to A/B the two paths without a rebuild.
-fn memory_fast_path_enabled() -> bool {
-    parse_memory_fast_path_enabled(std::env::var("OPENHUMAN_MEMORY_FAST_PATH").ok().as_deref())
-}
-
-/// Pure core of [`memory_fast_path_enabled`], kept env-free for deterministic
-/// unit testing.
-fn parse_memory_fast_path_enabled(env_value: Option<&str>) -> bool {
-    !matches!(
-        env_value.map(|v| v.trim().to_ascii_lowercase()).as_deref(),
-        Some("0") | Some("false") | Some("no") | Some("off")
-    )
-}
-
-/// Render deterministic retrieval hits into a compact, citable memory-context
-/// block for the parent turn. Returns `None` when there are no hits, so the
-/// caller falls back to the model-driven walk (the empty/degraded case is
-/// #4655's territory and still benefits from the model's judgement).
-fn format_deterministic_memory_hits(resp: &RetrievalResponse) -> Option<String> {
-    use std::fmt::Write as _;
-    if resp.hits.is_empty() {
-        return None;
-    }
-    const PER_HIT_CHARS: usize = 600;
-    let mut out = format!(
-        "Retrieved {} relevant memor{} via deterministic memory search:\n",
-        resp.hits.len(),
-        if resp.hits.len() == 1 { "y" } else { "ies" }
-    );
-    for (i, hit) in resp.hits.iter().enumerate() {
-        let content = hit.content.trim();
-        let body: String = content.chars().take(PER_HIT_CHARS).collect();
-        let ellipsis = if content.chars().count() > PER_HIT_CHARS {
-            " …"
-        } else {
-            ""
-        };
-        let scope = if hit.tree_scope.trim().is_empty() {
-            "memory"
-        } else {
-            hit.tree_scope.trim()
-        };
-        let _ = writeln!(
-            out,
-            "{}. [{scope}] {body}{ellipsis} (relevance {:.2})",
-            i + 1,
-            hit.score
-        );
-    }
-    Some(out)
-}
-
-/// Truncate `output` in place to the definition's `max_result_chars` cap (when
-/// set), appending a `[...truncated]` marker. Char-count based (not byte-length)
-/// to avoid panicking on a multi-byte UTF-8 sequence at the boundary.
+/// Execute a prepared sub-agent based on its definition and a task prompt.
 ///
-/// Shared by the normal sub-agent path and the deterministic memory fast path so
-/// both honour a definition's cap. `agent_memory` sets no cap today (its output
-/// is self-bounded at 8 hits × 600 chars), but routing the fast path through the
-/// same helper keeps the two paths from silently diverging if one is ever added
-/// (YellowSnnowmann review).
-fn apply_max_result_chars(output: &mut String, cap: Option<usize>, agent_id: &str) {
-    let Some(cap) = cap else { return };
-    let original_chars = output.chars().count();
-    if original_chars <= cap {
-        return;
-    }
-    tracing::debug!(
-        agent_id = %agent_id,
-        original_chars,
-        cap,
-        "[subagent_host] truncating oversized result to max_result_chars cap"
-    );
-    let byte_offset = output
-        .char_indices()
-        .nth(cap)
-        .map(|(i, _)| i)
-        .unwrap_or(output.len());
-    output.truncate(byte_offset);
-    output.push_str("\n[...truncated]");
-}
-
-/// Deterministic fast path for the pure-retrieval [`AGENT_MEMORY_ID`] sub-agent
-/// (#4677).
-///
-/// `agent_memory` otherwise runs a model-driven walk (≤ its `max_iterations`)
-/// whose per-iteration LLM round-trips dominate turn latency at ~30–40s per call
-/// *even when data is present*. [`fast_retrieve`] (E2GraphRAG: query-entity +
-/// dense/semantic recall over the same memory tree, no LLM in the loop) returns
-/// the same hits in a single deterministic pass. When it finds data we return
-/// those hits directly; when the fast path is disabled, errors, or finds nothing
-/// we return `None` so the caller runs the full sub-agent unchanged.
-///
-/// # Relevance guard (Codex review)
-///
-/// We only short-circuit for an **entity-grounded** query — one that yields at
-/// least one canonical entity or salient topic. Without grounding, `fast_retrieve`
-/// falls back to a pure global-dense pass that reranks/truncates whatever
-/// summaries exist, so a vague query against a populated profile would surface
-/// unrelated top-k memories as a "completed" retrieval instead of letting the
-/// model-driven agent judge relevance (or emit "no relevant memory found").
-/// Grounded queries keep the fast path; ungrounded ones defer to the full agent.
-async fn try_deterministic_memory_retrieval(
-    task_prompt: &str,
-    definition: &AgentDefinition,
-    task_id: &str,
-    started: Instant,
-    loaded_config: &LoadedConfig,
-) -> Option<SubagentRunOutcome> {
-    let agent_id = definition.id.as_str();
-    if !memory_fast_path_enabled() {
-        return None;
-    }
-    let query = task_prompt.trim();
-    if query.is_empty() {
-        return None;
-    }
-    let config = match loaded_config.as_ref() {
-        Ok(config) => config.as_ref(),
-        Err(e) => {
-            tracing::warn!(
-                task_id = %task_id,
-                error = %e,
-                "[subagent_host] agent_memory fast-path config load failed — falling back to model walk (#4677)"
-            );
-            return None;
-        }
-    };
-    // Relevance guard (Codex review): require entity/topic grounding before a
-    // deterministic pass stands in for the model's relevance judgement — the
-    // extraction is cheap (regex or one spaCy call) and `fast_retrieve` repeats
-    // it internally anyway. It goes through the provider's scoring family so
-    // the host no longer calls `tinymemory_core::` directly, and every failure
-    // (binding unavailable, scoring not exposed, extraction error) is fail-safe
-    // as entities_empty = true: the fast path is skipped and the model-driven
-    // walk runs — the same conservative outcome an unavailable extractor
-    // produced before scoring existed.
-    let entities_empty = match crate::memory::binding::for_config(config) {
-        Ok(binding) => match binding.provider().as_scoring() {
-            Some(scoring) => match scoring.extract_entities(query).await {
-                Ok(entities) => entities.is_empty(),
-                Err(e) => {
-                    tracing::debug!(
-                        task_id = %task_id,
-                        error = %e,
-                        "[subagent_host] scoring extract_entities failed (non-fatal) — deferring to model walk (#4677)"
-                    );
-                    true
-                }
-            },
-            None => {
-                tracing::debug!(
-                    task_id = %task_id,
-                    "[subagent_host] driver does not expose scoring (module not loaded or policy excluded) — deferring to model walk (#4677)"
-                );
-                true
-            }
-        },
-        Err(e) => {
-            tracing::debug!(
-                task_id = %task_id,
-                error = %e,
-                "[subagent_host] memory binding unavailable (non-fatal) — deferring to model walk (#4677)"
-            );
-            true
-        }
-    };
-    if entities_empty {
-        tracing::debug!(
-            task_id = %task_id,
-            "[subagent_host] agent_memory fast-path skipped — ungrounded query (no entities/topics); deferring to model walk (#4677)"
-        );
-        return None;
-    }
-    let opts = FastRetrieveQuery {
-        limit: MEMORY_FAST_PATH_LIMIT,
-        ..FastRetrieveQuery::default()
-    };
-    // Through the bound driver's `MemoryRetrieval`, not the engine (#5560).
-    // This is an agent turn, so `as_bus_scope()` carries the turn's own
-    // memory-source allowlist; `binding.provider()` is unguarded, which makes
-    // that argument the gate rather than a hint.
-    let scope = as_bus_scope();
-    let binding = match crate::memory::binding::for_config(config) {
-        Ok(binding) => binding,
-        Err(e) => {
-            tracing::warn!(
-                task_id = %task_id,
-                error = %e,
-                "[subagent_host] agent_memory fast-path could not bind the memory driver — falling back to model walk (#4677)"
-            );
-            return None;
-        }
-    };
-    // A driver with no retrieval family has no summary tree to rank. Falling
-    // through to the model walk is the same answer this path already gives for
-    // an empty result, and strictly better than reporting a failure that is
-    // really an absent capability.
-    let retrieval = binding.provider().as_retrieval()?;
-    let resp = match retrieval.fast_retrieve(query, opts, scope.as_ref()).await {
-        Ok(resp) => resp,
-        Err(e) => {
-            tracing::warn!(
-                task_id = %task_id,
-                error = %format!("{e:#}"),
-                "[subagent_host] agent_memory fast-path retrieval errored — falling back to model walk (#4677)"
-            );
-            return None;
-        }
-    };
-    let mut output = format_deterministic_memory_hits(&resp)?;
-    // Honour the definition's `max_result_chars` cap just like the model-driven
-    // path (YellowSnnowmann review). No-op for `agent_memory` (uncapped, and the
-    // block above is already self-bounded), but keeps the paths from diverging.
-    apply_max_result_chars(&mut output, definition.max_result_chars, agent_id);
-    tracing::info!(
-        task_id = %task_id,
-        hits = resp.hits.len(),
-        total = resp.total,
-        elapsed_ms = started.elapsed().as_millis() as u64,
-        "[subagent_host] agent_memory deterministic fast-path hit — skipped the model walk (#4677)"
-    );
-    Some(SubagentRunOutcome {
-        task_id: task_id.to_string(),
-        agent_id: agent_id.to_string(),
-        output,
-        iterations: 0,
-        elapsed: started.elapsed(),
-        mode: SubagentMode::Typed,
-        status: SubagentRunStatus::Completed,
-        final_history: Vec::new(),
-        usage: SubagentUsage::default(),
-        // Deterministic memory hits are already bounded; nothing is offloaded
-        // on this path.
-        artifact_paths: Vec::new(),
-        persistence_disposition:
-            tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting,
-    })
-}
-
-/// Run a sub-agent based on its definition and a task prompt.
-///
-/// This is the primary entry point for agent delegation. It performs the following:
-/// 1. Generates a unique `task_id` if one wasn't provided.
-/// 2. Asks the turn's
-///    explicit root-turn dispatch guard
-///    whether a delegation can still succeed, and refuses before spending
-///    anything if it cannot (#5804).
-/// 3. Reads the parent's explicit [`ParentExecutionContext`] from its run
-///    carrier.
-/// 4. Dispatches to `run_typed_mode`.
+/// Creates a task id, checks the root-turn dispatch budget, reads the parent's
+/// [`ParentExecutionContext`], then dispatches to `run_typed_mode`.
 ///
 /// On success returns a [`SubagentRunOutcome`] whose `output` is the
 /// final assistant text. On failure the error is suitable for stringifying
 /// into a `tool_result` block — including the two dispatch refusals, whose
-/// messages tell the model to summarise rather than delegate again.
-pub(crate) async fn run_subagent_direct(
+/// messages direct the model to summarize rather than delegate again.
+pub(crate) async fn run_subagent_direct_with_native_context(
     definition: &AgentDefinition,
     task_prompt: &str,
-    options: SubagentRunOptions,
+    mut options: SubagentRunOptions,
+    native: crate::agent::tinyagents::NativeSubagentRunContext,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
-    // Unconditionally heap-allocate the entire run_subagent body so
+    // Unconditionally heap-allocate the entire child execution body so
     // every caller doesn't have to carry this future's state inline.
     // Tools that delegate run inside the parent agent's already-deep
     // turn poll (the boxed tinyagents harness drive future in
-    // `run_turn_via_tinyagents_shared`), so the parent's stack would
+    // `TurnSpec::run`), so the parent's stack would
     // otherwise pile (parent turn state + dispatch_subagent state +
-    // run_subagent's wrapper state + run_typed_mode state + child turn
+    // dispatcher state + run_typed_mode state + child turn
     // state) onto tokio's 2 MiB worker stack and abort with "thread
     // 'tokio-rt-worker' has overflowed its stack, fatal runtime error:
     // stack overflow" — observed at `[subagent_host] dispatching
@@ -467,40 +199,28 @@ pub(crate) async fn run_subagent_direct(
                 });
             }
         }
-
         let parent = options
             .run_context
             .parent
             .clone()
             .ok_or(SubagentRunError::NoParentContext)?;
         let started = Instant::now();
-        // Typed callers carry their depth in the run context. Direct callers
-        // are scoped by `with_spawn_depth`; honor both authorities and count
-        // this child spawn exactly once.
-        let attempted_depth = options
-            .run_context
-            .spawn_depth
-            .max(current_spawn_depth().saturating_add(1));
-
-        // Synchronous pre-dispatch projection of the single depth authority
-        // (`MAX_SPAWN_DEPTH`, also fed to the crate's `RunPolicy.limits.max_depth`).
-        // This surfaces `SpawnDepthExceeded` before a provider round-trip and
-        // across the MCP process hop; the crate's `TinyAgentsError::SubAgentDepth`
-        // maps onto this same error shape for over-deep in-process runs.
-        if attempted_depth > MAX_SPAWN_DEPTH {
-            tracing::warn!(
-                agent_id = %definition.id,
-                task_id = %task_id,
-                attempted_depth,
-                max_depth = MAX_SPAWN_DEPTH,
-                "[subagent_host] spawn depth exceeded"
-            );
-            return Err(SubagentRunError::SpawnDepthExceeded {
-                attempted_depth,
-                max_depth: MAX_SPAWN_DEPTH,
-            });
-        }
-
+        // The host carries an already-derived child depth; native and MCP
+        // callers expose their parent depth through TinyAgents' context.
+        let parent_depth = options.run_context.spawn_depth.saturating_sub(1)
+            .max(current_run_depth().map_or(0, |facts| facts.depth));
+        let max_depth = crate::agent::tinyagents::budget::depth(&options.run_context);
+        let attempted_depth = RunConfig::checked_child_depth(parent_depth, max_depth)
+            .map_err(|_| SubagentRunError::SpawnDepthExceeded {
+                attempted_depth: parent_depth.saturating_add(1),
+                max_depth,
+            })?;
+        let nested_spawn_depth_available =
+            RunConfig::checked_child_depth(attempted_depth, max_depth).is_ok();
+        options.run_context.spawn_depth = attempted_depth;
+        // Acts on memory as a child of its parent: same team, own definition.
+        let acting = options.run_context.memory_identity.take().unwrap_or_default();
+        options.run_context.memory_identity = Some(acting.child(&definition.id));
         // Runtime spawn-hierarchy (tier) gate — defense-in-depth alongside the
         // depth gate above. The loader validates *declared* `subagents` pairs
         // statically at boot (`validate_tier_hierarchy`), but dynamic, custom,
@@ -508,16 +228,17 @@ pub(crate) async fn run_subagent_direct(
         // through that walk. Resolve the parent's tier from the registry by its
         // definition id; `tier_gate_decision` rejects (and logs) any forbidden
         // chat/reasoning hop while exempting unresolved + worker parents.
-        let parent_def =
-            AgentDefinitionRegistry::global().and_then(|reg| reg.get(&parent.agent_definition_id));
+        let parent_registry = AgentDefinitionRegistry::current();
+        let parent_def = parent_registry
+            .as_deref()
+            .and_then(|reg| reg.get(&parent.agent_definition_id));
         tier_gate_decision(parent_def, definition, &parent.agent_definition_id, &task_id)?;
-
         // Configured `subagentStart` hooks — the last gate before a spawn costs
         // anything. Placed after the tier gate so a spawn the graph already
         // forbids never reaches a user script, and before config load so a
         // denied spawn has no side effects at all.
         if let Err(reason) = crate::hooks::ops::subagent_starting(
-            crate::hooks::context::TurnIdentity {
+            tinyagents_hooks::command::context::TurnIdentity {
                 conversation_id: Some(parent.session_id.clone()),
                 session_id: Some(parent.session_id.clone()),
                 agent_id: Some(parent.agent_definition_id.clone()),
@@ -540,59 +261,12 @@ pub(crate) async fn run_subagent_direct(
             return Err(SubagentRunError::HookDenied(reason));
         }
 
-        // Load the host config exactly once for this spawn and hand it to
-        // everything below. See `LoadedConfig` — `load_or_init` re-reads
-        // config.toml on every call, and the runtime below is slated to move
-        // into TinyAgents, where there is no config file to load.
-        //
-        // Deliberately placed *after* `tier_gate_decision`: `load_or_init` can
-        // initialize config on first run, and a spawn the tier gate rejects
-        // should not have that side effect.
-        let loaded_config: LoadedConfig = crate::config::Config::load_or_init()
+        // Loaded once per spawn (see `LoadedConfig`), after the tier gate so a
+        // rejected spawn never initialises config on first run.
+        let loaded_config: LoadedConfig = Box::pin(crate::config::ops::load_current_or_init(&options.run_context.dispatch_ctx()))
             .await
             .map(std::sync::Arc::new)
             .map_err(|e| e.to_string());
-
-        // Deterministic fast path for the pure-retrieval memory agent (#4677).
-        // Both `retrieve_memory` (chat delegate) and `call_memory_agent` land
-        // here via `run_subagent`; short-circuit with the E2GraphRAG hits when
-        // data is present so the happy path costs ~1 deterministic pass instead
-        // of a ≤6-iteration model walk (~30–40s of round-trips). Falls through
-        // to the full sub-agent when the fast path is disabled/errs/finds
-        // nothing (the empty/degraded case is handled by #4655).
-        if definition.id == AGENT_MEMORY_ID {
-            if let Some(outcome) = try_deterministic_memory_retrieval(
-                task_prompt,
-                definition,
-                &task_id,
-                started,
-                &loaded_config,
-            )
-            .await
-            {
-                // The fast path completes a real delegation and returns here,
-                // short-circuiting the recorder below — so record it too, or a
-                // turn whose only delegations are deterministic memory
-                // retrievals never accumulates a sample and the budget gate
-                // stays disarmed for the whole turn (#5804 review).
-                //
-                // Including it cannot weaken the gate. `observed_max` is a
-                // running **maximum**, so a short sample can only leave it
-                // where it was — an earlier revision of this comment claimed
-                // the opposite and was wrong about its own statistic. What it
-                // does buy is a correct `observed_samples` count and a gate
-                // that arms on a turn shaped entirely from fast-path work.
-                if let Some(dispatch) = options.run_context.dispatch.as_deref() {
-                    dispatch.record_subagent_elapsed(started.elapsed());
-                }
-                usage_finalizer.finish(crate::agent::tinyagents::host::SubagentUsageEntry {
-                    task_id: task_id.clone(),
-                    agent_id: definition.id.clone(),
-                    usage: outcome.usage,
-                });
-                return Ok(outcome);
-            }
-        }
 
         tracing::info!(
             agent_id = %definition.id,
@@ -604,49 +278,35 @@ pub(crate) async fn run_subagent_direct(
             "[subagent_host] dispatching"
         );
 
-        // Install the sub-agent's declared `sandbox_mode` as the active
-        // task-local for every tool invocation inside this run.
+        // The child carrier projects the definition's sandbox mode to every
+        // tool through HostOperationContext.
         //
-        // When the worker opted into git-worktree isolation, its isolated
-        // checkout is carried on the `WorkspaceDescriptor` prepared below and
-        // threaded onto the run's tinyagents `RunContext`
-        // (`run_turn_via_tinyagents_shared` → `RunContext::with_workspace`).
-        // Every tool call then receives it via
-        // `ToolExecutionContext::from_run_context`, so acting tools (shell, git)
-        // resolve their CWD to that worktree (`effective_action_dir_for_context`)
-        // instead of the shared `Config.action_dir` — no task-local override
-        // needed. When no descriptor is prepared (the default / non-isolated
-        // path), tools fall through to `security.action_dir` and behaviour is
-        // unchanged.
         let mut parent_for_subagent = parent.clone();
-        parent_for_subagent.workspace_descriptor =
-            workspace_descriptor_for_subagent(definition, &options, &parent, &task_id);
-        if let Some(descriptor) = parent_for_subagent.workspace_descriptor.as_ref() {
-            tracing::debug!(
-                agent_id = %definition.id,
-                task_id = %task_id,
-                worktree = %descriptor.root.display(),
-                policy_id = %descriptor.policy_id,
-                "[subagent_host] worktree-isolated worker: descriptor will route acting-tool CWD"
-            );
+        // The direct-child list belongs to the agent now being run. It is not
+        // the originating parent's list: each definition's allowlist governs
+        // only that actor's own children.
+        parent_for_subagent.agent_definition_id = definition.id.clone();
+        parent_for_subagent.allowed_subagent_ids =
+            definition.allowed_subagent_ids().into_iter().collect();
+        if let Some(descriptor) = options.workspace_descriptor.clone() {
+            parent_for_subagent.workspace_descriptor = Some(descriptor);
         }
-        let run_result = with_spawn_depth(attempted_depth, async {
+        let run_result = Box::pin(with_run_depth(RunDepth { depth: attempted_depth, max_depth }, async {
             with_file_state_agent_id(task_id.clone(), async {
-                with_current_sandbox_mode(definition.sandbox_mode, async {
-                    Box::pin(run_typed_mode(
-                        definition,
-                        task_prompt,
-                        &options,
-                        &parent_for_subagent,
-                        &task_id,
-                        &loaded_config,
-                    ))
-                    .await
-                })
+                Box::pin(run_typed_mode(
+                    definition,
+                    task_prompt,
+                    &options,
+                    &parent_for_subagent,
+                    &task_id,
+                    &loaded_config,
+                    native,
+                    nested_spawn_depth_available,
+                ))
                 .await
             })
             .await
-        })
+        }))
         .await;
 
         // Feed this delegation's wall-clock into the turn's running maximum,
@@ -668,7 +328,6 @@ pub(crate) async fn run_subagent_direct(
         if let Some(dispatch) = options.run_context.dispatch.as_deref() {
             dispatch.record_subagent_elapsed(started.elapsed());
         }
-
         let mut outcome = run_result?;
 
         // Commit the completed subtree before the soft, awaited artifact
@@ -680,16 +339,20 @@ pub(crate) async fn run_subagent_direct(
             usage: outcome.usage,
         });
 
-        // #3883: offload an oversized worker result to `action_dir/outputs/`
-        // BEFORE the cap below truncates it, so the parent receives a path plus
-        // an abstract and the full-fidelity body survives on disk instead of
-        // being cut. A refused or failed offload is soft: the inline payload
-        // continues on to the cap and the summarizer detour exactly as before.
-        offload_outcome_artifacts(&mut outcome, definition, &options, &task_id).await;
-
-        // Truncate result to the definition's cap if set (shared with the
-        // deterministic memory fast path via `apply_max_result_chars`).
-        apply_max_result_chars(&mut outcome.output, definition.max_result_chars, &definition.id);
+        // The owner policy makes the generic byte-overflow decision and calls
+        // this host's authorized artifact store. Project its opaque reference
+        // into the product pointer before applying the independent character
+        // cap, preserving the existing full-output-first behavior.
+        if let Some(error) = super::runner_artifacts::apply_subagent_result_policies(
+            &mut outcome,
+            definition,
+            &options,
+            &task_id,
+        )
+        .await
+        {
+            tracing::debug!(task_id = %task_id, error = %error, "[artifact] sub-agent result policy fell back to inline output");
+        }
 
         tracing::info!(
             agent_id = %definition.id,
@@ -707,147 +370,12 @@ pub(crate) async fn run_subagent_direct(
     .await
 }
 
-/// Apply the filesystem-offload convention to a finished sub-agent run (#3883).
-///
-/// Writes an oversized result to `action_dir/outputs/` and swaps `output` for a
-/// path + abstract, then records every `[artifact]` pointer the outgoing payload
-/// carries — the harness-written one and any the worker authored itself by
-/// following the prompt contract — onto `SubagentRunOutcome::artifact_paths`, so
-/// the parent receives the paths structurally, not only as prose.
-///
-/// Every failure is soft. With no resolvable action root (or a refused target)
-/// the outcome is left untouched and the summarizer detour plus
-/// `tool_result_budget_bytes` truncation stay in charge as the fallback.
-async fn offload_outcome_artifacts(
-    outcome: &mut SubagentRunOutcome,
-    definition: &AgentDefinition,
-    options: &SubagentRunOptions,
-    task_id: &str,
-) {
-    // Pointers the WORKER authored itself (prompt contract) are read first: the
-    // harness may be about to replace `output` wholesale with its own pointer,
-    // which would otherwise drop them. They also have to survive the early
-    // returns below, so a run with no resolvable action root still reports the
-    // paths its child wrote by hand.
-    let mut paths = extract_artifact_paths(&outcome.output);
-
-    // A worktree-isolated worker offloads into its own checkout; everyone else
-    // uses the live policy's action root, which is the same root a parent's
-    // relative read resolves the returned path against.
-    let policy = crate::security::live_policy::current();
-    let Some(action_dir) = options
-        .worktree_action_dir
-        .clone()
-        .or_else(|| policy.as_ref().map(|p| p.action_dir.clone()))
-    else {
-        tracing::debug!(
-            task_id = %task_id,
-            agent_id = %outcome.agent_id,
-            worker_authored_paths = paths.len(),
-            "[artifact] no resolvable action_dir — skipping offload (summarizer/truncation backstop applies)"
-        );
-        outcome.artifact_paths = paths;
-        note_artifact_handoff(
-            HANDOFF_STAGE_RECORDED,
-            &outcome.agent_id,
-            task_id,
-            &outcome.artifact_paths,
-        );
-        return;
-    };
-
-    // A read-only tier means this run may not mutate the disk at all, so the
-    // harness does not persist on its behalf either. The result stays inline and
-    // the summarizer / truncation backstops handle it, exactly as before #3883.
-    if policy
-        .as_ref()
-        .is_some_and(|p| p.autonomy == crate::security::AutonomyLevel::ReadOnly)
-    {
-        tracing::debug!(
-            task_id = %task_id,
-            agent_id = %outcome.agent_id,
-            "[artifact] readonly autonomy tier — skipping offload (summarizer/truncation backstop applies)"
-        );
-        outcome.artifact_paths = paths;
-        note_artifact_handoff(
-            HANDOFF_STAGE_RECORDED,
-            &outcome.agent_id,
-            task_id,
-            &outcome.artifact_paths,
-        );
-        return;
-    }
-
-    // Offload at the tighter of the global default and this agent's own result
-    // cap, so a definition capped below the default (flow_memory_agent at 4 000
-    // chars, context_scout at 5 000) gets its full body on disk instead of
-    // truncated by `apply_max_result_chars` immediately after.
-    let threshold =
-        effective_offload_threshold(DEFAULT_OFFLOAD_THRESHOLD_BYTES, definition.max_result_chars);
-
-    // Worktree-isolated workers write inside their own checkout, but the parent
-    // that receives the pointer resolves relative paths against ITS action root.
-    // Render against that root so the handed-back path is one the parent can
-    // actually open (relative when the worktree nests inside it, absolute when
-    // it does not) rather than a bare `outputs/…` that silently misses.
-    let render_root = policy
-        .as_ref()
-        .map(|p| p.action_dir.clone())
-        .unwrap_or_else(|| action_dir.clone());
-    let offload = new_artifact_offload(action_dir, policy, outcome.agent_id.clone(), task_id)
-        .with_render_root(render_root);
-    let (output, _artifact) =
-        offload_oversized_result(std::mem::take(&mut outcome.output), &offload, threshold).await;
-    outcome.output = output;
-
-    // Merge: the harness pointer (if it fired) plus any worker-authored pointer
-    // read before the swap. `extract_artifact_paths` already de-duplicates
-    // within a payload; dedupe across the two sources here.
-    for path in extract_artifact_paths(&outcome.output) {
-        if !paths.contains(&path) {
-            paths.push(path);
-        }
-    }
-    outcome.artifact_paths = paths;
-    note_artifact_handoff(
-        HANDOFF_STAGE_RECORDED,
-        &outcome.agent_id,
-        task_id,
-        &outcome.artifact_paths,
-    );
-}
-
-fn workspace_descriptor_for_subagent(
-    definition: &AgentDefinition,
-    options: &SubagentRunOptions,
-    parent: &ParentExecutionContext,
-    task_id: &str,
-) -> Option<WorkspaceDescriptor> {
-    if let Some(descriptor) = options.workspace_descriptor.clone() {
-        return Some(descriptor);
-    }
-    if let Some(descriptor) = parent.workspace_descriptor.clone() {
-        return Some(descriptor);
-    }
-    let root = options.worktree_action_dir.clone()?;
-    let sandbox = match definition.sandbox_mode {
-        AgentSandboxMode::Sandboxed => TinyagentsSandboxMode::Required,
-        AgentSandboxMode::None | AgentSandboxMode::ReadOnly => TinyagentsSandboxMode::Inherit,
-    };
-    Some(
-        WorkspaceDescriptor::new(root)
-            .with_policy_id(format!("openhuman.worktree:{task_id}"))
-            .with_sandbox(sandbox),
-    )
-}
-
-/// One spawn's snapshot of the host config, loaded once by [`run_subagent`].
+/// One spawn's snapshot of the host config, loaded once by the host adapter.
 ///
 /// `Config::load_or_init()` is **not cached** — it re-resolves the config dirs
 /// and re-reads `config.toml` on every call. `run_typed_mode` needed it in six
 /// places, so a single sub-agent spawn used to hit the disk six times and could
-/// observe six *different* configs if the file changed mid-spawn. One snapshot
-/// is both cheaper and more coherent.
+/// observe six *different* configs if the file changed mid-spawn.
 ///
 /// The error is captured as a `String` rather than dropped to `Option` so the
 /// sites that log it can say why the config was unavailable; every site
@@ -857,7 +385,6 @@ fn workspace_descriptor_for_subagent(
 /// is `docs/specs/plan-agents.md` Phase 3: the sub-agent runner is slated to
 /// move into TinyAgents, and a generic runtime has no config file to load.
 type LoadedConfig = Result<std::sync::Arc<crate::config::Config>, String>;
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Typed mode — narrow prompt, filtered tools, cheaper model
 // ─────────────────────────────────────────────────────────────────────────────
@@ -874,6 +401,8 @@ async fn run_typed_mode(
     parent: &ParentExecutionContext,
     task_id: &str,
     config: &LoadedConfig,
+    native: crate::agent::tinyagents::NativeSubagentRunContext,
+    nested_spawn_depth_available: bool,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
     let started = Instant::now();
 
@@ -903,11 +432,11 @@ async fn run_typed_mode(
     // once the OAuth handshake reaches ACTIVE/CONNECTED, so this call
     // returns the fresh list almost for free on the warm path. Fall back
     // to the parent's frozen list when the live fetch returns empty.
-    let live_integrations: Vec<crate::agent::prompts::ConnectedIntegration> = {
+    let live_integrations: Vec<crate::integrations::ConnectedIntegration> = {
         let signed_in = config
             .as_ref()
             .ok()
-            .map(|cfg| user_is_signed_in_to_composio(cfg))
+            .map(|cfg| crate::integrations::composio::user_is_signed_in_to_composio(cfg))
             .unwrap_or(false);
         if !signed_in {
             parent.connected_integrations.clone()
@@ -946,134 +475,100 @@ async fn run_typed_mode(
     };
 
     // ── Filter tools per definition + per-spawn override ───────────────
-    let toolkit_filter = options.toolkit_override.as_deref();
-    let mut allowed_indices = filter_tool_indices(
+    let filtered_tools = filter_definition_tool_indices(
         &parent.all_tools,
-        &definition.tools,
-        &definition.disallowed_tools,
+        definition,
         options
             .skill_filter_override
             .as_deref()
             .or(definition.skill_filter.as_deref()),
-    );
-
-    // Sub-agents must never spawn their own sub-agents. Strip `spawn_subagent`
-    // and every synthesised `delegate_*` tool regardless of the archetype's
-    // declared scope.
-    let before = allowed_indices.len();
-    allowed_indices.retain(|&i| {
-        let name = parent.all_tools[i].name();
-        !is_subagent_spawn_tool(name) && name != "spawn_worker_thread"
-    });
-    let stripped = before - allowed_indices.len();
-    if stripped > 0 {
-        tracing::debug!(
-            agent_id = %definition.id,
-            stripped,
-            "[subagent_host] removed sub-agent spawn tools from sub-agent's tool surface"
-        );
-    }
-
-    // ── Force-include extra_tools ──────────────────────────────────────
-    if !definition.extra_tools.is_empty() {
-        for (i, tool) in parent.all_tools.iter().enumerate() {
-            let name = tool.name();
-            if definition.extra_tools.iter().any(|n| n == name)
-                && !allowed_indices.contains(&i)
-                && !super::super::tool_prep::disallowed_tool_matches(
-                    &definition.disallowed_tools,
-                    name,
-                )
-                && !is_subagent_spawn_tool(name)
-            {
-                allowed_indices.push(i);
-            }
-        }
-    }
-
-    // A child may only narrow an explicit profile/channel ceiling, never widen
-    // it back to `all_tools`. The parent's own role-specific prompt surface is
-    // intentionally not a ceiling: coordinators delegate effectful work to
-    // specialists whose tools they do not advertise directly.
-    super::super::tool_prep::retain_parent_visible_tool_indices(
-        &mut allowed_indices,
-        &parent.all_tools,
+        nested_spawn_depth_available,
         &parent.subagent_tool_ceiling_names,
     );
+    let allowed_indices = filtered_tools.indices;
+    let nested_spawn_ids = filtered_tools.nested_spawn_ids;
+    let can_spawn_subagent = filtered_tools.nested_spawn_tools.contains("spawn_subagent");
 
-    let filtered_specs: Vec<ToolSpec> = allowed_indices
+    // Rule-withheld tools stay callable (`allowed_names`) but off the prompt.
+    let child_rules = options
+        .run_context
+        .for_subagent(definition, config.as_ref().ok().map(AsRef::as_ref))
+        .tool_rules;
+    let listed = super::super::tool_prep::rule_listed_indices(
+        &allowed_indices,
+        &parent.all_tools,
+        child_rules.as_deref(),
+    );
+    let mut filtered_specs: Vec<ToolSpec> = listed
         .iter()
         .map(|&i| parent.all_tool_specs[i].as_ref().clone())
         .collect();
+    let nested_spawn_tool = if can_spawn_subagent {
+        Some(
+            crate::agent::orchestration::tools::SpawnSubagentTool::scoped(nested_spawn_ids.clone()),
+        )
+    } else {
+        None
+    };
+    if let Some(tool) = &nested_spawn_tool {
+        if let Some(spec) = filtered_specs
+            .iter_mut()
+            .find(|spec| spec.name == "spawn_subagent")
+        {
+            *spec = tool.spec();
+        }
+    }
     let allowed_names: HashSet<String> = allowed_indices
         .iter()
         .map(|&i| parent.all_tools[i].name().to_string())
         .collect();
-    let filtered_specs = crate::agent::session_host::dedup_visible_tool_specs(filtered_specs);
-    let filtered_specs = dedup_tool_specs_by_name(&definition.id, filtered_specs);
+    let filtered_specs = dedup_owned_tool_specs(filtered_specs);
 
     tracing::debug!(
         agent_id = %definition.id,
         model = %model,
         tool_count = allowed_names.len(),
-        max_iterations = subagent_iter_cap_with_autonomous_lift(definition.effective_max_iterations()),
+        max_iterations = definition_iter_cap(&options.run_context, definition),
         iteration_policy = ?definition.iteration_policy,
         "[subagent_host:typed] resolved configuration"
     );
 
     // ── Build the narrow system prompt ─────────────────────────────────
     let render_options = SubagentRenderOptions::from_definition_flags(
-        definition.omit_identity,
-        definition.omit_safety_preamble,
-        definition.omit_profile,
-        definition.omit_memory_md,
+        definition.extensions.omit_identity,
+        definition.extensions.omit_safety_preamble,
     );
 
-    let narrowed_integrations: Vec<crate::agent::prompts::ConnectedIntegration> =
-        match toolkit_filter {
-            Some(tk) => live_integrations
-                .iter()
-                .filter(|ci| ci.connected && ci.toolkit.eq_ignore_ascii_case(tk))
-                .cloned()
-                .collect(),
-            None => live_integrations
-                .iter()
-                .filter(|ci| ci.connected)
-                .cloned()
-                .collect(),
-        };
+    let connected_integrations_for_prompt: Vec<crate::integrations::ConnectedIntegration> =
+        live_integrations
+            .iter()
+            .filter(|ci| ci.connected)
+            .cloned()
+            .collect();
 
-    let prompt_tools: Vec<PromptTool<'_>> = allowed_indices
-        .iter()
-        .map(|&i| {
-            let t = parent.all_tools[i].as_ref();
-            PromptTool {
-                name: std::borrow::Cow::Borrowed(t.name()),
-                description: std::borrow::Cow::Borrowed(t.description()),
-                parameters_schema: Some(t.parameters_schema().to_string()),
-            }
-        })
-        .collect();
+    let prompt_tools = super::super::tool_prep::prompt_tools_for(&listed, &parent.all_tools);
     let visible_tool_names: std::collections::HashSet<String> =
         prompt_tools.iter().map(|t| t.name.to_string()).collect();
     let (prompt_tool_call_format, dispatcher_instructions) =
         subagent_prompt_protocol(parent.tool_call_format, &filtered_specs);
     // Load AGENTS.md instruction layers once, at prompt-build time, when the
     // config gate is on. The global layer comes from the workspace dir; the
-    // project layer comes from the sub-agent's `worktree_action_dir` override
-    // when present (git-worktree isolation), otherwise the global config
-    // `action_dir`. Loading here (not per turn) keeps the sub-agent system
+    // project layer prefers an explicitly inherited workspace root and falls
+    // back to the global config `action_dir`. Loading here (not per turn) keeps
+    // the sub-agent system
     // prompt byte-stable for prefix caching.
     let agents_md = if parent.agent_config.agents_md_enabled {
         let local_dir = options
-            .worktree_action_dir
-            .clone()
+            .workspace_descriptor
+            .as_ref()
+            .or(parent.workspace_descriptor.as_ref())
+            .map(|descriptor| descriptor.root.clone())
             .or_else(|| config.as_ref().ok().map(|c| c.action_dir.clone()));
         match local_dir {
             Some(dir) => crate::agent::prompts::load_agents_md_layers(&parent.workspace_dir, &dir),
             None => {
                 // No resolvable project dir — still surface the workspace layer.
-                crate::agent::prompts::AgentsMdContent {
+                tinyagents_harness::context::AgentsMdContent {
                     global: crate::agent::prompts::load_agents_md(&parent.workspace_dir),
                     local: None,
                 }
@@ -1084,39 +579,33 @@ async fn run_typed_mode(
             agent_id = %definition.id,
             "[agents_md] disabled by config; skipping AGENTS.md injection for subagent"
         );
-        crate::agent::prompts::AgentsMdContent::default()
+        tinyagents_harness::context::AgentsMdContent::default()
     };
 
+    let connected_identities_md = options.run_context.connected_identities_md().await;
     let prompt_ctx = PromptContext {
         workspace_dir: &parent.workspace_dir,
         model_name: &model,
         agent_id: &definition.id,
+        flow_archetype_text: None,
         tools: &prompt_tools,
         workflows: &parent.workflows,
         dispatcher_instructions: &dispatcher_instructions,
-        learned: crate::agent::prompts::LearnedContextData::default(),
         visible_tool_names: &visible_tool_names,
         tool_call_format: prompt_tool_call_format,
-        connected_integrations: &narrowed_integrations,
-        connected_identities_md: crate::agent::prompts::render_connected_identities(),
-        include_profile: !definition.omit_profile,
-        include_memory_md: !definition.omit_memory_md,
-        curated_snapshot: None,
+        connected_integrations: &connected_integrations_for_prompt,
+        connected_identities_md,
         user_identity: crate::security::credentials::identity::peek_credential_user_identity(),
         personality_roster: vec![],
         agents_md_global: agents_md.global.clone(),
         agents_md_local: agents_md.local.clone(),
     };
 
+    let archetype_prompt_body = load_typed_prompt_source(definition, config, prompt_ctx).await?;
     let system_prompt = match &definition.system_prompt {
-        PromptSource::Dynamic(build) => {
-            build(&prompt_ctx).map_err(|e| SubagentRunError::PromptLoad {
-                path: format!("<dynamic:{}>", definition.id),
-                source: std::io::Error::other(e.to_string()),
-            })?
-        }
+        // The whole prompt, with no sub-agent sections around it.
+        PromptSource::Dynamic(_) | PromptSource::Verbatim(_) => archetype_prompt_body,
         PromptSource::Inline(_) | PromptSource::File { .. } => {
-            let archetype_prompt_body = load_prompt_source(&definition.system_prompt, &prompt_ctx)?;
             render_subagent_system_prompt_with_format(
                 &parent.workspace_dir,
                 &model,
@@ -1126,28 +615,29 @@ async fn run_typed_mode(
                 &archetype_prompt_body,
                 render_options,
                 prompt_tool_call_format,
-                &narrowed_integrations,
+                &connected_integrations_for_prompt,
                 agents_md.global.as_deref(),
                 agents_md.local.as_deref(),
             )
         }
     };
 
-    let system_prompt = append_subagent_role_contract(system_prompt, &definition.id);
-    // #3883: only agents that actually hold a file-write tool are told to
-    // offload. `visible_tool_names` is this sub-agent's real, post-filter tool
-    // surface, so the contract can never advertise a tool the child cannot call.
-    let system_prompt =
-        append_artifact_offload_contract(system_prompt, &definition.id, &visible_tool_names);
+    let system_prompt = compose_subagent_system_prompt(
+        system_prompt,
+        &definition.id,
+        &visible_tool_names,
+        task_prompt,
+        options.run_context.spawn_depth,
+    );
 
     // ── Build the user message (with optional context prefix) ──────────
-    // Shared one-line stamp (#3602) so sub-agents report time in the same
-    // format as the main agent. Lives on the user message because sub-agent
-    // system prompts are byte-stable for prefix caching.
-    let now_str = crate::agent::prompts::current_datetime_line();
+    // Shared one-line stamp (#3602), in the user's zone like the main agent's.
+    // On the user message: sub-agent system prompts are byte-stable for caching.
+    let zone = config.as_ref().ok().map(|c| c.time_zone());
+    let now_str = crate::prompts::current_datetime_line(zone.as_deref());
 
     let mut context_parts: Vec<&str> = Vec::new();
-    if !definition.omit_memory_context {
+    if !definition.extensions.omit_memory_context {
         if let Some(ref mem_ctx) = *parent.memory_context {
             context_parts.push(mem_ctx);
         }
@@ -1157,7 +647,7 @@ async fn run_typed_mode(
     if let Some(ref ctx) = options.context {
         context_parts.push(ctx);
     }
-    let mut history: Vec<crate::agent::messages::ChatMessage> =
+    let mut history: Vec<tinyagents_session::transcript::TranscriptMessage> =
         if let Some(ref initial) = options.initial_history {
             tracing::info!(
                 agent_id = %definition.id,
@@ -1173,8 +663,8 @@ async fn run_typed_mode(
                 format!("[Context]\n{}\n\n{task_prompt}", context_parts.join("\n\n"))
             };
             vec![
-                crate::agent::messages::ChatMessage::system(system_prompt),
-                crate::agent::messages::ChatMessage::user(user_message),
+                tinyagents_session::transcript::TranscriptMessage::system(system_prompt),
+                tinyagents_session::transcript::TranscriptMessage::user(user_message),
             ]
         };
 
@@ -1193,12 +683,6 @@ async fn run_typed_mode(
         model_vision,
         "[subagent_host] resolved sub-agent model vision capability"
     );
-    // Per-agent turn graph (issue #4249): `Default` runs the shared sub-agent
-    // graph; `Custom` hands the assembled turn to this agent's own graph runner
-    // (declared in its `graph.rs::graph()`). Every built-in agent selects
-    // `Default` today — the branch is the extension point.
-    use super::graph::AggregatedUsage;
-    use crate::agent::harness::agent_graph::AgentGraph;
     // Resolve the child transcript stem once — `{parent_chain}__{child_session_key}`
     // — so the sub-agent's raw transcript lands in `session_raw` under a filename
     // that chains the parent session (parity with the removed observer stem).
@@ -1237,8 +721,10 @@ async fn run_typed_mode(
         };
         format!("{parent_chain}__{child_session_key}")
     };
-    let workspace_descriptor =
-        workspace_descriptor_for_subagent(definition, options, parent, task_id);
+    let workspace_descriptor = options
+        .workspace_descriptor
+        .clone()
+        .or_else(|| parent.workspace_descriptor.clone());
     if let Some(descriptor) = &workspace_descriptor {
         tracing::debug!(
             agent_id = %definition.id,
@@ -1249,99 +735,50 @@ async fn run_typed_mode(
         );
     }
 
-    let (output, iterations, agg_usage, early_exit_tool, hit_cap, breaker_halt) =
-        match &definition.graph {
-            AgentGraph::Default => {
-                super::graph::run_subagent_via_graph(
-                    subagent_source.clone(),
-                    &model,
-                    temperature,
-                    &mut history,
-                    parent.all_tools.clone(),
-                    Vec::new(),
-                    filtered_specs.clone(),
-                    allowed_names,
-                    subagent_iter_cap_with_autonomous_lift(definition.effective_max_iterations()),
-                    options.run_queue.clone(),
-                    parent.on_progress.clone(),
-                    &definition.id,
-                    task_id,
-                    definition.iteration_policy == IterationPolicy::Extended,
-                    options.thread_id.clone(),
-                    options.run_context.clone(),
-                    options.worker_thread_id.clone(),
-                    parent.workspace_dir.clone(),
-                    workspace_descriptor.clone(),
-                    max_output_tokens,
-                    model_vision,
-                    &transcript_stem,
-                    // Sub-agent turns record their provider label as the literal
-                    // "subagent" (parity with the legacy observer's TurnObserver
-                    // provenance), distinguishing delegated spend from the parent's
-                    // own channel in per-thread usage reads.
-                    "subagent",
-                    // Agent-level TokenJuice profile → sub-agent context middleware
-                    // (#4466), so sub-agent tool outputs compact like the chat path.
-                    definition.effective_tokenjuice_compression(),
-                    // The spawn-wide config snapshot supplies the `[context]`
-                    // knobs the graph used to load for itself.
-                    config.as_ref().ok().map(|c| c.as_ref()),
-                )
-                .await?
-            }
-            AgentGraph::Custom(run) => {
-                let req = AgentTurnRequest {
-                    turn_model_source: subagent_source.clone(),
-                    model: model.clone(),
-                    temperature,
-                    history: std::mem::take(&mut history),
-                    parent_tools: parent.all_tools.clone(),
-                    dynamic_tools: Vec::new(),
-                    specs: filtered_specs.clone(),
-                    allowed_names,
-                    max_iterations: subagent_iter_cap_with_autonomous_lift(
-                        definition.effective_max_iterations(),
-                    ),
-                    run_queue: options.run_queue.clone(),
-                    on_progress: parent.on_progress.clone(),
-                    agent_id: definition.id.clone(),
-                    task_id: task_id.to_string(),
-                    extended_policy: definition.iteration_policy == IterationPolicy::Extended,
-                    thread_id: options.thread_id.clone(),
-                    run_context: options.run_context.clone(),
-                    worker_thread_id: options.worker_thread_id.clone(),
-                    workspace_dir: parent.workspace_dir.clone(),
-                    workspace_descriptor: workspace_descriptor.clone(),
-                    max_output_tokens,
-                    model_vision,
-                    transcript_stem: transcript_stem.clone(),
-                    provider_label: "subagent".to_string(),
-                    tokenjuice_compression: definition.effective_tokenjuice_compression(),
-                    config: config.as_ref().ok().map(Arc::clone),
-                };
-                let res = run(req).await?;
-                history = res.history;
-                let AgentTurnUsage {
-                    input_tokens,
-                    output_tokens,
-                    cached_input_tokens,
-                    charged_amount_usd,
-                } = res.usage;
-                (
-                    res.output,
-                    res.iterations,
-                    AggregatedUsage {
-                        input_tokens,
-                        output_tokens,
-                        cached_input_tokens,
-                        charged_amount_usd,
-                    },
-                    res.early_exit_tool,
-                    res.hit_cap,
-                    res.breaker_halt,
-                )
-            }
-        };
+    let mut child_run_context = options
+        .run_context
+        .for_subagent(definition, config.as_ref().ok().map(AsRef::as_ref));
+    child_run_context.parent = Some(parent.clone());
+    let dynamic_tools = nested_spawn_tool
+        .map(|tool| vec![Box::new(tool) as Box<dyn Tool>])
+        .unwrap_or_default();
+    let (output, iterations, agg_usage, early_exit_tool, hit_cap, breaker_halt, failure_cause) =
+        super::graph::run_subagent_via_graph(
+            subagent_source.clone(),
+            &model,
+            temperature,
+            &mut history,
+            parent.all_tools.clone(),
+            dynamic_tools,
+            filtered_specs.clone(),
+            allowed_names,
+            definition_iter_cap(&options.run_context, definition),
+            (options.run_queue.clone(), options.message_run_queue.clone()),
+            parent.on_progress.clone(),
+            &definition.id,
+            task_id,
+            definition.iteration_policy == IterationPolicy::Extended,
+            options.thread_id.clone(),
+            child_run_context,
+            options.worker_thread_id.clone(),
+            parent.workspace_dir.clone(),
+            workspace_descriptor.clone(),
+            max_output_tokens,
+            model_vision,
+            &transcript_stem,
+            // Sub-agent turns record their provider label as the literal
+            // "subagent" (parity with the legacy observer's TurnObserver
+            // provenance), distinguishing delegated spend from the parent's
+            // own channel in per-thread usage reads.
+            "subagent",
+            // Agent TokenJuice profile → sub-agent context middleware (#4466).
+            definition.extensions.tokenjuice_for(&definition.model),
+            // The spawn-wide config snapshot supplies the `[context]`
+            // knobs the graph used to load for itself.
+            config.as_ref().ok().map(|c| c.as_ref()),
+            Some(native),
+        )
+        .await?;
 
     // Determine status: if the turn engine exited early because of
     // ask_user_clarification, checkpoint the history and return
@@ -1372,7 +809,10 @@ async fn run_typed_mode(
             reason = %reason,
             "[subagent_host] child halted by circuit breaker; reporting Incomplete (#4466)"
         );
-        crate::agent::subagent_host::types::SubagentRunStatus::Incomplete { reason }
+        crate::agent::subagent_host::types::SubagentRunStatus::Incomplete {
+            reason,
+            failure_cause: failure_cause.clone(),
+        }
     } else if hit_cap {
         // The tinyagents run stopped at the model-call cap with work still
         // pending (graph summarized a resumable checkpoint into `output`).
@@ -1380,7 +820,8 @@ async fn run_typed_mode(
         // result + blocker instead of treating the summary as a finished answer
         // or re-spinning the identical delegation (#4096).
         crate::agent::subagent_host::types::SubagentRunStatus::Incomplete {
-            reason: "reached its tool-call limit before finishing".into(),
+            reason: tinyagents_harness::turn_stop::SUBAGENT_ITERATION_CAP_REASON.into(),
+            failure_cause: None,
         }
     } else {
         // A clean final response. (An `ask_user_clarification` early-exit is
@@ -1396,7 +837,8 @@ async fn run_typed_mode(
         input_tokens: agg_usage.input_tokens,
         output_tokens: agg_usage.output_tokens,
         cached_input_tokens: agg_usage.cached_input_tokens,
-        charged_amount_usd: agg_usage.charged_amount_usd,
+        charged_amount_usd: agg_usage.cost.known_usd,
+        cost_source: agg_usage.cost.source,
     };
     // A nested child records on this run's isolated ledger. Fold those totals
     // into the completed child before writing the immediate parent's ledger so
@@ -1411,6 +853,7 @@ async fn run_typed_mode(
             .cached_input_tokens
             .saturating_add(entry.usage.cached_input_tokens);
         usage.charged_amount_usd += entry.usage.charged_amount_usd;
+        usage.cost_source = usage.cost_source.max(entry.usage.cost_source);
     }
     Ok(SubagentRunOutcome {
         task_id: task_id.to_string(),
@@ -1420,16 +863,16 @@ async fn run_typed_mode(
         elapsed: started.elapsed(),
         mode: SubagentMode::Typed,
         status,
+        failure_cause,
         final_history: history,
         usage,
-        // Filled in by `run_subagent` once the offload step has had its say, so
+        // Filled in by the host adapter once the offload step has had its say, so
         // both the harness-offloaded and worker-authored pointers are counted.
         artifact_paths: Vec::new(),
         persistence_disposition:
             tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting,
     })
 }
-
 #[cfg(test)]
-#[path = "runner_fast_path_tests_tests.rs"]
-mod fast_path_tests;
+#[path = "runner_flow_prompt_tests.rs"]
+mod flow_prompt_tests;

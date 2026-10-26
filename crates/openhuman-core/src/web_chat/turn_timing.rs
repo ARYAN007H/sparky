@@ -93,14 +93,14 @@ impl TurnTimingSnapshot {
     pub(crate) fn into_payload(
         self,
         output_tokens: Option<u64>,
-    ) -> crate::core::socketio::TurnTimingPayload {
+    ) -> crate::web_chat::TurnTimingPayload {
         let tokens_per_second = match (output_tokens, self.total_ms) {
             (Some(tokens), Some(total_ms)) if total_ms > 0 => {
                 Some(tokens as f64 / (total_ms as f64 / 1000.0))
             }
             _ => None,
         };
-        crate::core::socketio::TurnTimingPayload {
+        crate::web_chat::TurnTimingPayload {
             first_token_ms: self.first_token_ms,
             first_tool_ms: self.first_tool_ms,
             total_ms: self.total_ms,

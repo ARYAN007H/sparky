@@ -2,7 +2,8 @@
 //!
 //! Boots the real TinyHumans backend transport in-process, builds the
 //! production `media_generate_image` / `media_generate_video` tools through
-//! `build_media_tools`' own code path (`managed_generators` +
+//! the registered media tool source's own code path
+//! (`openhuman_tinyhumans::integrations::media::managed_generators` +
 //! `media_tools_from`), and drives them against a scripted fake of the
 //! backend's `/agent-integrations/openrouter` proxy:
 //!
@@ -37,7 +38,8 @@ use tinyagents_harness::tinyinference_video::WaitPolicy;
 use tinytools::Tool;
 
 use openhuman_core::config::Config;
-use openhuman_core::media::generation::{managed_generators, media_tools_from};
+use openhuman_core::media::generation::media_tools_from;
+use openhuman_tinyhumans::integrations::media::managed_generators;
 
 /// A 1×1 PNG.
 const PNG: &[u8] = &[
@@ -154,10 +156,12 @@ async fn start_backend() -> (String, Backend) {
 }
 
 fn config(root: &Path, api_url: &str) -> Config {
-    let mut config = Config::default();
-    config.config_path = root.join("config.toml");
-    config.workspace_dir = root.join("workspace");
-    config.api_url = Some(api_url.to_owned());
+    let mut config = Config {
+        config_path: root.join("config.toml"),
+        workspace_dir: root.join("workspace"),
+        api_url: Some(api_url.to_owned()),
+        ..Default::default()
+    };
     config.secrets.encrypt = false;
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
     openhuman_core::security::credentials::api_key::store_api_key(&config, API_KEY)
@@ -178,14 +182,49 @@ async fn media_tools_deliver_images_and_videos_through_the_backend_proxy() {
     tinyhumans_boot::boot();
     let tmp = tempfile::tempdir().unwrap();
     let (api_url, backend) = start_backend().await;
-    let config = config(tmp.path(), &api_url);
+    let mut config = config(tmp.path(), &api_url);
     let action_dir = tmp.path().join("projects");
+    // Deliverables land in the visible Files folder (#5505); metadata is read
+    // through the artifact store because it may use the configured backend.
+    let files_dir = tmp.path().join("Files");
+    config.files_dir_override = Some(files_dir.clone());
+
+    // The source-backed product catalog is assembled after TinyHumans installs
+    // its media registration. Keep these hosted tools in the core catalog as
+    // well as exercising their generators below.
+    let security = Arc::new(openhuman_core::security::SecurityPolicy::from_config(
+        &config.autonomy,
+        &config.workspace_dir,
+        &config.action_dir,
+    ));
+    let registered = openhuman_core::tools::ops::all_tools(
+        Arc::new(config.clone()),
+        &security,
+        openhuman_core::security::AuditLogger::disabled(),
+        &config.browser,
+        &config.http_request,
+        &action_dir,
+        &config,
+    );
+    for expected in [
+        "media_generate_image",
+        "media_generate_video",
+        "media_list_models",
+    ] {
+        assert!(
+            registered
+                .iter()
+                .any(|candidate| candidate.name() == expected),
+            "the host-registered media source must expose `{expected}`"
+        );
+    }
 
     let generators = managed_generators(&config).expect("backend transport is installed");
     let tools = media_tools_from(
         generators,
         &action_dir,
         &config.workspace_dir,
+        &files_dir,
         WaitPolicy::new(Duration::from_millis(5), Duration::from_secs(20)),
     );
 
@@ -210,7 +249,12 @@ async fn media_tools_deliver_images_and_videos_through_the_backend_proxy() {
     assert_eq!(image_artifacts.len(), 1, "one filed image: {result:?}");
     let image_id = image_artifacts[0]["artifact_id"]
         .as_str()
-        .expect("image filed as artifact")
+        .unwrap_or_else(|| {
+            panic!(
+                "image was not filed as an artifact: {:?}",
+                image_artifacts[0]
+            )
+        })
         .to_owned();
 
     // ── video: must poll through `completed` with no outputs ─────────────
@@ -235,35 +279,47 @@ async fn media_tools_deliver_images_and_videos_through_the_backend_proxy() {
     assert_eq!(video_artifacts.len(), 1, "one filed video: {result:?}");
     let video_id = video_artifacts[0]["artifact_id"]
         .as_str()
-        .expect("video filed as artifact")
+        .unwrap_or_else(|| {
+            panic!(
+                "video was not filed as an artifact: {:?}",
+                video_artifacts[0]
+            )
+        })
         .to_owned();
     assert!(
         backend.polls.load(Ordering::SeqCst) >= 4,
         "the job must be polled through the empty `completed` states"
     );
 
-    // ── artifacts on disk ────────────────────────────────────────────────
-    assert_eq!(
-        std::fs::read_dir(action_dir.join("generated-media"))
-            .expect("generated-media staging directory")
-            .count(),
-        0,
-        "filed media must leave the staging directory"
+    // ── artifacts are persisted and their visible files resolve ──────────
+    assert!(
+        !action_dir.join("generated-media").exists(),
+        "blob-backed generation must not leave a filesystem staging directory"
     );
-    let mut saved: Vec<(String, Vec<u8>)> = [image_id, video_id]
-        .iter()
-        .flat_map(|id| {
-            std::fs::read_dir(config.workspace_dir.join("artifacts").join(id))
-                .expect("filed artifact directory")
-                .map(|entry| entry.unwrap().path())
-                .filter(|path| path.extension().is_some_and(|ext| ext != "json"))
-                .map(|path| {
-                    (
-                        path.extension().unwrap().to_string_lossy().into_owned(),
-                        std::fs::read(&path).unwrap(),
-                    )
-                })
-                .collect::<Vec<_>>()
+    for (id, kind) in [(&image_id, "image"), (&video_id, "video")] {
+        let record = openhuman_core::artifacts::ops::ai_get_artifact(&config, id)
+            .await
+            .expect("filed artifact record")
+            .value;
+        assert_eq!(record["kind"], kind);
+        assert_eq!(record["status"], "ready");
+        let path = std::path::Path::new(
+            record["absolute_path"]
+                .as_str()
+                .expect("resolved artifact path"),
+        );
+        assert!(path.starts_with(&files_dir), "{path:?}");
+        assert!(path.is_file(), "{path:?}");
+    }
+    let mut saved: Vec<(String, Vec<u8>)> = std::fs::read_dir(&files_dir)
+        .expect("visible files folder")
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.is_file())
+        .map(|path| {
+            (
+                path.extension().unwrap().to_string_lossy().into_owned(),
+                std::fs::read(&path).unwrap(),
+            )
         })
         .collect();
     saved.sort();

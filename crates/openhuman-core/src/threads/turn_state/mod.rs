@@ -1,11 +1,13 @@
 //! Restart-survivable snapshots of in-flight agent turns.
 //!
-//! [`store::TurnStateStore`] is the persistence layer: one JSON file per
-//! turn under the workspace, written atomically and serialized through a
-//! process-wide mutex; `mark_all_interrupted` flags any non-terminal
-//! snapshot left over from an unclean shutdown at cold boot.
-//! [`mirror::TurnStateMirror`] is the writer — it translates
-//! [`crate::agent::progress::AgentProgress`] events into [`types::TurnState`]
+//! The `tinyagents_session::port::TurnStates` port is the persistence layer
+//! (reached through `storage::sessions::turn_states_for`): one snapshot per
+//! turn in the storage backend, so a thread's turn state survives a restart;
+//! `mark_all_interrupted` flags any non-terminal snapshot left over from an
+//! unclean shutdown at cold boot.
+//! `tinyagents_session::turn_state::TurnStateMirror` is the writer — it is driven by
+//! [`mirror::ObserveProgress`], which translates
+//! [`crate::progress::AgentProgress`] events into [`types::TurnState`]
 //! mutations and flushes to the store at iteration / tool boundaries (not on
 //! every streaming delta), keeping `Completed` snapshots so the UI can replay
 //! a finished turn.
@@ -19,14 +21,9 @@
 //! picture.
 
 pub mod mirror;
-pub mod store;
-pub mod types;
+pub mod rpc_types;
 
-pub use mirror::TurnStateMirror;
-
-pub use store::TurnStateStore;
-pub use types::{
+pub use rpc_types::{
     ClearTurnStateRequest, ClearTurnStateResponse, GetTurnStateForRequestRequest,
-    GetTurnStateRequest, GetTurnStateResponse, ListTurnStatesResponse, SubagentActivity,
-    SubagentToolCall, ToolTimelineEntry, ToolTimelineStatus, TurnLifecycle, TurnPhase, TurnState,
+    GetTurnStateRequest, GetTurnStateResponse, ListTurnStatesResponse,
 };

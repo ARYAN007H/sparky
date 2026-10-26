@@ -32,8 +32,49 @@ impl tinytools::Tool for Marker {
     }
 }
 
-fn definition() -> crate::agent::harness::definition::AgentDefinition {
+fn definition() -> crate::agent_registry::host_definition::AgentDefinition {
     super::wildcard_probe_def()
+}
+
+#[test]
+fn host_scope_additions_respect_named_and_withheld_tools() {
+    let mut definition = definition();
+    definition.tools =
+        tinyagents_definition::ToolScope::Named(vec!["base".into(), "already_withheld".into()]);
+    definition.extra_tools = vec!["already_withheld".into(), "base".into()];
+    let host_tools = super::super::host_tools::MergedHostTurnTools {
+        policy: None,
+        withheld: std::collections::HashSet::from(["already_withheld".into(), "hidden".into()]),
+        permanent: std::collections::HashSet::new(),
+        scope_additions: std::collections::HashSet::from(["host_visible".into()]),
+    };
+
+    let resolved = super::super::host_tools::scope_def(Some(&definition), &host_tools).unwrap();
+    assert!(matches!(
+        &resolved.tools,
+        tinyagents_definition::ToolScope::Named(names)
+            if names.len() == 1 && names[0] == "base"
+    ));
+    assert_eq!(resolved.extra_tools, vec!["base", "host_visible"]);
+}
+
+#[test]
+fn host_scope_additions_leave_wildcard_definitions_unchanged() {
+    let mut definition = definition();
+    definition.extra_tools = vec!["existing".into()];
+    let host_tools = super::super::host_tools::MergedHostTurnTools {
+        policy: None,
+        withheld: std::collections::HashSet::from(["existing".into()]),
+        permanent: std::collections::HashSet::new(),
+        scope_additions: std::collections::HashSet::from(["host_visible".into()]),
+    };
+
+    let resolved = super::super::host_tools::scope_def(Some(&definition), &host_tools).unwrap();
+    assert_eq!(resolved.extra_tools, vec!["existing"]);
+    assert!(matches!(
+        resolved.tools,
+        tinyagents_definition::ToolScope::Wildcard
+    ));
 }
 
 /// The whole point: a name the host supplied is callable, and the model is
@@ -48,6 +89,7 @@ fn a_host_tool_is_on_the_belt_and_advertised() {
     });
 
     let agent = crate::agent::OpenHumanSessionHost::from_config_with_host_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &definition(),
         &host,
@@ -61,6 +103,91 @@ fn a_host_tool_is_on_the_belt_and_advertised() {
             .iter()
             .any(|spec| spec.name == "oc_marker_tool"),
         "a host tool must be advertised to the provider by its own name"
+    );
+}
+
+/// A host can hide a config-derived tool for one turn without changing the
+/// agent's static scope or the tool belt used on its other turns.
+#[test]
+fn a_host_can_withhold_a_config_tool_for_one_turn() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let normally_visible = crate::agent::OpenHumanSessionHost::from_config_with_definition(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &definition(),
+    )
+    .expect("build a session without a host belt")
+    .visible_tool_specs_arc()
+    .first()
+    .map(|spec| spec.name.clone())
+    .expect("the config-derived belt advertises at least one tool");
+
+    let host: crate::agent::HostTools = {
+        let normally_visible = normally_visible.clone();
+        Arc::new(move |turn| crate::agent::HostTurnTools {
+            withheld: match turn.session_id() {
+                Some("hidden-turn") => std::collections::HashSet::from([normally_visible.clone()]),
+                _ => std::collections::HashSet::new(),
+            },
+            ..Default::default()
+        })
+    };
+    let hidden_turn = crate::agent::OpenHumanSessionHost::from_config_with_host_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &definition(),
+        &host,
+        Some("hidden-turn"),
+    )
+    .expect("build a session with a per-turn withheld name");
+
+    assert!(
+        !hidden_turn
+            .visible_tool_specs_arc()
+            .iter()
+            .any(|spec| spec.name == normally_visible),
+        "a per-turn host withholding must remove a config-derived tool from the provider view"
+    );
+
+    let visible_turn = crate::agent::OpenHumanSessionHost::from_config_with_host_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &definition(),
+        &host,
+        Some("visible-turn"),
+    )
+    .expect("build the next session without the temporary withholding");
+    assert!(
+        visible_turn
+            .visible_tool_specs_arc()
+            .iter()
+            .any(|spec| spec.name == normally_visible),
+        "a withholding for one turn must not alter the agent's next provider view"
+    );
+}
+
+#[test]
+fn withholding_tool_search_disables_wildcard_discovery() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let host: crate::agent::HostTools = Arc::new(|_| crate::agent::HostTurnTools {
+        withheld: std::collections::HashSet::from([tinytools::TOOL_SEARCH_NAME.to_string()]),
+        ..Default::default()
+    });
+
+    let agent = crate::agent::OpenHumanSessionHost::from_config_with_host_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &definition(),
+        &host,
+        None,
+    )
+    .expect("build a wildcard session with discovery withheld");
+
+    assert!(
+        agent.deferred_tool_names.is_empty(),
+        "withholding tool_search must also make deferred tools unreachable"
     );
 }
 
@@ -84,6 +211,7 @@ fn the_factory_runs_once_per_session_build() {
 
     for _ in 0..2 {
         crate::agent::OpenHumanSessionHost::from_config_with_host_tools(
+            &crate::core::runtime::DispatchCtx::ambient(),
             &config,
             &definition(),
             &host,
@@ -99,15 +227,56 @@ fn the_factory_runs_once_per_session_build() {
     );
 }
 
+#[test]
+fn invalid_dynamic_prompt_fails_before_the_host_tool_factory_runs() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let mut definition = definition();
+    definition.system_prompt = tinyagents_definition::PromptSource::Dynamic(());
+    definition.extensions.prompt_builder = None;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let host: crate::agent::HostTools = {
+        let calls = Arc::clone(&calls);
+        Arc::new(move |_| {
+            calls.fetch_add(1, Ordering::SeqCst);
+            crate::agent::HostTurnTools::default()
+        })
+    };
+
+    let result = crate::agent::OpenHumanSessionHost::from_config_with_host_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &definition,
+        &host,
+        None,
+    );
+    let error = result
+        .err()
+        .expect("a dynamic prompt without a builder must be rejected");
+
+    assert!(
+        format!("{error:#}").contains("dynamic prompt but has no builder"),
+        "unexpected error: {error:#}"
+    );
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        0,
+        "prompt validation must fail before invoking host code"
+    );
+}
+
 /// A session built the ordinary way must be byte-identical to before this
 /// seam existed -- the factory is opt-in, and a `None` host adds nothing.
 #[test]
 fn no_host_belt_leaves_the_advertised_set_alone() {
     let tmp = tempfile::TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let agent =
-        crate::agent::OpenHumanSessionHost::from_config_with_definition(&config, &definition())
-            .expect("build a plain session");
+    let agent = crate::agent::OpenHumanSessionHost::from_config_with_definition(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &definition(),
+    )
+    .expect("build a plain session");
 
     assert!(
         !agent
@@ -147,6 +316,7 @@ fn the_factory_is_told_the_session_it_is_building_for() {
     };
 
     let desked = crate::agent::OpenHumanSessionHost::from_config_with_host_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &definition(),
         &host,
@@ -163,6 +333,7 @@ fn the_factory_is_told_the_session_it_is_building_for() {
     );
 
     let unnamed = crate::agent::OpenHumanSessionHost::from_config_with_host_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &definition(),
         &host,
@@ -204,13 +375,16 @@ fn a_host_tool_overrides_a_config_tool_of_the_same_name() {
     let config = test_config(&tmp);
 
     // A name the config-derived belt already carries, so the two collide.
-    let contested =
-        crate::agent::OpenHumanSessionHost::from_config_with_definition(&config, &definition())
-            .expect("build a session without a host belt")
-            .visible_tool_specs_arc()
-            .first()
-            .map(|spec| spec.name.clone())
-            .expect("the config-derived belt advertises at least one tool");
+    let contested = crate::agent::OpenHumanSessionHost::from_config_with_definition(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &definition(),
+    )
+    .expect("build a session without a host belt")
+    .visible_tool_specs_arc()
+    .first()
+    .map(|spec| spec.name.clone())
+    .expect("the config-derived belt advertises at least one tool");
 
     let host: crate::agent::HostTools = {
         let contested = contested.clone();
@@ -222,6 +396,7 @@ fn a_host_tool_overrides_a_config_tool_of_the_same_name() {
     };
 
     let agent = crate::agent::OpenHumanSessionHost::from_config_with_host_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &definition(),
         &host,
@@ -258,5 +433,112 @@ fn a_host_tool_overrides_a_config_tool_of_the_same_name() {
     assert_eq!(
         executable, "a test marker",
         "the tool that runs must be the host's, matching the spec advertised for it"
+    );
+}
+
+/// Attaching a permanent tool before turn one must retain the original wildcard
+/// native surface; the empty visible set is its builder sentinel.
+#[test]
+fn permanent_attachment_preserves_a_fresh_wildcard_belt() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let definition = definition();
+    let baseline = crate::agent::OpenHumanSessionHost::from_config_with_definition(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &definition,
+    )
+    .unwrap();
+    let original: std::collections::HashSet<_> = baseline
+        .visible_tool_specs_arc()
+        .iter()
+        .map(|spec| spec.name.clone())
+        .collect();
+    assert!(!original.is_empty());
+    let host: crate::agent::HostTools = Arc::new(|_| {
+        let mut tools =
+            crate::agent::HostTurnTools::advertised(vec![Box::new(Marker("attached_marker"))]);
+        tools.permanent.insert("attached_marker".into());
+        tools
+    });
+    let attached = crate::agent::OpenHumanSessionHost::from_config_with_host_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &definition,
+        &host,
+        None,
+    )
+    .unwrap();
+    let names: std::collections::HashSet<_> = attached
+        .visible_tool_specs_arc()
+        .iter()
+        .map(|spec| spec.name.clone())
+        .collect();
+    assert!(
+        original.is_subset(&names),
+        "native names lost: {:?}",
+        original.difference(&names).collect::<Vec<_>>()
+    );
+    assert!(names.contains("attached_marker"));
+}
+
+#[test]
+fn permanent_metadata_without_a_source_is_rejected_before_build() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let host: crate::agent::HostTools = Arc::new(|_| crate::agent::HostTurnTools {
+        permanent: std::collections::HashSet::from(["missing_source".into()]),
+        ..Default::default()
+    });
+    let error = crate::agent::OpenHumanSessionHost::from_config_with_host_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &definition(),
+        &host,
+        None,
+    )
+    .err()
+    .expect("inconsistent permanent metadata must be rejected");
+    assert!(error
+        .to_string()
+        .contains("permanent tool must have exactly one source: missing_source"));
+}
+
+/// The factory is told the context the session is built under, not the
+/// calling task's: a profile belt reads its tenant from it.
+#[test]
+fn the_factory_is_told_the_context_the_session_is_built_under() {
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+
+    let tmp = tempfile::TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let explicit = CoreContext::for_test(DomainSet::full(), None);
+    crate::agent::session_host::test_support::install_model_fixture_in(explicit.extensions());
+    let seen = Arc::new(std::sync::Mutex::new(Vec::<DispatchCtx>::new()));
+
+    let host: crate::agent::HostTools = {
+        let seen = Arc::clone(&seen);
+        Arc::new(move |turn: crate::agent::TurnContext<'_>| {
+            seen.lock().unwrap().push(turn.dispatch_ctx());
+            crate::agent::HostTurnTools::advertised(vec![Box::new(Marker("oc_ctx_tool"))])
+        })
+    };
+
+    crate::agent::OpenHumanSessionHost::from_config_with_host_tools(
+        &DispatchCtx::new(explicit.clone()),
+        &config,
+        &definition(),
+        &host,
+        None,
+    )
+    .expect("build a session under an explicit context");
+
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen.len(), 1);
+    assert!(
+        seen[0]
+            .core()
+            .is_some_and(|core| Arc::ptr_eq(core, &explicit)),
+        "the factory must see the context the session was built under"
     );
 }

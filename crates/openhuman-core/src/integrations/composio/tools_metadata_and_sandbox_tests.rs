@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::agent::harness::SandboxMode;
+use tinyagents_definition::SandboxMode;
 /// Every composio tool must report `ToolCategory::Workflow` so the
 /// skills sub-agent (`category_filter = "skill"`) picks them up.
 ///
@@ -52,7 +52,7 @@ fn list_toolkits_tool_metadata_is_stable() {
     assert!(s
         .get("required")
         .and_then(|r| r.as_array())
-        .map_or(true, |a| a.is_empty()));
+        .is_none_or(|a| a.is_empty()));
 }
 
 #[test]
@@ -134,7 +134,7 @@ async fn connect_tool_execute_rejects_missing_toolkit() {
 
 #[tokio::test]
 async fn connect_tool_refuses_without_interactive_chat_context() {
-    // No `APPROVAL_CHAT_CONTEXT` in scope → background/cron turn. There is no
+    // No chat approval context → background/cron turn. There is no
     // surface for the Connect card, so the tool must fail closed (it returns
     // before touching the network).
     let t = ComposioConnectTool::new(fake_config_arc());
@@ -174,9 +174,19 @@ fn canonicalize_toolkit_slug_maps_known_aliases_and_passes_through() {
     assert_eq!(super::super::canonicalize_toolkit_slug("gmail"), "gmail");
 }
 
+/// The execution context the harness hands a tool dispatched inside a turn
+/// whose chat is `chat`.
+fn chat_tool_context(
+    chat: crate::security::approval::ApprovalChatContext,
+) -> tinyagents_harness::tool::ToolExecutionContext {
+    crate::agent::tinyagents::host::run_context::tool_context_with_approval(
+        crate::security::approval::ApprovalTurnContext::chat(chat),
+    )
+}
+
 #[tokio::test]
 async fn connect_tool_validates_before_gating_in_chat_context() {
-    use crate::security::approval::{ApprovalChatContext, APPROVAL_CHAT_CONTEXT};
+    use crate::security::approval::ApprovalChatContext;
     // With a chat context the interactive guard passes; with no composio
     // credentials the client factory errors — so execute canonicalizes the
     // slug, reloads config, checks connected state, and returns a clean error
@@ -188,10 +198,11 @@ async fn connect_tool_validates_before_gating_in_chat_context() {
         client_id: "c-test".into(),
         request_id: None,
     };
-    let result = APPROVAL_CHAT_CONTEXT
-        .scope(
-            ctx,
-            tool.execute(serde_json::json!({ "toolkit": "google_drive" })),
+    let result = tool
+        .execute_with_context(
+            serde_json::json!({ "toolkit": "google_drive" }),
+            tinytools::ToolCallOptions::default(),
+            Some(&chat_tool_context(ctx)),
         )
         .await
         .unwrap();
@@ -301,7 +312,33 @@ fn agent_tools_skip_registration_when_no_credentials_at_all() {
 }
 
 #[test]
+fn agent_tools_are_all_removed_when_composio_is_disabled_even_if_signed_in() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = crate::config::Config::default();
+    config.config_path = tmp.path().join("config.toml");
+    crate::security::credentials::AuthService::from_config(&config)
+        .store_provider_token(
+            crate::security::credentials::APP_SESSION_PROVIDER,
+            crate::security::credentials::DEFAULT_AUTH_PROFILE_NAME,
+            "test-token",
+            std::collections::HashMap::new(),
+            true,
+        )
+        .expect("store test session token");
+    config.composio.mode = "disabled".into();
+    let names: Vec<String> = all_composio_agent_tools(&config)
+        .iter()
+        .map(|t| t.name().to_string())
+        .collect();
+    assert!(
+        names.is_empty(),
+        "no composio tool (incl. composio_connect) may register: {names:?}"
+    );
+}
+
+#[test]
 fn agent_tools_register_when_backend_signed_in() {
+    crate::integrations::composio::test_backend_route::register();
     let tmp = tempfile::tempdir().unwrap();
     let mut config = crate::config::Config::default();
     config.config_path = tmp.path().join("config.toml");
@@ -353,11 +390,11 @@ fn agent_tools_register_when_direct_mode_with_stored_key_and_no_backend_session(
 #[tokio::test]
 async fn sandbox_read_only_blocks_write_scope_action() {
     let t = ComposioExecuteTool::new(fake_config_arc());
-    let result = crate::agent::harness::with_current_sandbox_mode(SandboxMode::ReadOnly, async {
-        t.execute(serde_json::json!({ "tool": "GMAIL_SEND_EMAIL" }))
-            .await
-            .unwrap()
-    })
+    let result = execute_in_agent_mode(
+        &t,
+        serde_json::json!({ "tool": "GMAIL_SEND_EMAIL" }),
+        SandboxMode::ReadOnly,
+    )
     .await;
     assert!(
         result.is_error,
@@ -371,11 +408,11 @@ async fn sandbox_read_only_blocks_write_scope_action() {
 #[tokio::test]
 async fn sandbox_read_only_blocks_admin_scope_action() {
     let t = ComposioExecuteTool::new(fake_config_arc());
-    let result = crate::agent::harness::with_current_sandbox_mode(SandboxMode::ReadOnly, async {
-        t.execute(serde_json::json!({ "tool": "GMAIL_DELETE_EMAIL" }))
-            .await
-            .unwrap()
-    })
+    let result = execute_in_agent_mode(
+        &t,
+        serde_json::json!({ "tool": "GMAIL_DELETE_EMAIL" }),
+        SandboxMode::ReadOnly,
+    )
     .await;
     assert!(result.is_error);
     let msg = error_text(&result);
@@ -396,10 +433,10 @@ async fn sandbox_read_only_passes_through_read_scope_actions_to_downstream_gates
     // config nor races the shared env var against the other
     // config-loading composio tests.
     use crate::config::TEST_ENV_LOCK;
-    let _env_guard = TEST_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _env_guard = TEST_ENV_LOCK.lock().await;
 
     let tmp = tempfile::tempdir().expect("tempdir");
-    let _workspace_guard = WorkspaceEnvGuard::set(tmp.path());
+    let _workspace_guard = EnvVarGuard::workspace_unlocked(tmp.path());
 
     let mut config = crate::config::Config::default();
     config.config_path = tmp.path().join("config.toml");
@@ -407,11 +444,11 @@ async fn sandbox_read_only_passes_through_read_scope_actions_to_downstream_gates
     config.save().await.expect("save fake config to disk");
 
     let t = ComposioExecuteTool::new(Arc::new(config));
-    let result = crate::agent::harness::with_current_sandbox_mode(SandboxMode::ReadOnly, async {
-        t.execute(serde_json::json!({ "tool": "GMAIL_FETCH_EMAILS" }))
-            .await
-            .unwrap()
-    })
+    let result = execute_in_agent_mode(
+        &t,
+        serde_json::json!({ "tool": "GMAIL_FETCH_EMAILS" }),
+        SandboxMode::ReadOnly,
+    )
     .await;
     let msg = error_text(&result);
     assert!(
@@ -422,7 +459,7 @@ async fn sandbox_read_only_passes_through_read_scope_actions_to_downstream_gates
 
 #[tokio::test]
 async fn sandbox_unset_leaves_all_scopes_to_downstream_gates() {
-    // Outside any `with_current_sandbox_mode` scope the task-local
+    // Without an explicit agent context there is no agent-specific mode; the tool
     // returns `None` and the gate becomes a no-op (backward
     // compatible — this is the CLI / JSON-RPC / unit-test path).
     //
@@ -432,10 +469,10 @@ async fn sandbox_unset_leaves_all_scopes_to_downstream_gates() {
     // so this test neither reads the dev's real config nor races the
     // shared env var against the other config-loading composio tests.
     use crate::config::TEST_ENV_LOCK;
-    let _env_guard = TEST_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _env_guard = TEST_ENV_LOCK.lock().await;
 
     let tmp = tempfile::tempdir().expect("tempdir");
-    let _workspace_guard = WorkspaceEnvGuard::set(tmp.path());
+    let _workspace_guard = EnvVarGuard::workspace_unlocked(tmp.path());
 
     let mut config = crate::config::Config::default();
     config.config_path = tmp.path().join("config.toml");
@@ -467,10 +504,10 @@ async fn sandbox_sandboxed_mode_does_not_trigger_readonly_gate() {
     // config nor races the shared env var against the other
     // config-loading composio tests.
     use crate::config::TEST_ENV_LOCK;
-    let _env_guard = TEST_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _env_guard = TEST_ENV_LOCK.lock().await;
 
     let tmp = tempfile::tempdir().expect("tempdir");
-    let _workspace_guard = WorkspaceEnvGuard::set(tmp.path());
+    let _workspace_guard = EnvVarGuard::workspace_unlocked(tmp.path());
 
     let mut config = crate::config::Config::default();
     config.config_path = tmp.path().join("config.toml");
@@ -478,11 +515,11 @@ async fn sandbox_sandboxed_mode_does_not_trigger_readonly_gate() {
     config.save().await.expect("save fake config to disk");
 
     let t = ComposioExecuteTool::new(Arc::new(config));
-    let result = crate::agent::harness::with_current_sandbox_mode(SandboxMode::Sandboxed, async {
-        t.execute(serde_json::json!({ "tool": "GMAIL_SEND_EMAIL" }))
-            .await
-            .unwrap()
-    })
+    let result = execute_in_agent_mode(
+        &t,
+        serde_json::json!({ "tool": "GMAIL_SEND_EMAIL" }),
+        SandboxMode::Sandboxed,
+    )
     .await;
     let msg = error_text(&result);
     assert!(
@@ -660,4 +697,22 @@ fn empty_uncurated_toolkits_message_names_agent_unsupported_toolkits() {
 fn empty_uncurated_toolkits_message_ignores_catalogued_toolkits() {
     assert!(empty_uncurated_toolkits_message(&["gmail".to_string()]).is_none());
     assert!(empty_uncurated_toolkits_message(&["googlesheets".to_string()]).is_none());
+}
+
+/// Builds the same typed operation carrier the harness passes to real tools.
+async fn execute_in_agent_mode(
+    tool: &dyn Tool,
+    args: serde_json::Value,
+    mode: SandboxMode,
+) -> tinytools::ToolResult {
+    let mut host = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+    host.sandbox_mode = Some(mode);
+    let run = host.into_tinyagents(tinyagents_harness::context::RunConfig::new("composio-test"));
+    let context = tinyagents_harness::tool::ToolExecutionContext::from_run_context(
+        &run,
+        tinyagents_harness::ids::CallId::new("execute"),
+    );
+    tool.execute_with_context(args, Default::default(), Some(&context))
+        .await
+        .unwrap()
 }

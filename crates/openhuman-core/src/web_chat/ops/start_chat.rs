@@ -10,17 +10,18 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::core::events::DomainEvent;
-use crate::core::socketio::WebChannelEvent;
 use crate::security::prompt_injection::{
     enforce_prompt_input, PromptEnforcementAction, PromptEnforcementContext,
 };
+use crate::web_chat::WebChannelEvent;
 
-use super::super::event_bus::publish_web_channel_event;
+use super::super::event_bus::publish_web_channel_event_in;
 use super::super::run_task::run_chat_task;
 use super::super::types::{ChatRequestMetadata, InFlightEntry, QueueMode};
 use super::super::web_errors::classify_inference_error;
+use super::followups::dispatch_followups;
 use super::parallel_turn::spawn_parallel_turn;
-use super::state::{cancel_in_flight_gracefully, key_for, IN_FLIGHT};
+use super::state::{cancel_in_flight_gracefully, in_flight, key_for};
 use super::turn_guards::{
     run_turn_under_cancel_and_deadline, sentry_suppression_reason, timeout_bound_tag,
 };
@@ -41,7 +42,7 @@ pub enum StartChatError {
     Guardrail {
         verdict: String,
         score: f64,
-        reasons: Vec<crate::core::socketio::GuardrailReason>,
+        reasons: Vec<crate::web_chat::GuardrailReason>,
     },
     Other(String),
 }
@@ -104,7 +105,7 @@ impl From<StartChatError> for String {
                 score,
                 reasons,
             } => {
-                let payload = crate::core::socketio::GuardrailPayload {
+                let payload = crate::web_chat::GuardrailPayload {
                     verdict,
                     score,
                     reasons,
@@ -119,12 +120,6 @@ impl From<StartChatError> for String {
     }
 }
 
-/// Whether `msg` is the [`GUARDRAIL_ERROR_PREFIX`] sentinel — mirrors
-/// [`crate::core::observability::is_backend_unavailable_message`].
-pub fn is_guardrail_error_message(msg: &str) -> bool {
-    msg.starts_with(GUARDRAIL_ERROR_PREFIX)
-}
-
 fn prompt_guard_user_message(action: PromptEnforcementAction) -> &'static str {
     match action {
         PromptEnforcementAction::Allow => "Message accepted.",
@@ -137,7 +132,39 @@ fn prompt_guard_user_message(action: PromptEnforcementAction) -> &'static str {
     }
 }
 
-pub async fn start_chat(
+/// Returned boxed and `#[inline(never)]` on purpose: other crates await this
+/// (`openhuman-rpc`, `openhuman-embed`), and an `async fn` body is otherwise
+/// re-instantiated inside every calling crate's state machine. Boxing here
+/// keeps one copy, compiled in this crate.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+pub fn start_chat<'a>(
+    ctx: &'a crate::core::runtime::DispatchCtx,
+    client_id: &'a str,
+    thread_id: &'a str,
+    message: &'a str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    locale: Option<String>,
+    queue_mode: Option<String>,
+    metadata: ChatRequestMetadata,
+) -> futures::future::BoxFuture<'a, Result<String, StartChatError>> {
+    Box::pin(start_chat_inner(
+        ctx,
+        client_id,
+        thread_id,
+        message,
+        model_override,
+        temperature,
+        locale,
+        queue_mode,
+        metadata,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn start_chat_inner(
+    ctx: &crate::core::runtime::DispatchCtx,
     client_id: &str,
     thread_id: &str,
     message: &str,
@@ -160,57 +187,37 @@ pub async fn start_chat(
     if message.is_empty() {
         return Err(StartChatError::Other("message is required".to_string()));
     }
+    // A profile this node no longer hosts (its lease was lost or released)
+    // starts no new turn here. No-op outside SaaS.
+    crate::profiles::host::ensure_hosted(ctx).map_err(StartChatError::Other)?;
 
-    // [pdf/image-attach fix] Process attachments at ingress, BEFORE the message is
-    // injection-scanned, persisted to history/JSONL, or auto-saved to the memory
-    // store. Otherwise a multi-MB base64 data URI floods every upstream stage
-    // (N-chunk embed → Voyage 400, cross-thread index) and stalls the turn.
-    //   [FILE:data:…]  → [FILE-EXTRACTED]text (or [FILE-ATTACHED] placeholder)
-    //   [IMAGE:data:…] → [Image: … #att:<id>] placeholder + out-of-band stash
-    // Images are rehydrated to a data URI at provider dispatch for vision-capable
-    // models only.
+    // Save originals before scanning, history, memory, or queue persistence.
+    // A missing config/root cannot safely accept an upload.
     let mut message = if message.contains("[FILE:") || message.contains("[IMAGE:") {
-        let before_chars = message.chars().count();
-        log::debug!(
-            "[web-channel][ingress] preprocessing attachment markers thread_id={} client_id={} chars={}",
-            thread_id,
-            client_id,
-            before_chars
-        );
-        // Fail CLOSED on a config-load error: process with default limits rather
-        // than passing the raw `[FILE:data:…]`/`[IMAGE:data:…]` blob through —
-        // otherwise the injection scan, history/JSONL persistence, and memory
-        // autosave all see the multi-MB data URI again, reopening the flood path.
-        let (file_cfg, image_cfg) = match crate::config::rpc::load_config_with_timeout().await {
-            Ok(cfg) => {
-                log::debug!(
-                    "[web-channel][ingress] using configured multimodal limits thread_id={}",
-                    thread_id
-                );
-                (cfg.multimodal_files, cfg.multimodal)
-            }
-            Err(err) => {
-                log::warn!(
-                    "[web-channel][ingress] config load failed; using default limits (fail-closed) thread_id={} err={err}",
-                    thread_id
-                );
-                (
-                    crate::config::MultimodalFileConfig::default(),
-                    crate::config::MultimodalConfig::default(),
-                )
-            }
-        };
-        let extracted =
-            crate::agent::multimodal::inline_file_attachments(&message, &file_cfg).await;
-        let processed =
-            crate::agent::multimodal::stash_image_attachments(&extracted, &image_cfg).await;
-        log::debug!(
-            "[web-channel][ingress] attachment preprocessing complete thread_id={} before_chars={} after_chars={}",
-            thread_id,
-            before_chars,
-            processed.chars().count()
-        );
-        processed
+        let config = ctx.load_config().await.map_err(|error| {
+            StartChatError::Other(format!("upload configuration unavailable: {error}"))
+        })?;
+        // Stage where the turn will read: the thread's working folder when
+        // one is bound (`run_task` applies the same folder), else action_dir.
+        let workspace = crate::attachments::thread_action_dir(
+            ctx,
+            &config,
+            &config.workspace_dir,
+            Some(&thread_id),
+        )
+        .await
+        .map_err(|error| StartChatError::Other(format!("upload could not be saved: {error}")))?;
+        crate::attachments::stage(
+            &message,
+            &thread_id,
+            &config,
+            &crate::attachments::AttachmentAccessScope {
+                external_channel: false,
+                workspace: Some(workspace),
+            },
+        )
+        .await
+        .map_err(|error| StartChatError::Other(format!("upload could not be saved: {error}")))?
     } else {
         message
     };
@@ -258,7 +265,7 @@ pub async fn start_chat(
             reasons: prompt_decision
                 .reasons
                 .iter()
-                .map(|r| crate::core::socketio::GuardrailReason {
+                .map(|r| crate::web_chat::GuardrailReason {
                     code: r.code.clone(),
                     message: r.message.clone(),
                 })
@@ -312,7 +319,7 @@ pub async fn start_chat(
     // The message here is post-attachment-processing, so a hook sees extracted
     // text and placeholders rather than a multi-megabyte data URI on stdin.
     match crate::hooks::ops::prompt_submitted(
-        crate::hooks::context::TurnIdentity {
+        tinyagents_hooks::command::context::TurnIdentity {
             conversation_id: Some(thread_id.clone()),
             ..Default::default()
         },
@@ -342,9 +349,9 @@ pub async fn start_chat(
     // A fresh accepted user request is the explicit boundary after Stop. Keep
     // the gate installed through validation and registry cancellation so a
     // child registering late cannot deliver into the stopped generation.
-    crate::agent::orchestration::background_completions::resume_stopped_thread(&thread_id);
+    crate::agent::orchestration::background_completions::resume_stopped_thread(ctx, &thread_id);
 
-    let map_key = key_for(&thread_id);
+    let map_key = key_for(ctx, &thread_id);
 
     let parsed_mode = match queue_mode.as_deref() {
         Some("steer") => QueueMode::Steer,
@@ -364,6 +371,7 @@ pub async fn start_chat(
             request_id
         );
         spawn_parallel_turn(
+            ctx,
             &client_id,
             &thread_id,
             request_id.clone(),
@@ -379,7 +387,7 @@ pub async fn start_chat(
 
     // Non-interrupt modes: push into the running turn's queue and return.
     if !matches!(parsed_mode, QueueMode::Interrupt) {
-        let in_flight = IN_FLIGHT.lock().await;
+        let in_flight = in_flight(ctx).lock_owned().await;
         if let Some(existing) = in_flight.get(&map_key) {
             let item_id = uuid::Uuid::new_v4().to_string();
             let text_preview = crate::agent::queued_turn::text_preview(&message);
@@ -433,7 +441,7 @@ pub async fn start_chat(
     }
 
     {
-        let mut in_flight = IN_FLIGHT.lock().await;
+        let mut in_flight = in_flight(ctx).lock_owned().await;
 
         if let Some(existing) = in_flight.remove(&map_key) {
             let cancelled_id = cancel_in_flight_gracefully(existing);
@@ -448,27 +456,33 @@ pub async fn start_chat(
                 item_id: Some(request_id.clone()),
                 text_preview: Some(crate::agent::queued_turn::text_preview(&message)),
             });
-            publish_web_channel_event(WebChannelEvent {
-                event: "chat_error".to_string(),
-                client_id: client_id.clone(),
-                thread_id: thread_id.clone(),
-                request_id: cancelled_id.clone(),
-                message: Some("Cancelled by newer request".to_string()),
-                error_type: Some("cancelled".to_string()),
-                ..Default::default()
-            });
+            publish_web_channel_event_in(
+                ctx,
+                WebChannelEvent {
+                    event: "chat_error".to_string(),
+                    client_id: client_id.clone(),
+                    thread_id: thread_id.clone(),
+                    request_id: cancelled_id.clone(),
+                    message: Some("Cancelled by newer request".to_string()),
+                    error_type: Some("cancelled".to_string()),
+                    ..Default::default()
+                },
+            );
             // See channel_ops::cancel_chat_inner — `chat_cancelled` is the
             // structured successor to `chat_error{error_type:"cancelled"}`,
             // kept alongside it for one release.
-            publish_web_channel_event(WebChannelEvent {
-                event: "chat_cancelled".to_string(),
-                client_id: client_id.clone(),
-                thread_id: thread_id.clone(),
-                request_id: cancelled_id,
-                cancel_reason: Some("superseded".to_string()),
-                superseded_by: Some(request_id.clone()),
-                ..Default::default()
-            });
+            publish_web_channel_event_in(
+                ctx,
+                WebChannelEvent {
+                    event: "chat_cancelled".to_string(),
+                    client_id: client_id.clone(),
+                    thread_id: thread_id.clone(),
+                    request_id: cancelled_id,
+                    cancel_reason: Some("superseded".to_string()),
+                    superseded_by: Some(request_id.clone()),
+                    ..Default::default()
+                },
+            );
         }
     }
 
@@ -487,6 +501,7 @@ pub async fn start_chat(
     let task_cancel_token = cancel_token.clone();
 
     let user_message = message.clone();
+    let ctx_task = ctx.clone();
     let handle = tokio::spawn(crate::core::runtime::context::CoreContext::propagate(
         async move {
             let approval_ctx = crate::security::approval::ApprovalChatContext {
@@ -494,7 +509,7 @@ pub async fn start_chat(
                 client_id: client_id_task.clone(),
                 request_id: Some(request_id_task.clone()),
             };
-            let origin = crate::agent::turn_origin::AgentTurnOrigin::WebChat {
+            let origin = crate::security::turn_origin::AgentTurnOrigin::WebChat {
                 thread_id: thread_id_task.clone(),
                 client_id: client_id_task.clone(),
                 request_id: Some(request_id_task.clone()),
@@ -503,21 +518,29 @@ pub async fn start_chat(
             // result; the interrupting/cancelling side already emitted the
             // user-facing `chat_error`, so we just unwind quietly here.
             let result = run_turn_under_cancel_and_deadline(
+                &ctx_task,
                 task_cancel_token,
-                origin,
+                origin.clone(),
                 approval_ctx,
-                run_chat_task(
-                    &client_id_task,
-                    &thread_id_task,
-                    &request_id_task,
-                    &user_message,
-                    model_override,
-                    temperature,
-                    locale,
-                    turn_run_queue_task,
-                    metadata,
-                    /* fork */ false,
-                ),
+                |host_env, activity, approval| {
+                    run_chat_task(
+                        &ctx_task,
+                        &client_id_task,
+                        &thread_id_task,
+                        &request_id_task,
+                        &user_message,
+                        model_override,
+                        temperature,
+                        locale,
+                        turn_run_queue_task,
+                        metadata,
+                        origin.clone(),
+                        /* fork */ false,
+                        host_env,
+                        activity,
+                        approval,
+                    )
+                },
             )
             .await;
 
@@ -533,7 +556,7 @@ pub async fn start_chat(
                     // Release any in-flight slot we still own and stop. The
                     // `request_id` guard below prevents clobbering a newer turn that
                     // replaced us on the interrupt path.
-                    let mut in_flight = IN_FLIGHT.lock().await;
+                    let mut in_flight = in_flight(&ctx_task).lock_owned().await;
                     if let Some(current) = in_flight.get(&map_key_task) {
                         if current.request_id == request_id_task {
                             in_flight.remove(&map_key_task);
@@ -544,29 +567,25 @@ pub async fn start_chat(
             };
 
             // A terminal socket event is also the UI's permission to submit a
-            // replacement turn.  Defer `chat_error` until after the in-flight
-            // slot below has been removed: publishing it while the failed slot
-            // is still present lets an immediate retry interrupt the dead run
-            // and inherit its failed model state.
+            // replacement turn. Defer both terminals until after the in-flight
+            // slot below has been removed: publishing either while the slot is
+            // still present lets the next message interrupt this finished run,
+            // which then gets a spurious "cancelled" chat_error (and, after a
+            // failure, lets an immediate retry inherit its failed model state).
+            // The reply is stored now, before the slot is released (#6034).
+            let mut deferred_done = None;
             let deferred_error = match result {
                 Ok(chat_result) => {
-                    crate::web_chat::presentation::deliver_response(
-                        &client_id_task,
+                    crate::web_chat::presentation::persist_reply(
+                        &ctx_task,
                         &thread_id_task,
                         &request_id_task,
                         &chat_result.full_response,
-                        &user_message,
                         &chat_result.citations,
-                        chat_result.usage.as_ref(),
-                        // The workspace the turn ran in, so the reply is stored
-                        // there before it is announced (#6034).
                         Some(chat_result.workspace_dir.as_path()),
-                        chat_result.timing,
-                        // The main single-user turn is the only surface with
-                        // a human waiting on a next-message suggestion (C5).
-                        true,
                     )
                     .await;
+                    deferred_done = Some(chat_result);
                     None
                 }
                 Err(err) => {
@@ -625,6 +644,8 @@ pub async fn start_chat(
                         error_retry_after_ms: classified.retry_after_ms,
                         error_provider: classified.provider,
                         error_fallback_available: classified.fallback_available,
+                        copy_key: Some(classified.copy_key.to_string()),
+                        copy_params: classified.copy_params,
                         ..Default::default()
                     })
                 }
@@ -632,7 +653,7 @@ pub async fn start_chat(
 
             // Drain followup messages queued during this turn.
             let followups = {
-                let mut in_flight = IN_FLIGHT.lock().await;
+                let mut in_flight = in_flight(&ctx_task).lock_owned().await;
                 let followups = if let Some(current) = in_flight.get(&map_key_task) {
                     if current.request_id == request_id_task {
                         let fups = current.run_queue.drain(QueueLane::Followup).await;
@@ -650,8 +671,24 @@ pub async fn start_chat(
             // Socket subscribers then observe the old terminal event before
             // any inference_start from the follow-up, even if it starts at
             // once on another task.
+            if let Some(chat_result) = deferred_done {
+                crate::web_chat::presentation::announce_reply(
+                    &ctx_task,
+                    &client_id_task,
+                    &thread_id_task,
+                    &request_id_task,
+                    &chat_result.full_response,
+                    &user_message,
+                    &chat_result.citations,
+                    chat_result.usage.as_ref(),
+                    chat_result.timing,
+                    // The main single-user turn is the only surface with a
+                    // human waiting on a next-message suggestion (C5).
+                    true,
+                );
+            }
             if let Some(event) = deferred_error {
-                publish_web_channel_event(event);
+                publish_web_channel_event_in(&ctx_task, event);
             }
             if !followups.is_empty() {
                 log::info!(
@@ -672,17 +709,18 @@ pub async fn start_chat(
                             .map(|f| crate::agent::queued_turn::text_preview(&f.text)),
                     },
                 );
-                dispatch_followups(followups);
+                dispatch_followups(&ctx_task, followups);
             }
         },
     ));
 
     {
-        let mut in_flight = IN_FLIGHT.lock().await;
+        let mut in_flight = in_flight(ctx).lock_owned().await;
         in_flight.insert(
             map_key,
             InFlightEntry {
                 request_id: request_id.clone(),
+                client_id: client_id.clone(),
                 handle,
                 run_queue: turn_run_queue,
                 cancel_token,
@@ -691,33 +729,6 @@ pub async fn start_chat(
     }
 
     Ok(request_id)
-}
-
-fn dispatch_followups(followups: Vec<crate::agent::queued_turn::QueuedTurn>) {
-    for fup in followups {
-        tokio::spawn(crate::core::runtime::context::CoreContext::propagate(
-            async move {
-                if let Err(err) = start_chat(
-                    &fup.client_id,
-                    &fup.thread_id,
-                    &fup.text,
-                    fup.model_override,
-                    fup.temperature,
-                    fup.locale,
-                    Some("followup".to_string()),
-                    ChatRequestMetadata::default(),
-                )
-                .await
-                {
-                    log::warn!(
-                        "[web-channel] failed to dispatch followup thread_id={} err={}",
-                        fup.thread_id,
-                        err
-                    );
-                }
-            },
-        ));
-    }
 }
 
 #[cfg(test)]

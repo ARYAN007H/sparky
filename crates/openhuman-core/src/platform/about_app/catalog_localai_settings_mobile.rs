@@ -4,32 +4,12 @@ use super::*;
 
 pub(super) const CAPABILITIES: &[Capability] = &[
 Capability {
-        id: "local_ai.download_model",
-        name: "Download Local Models",
-        domain: "local_ai",
-        category: CapabilityCategory::LocalAI,
-        description: "Download and bootstrap local AI runtimes and model bundles.",
-        how_to: "Downloaded by the core local-runtime module; progress surfaces in the download snackbar. No settings control exposes it since the local-model panel was removed (0ec68613af).",
-        status: CapabilityStatus::Beta,
-        privacy: MODEL_DOWNLOAD,
-    },
-Capability {
         id: "local_ai.configure_provider",
         name: "Configure Local Provider",
         domain: "local_ai",
         category: CapabilityCategory::LocalAI,
-        description: "Select Ollama, LM Studio, MLX, oMLX, or a generic local OpenAI-compatible server. Local chat inference does not require an OpenHuman account.",
+        description: "Point OpenHuman at a local runtime you run yourself: Ollama, LM Studio, MLX, oMLX, or a generic OpenAI-compatible server. OpenHuman does not install the runtime or download models; pull them in your runtime (e.g. `ollama pull <model>`). Local chat inference does not require an OpenHuman account.",
         how_to: "Connections → API keys → LLM, or use provider strings: ollama:<model>, lmstudio:<model>, mlx:<model>, omlx:<model>, local-openai:<model>",
-        status: CapabilityStatus::Beta,
-        privacy: None,
-    },
-Capability {
-        id: "local_ai.manage_model_assets",
-        name: "Manage Model Assets",
-        domain: "local_ai",
-        category: CapabilityCategory::LocalAI,
-        description: "Inspect asset status and download specific chat, vision, embedding, STT, or TTS assets.",
-        how_to: "Served by the core `inference_assets_status` / `inference_download_asset` methods; no settings control exposes it since the local-model panel was removed (0ec68613af).",
         status: CapabilityStatus::Beta,
         privacy: None,
     },
@@ -49,7 +29,7 @@ Capability {
         domain: "local_ai",
         category: CapabilityCategory::LocalAI,
         description: "Create local vector embeddings for text input.",
-        how_to: "Connections → API keys → Embeddings, or the core `inference_embed` method.",
+        how_to: "Connections → API keys → Embeddings, or the core `embeddings_embed` method.",
         status: CapabilityStatus::Beta,
         privacy: LOCAL_RAW,
     },
@@ -87,36 +67,11 @@ Capability {
         privacy: None,
     },
 Capability {
-        id: "local_ai.piper_installer",
-        name: "Piper Installer (Local TTS)",
-        domain: "local_ai",
-        category: CapabilityCategory::LocalAI,
-        description:
-            "One-click download of the Piper binary archive and the bundled en_US-lessac-medium \
-             voice (.onnx + .onnx.json) into the workspace so local Text-to-Speech runs without \
-             manual setup. Atomic rename guarantees no half-written voice files are ever read \
-             by the runtime.",
-        how_to: "Settings > Voice > Voice Providers > Install Piper",
-        status: CapabilityStatus::Beta,
-        privacy: MODEL_DOWNLOAD,
-    },
-Capability {
-        id: "local_ai.python_runtime_installer",
-        name: "Managed Python Runtime",
-        domain: "runtime_python",
-        category: CapabilityCategory::LocalAI,
-        description:
-            "Download and reuse an OpenHuman-managed CPython runtime for Python-backed local integrations such as MCP servers, with a system-Python override reserved for development.",
-        how_to: "Configured by the core `runtime_python` module; future UI surfaces can expose install state and overrides.",
-        status: CapabilityStatus::Beta,
-        privacy: MODEL_DOWNLOAD,
-    },
-Capability {
         id: "settings.configure_ai",
         name: "Configure AI",
         domain: "settings",
         category: CapabilityCategory::Settings,
-        description: "Configure managed, local, custom, and built-in BYOK LLM providers, including SumoPod and other OpenAI-compatible gateways, plus per-workload routing preferences.",
+        description: "Configure managed, local, custom, and built-in BYOK LLM providers, including SumoPod and other OpenAI-compatible gateways. Custom providers can trust an uploaded PEM CA certificate for model listing and inference. Set per-workload routing preferences here too.",
         how_to: "Connections → API keys → LLM",
         status: CapabilityStatus::Stable,
         privacy: None,
@@ -126,7 +81,7 @@ Capability {
         name: "Desktop Control",
         domain: "desktop",
         category: CapabilityCategory::Settings,
-        description: "Let agents inspect and control native desktop apps through a local, permission-aware connection. Desktop actions are discovered on demand.",
+        description: "Let agents inspect and control native desktop apps through a local, permission-aware connection. macOS only for now; Windows and Linux are not supported yet. Desktop actions are discovered on demand. Switched off by [components] computer = false, which unregisters the desktop tools and answers the desktop.* RPCs with COMPONENT_DISABLED:computer while keeping this machine's own consent setting untouched.",
         how_to: "Connections → Computer → Desktop; enable access and grant operating system permissions when requested",
         status: CapabilityStatus::Beta,
         privacy: DESKTOP_TO_JEV,
@@ -254,7 +209,7 @@ Capability {
         name: "Log Out and Clear App Data",
         domain: "settings",
         category: CapabilityCategory::Settings,
-        description: "Sign out and permanently clear local app data, including workflow data.",
+        description: "Sign out and permanently clear the signed-in account's local app data, including workflow data. Other accounts on the device are kept. Not available on the legacy single-folder data layout.",
         how_to: "Settings > Log Out & Clear App Data",
         status: CapabilityStatus::Stable,
         privacy: None,
@@ -414,8 +369,8 @@ Capability {
         category: CapabilityCategory::Settings,
         description: "Dedicated action directory for agent tools (shell, file, git), separate \
                       from internal application state. Agent tools default their working directory \
-                      and path resolution to the action sandbox, preventing accidental modification \
-                      of memory databases, session transcripts, tokens, and other internal state.",
+                      and path resolution to the action sandbox, preventing accidental changes to \
+                      local internal files or records in the configured storage backend.",
         how_to: "Settings → Agent OS access",
         status: CapabilityStatus::Stable,
         privacy: None,
@@ -431,7 +386,7 @@ Capability {
                       Configurable per agent/session/channel with safe defaults for non-main sessions.",
         how_to: "Set sandbox_mode = \"sandboxed\" in agent.toml, or configure runtime.kind = \
                  \"docker\" in the TOML config. Use openhuman.sandbox_status / \
-                 openhuman.sandbox_resolve_policy RPC to inspect.",
+                 openhuman.sandbox_resolve_policy RPC to inspect. Switched off by [components] sandbox = false (also set by the legacy [sandbox] enabled = false), which never loads the TinyBox module, runs commands unjailed under the Rust path checks, and answers COMPONENT_DISABLED:sandbox.",
         status: CapabilityStatus::Beta,
         privacy: None,
     },

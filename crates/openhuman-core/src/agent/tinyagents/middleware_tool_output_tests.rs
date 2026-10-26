@@ -1,50 +1,12 @@
 use crate::agent::tinyagents::middleware::tool_output::ToolOutputMiddleware;
 // Imported here rather than in the middleware module since #6014: the
-// production install site moved to `assemble_turn_harness` (which names it
+// production install site moved to `install_turn_middleware` (which names it
 // fully-qualified), so the module itself no longer references the type.
 use super::*;
+use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
+use tinyagents_harness::middleware::library::DEFAULT_CLEARED_PLACEHOLDER as CLEARED_PLACEHOLDER;
 use tinyagents_harness::middleware::MicrocompactMiddleware;
 use tinytools::{ToolRuntime, ToolTimeout};
-
-// #4462: image-aware token estimation. A base64 image marker must be priced
-// at the flat IMAGE_MARKER_TOKEN_COST, not chars/4 of its payload — otherwise
-// one image reads as millions of tokens and the trimmer evicts everything,
-// including the system prompt.
-
-#[test]
-fn estimate_text_tokens_markerless_is_chars_over_four() {
-    assert_eq!(estimate_text_tokens(&"a".repeat(40)), (40 + 3) / 4);
-    assert_eq!(estimate_text_tokens(""), 0);
-}
-
-#[test]
-fn estimate_text_tokens_prices_image_marker_flat_not_by_length() {
-    let huge = "x".repeat(40_000);
-    let text = format!("[IMAGE:{huge}]");
-    let tokens = estimate_text_tokens(&text);
-    // chars/4 of the payload would be ~10_000; the flat price is 1_200.
-    assert!(
-        tokens >= IMAGE_MARKER_TOKEN_COST,
-        "at least the flat image cost: {tokens}"
-    );
-    assert!(
-        tokens < 2_000,
-        "image priced flat, not by base64 length: {tokens}"
-    );
-}
-
-#[test]
-fn estimate_text_tokens_charges_each_image_marker_once() {
-    let tokens = estimate_text_tokens("[IMAGE:aaaa] and [IMAGE:bbbb]");
-    assert!(
-        tokens >= 2 * IMAGE_MARKER_TOKEN_COST,
-        "two images each priced: {tokens}"
-    );
-    assert!(
-        tokens < 2 * IMAGE_MARKER_TOKEN_COST + 100,
-        "no runaway from the surrounding text: {tokens}"
-    );
-}
 
 #[tokio::test]
 async fn unavailable_summarization_is_disclosed_in_the_payload() {
@@ -117,7 +79,14 @@ async fn a_summary_model_that_cannot_prepare_leaves_the_payload_intact() {
     // payload is untouched, and disclosed as unsummarized like any other
     // failed summary, so the model does not re-run the tool for one.
     struct Unpreparable;
-    impl PayloadSummarizer for Unpreparable {
+    impl
+        tinyagents_harness::summarization::payload_summarizer::PayloadSummarizer<
+            crate::agent::tinyagents::host::OpenHumanRunContext,
+        > for Unpreparable
+    {
+        type Prepared = crate::inference::tokenjuice::generate::PreparedGenerate;
+        type Error = anyhow::Error;
+
         fn prepare(
             &self,
             _parent_ctx: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
@@ -169,7 +138,7 @@ async fn raw_security_policy_block_is_enriched_with_workaround_and_relay() {
         result_text(&result)
     );
     assert!(result_text(&result).contains("Relay this to the user"));
-    assert!(result_text(&result).contains(crate::security::POLICY_BLOCKED_MARKER));
+    assert!(result_text(&result).contains(tinytools::status::POLICY_BLOCKED_MARKER));
     assert!(result_text(&result).contains("read-only mode"));
 }
 
@@ -200,7 +169,7 @@ fn defaults_enable_the_byte_cap_only() {
     let mw = TurnContextMiddleware::defaults();
     assert_eq!(
         mw.tool_result_budget_bytes,
-        DEFAULT_TOOL_RESULT_BUDGET_BYTES
+        tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes
     );
     assert!(mw.payload_summarizer.is_none());
     assert_eq!(mw.microcompact_keep_recent, 0);
@@ -257,31 +226,6 @@ async fn microcompact_clears_older_tool_bodies_and_keeps_recent() {
     assert_eq!(req.messages[3].text(), "thinking");
 }
 
-#[tokio::test]
-async fn microcompact_is_a_noop_when_within_keep_recent() {
-    let mw = MicrocompactMiddleware::new(5, CLEARED_PLACEHOLDER);
-    let mut req = ModelRequest::new(vec![TaMessage::tool("t1", "A"), TaMessage::tool("t2", "B")]);
-    mw.before_model(&mut ctx(), &(), &mut req).await.unwrap();
-    assert_eq!(req.messages[0].text(), "A");
-    assert_eq!(req.messages[1].text(), "B");
-}
-
-#[tokio::test]
-async fn microcompact_is_idempotent() {
-    let mw = MicrocompactMiddleware::new(1, CLEARED_PLACEHOLDER);
-    let mut req = ModelRequest::new(vec![
-        TaMessage::tool("t1", "FIRST"),
-        TaMessage::tool("t2", "SECOND"),
-    ]);
-    mw.before_model(&mut ctx(), &(), &mut req).await.unwrap();
-    let after_first = req.messages[0].text();
-    assert_eq!(after_first, CLEARED_PLACEHOLDER);
-    // Second pass leaves the already-cleared body as the placeholder.
-    mw.before_model(&mut ctx(), &(), &mut req).await.unwrap();
-    assert_eq!(req.messages[0].text(), CLEARED_PLACEHOLDER);
-    assert_eq!(req.messages[1].text(), "SECOND");
-}
-
 // ── ToolOutputMiddleware ────────────────────────────────────────────────
 
 #[tokio::test]
@@ -298,6 +242,7 @@ async fn tool_output_truncates_over_the_flat_budget() {
         focus_by_call: Default::default(),
         summary_focus_tools: Default::default(),
         raw_fetches: Default::default(),
+        file_reads: Default::default(),
     };
     let mut result = tool_result("echo", &"x".repeat(5_000));
     mw.after_tool(
@@ -333,6 +278,7 @@ async fn tool_output_leaves_small_results_untouched() {
         focus_by_call: Default::default(),
         summary_focus_tools: Default::default(),
         raw_fetches: Default::default(),
+        file_reads: Default::default(),
     };
     let mut result = tool_result("echo", "tiny");
     mw.after_tool(
@@ -375,6 +321,7 @@ fn tool_char_cap_reads_the_tools_own_declared_cap() {
         focus_by_call: Default::default(),
         summary_focus_tools: Default::default(),
         raw_fetches: Default::default(),
+        file_reads: Default::default(),
     };
     // Tool declares its own char cap → surfaced for the per-tool truncation.
     assert_eq!(mw.tool_char_cap("big"), Some(10));
@@ -538,6 +485,7 @@ async fn tool_output_honors_a_tools_own_cap() {
         focus_by_call: Default::default(),
         summary_focus_tools: Default::default(),
         raw_fetches: Default::default(),
+        file_reads: Default::default(),
     };
     let mut result = tool_result("capped", &"y".repeat(500));
     mw.after_tool(
@@ -557,6 +505,16 @@ async fn tool_output_honors_a_tools_own_cap() {
         text.contains("truncated by tool_result_budget"),
         "a capped tool now takes the shared spill path, which says how much \
          is missing and how to get it: {text}"
+    );
+}
+
+/// The shared tool-result byte backstop is a user-visible truncation limit;
+/// moving the ladder into the harness must not change it.
+#[test]
+fn shared_tool_result_byte_budget_stays_16_kib() {
+    assert_eq!(
+        tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes,
+        16 * 1024
     );
 }
 

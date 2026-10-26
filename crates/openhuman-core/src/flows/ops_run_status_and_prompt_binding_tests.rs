@@ -50,9 +50,22 @@ async fn graph_wiring_warnings_uses_the_probed_output_fields_when_schema_is_unkn
         ]
     }));
     assert!(
-        graph_wiring_warnings(&config, &real_field).await.is_empty(),
+        graph_wiring_warnings(
+            &crate::core::runtime::DispatchCtx::unbound(),
+            &config,
+            &real_field
+        )
+        .await
+        .expect("TinyFlows wiring warnings should succeed")
+        .is_empty(),
         "a probed-real field must not warn: {:?}",
-        graph_wiring_warnings(&config, &real_field).await
+        graph_wiring_warnings(
+            &crate::core::runtime::DispatchCtx::unbound(),
+            &config,
+            &real_field
+        )
+        .await
+        .expect("TinyFlows wiring warnings should succeed")
     );
 
     // A binding to a field the probe did NOT observe — flagged, using the
@@ -72,142 +85,19 @@ async fn graph_wiring_warnings_uses_the_probed_output_fields_when_schema_is_unkn
             { "from_node": "post", "to_node": "xform" }
         ]
     }));
-    let warnings = graph_wiring_warnings(&config, &fake_field).await;
+    let warnings = graph_wiring_warnings(
+        &crate::core::runtime::DispatchCtx::unbound(),
+        &config,
+        &fake_field,
+    )
+    .await
+    .expect("TinyFlows wiring warnings should succeed");
     assert!(
         warnings
             .iter()
             .any(|w| w.contains("not_a_probed_field") && w.contains("post")),
         "{warnings:?}"
     );
-}
-
-#[test]
-fn degrade_completed_status_all_clean_stays_completed() {
-    let steps = vec![clean_step("a"), clean_step("b")];
-    assert_eq!(degrade_completed_status(&steps), "completed");
-}
-
-#[test]
-fn degrade_completed_status_null_binding_becomes_warnings() {
-    let mut warned = clean_step("a");
-    warned.diagnostics = vec![json!({ "location": "args.to", "expression": "=item.to" })];
-    let steps = vec![clean_step("trigger"), warned];
-    assert_eq!(degrade_completed_status(&steps), "completed_with_warnings");
-}
-
-#[test]
-fn degrade_completed_status_errored_step_becomes_failed() {
-    let mut errored = clean_step("a");
-    errored.status = Some("error".to_string());
-    let steps = vec![clean_step("trigger"), errored];
-    assert_eq!(degrade_completed_status(&steps), "failed");
-}
-
-#[test]
-fn degrade_completed_status_error_outranks_diagnostics() {
-    // A step can carry both an error status and null-resolution diagnostics
-    // (e.g. it errored trying to use the unresolved value) — failed wins.
-    let mut errored_with_diagnostics = clean_step("a");
-    errored_with_diagnostics.status = Some("error".to_string());
-    errored_with_diagnostics.diagnostics =
-        vec![json!({ "location": "args.to", "expression": "=item.to" })];
-    let steps = vec![errored_with_diagnostics];
-    assert_eq!(degrade_completed_status(&steps), "failed");
-}
-
-#[test]
-fn failed_step_error_summary_none_when_no_step_errored() {
-    let steps = vec![clean_step("a"), clean_step("b")];
-    assert_eq!(failed_step_error_summary(&steps), None);
-}
-
-#[test]
-fn failed_step_error_summary_names_the_errored_node() {
-    let mut errored = clean_step("x");
-    errored.status = Some("error".to_string());
-    let steps = vec![clean_step("trigger"), errored];
-    let summary = failed_step_error_summary(&steps).expect("an errored step must summarize");
-    assert!(summary.contains('x'), "got: {summary}");
-}
-
-#[test]
-fn failed_step_error_summary_names_every_errored_node() {
-    let mut errored_a = clean_step("a");
-    errored_a.status = Some("error".to_string());
-    let mut errored_b = clean_step("b");
-    errored_b.status = Some("error".to_string());
-    let steps = vec![errored_a, errored_b];
-    let summary = failed_step_error_summary(&steps).unwrap();
-    assert!(
-        summary.contains('a') && summary.contains('b'),
-        "got: {summary}"
-    );
-}
-
-#[test]
-fn envelope_violation_detected() {
-    // `summarize` DOES declare a matching schema, but the binding reaches
-    // into `.item.channel` (skipping `.json`) — that dereferences the
-    // `{json,text,raw}` envelope wrapper itself, not the field inside it.
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "summarize", "kind": "agent", "name": "Summarize",
-              "config": { "prompt": "summarize",
-                "output_parser": { "schema": { "type": "object",
-                    "properties": { "channel": { "type": "string" } } } } } },
-            { "id": "post", "kind": "tool_call", "name": "Post",
-              "config": { "slug": "SLACK_SEND_MESSAGE",
-                "args": { "channel": "=nodes.summarize.item.channel" } } }
-        ],
-        "edges": [
-            { "from_node": "t", "to_node": "summarize" },
-            { "from_node": "summarize", "to_node": "post" }
-        ]
-    }));
-    let errors = validate_binding_resolvability(&g);
-    assert_eq!(errors.len(), 1, "{errors:?}");
-    assert!(errors[0].contains("json"), "{}", errors[0]);
-    assert!(errors[0].contains("summarize"), "{}", errors[0]);
-}
-
-#[test]
-fn non_enveloping_node_binding_is_accepted() {
-    // `code` nodes emit their item directly (no envelope) — `.item.<field>`
-    // is the correct, and only, form.
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "compute", "kind": "code", "name": "Compute",
-              "config": { "language": "javascript", "source": "return {channel:'general'};" } },
-            { "id": "post", "kind": "tool_call", "name": "Post",
-              "config": { "slug": "SLACK_SEND_MESSAGE",
-                "args": { "channel": "=nodes.compute.item.channel" } } }
-        ],
-        "edges": [
-            { "from_node": "t", "to_node": "compute" },
-            { "from_node": "compute", "to_node": "post" }
-        ]
-    }));
-    assert!(
-        validate_binding_resolvability(&g).is_empty(),
-        "{:?}",
-        validate_binding_resolvability(&g)
-    );
-}
-
-#[test]
-fn literal_args_unaffected() {
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "post", "kind": "tool_call", "name": "Post",
-              "config": { "slug": "SLACK_SEND_MESSAGE",
-                "args": { "channel": "general", "count": 3, "cc": ["a@b.com"] } } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "post" } ]
-    }));
-    assert!(validate_binding_resolvability(&g).is_empty());
 }
 
 #[test]
@@ -227,172 +117,9 @@ fn agent_prompt_binding_unaffected() {
         ],
         "edges": [ { "from_node": "t", "to_node": "summarize" } ]
     }));
-    assert!(validate_binding_resolvability(&g).is_empty());
-}
-
-// ── agent-prompt invalid-jq gate (PR C) ─────────────────────────────────────
-
-#[test]
-fn agent_prompt_prose_written_as_expression_is_rejected() {
-    // The exact live-failure shape: a builder smuggled upstream data into the
-    // prompt via a jq `=`-expression, but the result is prose, not a valid jq
-    // program — it resolves to `null` at runtime, handing the agent an empty
-    // prompt (the root-cause bug `input_context` exists to fix).
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "classify", "kind": "agent", "name": "Classify",
-              "config": { "prompt": "=You are given an email: .item. Classify the following \
-                  email as urgent/normal/low priority. Return JSON with fields \"priority\" and \
-                  \"reason\"." } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "classify" } ]
-    }));
-    let errors = validate_binding_resolvability(&g);
-    assert_eq!(errors.len(), 1, "{errors:?}");
-    assert!(errors[0].contains("classify"), "{}", errors[0]);
-    // The gate is `tinyflows::gates`', so the message says what is wrong with
-    // the graph and stops there. WHERE to put the data instead — this host's
-    // `input_context` node-config key, which its own LLM adapter reads and
-    // which the engine knows nothing about — is taught by the workflow_builder
-    // archetype, not by a crate-level error.
-    assert!(errors[0].contains("does not interpolate"), "{}", errors[0]);
-}
-
-#[test]
-fn agent_prompt_jq_concatenation_is_accepted() {
-    // A real jq program built from string-literal concatenation is a
-    // legitimate, resolvable expression — not the prose failure mode above.
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "greet", "kind": "agent", "name": "Greet",
-              "config": { "prompt": "=\"Hi \" + .item.name" } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "greet" } ]
-    }));
-    assert!(
-        validate_binding_resolvability(&g).is_empty(),
-        "{:?}",
-        validate_binding_resolvability(&g)
-    );
-}
-
-#[test]
-fn agent_plain_prompt_is_accepted() {
-    // No leading `=` at all — an ordinary instruction string, never inspected
-    // by this gate regardless of content.
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "classify", "kind": "agent", "name": "Classify",
-              "config": { "prompt": "Classify the email as urgent, normal, or low priority.",
-                "input_context": "=item" } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "classify" } ]
-    }));
-    assert!(validate_binding_resolvability(&g).is_empty());
-}
-
-#[test]
-fn agent_prompt_with_escaped_quote_inside_jq_string_is_accepted() {
-    // Regression for the quote-toggle desync: an escaped quote (`\"`) inside
-    // a jq string literal must not flip the strip pass's `in_str` state.
-    // Before the fix, the text between the escaped quote and the string's
-    // real closing quote ("hello world") leaked out of the string-stripping
-    // pass as if it were bare jq code, tripping the "two consecutive
-    // barewords" prose heuristic and rejecting this otherwise-valid
-    // concatenation expression.
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "greet", "kind": "agent", "name": "Greet",
-              "config": { "prompt": "=\"Say \\\"hello world\\\" nicely\" + .item.name" } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "greet" } ]
-    }));
-    assert!(
-        validate_binding_resolvability(&g).is_empty(),
-        "{:?}",
-        validate_binding_resolvability(&g)
-    );
-}
-
-#[test]
-fn agent_prose_prompt_with_populated_messages_is_accepted() {
-    // Both runtime paths (`build_completion_messages` /
-    // `node_request_to_prompt` in `tinyflows/caps.rs`) fall through to a
-    // populated `messages` array once `prompt` resolves to `null` — exactly
-    // what this prose-as-`=`-expression prompt does. So a node with real
-    // `messages` never actually runs on the null prompt; this gate must not
-    // reject the graph for a vestigial/unused `prompt` field alongside it.
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "classify", "kind": "agent", "name": "Classify",
-              "config": {
-                  "prompt": "=You are given an email: .item. Classify the following email.",
-                  "messages": [ { "role": "user", "content": "Classify this email." } ]
-              } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "classify" } ]
-    }));
-    assert!(
-        validate_binding_resolvability(&g).is_empty(),
-        "{:?}",
-        validate_binding_resolvability(&g)
-    );
-}
-
-#[test]
-fn agent_prose_prompt_with_empty_messages_is_still_rejected() {
-    // An empty `messages` array doesn't supply the turn at runtime (both
-    // `build_completion_messages` and `node_request_to_prompt` treat an empty
-    // array the same as absent) — the prose-prompt gate must still apply.
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "classify", "kind": "agent", "name": "Classify",
-              "config": {
-                  "prompt": "=You are given an email: .item. Classify the following email.",
-                  "messages": []
-              } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "classify" } ]
-    }));
-    let errors = validate_binding_resolvability(&g);
-    assert_eq!(errors.len(), 1, "{errors:?}");
-}
-
-#[test]
-fn finalize_terminal_status_pending_approval_wins_over_error() {
-    // Precedence: an outstanding pending_approval always wins, even if a step
-    // also settled with an error — mirrors degrade_completed_status's own
-    // precedence rule, now centralized in finalize_terminal_status.
-    let mut errored = clean_step("a");
-    errored.status = Some("error".to_string());
-    let steps = vec![errored];
-    let (status, error) = finalize_terminal_status(&steps, &["gate".to_string()]);
-    assert_eq!(status, "pending_approval");
-    assert_eq!(error, None);
-}
-
-#[test]
-fn finalize_terminal_status_populates_error_on_degraded_failure() {
-    let mut errored = clean_step("x");
-    errored.status = Some("error".to_string());
-    let steps = vec![errored];
-    let (status, error) = finalize_terminal_status(&steps, &[]);
-    assert_eq!(status, "failed");
-    assert!(error.unwrap().contains('x'));
-}
-
-#[test]
-fn finalize_terminal_status_no_error_when_clean() {
-    let steps = vec![clean_step("a")];
-    let (status, error) = finalize_terminal_status(&steps, &[]);
-    assert_eq!(status, "completed");
-    assert_eq!(error, None);
+    let engine_graph: tinyflows::model::WorkflowGraph =
+        serde_json::from_value(g.clone()).expect("graph fixture converts to engine graph");
+    assert!(tinyflows::gates::failures(&engine_graph).is_empty());
 }
 
 /// Regression for issue #4593 (widened for #4881's `resume_flow_run`/
@@ -406,6 +133,7 @@ fn finalize_terminal_status_no_error_when_clean() {
 /// tools in place so the turn still functions (never fail-closes).
 #[tokio::test]
 async fn flows_build_hides_the_live_run_tool_from_the_builder_belt() {
+    crate::agent::session_host::test_support::install_model_fixture();
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
@@ -415,20 +143,25 @@ async fn flows_build_hides_the_live_run_tool_from_the_builder_belt() {
     // belt name-resolution so the hide-list can't silently stop covering a
     // live-run/resume tool.
     use tinytools::Tool as _;
-    let live_runner = crate::flows::tools::RunFlowTool::new(std::sync::Arc::new(config.clone()));
+    let live_runner = crate::flows::copilot_bus::BusCopilotTool::from_name(
+        std::sync::Arc::new(config.clone()),
+        "run_flow",
+    );
     assert!(
         live_runner.external_effect(),
         "the flows live-runner must be external-effect for the #4593 concern to apply"
     );
-    let resumer =
-        crate::flows::builder_tools::ResumeFlowRunTool::new(std::sync::Arc::new(config.clone()));
+    let resumer = crate::flows::builder_tools::tests_support::resume_flow_run_tool(
+        std::sync::Arc::new(config.clone()),
+    );
     assert!(
         resumer.external_effect(),
         "resume_flow_run advances a real run's outbound effects, so it must be \
          external-effect for the same #4593/#4881 concern to apply"
     );
-    let canceller =
-        crate::flows::builder_tools::CancelFlowRunTool::new(std::sync::Arc::new(config.clone()));
+    let canceller = crate::flows::builder_tools::tests_support::cancel_flow_run_tool(
+        std::sync::Arc::new(config.clone()),
+    );
     assert!(
         canceller.external_effect(),
         "cancel_flow_run is external-effect since the T-M3 fix — it stays hidden on THIS \
@@ -438,19 +171,24 @@ async fn flows_build_hides_the_live_run_tool_from_the_builder_belt() {
 
     // Building an agent constructs a memory client, which needs the host seams
     // wired. `Once`-guarded, so this is free when another test got there first.
-    crate::agent::harness::AgentDefinitionRegistry::init_global(&config.workspace_dir)
-        .expect("agent registry init");
-    let mut agent =
-        crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "workflow_builder")
-            .expect("build workflow_builder agent");
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
+        &config.workspace_dir,
+    )
+    .expect("agent registry init");
+    let mut agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "workflow_builder",
+    )
+    .expect("build workflow_builder agent");
     agent.set_agent_definition_name("workflow_builder".to_string());
 
     // Precondition: the builder advertises all four run-advancing tools on its
     // belt before restriction — the exact set #4593/#4881 are about.
-    let visible_before = agent.visible_tool_names_for_test();
+    let visible_before = agent.visible_tool_specs_arc();
     for present in ["run_flow", "resume_flow_run", "cancel_flow_run"] {
         assert!(
-            visible_before.contains(present),
+            visible_before.iter().any(|spec| spec.name == present),
             "precondition: workflow_builder belt should advertise `{present}`; visible = \
              {visible_before:?}"
         );
@@ -460,7 +198,7 @@ async fn flows_build_hides_the_live_run_tool_from_the_builder_belt() {
 
     // After restriction none of the run-advancing tools are callable on the
     // flows_build path — the hide-list covers all of them (#4593 + #4881).
-    let visible = agent.visible_tool_names_for_test();
+    let visible = agent.visible_tool_specs_arc();
     for hidden in [
         "run_workflow",
         "run_flow",
@@ -468,7 +206,7 @@ async fn flows_build_hides_the_live_run_tool_from_the_builder_belt() {
         "cancel_flow_run",
     ] {
         assert!(
-            !visible.contains(hidden),
+            !visible.iter().any(|spec| spec.name == hidden),
             "run-advancing tool `{hidden}` must be hidden on the flows_build path; visible = \
              {visible:?}"
         );
@@ -486,7 +224,7 @@ async fn flows_build_hides_the_live_run_tool_from_the_builder_belt() {
         "duplicate_flow",
     ] {
         assert!(
-            visible.contains(keep),
+            visible.iter().any(|spec| spec.name == keep),
             "authoring tool `{keep}` must remain visible after restriction; visible = {visible:?}"
         );
     }
@@ -531,31 +269,81 @@ fn flows_build_hide_lists_have_the_expected_contents() {
 /// run — a product decision, deliberately not taken here.
 #[tokio::test]
 async fn flows_build_copilot_toolset_unhides_the_live_run_tools() {
+    crate::agent::session_host::test_support::install_model_fixture();
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
     // Building an agent constructs a memory client, which needs the host seams
     // wired. `Once`-guarded, so this is free when another test got there first.
-    crate::agent::harness::AgentDefinitionRegistry::init_global(&config.workspace_dir)
-        .expect("agent registry init");
-    let mut agent =
-        crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "workflow_builder")
-            .expect("build workflow_builder agent");
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
+        &config.workspace_dir,
+    )
+    .expect("agent registry init");
+    let mut agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "workflow_builder",
+    )
+    .expect("build workflow_builder agent");
     agent.set_agent_definition_name("workflow_builder".to_string());
+
+    #[derive(Clone, Default)]
+    struct Capture(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+    impl std::io::Write for Capture {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Capture {
+        type Writer = Self;
+
+        fn make_writer(&'a self) -> Self::Writer {
+            self.clone()
+        }
+    }
+
+    let capture = Capture::default();
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(capture.clone())
+        .with_ansi(false)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("install test tracing subscriber");
 
     restrict_builder_toolset_for_copilot(&mut agent);
 
-    let visible = agent.visible_tool_names_for_test();
+    let log = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
+    assert!(
+        log.contains("cancel_flow_run"),
+        "trace should name the hidden tool: {log}"
+    );
+    assert!(
+        log.contains("run_flow/resume_flow_run stay visible")
+            && log.contains("cancel_flow_run and the unrelated legacy run_workflow are hidden"),
+        "trace should describe the actual builder tool visibility: {log}"
+    );
+    assert!(
+        !log.contains("run_flow/resume_flow_run/cancel_flow_run stay visible"),
+        "trace contradicts the actual hidden toolset: {log}"
+    );
+
+    let visible = agent.visible_tool_specs_arc();
     for still_reachable in ["run_flow", "resume_flow_run"] {
         assert!(
-            visible.contains(still_reachable),
+            visible.iter().any(|spec| spec.name == still_reachable),
             "`{still_reachable}` must stay reachable on the streaming copilot path — it \
              is gated behind the WebChat approval surface, not hidden; visible = {visible:?}"
         );
     }
     for hidden in ["run_workflow", "cancel_flow_run"] {
         assert!(
-            !visible.contains(hidden),
+            !visible.iter().any(|spec| spec.name == hidden),
             "`{hidden}` must stay hidden on the copilot path (unrelated legacy runner / \
              a cancel that is now safe to unhide but deliberately still gated behind a \
              product decision); visible = {visible:?}"
@@ -571,7 +359,7 @@ async fn flows_build_copilot_toolset_unhides_the_live_run_tools() {
         "duplicate_flow",
     ] {
         assert!(
-            visible.contains(keep),
+            visible.iter().any(|spec| spec.name == keep),
             "authoring tool `{keep}` must remain visible on the copilot path; visible = \
              {visible:?}"
         );
@@ -588,6 +376,7 @@ async fn flows_build_copilot_toolset_unhides_the_live_run_tools() {
 /// override needed (that function was deleted as part of #4868).
 #[tokio::test]
 async fn flows_build_applies_the_builder_definitions_effective_iteration_cap() {
+    crate::agent::session_host::test_support::install_model_fixture();
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
@@ -597,9 +386,11 @@ async fn flows_build_applies_the_builder_definitions_effective_iteration_cap() {
 
     // Building an agent constructs a memory client, which needs the host seams
     // wired. `Once`-guarded, so this is free when another test got there first.
-    crate::agent::harness::AgentDefinitionRegistry::init_global(&config.workspace_dir)
-        .expect("agent registry init");
-    let def = crate::agent::harness::AgentDefinitionRegistry::global()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(
+        &config.workspace_dir,
+    )
+    .expect("agent registry init");
+    let def = crate::agent_registry::host_definition::AgentDefinitionRegistry::global()
         .expect("registry initialised")
         .get("workflow_builder")
         .expect("workflow_builder definition registered")
@@ -614,9 +405,12 @@ async fn flows_build_applies_the_builder_definitions_effective_iteration_cap() {
     // End-to-end: the agent actually built for this path carries the
     // definition's cap straight off the unmodified `config` — the session
     // builder resolves it internally now, no `flows_build`-side override.
-    let agent =
-        crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "workflow_builder")
-            .expect("build workflow_builder agent");
+    let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "workflow_builder",
+    )
+    .expect("build workflow_builder agent");
     assert_eq!(agent.agent_config().max_tool_iterations, expected);
     assert_ne!(
         agent.agent_config().max_tool_iterations,

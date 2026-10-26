@@ -105,7 +105,7 @@ const CoreJobList = ({
   const runLabel = (jobId: string) =>
     coreBusyKey === `core-run:${jobId}`
       ? t('settings.cron.jobs.runningNow')
-      : t('subconscious.runNow');
+      : t('settings.cron.jobs.runNow');
   const runsLabel = (jobId: string) =>
     coreBusyKey === `core-runs:${jobId}`
       ? t('settings.cron.jobs.loadingRuns')

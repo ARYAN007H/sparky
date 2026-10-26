@@ -3,9 +3,9 @@
 //!
 //! "Fully encapsulated" here means: the runtime dispatch pipeline can be
 //! exercised end-to-end for `channel = "discord"` with every cross-module
-//! boundary (agent runtime, memory backend, LLM provider) substituted with a
-//! stub/noop. These tests do NOT spin up a real Discord gateway, a real LLM
-//! provider, or a real memory store — they only exercise the channels module
+//! boundary (agent runtime, LLM provider) substituted with a stub/noop. These
+//! tests do NOT spin up a real Discord gateway or a real LLM provider — they
+//! only exercise the channels module
 //! itself.
 //!
 //! Coverage:
@@ -27,13 +27,12 @@ use super::super::context::{
     conversation_history_key, ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
 use super::super::runtime::process_channel_message;
-use super::super::traits;
-use super::super::{Channel, SendMessage};
-use super::common::HistoryCaptureModel;
-use crate::agent::bus::{mock_agent_run_turn, AgentTurnResponse};
+use super::super::Channel;
+use super::common::{channel_envelope, HistoryCaptureModel};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use tinychannels_bus as traits;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 
 // ── Test helpers ────────────────────────────────────────────────────────────
@@ -44,7 +43,7 @@ use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 /// real `DiscordChannel`. No HTTP is involved.
 #[derive(Default)]
 struct DiscordRecordingChannel {
-    sent: tokio::sync::Mutex<Vec<SendMessage>>,
+    sent: tokio::sync::Mutex<Vec<traits::ChannelOutboundMessage>>,
     start_typing_calls: AtomicUsize,
     stop_typing_calls: AtomicUsize,
 }
@@ -55,11 +54,27 @@ impl Channel for DiscordRecordingChannel {
         "discord"
     }
 
-    async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 adapter for one release"
+    )]
+    async fn send(&self, message: &traits::SendMessage) -> anyhow::Result<()> {
+        self.send_typed(&traits::ChannelOutboundMessage::from_legacy_message(
+            self.name(),
+            message,
+        ))
+        .await
+    }
+
+    async fn send_typed(&self, message: &traits::ChannelOutboundMessage) -> anyhow::Result<()> {
         self.sent.lock().await.push(message.clone());
         Ok(())
     }
 
+    #[allow(
+        deprecated,
+        reason = "Channel still requires its v21 listener for one release"
+    )]
     async fn listen(
         &self,
         _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
@@ -106,36 +121,34 @@ fn make_discord_ctx(
     channels.insert(channel.name().to_string(), channel);
 
     Arc::new(ChannelRuntimeContext {
+        relay_thread: None,
         channels_by_name: Arc::new(channels),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(model)),
         default_provider: Arc::new("test-provider".to_string()),
-        memory: crate::memory::guard::in_memory::FixedRecallProvider::guarded(Vec::new()),
         tools_registry: Arc::new(vec![]),
         system_prompt: crate::channels::ChannelSystemPrompt::fixed("test-system-prompt"),
         model: Arc::new("test-model".to_string()),
         temperature: 0.0,
-        auto_save_memory: false,
         max_tool_iterations: 1,
-        min_relevance_score: 0.0,
         conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: crate::inference::provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     })
 }
 
 // ── 1. Full-pipeline smoke test ─────────────────────────────────────────────
 
 /// A Discord inbound message must flow through the full runtime dispatch
-/// pipeline — memory lookup, history update, `agent.run_turn` bus call,
+/// pipeline — history update, `agent.run_turn` bus call,
 /// channel send — without requiring any external services. The response text
 /// from the stubbed provider must reach the channel's `send()` with the
 /// recipient matching `reply_target`.
@@ -151,15 +164,16 @@ async fn discord_inbound_dispatches_through_full_pipeline() {
 
     process_channel_message(
         ctx,
-        traits::ChannelMessage {
-            id: "discord_msg_1".to_string(),
-            sender: "user-123".to_string(),
-            reply_target: "channel-456".to_string(),
-            content: "what's up?".to_string(),
-            channel: "discord".to_string(),
-            timestamp: 1,
-            thread_ts: None,
-        },
+        channel_envelope(
+            "discord",
+            "user-123",
+            "channel-456",
+            "what's up?",
+            "discord_msg_1",
+            1,
+            None,
+            None,
+        ),
     )
     .await;
 
@@ -170,16 +184,16 @@ async fn discord_inbound_dispatches_through_full_pipeline() {
         "expected exactly one send for discord dispatch"
     );
     assert_eq!(
-        sent[0].recipient, "channel-456",
+        sent[0].conversation_id, "channel-456",
         "recipient must match reply_target"
     );
     assert!(
-        sent[0].content.contains("hi from discord"),
+        sent[0].legacy_text().unwrap().contains("hi from discord"),
         "dispatch must forward the stubbed provider response verbatim, got {:?}",
-        sent[0].content
+        sent[0].legacy_text().unwrap()
     );
     assert!(
-        sent[0].thread_ts.is_none(),
+        sent[0].thread_id.is_none(),
         "absent inbound thread_ts must not be fabricated on discord send"
     );
 }
@@ -201,15 +215,16 @@ async fn discord_threaded_message_does_not_emit_reaction_ack() {
 
     process_channel_message(
         ctx,
-        traits::ChannelMessage {
-            id: "discord_msg_2".to_string(),
-            sender: "user-123".to_string(),
-            reply_target: "channel-456".to_string(),
-            content: "in-thread message".to_string(),
-            channel: "discord".to_string(),
-            timestamp: 1,
-            thread_ts: Some("thread-42".to_string()),
-        },
+        channel_envelope(
+            "discord",
+            "user-123",
+            "channel-456",
+            "in-thread message",
+            "discord_msg_2",
+            1,
+            Some("thread-42"),
+            None,
+        ),
     )
     .await;
 
@@ -221,14 +236,14 @@ async fn discord_threaded_message_does_not_emit_reaction_ack() {
         "Discord must not receive an ack reaction alongside the reply"
     );
     assert!(
-        !sent[0].content.starts_with("[REACTION:"),
+        !sent[0].legacy_text().unwrap().starts_with("[REACTION:"),
         "discord send must not contain a reaction marker, got {:?}",
-        sent[0].content
+        sent[0].legacy_text().unwrap()
     );
     assert!(
-        sent[0].content.contains("roger"),
+        sent[0].legacy_text().unwrap().contains("roger"),
         "expected the normal reply content, got {:?}",
-        sent[0].content
+        sent[0].legacy_text().unwrap()
     );
 }
 
@@ -249,22 +264,21 @@ async fn discord_thread_ts_splits_conversation_history_end_to_end() {
     let provider: Arc<dyn ChatModel<()>> = provider_impl.clone();
     let ctx = make_discord_ctx(channel, provider);
 
-    let first = traits::ChannelMessage {
-        id: "discord_msg_a".to_string(),
-        sender: "user-123".to_string(),
-        reply_target: "channel-456".to_string(),
-        content: "first thread message".to_string(),
-        channel: "discord".to_string(),
-        timestamp: 1,
-        thread_ts: Some("thread-A".to_string()),
-    };
+    let first = channel_envelope(
+        "discord",
+        "user-123",
+        "channel-456",
+        "first thread message",
+        "discord_msg_a",
+        1,
+        Some("thread-A"),
+        None,
+    );
 
-    let second = traits::ChannelMessage {
-        id: "discord_msg_b".to_string(),
-        thread_ts: Some("thread-B".to_string()),
-        content: "second thread message".to_string(),
-        ..first.clone()
-    };
+    let mut second = first.clone();
+    second.message_id = "discord_msg_b".to_string();
+    second.conversation.thread_id = Some("thread-B".to_string());
+    second.text = "second thread message".to_string();
 
     // Sanity: the key function itself must split these. Without this, the
     // end-to-end expectations below would be ambiguous — is the split
@@ -309,72 +323,5 @@ async fn discord_thread_ts_splits_conversation_history_end_to_end() {
             .iter()
             .any(|(_, content)| content.contains("first thread message")),
         "thread-B history MUST NOT leak content from thread-A"
-    );
-}
-
-// ── 4. Encapsulation money shot: stub the agent bus handler ────────────────
-
-/// Full encapsulation proof: install a stub `agent.run_turn` bus handler,
-/// drive a Discord message end-to-end, assert the stub was called exactly
-/// once and its canned response reached the channel. This is the end-to-end
-/// coverage that closes the decoupling loop for the Discord dispatch path —
-/// if dispatch ever reverts to calling `run_tool_call_loop` directly, this
-/// test starts failing because the stub handler won't be invoked.
-#[tokio::test]
-async fn discord_dispatch_routes_through_agent_run_turn_bus_handler() {
-    // Install a stub `agent.run_turn` handler via the shared mock bus
-    // helper. The returned guard holds `BUS_HANDLER_LOCK` for the whole
-    // test body and re-registers production handlers on drop — even on
-    // panic — so no manual restore call is required.
-    let stub_calls = Arc::new(AtomicUsize::new(0));
-    let stub_calls_for_handler = Arc::clone(&stub_calls);
-    let _bus_guard = mock_agent_run_turn(move |req| {
-        let stub_calls = Arc::clone(&stub_calls_for_handler);
-        async move {
-            stub_calls.fetch_add(1, Ordering::SeqCst);
-            // Sanity-check the payload the dispatcher built for us.
-            assert_eq!(req.channel_name, "discord");
-            assert_eq!(req.provider_name, "test-provider");
-            assert_eq!(req.model, "test-model");
-            assert!(
-                req.history.len() >= 2,
-                "history should include at least the system prompt and user message"
-            );
-            Ok(AgentTurnResponse::new("CANNED_DISCORD_RESPONSE"))
-        }
-    })
-    .await;
-
-    let recorder = Arc::new(DiscordRecordingChannel::default());
-    let channel: Arc<dyn Channel> = recorder.clone();
-    // Minimal provider — never invoked because the stub short-circuits.
-    let ctx = make_discord_ctx(channel, Arc::new(super::common::DummyModel));
-
-    process_channel_message(
-        ctx,
-        traits::ChannelMessage {
-            id: "discord_stub_msg".to_string(),
-            sender: "user-123".to_string(),
-            reply_target: "channel-456".to_string(),
-            content: "hello via stub".to_string(),
-            channel: "discord".to_string(),
-            timestamp: 1,
-            thread_ts: None,
-        },
-    )
-    .await;
-
-    assert_eq!(
-        stub_calls.load(Ordering::SeqCst),
-        1,
-        "discord dispatch must route through the agent.run_turn bus handler exactly once"
-    );
-
-    let sent = recorder.sent.lock().await;
-    assert_eq!(sent.len(), 1, "stubbed response must reach the channel");
-    assert!(
-        sent[0].content.contains("CANNED_DISCORD_RESPONSE"),
-        "delivered message should contain the stubbed text, got {:?}",
-        sent[0].content
     );
 }

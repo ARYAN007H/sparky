@@ -1,19 +1,20 @@
 //! RPC accessors over persisted in-flight turn snapshots.
 
 use super::support::{counts, envelope, workspace_dir};
-use crate::memory::{ApiEnvelope, EmptyRequest};
-use crate::rpc::RpcOutcome;
+use crate::core::Outcome;
+use crate::storage::sessions::turn_states_for;
 use crate::threads::turn_state::{
-    self, ClearTurnStateRequest, ClearTurnStateResponse, GetTurnStateForRequestRequest,
+    ClearTurnStateRequest, ClearTurnStateResponse, GetTurnStateForRequestRequest,
     GetTurnStateRequest, GetTurnStateResponse, ListTurnStatesResponse,
 };
+use crate::threads::{ApiEnvelope, EmptyRequest};
 
 /// Returns the persisted in-flight turn snapshot for a thread, if any.
 pub async fn turn_state_get(
     request: GetTurnStateRequest,
-) -> Result<RpcOutcome<ApiEnvelope<GetTurnStateResponse>>, String> {
+) -> Result<Outcome<ApiEnvelope<GetTurnStateResponse>>, String> {
     let dir = workspace_dir().await?;
-    let turn_state = turn_state::store::get(dir, &request.thread_id)?;
+    let turn_state = turn_states_for(&dir).get(&request.thread_id)?;
     let present = turn_state.is_some();
     Ok(envelope(
         GetTurnStateResponse { turn_state },
@@ -26,9 +27,9 @@ pub async fn turn_state_get(
 /// surface interrupted turns from a previous process.
 pub async fn turn_state_list(
     _request: EmptyRequest,
-) -> Result<RpcOutcome<ApiEnvelope<ListTurnStatesResponse>>, String> {
+) -> Result<Outcome<ApiEnvelope<ListTurnStatesResponse>>, String> {
     let dir = workspace_dir().await?;
-    let turn_states = turn_state::store::list(dir)?;
+    let turn_states = turn_states_for(&dir).list()?;
     let count = turn_states.len();
     Ok(envelope(
         ListTurnStatesResponse { turn_states, count },
@@ -41,9 +42,9 @@ pub async fn turn_state_list(
 /// per-turn history that lets the UI render each answer's own process trail.
 pub async fn turn_state_history(
     request: GetTurnStateRequest,
-) -> Result<RpcOutcome<ApiEnvelope<ListTurnStatesResponse>>, String> {
+) -> Result<Outcome<ApiEnvelope<ListTurnStatesResponse>>, String> {
     let dir = workspace_dir().await?;
-    let turn_states = turn_state::store::list_thread(dir, &request.thread_id)?;
+    let turn_states = turn_states_for(&dir).list_thread(&request.thread_id)?;
     let count = turn_states.len();
     Ok(envelope(
         ListTurnStatesResponse { turn_states, count },
@@ -57,9 +58,9 @@ pub async fn turn_state_history(
 /// first expanded.
 pub async fn turn_state_get_turn(
     request: GetTurnStateForRequestRequest,
-) -> Result<RpcOutcome<ApiEnvelope<GetTurnStateResponse>>, String> {
+) -> Result<Outcome<ApiEnvelope<GetTurnStateResponse>>, String> {
     let dir = workspace_dir().await?;
-    let turn_state = turn_state::store::get_turn(dir, &request.thread_id, &request.request_id)?;
+    let turn_state = turn_states_for(&dir).get_turn(&request.thread_id, &request.request_id)?;
     let present = turn_state.is_some();
     Ok(envelope(
         GetTurnStateResponse { turn_state },
@@ -72,8 +73,8 @@ pub async fn turn_state_get_turn(
 /// dismisses an "interrupted" banner).
 pub async fn turn_state_clear(
     request: ClearTurnStateRequest,
-) -> Result<RpcOutcome<ApiEnvelope<ClearTurnStateResponse>>, String> {
+) -> Result<Outcome<ApiEnvelope<ClearTurnStateResponse>>, String> {
     let dir = workspace_dir().await?;
-    let cleared = turn_state::store::delete(dir, &request.thread_id)?;
+    let cleared = turn_states_for(&dir).delete(&request.thread_id)?;
     Ok(envelope(ClearTurnStateResponse { cleared }, None, None))
 }

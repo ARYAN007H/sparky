@@ -3,8 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { checkBackendHealthy } from '../../../services/backendHealth';
 import {
+  beginAwaitingAuthCallback,
   beginDeepLinkAuthProcessing,
   completeDeepLinkAuthProcessing,
+  endAwaitingAuthCallback,
   getDeepLinkAuthState,
 } from '../../../store/deepLinkAuthState';
 import { handleDeepLinkUrls } from '../../../utils/desktopDeepLinkListener';
@@ -35,6 +37,8 @@ vi.mock('../../../utils/desktopDeepLinkListener', () => ({
 vi.mock('../../../store/deepLinkAuthState', () => ({
   beginDeepLinkAuthProcessing: vi.fn(),
   completeDeepLinkAuthProcessing: vi.fn(),
+  beginAwaitingAuthCallback: vi.fn(),
+  endAwaitingAuthCallback: vi.fn(),
   getDeepLinkAuthState: vi.fn(),
 }));
 
@@ -67,6 +71,7 @@ describe('OAuthProviderButton', () => {
     vi.mocked(isTauri).mockReturnValue(true);
     vi.mocked(getDeepLinkAuthState).mockReturnValue({
       isProcessing: false,
+      awaitingCallback: false,
       errorMessage: null,
       errorMessageKey: null,
       requiresAppDataReset: false,
@@ -101,6 +106,39 @@ describe('OAuthProviderButton', () => {
     expect(screen.getByRole('button', { name: /Connecting/ })).toBeDisabled();
   });
 
+  it('warns before switching away from a local profile and continues only after confirmation', async () => {
+    render(<OAuthProviderButton provider={stubProvider} localProfileId="local-device" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Google' }));
+
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(screen.getByText(/users\/local-device/)).toBeInTheDocument();
+    expect(screen.getByText(/sign out and choose the local session/i)).toBeInTheDocument();
+    expect(checkBackendHealthy).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /continue to sign in/i }));
+    await act(async () => {
+      for (let i = 0; i < 6; i++) await Promise.resolve();
+    });
+
+    expect(checkBackendHealthy).toHaveBeenCalledTimes(1);
+    expect(openUrl).toHaveBeenCalledWith(
+      expect.stringMatching(/^https:\/\/backend\.test\/auth\/google\/login/)
+    );
+  });
+
+  it('does not show the local-profile warning for a cloud profile', async () => {
+    render(<OAuthProviderButton provider={stubProvider} localProfileId="cloud-user" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Google' }));
+    await act(async () => {
+      for (let i = 0; i < 6; i++) await Promise.resolve();
+    });
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(checkBackendHealthy).toHaveBeenCalledTimes(1);
+  });
+
   it('resets isLoading when the window regains focus', async () => {
     render(<OAuthProviderButton provider={stubProvider} />);
 
@@ -124,6 +162,7 @@ describe('OAuthProviderButton', () => {
   it('does NOT reset isLoading on focus when a deep-link auth round-trip is processing', async () => {
     vi.mocked(getDeepLinkAuthState).mockReturnValue({
       isProcessing: true,
+      awaitingCallback: false,
       errorMessage: null,
       errorMessageKey: null,
       requiresAppDataReset: false,
@@ -197,6 +236,29 @@ describe('OAuthProviderButton', () => {
 
     expect(screen.queryByText('Connecting...')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Google' })).toBeEnabled();
+  });
+
+  it('ends the awaiting-callback hand-off when the 300s timeout elapses, not before', async () => {
+    render(<OAuthProviderButton provider={stubProvider} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Google' }));
+    await act(async () => {
+      for (let i = 0; i < 6; i++) await Promise.resolve();
+    });
+
+    // The browser is open: the hand-off flag was raised and not yet dropped.
+    expect(beginAwaitingAuthCallback).toHaveBeenCalledTimes(1);
+    expect(endAwaitingAuthCallback).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(299_999);
+    });
+    expect(endAwaitingAuthCallback).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(endAwaitingAuthCallback).toHaveBeenCalledTimes(1);
   });
 
   it('honors onClickOverride and skips the OAuth flow', () => {
@@ -485,6 +547,7 @@ describe('OAuthProviderButton web dev redirect', () => {
     vi.mocked(isTauri).mockReturnValue(false);
     vi.mocked(getDeepLinkAuthState).mockReturnValue({
       isProcessing: false,
+      awaitingCallback: false,
       errorMessage: null,
       errorMessageKey: null,
       requiresAppDataReset: false,
@@ -543,6 +606,7 @@ describe('OAuthProviderButton — every configured provider reaches its own back
     vi.mocked(isTauri).mockReturnValue(true);
     vi.mocked(getDeepLinkAuthState).mockReturnValue({
       isProcessing: false,
+      awaitingCallback: false,
       errorMessage: null,
       errorMessageKey: null,
       requiresAppDataReset: false,

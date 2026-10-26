@@ -2,28 +2,11 @@ use crate::config::PrivacyMode;
 use parking_lot::Mutex;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::OnceCell;
-
-/// Stable, machine-recognizable marker prefixing a **permanent** policy
-/// rejection: the identical `(tool, args)` call can never succeed in the
-/// current tier (read-only blocking a write, a forbidden/credential path, a
-/// disallowed high-risk or hidden-execution command, an off-allowlist command).
-/// The agent harness's repeated-failure middleware
-/// ([`crate::agent::tinyagents::middleware::RepeatedToolFailureMiddleware`])
-/// detects this and halts on the **first verbatim repeat** rather than
-/// reiterating a provably-futile call. Kept short and bracketed so it survives the
-/// `Error: …` wrapping the tool layer adds and is easy to grep in logs.
-pub const POLICY_BLOCKED_MARKER: &str = "[policy-blocked]";
-
-/// Stable marker prefixing a **this-turn denial** — the user answered "no" to
-/// an approval prompt, or the prompt timed out / its channel dropped. Unlike a
-/// block this isn't permanent across turns, but re-issuing the *same* call this
-/// turn just re-prompts the user, so the harness records it in the circuit
-/// breaker and stops the agent from re-asking the identical call.
-pub const POLICY_DENIED_MARKER: &str = "[policy-denied]";
 
 /// How much autonomy the agent has
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -71,29 +54,22 @@ pub enum CommandRiskLevel {
     High,
 }
 
-/// Coarse permission bucket the harness approval gate keys on.
+/// OpenHuman's fail-closed classification for an acting command.
 ///
-/// Classification is **fail-closed**: a command that is not provably read-only
-/// (and not a recognized network/destructive command) is treated as at least
-/// [`CommandClass::Write`]. Across multiple shell segments the **highest** class
-/// wins (so `ls | curl …` is `Network`). Variants are ordered low→high so
-/// [`Ord`] / [`Iterator::max`] compose them directly.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+/// This is host policy vocabulary. Module contracts report structural facts;
+/// they do not classify commands or decide which autonomy tier may run them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CommandClass {
-    /// Provably read-only / observational (curated safe-read allowlist).
+    /// No side effects are expected.
     Read,
-    /// State-changing but not inherently catastrophic — the fail-closed default
-    /// for anything not recognized as read/network/destructive.
+    /// Changes local or remote state.
     Write,
-    /// Reaches the network (curl/wget/ssh/scp/…). Always prompts, every tier.
+    /// Performs a network operation.
     Network,
-    /// Installs an OS / language package (system package manager, or a *global*
-    /// npm/pnpm/yarn/cargo/pip install). Always-ask in every acting tier,
-    /// including Full — mirrors the dedicated `install_tool` gate so shell
-    /// installs can't slip past it. Project-local installs are ordinary `Write`.
+    /// Installs or updates software.
     Install,
-    /// Catastrophic / irreversible / privilege-escalating / system-control.
-    /// Always prompts, even in Full.
+    /// Performs a destructive or privilege-sensitive operation.
     Destructive,
 }
 
@@ -123,7 +99,7 @@ pub enum ToolOperation {
 #[derive(Debug)]
 pub struct ActionTracker {
     /// Timestamps of recent actions (kept within the last hour).
-    actions: Mutex<Vec<Instant>>,
+    actions: Arc<Mutex<Vec<Instant>>>,
 }
 
 impl Default for ActionTracker {
@@ -135,7 +111,7 @@ impl Default for ActionTracker {
 impl ActionTracker {
     pub fn new() -> Self {
         Self {
-            actions: Mutex::new(Vec::new()),
+            actions: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -159,13 +135,23 @@ impl ActionTracker {
         actions.retain(|t| *t > cutoff);
         actions.len()
     }
+
+    /// Shares the action history with a short-lived policy derived from this
+    /// tracker. Ordinary `Clone` intentionally snapshots history for separate
+    /// policies; live flow gates use this handle so rebuilding the tier view
+    /// does not reset one run's action budget.
+    pub(crate) fn shared_clone(&self) -> Self {
+        Self {
+            actions: Arc::clone(&self.actions),
+        }
+    }
 }
 
 impl Clone for ActionTracker {
     fn clone(&self) -> Self {
         let actions = self.actions.lock();
         Self {
-            actions: Mutex::new(actions.clone()),
+            actions: Arc::new(Mutex::new(actions.clone())),
         }
     }
 }
@@ -186,7 +172,6 @@ pub(super) const WORKSPACE_INTERNAL_DIRS: &[&str] = &[
     "cron",
     "devices",
     "mcp_clients",
-    "subconscious",
     "vault",
     "task_sources",
     // The whatsapp_data store was removed along with the scanner that wrote it,
@@ -194,6 +179,10 @@ pub(super) const WORKSPACE_INTERNAL_DIRS: &[&str] = &[
     // (chat and message history) from an older version. Keep the directory on
     // the internal denylist so agents with workspace access cannot read it.
     "whatsapp_data",
+    // The retired background-reasoning engine kept its SQLite state under
+    // `subconscious/`. The engine is gone, but an upgraded profile can still
+    // hold that database (memory-derived reflections). Keep it denied.
+    "subconscious",
     // The redirect_links domain was removed (#5051), but an upgraded profile can
     // still hold a legacy `redirect_links/links.db` (stored URL history) written
     // by an older version. Keep the directory on the internal denylist so agents
@@ -208,6 +197,32 @@ pub(super) const WORKSPACE_INTERNAL_DIRS: &[&str] = &[
     "tinyplace",
 ];
 
+/// The artifact store under `workspace_dir`. Its per-artifact directories are
+/// internal state (see `is_workspace_internal_path`); only
+/// [`ARTIFACT_TOOL_RESULTS_DIR`] inside it stays agent-readable.
+pub(super) const ARTIFACTS_DIR: &str = "artifacts";
+/// The account config file, stored beside `workspace_dir` (see
+/// `is_workspace_internal_path`).
+pub(super) const ACCOUNT_CONFIG_FILE: &str = "config.toml";
+/// Where oversized tool outputs are persisted for the agent to read back.
+pub(super) const ARTIFACT_TOOL_RESULTS_DIR: &str = "tool-results";
+
+/// Where oversized tool outputs are persisted for the agent to read back:
+/// `<workspace_dir>/artifacts/tool-results`.
+///
+/// Inside the core's own state, not the agent's working directory. The action
+/// directory is often a project the agent is editing, and a tool output saved
+/// there becomes a stray file in that project (picked up by `git add -A`, shown
+/// in the diff). This is the one subdirectory of the internal `artifacts/` store
+/// agent file tools may read (`is_workspace_internal_path`), and `from_config`
+/// grants it as a read-only root so the absolute pointer the store hands out
+/// stays readable when `workspace_only` refuses other absolute paths.
+pub fn tool_result_artifacts_dir(workspace_dir: &std::path::Path) -> PathBuf {
+    workspace_dir
+        .join(ARTIFACTS_DIR)
+        .join(ARTIFACT_TOOL_RESULTS_DIR)
+}
+
 /// Files directly under `workspace_dir` that hold secrets or persona config
 /// and must not be writable by agent tools.
 pub(super) const WORKSPACE_INTERNAL_FILES: &[&str] = &[
@@ -216,6 +231,8 @@ pub(super) const WORKSPACE_INTERNAL_FILES: &[&str] = &[
     ".env",
     "SOUL.md",
     "IDENTITY.md",
+    // No longer seeded or read (#5701), but an upgraded workspace can still
+    // hold one; keep it out of the agent-writable surface.
     "HEARTBEAT.md",
     "PROFILE.md",
 ];
@@ -272,6 +289,15 @@ pub struct SecurityPolicy {
     pub block_high_risk_commands: bool,
     /// Directories outside the workspace the agent may access (read or read-write).
     pub trusted_roots: Vec<TrustedRoot>,
+    /// Exact, finalized media artifact files admitted for read-only inspection.
+    /// Shared with the media tools so file_read and image_info follow the same
+    /// per-artifact grant without trusting the whole Files directory.
+    #[doc(hidden)]
+    pub media_artifact_paths: Arc<std::sync::Mutex<HashSet<PathBuf>>>,
+    /// Configured Files roots used to resolve Ready artifact records after a
+    /// session is rebuilt.
+    #[doc(hidden)]
+    pub media_files_roots: Arc<std::sync::Mutex<Option<crate::artifacts::FileRoots>>>,
     /// Whether the agent may install OS packages via the `install_tool` tool.
     pub allow_tool_install: bool,
     /// Tool names the user has pre-approved ("Always allow"). The `ApprovalGate`
@@ -281,8 +307,7 @@ pub struct SecurityPolicy {
     pub auto_approve: Vec<String>,
     /// When true, the approval gate auto-approves ALL tool calls without
     /// prompting — a blanket bypass, not just the `auto_approve` allowlist
-    /// above. `TrustedAutomationSource::SubconsciousTainted` and
-    /// `AgentTurnOrigin::Unknown` origins are still denied by the gate
+    /// above. `AgentTurnOrigin::Unknown` origins are still denied by the gate
     /// regardless of this flag. A remote-origin triage dispatch is *not* in
     /// that protected set: with this flag on it is allowed without parking and
     /// without a `pending_approvals` audit row (openhuman#5634, accepted).
@@ -423,6 +448,8 @@ impl Default for SecurityPolicy {
             require_approval_for_medium_risk: true,
             block_high_risk_commands: true,
             trusted_roots: Vec::new(),
+            media_artifact_paths: Arc::new(std::sync::Mutex::new(HashSet::new())),
+            media_files_roots: Arc::new(std::sync::Mutex::new(None)),
             allow_tool_install: false,
             auto_approve: Vec::new(),
             auto_approve_all: false,

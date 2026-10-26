@@ -18,99 +18,43 @@ fn config_with_chat_provider(s: Option<&str>) -> Config {
 }
 
 #[test]
-fn chat_provider_unset_resolves_to_cloud() {
-    let config = config_with_chat_provider(None);
-    assert!(matches!(
-        resolve_chat_workload(&config),
-        ChatWorkloadResolution::Cloud
-    ));
-}
-
-#[test]
-fn chat_provider_blank_resolves_to_cloud() {
-    let config = config_with_chat_provider(Some(""));
-    assert!(matches!(
-        resolve_chat_workload(&config),
-        ChatWorkloadResolution::Cloud
-    ));
-}
-
-#[test]
-fn chat_provider_cloud_sentinel_resolves_to_cloud() {
-    let config = config_with_chat_provider(Some("cloud"));
-    assert!(matches!(
-        resolve_chat_workload(&config),
-        ChatWorkloadResolution::Cloud
-    ));
-}
-
-#[test]
-fn chat_provider_openhuman_sentinel_resolves_to_cloud() {
-    let config = config_with_chat_provider(Some("openhuman"));
-    assert!(matches!(
-        resolve_chat_workload(&config),
-        ChatWorkloadResolution::Cloud
-    ));
-}
-
-#[test]
-fn chat_provider_ollama_resolves_to_workload() {
-    let config = config_with_chat_provider(Some("ollama:llama3.2"));
-    match resolve_chat_workload(&config) {
-        ChatWorkloadResolution::Workload {
-            provider_string,
-            slug,
-        } => {
-            assert_eq!(provider_string, "ollama:llama3.2");
-            assert_eq!(slug, "ollama");
-        }
-        ChatWorkloadResolution::Cloud => panic!("expected Workload for ollama, got Cloud"),
+fn chat_provider_unset_blank_or_sentinel_resolves_to_cloud() {
+    for value in [None, Some(""), Some("cloud"), Some("openhuman")] {
+        let config = config_with_chat_provider(value);
+        assert!(
+            matches!(
+                resolve_chat_workload(&config),
+                ChatWorkloadResolution::Cloud
+            ),
+            "{value:?} must resolve to cloud"
+        );
     }
 }
 
 #[test]
-fn chat_provider_lmstudio_resolves_to_workload() {
-    let config = config_with_chat_provider(Some("lmstudio:qwen2.5:0.5b"));
-    match resolve_chat_workload(&config) {
-        ChatWorkloadResolution::Workload {
-            provider_string,
-            slug,
-        } => {
-            assert_eq!(provider_string, "lmstudio:qwen2.5:0.5b");
-            assert_eq!(slug, "lmstudio");
+fn chat_provider_local_and_byok_strings_resolve_to_workload() {
+    // (configured string, expected slug). The bare `claude_agent_sdk`
+    // sentinel has no colon, so its slug is the full string.
+    let cases = [
+        ("ollama:llama3.2", "ollama"),
+        ("lmstudio:qwen2.5:0.5b", "lmstudio"),
+        ("openai:gpt-4o", "openai"),
+        ("claude_agent_sdk", "claude_agent_sdk"),
+    ];
+    for (configured, expected_slug) in cases {
+        let config = config_with_chat_provider(Some(configured));
+        match resolve_chat_workload(&config) {
+            ChatWorkloadResolution::Workload {
+                provider_string,
+                slug,
+            } => {
+                assert_eq!(provider_string, configured);
+                assert_eq!(slug, expected_slug);
+            }
+            ChatWorkloadResolution::Cloud => {
+                panic!("expected Workload for {configured}, got Cloud")
+            }
         }
-        ChatWorkloadResolution::Cloud => panic!("expected Workload for lmstudio"),
-    }
-}
-
-#[test]
-fn chat_provider_byok_slug_resolves_to_workload() {
-    let config = config_with_chat_provider(Some("openai:gpt-4o"));
-    match resolve_chat_workload(&config) {
-        ChatWorkloadResolution::Workload {
-            provider_string,
-            slug,
-        } => {
-            assert_eq!(provider_string, "openai:gpt-4o");
-            assert_eq!(slug, "openai");
-        }
-        ChatWorkloadResolution::Cloud => panic!("expected Workload for byok slug"),
-    }
-}
-
-#[test]
-fn chat_provider_claude_agent_sdk_resolves_to_workload() {
-    // Bare sentinel (no colon) — slug is the full string.
-    let config = config_with_chat_provider(Some("claude_agent_sdk"));
-    match resolve_chat_workload(&config) {
-        ChatWorkloadResolution::Workload {
-            provider_string,
-            slug,
-        } => {
-            assert_eq!(provider_string, "claude_agent_sdk");
-            assert_eq!(slug, "claude_agent_sdk");
-        }
-        ChatWorkloadResolution::Cloud => panic!("expected Workload for claude_agent_sdk"),
     }
 }
 
@@ -147,18 +91,13 @@ async fn relay_inbound_handler_forwards_envelopes_to_dispatch_bus() {
         .expect("handle relay inbound");
 
     let runtime_msg = rx.recv().await.expect("forwarded channel message");
-    let msg = runtime_msg.message;
-    assert_eq!(msg.channel, "telegram");
-    assert_eq!(msg.id, "relay-msg-1");
-    assert_eq!(msg.reply_target, "chat-1");
-    assert_eq!(msg.sender, "alice");
-    assert_eq!(msg.content, "hello from relay");
-    assert_eq!(msg.thread_ts.as_deref(), Some("topic-1"));
-    let forwarded = runtime_msg
-        .inbound_envelope
-        .expect("relay envelope should stay attached for dispatch");
+    let forwarded = runtime_msg.message;
     assert_eq!(forwarded.message_id, "relay-msg-1");
+    assert_eq!(forwarded.channel.id, "telegram");
     assert_eq!(forwarded.conversation.id, "chat-1");
+    assert_eq!(forwarded.sender.id, "alice");
+    assert_eq!(forwarded.text, "hello from relay");
+    assert_eq!(forwarded.conversation.thread_id, None);
     assert_eq!(forwarded.conversation.topic_id.as_deref(), Some("topic-1"));
 }
 

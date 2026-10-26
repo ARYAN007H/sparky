@@ -1,5 +1,8 @@
+#[path = "support/env_guard.rs"]
+mod env_guard;
+use env_guard::EnvVarGuard;
 use openhuman_core::config::schema::{Config, StreamMode, TelegramConfig};
-use openhuman_core::security::keyring;
+use openhuman_core::security::secret_storage;
 use std::sync::OnceLock;
 
 async fn env_lock() -> tokio::sync::MutexGuard<'static, ()> {
@@ -7,42 +10,6 @@ async fn env_lock() -> tokio::sync::MutexGuard<'static, ()> {
     LOCK.get_or_init(|| tokio::sync::Mutex::new(()))
         .lock()
         .await
-}
-
-struct EnvGuard {
-    key: &'static str,
-    previous: Option<std::ffi::OsString>,
-}
-
-impl EnvGuard {
-    fn set(key: &'static str, value: &std::path::Path) -> Self {
-        let previous = std::env::var_os(key);
-        unsafe {
-            std::env::set_var(key, value);
-        }
-        Self { key, previous }
-    }
-
-    fn set_str(key: &'static str, value: &'static str) -> Self {
-        let previous = std::env::var_os(key);
-        unsafe {
-            std::env::set_var(key, value);
-        }
-        Self { key, previous }
-    }
-}
-
-impl Drop for EnvGuard {
-    fn drop(&mut self) {
-        match self.previous.take() {
-            Some(value) => unsafe {
-                std::env::set_var(self.key, value);
-            },
-            None => unsafe {
-                std::env::remove_var(self.key);
-            },
-        }
-    }
 }
 
 #[tokio::test]
@@ -53,9 +20,9 @@ async fn config_secrets_roundtrip_via_keyring_backed_master_key_migration() {
     let workspace_dir = openhuman_dir.join("workspace");
     std::fs::create_dir_all(&workspace_dir).expect("workspace dir");
 
-    let _keyring_backend = EnvGuard::set_str("OPENHUMAN_KEYRING_BACKEND", "file");
-    let _workspace_override = EnvGuard::set("OPENHUMAN_WORKSPACE", &openhuman_dir);
-    keyring::init_workspace(&workspace_dir);
+    let _keyring_backend = EnvVarGuard::set("OPENHUMAN_KEYRING_BACKEND", "file");
+    let _workspace_override = EnvVarGuard::set("OPENHUMAN_WORKSPACE", &openhuman_dir);
+    secret_storage::init_workspace(&workspace_dir);
 
     let legacy_key_path = openhuman_dir.join(".secret_key");
     std::fs::write(
@@ -71,8 +38,8 @@ async fn config_secrets_roundtrip_via_keyring_backed_master_key_migration() {
         api_key: Some("sk-direct-secret".into()),
         search: openhuman_core::config::schema::SearchConfig {
             brave: openhuman_core::config::schema::SearchEngineCredentials {
+                base_url: None,
                 api_key: Some("brave-secret".into()),
-                ..Default::default()
             },
             ..Default::default()
         },

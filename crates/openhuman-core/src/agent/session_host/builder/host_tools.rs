@@ -22,34 +22,52 @@
 //! that composes its prompt**. A resumed session reuses its persisted system
 //! messages, so a belt that moves under one is described by the prompt it had
 //! when the thread opened; a host that varies its belt should run such turns
-//! on a session of their own.
+//! on a session of their own. Permanent attachments are the exception: their
+//! catalogue occupies a managed system section refreshed independently of
+//! the frozen host prompt.
 
 use std::collections::HashSet;
 use std::sync::Arc;
 
 use tinytools::Tool;
 
-use crate::agent::tool_policy::ToolPolicy;
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
 use anyhow::Result;
 
 /// One turn's worth of host-supplied belt.
 ///
-/// `visible` is the provider-visible allow-list to union into the session's
-/// own; leaving it empty makes the tools reachable but unadvertised, which is
-/// rarely what a host wants. `policy`, when set, becomes the session's gate --
-/// see [`with_policy`](Self::with_policy), which is not what "host tools"
-/// might suggest.
+/// `visible` adds names to a named session allow-list. A wildcard session
+/// retains its native registry and applies each tool's exposure metadata;
+/// `permanent` explicitly forces selected host tools into the prompt and schema.
+/// `policy`, when set, becomes the whole session's gate; see
+/// [`with_policy`](Self::with_policy).
 #[derive(Default)]
 pub struct HostTurnTools {
     /// The tools themselves, placed **ahead of** the config-derived belt so a
     /// host tool wins a collision on its name.
     pub tools: Vec<Box<dyn Tool>>,
-    /// Names to add to the provider-visible allow-list.
+    /// Tool names permanently advertised directly and rendered in a managed prompt section.
+    pub permanent: HashSet<String>,
+    /// Names to add to a named provider-visible allow-list.
+    /// Wildcard sessions already expand the registry subject to tool exposure.
     pub visible: HashSet<String>,
+    /// Names to remove from the provider-visible allow-list for this turn.
+    ///
+    /// This is applied after the config-derived scope and `visible` names are
+    /// combined, so a host can hide a tool that the agent normally receives
+    /// without changing the agent's scope for other turns. Withheld tools
+    /// remain in the registry; hosts that require a call boundary must also
+    /// enforce one through the session's tool policy.
+    pub withheld: HashSet<String>,
     /// The session's admission gate, if the host sets one.
-    pub policy: Option<Arc<dyn ToolPolicy>>,
+    pub policy: Option<
+        Arc<
+            dyn tinyagents_harness::middleware::ToolCallPolicy<
+                crate::agent::tinyagents::host::OpenHumanRunContext,
+            >,
+        >,
+    >,
 }
 
 impl HostTurnTools {
@@ -59,7 +77,9 @@ impl HostTurnTools {
         let visible = tools.iter().map(|tool| tool.name().to_string()).collect();
         Self {
             tools,
+            permanent: HashSet::new(),
             visible,
+            withheld: HashSet::new(),
             policy: None,
         }
     }
@@ -73,7 +93,7 @@ impl HostTurnTools {
     /// specifically, and a host that cannot override a tool it collides with
     /// has no way to correct one.
     ///
-    /// First and not last because [`dedup_visible_tool_specs`] keeps the first
+    /// First and not last because TinyAgents' `dedup_visible_tool_specs` keeps the first
     /// occurrence. Appending would advertise the config-derived spec while the
     /// host believed it had replaced it -- the model told about one tool and a
     /// different one answering, which is the version of this bug that is
@@ -82,16 +102,21 @@ impl HostTurnTools {
     /// Returns `None` for an empty belt, which is also a host that supplied no
     /// gate: there is nothing to admit.
     ///
-    /// [`dedup_visible_tool_specs`]: super::dedup_visible_tool_specs
-    #[must_use]
+    /// Tool schema deduplication is owned by
+    /// `tinyagents_runtime::dedup_visible_tool_specs`.
     pub(super) fn merge_into(
         self,
         agent_id: &str,
         tools: &mut Vec<Box<dyn Tool>>,
         visible: &mut HashSet<String>,
-    ) -> Option<Arc<dyn ToolPolicy>> {
+    ) -> Result<MergedHostTurnTools> {
         if self.is_empty() {
-            return None;
+            return Ok(MergedHostTurnTools {
+                policy: None,
+                withheld: HashSet::new(),
+                permanent: HashSet::new(),
+                scope_additions: HashSet::new(),
+            });
         }
         log::debug!(
             "[agent::builder] host supplied {} tool(s) for agent_id={agent_id}: {:?}",
@@ -101,9 +126,40 @@ impl HostTurnTools {
                 .map(|tool| tool.name())
                 .collect::<Vec<_>>(),
         );
-        tools.splice(0..0, self.tools);
-        visible.extend(self.visible);
-        self.policy
+        for name in &self.permanent {
+            anyhow::ensure!(
+                !tools.iter().any(|tool| tool.name() == name),
+                "permanent tool name collision: {name}"
+            );
+            anyhow::ensure!(
+                self.tools.iter().filter(|tool| tool.name() == name).count() == 1,
+                "permanent tool must have exactly one source: {name}"
+            );
+        }
+        let permanent = &self.permanent;
+        tools.splice(
+            0..0,
+            self.tools.into_iter().map(|tool| {
+                if permanent.contains(tool.name()) {
+                    Box::new(tinyagents_runtime::PermanentTool(tool)) as Box<dyn Tool>
+                } else {
+                    tool
+                }
+            }),
+        );
+        // An empty set represents the original wildcard scope until build().
+        // Filling it with an attached source's names would turn it into a
+        // literal allowlist and silently discard the native registry.
+        if !visible.is_empty() {
+            visible.extend(self.visible.iter().cloned());
+        }
+        let scope_additions = self.visible.difference(&self.withheld).cloned().collect();
+        Ok(MergedHostTurnTools {
+            policy: self.policy,
+            withheld: self.withheld,
+            permanent: self.permanent,
+            scope_additions,
+        })
     }
 
     /// Sets the gate for the whole session.
@@ -121,7 +177,14 @@ impl HostTurnTools {
     /// session should keep an existing policy for calls the host does not own,
     /// the host composes the two and passes the result here.
     #[must_use]
-    pub fn with_policy(mut self, policy: Arc<dyn ToolPolicy>) -> Self {
+    pub fn with_policy(
+        mut self,
+        policy: Arc<
+            dyn tinyagents_harness::middleware::ToolCallPolicy<
+                crate::agent::tinyagents::host::OpenHumanRunContext,
+            >,
+        >,
+    ) -> Self {
         self.policy = Some(policy);
         self
     }
@@ -129,7 +192,77 @@ impl HostTurnTools {
     /// Whether this contributes nothing, so a caller can skip the union.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.tools.is_empty() && self.visible.is_empty() && self.policy.is_none()
+        self.tools.is_empty()
+            && self.visible.is_empty()
+            && self.withheld.is_empty()
+            && self.policy.is_none()
+            && self.permanent.is_empty()
+    }
+}
+
+/// The parts of a host turn belt that the session builder applies after
+/// expanding the agent's static scope.
+pub(super) struct MergedHostTurnTools {
+    pub policy: Option<
+        Arc<
+            dyn tinyagents_harness::middleware::ToolCallPolicy<
+                crate::agent::tinyagents::host::OpenHumanRunContext,
+            >,
+        >,
+    >,
+    pub withheld: HashSet<String>,
+    pub permanent: HashSet<String>,
+    pub scope_additions: HashSet<String>,
+}
+
+pub(super) fn add_permanent_tools(
+    mut definition: crate::agent_registry::host_definition::AgentDefinition,
+    permanent: &HashSet<String>,
+) -> crate::agent_registry::host_definition::AgentDefinition {
+    definition.extra_tools.extend(permanent.iter().cloned());
+    definition.extra_tools.sort();
+    definition.extra_tools.dedup();
+    definition
+}
+
+pub(super) fn scope_def(
+    definition: Option<&crate::agent_registry::host_definition::AgentDefinition>,
+    host_tools: &MergedHostTurnTools,
+) -> Option<crate::agent_registry::host_definition::AgentDefinition> {
+    let mut definition = definition.cloned()?;
+    if let tinyagents_definition::ToolScope::Named(names) = &mut definition.tools {
+        names.retain(|name| !host_tools.withheld.contains(name));
+        definition
+            .extra_tools
+            .retain(|name| !host_tools.withheld.contains(name));
+        definition
+            .extra_tools
+            .extend(host_tools.scope_additions.iter().cloned());
+        definition.extra_tools.sort();
+        definition.extra_tools.dedup();
+    }
+    Some(definition)
+}
+
+pub(super) fn merge_for_turn(
+    dispatch: &crate::core::runtime::DispatchCtx,
+    host: Option<&HostTools>,
+    agent_id: &str,
+    session_id: Option<&str>,
+    tools: &mut Vec<Box<dyn Tool>>,
+    visible: &mut HashSet<String>,
+) -> Result<MergedHostTurnTools> {
+    match host
+        .map(|build| build(TurnContext::new(agent_id, session_id).with_dispatch(dispatch)))
+        .map(|host_tools| host_tools.merge_into(agent_id, tools, visible))
+    {
+        Some(merged) => merged,
+        None => Ok(MergedHostTurnTools {
+            policy: None,
+            withheld: HashSet::new(),
+            permanent: HashSet::new(),
+            scope_additions: HashSet::new(),
+        }),
     }
 }
 
@@ -145,6 +278,7 @@ impl std::fmt::Debug for HostTurnTools {
                     .collect::<Vec<_>>(),
             )
             .field("visible", &self.visible)
+            .field("withheld", &self.withheld)
             .field("policy", &self.policy.is_some())
             .finish()
     }
@@ -161,11 +295,22 @@ impl std::fmt::Debug for HostTurnTools {
 /// Non-exhaustive: this describes an occasion, and occasions gain detail.
 /// Construct it with [`TurnContext::new`] and read it through the accessors so
 /// a later field cannot break a host that matched on it.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[non_exhaustive]
 pub struct TurnContext<'a> {
     agent_id: &'a str,
     session_id: Option<&'a str>,
+    dispatch: Option<&'a crate::core::runtime::DispatchCtx>,
+}
+
+impl std::fmt::Debug for TurnContext<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TurnContext")
+            .field("agent_id", &self.agent_id)
+            .field("session_id", &self.session_id)
+            .field("dispatch", &self.dispatch.is_some())
+            .finish()
+    }
 }
 
 impl<'a> TurnContext<'a> {
@@ -175,7 +320,26 @@ impl<'a> TurnContext<'a> {
         Self {
             agent_id,
             session_id,
+            dispatch: None,
         }
+    }
+
+    /// The same occasion, built under `dispatch`: the context of the session
+    /// being assembled, which a belt that reads the acting tenant takes it from.
+    #[must_use]
+    pub fn with_dispatch(mut self, dispatch: &'a crate::core::runtime::DispatchCtx) -> Self {
+        self.dispatch = Some(dispatch);
+        self
+    }
+
+    /// The context this turn is built under: the one named by
+    /// [`with_dispatch`](Self::with_dispatch), else the calling task's own (an
+    /// occasion built without one).
+    #[must_use]
+    pub fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
+        self.dispatch
+            .cloned()
+            .unwrap_or_else(|| crate::core::runtime::DispatchCtx::from_weak(None))
     }
 
     /// The agent definition this turn runs as.
@@ -232,18 +396,70 @@ impl OpenHumanSessionHost {
     /// `session_id` is the conversation this turn runs in, reaching the
     /// factory as [`TurnContext::session_id`]; `None` when none is named yet.
     pub fn from_config_with_host_tools(
+        ctx: &crate::core::runtime::DispatchCtx,
         config: &Config,
-        definition: &crate::agent::harness::definition::AgentDefinition,
+        definition: &crate::agent_registry::host_definition::AgentDefinition,
         host: &super::HostTools,
         session_id: Option<&str>,
     ) -> Result<Self> {
         OpenHumanSessionHost::build_session_agent_inner(
+            ctx,
             config,
             &definition.id,
             Some(definition),
             false,
             Some(host),
             session_id,
+        )
+    }
+
+    /// Build a session agent from a definition the caller already holds,
+    /// rather than an id resolved through `AgentDefinitionRegistry::current()`
+    /// or `config.agent_registry`.
+    ///
+    /// The definition is authoritative for this agent's prompt, tool scope,
+    /// sandbox mode and delegation allowlist; it is stamped on the session so
+    /// in-turn readers ([`OpenHumanSessionHost::resolved_definition`]) never fall back to a
+    /// registry entry that happens to share its id. This is the constructor a
+    /// library host uses to run many independently specified agents on one
+    /// booted core.
+    pub fn from_config_with_definition(
+        ctx: &crate::core::runtime::DispatchCtx,
+        config: &Config,
+        definition: &crate::agent_registry::host_definition::AgentDefinition,
+    ) -> Result<Self> {
+        log::debug!(
+            "[agent] from_config_with_definition id={} sandbox={:?}",
+            definition.id,
+            definition.sandbox_mode,
+        );
+        OpenHumanSessionHost::build_session_agent_inner(
+            ctx,
+            config,
+            &definition.id,
+            Some(definition),
+            false,
+            None,
+            None,
+        )
+    }
+
+    pub(crate) fn from_config_with_definition_and_turn_model_source(
+        ctx: &crate::core::runtime::DispatchCtx,
+        config: &Config,
+        definition: &crate::agent_registry::host_definition::AgentDefinition,
+        source: crate::agent::tinyagents::TurnModelSource,
+        model: String,
+    ) -> Result<Self> {
+        OpenHumanSessionHost::build_session_agent_inner_with_turn_model_source(
+            ctx,
+            config,
+            &definition.id,
+            Some(definition),
+            false,
+            None,
+            None,
+            Some((source, model)),
         )
     }
 }

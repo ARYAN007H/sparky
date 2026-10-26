@@ -19,10 +19,11 @@
 //! (step 1). This avoids double-delivering to a channel that doesn't
 //! exist.
 
-use crate::channels::{Channel, ChannelSendExt, SendMessage};
+use crate::channels::outbound::text_message;
+use crate::channels::Channel;
 use crate::core::events::DomainEvent;
-use crate::core::socketio::WebChannelEvent;
 use crate::web_chat::publish_web_channel_event;
+use crate::web_chat::WebChannelEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -202,13 +203,14 @@ impl EventHandler<DomainEvent> for ProactiveMessageSubscriber {
             error_retry_after_ms: None,
             error_provider: None,
             error_fallback_available: None,
+            copy_key: None,
+            copy_params: None,
             tool_name: None,
             skill_id: None,
             args: None,
             output: None,
             success: Some(true),
             round: None,
-            reaction_emoji: None,
             segment_index: None,
             segment_total: None,
             delta: None,
@@ -292,9 +294,29 @@ impl EventHandler<DomainEvent> for ProactiveMessageSubscriber {
                         "source": source.to_string(),
                         "message_chars": message.chars().count(),
                     });
-                    let (outcome, request_id) = gate
-                        .intercept_audited("channels.proactive_send", &summary, redacted)
-                        .await;
+                    // This runs on a spawned bus task, where the publisher's
+                    // task-local turn origin is gone and the gate would deny it
+                    // as `Unknown`. The event is host-originated automation
+                    // (a cron job's output, a briefing), so label it as such.
+                    // This bus task delivers a result to a destination the
+                    // operator configured. It is distinct from the cron
+                    // agent turn that produced the result, whose tool calls
+                    // must remain subject to the cron effect restriction.
+                    let automation_source =
+                        crate::security::turn_origin::TrustedAutomationSource::Background;
+                    let (outcome, request_id) = crate::security::turn_origin::with_origin(
+                        crate::security::turn_origin::AgentTurnOrigin::TrustedAutomation {
+                            job_id: source.clone(),
+                            source: automation_source,
+                        },
+                        gate.intercept_audited(
+                            &Default::default(),
+                            "channels.proactive_send",
+                            &summary,
+                            redacted,
+                        ),
+                    )
+                    .await;
                     match outcome {
                         crate::security::approval::GateOutcome::Allow => {
                             approval_request_id = request_id;
@@ -315,7 +337,7 @@ impl EventHandler<DomainEvent> for ProactiveMessageSubscriber {
                 }
 
                 let send_result = ch
-                    .send_with_outbound_intent(&SendMessage::new(message, &recipient))
+                    .send_typed(&text_message(&key, &recipient, message, None))
                     .await;
                 // Record the terminal status on the approval audit
                 // row before we log the outcome — best-effort, see

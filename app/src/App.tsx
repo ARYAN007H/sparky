@@ -17,9 +17,7 @@ import AppUpdatePrompt from './components/AppUpdatePrompt';
 import BootCheckGate from './components/BootCheckGate/BootCheckGate';
 import CommandProvider from './components/commands/CommandProvider';
 import ServiceBlockingGate from './components/daemon/ServiceBlockingGate';
-import DictationHotkeyManager from './components/DictationHotkeyManager';
 import ErrorFallbackScreen from './components/ErrorFallbackScreen';
-import HarnessInitOverlay from './components/InitProgressScreen/HarnessInitOverlay';
 import KeyringConsentOverlay from './components/keyring/KeyringConsentOverlay';
 import AppSidebar from './components/layout/shell/AppSidebar';
 import RootShellLayout from './components/layout/shell/RootShellLayout';
@@ -28,15 +26,13 @@ import WindowDragBar from './components/layout/shell/WindowDragBar';
 import WindowsWindowControls, {
   isWindowsDesktop,
 } from './components/layout/shell/WindowsWindowControls';
-import LocalAIDownloadSnackbar from './components/LocalAIDownloadSnackbar';
 import NoticeCenter from './components/notices/NoticeCenter';
 import OpenhumanLinkModal from './components/OpenhumanLinkModal';
 import PersistRehydrationScreen from './components/PersistRehydrationScreen';
-import PttHotkeyManager from './components/PttHotkeyManager';
 import SecurityBanner from './components/SecurityBanner';
+import { Toaster } from './components/ui/Toast';
 import AppWalkthrough from './components/walkthrough/AppWalkthrough';
 import { useDevSkipOnboarding } from './hooks/useDevSkipOnboarding';
-import { useNotchBootSync } from './hooks/useNotchBootSync';
 import { I18nProvider } from './lib/i18n/I18nContext';
 import {
   startNativeNotificationsService,
@@ -102,7 +98,7 @@ function App() {
    * Authoritative top-level provider / gate nesting for the desktop shell,
    * outermost first. Keep this list in sync with the JSX returned below;
    * `scripts/generate-architecture-docs.mjs` renders it into
-   * `gitbooks/developing/architecture/frontend.md` and CI (`pnpm docs:check`)
+   * `docs/gitbooks/en/developing/architecture/frontend.md` and CI (`pnpm docs:check`)
    * fails if the doc drifts. Refresh the doc with `pnpm docs:generate`.
    * Format per line: `<order>. <Component> — <role>` (role must not contain " — ").
    * 1. Sentry.ErrorBoundary — Crash boundary; renders ErrorFallbackScreen
@@ -136,6 +132,7 @@ function App() {
             <ThemeProvider>
               <I18nProvider>
                 {!onMobile && <WindowsWindowControls />}
+                <Toaster />
                 <BootCheckGate>
                   <CoreStateProvider>
                     {socketWrapped(
@@ -146,12 +143,8 @@ function App() {
                               <AnalyticsPageTracker />
                               <AppShell />
                               <SecurityBanner />
-                              {!onMobile && <DictationHotkeyManager />}
-                              {!onMobile && <PttHotkeyManager />}
-                              {!onMobile && <LocalAIDownloadSnackbar />}
                               {!onMobile && <AppUpdatePrompt />}
                               <KeyringConsentOverlay />
-                              <HarnessInitOverlay />
                               <AnnouncementGate />
                             </ServiceBlockingGate>
                           </CommandProvider>
@@ -232,10 +225,6 @@ export function AppShellDesktop() {
     location.pathname,
     navigate,
   ]);
-
-  // Sync the notch indicator to the persisted always-on listening state once
-  // the core is ready (once per boot). Extracted to a hook so it's testable.
-  useNotchBootSync(isBootstrapping);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const navType = useNavigationType();

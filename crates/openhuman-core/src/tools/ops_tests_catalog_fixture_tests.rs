@@ -38,9 +38,12 @@ fn full_product_features_enabled() -> bool {
         ("http-server", cfg!(feature = "http-server")),
         ("scheduler-gate", cfg!(feature = "scheduler-gate")),
         ("file-logging", cfg!(feature = "file-logging")),
-        ("contacts", cfg!(feature = "contacts")),
-        ("runtime-node", cfg!(feature = "runtime-node")),
         ("hosting", cfg!(feature = "hosting")),
+        ("inbound-queues", cfg!(feature = "inbound-queues")),
+        ("storage-sqlite", cfg!(feature = "storage-sqlite")),
+        ("storage-file", cfg!(feature = "storage-file")),
+        ("secret-file", cfg!(feature = "secret-file")),
+        ("legacy-import", cfg!(feature = "legacy-import")),
     ];
     let declared: std::collections::BTreeSet<_> = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -49,6 +52,9 @@ fn full_product_features_enabled() -> bool {
     .lines()
     .map(|line| line.split('#').next().unwrap_or("").trim())
     .filter(|line| !line.is_empty())
+    // This gate belongs only to the RPC host. It cannot change the core tool
+    // catalog and is deliberately not a core feature (see CHAIN_LOCAL_GATES).
+    .filter(|line| *line != "os-keyring")
     .collect();
     let checked: std::collections::BTreeSet<_> = flags.iter().map(|(name, _)| *name).collect();
     assert_eq!(
@@ -87,13 +93,12 @@ fn full_product_features_enabled() -> bool {
 ///   build may register fewer tools, but every name it registers must be in
 ///   the product catalog. The full product build checks exact equality.
 ///
-/// On top of the domain registry this adds the two harness-intrinsic bridge
-/// tool names, `tool_search` and `tool_call`
-/// (`tinyagents_harness::tool::discover::{TOOL_SEARCH_NAME, TOOL_CALL_NAME}`):
-/// neither is ever a registered [`tinytools::Tool`] — the agent loop answers
-/// both itself once a turn has deferred tools (see that module's doc comment)
-/// — but both are model-visible tool names the frontend's tool-call
-/// presentation must recognize exactly like any other.
+/// On top of the domain registry this adds the harness-intrinsic bridge tool
+/// name, `tool_search` (`tinyagents_harness::tool::discover::TOOL_SEARCH_NAME`):
+/// it is never a registered [`tinytools::Tool`] — the agent loop answers it
+/// itself once a turn has deferred tools (see that module's doc comment) —
+/// but it is a model-visible tool name the frontend's tool-call presentation
+/// must recognize exactly like any other.
 fn full_tool_catalog_names() -> Vec<String> {
     let tmp = TempDir::new().unwrap();
     let security = Arc::new(SecurityPolicy::default());
@@ -106,23 +111,58 @@ fn full_tool_catalog_names() -> Vec<String> {
         );
         cfg.search.credentials_mut(provider).unwrap().api_key = Some(key.into());
     }
+    // Memory registers its `memory` tool only while an engine is usable (a
+    // signed-in user, or a CortexDB key). Bind the reference engine so the
+    // catalog is the one a signed-in user sees.
+    crate::memory::test_fixtures::bind_reference(&cfg);
     let browser = cfg.browser.clone();
     let http = cfg.http_request.clone();
 
-    let tools = all_tools(
-        Arc::new(cfg.clone()),
-        &security,
-        AuditLogger::disabled(),
-        &browser,
-        &http,
-        tmp.path(),
-        &HashMap::new(),
-        &cfg,
+    // Media generators belong to the host, so provide the same three tools
+    // through the generic source port the product host uses. Keep the source
+    // in this context's Extensions: a process-global test registration can
+    // leak into concurrently running catalog tests.
+    let extensions = crate::core::slots::Extensions::new();
+    #[cfg(feature = "media")]
+    crate::tools::sources::register_tool_source_in(&extensions, "catalog-test-media", |_| {
+        use std::sync::Arc;
+        use tinyagents_harness::tinyinference_image::MockImageGenerator;
+        use tinyagents_harness::tinyinference_video::{MockVideoGenerator, MockVideoScript};
+
+        crate::media::generation::media_tools_from(
+            crate::media::generation::MediaGenerators::new(
+                Arc::new(MockImageGenerator::new()),
+                Arc::new(MockVideoGenerator::new(MockVideoScript::delivers())),
+            ),
+            std::path::Path::new("."),
+            std::path::Path::new("./workspace"),
+            std::path::Path::new("./Files"),
+            tinyagents_harness::tinyinference_video::WaitPolicy::new(
+                std::time::Duration::from_millis(1),
+                std::time::Duration::from_secs(5),
+            ),
+        )
+    });
+    let context = crate::core::runtime::CoreContext::for_test_with_extensions(
+        crate::core::runtime::DomainSet::full(),
+        Some(tmp.path().to_path_buf()),
+        extensions,
     );
+
+    let tools = crate::core::runtime::CoreContext::sync_scope(context, || {
+        all_tools(
+            Arc::new(cfg.clone()),
+            &security,
+            AuditLogger::disabled(),
+            &browser,
+            &http,
+            tmp.path(),
+            &cfg,
+        )
+    });
 
     let mut names: Vec<String> = tools.iter().map(|t| t.name().to_string()).collect();
     names.push(tinyagents_harness::tool::discover::TOOL_SEARCH_NAME.to_string());
-    names.push(tinyagents_harness::tool::discover::TOOL_CALL_NAME.to_string());
     names.sort();
     names.dedup();
     // Defensive: a Composio per-connection action tool would be an
@@ -139,6 +179,17 @@ fn full_tool_catalog_names() -> Vec<String> {
     names
 }
 
+/// Tool families the core does not register itself: they come from tool
+/// sources the TinyHumans layer plugs in (`tools::sources`), which a
+/// core-only lib test cannot install. The frontend fixture still lists them
+/// because the shipped product has them, so a core-only run must not read
+/// their absence as drift.
+const HOSTED_TOOL_PREFIXES: &[&str] = &["media_"];
+
+fn is_hosted_tool(name: &str) -> bool {
+    HOSTED_TOOL_PREFIXES.iter().any(|p| name.starts_with(p))
+}
+
 const REGENERATE_COMMAND: &str = "UPDATE_TOOL_CATALOG=1 cargo test -p openhuman --lib \
      --features \"$(bash scripts/ci/product-features.sh)\" \
      tools::ops::tests::catalog_fixture_tests::tool_catalog_matches_frontend_fixture";
@@ -152,6 +203,16 @@ fn tool_catalog_matches_frontend_fixture() {
 
     if std::env::var("UPDATE_TOOL_CATALOG").as_deref() == Ok("1") {
         assert!(full_product_features_enabled(), "{REGENERATE_COMMAND}");
+        // Keep the hosted families the fixture already lists: this build
+        // cannot see them, so regenerating must not drop them.
+        let mut names = names;
+        if let Ok(previous) = std::fs::read_to_string(&path) {
+            if let Ok(previous) = serde_json::from_str::<Vec<String>>(&previous) {
+                names.extend(previous.into_iter().filter(|n| is_hosted_tool(n)));
+                names.sort();
+                names.dedup();
+            }
+        }
         let json = serde_json::to_string_pretty(&names).expect("serialize tool catalog");
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).expect("create fixture directory");
@@ -185,7 +246,10 @@ fn tool_catalog_matches_frontend_fixture() {
     let full_product = full_product_features_enabled();
     let added: Vec<&String> = names.iter().filter(|n| !expected.contains(n)).collect();
     let removed: Vec<&String> = if full_product {
-        expected.iter().filter(|n| !names.contains(n)).collect()
+        expected
+            .iter()
+            .filter(|n| !names.contains(n) && !is_hosted_tool(n))
+            .collect()
     } else {
         Vec::new()
     };

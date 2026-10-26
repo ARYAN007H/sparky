@@ -1,4 +1,5 @@
 use super::*;
+use tinytools_agent::dialect::TranscriptEntry;
 #[derive(Clone, Default)]
 struct WarnSink(Arc<std::sync::Mutex<Vec<String>>>);
 
@@ -29,6 +30,13 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for WarnLayer {
         }
         struct Message(Option<String>);
         impl tracing::field::Visit for Message {
+            /// Preserve string-valued tracing messages without a Debug wrapper.
+            fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+                if field.name() == "message" {
+                    self.0 = Some(value.to_string());
+                }
+            }
+
             /// Keep the formatted `message` field and discard the rest.
             fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
                 if field.name() == "message" {
@@ -96,18 +104,18 @@ impl ChatModel<()> for SpawnAttemptProvider {
     }
 }
 
-const REFUSAL: &str = "refusing to register spawn/delegate tool";
+const REFUSAL: &str = "refused spawn tool on sub-agent";
 
 /// Runs one sub-agent turn whose parent surface carries `spawn_subagent`, with
 /// `allowed` deciding whether the allowlist readmits it. Returns
 /// (spawn tool executed?, refusal warnings emitted).
 async fn run_with_spawn_tool_in_parent_surface(allowed: HashSet<String>) -> (bool, Vec<String>) {
+    use tracing::instrument::WithSubscriber;
     use tracing_subscriber::layer::SubscriberExt;
 
     let executed = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let sink = WarnSink::default();
     let subscriber = tracing_subscriber::registry().with(WarnLayer(sink.clone()));
-    let _subscriber_guard = tracing::subscriber::set_default(subscriber);
 
     let provider = Arc::new(SpawnAttemptProvider {
         calls: AtomicUsize::new(0),
@@ -116,8 +124,12 @@ async fn run_with_spawn_tool_in_parent_surface(allowed: HashSet<String>) -> (boo
         Box::new(EchoTool),
         Box::new(SpawnProbeTool(executed.clone())),
     ]);
-    let mut history = vec![ChatMessage::user("spawn a helper")];
+    let mut history = vec![TranscriptMessage::user("spawn a helper")];
 
+    let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+    // Exercise the refusal path at the product depth ceiling. Below the cap,
+    // bounded nested spawning is intentionally permitted and must not warn.
+    run_context.max_spawn_depth = Some(0);
     run_subagent_via_graph(
         crate::agent::tinyagents::TurnModelSource::from_model(provider),
         "mock-model",
@@ -128,13 +140,13 @@ async fn run_with_spawn_tool_in_parent_surface(allowed: HashSet<String>) -> (boo
         vec![],
         allowed,
         10,
-        None,
+        (None, None),
         None,
         "researcher",
         "task-6157",
         false,
         None,
-        crate::agent::tinyagents::host::OpenHumanRunContext::new(),
+        run_context,
         None,
         std::env::temp_dir(),
         None,
@@ -144,7 +156,9 @@ async fn run_with_spawn_tool_in_parent_surface(allowed: HashSet<String>) -> (boo
         "mock-channel",
         AgentTokenjuiceCompression::Off,
         None,
+        None,
     )
+    .with_subscriber(subscriber)
     .await
     .expect("graph subagent runs");
 
@@ -205,13 +219,14 @@ async fn an_allowlist_that_readmits_a_spawn_tool_is_refused_loudly() {
 /// record stays in the log for the process rail; it just stops being chat.
 #[test]
 fn mirrored_tool_results_are_hidden_from_the_worker_thread_chat() {
-    use crate::memory::conversations::{self as store, CreateConversationThread};
+    use crate::threads::store::{self as store, CreateConversationThread};
 
     let dir = std::env::temp_dir().join(format!("wt-5934-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
     let now = chrono::Utc::now().to_rfc3339();
     for id in ["worker-typed", "worker-recovered"] {
         store::ensure_thread(
+            &crate::core::runtime::DispatchCtx::ambient(),
             dir.clone(),
             CreateConversationThread {
                 id: id.to_string(),
@@ -220,6 +235,7 @@ fn mirrored_tool_results_are_hidden_from_the_worker_thread_chat() {
                 parent_thread_id: Some("parent-1".to_string()),
                 labels: Some(vec!["tasks".to_string()]),
                 personality_id: None,
+                working_dir: None,
             },
         )
         .unwrap();
@@ -227,16 +243,17 @@ fn mirrored_tool_results_are_hidden_from_the_worker_thread_chat() {
 
     const RAW: &str = "{\"events\":[{\"title\":\"raw tool output the human never typed\"}]}";
 
-    // The typed path (`ConversationMessage::ToolResults`), used on a normal run.
+    // The typed path (`TranscriptEntry::ToolResults`), used on a normal run.
     mirror_worker_thread(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &dir,
         "worker-typed",
         "researcher",
         "task-1",
         &[
-            ConversationMessage::AssistantToolCalls {
+            TranscriptEntry::AssistantToolCalls {
                 text: Some("checking the calendar".to_string()),
-                tool_calls: vec![crate::inference::provider::ToolCall {
+                tool_calls: vec![tinytools_agent::dialect::NativeToolCall {
                     id: "call-1".to_string(),
                     name: "list_events".to_string(),
                     arguments: "{}".to_string(),
@@ -245,9 +262,10 @@ fn mirrored_tool_results_are_hidden_from_the_worker_thread_chat() {
                 reasoning_content: None,
                 extra_metadata: None,
             },
-            ConversationMessage::ToolResults(vec![crate::agent::messages::ToolResultMessage {
+            TranscriptEntry::ToolResults(vec![tinytools_agent::dialect::ToolResultEntry {
                 tool_call_id: "call-1".to_string(),
                 content: RAW.to_string(),
+                trusted_verbatim: false,
             }]),
         ],
         Some("Here is your week."),
@@ -255,13 +273,14 @@ fn mirrored_tool_results_are_hidden_from_the_worker_thread_chat() {
 
     // The error-recovery path (`role: "tool"`), used when a run fails mid-turn.
     mirror_worker_thread_from_history(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &dir,
         "worker-recovered",
         "researcher",
         "task-1",
         &[
-            ChatMessage::assistant("checking the calendar"),
-            ChatMessage::tool(RAW),
+            TranscriptMessage::assistant("checking the calendar"),
+            TranscriptMessage::tool(RAW),
         ],
         Some("[subagent run failed before completion]"),
     );
@@ -270,7 +289,12 @@ fn mirrored_tool_results_are_hidden_from_the_worker_thread_chat() {
     // failure names every path that is still painting a tool result as chat.
     let mut painted_as_user_chat: Vec<String> = Vec::new();
     for thread_id in ["worker-typed", "worker-recovered"] {
-        let rows = store::get_messages(dir.clone(), thread_id).unwrap();
+        let rows = store::get_messages(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            dir.clone(),
+            thread_id,
+        )
+        .unwrap();
         assert!(
             rows.iter().any(|r| r.content == RAW),
             "{thread_id}: the mirror wrote no tool-result row to assert on"

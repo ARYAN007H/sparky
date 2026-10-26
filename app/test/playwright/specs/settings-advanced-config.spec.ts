@@ -90,7 +90,11 @@ test.describe('Settings - Advanced Config', () => {
 
     await expect(page.getByRole('heading', { name: 'Max actions per hour' })).toBeVisible();
     await page.locator('#autonomy-max-actions').fill(String(target));
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page
+      .locator('#autonomy-max-actions')
+      .locator('xpath=ancestor::div[.//button[normalize-space()="Save"]][1]')
+      .getByRole('button', { name: 'Save' })
+      .click();
     await expect(page.getByText('Saved.')).toBeVisible();
 
     await expect
@@ -148,11 +152,20 @@ test.describe('Settings - Advanced Config', () => {
     await expect
       .poll(async () => page.evaluate(() => window.location.hash))
       .toContain('/connections');
+    await expect(page.getByText('LLM Providers')).toBeVisible();
+
+    await gotoSettingsRoute(page, '/settings/agent-chat');
+    await expect
+      .poll(async () => page.evaluate(() => window.location.hash))
+      .toContain('/connections?tab=llm');
+    await expect(page.getByText('LLM Providers')).toBeVisible();
+    await expect(page.getByText('Runtime Status')).toHaveCount(0);
 
     await gotoSettingsRoute(page, '/settings/about');
     // The About description copy also contains "software updates"; match the
     // section label exactly to avoid a strict-mode violation.
     await expect(page.getByText('Resources', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('about-check-updates')).toBeVisible();
 
     // /settings/llm now redirects to the Connections page (LLM moved there).
     await gotoSettingsRoute(page, '/settings/llm');

@@ -41,8 +41,8 @@ pub(crate) async fn proxy(config: &Config) -> Result<Proxy, String> {
         Some(std::time::Duration::from_secs(8)),
     )
     .await
-    .map_err(crate::modules::ops::LoadError::into_message)?;
-    let runtime = crate::modules::host::runtime()
+    .map_err(crate::modules::ops::load_error_message)?;
+    let runtime = crate::modules::runtime::runtime()
         .await
         .map_err(|error| format!("TinyComputer module bus unavailable: {error}"))?;
     crate::modules::registry::find(MODULE_ID)
@@ -64,7 +64,7 @@ pub(crate) async fn proxy(config: &Config) -> Result<Proxy, String> {
                     // The module refused its configuration and faulted; it
                     // stays unusable in this process, so report it that way.
                     tracing::warn!(%message, "[computer] module faulted on reinitialization");
-                    super::resolution::table().mark_faulted(MODULE_ID, message.clone());
+                    tinybus::module::resolution::global().mark_faulted(MODULE_ID, message.clone());
                 }
                 message
             })?;

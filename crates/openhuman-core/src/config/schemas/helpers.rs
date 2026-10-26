@@ -2,8 +2,8 @@ use serde::de::{DeserializeOwned, Deserializer};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
+use crate::core::Outcome;
 use crate::core::{FieldSchema, TypeSchema};
-use crate::rpc::RpcOutcome;
 
 pub(super) const DEFAULT_ONBOARDING_FLAG_NAME: &str = ".skip_onboarding";
 
@@ -26,7 +26,12 @@ pub(super) struct CloudProviderUpdate {
     /// Auth style: "bearer" | "anthropic" | "openhuman_jwt" | "none".
     #[serde(default)]
     pub(super) auth_style: Option<String>,
+    /// Optional PEM CA bundle for this provider. Empty string removes it.
+    #[serde(default)]
+    pub(super) ca_cert_pem: Option<String>,
     /// Legacy field — tolerated on read for back-compat but not required.
+    // keep until v0.66 (review after 2027-01-11): incoming RPC discriminator
+    // remains accepted until shipped-client parameter coverage exists.
     #[serde(rename = "type", default)]
     pub(super) legacy_type: Option<String>,
     /// Legacy field — tolerated on read.
@@ -69,26 +74,21 @@ pub(super) struct ModelSettingsUpdate {
     pub(super) vision_provider: Option<String>,
     pub(super) memory_provider: Option<String>,
     pub(super) embeddings_provider: Option<String>,
-    pub(super) heartbeat_provider: Option<String>,
-    pub(super) learning_provider: Option<String>,
-    pub(super) subconscious_provider: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub(super) struct MemorySettingsUpdate {
-    pub(super) backend: Option<String>,
-    pub(super) auto_save: Option<bool>,
     pub(super) embedding_provider: Option<String>,
     pub(super) embedding_model: Option<String>,
     pub(super) embedding_dimensions: Option<usize>,
-    /// One of `"minimal" | "balanced" | "extended" | "maximum"`.
-    pub(super) memory_window: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub(super) struct RuntimeSettingsUpdate {
     pub(super) kind: Option<String>,
     pub(super) reasoning_enabled: Option<bool>,
+    pub(super) reasoning_effort: Option<String>,
+    pub(super) reasoning_effort_model: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -104,6 +104,7 @@ pub(super) struct BrowserSettingsUpdate {
     pub(super) download_dir: Option<String>,
     pub(super) max_task_steps: Option<usize>,
     pub(super) task_timeout_secs: Option<u64>,
+    pub(super) learn_from_tasks: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -122,6 +123,12 @@ pub(super) struct AnalyticsSettingsUpdate {
 }
 
 #[derive(Debug, Deserialize)]
+pub(super) struct UserTimezoneUpdate {
+    #[serde(default)]
+    pub(super) timezone: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(super) struct LocalAiSettingsUpdate {
     pub(super) runtime_enabled: Option<bool>,
     /// MVP opt-in marker. Tied to `runtime_enabled` from the unified AI
@@ -135,9 +142,6 @@ pub(super) struct LocalAiSettingsUpdate {
     pub(super) model_id: Option<String>,
     pub(super) chat_model_id: Option<String>,
     pub(super) usage_embeddings: Option<bool>,
-    pub(super) usage_heartbeat: Option<bool>,
-    pub(super) usage_learning_reflection: Option<bool>,
-    pub(super) usage_subconscious: Option<bool>,
     pub(super) api_key: Option<String>,
 }
 
@@ -160,30 +164,6 @@ pub(super) struct WorkspaceOnboardingFlagSetParams {
 #[derive(Debug, Deserialize)]
 pub(super) struct OnboardingCompletedSetParams {
     pub(super) value: bool,
-}
-
-#[derive(Debug, Deserialize)]
-pub(super) struct DictationSettingsUpdate {
-    pub(super) enabled: Option<bool>,
-    pub(super) hotkey: Option<String>,
-    pub(super) activation_mode: Option<String>,
-    pub(super) llm_refinement: Option<bool>,
-    pub(super) streaming: Option<bool>,
-    pub(super) streaming_interval_ms: Option<u64>,
-}
-
-#[derive(Debug, Deserialize)]
-pub(super) struct VoiceServerSettingsUpdate {
-    pub(super) auto_start: Option<bool>,
-    pub(super) hotkey: Option<String>,
-    pub(super) activation_mode: Option<String>,
-    pub(super) skip_cleanup: Option<bool>,
-    pub(super) min_duration_secs: Option<f32>,
-    pub(super) silence_threshold: Option<f32>,
-    pub(super) custom_dictionary: Option<Vec<String>>,
-    pub(super) always_on_enabled: Option<bool>,
-    pub(super) wake_word: Option<String>,
-    pub(super) stt_engine: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -215,9 +195,8 @@ pub(super) struct AutonomySettingsUpdate {
     /// Replaces the "Always allow" allowlist wholesale — tool names the agent
     /// may run without an approval prompt. Empty list clears it.
     pub(super) auto_approve: Option<Vec<String>>,
-    /// Blanket "auto-approve everything" bypass. `SubconsciousTainted` and
-    /// `Unknown` origins are still denied by the gate regardless of this
-    /// setting.
+    /// Blanket "auto-approve everything" bypass. `Unknown` origins are still
+    /// denied by the gate regardless of this setting.
     pub(super) auto_approve_all: Option<bool>,
 }
 
@@ -235,6 +214,10 @@ pub(super) struct AgentSettingsUpdate {
     /// override (back to the orchestrator); omitted leaves it unchanged.
     #[serde(default)]
     pub(super) chat_agent_id: Option<String>,
+    /// `auto | native | xml | pformat | python | typescript`. Validated
+    /// server-side; omitted leaves it unchanged.
+    #[serde(default)]
+    pub(super) tool_dispatcher: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -242,11 +225,10 @@ pub(super) struct AgentPathsUpdate {
     /// New absolute action sandbox path. Empty string clears the override;
     /// omitted leaves it unchanged. Validated server-side.
     pub(super) action_dir: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub(super) struct MemorySyncSettingsUpdate {
-    pub(super) sync_interval_secs: Option<u64>,
+    /// New absolute folder for agent deliverables (#5505). Empty string
+    /// clears the override; omitted leaves it unchanged.
+    #[serde(default)]
+    pub(super) files_dir: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -290,7 +272,6 @@ pub fn optional_json(name: &'static str, comment: &'static str) -> FieldSchema {
     }
 }
 
-#[allow(dead_code)]
 pub fn required_string(name: &'static str, comment: &'static str) -> FieldSchema {
     FieldSchema {
         name,
@@ -327,6 +308,6 @@ pub fn json_output(name: &'static str, comment: &'static str) -> FieldSchema {
     }
 }
 
-pub(super) fn to_json<T: serde::Serialize>(outcome: RpcOutcome<T>) -> Result<Value, String> {
+pub(super) fn to_json<T: serde::Serialize>(outcome: Outcome<T>) -> Result<Value, String> {
     outcome.into_cli_compatible_json()
 }

@@ -1,5 +1,6 @@
+use std::collections::HashSet;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use serde_json::json;
 use tinyagents_harness::tinyinference_image::MockImageGenerator;
@@ -13,12 +14,13 @@ use crate::media::generation::MediaGenerators;
 
 fn tools(action_dir: &Path) -> Vec<Box<dyn Tool>> {
     media_tools_from(
-        MediaGenerators {
-            image: Arc::new(MockImageGenerator::new()),
-            video: Arc::new(MockVideoGenerator::new(MockVideoScript::delivers())),
-        },
+        MediaGenerators::new(
+            Arc::new(MockImageGenerator::new()),
+            Arc::new(MockVideoGenerator::new(MockVideoScript::delivers())),
+        ),
         action_dir,
         &action_dir.join("workspace"),
+        action_dir.join("Files"),
         tinyagents_harness::tinyinference_video::WaitPolicy::new(
             std::time::Duration::from_millis(1),
             std::time::Duration::from_secs(5),
@@ -110,63 +112,6 @@ fn schemas_expose_the_reference_standards() {
 }
 
 #[tokio::test]
-async fn image_tool_files_each_generated_file_as_an_artifact() {
-    // The `media_generate_image` tool is wrapped in a `MediaArtifactTool`
-    // (`super::artifact_tool`) which relocates every file the inner
-    // `GenerateImageTool` writes under `<action_dir>/generated-media/` into
-    // the artifact store under `<workspace_dir>/artifacts/<id>/` and tags
-    // the result entry with `artifact_id`, so nothing is left behind in
-    // `generated-media` and the artifact directory holds the file instead.
-    let dir = tempfile::tempdir().unwrap();
-    let tools = tools(dir.path());
-    let result = by_name(&tools, IMAGE_TOOL_NAME)
-        .execute(json!({ "prompt": "an anime comic about a delivery certificate" }))
-        .await
-        .unwrap();
-    assert!(!result.is_error, "{result:?}");
-
-    let payload = result
-        .content
-        .iter()
-        .find_map(|block| match block {
-            tinytools::ToolContent::Json { data } => Some(data.clone()),
-            _ => None,
-        })
-        .expect("json content block");
-    let artifacts = payload["artifacts"].as_array().expect("artifacts array");
-    assert_eq!(artifacts.len(), 1);
-    let artifact_id = artifacts[0]["artifact_id"]
-        .as_str()
-        .expect("artifact_id set on the entry");
-    assert!(
-        artifacts[0].get("artifact_error").is_none(),
-        "{:?}",
-        artifacts[0]
-    );
-
-    // Nothing left behind in the raw generated-media staging dir...
-    let staged = std::fs::read_dir(dir.path().join("generated-media"))
-        .unwrap()
-        .count();
-    assert_eq!(staged, 0, "generated file should have been moved");
-
-    // ...and the file now lives under the artifact store, alongside the
-    // `meta.json` record `create_artifact_for_call` writes.
-    let workspace = dir.path().join("workspace");
-    let artifact_dir = workspace.join("artifacts").join(artifact_id);
-    let entries: Vec<String> = std::fs::read_dir(&artifact_dir)
-        .unwrap()
-        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
-        .collect();
-    assert!(entries.contains(&"meta.json".to_string()), "{entries:?}");
-    assert_eq!(
-        entries.len(),
-        2,
-        "expected meta.json + the moved media file under {artifact_dir:?}, got {entries:?}"
-    );
-}
-
-#[tokio::test]
 async fn list_models_reports_both_catalogs_and_defaults() {
     let dir = tempfile::tempdir().unwrap();
     let tools = tools(dir.path());
@@ -185,13 +130,21 @@ async fn list_models_reports_both_catalogs_and_defaults() {
 fn reference_policy_admits_workspace_files_only() {
     let action = Path::new("/home/user/OpenHuman/projects");
     let workspace = Path::new("/home/user/.openhuman/users/u/workspace");
-    let policy = reference_policy(action, workspace);
+    let allowed_artifacts = Arc::new(Mutex::new(HashSet::new()));
+    let policy = reference_policy(action, workspace, Arc::clone(&allowed_artifacts));
 
     assert!(policy(&action.join("art/ref.png")).is_ok());
     assert!(policy(&workspace.join("attachments/photo.jpg")).is_ok());
     assert!(policy(&action.join("../secret.png")).is_err());
     assert!(policy(Path::new("/etc/passwd")).is_err());
     assert!(policy(Path::new("/home/user/Documents/private.png")).is_err());
+    let files = tempfile::tempdir().unwrap();
+    let filed = files.path().join("generated.png");
+    std::fs::write(&filed, b"generated image").unwrap();
+    let filed = filed.canonicalize().unwrap();
+    allowed_artifacts.lock().unwrap().insert(filed.clone());
+    assert!(policy(&filed).is_ok());
+    assert!(policy(&files.path().join("unrelated.png")).is_err());
     assert!(
         policy(&action.join(".ssh/id_rsa")).is_err(),
         "credential stores stay forbidden"

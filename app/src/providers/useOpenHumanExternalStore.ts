@@ -3,10 +3,13 @@ import type {
   AppendMessage,
   ThreadMessage as AuiThreadMessage,
   RespondToToolApprovalOptions,
+  ThreadMessageLike,
   ThreadSuggestion,
 } from '@assistant-ui/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import debug from 'debug';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { toast } from '../components/ui/Toast';
 import { useOpenHumanQueueAdapter } from '../features/conversations/aui/queueAdapter';
 import { mapDisplayItems } from '../features/conversations/derived/mapDisplayItems';
 import { useT } from '../lib/i18n/I18nContext';
@@ -24,6 +27,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   FEEDBACK_ROW_IDS_METADATA_KEY,
   persistMessageFeedback,
+  removeMessagesById,
   truncateMessagesFrom,
 } from '../store/threadSlice';
 import type { DerivedDisplayItem } from '../types/derivedTranscript';
@@ -31,6 +35,8 @@ import type { ThreadMessage } from '../types/thread';
 import { buildRuntimeMessages, STREAMING_TAIL_ID } from './assistantUiMessages';
 import { getChatSurface } from './chatSurfaceHandlers';
 import { openHumanSpeechAdapter } from './speechAdapter';
+
+const log = debug('openhuman:chat:external-store');
 
 const EMPTY_MESSAGES: ThreadMessage[] = [];
 const EMPTY_SUGGESTIONS: readonly ThreadSuggestion[] = [];
@@ -47,6 +53,17 @@ const DERIVED_TRANSCRIPT_PAGE_LIMIT = 500;
  * the transcript RPC, not here.
  */
 const DERIVED_TRANSCRIPT_MAX_PAGES = 20;
+
+/**
+ * A projected item the core can still rewrite in place: a running tool call, or
+ * a sub-agent that is running or can be continued (`incomplete`/`interrupted`)
+ * and so changes status and contents without moving the thread's total (#7777).
+ */
+const isUnsettled = (item: DerivedDisplayItem) =>
+  item.kind === 'toolCall'
+    ? item.status === 'running'
+    : item.kind === 'subagent' &&
+      (item.status === 'running' || item.status === 'incomplete' || item.status === 'interrupted');
 
 /**
  * Everything the assistant-ui surface needs about the *currently running* turn
@@ -72,6 +89,8 @@ export type OpenHumanThreadExtras = {
   /** Running subagent row, used to title the `subagent` phase. */
   activeSubagentEntry?: ToolTimelineEntry | undefined;
 };
+
+const convertRuntimeMessage = (message: ThreadMessageLike) => message;
 
 const EMPTY_EXTRAS: OpenHumanThreadExtras = { inferenceStatus: null };
 
@@ -139,6 +158,21 @@ export function useCoreTranscriptProjection(
   liveRequestId: string | undefined
 ): CoreTranscriptProjection {
   const [projection, setProjection] = useState<CoreTranscriptProjection>(EMPTY_CORE_TRANSCRIPT);
+  // Read by the fetch loop after each await: the thread may have changed.
+  const latest = useRef({ threadId, liveRequestId });
+  latest.current = { threadId, liveRequestId };
+  // Newest-first items already fetched for one thread, and the thread's
+  // `total` when they were. Cursors are chronological, so items older than the
+  // newest page keep their position and a refresh only needs that page (#7731).
+  const held = useRef<{ threadId: string; total: number; items: DerivedDisplayItem[] } | null>(
+    null
+  );
+  // One fetch loop at a time; a change while it runs asks for one more pass.
+  // `loop` numbers the loops, so an abandoned one stays stale even when its
+  // thread is selected again.
+  const inFlight = useRef<string | null>(null);
+  const rerun = useRef(false);
+  const loop = useRef(0);
 
   useEffect(() => {
     if (!threadId) {
@@ -151,11 +185,18 @@ export function useCoreTranscriptProjection(
       setProjection({ threadId, timelines: EMPTY_TURN_MAP, transcripts: EMPTY_TURN_MAP });
       return;
     }
-    let cancelled = false;
-    const skipRequestIds = liveRequestId ? new Set([liveRequestId]) : undefined;
-    const project = (items: DerivedDisplayItem[]) => {
-      const mapped = mapDisplayItems(items, { skipRequestIds });
+    if (inFlight.current === threadId) {
+      rerun.current = true;
+      return;
+    }
+    const id = ++loop.current;
+    const stale = () => loop.current !== id || latest.current.threadId !== threadId;
+    const project = (items: DerivedDisplayItem[], partial = false) => {
+      const live = latest.current.liveRequestId;
+      const mapped = mapDisplayItems(items, { skipRequestIds: live ? new Set([live]) : undefined });
       setProjection(previous => {
+        if (partial && previous.threadId === threadId && Object.keys(previous.timelines).length > 0)
+          return previous;
         if (previous.threadId !== threadId) {
           return { threadId, timelines: mapped.timelines, transcripts: mapped.transcripts };
         }
@@ -167,23 +208,35 @@ export function useCoreTranscriptProjection(
         return { threadId, timelines, transcripts };
       });
     };
-    void (async () => {
-      try {
-        const first = await threadApi.getDerivedTranscript(threadId, {
-          limit: DERIVED_TRANSCRIPT_PAGE_LIMIT,
-        });
-        if (cancelled) return;
-        if (!first.hasTranscript) {
-          setProjection({ threadId, timelines: EMPTY_TURN_MAP, transcripts: EMPTY_TURN_MAP });
-          return;
-        }
+    const refresh = async () => {
+      const first = await threadApi.getDerivedTranscript(threadId, {
+        limit: DERIVED_TRANSCRIPT_PAGE_LIMIT,
+      });
+      if (stale()) return;
+      if (!first.hasTranscript) {
+        held.current = null;
+        setProjection({ threadId, timelines: EMPTY_TURN_MAP, transcripts: EMPTY_TURN_MAP });
+        return;
+      }
+      const prev = held.current?.threadId === threadId ? held.current : null;
+      // Chronological index of the page's oldest item.
+      const lower = Math.max(0, first.total - first.items.length);
+      let items = first.items;
+      const older = prev ? prev.items.slice(prev.total - lower) : [];
+      if (prev && first.total >= prev.total && lower <= prev.total && !older.some(isUnsettled)) {
+        // The newest page reaches into what is held: keep the held items older
+        // than it, within the same cap as a full walk. A shrunk total (edit,
+        // regenerate), a gap, or an older item still running (a detached
+        // sub-agent finishes in place) walks in full.
+        items = [...items, ...older].slice(
+          0,
+          DERIVED_TRANSCRIPT_PAGE_LIMIT * DERIVED_TRANSCRIPT_MAX_PAGES
+        );
+      } else {
         // Paint the newest page immediately, then walk the older pages and
-        // re-project once with the whole history. A single page silently
-        // dropped everything older than 500 items on a long thread, and a
-        // page that begins mid-turn hides that turn's leading tool calls until
-        // its boundary is in view — both only resolve with the full list.
-        let items = first.items;
-        project(items);
+        // re-project once with the whole history. A page that begins mid-turn
+        // hides that turn's leading tool calls until its boundary is in view.
+        if (first.hasMore) project(items, true);
         let cursor = first.hasMore ? first.nextCursor : undefined;
         let pages = 1;
         while (cursor && pages < DERIVED_TRANSCRIPT_MAX_PAGES) {
@@ -191,25 +244,32 @@ export function useCoreTranscriptProjection(
             limit: DERIVED_TRANSCRIPT_PAGE_LIMIT,
             cursor,
           });
-          if (cancelled) return;
+          if (stale()) return;
           // Pages are newest-first and each next page is older, so appending
           // keeps the newest-first order `mapDisplayItems` expects.
           items = [...items, ...page.items];
           pages += 1;
           cursor = page.hasMore ? page.nextCursor : undefined;
         }
-        if (pages > 1) project(items);
-      } catch {
-        // A missing/older core has no settled process trail; message text and
-        // the live socket projection remain usable. Navigation must not fail.
-        if (!cancelled) {
-          setProjection({ threadId, timelines: EMPTY_TURN_MAP, transcripts: EMPTY_TURN_MAP });
-        }
       }
-    })();
-    return () => {
-      cancelled = true;
+      held.current = { threadId, total: first.total, items };
+      project(items);
     };
+    inFlight.current = threadId;
+    void (async () => {
+      do {
+        rerun.current = false;
+        try {
+          await refresh();
+        } catch {
+          // A missing/older core has no settled process trail; message text and
+          // the live socket projection remain usable. Navigation must not fail.
+          // A transient refresh failure must not erase the last complete trail,
+          // and a pass queued meanwhile still runs.
+        }
+      } while (rerun.current && !stale());
+      if (loop.current === id) inFlight.current = null;
+    })();
   }, [liveRequestId, revision, threadId]);
 
   return projection.threadId === threadId ? projection : EMPTY_CORE_TRANSCRIPT;
@@ -336,6 +396,43 @@ function appendMessageQuote(message: AppendMessage): string {
     .join('\n')}\n\n`;
 }
 
+/** Prefix of the core's deterministic assistant-reply ids (`agent:<request_id>`). */
+const AGENT_REPLY_ID_PREFIX = 'agent:';
+
+/**
+ * Which id to hand `threads.regenerate` for the reply `sourceId`, or `null`
+ * when it cannot be regenerated.
+ *
+ * The core accepts only an assistant reply id (`agent:<request_id>`) or no id
+ * (redo the thread's last turn), so in order:
+ * - `sourceId` is already an `agent:` reply id → send it;
+ * - the reply carries its turn's `requestId` (older rows persisted under a
+ *   `msg_<uuid>` id do) → send `agent:<requestId>`;
+ * - it is the thread's last assistant message, or no reply was named at all →
+ *   send no id, which the core reads as "the last turn";
+ * - anything else is an earlier reply the core has no handle on → `null`.
+ */
+export function resolveRegenerateTarget(
+  runtimeMessages: readonly ThreadMessageLike[],
+  sourceId: string | null
+): { messageId: string | undefined } | null {
+  if (!sourceId) return { messageId: undefined };
+  if (sourceId.startsWith(AGENT_REPLY_ID_PREFIX)) return { messageId: sourceId };
+  const source = runtimeMessages.find(message => message.id === sourceId);
+  const custom = source?.metadata?.custom as
+    | { extraMetadata?: Record<string, unknown> }
+    | undefined;
+  const requestId = custom?.extraMetadata?.requestId;
+  if (typeof requestId === 'string' && requestId.length > 0) {
+    return { messageId: `${AGENT_REPLY_ID_PREFIX}${requestId}` };
+  }
+  const lastAssistant = [...runtimeMessages]
+    .reverse()
+    .find(message => message.role === 'assistant');
+  if (source && lastAssistant?.id === sourceId) return { messageId: undefined };
+  return null;
+}
+
 /**
  * Build the `ExternalStoreAdapter` that backs `useExternalStoreRuntime`.
  *
@@ -357,6 +454,7 @@ export function useOpenHumanExternalStore(
   } = {}
 ) {
   const dispatch = useAppDispatch();
+  const { t } = useT();
   const messages = useAppSelector(state =>
     threadId ? (state.thread.messagesByThreadId[threadId] ?? EMPTY_MESSAGES) : EMPTY_MESSAGES
   );
@@ -501,7 +599,12 @@ export function useOpenHumanExternalStore(
       submit: ({ message, type }: { message: AuiThreadMessage; type: 'positive' | 'negative' }) => {
         // The live tail is not a persisted row; there is nothing to attach a
         // rating to until the turn settles.
-        if (!threadId || message.id === STREAMING_TAIL_ID) return;
+        if (
+          !threadId ||
+          message.id === STREAMING_TAIL_ID ||
+          (message.metadata?.custom as { streaming?: boolean })?.streaming
+        )
+          return;
         const custom = message.metadata?.custom as
           | { extraMetadata?: Record<string, unknown> }
           | undefined;
@@ -564,23 +667,94 @@ export function useOpenHumanExternalStore(
   );
 
   /**
-   * Re-run the turn after `parentId` (the assistant message being reloaded,
-   * or the message immediately before the point to regenerate from), via the
-   * `threads.regenerate` RPC. Same capability-gating rule as `onEdit`:
-   * supplying `onReload` is what turns `capabilities.reload` on, which
-   * un-gates the Reload button in `AssistantActionBar` (`useAuiReloadCapability`).
+   * Regenerate an assistant reply via the `threads.regenerate` RPC. Same
+   * capability-gating rule as `onEdit`: supplying `onReload` is what turns
+   * `capabilities.reload` on, which un-gates the Reload button in
+   * `AssistantActionBar` (`useAuiReloadCapability`).
+   *
+   * assistant-ui's `MessageRuntime.reload()` calls this with `parentId` = the
+   * USER prompt that preceded the reply and `config.sourceId` = the reply
+   * itself. The core only regenerates an assistant reply id
+   * (`agent:<request_id>`) or, with no id, the thread's last turn — a user
+   * prompt's `msg_<uuid>` is rejected as "not a regenerable assistant reply".
+   * See {@link resolveRegenerateTarget} for how the reply id is resolved.
+   *
+   * The local cache is trimmed only once the core has accepted the
+   * regenerate, and a failure is reported to the user rather than rethrown —
+   * the runtime has no error channel for a reload, so a rethrow surfaced as an
+   * unhandled rejection.
    */
   const onReload = useCallback(
-    async (parentId: string | null) => {
+    async (parentId: string | null, config?: { sourceId?: string | null }) => {
       if (!threadId) {
-        throw new Error('No thread selected for reload');
+        log('reload skipped: no thread selected');
+        return;
       }
+      // assistant-ui always sends the reply as `sourceId`; if only the user
+      // prompt (`parentId`) arrives, the reply is the first agent row after it.
+      let sourceId = config?.sourceId ?? null;
+      if (!sourceId && parentId) {
+        const parentIndex = messages.findIndex(m => m.id === parentId);
+        if (parentIndex >= 0) {
+          sourceId = messages.slice(parentIndex + 1).find(m => m.sender === 'agent')?.id ?? null;
+        }
+      }
+      const target = resolveRegenerateTarget(runtimeMessages, sourceId);
+      if (!target) {
+        log('reload refused: reply has no regenerable id thread=%s', threadId);
+        toast.add({ type: 'error', title: t('chat.regenerate.unavailable') });
+        return;
+      }
+      // Snapshot the rows this regenerate discards — the reply (and anything
+      // after it) — BEFORE the RPC. The new turn can stream in over the socket
+      // before the RPC resolves, and trimming by position afterwards would drop
+      // it too.
+      let discardFrom = -1;
+      let discardedIds: string[] = [];
       if (parentId) {
-        dispatch(truncateMessagesFrom({ threadId, messageId: parentId, inclusive: false }));
+        const parentIndex = messages.findIndex(m => m.id === parentId);
+        if (parentIndex >= 0) discardFrom = parentIndex + 1;
+      } else if (sourceId) {
+        discardFrom = messages.findIndex(m => m.id === sourceId);
+      } else {
+        // No ids at all: the core regenerates the thread's last turn. Discard
+        // every cached row of the final assistant bubble (it can span several).
+        const lastAssistant = [...runtimeMessages]
+          .reverse()
+          .find(message => message.role === 'assistant');
+        const custom = lastAssistant?.metadata?.custom as
+          | { extraMetadata?: Record<string, unknown> }
+          | undefined;
+        const rowIds = custom?.extraMetadata?.[FEEDBACK_ROW_IDS_METADATA_KEY];
+        const turnRowIds =
+          Array.isArray(rowIds) && rowIds.length > 0
+            ? rowIds.filter((id): id is string => typeof id === 'string')
+            : lastAssistant?.id
+              ? [lastAssistant.id]
+              : [];
+        const turnRowIdSet = new Set(turnRowIds);
+        discardedIds = messages.filter(m => turnRowIdSet.has(m.id)).map(m => m.id);
       }
-      await regenerateMessage({ threadId, messageId: parentId ?? undefined });
+      if (discardFrom >= 0) {
+        discardedIds = messages.slice(discardFrom).map(m => m.id);
+      }
+      try {
+        await regenerateMessage({ threadId, messageId: target.messageId });
+      } catch (err) {
+        log(
+          'reload failed thread=%s error=%s',
+          threadId,
+          err instanceof Error ? err.name : typeof err
+        );
+        toast.add({ type: 'error', title: t('chat.regenerate.failed') });
+        return;
+      }
+      // The regenerate RPC returns no message list, and the socket events
+      // that follow only carry the new turn, so drop the discarded rows from
+      // the cache now that the core has forked.
+      dispatch(removeMessagesById({ threadId, messageIds: discardedIds }));
     },
-    [dispatch, threadId]
+    [dispatch, messages, runtimeMessages, t, threadId]
   );
 
   /**
@@ -733,7 +907,7 @@ export function useOpenHumanExternalStore(
       // reply, otherwise empty — see `useWelcomeSuggestions`.
       suggestions,
       // Already `ThreadMessageLike`; the runtime's converter is the identity.
-      convertMessage: (m: (typeof runtimeMessages)[number]) => m,
+      convertMessage: convertRuntimeMessage,
       onNew,
       onCancel,
       queue,
@@ -753,9 +927,15 @@ export function useOpenHumanExternalStore(
       // support speech." That is the #5897 defect shape, and Reload already
       // sits in the same trap today.
       // No `dictation` key here — see the Web Speech note above this object.
-      adapters: { feedback: feedbackAdapter, speech: openHumanSpeechAdapter },
+      adapters: {
+        feedback: feedbackAdapter,
+        speech: openHumanSpeechAdapter,
+        // Native viewport and composer resets need the real conversation identity.
+        threadList: { threadId: threadId ?? undefined },
+      },
     }),
     [
+      threadId,
       runtimeMessages,
       isRunning,
       isLoading,

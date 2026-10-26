@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 // ── clear_session ──────────────────────────────────────────────
 
@@ -10,13 +11,13 @@ async fn clear_session_on_empty_store_reports_removed_false() {
     // lock) it deletes whichever concurrently-running test currently owns HOME —
     // e.g. `deferred_session_without_user_id_does_not_replace_active_user_profile`,
     // whose active-session guard then silently stops firing.
-    let _env_guard = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_to_path("HOME", tmp.path());
+    let _home = EnvVarGuard::set("HOME", tmp.path());
     let config = test_config(&tmp);
-    let result = clear_session(&config).await.unwrap();
+    let result = clear_session(&DispatchCtx::process_default(), &config)
+        .await
+        .unwrap();
     assert_eq!(result.value["removed"], false);
 }
 
@@ -267,16 +268,6 @@ async fn list_provider_credentials_sorts_by_provider_then_profile_name() {
     assert_eq!(all.value[2].provider, "zeta");
 }
 
-// ── oauth_* (validation paths that don't require network) ─────
-
-#[tokio::test]
-async fn oauth_fetch_client_key_errors_without_session() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let err = oauth_fetch_client_key(&config, "int-1").await.unwrap_err();
-    assert!(err.contains("session JWT required"));
-}
-
 // ── list_provider_credentials_by_prefix ───────────────────────
 
 /// Issue #1149 root-cause regression: the exact-match filter on
@@ -380,12 +371,10 @@ async fn credentials_stored_under_one_workspace_dir_invisible_to_another() {
 async fn clear_session_on_one_account_does_not_affect_another() {
     // See `clear_session_on_empty_store_reports_removed_false`: `clear_session`
     // reaches the HOME-derived root, so this test must own HOME while it runs.
-    let _env_guard = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp_a = TempDir::new().unwrap();
     let tmp_b = TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_to_path("HOME", tmp_a.path());
+    let _home = EnvVarGuard::set("HOME", tmp_a.path());
     let config_a = test_config(&tmp_a);
     let config_b = test_config(&tmp_b);
 
@@ -412,7 +401,9 @@ async fn clear_session_on_one_account_does_not_affect_another() {
     .unwrap();
 
     // Clearing the session for account A must not wipe account B's credentials.
-    clear_session(&config_a).await.unwrap();
+    clear_session(&DispatchCtx::process_default(), &config_a)
+        .await
+        .unwrap();
 
     let listed_b = list_provider_credentials(&config_b, None)
         .await
@@ -477,7 +468,7 @@ async fn each_account_workspace_holds_its_own_credential_data() {
     assert_eq!(result_b.value[0].provider, "anthropic");
 }
 
-/// #3490 regression: `start_login_gated_services` must launch its services
+/// #3490 regression: `start_credential_gated_services` must launch its services
 /// concurrently (independent `tokio::spawn` tasks) and return, rather than
 /// awaiting them serially. With an all-disabled config every `start_if_enabled`
 /// is a no-op, so this drives the spawn/await/join orchestration (the changed
@@ -489,38 +480,56 @@ async fn each_account_workspace_holds_its_own_credential_data() {
 /// per-service cold-starts to the slowest single one; this test guards that the
 /// orchestration keeps returning (and never deadlocks/panics on join).
 #[tokio::test]
-async fn start_login_gated_services_completes_with_all_services_disabled() {
+async fn start_credential_gated_services_completes_with_all_services_disabled() {
     // Serialize with the other env-mutating tests: this test sets a process-wide
     // opt-in env var below, and the lock keeps it from leaking into a
     // concurrently-running `store_session` test that would then start real
     // background services. (These are the same semantics `TEST_ENV_LOCK` gives
     // the HOME-mutating tests.)
-    let _env_guard = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = TempDir::new().unwrap();
-    // Under `#[cfg(test)]` `start_login_gated_services` skips the real services
+    // Under `#[cfg(test)]` `start_credential_gated_services` skips the real services
     // by default (they leak across the parallel test run); opt this one test
     // back in so it actually drives the concurrent spawn/await path it guards.
     // Only presence is checked, so the value (a temp path) is irrelevant.
-    let _run_services =
-        EnvVarGuard::set_to_path("OPENHUMAN_RUN_LOGIN_GATED_SERVICES_IN_TEST", tmp.path());
+    let _run_services = EnvVarGuard::set("OPENHUMAN_RUN_LOGIN_GATED_SERVICES_IN_TEST", tmp.path());
 
     let mut config = Config::default();
     // Every service is disabled so each `start_if_enabled` is a no-op: the test
     // exercises the concurrent spawn/await machinery (the changed code) without
     // touching the mic, a model, the screen, or the network.
     config.local_ai.runtime_enabled = false;
-    config.voice_server.auto_start = false;
-    config.voice_server.always_on_enabled = false;
 
     // Bound the wait so a serial-blocking regression (or a hung join) fails the
     // test instead of hanging CI. Every service no-ops, so this resolves almost
     // immediately; the generous ceiling only guards against a deadlock.
     tokio::time::timeout(
         std::time::Duration::from_secs(30),
-        start_login_gated_services(&config),
+        start_credential_gated_services(&crate::core::runtime::DispatchCtx::default(), &config),
     )
     .await
-    .expect("start_login_gated_services must return, not block");
+    .expect("start_credential_gated_services must return, not block");
+}
+
+#[tokio::test]
+async fn logout_stops_remaining_services_without_voice_listeners() {
+    let _inference = crate::inference::host_runtime::inference_test_guard_async().await;
+    let tmp = TempDir::new().expect("private workspace");
+    let mut config = test_config(&tmp);
+    config.local_ai.runtime_enabled = true;
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config.clone(),
+    );
+    let service = crate::inference::host_runtime::global(&config);
+    service.replace_status_state("ready");
+    let ctx = DispatchCtx::new(core);
+
+    tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        stop_credential_gated_services(&ctx, &config),
+    )
+    .await
+    .expect("logout cleanup must finish when no voice listener exists");
+    assert_eq!(service.status().state, "idle");
 }

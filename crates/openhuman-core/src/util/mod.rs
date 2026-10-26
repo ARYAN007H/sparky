@@ -6,7 +6,7 @@
 //!
 //! - [`text`]     — UTF-8-safe truncation, char-boundary rounding, provenance tags
 //! - [`retry`]    — retry-with-backoff + transient-filesystem-error classification
-//! - [`sanitize`] — LLM-facing text sanitization (control-char stripping,
+//! - `tinytools::sanitize` — LLM-facing text sanitization (control-char stripping,
 //!   instruction-fence removal, UTF-8-safe byte caps)
 //! - [`tls`]      — platform-conditional `reqwest::ClientBuilder` factory
 //! - [`types`]    — shared utility types
@@ -26,7 +26,6 @@ pub mod params;
 /// not taken from the memory engine.
 pub mod redact;
 pub mod retry;
-pub mod sanitize;
 pub mod text;
 pub mod tls;
 pub mod types;
@@ -36,8 +35,12 @@ pub use params::{read_optional, read_required};
 pub use redact::redact_url_for_log;
 pub use retry::{is_transient_fs_error, retry_with_backoff, retry_with_backoff_async};
 pub use text::{
-    ceil_char_boundary, floor_char_boundary, provenance_tag, truncate_at_byte_boundary,
-    truncate_chars_flagged, truncate_with_ellipsis, truncate_with_suffix,
-    utf8_safe_prefix_at_byte_boundary,
+    ceil_char_boundary, floor_char_boundary, truncate_at_byte_boundary, truncate_with_ellipsis,
+    truncate_with_suffix, utf8_safe_prefix_at_byte_boundary,
 };
 pub use types::MaybeSet;
+
+#[cfg(test)]
+pub(crate) mod classic_transcript_fixture;
+#[cfg(test)]
+pub(crate) mod module_test_process;

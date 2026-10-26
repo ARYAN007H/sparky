@@ -2,11 +2,6 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  installPiper,
-  piperInstallStatus,
-  type VoiceInstallStatus,
-} from '../../../../services/api/voiceInstallApi';
-import {
   clearVoiceProviderKey,
   loadVoiceSettings,
   saveVoiceSettings,
@@ -16,27 +11,15 @@ import {
 } from '../../../../services/api/voiceSettingsApi';
 import { renderWithProviders } from '../../../../test/test-utils';
 import {
-  openhumanGetVoiceServerSettings,
-  openhumanUpdateVoiceServerSettings,
   openhumanVoiceSetProviders,
   openhumanVoiceStatus,
-  syncNotchVisibility,
-  type VoiceServerSettings,
   type VoiceStatus,
 } from '../../../../utils/tauriCommands';
 import VoicePanel from '../VoicePanel';
 
 vi.mock('../../../../utils/tauriCommands', () => ({
-  openhumanGetVoiceServerSettings: vi.fn(),
-  openhumanUpdateVoiceServerSettings: vi.fn(),
   openhumanVoiceSetProviders: vi.fn(),
   openhumanVoiceStatus: vi.fn(),
-  syncNotchVisibility: vi.fn(),
-}));
-
-vi.mock('../../../../services/api/voiceInstallApi', () => ({
-  installPiper: vi.fn(),
-  piperInstallStatus: vi.fn(),
 }));
 
 vi.mock('../../../../services/api/voiceSettingsApi', async () => {
@@ -66,20 +49,6 @@ vi.mock('../../../../features/human/voice/ttsClient', async () => {
   return { ...actual, synthesizeSpeech: vi.fn() };
 });
 
-const makeInstallStatus = (
-  engine: 'piper',
-  overrides: Partial<VoiceInstallStatus> = {}
-): VoiceInstallStatus => ({
-  engine,
-  state: 'missing',
-  progress: null,
-  downloaded_bytes: null,
-  total_bytes: null,
-  stage: null,
-  error_detail: null,
-  ...overrides,
-});
-
 /** A registered ElevenLabs entry — the STT engine tests need a provider in the
  *  registry, because the routing dropdown only offers slugs it knows about. */
 const ELEVENLABS_PROVIDER = {
@@ -104,12 +73,7 @@ const makeVoiceSettings = (overrides: Partial<VoiceSettings> = {}): VoiceSetting
   ...overrides,
 });
 
-type RuntimeHarness = {
-  settings: VoiceServerSettings;
-  voiceStatus: VoiceStatus;
-  piperStatus: VoiceInstallStatus;
-  voiceSettings: VoiceSettings;
-};
+type RuntimeHarness = { voiceStatus: VoiceStatus; voiceSettings: VoiceSettings };
 
 describe('VoicePanel', () => {
   let runtime: RuntimeHarness;
@@ -118,17 +82,6 @@ describe('VoicePanel', () => {
     vi.clearAllMocks();
 
     runtime = {
-      settings: {
-        auto_start: false,
-        hotkey: 'Fn',
-        activation_mode: 'push',
-        skip_cleanup: true,
-        min_duration_secs: 0.3,
-        silence_threshold: 0.002,
-        custom_dictionary: [],
-        always_on_enabled: false,
-        stt_engine: 'backend',
-      },
       voiceStatus: {
         stt_available: true,
         tts_available: true,
@@ -141,22 +94,10 @@ describe('VoicePanel', () => {
         stt_error: null,
         tts_provider: 'cloud',
       },
-      piperStatus: makeInstallStatus('piper'),
       voiceSettings: makeVoiceSettings(),
     };
 
-    vi.mocked(openhumanGetVoiceServerSettings).mockImplementation(async () => ({
-      result: { ...runtime.settings },
-      logs: [],
-    }));
     vi.mocked(openhumanVoiceStatus).mockImplementation(async () => ({ ...runtime.voiceStatus }));
-    // The toggle handler ignores the resolved value (it updates React state
-    // optimistically before awaiting), so a minimal cast is enough here.
-    vi.mocked(openhumanUpdateVoiceServerSettings).mockResolvedValue({
-      result: {},
-      logs: [],
-    } as never);
-    vi.mocked(syncNotchVisibility).mockResolvedValue(undefined);
     vi.mocked(openhumanVoiceSetProviders).mockImplementation(async update => {
       if (update.stt_provider) runtime.voiceStatus.stt_engine = update.stt_provider;
       if (update.tts_provider) runtime.voiceStatus.tts_provider = update.tts_provider;
@@ -175,51 +116,21 @@ describe('VoicePanel', () => {
     vi.mocked(setVoiceProviderKey).mockResolvedValue(undefined);
     vi.mocked(clearVoiceProviderKey).mockResolvedValue(undefined);
     vi.mocked(testVoiceProvider).mockResolvedValue({ ok: true, detail: 'OK' });
-
-    // Install-status polls return the current harness snapshot — tests
-    // mutate `runtime.piperStatus` to simulate a real install cycle.
-    vi.mocked(piperInstallStatus).mockImplementation(async () => ({ ...runtime.piperStatus }));
-    vi.mocked(installPiper).mockImplementation(async () => {
-      runtime.piperStatus = makeInstallStatus('piper', {
-        state: 'installed',
-        progress: 100,
-        stage: 'install complete',
-      });
-      return { ...runtime.piperStatus };
-    });
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('persists always-on listening and syncs the notch indicator', async () => {
+  it('does not render ambient listening controls or send removed settings', async () => {
     renderWithProviders(<VoicePanel />);
 
-    const toggle = await screen.findByTestId('voice-always-on-toggle');
-    expect(toggle).toHaveAttribute('aria-checked', 'false');
-
-    fireEvent.click(toggle);
-
-    await waitFor(() =>
-      expect(openhumanUpdateVoiceServerSettings).toHaveBeenCalledWith({ always_on_enabled: true })
+    expect(screen.queryByTestId('voice-always-on-card')).not.toBeInTheDocument();
+    await waitFor(() => expect(openhumanVoiceStatus).toHaveBeenCalled());
+    const removedSettingParam = ['always', 'on', 'enabled'].join('_');
+    expect(openhumanVoiceSetProviders).not.toHaveBeenCalledWith(
+      expect.objectContaining({ [removedSettingParam]: expect.anything() })
     );
-    await waitFor(() => expect(syncNotchVisibility).toHaveBeenCalledWith(true));
-    expect(toggle).toHaveAttribute('aria-checked', 'true');
-  });
-
-  it('restores the always-on toggle when persistence fails', async () => {
-    vi.mocked(openhumanUpdateVoiceServerSettings).mockRejectedValueOnce(
-      new Error('settings unavailable')
-    );
-    renderWithProviders(<VoicePanel />);
-
-    const toggle = await screen.findByTestId('voice-always-on-toggle');
-    fireEvent.click(toggle);
-
-    await screen.findByText('settings unavailable');
-    expect(toggle).toHaveAttribute('aria-checked', 'false');
-    expect(syncNotchVisibility).not.toHaveBeenCalled();
   });
 
   // ─── Voice Routing Section ──────────────────────────────────────────────
@@ -362,12 +273,9 @@ describe('VoicePanel', () => {
     const sttSelect = (await screen.findByTestId('stt-provider-select')) as HTMLSelectElement;
     await waitFor(() => expect(sttSelect.value).toBe('elevenlabs'));
 
-    // Freeze subsequent loadData calls so the error set by persistProviders is
-    // not cleared by the automatic reload that fires in saveRouting after
-    // persistProviders() returns (without re-throwing).
-    vi.mocked(openhumanGetVoiceServerSettings).mockImplementation(
-      () => new Promise(() => {}) // hang — prevents error being wiped by reload
-    );
+    // Keep the saveRouting refresh pending so it does not clear the error set
+    // by the failed persistence attempt.
+    vi.mocked(openhumanVoiceStatus).mockImplementation(() => new Promise(() => {}));
 
     // Change provider and click save to trigger the RPC error.
     fireEvent.change(sttSelect, { target: { value: 'cloud' } });
@@ -417,17 +325,17 @@ describe('VoicePanel', () => {
     renderWithProviders(<VoicePanel />, { initialEntries: ['/settings/voice'] });
 
     await screen.findByTestId('voice-providers-section');
-    // The Piper chip must be reachable so users can install and route to the
+    // The Piper chip must be reachable so users can route to their own
     // local TTS engine without editing config.toml by hand. The chip is "off"
     // until Piper is the active TTS routing target. There is no STT
-    // counterpart: every speech-to-text engine is hosted, so nothing installs.
+    // counterpart: every speech-to-text engine is hosted.
     const piperChip = await screen.findByTestId('voice-provider-chip-piper');
     expect(piperChip).not.toBeDisabled();
     expect(piperChip).toHaveAttribute('aria-checked', 'false');
     expect(screen.queryByTestId('voice-provider-chip-whisper')).not.toBeInTheDocument();
   });
 
-  it('opens the install modal when the Piper chip is clicked', async () => {
+  it('opens the setup modal when the Piper chip is clicked', async () => {
     renderWithProviders(<VoicePanel />, { initialEntries: ['/settings/voice'] });
 
     await screen.findByTestId('voice-providers-section');
@@ -512,8 +420,8 @@ describe('VoicePanel', () => {
 
   // ─── Error / notice display ─────────────────────────────────────────────
 
-  it('shows an error banner when openhumanGetVoiceServerSettings rejects', async () => {
-    vi.mocked(openhumanGetVoiceServerSettings).mockRejectedValueOnce(new Error('core offline'));
+  it('shows an error banner when voice status cannot be loaded', async () => {
+    vi.mocked(openhumanVoiceStatus).mockRejectedValueOnce(new Error('core offline'));
 
     renderWithProviders(<VoicePanel />, { initialEntries: ['/settings/voice'] });
 
@@ -608,15 +516,14 @@ describe('VoicePanel', () => {
     );
   });
 
-  // ─── Test buttons gate on local-model install completion ────────────────────
+  // ─── Test buttons gate on the user-supplied Piper resolving ────────────────
 
-  it('disables Test TTS while the selected Piper voice is not installed', async () => {
+  it('disables Test TTS while the user-supplied Piper binary or voice is missing', async () => {
     runtime.voiceSettings = makeVoiceSettings({
       ttsProvider: { kind: 'local', engine: 'piper', model: '' },
     });
-    runtime.piperStatus = makeInstallStatus('piper', { state: 'missing' });
-    // Mirror the STT gate: no installed voice and no runtime availability is
-    // the real "not installed" case; `piperReady` also keys off `tts_available`.
+    // `piperReady` keys off `voice_status.tts_available` alone — the app no
+    // longer installs Piper, so there is no installer state to consult.
     runtime.voiceStatus.tts_available = false;
 
     renderWithProviders(<VoicePanel />, { initialEntries: ['/settings/voice'] });
@@ -627,11 +534,11 @@ describe('VoicePanel', () => {
     expect(await screen.findByTestId('test-tts-button')).toBeDisabled();
   });
 
-  it('enables Test TTS once the selected Piper voice is installed', async () => {
+  it('enables Test TTS once voice_status resolves the user-supplied Piper', async () => {
     runtime.voiceSettings = makeVoiceSettings({
       ttsProvider: { kind: 'local', engine: 'piper', model: '' },
     });
-    runtime.piperStatus = makeInstallStatus('piper', { state: 'installed', progress: 100 });
+    runtime.voiceStatus.tts_available = true;
 
     renderWithProviders(<VoicePanel />, { initialEntries: ['/settings/voice'] });
 
@@ -663,26 +570,49 @@ describe('VoicePanel', () => {
     expect(vi.mocked(openhumanVoiceSetProviders).mock.calls.length).toBe(beforeCallCount);
   });
 
-  // ─── Modal: install button (piper in the API-key modal) ────────────────────
+  // ─── Modal: Piper is user-supplied (no installer) ───────────────────────────
 
-  it('clicking Install Piper inside the modal triggers handleInstallPiper', async () => {
+  it('shows the self-install hint and no install button in the Piper modal', async () => {
+    runtime.voiceStatus.tts_available = false;
+
     renderWithProviders(<VoicePanel />, { initialEntries: ['/settings/voice'] });
 
     await screen.findByTestId('voice-providers-section');
-    const piperChip = await screen.findByTestId('voice-provider-chip-piper');
-    fireEvent.click(piperChip);
-
+    fireEvent.click(await screen.findByTestId('voice-provider-chip-piper'));
     await screen.findByTestId('voice-provider-key-modal');
 
-    const installBtn = await screen.findByRole('button', { name: /install locally/i });
-    fireEvent.click(installBtn);
+    expect(screen.getByTestId('voice-piper-self-install-hint')).toHaveTextContent(/PIPER_BIN/);
+    expect(screen.getByTestId('voice-piper-status')).toHaveTextContent(/^Piper not found$/);
+    expect(screen.queryByRole('button', { name: /install locally/i })).not.toBeInTheDocument();
+  });
 
-    await waitFor(() => expect(vi.mocked(installPiper)).toHaveBeenCalled());
+  it('Check again re-reads voice_status and enables Piper once it resolves', async () => {
+    runtime.voiceStatus.tts_available = false;
+
+    renderWithProviders(<VoicePanel />, { initialEntries: ['/settings/voice'] });
+
+    await screen.findByTestId('voice-providers-section');
+    fireEvent.click(await screen.findByTestId('voice-provider-chip-piper'));
+    await screen.findByTestId('voice-provider-key-modal');
+    expect(screen.getByRole('button', { name: /^Enable$/i })).toBeDisabled();
+
+    // The user installs Piper themselves, then asks the panel to look again.
+    runtime.voiceStatus.tts_available = true;
+    const callsBefore = vi.mocked(openhumanVoiceStatus).mock.calls.length;
+    fireEvent.click(screen.getByTestId('voice-piper-recheck'));
+
+    await waitFor(() =>
+      expect(vi.mocked(openhumanVoiceStatus).mock.calls.length).toBeGreaterThan(callsBefore)
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('voice-piper-status')).toHaveTextContent(/^Piper found$/)
+    );
+    expect(screen.getByRole('button', { name: /^Enable$/i })).not.toBeDisabled();
   });
 
   // ─── Modal: Enable button for local providers ──────────────────────────────
 
-  it('keeps Enable disabled in the Piper modal until the voice is installed', async () => {
+  it('keeps Enable disabled in the Piper modal until Piper resolves', async () => {
     runtime.voiceStatus.tts_available = false;
     runtime.voiceStatus.tts_voice_path = null;
     runtime.voiceStatus.piper_binary = null;
@@ -704,7 +634,6 @@ describe('VoicePanel', () => {
   });
 
   it('allows Enable in the Piper modal when voice_status reports local TTS ready', async () => {
-    runtime.piperStatus = makeInstallStatus('piper');
     runtime.voiceStatus.tts_available = true;
     runtime.voiceStatus.tts_voice_path = '/legacy/voices/en_US-lessac-medium.onnx';
     runtime.voiceStatus.piper_binary = '/usr/local/bin/piper';
@@ -727,11 +656,7 @@ describe('VoicePanel', () => {
   });
 
   it('clicking Enable inside the Piper modal calls persistProviders and closes modal', async () => {
-    runtime.piperStatus = makeInstallStatus('piper', {
-      state: 'installed',
-      progress: 100,
-      stage: 'install complete',
-    });
+    runtime.voiceStatus.tts_available = true;
 
     renderWithProviders(<VoicePanel />, { initialEntries: ['/settings/voice'] });
 

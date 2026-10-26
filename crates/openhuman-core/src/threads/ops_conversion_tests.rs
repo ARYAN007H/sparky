@@ -1,33 +1,81 @@
 use super::*;
+use crate::core::runtime::DispatchCtx;
+use tinyagents_session::port::InMemorySessionStores;
 
-// ── request_id ────────────────────────────────────────────────
+struct FailingTurnStateDelete;
 
-#[test]
-fn request_id_is_a_non_empty_uuid_and_fresh_per_call() {
-    let a = request_id();
-    let b = request_id();
-    assert!(!a.is_empty());
-    // v4 UUID canonical form: 36 chars with 4 hyphens.
-    assert_eq!(a.len(), 36);
-    assert_eq!(a.chars().filter(|c| *c == '-').count(), 4);
-    // Two calls must not collide — catches accidental caching.
-    assert_ne!(a, b);
+impl tinyagents_session::port::TurnStates for FailingTurnStateDelete {
+    fn put(&self, _: &tinyagents_session::turn_state::TurnState) -> Result<(), String> {
+        unreachable!("only delete is used by this fixture")
+    }
+
+    fn put_unless_completed(
+        &self,
+        _: &tinyagents_session::turn_state::TurnState,
+    ) -> Result<bool, String> {
+        unreachable!("only delete is used by this fixture")
+    }
+
+    fn get(&self, _: &str) -> Result<Option<tinyagents_session::turn_state::TurnState>, String> {
+        unreachable!("only delete is used by this fixture")
+    }
+
+    fn get_turn(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<tinyagents_session::turn_state::TurnState>, String> {
+        unreachable!("only delete is used by this fixture")
+    }
+
+    fn delete(&self, _: &str) -> Result<bool, String> {
+        Err("injected turn snapshot cleanup failure".into())
+    }
+
+    fn delete_turn(&self, _: &str, _: &str) -> Result<bool, String> {
+        unreachable!("only delete is used by this fixture")
+    }
+
+    fn list(&self) -> Result<Vec<tinyagents_session::turn_state::TurnState>, String> {
+        unreachable!("only delete is used by this fixture")
+    }
+
+    fn list_thread(
+        &self,
+        _: &str,
+    ) -> Result<Vec<tinyagents_session::turn_state::TurnState>, String> {
+        unreachable!("only delete is used by this fixture")
+    }
+
+    fn clear_all(&self) -> Result<usize, String> {
+        unreachable!("only delete is used by this fixture")
+    }
+
+    fn mark_all_interrupted(&self, _: &str) -> Result<usize, String> {
+        unreachable!("only delete is used by this fixture")
+    }
+
+    fn settle_turn(
+        &self,
+        _: &str,
+        _: &str,
+        _: tinyagents_session::turn_state::TurnLifecycle,
+        _: &str,
+    ) -> Result<bool, String> {
+        unreachable!("only delete is used by this fixture")
+    }
 }
 
-// ── counts ────────────────────────────────────────────────────
+struct FailingTurnStateDeleteProvider;
 
-#[test]
-fn counts_materialises_entries_as_owned_string_keys() {
-    let map = counts([("num_threads", 3), ("num_messages", 7)]);
-    assert_eq!(map.get("num_threads"), Some(&3));
-    assert_eq!(map.get("num_messages"), Some(&7));
-    assert_eq!(map.len(), 2);
-}
-
-#[test]
-fn counts_empty_iter_yields_empty_map() {
-    let map = counts([]);
-    assert!(map.is_empty());
+impl tinyagents_session::port::SessionStoreProvider for FailingTurnStateDeleteProvider {
+    fn for_agent(&self, agent_id: &str) -> tinyagents_session::port::AgentStores {
+        let stores = InMemorySessionStores::new().for_agent(agent_id);
+        tinyagents_session::port::AgentStores {
+            turn_states: std::sync::Arc::new(FailingTurnStateDelete),
+            ..stores
+        }
+    }
 }
 
 // NOTE: the title_log_fingerprint / collapse_whitespace copies were removed
@@ -54,7 +102,7 @@ fn build_title_request_sends_no_per_request_model_override() {
     // `create_chat_model` (managed backend, Claude Agent SDK, Claude Code,
     // local runtime, BYOK cloud slug). Pinning a concrete managed tier here
     // would fix the managed route and break the other four.
-    let request = crate::threads::title::build_title_request("hi there", "hello back");
+    let request = tinyagents_harness::title::build_title_request("hi there", "hello back");
 
     assert!(
         request.model.is_none(),
@@ -70,7 +118,7 @@ fn build_title_request_carries_the_system_prompt_and_rendered_user_prompt() {
     // satisfied by an empty or malformed request.
     use tinyinference_llm::message::Message;
 
-    let request = crate::threads::title::build_title_request("hi there", "hello back");
+    let request = tinyagents_harness::title::build_title_request("hi there", "hello back");
 
     assert_eq!(request.messages.len(), 2, "system + user");
     assert!(
@@ -108,120 +156,38 @@ fn build_title_prompt_renders_user_and_assistant_sections_in_order() {
 // ── is_auto_generated_thread_title ────────────────────────────
 
 #[test]
-fn is_auto_generated_thread_title_accepts_canonical_new_chat_format() {
+fn is_auto_generated_thread_title_accepts_only_the_new_chat_format() {
     // Parser locks the format produced by `thread_create_new`:
-    // "Chat <Mon> <day> <H:MM> AM|PM".
-    assert!(is_auto_generated_thread_title("Chat Jan 1 1:00 AM"));
-    assert!(is_auto_generated_thread_title("Chat Dec 31 12:59 PM"));
-}
-
-#[test]
-fn is_auto_generated_thread_title_tolerates_surrounding_whitespace() {
-    // Input is trimmed before parsing — storage layers may round-trip
-    // titles with stray whitespace.
-    assert!(is_auto_generated_thread_title("  Chat Jan 1 1:00 AM  "));
-}
-
-#[test]
-fn is_auto_generated_thread_title_rejects_user_edited_titles() {
-    // Any freeform user title must fall through to the "not a
-    // placeholder" branch so we never overwrite user-authored names.
-    assert!(!is_auto_generated_thread_title("My custom title"));
-    assert!(!is_auto_generated_thread_title("Trip planning"));
-}
-
-#[test]
-fn is_auto_generated_thread_title_rejects_short_strings() {
-    // Hard `bytes.len() < 16` guard — locks in the minimum shape so
-    // we never enter the parser with too-small input.
-    assert!(!is_auto_generated_thread_title(""));
-    assert!(!is_auto_generated_thread_title("Chat"));
-    assert!(!is_auto_generated_thread_title("Chat Jan 1"));
-}
-
-#[test]
-fn is_auto_generated_thread_title_rejects_non_alpha_month() {
-    // Month abbreviation must be 3 ASCII alpha chars.
-    assert!(!is_auto_generated_thread_title("Chat 123 1 1:00 AM"));
-}
-
-#[test]
-fn is_auto_generated_thread_title_rejects_long_month_name() {
-    // "January 1 1:00 AM" — after "Chat ", bytes[8] is 'u' not ' '.
-    assert!(!is_auto_generated_thread_title("Chat January 1 1:00 AM"));
-}
-
-#[test]
-fn is_auto_generated_thread_title_rejects_three_digit_day() {
-    // day: 1–2 ASCII digits; idx-day_start>2 rejects.
-    assert!(!is_auto_generated_thread_title("Chat Jan 100 1:00 AM"));
-}
-
-#[test]
-fn is_auto_generated_thread_title_rejects_missing_colon() {
-    // 3-digit hour consumes through the position the `:` must occupy.
-    assert!(!is_auto_generated_thread_title("Chat Jan 1 100 AM"));
-}
-
-#[test]
-fn is_auto_generated_thread_title_rejects_lowercase_meridiem() {
-    // Parser only accepts "AM" | "PM" (not "am"/"pm") so pattern stays
-    // tied to the producer in `thread_create_new`.
-    assert!(!is_auto_generated_thread_title("Chat Jan 1 1:00 am"));
-}
-
-#[test]
-fn is_auto_generated_thread_title_rejects_missing_space_before_meridiem() {
-    // The `bytes[idx + 2] != b' '` guard must reject "1:00AM" (no space).
-    assert!(!is_auto_generated_thread_title("Chat Jan 1 1:00AM"));
-}
-
-// ── envelope ──────────────────────────────────────────────────
-
-#[test]
-fn envelope_sets_data_and_propagates_counts_and_pagination() {
-    let pagination = PaginationMeta {
-        limit: 10,
-        offset: 0,
-        count: 7,
-    };
-    let counts_map = counts([("num_messages", 7)]);
-    let out = envelope(
-        json!({"v": 42}),
-        Some(counts_map.clone()),
-        Some(pagination.clone()),
-    );
-    let env = &out.value;
-    assert_eq!(env.data.as_ref().unwrap()["v"], json!(42));
-    assert!(env.error.is_none());
-    assert!(!env.meta.request_id.is_empty());
-    assert_eq!(env.meta.counts.as_ref().unwrap(), &counts_map);
-    let pag = env.meta.pagination.as_ref().unwrap();
-    assert_eq!(pag.limit, pagination.limit);
-    assert_eq!(pag.count, pagination.count);
-    assert_eq!(pag.offset, pagination.offset);
-    // No implicit latency/cached info — the envelope helper keeps
-    // optional fields unset so callers opt in explicitly.
-    assert!(env.meta.latency_seconds.is_none());
-    assert!(env.meta.cached.is_none());
-    // No logs are attached by default.
-    assert!(out.logs.is_empty());
-}
-
-#[test]
-fn envelope_omits_counts_and_pagination_when_not_provided() {
-    let out = envelope(json!(null), None, None);
-    assert!(out.value.meta.counts.is_none());
-    assert!(out.value.meta.pagination.is_none());
-}
-
-#[test]
-fn envelope_generates_unique_request_ids_per_call() {
-    // request_id uniqueness matters for client-side correlation of
-    // overlapping threads-API calls. Lock it in.
-    let a = envelope(json!({}), None, None);
-    let b = envelope(json!({}), None, None);
-    assert_ne!(a.value.meta.request_id, b.value.meta.request_id);
+    // "Chat <Mon> <day> <H:MM> AM|PM". Input is trimmed before parsing.
+    for title in [
+        "Chat Jan 1 1:00 AM",
+        "Chat Dec 31 12:59 PM",
+        "  Chat Jan 1 1:00 AM  ",
+    ] {
+        assert!(is_auto_generated_thread_title(title), "{title:?}");
+    }
+    // Everything else must fall through so user-authored names are never
+    // overwritten.
+    for title in [
+        "My custom title",
+        "Trip planning",
+        // `bytes.len() < 16` guard
+        "",
+        "Chat",
+        "Chat Jan 1",
+        // month must be 3 ASCII alpha chars
+        "Chat 123 1 1:00 AM",
+        "Chat January 1 1:00 AM",
+        // day is 1-2 digits
+        "Chat Jan 100 1:00 AM",
+        // hour/colon shape
+        "Chat Jan 1 100 AM",
+        // meridiem is exactly "AM" | "PM", preceded by a space
+        "Chat Jan 1 1:00 am",
+        "Chat Jan 1 1:00AM",
+    ] {
+        assert!(!is_auto_generated_thread_title(title), "{title:?}");
+    }
 }
 
 #[test]
@@ -292,24 +258,25 @@ fn title_log_prefix_is_grep_friendly_and_stable() {
 
 #[tokio::test]
 async fn message_append_returns_typed_not_found_for_stale_thread() {
-    let _env_lock = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let workspace = tempfile::tempdir().expect("workspace");
-    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", workspace.path());
+    let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
     let thread_id = "thread-missing";
 
-    let err = message_append(AppendConversationMessageRequest {
-        thread_id: thread_id.to_string(),
-        message: ConversationMessageRecord {
-            id: "msg-1".to_string(),
-            content: "hello".to_string(),
-            message_type: "text".to_string(),
-            extra_metadata: Value::Null,
-            sender: "user".to_string(),
-            created_at: "2026-01-01T00:00:00Z".to_string(),
+    let err = message_append(
+        &DispatchCtx::process_default(),
+        AppendConversationMessageRequest {
+            thread_id: thread_id.to_string(),
+            message: ConversationMessageRecord {
+                id: "msg-1".to_string(),
+                content: "hello".to_string(),
+                message_type: "text".to_string(),
+                extra_metadata: Value::Null,
+                sender: "user".to_string(),
+                created_at: "2026-01-01T00:00:00Z".to_string(),
+            },
         },
-    })
+    )
     .await
     .expect_err("missing thread must return a typed not-found error");
 
@@ -324,17 +291,18 @@ async fn message_append_returns_typed_not_found_for_stale_thread() {
 
 #[tokio::test]
 async fn generate_title_returns_typed_not_found_for_stale_thread() {
-    let _env_lock = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let workspace = tempfile::tempdir().expect("workspace");
-    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", workspace.path());
+    let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
     let thread_id = "thread-missing";
 
-    let err = thread_generate_title(GenerateConversationThreadTitleRequest {
-        thread_id: thread_id.to_string(),
-        assistant_message: None,
-    })
+    let err = thread_generate_title(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        GenerateConversationThreadTitleRequest {
+            thread_id: thread_id.to_string(),
+            assistant_message: None,
+        },
+    )
     .await
     .expect_err("missing thread must return a typed not-found error");
 
@@ -349,11 +317,9 @@ async fn generate_title_returns_typed_not_found_for_stale_thread() {
 
 #[tokio::test]
 async fn generate_title_leaves_custom_title_unchanged() {
-    let _env_lock = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let workspace = tempfile::tempdir().expect("workspace");
-    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", workspace.path());
+    let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
     let thread_id = "thread-custom";
     create_thread_with_title(&workspace, thread_id, "Already named").await;
     let dir = crate::config::Config::load_or_init()
@@ -361,6 +327,7 @@ async fn generate_title_leaves_custom_title_unchanged() {
         .expect("load config")
         .workspace_dir;
     conversations_store::append_message(
+        &crate::core::runtime::DispatchCtx::ambient(),
         dir,
         thread_id,
         ConversationMessage {
@@ -374,10 +341,13 @@ async fn generate_title_leaves_custom_title_unchanged() {
     )
     .unwrap();
 
-    let outcome = thread_generate_title(GenerateConversationThreadTitleRequest {
-        thread_id: thread_id.to_string(),
-        assistant_message: None,
-    })
+    let outcome = thread_generate_title(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        GenerateConversationThreadTitleRequest {
+            thread_id: thread_id.to_string(),
+            assistant_message: None,
+        },
+    )
     .await
     .expect("generate title");
 
@@ -390,18 +360,19 @@ async fn generate_title_leaves_custom_title_unchanged() {
 
 #[tokio::test]
 async fn generate_title_returns_existing_title_when_no_user_message_exists() {
-    let _env_lock = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let workspace = tempfile::tempdir().expect("workspace");
-    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", workspace.path());
+    let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
     let thread_id = "thread-no-user";
     create_thread_with_title(&workspace, thread_id, "Chat Jan 1 1:00 AM").await;
 
-    let outcome = thread_generate_title(GenerateConversationThreadTitleRequest {
-        thread_id: thread_id.to_string(),
-        assistant_message: Some("assistant reply".into()),
-    })
+    let outcome = thread_generate_title(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        GenerateConversationThreadTitleRequest {
+            thread_id: thread_id.to_string(),
+            assistant_message: Some("assistant reply".into()),
+        },
+    )
     .await
     .expect("generate title");
 
@@ -413,11 +384,9 @@ async fn generate_title_returns_existing_title_when_no_user_message_exists() {
 
 #[tokio::test]
 async fn generate_title_falls_back_to_first_user_message_when_assistant_missing() {
-    let _env_lock = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let workspace = tempfile::tempdir().expect("workspace");
-    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", workspace.path());
+    let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
     let thread_id = "thread-fallback";
     create_thread_with_title(&workspace, thread_id, "Chat Jan 1 1:00 AM").await;
     let dir = crate::config::Config::load_or_init()
@@ -426,6 +395,7 @@ async fn generate_title_falls_back_to_first_user_message_when_assistant_missing(
         .workspace_dir;
     let user_message = "Please summarize the latest five email threads for me.";
     conversations_store::append_message(
+        &crate::core::runtime::DispatchCtx::ambient(),
         dir,
         thread_id,
         ConversationMessage {
@@ -439,10 +409,13 @@ async fn generate_title_falls_back_to_first_user_message_when_assistant_missing(
     )
     .unwrap();
 
-    let outcome = thread_generate_title(GenerateConversationThreadTitleRequest {
-        thread_id: thread_id.to_string(),
-        assistant_message: None,
-    })
+    let outcome = thread_generate_title(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        GenerateConversationThreadTitleRequest {
+            thread_id: thread_id.to_string(),
+            assistant_message: None,
+        },
+    )
     .await
     .expect("generate title");
 
@@ -454,11 +427,10 @@ async fn generate_title_falls_back_to_first_user_message_when_assistant_missing(
 
 #[tokio::test]
 async fn thread_delete_removes_persisted_turn_state_snapshot() {
-    let _env_lock = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let workspace = tempfile::tempdir().expect("workspace");
-    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", workspace.path());
+    crate::storage::local::use_persistent_default_for_test(&workspace.path().join("workspace"));
+    let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
     let thread_id = "thread-delete";
     create_thread_with_title(&workspace, thread_id, "Chat Jan 1 1:00 AM").await;
     let dir = crate::config::Config::load_or_init()
@@ -467,30 +439,37 @@ async fn thread_delete_removes_persisted_turn_state_snapshot() {
         .workspace_dir;
 
     let snapshot = TurnState::started(thread_id, "req-1", 4, "2026-01-01T00:00:00Z");
-    turn_state::store::put(dir.clone(), &snapshot).expect("put snapshot");
-    assert!(turn_state::store::get(dir, thread_id).unwrap().is_some());
+    let store = crate::storage::sessions::turn_states_for(&dir);
+    store.put(&snapshot).expect("put snapshot");
+    assert!(store.get(thread_id).unwrap().is_some());
 
     // Queue a finished background sub-agent result for this thread; deleting the
     // thread must discard it so it's never delivered into a dead thread.
     use crate::agent::orchestration::background_completions as bg;
     bg::record_completion(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &dir,
         "sess-del",
         "sub-del-1",
         "researcher",
         "result",
         Some(thread_id.to_string()),
-    );
-    assert_eq!(bg::pending_count("sess-del"), 1);
+    )
+    .await;
+    assert_eq!(bg::pending_for(&dir, thread_id).len(), 1);
 
-    thread_delete(DeleteConversationThreadRequest {
-        thread_id: thread_id.to_string(),
-        deleted_at: "2026-01-01T00:02:00Z".into(),
-    })
+    thread_delete(
+        &DispatchCtx::process_default(),
+        DeleteConversationThreadRequest {
+            thread_id: thread_id.to_string(),
+            deleted_at: "2026-01-01T00:02:00Z".into(),
+        },
+    )
     .await
     .expect("delete thread");
 
     assert_eq!(
-        bg::pending_count("sess-del"),
+        bg::pending_for(&dir, thread_id).len(),
         0,
         "queued completion for the deleted thread should be discarded"
     );
@@ -504,12 +483,115 @@ async fn thread_delete_removes_persisted_turn_state_snapshot() {
 }
 
 #[tokio::test]
-async fn threads_purge_removes_valid_and_corrupted_turn_state_files() {
-    let _env_lock = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+async fn thread_delete_queues_memory_before_snapshot_cleanup_error() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::threads::store::CreateConversationThread;
+    use crate::tools::toolpacks::ToolGroups;
+    use tinymemory_api::{
+        ItemKind, LearningKind, ListRequest, MemoryEngine, MemoryMeta, MetaFilter, Role, StoreItem,
+        Turn,
+    };
+
     let workspace = tempfile::tempdir().expect("workspace");
-    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", workspace.path());
+    let dir = workspace.path().to_path_buf();
+    crate::storage::local::use_persistent_default_for_test(&dir);
+    let thread_id = "channel:discord/sender/chat";
+    let mut config = crate::config::Config {
+        workspace_dir: dir.clone(),
+        action_dir: dir.clone(),
+        config_path: dir.join("config.toml"),
+        ..Default::default()
+    };
+    config.memory.engine.clear();
+
+    let mut host_overrides = crate::agent::host_overrides::HostOverrides::default();
+    host_overrides.session_store = Some(std::sync::Arc::new(FailingTurnStateDeleteProvider));
+    let ctx = DispatchCtx::new(
+        CoreContext::for_test(DomainSet::full(), Some(dir.clone())).derive_with(
+            ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::none())
+                .profile("channel-delete-profile")
+                .host_overrides(std::sync::Arc::new(host_overrides)),
+        ),
+    );
+    crate::threads::store::blocking::ensure_thread(
+        ctx.clone(),
+        dir.clone(),
+        CreateConversationThread {
+            id: thread_id.into(),
+            title: "Discord chat".into(),
+            created_at: "2026-01-01T00:00:00Z".into(),
+            parent_thread_id: None,
+            labels: None,
+            personality_id: None,
+            working_dir: None,
+        },
+    )
+    .await
+    .expect("create channel thread in the profile scope");
+
+    let error = thread_delete(
+        &ctx,
+        DeleteConversationThreadRequest {
+            thread_id: thread_id.into(),
+            deleted_at: "2026-01-01T00:02:00Z".into(),
+        },
+    )
+    .await
+    .expect_err("turn-state cleanup fails after the thread has been deleted");
+    assert!(error.contains("turn-snapshot cleanup failed"));
+    assert!(
+        crate::threads::store::blocking::list_threads(ctx.clone(), dir.clone())
+            .await
+            .expect("list profile threads")
+            .is_empty()
+    );
+    assert_eq!(
+        crate::memory::deletion::pending(&dir),
+        vec![crate::memory::deletion::PendingDeletion::Thread {
+            thread_id: thread_id.into()
+        }]
+    );
+
+    let engine = std::sync::Arc::new(tinymemory_api::conformance::ReferenceEngine::new());
+    crate::memory::engine::install_test_engine(&dir, engine.clone());
+    engine
+        .store(StoreItem::Conversation {
+            turns: vec![Turn::new(Role::User, "remote message")],
+            meta: MemoryMeta {
+                thread_id: Some(thread_id.into()),
+                channel: Some("discord".into()),
+                ..MemoryMeta::default()
+            },
+        })
+        .await
+        .unwrap();
+    engine
+        .store(StoreItem::learning(
+            "a learned fact remains",
+            LearningKind::Fact,
+            0.9,
+            MemoryMeta::default(),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(crate::memory::deletion::drain(&config).await, 1);
+    assert!(crate::memory::deletion::pending(&dir).is_empty());
+    let remaining = engine
+        .list(ListRequest::new(MetaFilter::default(), 10))
+        .await
+        .unwrap()
+        .items;
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].kind, ItemKind::Learning);
+}
+
+#[tokio::test]
+async fn threads_purge_removes_every_turn_state_snapshot() {
+    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
+    let workspace = tempfile::tempdir().expect("workspace");
+    crate::storage::local::use_persistent_default_for_test(&workspace.path().join("workspace"));
+    let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
     create_thread_with_title(&workspace, "thread-a", "Chat Jan 1 1:00 AM").await;
     create_thread_with_title(&workspace, "thread-b", "Chat Jan 1 1:01 AM").await;
     let dir = crate::config::Config::load_or_init()
@@ -518,58 +600,62 @@ async fn threads_purge_removes_valid_and_corrupted_turn_state_files() {
         .workspace_dir;
 
     let snapshot = TurnState::started("thread-a", "req-1", 4, "2026-01-01T00:00:00Z");
-    turn_state::store::put(dir.clone(), &snapshot).expect("put snapshot");
-
-    let turn_state_dir = dir.join("memory").join("conversations").join("turn_states");
-    std::fs::create_dir_all(&turn_state_dir).unwrap();
-    std::fs::write(
-        turn_state_dir.join("corrupted.json"),
-        "{ definitely not json",
-    )
-    .unwrap();
+    let store = crate::storage::sessions::turn_states_for(&dir);
+    store.put(&snapshot).expect("put snapshot");
+    store
+        .put(&TurnState::started(
+            "thread-b",
+            "req-2",
+            4,
+            "2026-01-01T00:00:01Z",
+        ))
+        .expect("put second snapshot");
 
     // Queue background sub-agent results across sessions; a full purge must wipe
     // them all since no parent thread survives.
     use crate::agent::orchestration::background_completions as bg;
     bg::record_completion(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &dir,
         "sess-p1",
         "sub-p1",
         "researcher",
         "x",
         Some("thread-a".into()),
-    );
+    )
+    .await;
     bg::record_completion(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &dir,
         "sess-p2",
         "sub-p2",
         "researcher",
         "y",
         Some("thread-b".into()),
+    )
+    .await;
+
+    threads_purge(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        EmptyRequest {},
+    )
+    .await
+    .expect("purge threads should also clear snapshots");
+
+    assert!(bg::pending_for(&dir, "thread-a").is_empty());
+    assert!(bg::pending_for(&dir, "thread-b").is_empty());
+
+    assert!(
+        store.list().expect("list").is_empty(),
+        "a purge leaves no turn snapshot behind"
     );
-
-    threads_purge(EmptyRequest {})
-        .await
-        .expect("purge threads should also clear snapshots");
-
-    assert!(!bg::has_pending("sess-p1"));
-    assert!(!bg::has_pending("sess-p2"));
-
-    if turn_state_dir.exists() {
-        let remaining_json: Vec<_> = std::fs::read_dir(&turn_state_dir)
-            .unwrap()
-            .filter_map(Result::ok)
-            .filter(|entry| entry.path().extension().and_then(|s| s.to_str()) == Some("json"))
-            .collect();
-        assert!(remaining_json.is_empty(), "expected no snapshot json files");
-    }
 }
 
 #[tokio::test]
 async fn turn_state_clear_reports_false_when_snapshot_is_absent() {
-    let _env_lock = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let workspace = tempfile::tempdir().expect("workspace");
-    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", workspace.path());
+    let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
 
     let outcome = turn_state_clear(ClearTurnStateRequest {
         thread_id: "missing-thread".into(),
@@ -583,43 +669,73 @@ async fn turn_state_clear_reports_false_when_snapshot_is_absent() {
 // ── thread_update_title ───────────────────────────────────────
 
 #[tokio::test]
-async fn thread_update_title_rejects_empty_title() {
-    let _env_lock = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+async fn thread_update_title_rejects_empty_and_whitespace_only_titles() {
+    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let workspace = tempfile::tempdir().expect("workspace");
-    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", workspace.path());
+    let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
 
-    let err = thread_update_title(crate::memory::UpdateConversationThreadTitleRequest {
-        thread_id: "t-1".to_string(),
-        title: "".to_string(),
-    })
-    .await
-    .expect_err("empty title must be rejected");
+    for title in ["", "   "] {
+        let err = thread_update_title(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            crate::threads::UpdateConversationThreadTitleRequest {
+                thread_id: "t-1".to_string(),
+                title: title.to_string(),
+            },
+        )
+        .await
+        .expect_err("blank title must be rejected");
 
-    assert!(
-        err.contains("must not be empty"),
-        "expected empty-title error, got: {err}"
-    );
+        assert!(
+            err.contains("must not be empty"),
+            "expected empty-title error for {title:?}, got: {err}"
+        );
+    }
 }
 
 #[tokio::test]
-async fn thread_update_title_rejects_whitespace_only_title() {
-    let _env_lock = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+async fn thread_delete_forgets_its_conversation_memory_or_queues_it() {
+    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let workspace = tempfile::tempdir().expect("workspace");
-    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", workspace.path());
+    crate::storage::local::use_persistent_default_for_test(&workspace.path().join("workspace"));
+    let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
+    let thread_id = "thread-delete-memory";
+    create_thread_with_title(&workspace, thread_id, "Chat Jan 1 1:00 AM").await;
+    let dir = crate::config::Config::load_or_init()
+        .await
+        .expect("load config")
+        .workspace_dir;
 
-    let err = thread_update_title(crate::memory::UpdateConversationThreadTitleRequest {
-        thread_id: "t-1".to_string(),
-        title: "   ".to_string(),
-    })
+    let mut config = crate::config::Config::load_or_init()
+        .await
+        .expect("load config");
+    config.memory.engine.clear();
+    let ctx = DispatchCtx::new(
+        crate::core::runtime::CoreContext::for_test(
+            crate::core::runtime::DomainSet::full(),
+            Some(dir.clone()),
+        )
+        .derive_with(crate::core::runtime::ContextOverlay::new(
+            config,
+            crate::core::runtime::DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )),
+    );
+    thread_delete(
+        &ctx,
+        DeleteConversationThreadRequest {
+            thread_id: thread_id.to_string(),
+            deleted_at: "2026-01-01T00:02:00Z".into(),
+        },
+    )
     .await
-    .expect_err("whitespace-only title must be rejected");
+    .expect("delete thread");
 
-    assert!(
-        err.contains("must not be empty"),
-        "expected empty-title error, got: {err}"
+    // Signed out in tests (memory off): the forget is queued for the next
+    // sign-in instead of being skipped.
+    assert_eq!(
+        crate::memory::deletion::pending(&dir),
+        vec![crate::memory::deletion::PendingDeletion::Thread {
+            thread_id: thread_id.to_string()
+        }]
     );
 }

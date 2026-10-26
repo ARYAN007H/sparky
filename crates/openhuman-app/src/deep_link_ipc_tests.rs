@@ -25,17 +25,8 @@ impl Write for FailingWriter {
 }
 
 #[test]
-fn socket_path_reads_the_runtime_environment() {
-    let runtime_dir = std::env::var("XDG_RUNTIME_DIR").ok();
-    assert_eq!(
-        socket_path(),
-        socket_path_with_runtime_dir(runtime_dir.as_deref())
-    );
-}
-
-#[test]
 fn socket_path_uses_xdg_runtime_dir() {
-    let path = socket_path_with_runtime_dir(Some("/run/user/1234"));
+    let path = socket_path_for(Some(Path::new("/run/user/1234")), Path::new("/tmp"), 5678);
     assert_eq!(
         path,
         PathBuf::from("/run/user/1234/com.openhuman.app-deeplink.sock")
@@ -44,15 +35,15 @@ fn socket_path_uses_xdg_runtime_dir() {
 
 #[test]
 fn socket_path_fallback_has_uid() {
-    let path = socket_path_with_runtime_dir(None);
+    let path = socket_path_for(None, Path::new("/tmp"), 5678);
     let name = path.file_name().unwrap().to_string_lossy();
     assert!(
         name.contains("com_openhuman_app_deeplink"),
         "path {path:?} should contain identifier"
     );
-    // Should NOT be inside /run/user since XDG_RUNTIME_DIR is unset.
+    // The fallback uses the supplied temp directory when XDG_RUNTIME_DIR is absent.
     assert!(
-        !path.starts_with("/run/user"),
+        path.starts_with("/tmp"),
         "path should use temp_dir fallback"
     );
 }
@@ -138,7 +129,7 @@ fn round_trip_bind_connect_forward() {
         if let Ok(stream) = listener.accept().map(|(s, _)| s) {
             stream.set_read_timeout(Some(Duration::from_secs(2))).ok();
             let reader = BufReader::new(stream);
-            for line in reader.lines().flatten() {
+            for line in reader.lines().map_while(Result::ok) {
                 if line.starts_with("openhuman://") {
                     received_clone.lock().unwrap().push(line);
                 }
@@ -154,4 +145,57 @@ fn round_trip_bind_connect_forward() {
     let got = received.lock().unwrap();
     assert_eq!(got.len(), 1);
     assert_eq!(got[0], "openhuman://auth?token=testtoken123");
+}
+
+#[test]
+fn a_socket_held_by_another_user_receives_nothing() {
+    use std::io::Read;
+    let tmp = tempfile::TempDir::new().unwrap();
+    let sock_path = tmp.path().join("squatted-deeplink.sock");
+    let listener = UnixListener::bind(&sock_path).unwrap();
+    let me = nix::unistd::getuid().as_raw();
+    assert_eq!(socket_owner(&sock_path), Some(me));
+    assert_eq!(socket_owner(&tmp.path().join("missing.sock")), None);
+
+    // Forwarding as a different user: our listener is "foreign" to them.
+    let urls = vec!["openhuman://auth?token=secret".to_string()];
+    let result = try_forward_urls_as(&urls, &sock_path, me.wrapping_add(1));
+
+    assert!(matches!(result, ForwardResult::NoPrimary));
+    // The peer check ran on the connected stream, so nothing was written.
+    let (mut accepted, _) = listener.accept().unwrap();
+    let mut received = String::new();
+    accepted.read_to_string(&mut received).unwrap();
+    assert!(received.is_empty(), "token leaked: {received:?}");
+}
+
+#[test]
+fn another_users_socket_is_neither_bound_over_nor_unlinked() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let sock_path = tmp.path().join("foreign-deeplink.sock");
+    let listener = UnixListener::bind(&sock_path).unwrap();
+    let me = nix::unistd::getuid().as_raw();
+
+    // Binding as a different user: the existing socket is "foreign" to them.
+    assert!(bind_and_listen_as(sock_path.clone(), me.wrapping_add(1)).is_none());
+
+    // The owner's socket is still there and still serves.
+    assert!(sock_path.exists());
+    let _client = UnixStream::connect(&sock_path).unwrap();
+    listener.accept().unwrap();
+}
+
+#[test]
+fn our_own_live_primary_is_left_bound() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let sock_path = tmp.path().join("live-deeplink.sock");
+    let listener = UnixListener::bind(&sock_path).unwrap();
+    let me = nix::unistd::getuid().as_raw();
+
+    // Same user, live listener: a secondary instance must not take over.
+    assert!(bind_and_listen_as(sock_path.clone(), me).is_none());
+
+    assert!(sock_path.exists());
+    let _client = UnixStream::connect(&sock_path).unwrap();
+    listener.accept().unwrap();
 }

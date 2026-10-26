@@ -1,6 +1,5 @@
 //! Pure result mapping and framing for synchronous delegation dispatch.
 
-use super::DispatchMode;
 use tinytools::ToolResult;
 
 pub(super) fn awaiting_outcome_to_tool_result(
@@ -16,7 +15,7 @@ pub(super) fn awaiting_outcome_to_tool_result(
             outcome.agent_id, question_json, outcome.task_id
         ));
     }
-    ToolResult::success(super::super::awaiting_user::awaiting_user_envelope(
+    ToolResult::success(super::awaiting_user::awaiting_user_envelope(
         &outcome.task_id,
         &outcome.agent_id,
         None,
@@ -26,13 +25,13 @@ pub(super) fn awaiting_outcome_to_tool_result(
 }
 
 pub(super) fn format_subagent_failure(tool_name: &str, message: &str) -> String {
-    format!("{tool_name} failed and did not complete — no work was performed and no results were produced. Do NOT treat this as success or fabricate an output; report the failure to the user. Error: {message}")
+    format!(
+        "{tool_name} failed and did not complete — no work was performed and no results were produced. Do NOT treat this as success or fabricate an output; report the failure to the user. Error: {message}"
+    )
 }
 
 pub(crate) fn is_unexecuted_tool_call_stub(output: &str) -> bool {
-    use crate::agent::harness::archivist::helpers::{
-        contains_tool_call_payload, strip_tool_calls_from_response,
-    };
+    use tinytools_agent::dialect::{contains_tool_call_payload, strip_tool_calls_from_response};
     if !contains_tool_call_payload(output) {
         return false;
     }
@@ -48,27 +47,38 @@ pub(crate) fn is_unexecuted_tool_call_stub(output: &str) -> bool {
         .any(char::is_alphanumeric)
 }
 
-const INLINE_RESULT_NOTE: &str = "\n\n[INLINE_RESULT] This delegation ran inline and is complete as returned — there is no sub-agent worker for it. Do NOT call wait_subagent, list_subagents or continue_subagent for this delegation.";
-const NO_WORKER_NOTE: &str = "\n\n[INLINE_RESULT] This delegation ran inline and registered no sub-agent worker, so there is nothing to collect: do NOT call wait_subagent, list_subagents or continue_subagent for it. Re-delegate with a corrected prompt instead.";
-
-pub(crate) fn with_inline_result_note(output: String, mode: DispatchMode) -> String {
-    if mode == DispatchMode::Blocking {
-        format!("{output}{INLINE_RESULT_NOTE}")
-    } else {
-        output
-    }
+/// How a sub-agent handed back as `Incomplete { reason }` was stopped
+/// (iteration cap or failure breaker), for its `SubagentCompleted` event.
+pub(crate) fn incomplete_stop(
+    reason: &str,
+    failure_cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
+) -> Option<tinyagents_harness::turn_stop::TurnStop> {
+    Some(
+        crate::agent::session_host::stop_policy::stop_from_incomplete_with_cause(
+            reason,
+            failure_cause,
+        ),
+    )
 }
 
-pub(crate) fn incomplete_envelope(
+/// The parent's tool result for a sub-agent the harness stopped early: a
+/// **failure** carrying `envelope` (the actionable "did not finish" framing
+/// plus the stop summary and partial progress), so the parent's failure
+/// policy and its trace see the stop. It used to be a success the parent
+/// could narrate as done.
+pub(crate) fn stopped_subagent_result(
     tool_name: &str,
+    agent_id: &str,
+    task_id: &str,
     reason: &str,
-    output: &str,
-    mode: DispatchMode,
-) -> String {
-    let envelope = format!("[SUBAGENT_INCOMPLETE] the {tool_name} sub-agent {reason} and did not finish. Below is partial progress only — do NOT report it as done or re-run the identical delegation unchanged.\n\nPartial progress:\n{output}");
-    if mode == DispatchMode::Blocking {
-        format!("{envelope}{NO_WORKER_NOTE}")
-    } else {
-        envelope
-    }
+    failure_cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
+    envelope: String,
+) -> ToolResult {
+    let stop = incomplete_stop(reason, failure_cause).expect("incomplete stop is present");
+    log::debug!(
+        "[subagent] {tool_name} child stopped early agent_id={agent_id} task_id={task_id} \
+         {}; returning a failed tool result",
+        stop.status_message()
+    );
+    ToolResult::error(envelope)
 }

@@ -1,85 +1,47 @@
 use super::*;
-use tinyagents_harness::context::{RunConfig, RunContext};
-use tinyagents_harness::runtime::AgentHarness;
-use tinyagents_harness::testkit::ScriptedModel;
+use tinyagents_harness::run_queue::QueueLane;
 
-#[tokio::test]
-async fn residual_collect_requeues_to_its_original_lane() {
-    let queue = Arc::new(RunQueue::new());
-    let handle = SteeringHandle::allow_all();
-    let guard = SteeringForwarderGuard::new(
-        handle.clone(),
-        Some(queue.clone()),
-        None,
-        "thread-test".to_string(),
-    );
-    handle.send(SteeringCommand::InjectMessage(TaMessage::user(format!(
-        "{COLLECT_PREFIX}recovered context"
-    ))));
-    drop(guard);
-    tokio::time::timeout(Duration::from_secs(1), async {
-        loop {
-            if queue.status().await.collects == 1 {
-                return;
-            }
-            tokio::task::yield_now().await;
-        }
-    })
-    .await
-    .expect("residual collect should be requeued before timeout");
-    assert!(queue.drain(QueueLane::Steer).await.is_empty());
-    let recovered = queue.drain(QueueLane::Collect).await;
-    assert_eq!(recovered.len(), 1);
-    assert_eq!(recovered[0].text, "recovered context");
+#[test]
+fn recovered_steer_becomes_a_queued_turn_on_the_forwarders_thread() {
+    let turn = QueuedTurn::requeued("id-1".into(), "text".into(), "thread-9", 42);
+    assert_eq!(turn.id(), "id-1");
+    assert_eq!(turn.text(), "text");
+    assert_eq!(turn.thread_id, "thread-9");
+    assert_eq!(turn.queued_at_ms, 42);
+    assert!(turn.client_id.is_empty());
+    assert!(turn.model_override.is_none() && turn.temperature.is_none() && turn.locale.is_none());
 }
 
 #[tokio::test]
-async fn collect_reaches_the_next_model_boundary_as_additional_context() {
-    let queue = Arc::new(RunQueue::new());
+async fn the_feed_drains_both_lanes_into_the_steering_handle() {
+    let queue = Arc::new(RunQueue::<QueuedTurn>::new());
+    queue
+        .push(
+            QueueLane::Steer,
+            QueuedTurn::requeued("s".into(), "go left".into(), "t", 1),
+        )
+        .await;
     queue
         .push(
             QueueLane::Collect,
-            crate::agent::queued_turn::QueuedTurn {
-                id: "queued-test".to_string(),
-                text: "the deployment finished successfully".to_string(),
-                client_id: "client-test".to_string(),
-                thread_id: "thread-test".to_string(),
-                queued_at_ms: 1,
-                model_override: None,
-                temperature: None,
-                locale: None,
-            },
+            QueuedTurn::requeued("c".into(), "fyi".into(), "t", 1),
         )
         .await;
     let handle = SteeringHandle::allow_all();
-    forward_collects(&queue, &handle, "thread-test").await;
-    let model = Arc::new(ScriptedModel::replies(vec!["done"]));
-    let mut harness: AgentHarness<()> = AgentHarness::new();
-    harness
-        .register_model("scripted", model.clone())
-        .set_default_model("scripted");
-    harness
-        .invoke_in_context(
-            &(),
-            RunContext::new(RunConfig::new("collect-boundary"), ()).with_steering(handle),
-            vec![TaMessage::user("start")],
-        )
-        .await
-        .expect("collect-context run should complete");
-    let requests = model.requests();
-    assert_eq!(requests.len(), 1, "one model boundary should be crossed");
-    let collect = requests[0]
-        .messages
-        .iter()
-        .find(|message| message.text().contains("deployment finished successfully"))
-        .expect("the next model request should contain the collected context");
-    assert!(matches!(collect, TaMessage::User(_)));
-    assert_eq!(
-        collect.text(),
-        "[Additional context from user]: the deployment finished successfully"
-    );
+    queue_feed(queue.clone()).prime(&handle, "t").await;
+    assert_eq!(handle.drain().len(), 2);
+    assert_eq!(queue.status().await.total, 0);
+}
+
+#[test]
+fn the_registrar_publishes_and_removes_the_subagent_handle() {
+    let task_id = TaskId::new("registrar-task");
+    let handle = SteeringHandle::allow_all();
+    SharedSteeringRegistrar.register(task_id.as_str(), &handle);
+    assert!(shared_steering_registry().get(&task_id).is_some());
+    SharedSteeringRegistrar.deregister(task_id.as_str());
     assert!(
-        !collect.text().starts_with(STEER_PREFIX),
-        "collect must be context, not a steering instruction"
+        shared_steering_registry().get(&task_id).is_none(),
+        "deregister must remove the sub-agent handle"
     );
 }

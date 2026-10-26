@@ -7,8 +7,8 @@
 use serde_json::Value;
 use tinyhumans_sdk::api::webhooks::{CreateWebhookTunnelRequest, UpdateWebhookTunnelRequest};
 
-use openhuman_core::config::Config;
-use openhuman_core::rpc::RpcOutcome;
+use openhuman_embed::__host::config::Config;
+use openhuman_embed::__host::core::Outcome;
 
 use crate::hosted::client::HostedClient;
 
@@ -21,13 +21,13 @@ fn require_id(id: &str) -> Result<&str, String> {
 }
 
 /// `GET /webhooks/core` — the user's tunnels.
-pub async fn list_tunnels(config: &Config) -> Result<RpcOutcome<Value>, String> {
+pub async fn list_tunnels(config: &Config) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "GET /webhooks/core",
         client.sdk().webhooks().list_tunnels().await,
     )?;
-    Ok(RpcOutcome::single_log(data, "webhook tunnels fetched"))
+    Ok(Outcome::single_log(data, "webhook tunnels fetched"))
 }
 
 /// `POST /webhooks/core`. `name` is trimmed and required; a blank
@@ -36,7 +36,7 @@ pub async fn create_tunnel(
     config: &Config,
     name: &str,
     description: Option<String>,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     let name = name.trim();
     if name.is_empty() {
         return Err("name is required".to_string());
@@ -52,18 +52,18 @@ pub async fn create_tunnel(
         "POST /webhooks/core",
         client.sdk().webhooks().create_tunnel(&request).await,
     )?;
-    Ok(RpcOutcome::single_log(data, "webhook tunnel created"))
+    Ok(Outcome::single_log(data, "webhook tunnel created"))
 }
 
 /// `GET /webhooks/core/{id}`.
-pub async fn get_tunnel(config: &Config, id: &str) -> Result<RpcOutcome<Value>, String> {
+pub async fn get_tunnel(config: &Config, id: &str) -> Result<Outcome<Value>, String> {
     let id = require_id(id)?;
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "GET /webhooks/core/{id}",
         client.sdk().webhooks().get_tunnel(id).await,
     )?;
-    Ok(RpcOutcome::single_log(data, "webhook tunnel fetched"))
+    Ok(Outcome::single_log(data, "webhook tunnel fetched"))
 }
 
 /// `PATCH /webhooks/core/{id}`; omitted fields are left unchanged.
@@ -71,35 +71,35 @@ pub async fn update_tunnel(
     config: &Config,
     id: &str,
     request: UpdateWebhookTunnelRequest,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     let id = require_id(id)?;
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "PATCH /webhooks/core/{id}",
         client.sdk().webhooks().update_tunnel(id, &request).await,
     )?;
-    Ok(RpcOutcome::single_log(data, "webhook tunnel updated"))
+    Ok(Outcome::single_log(data, "webhook tunnel updated"))
 }
 
 /// `DELETE /webhooks/core/{id}`.
-pub async fn delete_tunnel(config: &Config, id: &str) -> Result<RpcOutcome<Value>, String> {
+pub async fn delete_tunnel(config: &Config, id: &str) -> Result<Outcome<Value>, String> {
     let id = require_id(id)?;
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "DELETE /webhooks/core/{id}",
         client.sdk().webhooks().delete_tunnel(id).await,
     )?;
-    Ok(RpcOutcome::single_log(data, "webhook tunnel deleted"))
+    Ok(Outcome::single_log(data, "webhook tunnel deleted"))
 }
 
 /// `GET /webhooks/core/bandwidth` — the remaining bandwidth budget.
-pub async fn get_bandwidth(config: &Config) -> Result<RpcOutcome<Value>, String> {
+pub async fn get_bandwidth(config: &Config) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "GET /webhooks/core/bandwidth",
         client.sdk().webhooks().get_bandwidth().await,
     )?;
-    Ok(RpcOutcome::single_log(data, "webhook bandwidth fetched"))
+    Ok(Outcome::single_log(data, "webhook bandwidth fetched"))
 }
 
 #[cfg(test)]

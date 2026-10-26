@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use tinybus::{EventHandler, SubscriptionHandle};
 
 use crate::core::events::DomainEvent;
-use crate::core::socketio::WebChannelEvent;
+use crate::web_chat::WebChannelEvent;
 
 use super::event_bus::publish_web_channel_event;
 

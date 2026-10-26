@@ -44,31 +44,10 @@ impl VoiceCapability {
     }
 }
 
-/// API style for STT requests. Different providers use incompatible request
-/// shapes; the factory dispatches based on this discriminator.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum SttApiStyle {
-    /// OpenAI-compatible: multipart POST to `/audio/transcriptions`.
-    #[default]
-    OpenaiAudio,
-    /// Deepgram: POST binary audio to `/listen?model=<model>`.
-    Deepgram,
-    /// ElevenLabs Scribe: multipart POST to `/speech-to-text` with `model_id`
-    /// and an `xi-api-key` header.
-    ElevenLabs,
-}
-
-/// API style for TTS requests.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum TtsApiStyle {
-    /// OpenAI-compatible: POST JSON `{ model, voice, input }` to `/audio/speech`.
-    #[default]
-    OpenaiAudio,
-    /// ElevenLabs: POST JSON `{ text, model_id }` to `/text-to-speech/<voice_id>`.
-    ElevenLabs,
-}
+// The API-style enums live with the HTTP clients that dispatch on them
+// (`tinyinference_voice::external_{stt,tts}`); the TOML shape (`rename_all = "lowercase"`) and JSON schema are unchanged.
+use tinyinference_voice::external_stt::SttApiStyle;
+use tinyinference_voice::external_tts::TtsApiStyle;
 
 /// Endpoint config for one voice (STT/TTS) provider.
 ///
@@ -185,33 +164,7 @@ pub fn is_voice_slug_reserved(s: &str) -> bool {
 ///
 /// Format: `"vp_<slug>_<5 random alphanumerics>"`.
 pub fn generate_voice_provider_id(slug: &str) -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos();
-    let chars: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
-    let mut suffix = String::with_capacity(5);
-    let mut seed = nanos as usize;
-    for _ in 0..5 {
-        suffix.push(chars[seed % chars.len()] as char);
-        seed = seed
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        seed = (seed >> 33) ^ seed;
-    }
-    let safe_slug: String = slug
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .take(20)
-        .collect();
-    format!("vp_{}_{}", safe_slug, suffix)
+    super::generate_provider_id_with_prefix("vp", slug)
 }
 
 #[cfg(test)]

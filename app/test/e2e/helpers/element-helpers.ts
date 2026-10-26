@@ -1,7 +1,7 @@
 /**
  * Cross-platform WebView element helpers for E2E tests.
  *
- * Two backends are supported:
+ * Desktop backends and the Playwright web harness are supported:
  *
  * ## Appium Mac2 (macOS)
  * The mac2 driver exposes WKWebView content through the macOS accessibility
@@ -17,6 +17,7 @@
  * - `browser.execute()` runs JS inside the WebView
  * - `browser.getPageSource()` returns HTML (not accessibility XML)
  */
+import type { Page } from '@playwright/test';
 import type { ChainablePromiseElement } from 'webdriverio';
 
 import { isTauriDriver } from './platform';
@@ -521,6 +522,17 @@ export async function clickTestId(
   return el;
 }
 
+/** Set an input value through a stable test id in DOM-backed E2E runs. */
+export async function setValueByTestId(
+  testId: string,
+  value: string,
+  timeout: number = 15_000
+): Promise<ChainablePromiseElement> {
+  const el = await waitForTestId(testId, timeout);
+  await el.setValue(value);
+  return el;
+}
+
 /** Click a test id in DOM-backed runs or its visible text on Mac2. */
 export async function clickTestIdOrText(
   testId: string,
@@ -682,4 +694,40 @@ export async function dumpAccessibilityTree(): Promise<string> {
   } catch (err: unknown) {
     return `[dumpAccessibilityTree] Failed: ${err}`;
   }
+}
+
+// Playwright web-lane adapter. Keep platform locator types and locale-storage
+// decoding here so web specs use the same shared element-helper boundary.
+export type BrowserPage = Page;
+
+export function browserElements(page: BrowserPage) {
+  const language = (name: string) => page.getByRole('combobox', { name, exact: true });
+  return {
+    textbox: (name: string) => page.getByRole('textbox', { name, exact: true }),
+    button: (name: string) => page.getByRole('button', { name, exact: true }),
+    testId: (id: string) => page.getByTestId(id),
+    slot: (slot: string) => page.locator(`[data-slot="${slot}"]`),
+    language,
+    selectLanguage: (name: string, value: string | { label: string }) =>
+      language(name).selectOption(value),
+    document: page.locator('html'),
+    chatTab: page.locator('[data-walkthrough="tab-chat"]'),
+    text: (value: string) => page.getByText(value, { exact: true }),
+  };
+}
+
+export async function persistedBrowserLocale(page: BrowserPage): Promise<string | null> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem('persist:locale');
+    if (!raw) return null;
+    try {
+      // Redux Persist JSON-encodes each reducer property inside its outer JSON.
+      const persisted = JSON.parse(raw) as { current?: string };
+      if (!persisted.current) return null;
+      const locale = JSON.parse(persisted.current);
+      return typeof locale === 'string' ? locale : null;
+    } catch {
+      return null;
+    }
+  });
 }

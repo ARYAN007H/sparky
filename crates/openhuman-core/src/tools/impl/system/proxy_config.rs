@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::fs;
 use std::sync::Arc;
+use tinyagents_harness_tools::static_schema;
 use tinytools::{Tool, ToolResult};
 
 pub struct ProxyConfigTool {
@@ -27,12 +28,13 @@ impl ProxyConfigTool {
             )
         })?;
 
-        let mut parsed: Config = toml::from_str(&contents).map_err(|error| {
-            anyhow::anyhow!(
-                "Failed to parse config file {}: {error}",
-                self.config.config_path.display()
-            )
-        })?;
+        let mut parsed: Config =
+            crate::config::schema::config_from_toml_str(&contents).map_err(|error| {
+                anyhow::anyhow!(
+                    "Failed to parse config file {}: {error}",
+                    self.config.config_path.display()
+                )
+            })?;
         parsed.config_path = self.config.config_path.clone();
         parsed.workspace_dir = self.config.workspace_dir.clone();
         Ok(parsed)
@@ -155,7 +157,11 @@ impl ProxyConfigTool {
     }
 
     async fn handle_set(&self, args: &Value) -> anyhow::Result<ToolResult> {
-        let mut cfg = self.load_config_without_env()?;
+        let mut cfg = Config::load_from_config_path_without_env(
+            &self.config.config_path,
+            &self.config.workspace_dir,
+        )
+        .await?;
         let previous_scope = cfg.proxy.scope;
         let mut proxy = cfg.proxy.clone();
         let mut touched_proxy_url = false;
@@ -248,7 +254,11 @@ impl ProxyConfigTool {
     }
 
     async fn handle_disable(&self, args: &Value) -> anyhow::Result<ToolResult> {
-        let mut cfg = self.load_config_without_env()?;
+        let mut cfg = Config::load_from_config_path_without_env(
+            &self.config.config_path,
+            &self.config.workspace_dir,
+        )
+        .await?;
         let clear_env_default = cfg.proxy.scope == ProxyScope::Environment;
         cfg.proxy.enabled = false;
         cfg.save().await?;
@@ -320,54 +330,7 @@ impl Tool for ProxyConfigTool {
     }
 
     fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string",
-                    "enum": ["get", "set", "disable", "list_services", "apply_env", "clear_env"],
-                    "default": "get"
-                },
-                "enabled": {
-                    "type": "boolean",
-                    "description": "Enable or disable proxy"
-                },
-                "scope": {
-                    "type": "string",
-                    "description": "Proxy scope: environment | openhuman | services"
-                },
-                "http_proxy": {
-                    "type": ["string", "null"],
-                    "description": "HTTP proxy URL"
-                },
-                "https_proxy": {
-                    "type": ["string", "null"],
-                    "description": "HTTPS proxy URL"
-                },
-                "all_proxy": {
-                    "type": ["string", "null"],
-                    "description": "Fallback proxy URL for all protocols"
-                },
-                "no_proxy": {
-                    "description": "Comma-separated string or array of NO_PROXY entries",
-                    "oneOf": [
-                        {"type": "string"},
-                        {"type": "array", "items": {"type": "string"}}
-                    ]
-                },
-                "services": {
-                    "description": "Comma-separated string or array of service selectors used when scope=services",
-                    "oneOf": [
-                        {"type": "string"},
-                        {"type": "array", "items": {"type": "string"}}
-                    ]
-                },
-                "clear_env": {
-                    "type": "boolean",
-                    "description": "When action=disable, clear process proxy environment variables"
-                }
-            }
-        })
+        static_schema!(include_str!("parameters/proxy_config.json"))
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
@@ -408,3 +371,7 @@ impl Tool for ProxyConfigTool {
 #[cfg(test)]
 #[path = "proxy_config_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "proxy_config_schema_tests.rs"]
+mod schema_tests;

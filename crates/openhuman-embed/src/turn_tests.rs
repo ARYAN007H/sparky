@@ -14,10 +14,13 @@ use serde_json::json;
 /// controller it is sent to.
 #[test]
 fn turn_request_field_names_match_the_controller() {
-    let schema = openhuman_core::inference::host_runtime::all_local_inference_controller_schemas()
+    let schema = openhuman_core::core::all::all_registered_controllers()
         .into_iter()
-        .find(|s| s.namespace == "inference" && s.function == "agent_chat")
+        .find(|controller| {
+            controller.schema.namespace == "inference" && controller.schema.function == "agent_chat"
+        })
         .expect("inference.agent_chat is a registered controller");
+    let schema = schema.schema;
 
     let declared: std::collections::HashSet<&str> =
         schema.inputs.iter().map(|field| field.name).collect();
@@ -31,6 +34,9 @@ fn turn_request_field_names_match_the_controller() {
         cwd: Some("/tmp".into()),
         inference_url: Some("https://example.invalid/v1".into()),
         api_key: Some("k".into()),
+        inference_headers: vec![("x-worker".into(), "a".into())],
+        inference_provider_options: Some(serde_json::json!({"provider": {"sort": "latency"}})),
+        inference_reasoning_effort: Some("high".into()),
         agent_id: Some("a".into()),
     };
 
@@ -67,6 +73,41 @@ fn turn_request_omits_absent_options() {
     // depend on facade internals rather than on what was asked for.
     let encoded = serde_json::to_value(TurnRequest::new("hi")).expect("encodes");
     assert_eq!(encoded, json!({ "message": "hi" }));
+}
+
+#[test]
+fn typed_dispatch_refusal_precedes_structured_error_mapping_and_keeps_usage() {
+    let refusal =
+        crate::budget::DispatchRefusal::new(crate::budget::DispatchRefusalReason::CallLimit);
+    let error = anyhow::Error::new(refusal);
+    let mapped = map_agent_chat_error(
+        error,
+        Some(tinyagents_harness::middleware::ResponseUsage {
+            input_tokens: 13,
+            output_tokens: 5,
+            cached_tokens: 2,
+            reasoning_tokens: 1,
+            cost_usd: Some(0.004),
+            ..Default::default()
+        }),
+    );
+
+    match mapped {
+        CoreError::DispatchAdmission { source, usage, .. } => {
+            assert!(CoreError::DispatchAdmission {
+                method: AGENT_CHAT,
+                source,
+                usage: None,
+            }
+            .is_expected_user_state());
+            assert_eq!(source, refusal);
+            let usage = usage.expect("the completed invalid response remains accounted");
+            assert_eq!(usage.input_tokens, 13);
+            assert_eq!(usage.output_tokens, 5);
+            assert_eq!(usage.cost_usd, Some(0.004));
+        }
+        other => panic!("expected typed dispatch refusal, got {other:?}"),
+    }
 }
 
 #[test]
@@ -194,22 +235,28 @@ fn sanitize_redacts_unparseable_urls() {
 /// discovered by an agent answering with no memory of the conversation.
 #[test]
 fn the_controller_declares_nowhere_for_a_seed_to_travel() {
-    let schema = openhuman_core::inference::host_runtime::all_local_inference_controller_schemas()
+    let schema = openhuman_core::core::all::all_registered_controllers()
         .into_iter()
-        .find(|s| s.namespace == "inference" && s.function == "agent_chat")
+        .find(|controller| {
+            controller.schema.namespace == "inference" && controller.schema.function == "agent_chat"
+        })
         .expect("inference.agent_chat is a registered controller");
+    let schema = schema.schema;
 
     // An allowlist, not a denylist of suspicious names: a future input called
     // `context` or `transcript` could carry history just as well, and a
     // heuristic that guesses at names would pass it silently. Anything new
     // fails here until someone decides whether a seed could ride it.
-    const KNOWN: [&str; 8] = [
+    const KNOWN: [&str; 11] = [
         "message",
         "model_override",
         "temperature",
         "thread_id",
         "cwd",
         "inference_url",
+        "inference_headers",
+        "inference_provider_options",
+        "inference_reasoning_effort",
         "api_key",
         "agent_id",
     ];
@@ -239,19 +286,23 @@ fn a_turn_outcome_carries_what_the_turn_spent() {
     let spent = openhuman_core::agent::tinyagents::host::LastTurnUsage {
         input_tokens: 1_200,
         output_tokens: 340,
-        cost_usd: 0.0042,
+        cost_usd: Some(0.0042),
         ..Default::default()
     };
     let outcome = TurnOutcome {
         reply: "done".into(),
         session_id: "s".into(),
         usage: Some(spent.clone()),
+        structured: None,
+        finish_reason: None,
+        answered_model: None,
+        unapplied_steers: Vec::new(),
     };
 
     let metered = outcome.usage.as_ref().expect("a metered turn");
     assert_eq!(metered.input_tokens, 1_200);
     assert_eq!(metered.output_tokens, 340);
-    assert!((metered.cost_usd - 0.0042).abs() < f64::EPSILON);
+    assert!((metered.cost_usd.expect("a priced turn") - 0.0042).abs() < f64::EPSILON);
 
     // Unmetered is representable and distinct, which is what the RPC path and
     // a session that reported nothing both produce.
@@ -260,4 +311,67 @@ fn a_turn_outcome_carries_what_the_turn_spent() {
         ..outcome.clone()
     };
     assert_ne!(unmetered, outcome);
+}
+
+#[test]
+fn approval_event_correlation_uses_the_web_chat_origin_without_replacing_session_identity() {
+    let origin = AgentTurnOrigin::WebChat {
+        thread_id: "approval-thread".into(),
+        client_id: "client".into(),
+        request_id: None,
+    };
+    let session = "durable-session";
+    assert_eq!(event_thread_id(Some(&origin), session), "approval-thread");
+    assert_eq!(
+        event_thread_id(Some(&AgentTurnOrigin::Cli), session),
+        session
+    );
+    assert_eq!(event_thread_id(None, session), session);
+}
+
+#[tokio::test]
+async fn runtime_tool_events_preserve_order_and_discard_tool_payloads() {
+    let hub = crate::events::EventHub::new(8);
+    let mut events = hub.subscribe();
+    let agent = Some("a".to_owned());
+    let private = "private-tool-content";
+    let started = crate::AgentProgress::ToolCallStarted {
+        call_id: private.into(),
+        tool_name: "host_tool".into(),
+        arguments: serde_json::json!({"input": private}),
+        iteration: 1,
+        display_label: Some(private.into()),
+        display_detail: Some(private.into()),
+    };
+    let completed = crate::AgentProgress::ToolCallCompleted {
+        call_id: private.into(),
+        tool_name: "host_tool".into(),
+        success: true,
+        output_chars: private.len(),
+        output: private.into(),
+        arguments: Some(serde_json::json!({"input": private})),
+        elapsed_ms: 1,
+        iteration: 1,
+        failure: None,
+        display_label: Some(private.into()),
+        display_detail: Some(private.into()),
+        structured: Some(serde_json::json!({"output": private})),
+    };
+    observe_progress(&hub, &agent, "turn-a", &started);
+    observe_progress(&hub, &agent, "turn-a", &completed);
+    for expected in [
+        crate::RuntimeEventKind::ToolStarted {
+            tool_name: "host_tool".into(),
+        },
+        crate::RuntimeEventKind::ToolEnded {
+            tool_name: "host_tool".into(),
+            success: true,
+        },
+    ] {
+        let event = events.recv().await.unwrap();
+        assert_eq!(event.agent_id.as_deref(), Some("a"));
+        assert_eq!(event.turn_id.as_deref(), Some("turn-a"));
+        assert_eq!(event.kind, expected);
+        assert!(!serde_json::to_string(&event).unwrap().contains(private));
+    }
 }

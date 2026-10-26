@@ -1,8 +1,11 @@
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
-use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::all::{
+    BoundRegisteredController, ControllerEntry, ControllerFuture, RegisteredController,
+};
+use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use crate::rpc::RpcOutcome;
 
 /// Declared controller schemas for the `tool_registry` namespace.
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
@@ -24,6 +27,27 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
             schema: schemas("diagnostics"),
             handler: handle_diagnostics,
         },
+    ]
+}
+
+/// Bound runtime entries for the `tool_registry` namespace.
+pub(crate) fn all_bound_controller_entries() -> Vec<ControllerEntry> {
+    vec![
+        ControllerEntry::bound(BoundRegisteredController::typed(
+            schemas("list"),
+            parse_list,
+            run_list,
+        )),
+        ControllerEntry::bound(BoundRegisteredController::typed(
+            schemas("get"),
+            parse_get,
+            run_get,
+        )),
+        ControllerEntry::bound(BoundRegisteredController::typed(
+            schemas("diagnostics"),
+            parse_diagnostics,
+            run_diagnostics,
+        )),
     ]
 }
 
@@ -49,7 +73,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
             inputs: vec![FieldSchema {
                 name: "tool_id",
                 ty: TypeSchema::String,
-                comment: "Stable registry id, for example `memory.search` or `tools.web_search`.",
+                comment: "Stable registry id, for example `memory.recall` or `tools.web_search`.",
                 required: true,
             }],
             outputs: vec![FieldSchema {
@@ -86,30 +110,70 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_list(params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         log::debug!(
             "[tool_registry] rpc list requested param_count={}",
             params.len()
         );
-        to_json(crate::tools::registry::ops::list_tools())
+        to_json(crate::tools::registry::ops::list_tools(&ctx))
     })
 }
 
-fn handle_get(params: Map<String, Value>) -> ControllerFuture {
+fn handle_get(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let tool_id = required_tool_id(&params)?;
         log::debug!("[tool_registry] rpc get requested tool_id={tool_id}");
-        to_json(crate::tools::registry::ops::get_tool(tool_id)?)
+        to_json(crate::tools::registry::ops::get_tool(&ctx, tool_id)?)
     })
 }
 
-fn handle_diagnostics(params: Map<String, Value>) -> ControllerFuture {
+fn handle_diagnostics(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         log::debug!(
             "[tool_registry] rpc diagnostics requested param_count={}",
             params.len()
         );
+        let result = crate::tools::registry::ops::diagnostics()
+            .await
+            .and_then(to_json);
+        log::debug!(
+            "[tool_registry] rpc diagnostics completed success={}",
+            result.is_ok()
+        );
+        result
+    })
+}
+
+fn parse_list(_params: Map<String, Value>) -> Result<(), String> {
+    Ok(())
+}
+
+fn parse_get(params: Map<String, Value>) -> Result<String, String> {
+    required_tool_id(&params).map(str::to_owned)
+}
+
+fn parse_diagnostics(_params: Map<String, Value>) -> Result<(), String> {
+    Ok(())
+}
+
+fn run_list(ctx: DispatchCtx, (): ()) -> ControllerFuture {
+    Box::pin(async move {
+        log::debug!("[tool_registry] rpc list requested");
+        to_json(crate::tools::registry::ops::list_tools(&ctx))
+    })
+}
+
+fn run_get(ctx: DispatchCtx, tool_id: String) -> ControllerFuture {
+    Box::pin(async move {
+        log::debug!("[tool_registry] rpc get requested tool_id={tool_id}");
+        to_json(crate::tools::registry::ops::get_tool(&ctx, &tool_id)?)
+    })
+}
+
+fn run_diagnostics(_ctx: DispatchCtx, (): ()) -> ControllerFuture {
+    Box::pin(async move {
+        log::debug!("[tool_registry] rpc diagnostics requested");
         let result = crate::tools::registry::ops::diagnostics()
             .await
             .and_then(to_json);
@@ -130,7 +194,7 @@ fn required_tool_id(params: &Map<String, Value>) -> Result<&str, String> {
         .ok_or_else(|| "tool_id must be a non-empty string".to_string())
 }
 
-fn to_json<T: serde::Serialize>(outcome: RpcOutcome<T>) -> Result<Value, String> {
+fn to_json<T: serde::Serialize>(outcome: Outcome<T>) -> Result<Value, String> {
     outcome.into_cli_compatible_json()
 }
 

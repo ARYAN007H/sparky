@@ -1,4 +1,5 @@
 use super::*;
+use tinycomputer_bus::browser::{LocateBy, Locator, Target};
 
 fn session_entry(client: Arc<BrowserClient>, id: SessionId, last_used: Instant) -> ThreadSession {
     let config_fingerprint = browser_session_fingerprint(&client);
@@ -52,7 +53,8 @@ fn every_direct_or_controller_action_that_can_submit_needs_confirmation() {
         delay_ms: None
     }));
     assert!(needs_host_confirmation(&Action::Press {
-        key: "Enter".into()
+        key: "Enter".into(),
+        target: None
     }));
     assert!(!needs_host_confirmation(&Action::Hover {
         target: Target::reference("e1")
@@ -83,16 +85,54 @@ fn approval_describes_selector_and_locator_targets() {
     });
     assert!(locator.contains("Role locator") && locator.contains("Email"));
     assert!(!locator.contains("private@example.com"));
+
+    let press_action = Action::Press {
+        key: "Enter".into(),
+        target: Some(Target::reference("e7")),
+    };
+    let (reference, press) = approval_target(&press_action);
+    assert_eq!(reference, Some("e7"));
+    assert_eq!(press, " @e7");
+    let (_, untargeted) = approval_target(&Action::Press {
+        key: "Enter".into(),
+        target: None,
+    });
+    assert!(untargeted.is_empty());
 }
 
 #[test]
-fn direct_actions_use_typed_targets_and_reject_unbounded_inputs() {
+fn direct_actions_decode_through_the_bus_tool_args() {
     assert!(
-        matches!(parse_action(&json!({"action":"click","selector":"@e1"})).unwrap(), Action::Click { target: Target::Ref { value }, .. } if value == "e1")
+        matches!(direct_action(&json!({"action":"click","selector":"@e1"})).unwrap(), Action::Click { target: Target::Ref { value }, .. } if value == "e1")
     );
-    assert!(parse_action(&json!({"action":"click"})).is_err());
-    assert!(parse_action(&json!({"action":"scroll","direction":"diagonal"})).is_err());
-    assert!(parse_action(&json!({"action":"arbitrary_script"})).is_err());
+    assert!(direct_action(&json!({"action":"click"})).is_err());
+    assert!(direct_action(&json!({"action":"scroll","direction":"diagonal"})).is_err());
+    assert!(direct_action(&json!({"action":"arbitrary_script"})).is_err());
+    assert!(direct_action(
+        &json!({"action":"find","by":"text","value":"Save","find_action":"text"})
+    )
+    .is_ok());
+}
+
+#[test]
+fn model_visible_browser_schema_is_the_bus_schema() {
+    let tool = BrowserTool::new(
+        std::sync::Arc::new(crate::security::SecurityPolicy::default()),
+        std::sync::Arc::new(BrowserClient::new(std::sync::Arc::new(
+            crate::config::Config::default(),
+        ))),
+        3,
+    );
+    let schema = tinytools::Tool::parameters_schema(&tool);
+    assert_eq!(schema, tinycomputer_bus::browser::tool::parameters_schema());
+    assert_eq!(schema["required"], json!(["action"]));
+    assert_eq!(
+        schema["properties"]["action"]["enum"]
+            .as_array()
+            .unwrap()
+            .len(),
+        22
+    );
 }
 
 #[test]
@@ -153,7 +193,7 @@ async fn confirm_pending_without_a_held_action_is_refused() {
     )));
     let tool = BrowserTool::new(Arc::new(SecurityPolicy::default()), client, 3);
     let error = tool
-        .run(&json!({"action":"confirm_pending","token":"x"}))
+        .run(&json!({"action":"confirm_pending","token":"x"}), None)
         .await
         .unwrap_err();
     assert!(error.to_string().contains("No pending"), "{error}");
@@ -177,7 +217,7 @@ async fn task_without_allowed_websites_is_refused_before_the_module() {
     if client.task_origins().is_empty() {
         let tool = BrowserTool::new(Arc::new(SecurityPolicy::default()), client, 3);
         let error = tool
-            .run(&json!({"action":"task","goal":"Read the news"}))
+            .run(&json!({"action":"task","goal":"Read the news"}), None)
             .await
             .unwrap_err();
         assert!(error.to_string().contains("allowed origin"), "{error}");
@@ -261,7 +301,7 @@ async fn stale_tool_close_preserves_a_newer_thread_session() {
     thread_sessions().lock().await.remove(&key);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn changed_browser_policy_retires_cached_session_for_same_thread() {
     let mut old_config = crate::config::Config::default();
     old_config.http_request.allowed_domains = vec!["example.com".into(), "other.test".into()];
@@ -374,8 +414,89 @@ async fn task_rejects_a_malformed_flow_before_the_module() {
     )));
     let tool = BrowserTool::new(Arc::new(SecurityPolicy::default()), client, 3);
     let error = tool
-        .run(&json!({"action":"task","goal":"Read the news","flow":{"steps":"not a list"}}))
+        .run(
+            &json!({"action":"task","goal":"Read the news","flow":{"steps":"not a list"}}),
+            None,
+        )
         .await
         .unwrap_err();
     assert!(error.to_string().contains("Invalid flow"), "{error}");
+}
+
+#[test]
+fn a_task_that_found_no_chrome_tells_the_agent_to_ask_for_its_path() {
+    let failed = |reason: &str| -> TaskView {
+        serde_json::from_value(json!({
+            "id": "t-1",
+            "status": {"state": "failed", "step": null, "reason": reason,
+                       "hint": "", "recoverable": true},
+            "summary": "failed",
+            "progress": 0.0,
+            "next": []
+        }))
+        .unwrap()
+    };
+    let hint = host_hint(&failed("browser unavailable: Chrome not found. Checked: …"));
+    assert_eq!(hint, Some(crate::modules::browser::CHROME_NOT_FOUND_HINT));
+    assert_eq!(
+        host_hint(&failed("the last three actions changed nothing")),
+        None
+    );
+    // TinyComputer 0.11's own words: the step's note names a missing Chrome,
+    // or a Chrome path that names no Chrome it can start.
+    assert_eq!(
+        host_hint(&failed(
+            "https://www.amazon.in could not be opened: BROWSER_UNAVAILABLE (browser unavailable: no Chrome or Chromium was found on this machine; give the path of the browser to use)"
+        )),
+        Some(crate::modules::browser::CHROME_NOT_FOUND_HINT)
+    );
+    assert_eq!(
+        host_hint(&failed(
+            "https://www.amazon.in could not be opened: BROWSER_UNAVAILABLE (browser unavailable: the browser binary given could not be started (Chrome exited before providing DevTools URL); check that its path names Chrome or Chromium)"
+        )),
+        Some(crate::modules::browser::CHROME_PATH_HINT)
+    );
+}
+
+struct ThreadOnly(&'static str);
+
+impl tinytools::ToolRunContext for ThreadOnly {
+    fn thread_id(&self) -> Option<&str> {
+        Some(self.0)
+    }
+}
+
+#[tokio::test]
+async fn two_agents_on_one_thread_get_distinct_browser_session_keys() {
+    use crate::core::runtime::agent_scope::test_agent_context;
+    use crate::core::runtime::{context::CoreContext, DomainSet};
+    let root = CoreContext::for_test(DomainSet::full(), None);
+    let client = Arc::new(BrowserClient::new(Arc::new(
+        crate::config::Config::default(),
+    )));
+    let key_under = |ctx: Arc<CoreContext>| {
+        let client = client.clone();
+        async move {
+            CoreContext::scope(ctx, async move {
+                let tool = BrowserTool::new(Arc::new(SecurityPolicy::default()), client, 3);
+                let _ = tool
+                    .execute_with_context(
+                        json!({}),
+                        ToolCallOptions::default(),
+                        Some(&ThreadOnly("browser-shared-thread")),
+                    )
+                    .await;
+                let key = tool.thread_key.lock().unwrap().clone();
+                drop(tool);
+                key
+            })
+            .await
+        }
+    };
+
+    let alpha = key_under(test_agent_context(&root, "alpha")).await;
+    let beta = key_under(test_agent_context(&root, "beta")).await;
+
+    assert!(alpha.is_some() && beta.is_some());
+    assert_ne!(alpha, beta);
 }

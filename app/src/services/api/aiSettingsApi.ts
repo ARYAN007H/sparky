@@ -28,35 +28,22 @@ import {
   type ModelRegistryEntry,
   type ModelSettingsUpdate,
   openhumanGetClientConfig,
-  openhumanUpdateLocalAiSettings,
   openhumanUpdateModelSettings,
 } from '../../utils/tauriCommands/config';
 import {
   type InstalledModelInfo,
   type LocalAiDiagnostics,
   type LocalAiStatus,
-  openhumanLocalAiApplyPreset,
   openhumanLocalAiDiagnostics,
-  openhumanLocalAiPresets,
   openhumanLocalAiStatus,
-  type PresetsResponse,
 } from '../../utils/tauriCommands/localAi';
 
 // ─── Domain types — what the AIPanel consumes ──────────────────────────────
 
-export type WorkloadId =
-  | 'chat'
-  | 'reasoning'
-  | 'agentic'
-  | 'coding'
-  | 'vision'
-  | 'memory'
-  | 'heartbeat'
-  | 'learning'
-  | 'subconscious';
+export type WorkloadId = 'chat' | 'reasoning' | 'agentic' | 'coding' | 'vision' | 'memory';
 
 export const CHAT_WORKLOADS: WorkloadId[] = ['chat', 'reasoning', 'agentic', 'coding'];
-const BACKGROUND_WORKLOADS: WorkloadId[] = ['memory', 'heartbeat', 'learning', 'subconscious'];
+const BACKGROUND_WORKLOADS: WorkloadId[] = ['memory'];
 export const ALL_WORKLOADS: WorkloadId[] = [...CHAT_WORKLOADS, ...BACKGROUND_WORKLOADS];
 
 // Workloads that own a `<id>_provider` config field and must round-trip through
@@ -318,9 +305,6 @@ export async function loadAISettings(): Promise<AISettings> {
     coding: parseProviderString(config.coding_provider),
     vision: parseProviderString(config.vision_provider),
     memory: parseProviderString(config.memory_provider),
-    heartbeat: parseProviderString(config.heartbeat_provider),
-    learning: parseProviderString(config.learning_provider),
-    subconscious: parseProviderString(config.subconscious_provider),
   };
 
   // Diagnostic: detect partial BYOK routing — some workloads have a BYOK cloud
@@ -385,18 +369,20 @@ export async function saveAISettings(prev: AISettings, next: AISettings): Promis
         n.slug !== p.slug ||
         n.label !== p.label ||
         n.endpoint !== p.endpoint ||
+        n.ca_cert_pem !== p.ca_cert_pem ||
         n.auth_style !== p.auth_style
       );
     })
   ) {
     patch.cloud_providers = next.cloudProviders
       .filter(p => !['', 'cloud', 'openhuman', 'pid'].includes(p.slug.trim()))
-      .map(({ id, slug, label, endpoint, auth_style }) => ({
+      .map(({ id, slug, label, endpoint, auth_style, ca_cert_pem }) => ({
         id,
         slug,
         label,
         endpoint,
         auth_style,
+        ca_cert_pem,
       }));
   }
 
@@ -833,44 +819,27 @@ export async function testProviderModel(
   return res.result;
 }
 
-// ─── Local provider façade (Ollama install / detect / model manage) ───────
+// ─── Local provider snapshot (user-run Ollama endpoint: detect + list) ────
 
-/** Snapshot of the Ollama daemon + installed-model state for the AI panel. */
+/**
+ * Snapshot of the user-run local endpoint (Ollama / LM Studio / any
+ * OpenAI-compatible server) and its installed models for the AI panel. The app
+ * never installs the runtime or downloads models — the user does that.
+ */
 export interface LocalProviderSnapshot {
   status: LocalAiStatus | null;
   diagnostics: LocalAiDiagnostics | null;
-  presets: PresetsResponse | null;
   installedModels: InstalledModelInfo[];
 }
 
 export async function loadLocalProviderSnapshot(): Promise<LocalProviderSnapshot> {
-  const [statusRes, diag, presets] = await Promise.all([
+  const [statusRes, diag] = await Promise.all([
     openhumanLocalAiStatus().catch((): { result: LocalAiStatus | null } => ({ result: null })),
     openhumanLocalAiDiagnostics().catch((): LocalAiDiagnostics | null => null),
-    openhumanLocalAiPresets().catch((): PresetsResponse | null => null),
   ]);
   return {
     status: statusRes.result,
     diagnostics: diag,
-    presets,
     installedModels: diag?.installed_models ?? [],
   };
 }
-
-/**
- * Toggle the master local-AI runtime (Ollama daemon orchestration). When
- * `false`, every workload routed to `ollama:*` will fail to build at the
- * factory level — the user should leave routes set to "openhuman" while local
- * AI is disabled. The new AI panel surfaces this as a single switch.
- *
- * Critically: this flips BOTH `runtime_enabled` AND `opt_in_confirmed`.
- */
-export async function setLocalRuntimeEnabled(enabled: boolean): Promise<void> {
-  await openhumanUpdateLocalAiSettings({ runtime_enabled: enabled, opt_in_confirmed: enabled });
-}
-
-/** Convenience helpers re-exported so the panel imports from one place. */
-export const localProvider = {
-  applyPreset: (tier: string) => openhumanLocalAiApplyPreset(tier),
-  setEnabled: (enabled: boolean) => setLocalRuntimeEnabled(enabled),
-};

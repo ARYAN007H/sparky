@@ -1,5 +1,5 @@
 use super::*;
-
+use tokio::sync::broadcast;
 /// `fresh_approval_surface_subscription` returns `Some` when the global event bus has
 /// been initialised and `None` otherwise (bus not started).  It must never return `None`
 /// after `init_global` has been called — the production path always initialises the bus
@@ -300,6 +300,102 @@ async fn agent_surface_bridges_thread_goal_updated() {
     assert_eq!(ev.goal, Some(goal));
 }
 
+/// Goal resume and committed-turn accounting use the same observed owner store
+/// as model-facing goal tools, so both lifecycle paths reach the existing
+/// thread-scoped socket event.
+#[tokio::test]
+async fn goal_resume_and_account_updates_reach_the_web_channel() {
+    crate::core::bus::init().await.expect("bus init");
+    register_agent_surface_subscriber();
+    let mut web_rx = subscribe_web_channel_events();
+
+    let workspace = tempfile::tempdir().expect("workspace");
+    let context = crate::core::runtime::CoreContext::for_test(
+        crate::core::runtime::DomainSet::full(),
+        Some(workspace.path().to_path_buf()),
+    );
+    crate::core::runtime::CoreContext::scope(context, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        let store = crate::agent::goals::goal_store(workspace.path(), &dispatch);
+        let thread_id = "goal-observer-resume-account";
+
+        store
+            .set(thread_id, "resume this goal", Some(100))
+            .await
+            .expect("set goal");
+        let _ = find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id).await;
+        store.pause(thread_id).await.expect("pause goal");
+        let _ = find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id).await;
+
+        let prepared = store.prepare_turn(thread_id).await.expect("prepare turn");
+        let paused = tinyagents_harness_tools::goals::ThreadGoalStatus::Paused;
+        assert_eq!(prepared.goal.map(|goal| goal.status), Some(paused));
+        store.resume(thread_id).await.expect("resume goal");
+        let resumed = find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id).await;
+        assert_eq!(
+            resumed.goal.as_ref().and_then(|goal| goal.get("status")),
+            Some(&serde_json::json!("active"))
+        );
+
+        crate::agent::goals::account_turn(
+            workspace.path(),
+            &dispatch,
+            Some(thread_id),
+            2,
+            0,
+            std::time::Duration::from_secs(1),
+        )
+        .await;
+        drop(store);
+        crate::agent::goals::account_turn(
+            workspace.path(),
+            &dispatch,
+            Some(thread_id),
+            2,
+            0,
+            std::time::Duration::from_secs(1),
+        )
+        .await;
+        loop {
+            match web_rx.try_recv() {
+                Ok(event)
+                    if event.event == "thread_goal_updated" && event.thread_id == thread_id =>
+                {
+                    panic!("account update published before the throttle threshold")
+                }
+                Ok(_) | Err(broadcast::error::TryRecvError::Lagged(_)) => continue,
+                Err(broadcast::error::TryRecvError::Empty) => break,
+                Err(broadcast::error::TryRecvError::Closed) => {
+                    panic!("web-channel bus closed before the account threshold")
+                }
+            }
+        }
+        crate::agent::goals::account_turn(
+            workspace.path(),
+            &dispatch,
+            Some(thread_id),
+            1,
+            0,
+            std::time::Duration::from_secs(1),
+        )
+        .await;
+        let accounted = tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id),
+        )
+        .await
+        .expect("throttled account event arrives after the threshold");
+        assert_eq!(
+            accounted
+                .goal
+                .as_ref()
+                .and_then(|goal| goal.get("tokensUsed")),
+            Some(&serde_json::json!(5))
+        );
+    })
+    .await;
+}
+
 /// `ThreadGoalCleared` bridges to `thread_goal_cleared`.
 #[tokio::test]
 async fn agent_surface_bridges_thread_goal_cleared() {
@@ -443,6 +539,7 @@ async fn approval_surface_bridges_approval_decided_with_resolution() {
         client_id: Some("client-decided-1".to_string()),
         tool_call_id: Some("call-decided-1".to_string()),
         resolution: Some("expired".to_string()),
+        agent_id: None,
     });
 
     let ev = find_agent_web_event(&mut web_rx, "approval_decided", "thread-decided-1").await;
@@ -469,6 +566,7 @@ async fn approval_surface_drops_approval_decided_without_chat_routing() {
         client_id: None,
         tool_call_id: None,
         resolution: Some("expired".to_string()),
+        agent_id: None,
     });
     // A sibling event we know fires, so we don't just race an empty channel.
     crate::core::bus::BUS.publish(DomainEvent::ThreadGoalCleared {
@@ -485,7 +583,7 @@ async fn approval_surface_drops_approval_decided_without_chat_routing() {
                     if ev.event == "approval_decided"
                         && ev.request_id == "req-decided-no-route" =>
                 {
-                    return Some(ev)
+                    return Some(ev);
                 }
                 Ok(_) => continue,
                 Err(broadcast::error::RecvError::Lagged(_)) => continue,
@@ -571,4 +669,81 @@ async fn publish_web_channel_event_preserves_an_explicit_ts() {
     )
     .await;
     assert_eq!(ev.ts, Some(123));
+}
+
+/// A SaaS user's stream carries only events stamped with that user's agent:
+/// `publish_web_channel_event` stamps the publishing scope's agent, and an
+/// event published outside any agent scope belongs to no user.
+#[tokio::test]
+async fn published_events_carry_the_publishing_agent() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    let mut rx = subscribe_web_channel_events();
+    let marker = format!("agent-stamp-{}", uuid::Uuid::new_v4());
+    let ctx = CoreContext::for_test(DomainSet::full(), None).derive_with(
+        ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::full(),
+            Default::default(),
+        )
+        .session_agent("u-alice")
+        .profile("p-alice"),
+    );
+    CoreContext::scope(ctx, async {
+        publish_web_channel_event(WebChannelEvent {
+            event: "chat_done".into(),
+            thread_id: marker.clone(),
+            ..Default::default()
+        });
+    })
+    .await;
+    publish_web_channel_event(WebChannelEvent {
+        event: "chat_done".into(),
+        thread_id: format!("{marker}-unscoped"),
+        ..Default::default()
+    });
+
+    let mut seen = Vec::new();
+    while seen.len() < 2 {
+        let ev = rx.recv().await.unwrap();
+        if ev.thread_id.starts_with(&marker) {
+            seen.push(ev);
+        }
+    }
+    let scoped = seen.iter().find(|e| e.thread_id == marker).unwrap();
+    assert!(scoped.belongs_to("u-alice"));
+    assert!(!scoped.belongs_to("u-bob"));
+    assert!(scoped.belongs_to_profile("p-alice"));
+    assert!(!scoped.belongs_to_profile("p-bob"));
+    let unscoped = seen.iter().find(|e| e.thread_id != marker).unwrap();
+    assert!(
+        !unscoped.belongs_to("u-alice") && !unscoped.belongs_to_profile("p-alice"),
+        "unstamped events belong to no user"
+    );
+    assert!(
+        !serde_json::to_string(scoped).unwrap().contains("u-alice"),
+        "the stamp is not serialized"
+    );
+}
+
+/// An async sub-agent's card is marked `detached` on the wire so the client
+/// keeps it across the parent turn's `chat_done`; an in-turn card carries no
+/// flag at all.
+#[test]
+fn approval_request_event_marks_only_detached_parks() {
+    let build = |detached| {
+        serde_json::to_value(approval_request_event(
+            "req-1",
+            "media_generate_image",
+            "a red fox",
+            &serde_json::json!({}),
+            "thread-1",
+            "client-1",
+            None,
+            None,
+            detached,
+        ))
+        .unwrap()
+    };
+    assert_eq!(build(true)["detached"], serde_json::json!(true));
+    assert!(build(false).get("detached").is_none());
 }

@@ -1,324 +1,710 @@
-//! Unit tests for the memory `ops` helpers (retrieval context construction,
-//! hit filtering, and LLM context message formatting).
+use super::*;
+use crate::memory::test_fixtures::{bind_reference, config_in, stored};
+use crate::memory::types::EngineStatus;
+use tinymemory_api::{
+    FetchMode, ItemKind, LearningKind, ListRequest, MemoryMeta, MetaFilter, SourceKind, SourceRef,
+    StoreItem, ToolCallRef,
+};
 
-// The engine's re-export and the contract's are the same item; name the
-// contract, which is what this crate still links (openhuman#6161).
-use serde_json::json;
-use tinymemory_api::types::{MemoryItemKind, NamespaceMemoryHit, RetrievalScoreBreakdown};
-
-use super::{build_retrieval_context, filter_hits_by_document_ids, format_llm_context_message};
-use crate::memory::api::types::GraphRelationRecord;
-
-fn sample_hit() -> NamespaceMemoryHit {
-    NamespaceMemoryHit {
-        id: "doc-1".to_string(),
-        kind: MemoryItemKind::Document,
-        namespace: "team".to_string(),
-        key: "atlas-status".to_string(),
-        title: Some("Atlas status".to_string()),
-        content: "Project Atlas is owned by Alice.".to_string(),
-        category: "core".to_string(),
-        source_type: Some("doc".to_string()),
-        updated_at: 1_700_000_000.0,
-        score: 0.92,
-        score_breakdown: RetrievalScoreBreakdown {
-            keyword_relevance: 0.3,
-            vector_similarity: 0.4,
-            graph_relevance: 0.9,
-            episodic_relevance: 0.0,
-            freshness: 0.0,
-            final_score: 0.92,
-        },
-        document_id: Some("doc-1".to_string()),
-        chunk_id: Some("doc-1#chunk-1".to_string()),
-        supporting_relations: vec![GraphRelationRecord {
-            namespace: Some("team".to_string()),
-            subject: "Alice".to_string(),
-            predicate: "OWNS".to_string(),
-            object: "Atlas".to_string(),
-            attrs: json!({"source": "graph"}),
-            updated_at: 1_700_000_000.0,
-            evidence_count: 2,
-            order_index: Some(1),
-            document_ids: vec!["doc-1".to_string()],
-            chunk_ids: vec!["doc-1#chunk-1".to_string()],
-        }],
-        taint: crate::memory::MemoryTaint::Internal,
+fn learn_params(text: &str) -> LearnParams {
+    LearnParams {
+        text: text.to_string(),
+        kind: None,
+        confidence: None,
+        meta: None,
     }
 }
 
+#[cfg(feature = "channels")]
 #[test]
-fn build_retrieval_context_projects_hits_into_relations_and_chunks() {
-    let context = build_retrieval_context(&[sample_hit()]);
-    assert_eq!(context.entities.len(), 2);
-    assert_eq!(context.relations.len(), 1);
-    assert_eq!(context.chunks.len(), 1);
-    assert_eq!(context.chunks[0].document_id.as_deref(), Some("doc-1"));
-    assert_eq!(context.relations[0].predicate, "OWNS");
+fn corrupt_legacy_channel_threads_are_skipped_without_modifying_the_source() {
+    let tmp = tempfile::tempdir().unwrap();
+    let workspace = tmp.path().join("workspace");
+    let memory_dir = workspace.join("memory");
+    std::fs::create_dir_all(&memory_dir).unwrap();
+    let legacy_file = memory_dir.join("channel_threads.json");
+    let corrupt = br#"{"discord":["unfinished"}"#;
+    std::fs::write(&legacy_file, corrupt).unwrap();
+
+    let threads = legacy_channel_threads(&workspace, "discord");
+
+    assert!(threads.is_empty(), "invalid legacy state is skipped");
+    assert_eq!(std::fs::read(&legacy_file).unwrap(), corrupt);
+    assert!(
+        !legacy_file.with_extension("json.corrupt").exists(),
+        "a state read must not move or quarantine the legacy file"
+    );
 }
 
-fn sample_hit_with_entity_types() -> NamespaceMemoryHit {
-    NamespaceMemoryHit {
-        id: "doc-2".to_string(),
-        kind: MemoryItemKind::Document,
-        namespace: "team".to_string(),
-        key: "atlas-status".to_string(),
-        title: Some("Atlas status".to_string()),
-        content: "Project Atlas is owned by Alice.".to_string(),
-        category: "core".to_string(),
-        source_type: Some("doc".to_string()),
-        updated_at: 1_700_000_000.0,
-        score: 0.92,
-        score_breakdown: RetrievalScoreBreakdown {
-            keyword_relevance: 0.3,
-            vector_similarity: 0.4,
-            graph_relevance: 0.9,
-            episodic_relevance: 0.0,
-            freshness: 0.0,
-            final_score: 0.92,
+#[cfg(feature = "channels")]
+#[tokio::test]
+async fn reserved_thread_matching_uses_module_identity_boundaries() {
+    use tinychannels_bus::module_inbound::PrepareChannelIdentityRequest;
+
+    let client = crate::channels::module_fixture::client().await;
+    let base_for = |channel: &'static str| {
+        let client = client.clone();
+        async move {
+            crate::modules::channel_controller::prepare_identity(
+                &client,
+                PrepareChannelIdentityRequest {
+                    channel: channel.into(),
+                    sender: None,
+                    reply_target: None,
+                    thread_ts: None,
+                },
+            )
+            .await
+            .expect("linked TinyChannels module prepares its canonical base")
+            .thread_id
+        }
+    };
+    let base = base_for("discord").await;
+    let neighboring_channel = base_for("discordish").await;
+
+    assert!(is_channel_thread_id(&base, &base));
+    assert!(is_channel_thread_id(&format!("{base}/thread-1"), &base));
+    assert!(is_channel_thread_id(
+        &format!("{base}#thread:1700.001"),
+        &base
+    ));
+    assert!(!is_channel_thread_id(&format!("{base}suffix"), &base));
+    assert!(!is_channel_thread_id(&neighboring_channel, &base));
+    assert!(!is_channel_thread_id(&format!("prefix-{base}"), &base));
+}
+
+#[cfg(feature = "channels")]
+#[tokio::test]
+async fn unavailable_channel_module_reports_error_and_queues_known_legacy_threads() {
+    use tinychannels_bus::module_inbound::PrepareChannelIdentityRequest;
+
+    let _linked_module = crate::channels::module_fixture::client().await;
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config_in(&tmp);
+    config.modules.enabled = false;
+    let legacy_thread = "legacy-discord-thread";
+    let legacy_file = config.workspace_dir.join("memory/channel_threads.json");
+    std::fs::create_dir_all(legacy_file.parent().unwrap()).unwrap();
+    std::fs::write(&legacy_file, br#"{"discord":["legacy-discord-thread"]}"#).unwrap();
+
+    let unavailable = crate::modules::channel_controller::prepare_identity(
+        &crate::modules::client(config.clone()),
+        PrepareChannelIdentityRequest {
+            channel: "discord".into(),
+            sender: None,
+            reply_target: None,
+            thread_ts: None,
         },
-        document_id: Some("doc-2".to_string()),
-        chunk_id: Some("doc-2#chunk-1".to_string()),
-        supporting_relations: vec![GraphRelationRecord {
-            namespace: Some("team".to_string()),
-            subject: "Alice".to_string(),
-            predicate: "OWNS".to_string(),
-            object: "Atlas".to_string(),
-            attrs: json!({
-                "source": "ingestion",
-                "entity_types": {
-                    "subject": "PERSON",
-                    "object": "PROJECT"
-                }
+    )
+    .await
+    .err()
+    .expect("explicitly disabled module must stay unavailable");
+    assert_eq!(unavailable, tinybus::module::ModuleCallError::Unavailable);
+
+    let error = forget_channel(&config, "discord")
+        .await
+        .expect_err("an unavailable identity module must be visible to the caller");
+    assert_eq!(error.code(), "ENGINE");
+    assert!(error.to_string().contains("channel identity preparation"));
+    assert_eq!(
+        crate::memory::deletion::pending(&config.workspace_dir),
+        vec![crate::memory::deletion::PendingDeletion::Thread {
+            thread_id: legacy_thread.into()
+        }]
+    );
+}
+
+#[tokio::test]
+async fn every_engine_operation_reports_memory_off_without_an_engine() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+
+    let recall_error = recall(
+        &config,
+        RecallParams {
+            refers_to: None,
+            question: "anything?".into(),
+            filter: None,
+            limit: None,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(recall_error.code(), "MEMORY_OFF");
+
+    let fetch_error = fetch(
+        &config,
+        FetchParams {
+            refers_to: None,
+            query: "x".into(),
+            mode: None,
+            filter: None,
+            limit: None,
+            cursor: None,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(fetch_error.code(), "MEMORY_OFF");
+
+    let learn_error = learn(&config, learn_params("a fact"), None)
+        .await
+        .unwrap_err();
+    assert_eq!(learn_error.code(), "MEMORY_OFF");
+
+    let forget_error = forget(
+        &config,
+        ForgetParams {
+            ids: vec!["a".into()],
+            reach: None,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(forget_error.code(), "MEMORY_OFF");
+
+    let list_error = items_list(&config, ItemsListParams::default())
+        .await
+        .unwrap_err();
+    assert_eq!(list_error.code(), "MEMORY_OFF");
+
+    assert_eq!(engines_list(&config).active, None);
+    assert!(!engines_list(&config).engines.is_empty());
+
+    let view = engine_get(&config).await;
+    assert_eq!(view.status, EngineStatus::Off);
+    assert_eq!(view.engine.as_deref(), Some(TINYHUMANS_ENGINE));
+    assert!(view.reason.is_some());
+    assert!(view.fetch_modes.is_empty());
+    assert!(!view.has_key);
+}
+
+#[tokio::test]
+async fn learn_recall_fetch_list_and_forget_round_trip() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let engine = bind_reference(&config);
+
+    let learned = learn(
+        &config,
+        learn_params("The user prefers dark roast coffee"),
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(!learned.id.is_empty());
+
+    let answer = recall(
+        &config,
+        RecallParams {
+            refers_to: None,
+            question: "coffee".into(),
+            filter: None,
+            limit: Some(5),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(!answer.citations.is_empty());
+
+    let page = fetch(
+        &config,
+        FetchParams {
+            refers_to: None,
+            query: "coffee".into(),
+            mode: None,
+            filter: Some(MetaFilter {
+                kinds: vec![ItemKind::Learning],
+                ..MetaFilter::default()
             }),
-            updated_at: 1_700_000_000.0,
-            evidence_count: 2,
-            order_index: Some(1),
-            document_ids: vec!["doc-2".to_string()],
-            chunk_ids: vec!["doc-2#chunk-1".to_string()],
-        }],
-        taint: crate::memory::MemoryTaint::Internal,
+            limit: Some(1000),
+            cursor: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(page.hits.len(), 1);
+
+    let listed = items_list(&config, ItemsListParams::default())
+        .await
+        .unwrap();
+    assert_eq!(listed.items.len(), 1);
+    assert_eq!(listed.items[0].id.0, learned.id);
+    // A preview listing names the same items (the reference engine's
+    // preview is its listing).
+    let previewed = items_list(
+        &config,
+        ItemsListParams {
+            preview: true,
+            ..ItemsListParams::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        previewed.items.iter().map(|h| &h.id).collect::<Vec<_>>(),
+        listed.items.iter().map(|h| &h.id).collect::<Vec<_>>()
+    );
+
+    let view = engines_list(&config);
+    assert_eq!(view.active.as_deref(), Some("reference"));
+    let health = engine_get(&config).await;
+    assert_eq!(health.status, EngineStatus::Ok);
+    assert!(!health.fetch_modes.is_empty());
+
+    let forgotten = forget(
+        &config,
+        ForgetParams {
+            ids: vec![learned.id.clone(), "  ".into()],
+            reach: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(forgotten.forgotten, 1);
+    assert!(engine.is_empty());
+}
+
+#[tokio::test]
+async fn forget_needs_an_id() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    bind_reference(&config);
+    let error = forget(
+        &config,
+        ForgetParams {
+            ids: vec![" ".into()],
+            reach: None,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.code(), "INVALID_REQUEST");
+}
+
+#[test]
+fn host_meta_wins_over_caller_meta() {
+    let caller = MemoryMeta {
+        thread_id: Some("forged".into()),
+        channel: Some("caller-channel".into()),
+        repo: Some("owner/repo".into()),
+        tags: vec!["mine".into()],
+        ..MemoryMeta::default()
+    };
+    let host = MemoryMeta {
+        thread_id: Some("t-real".into()),
+        channel: Some("telegram".into()),
+        agent_id: Some("orchestrator".into()),
+        tool_call: Some(ToolCallRef {
+            name: "memory".into(),
+            id: Some("call-1".into()),
+        }),
+        source: SourceRef {
+            kind: SourceKind::Agent,
+            id: None,
+        },
+        tags: vec!["host".into(), "mine".into()],
+        ..MemoryMeta::default()
+    };
+    let item = learning_item(
+        LearnParams {
+            text: "  likes tea  ".into(),
+            kind: Some(LearningKind::Preference),
+            confidence: Some(0.5),
+            meta: Some(caller),
+        },
+        Some(host),
+    )
+    .unwrap();
+    let meta = item.meta();
+    assert_eq!(meta.thread_id.as_deref(), Some("t-real"));
+    assert_eq!(meta.channel.as_deref(), Some("telegram"));
+    assert_eq!(meta.agent_id.as_deref(), Some("orchestrator"));
+    assert_eq!(
+        meta.repo.as_deref(),
+        Some("owner/repo"),
+        "caller fields kept"
+    );
+    assert_eq!(meta.source.kind, SourceKind::Agent);
+    assert_eq!(meta.tags, vec!["mine".to_string(), "host".to_string()]);
+    assert!(meta.observed_at.is_some());
+    match item {
+        StoreItem::Learning {
+            text,
+            kind,
+            confidence,
+            ..
+        } => {
+            assert_eq!(text, "likes tea");
+            assert_eq!(kind, LearningKind::Preference);
+            assert!((confidence - 0.5).abs() < f32::EPSILON);
+        }
+        other => panic!("expected a learning, got {:?}", other.kind()),
     }
 }
 
 #[test]
-fn build_retrieval_context_extracts_entity_types_from_attrs() {
-    let context = build_retrieval_context(&[sample_hit_with_entity_types()]);
-    assert_eq!(context.entities.len(), 2);
+fn host_metadata_none_preserves_caller_channel() {
+    let item = learning_item(
+        LearnParams {
+            text: "likes tea".into(),
+            kind: None,
+            confidence: None,
+            meta: Some(MemoryMeta {
+                channel: Some("caller-channel".into()),
+                ..MemoryMeta::default()
+            }),
+        },
+        Some(MemoryMeta::default()),
+    )
+    .unwrap();
 
-    let alice = context.entities.iter().find(|e| e.name == "Alice").unwrap();
-    assert_eq!(alice.entity_type.as_deref(), Some("PERSON"));
-
-    let atlas = context.entities.iter().find(|e| e.name == "Atlas").unwrap();
-    assert_eq!(atlas.entity_type.as_deref(), Some("PROJECT"));
+    assert_eq!(item.meta().channel.as_deref(), Some("caller-channel"));
 }
 
 #[test]
-fn build_retrieval_context_entity_type_none_when_attrs_missing() {
-    let context = build_retrieval_context(&[sample_hit()]);
-    assert_eq!(context.entities.len(), 2);
+fn learning_confidence_must_be_a_probability() {
+    let mut params = learn_params("x");
+    params.confidence = Some(1.5);
+    assert_eq!(
+        learning_item(params, None).unwrap_err().code(),
+        "INVALID_REQUEST"
+    );
+    assert_eq!(
+        learning_item(learn_params("   "), None).unwrap_err().code(),
+        "INVALID_REQUEST"
+    );
+}
 
-    for entity in &context.entities {
+#[tokio::test]
+async fn stores_are_scrubbed_of_secrets() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let engine = bind_reference(&config);
+    learn(
+        &config,
+        learn_params("deploy key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789 is set"),
+        None,
+    )
+    .await
+    .unwrap();
+    let items = stored(&engine, MetaFilter::default()).await;
+    assert_eq!(items.len(), 1);
+    assert!(!items[0]
+        .text
+        .contains("abcdefghijklmnopqrstuvwxyz0123456789"));
+}
+
+#[test]
+fn engine_set_validates_and_rebinds() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config_in(&tmp);
+
+    let unknown = EngineSetParams {
+        engine: "nope".into(),
+        endpoint: None,
+        api_key: None,
+    };
+    assert_eq!(
+        apply_engine_set(&mut config, &unknown).unwrap_err().code(),
+        "INVALID_REQUEST"
+    );
+
+    for endpoint in ["not a url", "ftp://host", "file:///etc"] {
+        let params = EngineSetParams {
+            engine: CORTEXDB_ENGINE.into(),
+            endpoint: Some(endpoint.into()),
+            api_key: None,
+        };
         assert_eq!(
-            entity.entity_type, None,
-            "entity_type should be None when attrs has no entity_types"
+            apply_engine_set(&mut config, &params).unwrap_err().code(),
+            "INVALID_REQUEST",
+            "{endpoint}"
         );
     }
-}
 
-#[test]
-fn helpers_filter_document_ids_and_format_context_message() {
-    let hit = sample_hit();
-    let filtered = filter_hits_by_document_ids(vec![hit.clone()], Some(&["doc-2".to_string()]));
-    assert!(filtered.is_empty());
-
-    let message = format_llm_context_message(Some("who owns atlas"), &[hit])
-        .expect("context message should exist");
-    assert!(message.contains("Query: who owns atlas"));
-    // Without entity_types in attrs, relations render without type annotations.
-    assert!(message.contains("Alice -[OWNS]-> Atlas"));
-}
-
-#[test]
-fn format_llm_context_message_includes_entity_types_when_present() {
-    let hit = sample_hit_with_entity_types();
-    let message = format_llm_context_message(Some("who owns atlas"), &[hit])
-        .expect("context message should exist");
-    assert!(
-        message.contains("Alice (PERSON) -[OWNS]-> Atlas (PROJECT)"),
-        "expected entity types in relation text, got: {message}"
-    );
-}
-
-// ── Pure-helper coverage ───────────────────────────────────────
-
-use super::{
-    chunk_metadata, default_category, default_priority, default_source_type, error_envelope,
-    extract_entity_type, maybe_retrieval_context, memory_counts, memory_request_id,
-    relation_identity, relation_metadata, timestamp_to_rfc3339, validate_memory_relative_path,
-};
-use crate::memory::{ApiEnvelope, MemoryRetrievalContext};
-use crate::rpc::RpcOutcome;
-
-#[test]
-fn memory_request_id_is_nonempty_and_unique() {
-    let a = memory_request_id();
-    let b = memory_request_id();
-    assert!(!a.is_empty());
-    assert!(!b.is_empty());
-    assert_ne!(a, b);
-}
-
-#[test]
-fn memory_counts_builds_btreemap_from_entries() {
-    let m = memory_counts([("documents", 3), ("kv", 1)]);
-    assert_eq!(m.get("documents"), Some(&3));
-    assert_eq!(m.get("kv"), Some(&1));
-    assert_eq!(m.len(), 2);
-}
-
-#[test]
-fn memory_counts_is_empty_for_empty_input() {
-    let m: std::collections::BTreeMap<String, usize> = memory_counts(std::iter::empty());
-    assert!(m.is_empty());
-}
-
-#[test]
-fn timestamp_to_rfc3339_valid_seconds_and_fractional() {
-    let s = timestamp_to_rfc3339(1_700_000_000.0).unwrap();
-    assert!(s.contains("2023"));
-    // Fractional seconds should preserve nanoseconds within range.
-    let s = timestamp_to_rfc3339(1_700_000_000.5).unwrap();
-    assert!(s.contains("2023"));
-}
-
-#[test]
-fn timestamp_to_rfc3339_rejects_non_finite_and_negative() {
-    assert!(timestamp_to_rfc3339(f64::NAN).is_none());
-    assert!(timestamp_to_rfc3339(f64::INFINITY).is_none());
-    assert!(timestamp_to_rfc3339(-1.0).is_none());
-}
-
-fn relation_fixture(namespace: Option<&str>) -> GraphRelationRecord {
-    GraphRelationRecord {
-        namespace: namespace.map(str::to_string),
-        subject: "Alice".into(),
-        predicate: "OWNS".into(),
-        object: "Atlas".into(),
-        attrs: json!({"entity_types":{"subject":"PERSON","object":"PROJECT"}}),
-        updated_at: 1_700_000_000.0,
-        evidence_count: 2,
-        order_index: Some(1),
-        document_ids: vec!["doc-1".into()],
-        chunk_ids: vec!["doc-1#c1".into()],
-    }
-}
-
-#[test]
-fn relation_identity_uses_global_for_missing_namespace() {
-    let rel = relation_fixture(None);
-    assert_eq!(relation_identity(&rel), "global|Alice|OWNS|Atlas");
-    let rel = relation_fixture(Some("team"));
-    assert_eq!(relation_identity(&rel), "team|Alice|OWNS|Atlas");
-}
-
-#[test]
-fn relation_metadata_includes_expected_keys() {
-    let rel = relation_fixture(Some("team"));
-    let m = relation_metadata(&rel);
-    assert_eq!(m["namespace"], "team");
-    assert_eq!(m["order_index"], 1);
-    assert!(m["document_ids"].is_array());
-    assert!(m["updated_at"].is_string());
-}
-
-#[test]
-fn chunk_metadata_exposes_score_breakdown() {
-    let m = chunk_metadata(&sample_hit());
-    assert_eq!(m["kind"], "document");
-    assert_eq!(m["namespace"], "team");
-    assert!(m["score_breakdown"]["final_score"].is_number());
-}
-
-#[test]
-fn extract_entity_type_returns_nonempty_or_none() {
-    let attrs = json!({"entity_types":{"subject":"PERSON","object":""}});
-    assert_eq!(
-        extract_entity_type(&attrs, "subject"),
-        Some("PERSON".into())
-    );
-    // Empty string → None.
-    assert_eq!(extract_entity_type(&attrs, "object"), None);
-    // Missing role → None.
-    assert_eq!(extract_entity_type(&attrs, "missing"), None);
-    // Empty attrs → None.
-    assert_eq!(extract_entity_type(&json!({}), "subject"), None);
-}
-
-#[test]
-fn format_llm_context_message_returns_none_for_empty_hits() {
-    assert!(format_llm_context_message(None, &[]).is_none());
-    assert!(format_llm_context_message(Some("query"), &[]).is_none());
-}
-
-#[test]
-fn filter_hits_by_document_ids_passes_through_when_filter_is_none() {
-    let hits = vec![sample_hit()];
-    let filtered = filter_hits_by_document_ids(hits.clone(), None);
-    assert_eq!(filtered.len(), 1);
-}
-
-#[test]
-fn filter_hits_by_document_ids_retains_matching_ids() {
-    let hits = vec![sample_hit()];
-    let filtered = filter_hits_by_document_ids(hits, Some(&["doc-1".to_string()]));
-    assert_eq!(filtered.len(), 1);
-}
-
-#[test]
-fn maybe_retrieval_context_respects_include_flag() {
-    let empty = MemoryRetrievalContext {
-        entities: vec![],
-        relations: vec![],
-        chunks: vec![],
+    let keyed_tinyhumans = EngineSetParams {
+        engine: TINYHUMANS_ENGINE.into(),
+        endpoint: None,
+        api_key: Some("k".into()),
     };
-    // include=false → always None
-    assert!(maybe_retrieval_context(false, empty.clone()).is_none());
-    // include=true but context empty → None
-    assert!(maybe_retrieval_context(true, empty).is_none());
-    // include=true + non-empty context → Some
-    let ctx = build_retrieval_context(&[sample_hit()]);
-    assert!(maybe_retrieval_context(true, ctx).is_some());
+    assert_eq!(
+        apply_engine_set(&mut config, &keyed_tinyhumans)
+            .unwrap_err()
+            .code(),
+        "INVALID_REQUEST"
+    );
+
+    assert!(!engine::is_on(&config));
+    let cortex = EngineSetParams {
+        engine: CORTEXDB_ENGINE.into(),
+        endpoint: Some("https://cortex.example.test".into()),
+        api_key: Some("cdb-test-key".into()),
+    };
+    apply_engine_set(&mut config, &cortex).unwrap();
+    assert_eq!(config.memory.engine, CORTEXDB_ENGINE);
+    assert_eq!(
+        config.memory.endpoint_for(CORTEXDB_ENGINE).as_deref(),
+        Some("https://cortex.example.test")
+    );
+    let bound = engine::resolve(&config).engine().expect("rebuilt on");
+    assert_eq!(bound.id, CORTEXDB_ENGINE);
+    assert_eq!(bound.endpoint, "https://cortex.example.test");
+
+    let clear = EngineSetParams {
+        engine: CORTEXDB_ENGINE.into(),
+        endpoint: Some(String::new()),
+        api_key: Some(String::new()),
+    };
+    apply_engine_set(&mut config, &clear).unwrap();
+    assert!(config.memory.endpoint_for(CORTEXDB_ENGINE).is_none());
+    assert!(!engine::is_on(&config), "removing the key turns memory off");
 }
 
-#[test]
-fn default_constants_are_stable() {
-    assert!(!default_source_type().is_empty());
-    assert!(!default_priority().is_empty());
-    assert!(!default_category().is_empty());
+#[tokio::test]
+async fn disabling_memory_turns_it_off_and_keeps_the_engine_settings() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config_in(&tmp);
+    apply_engine_set(
+        &mut config,
+        &EngineSetParams {
+            engine: CORTEXDB_ENGINE.into(),
+            endpoint: Some("https://cortex.example.test".into()),
+            api_key: Some("cdb-test-key".into()),
+        },
+    )
+    .unwrap();
+    assert!(engine::is_on(&config));
+
+    let keyed = EngineSetParams {
+        engine: DISABLED_ENGINE.into(),
+        endpoint: None,
+        api_key: Some("k".into()),
+    };
+    assert_eq!(
+        apply_engine_set(&mut config, &keyed).unwrap_err().code(),
+        "INVALID_REQUEST"
+    );
+    assert!(engine::is_on(&config), "a refused disable changes nothing");
+
+    let disable = EngineSetParams {
+        engine: DISABLED_ENGINE.into(),
+        endpoint: None,
+        api_key: None,
+    };
+    apply_engine_set(&mut config, &disable).unwrap();
+    assert_eq!(config.memory.engine, DISABLED_ENGINE);
+    assert!(!engine::is_on(&config));
+    assert_eq!(
+        config.memory.endpoint_for(CORTEXDB_ENGINE).as_deref(),
+        Some("https://cortex.example.test"),
+        "the cortexdb endpoint survives disabling"
+    );
+
+    let view = engine_get(&config).await;
+    assert_eq!(view.engine.as_deref(), Some(DISABLED_ENGINE));
+    assert_eq!(view.status, EngineStatus::Off);
+    assert_eq!(view.reason.as_deref(), Some("memory is disabled"));
+    assert!(engines_list(&config).active.is_none());
+
+    // Selecting cortexdb again needs no endpoint or key re-entry.
+    apply_engine_set(
+        &mut config,
+        &EngineSetParams {
+            engine: CORTEXDB_ENGINE.into(),
+            endpoint: None,
+            api_key: None,
+        },
+    )
+    .unwrap();
+    assert!(engine::is_on(&config));
 }
 
-#[test]
-fn validate_memory_relative_path_rejects_empty_absolute_and_traversal() {
-    // Empty string is now allowed: it refers to the memory root
-    // (`<workspace>/memory`) since the file-based RPCs resolve everything
-    // relative to that directory rather than the workspace root.
-    assert!(validate_memory_relative_path("").is_ok());
-    assert!(validate_memory_relative_path("/etc/passwd").is_err());
-    assert!(validate_memory_relative_path("../secrets").is_err());
-    assert!(validate_memory_relative_path("ok/subdir/file.md").is_ok());
-    assert!(validate_memory_relative_path("simple.txt").is_ok());
+#[tokio::test]
+async fn fetch_refuses_a_mode_the_engine_does_not_declare() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config_in(&tmp);
+    apply_engine_set(
+        &mut config,
+        &EngineSetParams {
+            engine: CORTEXDB_ENGINE.into(),
+            endpoint: Some("https://cortex.example.test".into()),
+            api_key: Some("cdb-test-key".into()),
+        },
+    )
+    .unwrap();
+    let error = fetch(
+        &config,
+        FetchParams {
+            refers_to: None,
+            query: "x".into(),
+            mode: Some(FetchMode::Keyword),
+            filter: None,
+            limit: None,
+            cursor: None,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.code(), "UNSUPPORTED");
 }
 
+#[tokio::test]
+async fn erase_all_needs_its_confirmation() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let engine = bind_reference(&config);
+    learn(&config, learn_params("a fact"), None).await.unwrap();
+    let error = erase_all(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        EraseAllParams { confirm: false },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.code(), "INVALID_REQUEST");
+    assert_eq!(stored(&engine, MetaFilter::default()).await.len(), 1);
+}
+
+#[tokio::test]
+async fn erase_all_erases_everything_the_engine_holds() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let engine = bind_reference(&config);
+    learn(&config, learn_params("a fact"), None).await.unwrap();
+    learn(&config, learn_params("another fact"), None)
+        .await
+        .unwrap();
+    let view = erase_all(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        EraseAllParams { confirm: true },
+    )
+    .await
+    .unwrap();
+    assert!(view.erased_scopes >= 1, "{view:?}");
+    assert!(stored(&engine, MetaFilter::default()).await.is_empty());
+}
+
+#[tokio::test]
+async fn erase_all_reports_memory_off_without_an_engine() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let error = erase_all(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        EraseAllParams { confirm: true },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.code(), "MEMORY_OFF");
+}
+
+#[tokio::test]
+async fn erasing_memory_cancels_queued_learning_so_restart_cannot_restore_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let engine = bind_reference(&config);
+    let facts = crate::memory::tools::CallFacts::of(
+        &config,
+        &tinymemory_tools::layout::identity::Identity::agent("orchestrator"),
+    );
+    let queued = crate::memory::tool_writes::tests::enqueue(
+        &config,
+        &serde_json::json!({"action":"learn","text":"Prefers tea"}),
+        &facts,
+    )
+    .unwrap();
+    assert!(queued["status"].as_str().unwrap().starts_with("queued"));
+    erase_all(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        EraseAllParams { confirm: true },
+    )
+    .await
+    .unwrap();
+    let restarted = config.clone();
+    crate::memory::tool_writes::drain(&restarted).await;
+    assert!(stored(&engine, MetaFilter::default()).await.is_empty());
+}
+
+/// With a reach, forget by id goes to the engine's `forget_within` (through
+/// the scrubbing wrapper every bound engine sits in), so the engine never
+/// sweeps the tree for the ids; without one it stays a plain forget by id.
+#[tokio::test]
+async fn forget_with_a_reach_forgets_within_it() {
+    use tinymemory_api::MemoryEngine as _;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let engine = std::sync::Arc::new(crate::memory::test_fixtures::RecordingEngine::new());
+    crate::memory::test_fixtures::RecordingEngine::bind(&engine, &config);
+
+    let mine = learn(&config, learn_params("tea in the morning"), None)
+        .await
+        .unwrap();
+    let other = learn(&config, learn_params("coffee at night"), None)
+        .await
+        .unwrap();
+    let namespace = engine
+        .list(ListRequest {
+            filter: MetaFilter::default(),
+            limit: 10,
+            cursor: None,
+        })
+        .await
+        .unwrap()
+        .items
+        .into_iter()
+        .find(|hit| hit.id.0 == mine.id)
+        .expect("learned item listed")
+        .meta
+        .namespace;
+
+    let forgotten = forget(
+        &config,
+        ForgetParams {
+            ids: vec![mine.id.clone()],
+            reach: Some(tinymemory_api::Reach::exact(namespace)),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(forgotten.forgotten, 1);
+    assert_eq!(engine.calls(), vec!["forget_within"]);
+
+    let forgotten = forget(
+        &config,
+        ForgetParams {
+            ids: vec![other.id.clone()],
+            reach: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(forgotten.forgotten, 1);
+    assert_eq!(engine.calls(), vec!["forget_within", "forget"]);
+}
+
+#[path = "ops_compat_tests.rs"]
+mod compat_tests;
+
 #[test]
-fn error_envelope_produces_api_error_with_code_and_message() {
-    let envelope: RpcOutcome<ApiEnvelope<serde_json::Value>> =
-        error_envelope::<serde_json::Value>("NOT_FOUND", "missing".into());
-    let api = &envelope.value;
-    assert!(api.data.is_none());
-    let err = api.error.as_ref().expect("error set");
-    assert_eq!(err.code, "NOT_FOUND");
-    assert_eq!(err.message, "missing");
-    // Meta must carry a request id.
-    assert!(!api.meta.request_id.is_empty());
+fn disabled_engine_rejects_an_api_key_without_mutating_memory_settings() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config_in(&tmp);
+    let before = config.memory.clone();
+
+    let error = apply_engine_set(
+        &mut config,
+        &EngineSetParams {
+            engine: DISABLED_ENGINE.into(),
+            endpoint: None,
+            api_key: Some("not-a-real-key".into()),
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(error.code(), "INVALID_REQUEST");
+    assert_eq!(config.memory, before);
 }

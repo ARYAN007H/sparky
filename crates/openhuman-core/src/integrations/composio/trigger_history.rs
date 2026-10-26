@@ -1,270 +1,202 @@
-//! Persistent ComposeIO trigger history.
-//!
-//! Stores every incoming ComposeIO trigger as a JSONL record partitioned by
-//! UTC day under `<workspace>/state/triggers/YYYY-MM-DD.jsonl`.
+//! Lazy ownership of a module-side trigger archive; no files are opened here.
 
-use std::fs::{self, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
-#[cfg(windows)]
-use std::sync::Mutex;
+use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
+use tinyconnectors_bus::{
+    ArchiveHandle, OpenArchiveRequest, ReadArchiveRequest, RecordTriggerRequest,
+};
+use tokio::sync::Mutex;
 
-use chrono::Utc;
-#[cfg(not(windows))]
-use fs2::FileExt;
+use super::types::{
+    ComposioTriggerEvent, ComposioTriggerHistoryEntry, ComposioTriggerHistoryResult,
+};
+use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
+use tinybus::module::ModuleClient;
+use tinyconnectors_bus::names::methods;
 
-use super::types::{ComposioTriggerHistoryEntry, ComposioTriggerHistoryResult};
+static GLOBAL_TRIGGER_HISTORY: OnceLock<Arc<TriggerHistory>> = OnceLock::new();
 
-static GLOBAL_TRIGGER_HISTORY: OnceLock<Arc<ComposioTriggerHistoryStore>> = OnceLock::new();
+struct Lease {
+    workspace: PathBuf,
+    client: ModuleClient,
+    handle: ArchiveHandle,
+}
 
-/// Process-local write serializer for Windows, where `fs2::FileExt::lock_exclusive`
-/// is unavailable. This ensures concurrent `record_trigger` calls do not race and
-/// produce malformed JSONL lines.
-#[cfg(windows)]
-static WINDOWS_TRIGGER_WRITE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+/// Host lifecycle owner of one opaque archive lease. The module owns its files.
+pub struct TriggerHistory {
+    initial_workspace: PathBuf,
+    lease: Arc<Mutex<Option<Lease>>>,
+    #[cfg(all(test, feature = "modules"))]
+    fixture: Option<ModuleClient>,
+}
 
-const TRIGGER_ARCHIVE_DIR: &str = "triggers";
-
-pub fn init_global(workspace_dir: PathBuf) -> Result<(), String> {
-    let expected_archive_dir = workspace_dir.join("state").join(TRIGGER_ARCHIVE_DIR);
-    if let Some(existing) = GLOBAL_TRIGGER_HISTORY.get() {
-        if existing.archive_dir == expected_archive_dir {
-            return Ok(());
+impl TriggerHistory {
+    fn client(&self, config: &Config) -> ModuleClient {
+        #[cfg(all(test, feature = "modules"))]
+        if let Some(client) = self.fixture.as_ref() {
+            return client.clone();
         }
-
-        return Err(format!(
-            "[composio][history] global store already initialized for {} while attempting {}",
-            existing.archive_dir.display(),
-            expected_archive_dir.display()
-        ));
+        crate::modules::client(config.clone())
     }
 
-    let store = Arc::new(ComposioTriggerHistoryStore::new(&workspace_dir)?);
-    match GLOBAL_TRIGGER_HISTORY.set(store.clone()) {
-        Ok(()) => Ok(()),
-        Err(_) => {
-            if let Some(existing) = GLOBAL_TRIGGER_HISTORY.get() {
-                if existing.archive_dir == store.archive_dir {
-                    return Ok(());
-                }
-
-                return Err(format!(
-                    "[composio][history] global store already initialized for {} while attempting {}",
-                    existing.archive_dir.display(),
-                    store.archive_dir.display()
-                ));
-            }
-
-            Err(format!(
-                "[composio][history] failed to initialize global store for {}",
-                store.archive_dir.display()
-            ))
+    async fn ensure_lease(
+        ctx: &DispatchCtx,
+        config: &Config,
+        lease: &mut Option<Lease>,
+        client: ModuleClient,
+    ) -> Result<ArchiveHandle, String> {
+        if lease
+            .as_ref()
+            .is_some_and(|current| current.workspace != config.workspace_dir)
+        {
+            Self::release(lease).await?;
         }
+        if let Some(current) = lease.as_ref() {
+            return Ok(current.handle.clone());
+        }
+        let state_dir = config.workspace_dir.join("state");
+        let state_dir = state_dir
+            .to_str()
+            .ok_or_else(|| "trigger archive requires a UTF-8 state directory".to_owned())?;
+        // The archive opens on the module's storage: bring yesterday's JSONL
+        // files across first (once per state directory, best effort).
+        crate::modules::import_legacy_connectors(ctx, &config.workspace_dir.join("state")).await;
+        let handle = client
+            .call(
+                "tinyconnectors",
+                methods::OPEN_ARCHIVE,
+                (OpenArchiveRequest {
+                    state_dir: state_dir.to_owned(),
+                },),
+            )
+            .await
+            .map_err(|error| error.to_string())?;
+        *lease = Some(Lease {
+            workspace: config.workspace_dir.clone(),
+            client,
+            handle,
+        });
+        Ok(lease.as_ref().expect("lease installed").handle.clone())
+    }
+
+    async fn acquire(
+        &self,
+        ctx: &DispatchCtx,
+        config: &Config,
+    ) -> Result<tokio::sync::OwnedMutexGuard<Option<Lease>>, String> {
+        let lease = Arc::clone(&self.lease);
+        let config = config.clone();
+        let client = self.client(&config);
+        let task_ctx = ctx.clone();
+        // Keep ownership installation running if the caller is cancelled while
+        // OpenArchive completes. A later close can still release the handle.
+        ctx.spawn(async move {
+            let mut guard = lease.lock_owned().await;
+            Self::ensure_lease(&task_ctx, &config, &mut guard, client).await?;
+            Ok(guard)
+        })
+        .await
+        .map_err(|_| "trigger archive ownership task failed".to_owned())?
+    }
+
+    async fn release(lease: &mut Option<Lease>) -> Result<(), String> {
+        if let Some(current) = lease.as_ref() {
+            current
+                .client
+                .call::<()>(
+                    "tinyconnectors",
+                    methods::CLOSE_ARCHIVE,
+                    (current.handle.clone(),),
+                )
+                .await
+                .map_err(|error| error.to_string())?;
+            *lease = None;
+        }
+        Ok(())
+    }
+
+    /// Archive one delivered event, serialized with reads and scope changes.
+    pub async fn record(
+        &self,
+        ctx: &DispatchCtx,
+        config: &Config,
+        event: ComposioTriggerEvent,
+    ) -> Result<ComposioTriggerHistoryEntry, String> {
+        let lease = self.acquire(ctx, config).await?;
+        let handle = lease.as_ref().expect("lease installed").handle.clone();
+        lease
+            .as_ref()
+            .expect("lease installed")
+            .client
+            .call(
+                "tinyconnectors",
+                methods::RECORD_TRIGGER,
+                (RecordTriggerRequest { handle, event },),
+            )
+            .await
+            .map_err(|error| error.to_string())
+    }
+
+    /// Read persisted history without changing the user's connector route.
+    pub async fn read(
+        &self,
+        ctx: &DispatchCtx,
+        config: &Config,
+        limit: Option<usize>,
+    ) -> Result<ComposioTriggerHistoryResult, String> {
+        let lease = self.acquire(ctx, config).await?;
+        let handle = lease.as_ref().expect("lease installed").handle.clone();
+        lease
+            .as_ref()
+            .expect("lease installed")
+            .client
+            .call(
+                "tinyconnectors",
+                methods::READ_ARCHIVE,
+                (ReadArchiveRequest { handle, limit },),
+            )
+            .await
+            .map_err(|error| error.to_string())
+    }
+
+    /// Release the module resource while retaining all persisted documents.
+    pub async fn close(&self, ctx: &crate::core::runtime::DispatchCtx) -> Result<(), String> {
+        let lease = Arc::clone(&self.lease);
+        ctx.spawn(async move { Self::release(&mut *lease.lock_owned().await).await })
+            .await
+            .map_err(|_| "trigger archive release task failed".to_owned())?
     }
 }
 
-pub fn global() -> Option<Arc<ComposioTriggerHistoryStore>> {
+/// Install the lifecycle owner without downloading or loading a module.
+pub fn init_global(workspace_dir: PathBuf) -> Result<(), String> {
+    let installed = GLOBAL_TRIGGER_HISTORY.get_or_init(|| {
+        Arc::new(TriggerHistory {
+            initial_workspace: workspace_dir.clone(),
+            lease: Arc::new(Mutex::new(None)),
+            #[cfg(all(test, feature = "modules"))]
+            fixture: None,
+        })
+    });
+    if installed.initial_workspace == workspace_dir {
+        Ok(())
+    } else {
+        Err("trigger archive owner already initialized for another workspace".to_owned())
+    }
+}
+
+/// The process-wide lifecycle owner, if initialized at startup.
+pub fn global() -> Option<Arc<TriggerHistory>> {
     GLOBAL_TRIGGER_HISTORY.get().cloned()
 }
 
-pub struct ComposioTriggerHistoryStore {
-    archive_dir: PathBuf,
-}
-
-impl ComposioTriggerHistoryStore {
-    pub fn new(workspace_dir: &Path) -> Result<Self, String> {
-        let archive_dir = workspace_dir.join("state").join(TRIGGER_ARCHIVE_DIR);
-        fs::create_dir_all(&archive_dir).map_err(|error| {
-            format!(
-                "[composio][history] failed to create archive directory {}: {error}",
-                archive_dir.display()
-            )
-        })?;
-
-        tracing::debug!(
-            archive_dir = %archive_dir.display(),
-            "[composio][history] archive initialized"
-        );
-
-        Ok(Self { archive_dir })
+/// Close an existing lease on sign-out or runtime shutdown; never load at exit.
+pub(crate) async fn close_global(ctx: &crate::core::runtime::DispatchCtx) -> Result<(), String> {
+    match global() {
+        Some(store) => store.close(ctx).await,
+        None => Ok(()),
     }
-
-    pub fn record_trigger(
-        &self,
-        toolkit: &str,
-        trigger: &str,
-        metadata_id: &str,
-        metadata_uuid: &str,
-        payload: &serde_json::Value,
-    ) -> Result<ComposioTriggerHistoryEntry, String> {
-        let entry = ComposioTriggerHistoryEntry {
-            received_at_ms: now_ms(),
-            toolkit: toolkit.to_string(),
-            trigger: trigger.to_string(),
-            metadata_id: metadata_id.to_string(),
-            metadata_uuid: metadata_uuid.to_string(),
-            payload: payload.clone(),
-        };
-
-        let path = self.current_day_file_path();
-        let line = serde_json::to_string(&entry)
-            .map_err(|error| format!("[composio][history] failed to serialize trigger: {error}"))?;
-
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-            .map_err(|error| {
-                format!(
-                    "[composio][history] failed to open archive file {}: {error}",
-                    path.display()
-                )
-            })?;
-
-        #[cfg(windows)]
-        let _windows_guard = WINDOWS_TRIGGER_WRITE_LOCK
-            .get_or_init(|| Mutex::new(()))
-            .lock()
-            .map_err(|_| {
-                format!(
-                    "[composio][history] windows write mutex poisoned for archive file {}",
-                    path.display()
-                )
-            })?;
-
-        #[cfg(not(windows))]
-        file.lock_exclusive().map_err(|error| {
-            format!(
-                "[composio][history] failed to lock archive file {}: {error}",
-                path.display()
-            )
-        })?;
-
-        let write_result = writeln!(file, "{line}")
-            .and_then(|_| file.flush())
-            .map_err(|error| {
-                format!(
-                    "[composio][history] failed to append archive file {}: {error}",
-                    path.display()
-                )
-            });
-
-        #[cfg(not(windows))]
-        let unlock_result = file.unlock().map_err(|error| {
-            format!(
-                "[composio][history] failed to unlock archive file {}: {error}",
-                path.display()
-            )
-        });
-
-        write_result?;
-        #[cfg(not(windows))]
-        unlock_result?;
-
-        tracing::debug!(
-            toolkit = %entry.toolkit,
-            trigger = %entry.trigger,
-            metadata_id = %entry.metadata_id,
-            archive_file = %path.display(),
-            "[composio][history] trigger archived"
-        );
-
-        Ok(entry)
-    }
-
-    pub fn list_recent(&self, limit: usize) -> Result<ComposioTriggerHistoryResult, String> {
-        let limit = limit.max(1);
-        let mut day_files = self.list_day_files()?;
-        day_files.sort_by(|left, right| right.cmp(left));
-
-        let mut entries = Vec::new();
-        for file in day_files {
-            let mut file_entries = self.read_day_file(&file)?;
-            file_entries.reverse();
-            for entry in file_entries {
-                entries.push(entry);
-                if entries.len() >= limit {
-                    break;
-                }
-            }
-            if entries.len() >= limit {
-                break;
-            }
-        }
-
-        Ok(ComposioTriggerHistoryResult {
-            archive_dir: self.archive_dir.display().to_string(),
-            current_day_file: self.current_day_file_path().display().to_string(),
-            entries,
-        })
-    }
-
-    fn list_day_files(&self) -> Result<Vec<PathBuf>, String> {
-        let dir = fs::read_dir(&self.archive_dir).map_err(|error| {
-            format!(
-                "[composio][history] failed to read archive directory {}: {error}",
-                self.archive_dir.display()
-            )
-        })?;
-
-        Ok(dir
-            .filter_map(|entry| entry.ok().map(|value| value.path()))
-            .filter(|path| path.extension().is_some_and(|ext| ext == "jsonl"))
-            .collect())
-    }
-
-    fn read_day_file(&self, path: &Path) -> Result<Vec<ComposioTriggerHistoryEntry>, String> {
-        let file = OpenOptions::new().read(true).open(path).map_err(|error| {
-            format!(
-                "[composio][history] failed to open archive file {}: {error}",
-                path.display()
-            )
-        })?;
-
-        let reader = BufReader::new(file);
-        let mut entries = Vec::new();
-
-        for line in reader.lines() {
-            let line = match line {
-                Ok(line) if !line.trim().is_empty() => line,
-                Ok(_) => continue,
-                Err(error) => {
-                    tracing::warn!(
-                        archive_file = %path.display(),
-                        error = %error,
-                        "[composio][history] failed to read line"
-                    );
-                    continue;
-                }
-            };
-
-            match serde_json::from_str::<ComposioTriggerHistoryEntry>(&line) {
-                Ok(entry) => entries.push(entry),
-                Err(error) => {
-                    tracing::warn!(
-                        archive_file = %path.display(),
-                        error = %error,
-                        "[composio][history] failed to parse archived trigger line"
-                    );
-                }
-            }
-        }
-
-        Ok(entries)
-    }
-
-    fn current_day_file_path(&self) -> PathBuf {
-        self.archive_dir
-            .join(format!("{}.jsonl", Utc::now().format("%Y-%m-%d")))
-    }
-}
-
-fn now_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as u64)
-        .unwrap_or(0)
 }
 
 #[cfg(test)]

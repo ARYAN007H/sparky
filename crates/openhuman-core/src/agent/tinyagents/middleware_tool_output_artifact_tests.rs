@@ -3,17 +3,18 @@
 //! `middleware_tool_output_tests.rs` to keep each file under the layout limit.
 
 use super::*;
+use crate::agent::tinyagents::middleware::tool_output::ToolOutputMiddleware;
 
 fn artifact_mw(
-    summarizer: Option<Arc<dyn PayloadSummarizer>>,
-    action_dir: &std::path::Path,
+    summarizer: Option<Arc<DynPayloadSummarizer>>,
+    storage_dir: &std::path::Path,
 ) -> ToolOutputMiddleware {
     ToolOutputMiddleware {
         budget_bytes: 1_000,
         payload_summarizer: summarizer,
         artifact_store: Some(
-            crate::agent::harness::tool_result_artifacts::ToolResultArtifactStore::new(
-                action_dir.to_path_buf(),
+            crate::agent::harness::tool_result_artifacts::in_memory_tool_result_store(
+                storage_dir.to_path_buf(),
                 "session",
             ),
         ),
@@ -25,10 +26,11 @@ fn artifact_mw(
         focus_by_call: Default::default(),
         summary_focus_tools: Default::default(),
         raw_fetches: Default::default(),
+        file_reads: Default::default(),
     }
 }
 
-fn summarized(summary: &str) -> Arc<dyn PayloadSummarizer> {
+fn summarized(summary: &str) -> Arc<DynPayloadSummarizer> {
     StubSummarizer::replying(Ok(summary.to_string()))
 }
 
@@ -36,6 +38,8 @@ fn summarized(summary: &str) -> Arc<dyn PayloadSummarizer> {
 async fn a_wrapped_read_of_a_persisted_artifact_is_paged_not_resummarized_or_repersisted() {
     let tmp = tempfile::tempdir().unwrap();
     let mw = artifact_mw(Some(summarized("SUMMARY")), tmp.path());
+    // A relative pointer from a transcript written before the store was
+    // detached still pages.
     let path = "artifacts/tool-results/session/use_skill/earlier.txt";
     // The read arrives wrapped, reported under the wrapper's name, exactly as
     // `use_skill` delivers `file_read`.
@@ -67,7 +71,48 @@ async fn a_wrapped_read_of_a_persisted_artifact_is_paged_not_resummarized_or_rep
         &rendered[page_end..]
     );
     assert!(
-        !tmp.path().join("artifacts").exists(),
+        !tmp.path().join("tool-results/session").exists(),
+        "reading an artifact must not persist it again as a new artifact"
+    );
+}
+
+/// The store's own pointer is a blob key; a read of it is recognised and paged
+/// the same way, not summarized or stored again.
+#[tokio::test]
+async fn a_read_of_a_blob_key_pointer_is_paged_not_repersisted() {
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = tmp.path();
+    let mw = artifact_mw(Some(summarized("SUMMARY")), storage);
+    let pointer = "tool-results/session/shell/earlier.txt".to_string();
+    let mut call = TaToolCall::new("c1", "file_read", json!({"path": pointer}));
+    let mut ctx = ctx();
+    mw.before_tool(&mut ctx, &(), &mut call).await.unwrap();
+    let mut result = tool_result("file_read", &"y".repeat(5_000));
+
+    mw.after_tool(&mut ctx, &(), &invocation("c1", "file_read"), &mut result)
+        .await
+        .unwrap();
+
+    let rendered = result_text(&result);
+    assert!(
+        rendered.starts_with("yyyy"),
+        "{}",
+        &rendered[..rendered.len().min(120)]
+    );
+    assert!(
+        rendered.contains(&format!(
+            "Continue with file_read {{\"path\":\"{pointer}\",\"offset\":"
+        )),
+        "the continuation must name the same blob key: {rendered}"
+    );
+    assert!(
+        mw.artifact_store
+            .as_ref()
+            .unwrap()
+            .read("tool-results/session/file_read/c1.txt")
+            .await
+            .unwrap()
+            .is_none(),
         "reading an artifact must not persist it again as a new artifact"
     );
 }
@@ -91,11 +136,14 @@ async fn an_oversized_result_is_stored_as_the_tool_returned_it_not_as_rewritten(
         "an over-budget result is persisted: {}",
         result_text(&result)
     );
-    let stored = std::fs::read_to_string(
-        tmp.path()
-            .join("artifacts/tool-results/session/echo/c1.txt"),
-    )
-    .expect("artifact written");
+    let stored = mw
+        .artifact_store
+        .as_ref()
+        .unwrap()
+        .read("tool-results/session/echo/c1.txt")
+        .await
+        .unwrap()
+        .expect("artifact written");
     assert_eq!(
         stored, raw,
         "the artifact must hold the tool's own output, not the rewritten copy"
@@ -111,7 +159,8 @@ async fn an_oversized_result_is_stored_as_the_tool_returned_it_not_as_rewritten(
 async fn a_raw_result_file_read_cannot_open_is_stored_as_the_processed_copy() {
     let tmp = tempfile::tempdir().unwrap();
     let summary = "s".repeat(3_000);
-    let raw_len = crate::tools::FileReadTool::MAX_FILE_SIZE_BYTES as usize + 1;
+    let raw_len =
+        tinyagents_harness_tools::fs::filesystem::FileReadTool::MAX_FILE_SIZE_BYTES as usize + 1;
     let mw = artifact_mw(Some(summarized(&summary)), tmp.path());
     let mut result = tool_result("echo", &"r".repeat(raw_len));
 
@@ -120,11 +169,14 @@ async fn a_raw_result_file_read_cannot_open_is_stored_as_the_processed_copy() {
         .0
         .unwrap();
 
-    let stored = std::fs::read_to_string(
-        tmp.path()
-            .join("artifacts/tool-results/session/echo/c1.txt"),
-    )
-    .expect("artifact written");
+    let stored = mw
+        .artifact_store
+        .as_ref()
+        .unwrap()
+        .read("tool-results/session/echo/c1.txt")
+        .await
+        .unwrap()
+        .expect("artifact written");
     assert_eq!(
         stored, summary,
         "a raw body over file_read's limit would be unreadable, so the processed copy is stored"

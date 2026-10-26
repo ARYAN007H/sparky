@@ -8,7 +8,7 @@ import { callCoreRpc } from '../coreRpcClient';
 // approval gate through the controller registry; this client only READS them —
 // decisions still flow through `openhuman.approval_decide` (ApprovalRequestCard).
 //
-// Wire-shape note: both RPCs return an `RpcOutcome` with a single diagnostic
+// Wire-shape note: both RPCs return an `Outcome` with a single diagnostic
 // log line when the gate is installed, so the JSON-RPC `result` is the
 // CLI-compatible envelope `{ result: [...rows], logs: [...] }`. When the gate
 // is NOT installed the core returns a bare `[]`. `unwrapRows` normalizes both.

@@ -100,6 +100,8 @@ fn all_variants_have_correct_domain() {
                 key: "k".into(),
                 category: "c".into(),
                 namespace: "n".into(),
+                thread_id: None,
+                client_id: None,
             },
             "memory",
         ),
@@ -107,6 +109,8 @@ fn all_variants_have_correct_domain() {
             DomainEvent::MemoryRecalled {
                 query: "q".into(),
                 hit_count: 0,
+                thread_id: None,
+                client_id: None,
             },
             "memory",
         ),
@@ -198,15 +202,7 @@ fn all_variants_have_correct_domain() {
                 job_id: "j".into(),
                 success: true,
                 output: "ok".into(),
-            },
-            "cron",
-        ),
-        (
-            DomainEvent::CronDeliveryRequested {
-                job_id: "j".into(),
-                channel: "c".into(),
-                target: "t".into(),
-                output: "o".into(),
+                tenant: None,
             },
             "cron",
         ),
@@ -215,12 +211,6 @@ fn all_variants_have_correct_domain() {
                 source: "cron:morning_briefing".into(),
                 message: "Good morning!".into(),
                 job_name: Some("morning_briefing".into()),
-            },
-            "cron",
-        ),
-        (
-            DomainEvent::FlowScheduleTick {
-                flow_id: "flow-1".into(),
             },
             "cron",
         ),
@@ -345,6 +335,7 @@ fn all_variants_have_correct_domain() {
                 toolkit: "gmail".into(),
                 connection_id: "conn-1".into(),
                 connect_url: "https://backend.composio.dev/connect/abc".into(),
+                tenant: None,
             },
             "composio",
         ),
@@ -368,6 +359,7 @@ fn all_variants_have_correct_domain() {
             DomainEvent::ComposioConfigChanged {
                 mode: "direct".into(),
                 api_key_set: true,
+                tenant: None,
             },
             "composio",
         ),
@@ -399,31 +391,6 @@ fn all_variants_have_correct_domain() {
                 reason: "parser gave up after remote retry".into(),
             },
             "triage",
-        ),
-        // Tree Summarizer
-        (
-            DomainEvent::TreeSummarizerHourCompleted {
-                namespace: "n".into(),
-                node_id: "2024/03/15/14".into(),
-                token_count: 500,
-            },
-            "tree_summarizer",
-        ),
-        (
-            DomainEvent::TreeSummarizerPropagated {
-                namespace: "n".into(),
-                node_id: "2024/03/15".into(),
-                level: "day".into(),
-                token_count: 1000,
-            },
-            "tree_summarizer",
-        ),
-        (
-            DomainEvent::TreeSummarizerRebuildCompleted {
-                namespace: "n".into(),
-                total_nodes: 10,
-            },
-            "tree_summarizer",
         ),
         // Notification
         (
@@ -478,29 +445,6 @@ fn all_variants_have_correct_domain() {
                 component: "c".into(),
             },
             "system",
-        ),
-        // Memory tree
-        (
-            DomainEvent::DocumentCanonicalized {
-                source_id: "gmail:abc".into(),
-                source_kind: "email".into(),
-                chunks_written: 3,
-                chunk_ids: vec!["c1".into(), "c2".into(), "c3".into()],
-                canonicalized_at: 1_700_000_000.0,
-                body_preview: Some("Thanks,\nAlice".into()),
-            },
-            "memory",
-        ),
-        // Learning
-        (
-            DomainEvent::CacheRebuilt {
-                added: 2,
-                evicted: 1,
-                kept: 5,
-                total_size: 7,
-                rebuilt_at: 1_700_000_000.0,
-            },
-            "learning",
         ),
         // Auth
         (
@@ -583,15 +527,8 @@ fn all_variants_have_correct_domain() {
     }
 }
 
-/// Regression guard. An earlier revision of
-/// [`DomainEvent::ApprovalRequested`] published a `session_id`
-/// field that historically carried the verbatim JSON-RPC bearer.
-/// Any downstream subscriber that Debug-printed the event (audit
-/// pipeline, `tracing` instrumentation, panic backtrace) leaked
-/// the credential. The field has been removed from the variant;
-/// this test fails loudly if it ever comes back, by name, via
-/// Debug — the bus does not derive `Serialize` so the audit-side
-/// risk lives entirely in the Debug surface.
+/// [`DomainEvent::ApprovalRequested`] must never carry a `session_id`, which
+/// could hold the JSON-RPC bearer and leak through any Debug print.
 #[test]
 fn approval_requested_does_not_surface_session_id() {
     let event = DomainEvent::ApprovalRequested {
@@ -603,6 +540,7 @@ fn approval_requested_does_not_surface_session_id() {
         client_id: Some("c-1".to_string()),
         tool_call_id: None,
         expires_at: None,
+        agent_id: None,
     };
     let dbg = format!("{event:?}");
     assert!(
@@ -618,17 +556,6 @@ fn workflows_changed_domain_and_name() {
     };
     assert_eq!(event.domain(), "workflow");
     assert_eq!(event.variant_name(), "WorkflowsChanged");
-}
-
-#[test]
-fn memory_driver_bind_failed_domain_and_name() {
-    let event = DomainEvent::MemoryDriverBindFailed {
-        configured_driver: "supermemory".into(),
-        bound_driver: "null".into(),
-        reason: "external driver is untrusted".into(),
-    };
-    assert_eq!(event.domain(), "memory");
-    assert_eq!(event.variant_name(), "MemoryDriverBindFailed");
 }
 
 /// The Event Log's "agent" column is the only per-row context the stream
@@ -850,6 +777,7 @@ fn events_outside_the_supervisor_have_no_event_log_detail() {
         job_id: "job-1".into(),
         success: true,
         output: "done".into(),
+        tenant: None,
     }
     .log_detail()
     .is_none());
@@ -989,9 +917,6 @@ fn every_workspace_bound_variant_is_reachable_through_one_accessor() {
     }
 }
 
-/// `None` here means "not bound to a workspace", which a consumer filtering
-/// by workspace must let through rather than drop. Getting this backwards
-/// would silence cron, webhook and sub-agent notifications entirely.
 #[test]
 fn events_without_a_workspace_report_none() {
     assert_eq!(
@@ -1004,6 +929,7 @@ fn events_without_a_workspace_report_none() {
             job_id: "job-1".into(),
             success: true,
             output: "done".into(),
+            tenant: None,
         }
         .workspace_dir(),
         None

@@ -4,13 +4,12 @@ use anyhow::{bail, Result};
 // (the default, used by Claude Desktop / Cursor) works under `mcp` alone.
 #[cfg(feature = "http-server")]
 use std::net::SocketAddr;
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 
 use crate::core::logging::CliLogDefault;
 
 #[cfg(feature = "http-server")]
 use super::http::{run_http, HttpServerConfig};
-use super::{protocol, session::McpSession};
+use super::module::ServerSession;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum McpTransport {
@@ -86,7 +85,7 @@ pub fn run_stdio_from_cli(args: &[String]) -> Result<()> {
     match transport {
         McpTransport::Stdio => {
             log::debug!("[mcp_server] starting stdio MCP server");
-            rt.block_on(async { run_stdio(tokio::io::stdin(), tokio::io::stdout()).await })?;
+            rt.block_on(run_stdio_module())?;
         }
         McpTransport::Http => {
             #[cfg(feature = "http-server")]
@@ -116,6 +115,40 @@ pub fn run_stdio_from_cli(args: &[String]) -> Result<()> {
     Ok(())
 }
 
+async fn run_stdio_module() -> Result<()> {
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+
+    let config = crate::core::runtime::DispatchCtx::process_default()
+        .load_config()
+        .await
+        .map_err(anyhow::Error::msg)?;
+    let session = ServerSession::open(&config).await?;
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    let result = async {
+        let mut input = tokio::io::BufReader::new(tokio::io::stdin()).lines();
+        let mut output = tokio::io::stdout();
+        while let Some(line) = input.next_line().await? {
+            let snapshot = session
+                .submit(serde_json::Map::new(), line, &cancellation)
+                .await?;
+            if let tinymcp_bus::ServerOperationState::Complete {
+                response: Some(response),
+            } = snapshot.state
+            {
+                output.write_all(response.as_bytes()).await?;
+                output.write_all(b"\n").await?;
+                output.flush().await?;
+            }
+        }
+        Ok::<(), anyhow::Error>(())
+    }
+    .await;
+    let cleanup = session.close().await;
+    result?;
+    cleanup?;
+    Ok(())
+}
+
 /// Initialize logging for the MCP server.
 ///
 /// MCP servers run as subprocesses of clients (Claude Desktop, Cursor, …) which
@@ -133,29 +166,6 @@ fn init_mcp_logging(verbose: bool) {
         std::env::set_var("RUST_LOG", level);
     }
     crate::core::logging::init_for_cli_run(verbose, CliLogDefault::Global);
-}
-
-pub async fn run_stdio<R, W>(reader: R, mut writer: W) -> Result<()>
-where
-    R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
-{
-    let mut session = McpSession::default();
-    let mut lines = BufReader::new(reader).lines();
-    while let Some(line) = lines.next_line().await? {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        if let Some(response) = protocol::handle_json_line_with_session(trimmed, &mut session).await
-        {
-            writer.write_all(response.as_bytes()).await?;
-            writer.write_all(b"\n").await?;
-            writer.flush().await?;
-        }
-    }
-    log::debug!("[mcp_server] stdin closed; exiting");
-    Ok(())
 }
 
 fn print_help() {
@@ -177,8 +187,7 @@ fn print_help() {
     eprintln!("Tools exposed (stdio and HTTP):");
     eprintln!("  core.list_tools, core.tool_instructions");
     eprintln!("  agent.list_subagents, agent.run_subagent");
-    eprintln!("  memory.search, memory.recall, tree.read_chunk, tree.browse,");
-    eprintln!("  tree.top_entities, tree.list_sources");
+    eprintln!("  memory.recall, memory.fetch, memory.list, memory.learn, memory.forget");
     eprintln!();
     eprintln!("Logging is written to stderr. Stdio protocol messages use stdout only.");
 }

@@ -9,11 +9,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize};
 #[cfg(test)]
 use std::sync::Arc;
 
-use super::{
-    is_lock_create_unwritable_fs, AuthProfile, AuthProfilesData, AuthProfilesStore,
-    PROFILES_FILENAME,
-};
-use crate::security::keyring::SecretStore;
+use super::{is_lock_create_unwritable_fs, AuthProfile, AuthProfilesData, AuthProfilesStore};
+use crate::security::secret_storage::SecretStore;
 
 use super::LOCK_FILENAME;
 
@@ -22,7 +19,7 @@ impl AuthProfilesStore {
         let user_id = super::user_id_from_state_dir(state_dir);
         let policy = crate::security::keyring_consent::policy::check_secret_access();
         let use_keychain = policy == crate::security::keyring_consent::PolicyDecision::Proceed
-            && crate::security::keyring::is_available();
+            && crate::security::secret_storage::is_available();
         log::debug!(
             "[auth] AuthProfilesStore::new state_dir={} user_id={user_id} use_keychain={use_keychain} policy={policy:?}",
             state_dir.display()
@@ -51,7 +48,7 @@ impl AuthProfilesStore {
             }
         }
         Self {
-            path: state_dir.join(PROFILES_FILENAME),
+            path: super::profiles_file(state_dir),
             lock_path: state_dir.join(LOCK_FILENAME),
             secret_store: SecretStore::new(state_dir, encrypt_secrets),
             user_id,

@@ -1,11 +1,12 @@
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 #[tokio::test]
 async fn composio_set_api_key_rejects_invalid_direct_key_before_persisting() {
     use crate::config::TEST_ENV_LOCK;
     use crate::security::credentials::get_composio_api_key;
 
-    let _env_guard = TEST_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _env_guard = TEST_ENV_LOCK.lock().await;
     let app = Router::new().route(
         "/connected_accounts",
         get(|| async {
@@ -23,9 +24,14 @@ async fn composio_set_api_key_rejects_invalid_direct_key_before_persisting() {
     let config = direct_mode_no_key_config(&tmp);
     let _auth_guard = DirectAuthFailureGuard::new("ck_invalid_direct");
 
-    let err = composio_set_api_key(&config, "ck_invalid_direct", false)
-        .await
-        .expect_err("invalid direct-mode key must be rejected before persistence");
+    let err = composio_set_api_key(
+        &DispatchCtx::process_default(),
+        &config,
+        "ck_invalid_direct",
+        false,
+    )
+    .await
+    .expect_err("invalid direct-mode key must be rejected before persistence");
     assert!(
         err.contains("Invalid Composio API key"),
         "unexpected error: {err}"
@@ -43,7 +49,7 @@ async fn composio_set_api_key_validates_candidate_key_even_when_stored_key_exist
     use crate::security::credentials::{get_composio_api_key, store_composio_api_key};
     use std::sync::{Arc, Mutex};
 
-    let _env_guard = TEST_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _env_guard = TEST_ENV_LOCK.lock().await;
     let seen_keys = Arc::new(Mutex::new(Vec::<String>::new()));
     let app = Router::new()
         .route(
@@ -79,9 +85,14 @@ async fn composio_set_api_key_validates_candidate_key_even_when_stored_key_exist
         .expect("seed old stored composio key");
     let _new_key_guard = DirectAuthFailureGuard::new("ck_new_invalid");
 
-    let err = composio_set_api_key(&config, "ck_new_invalid", false)
-        .await
-        .expect_err("candidate invalid key must be rejected even if old stored key is valid");
+    let err = composio_set_api_key(
+        &DispatchCtx::process_default(),
+        &config,
+        "ck_new_invalid",
+        false,
+    )
+    .await
+    .expect_err("candidate invalid key must be rejected even if old stored key is valid");
     assert!(
         err.contains("Invalid Composio API key"),
         "unexpected error: {err}"
@@ -123,7 +134,13 @@ async fn composio_list_tools_in_direct_mode_does_not_fall_back_to_backend() {
     let _serialised = module_guard().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = direct_mode_config(&tmp);
-    let result = composio_list_tools(&config, None, None).await;
+    let result = composio_list_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        None,
+        None,
+    )
+    .await;
     match result {
         Ok(outcome) => {
             // If the prefetch returns empty connections (test env may
@@ -166,9 +183,14 @@ async fn composio_authorize_routes_through_direct_mode() {
     // "composio unavailable / no backend session" instead.
     let tmp = tempfile::tempdir().unwrap();
     let config = direct_mode_config(&tmp);
-    let err = composio_authorize(&config, "gmail", None)
-        .await
-        .unwrap_err();
+    let err = composio_authorize(
+        &crate::core::runtime::DispatchCtx::host_default(),
+        &config,
+        "gmail",
+        None,
+    )
+    .await
+    .unwrap_err();
     assert!(
         !err.contains("no backend session"),
         "direct mode must not surface backend-auth errors, got: {err}"
@@ -201,6 +223,22 @@ async fn composio_execute_routes_through_direct_mode() {
         err.to_lowercase().contains("composio"),
         "error must carry the composio prefix, got: {err}"
     );
+}
+
+#[cfg(feature = "crash-reporting")]
+#[test]
+fn a_cached_module_load_failure_is_not_reported_per_call() {
+    // TAURI-RUST-117K: the connector module failed to load, the failure is
+    // cached, and every composio call returned it. The load was reported once
+    // at resolution; the op-layer funnel must not report it again per call.
+    let error = "module 'tinyconnectors' could not be loaded from the installer bundle: \
+                 module `windows-2022-x86_64` refused: module directory is writable by \
+                 another user. Restart the app after repairing the installation. This is \
+                 terminal for the running process; restart the app to try again";
+    let events = sentry::test::with_captured_events(|| {
+        report_composio_op_error("list_connections", error);
+    });
+    assert!(events.is_empty(), "{events:?}");
 }
 
 // ── classify_composio_failure_tag ──────────────────────────────
@@ -451,16 +489,18 @@ fn composio_direct_500_does_not_demote() {
 
 #[tokio::test]
 async fn enrich_does_nothing_when_no_cached_identities() {
-    // `enrich_connections_with_identity` reads through the bound memory
-    // driver now (`identity_store::load_connected_identities`), not the
-    // deleted engine's process-global client — see the module doc comment on
-    // `identity_store`. The fresh temp workspace has no profiles, so it
-    // returns `Vec::new()` and the connection is returned unchanged.
+    // `enrich_connections_with_identity` reads the workspace identities file
+    // (`identity_store::load_connected_identities`). The fresh temp workspace
+    // has none, so the connection is returned unchanged.
     let tmp = tempfile::tempdir().unwrap();
     let config = test_config(&tmp);
-    crate::memory::test_support::install_memory_driver_for_test(&config);
     let resp = make_connections_response(&[("c1", "gmail", "ACTIVE")]);
-    let enriched = enrich_connections_with_identity(&config, resp).await;
+    let enriched = enrich_connections_with_identity(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        resp,
+    )
+    .await;
     assert_eq!(enriched.connections.len(), 1);
     assert!(enriched.connections[0].account_email.is_none());
     assert!(enriched.connections[0].workspace.is_none());
@@ -473,12 +513,16 @@ async fn enrich_skips_connection_already_having_identity() {
     // enricher must NOT overwrite it with a potentially stale cached value.
     let tmp = tempfile::tempdir().unwrap();
     let config = test_config(&tmp);
-    crate::memory::test_support::install_memory_driver_for_test(&config);
 
     let mut resp = make_connections_response(&[("c-preloaded", "gmail", "ACTIVE")]);
     resp.connections[0].account_email = Some("preloaded@example.com".to_string());
 
-    let enriched = enrich_connections_with_identity(&config, resp).await;
+    let enriched = enrich_connections_with_identity(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        resp,
+    )
+    .await;
     assert_eq!(
         enriched.connections[0].account_email.as_deref(),
         Some("preloaded@example.com"),
@@ -490,15 +534,15 @@ async fn enrich_skips_connection_already_having_identity() {
 async fn enrich_leaves_unmatched_connection_unchanged() {
     // Connection whose id has no cached profile row is returned with all
     // identity fields as None — the UI falls back to "toolkit · connection_id".
+    use crate::integrations::composio::contract::ProviderUserProfile;
     use crate::integrations::composio::identity_store::persist_provider_profile;
-    use tinymemory_api::composio::ProviderUserProfile;
 
     let tmp = tempfile::tempdir().unwrap();
     let config = test_config(&tmp);
-    crate::memory::test_support::install_memory_driver_for_test(&config);
 
     // Persist a profile for a DIFFERENT connection id.
     persist_provider_profile(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &ProviderUserProfile {
             toolkit: "gmail".to_string(),
@@ -511,63 +555,17 @@ async fn enrich_leaves_unmatched_connection_unchanged() {
     .expect("persist provider profile");
 
     let resp = make_connections_response(&[("no-profile-conn", "gmail", "ACTIVE")]);
-    let enriched = enrich_connections_with_identity(&config, resp).await;
+    let enriched = enrich_connections_with_identity(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        resp,
+    )
+    .await;
 
     assert!(
         enriched.connections[0].account_email.is_none(),
         "connection with no cached profile must remain unenriched"
     );
-}
-
-/// A run that wrote nothing because the day's request budget was spent must
-/// say so: the UI shows "Up to date" for a zero count, and a spent budget is
-/// the opposite. The note rides after the count so the parse contract holds,
-/// and a blank note is no separator with nothing behind it.
-#[test]
-fn completed_detail_carries_the_module_note_after_the_count() {
-    let re = regex::Regex::new(r"(?i)ingested\s+(\d+)\s+item").expect("ui parse regex");
-    let detail = crate::integrations::composio::ops::completed_sync_detail(
-        0,
-        true,
-        Some("today's provider request budget is spent"),
-    );
-    let caps = re.captures(&detail).expect("detail still parses");
-    assert_eq!(&caps[1], "0");
-    assert!(
-        detail.ends_with("; today's provider request budget is spent"),
-        "{detail}"
-    );
-    let bare = crate::integrations::composio::ops::completed_sync_detail(3, false, Some("   "));
-    assert_eq!(bare, "ingested 3 item(s)");
-}
-
-/// The per-source depth cap is matched the way the engine keys the rows and a
-/// zero reads as "no cap": the settings field stores unlimited as empty, and a
-/// zero typed by hand must not ask for mail newer than today.
-#[test]
-fn source_depth_matches_the_row_and_treats_zero_as_unbounded() {
-    use crate::integrations::composio::ops::pick_source_sync_depth_days;
-    let rows = [
-        (Some("gmail"), Some("conn-1"), Some(30)),
-        (Some("gmail"), Some("conn-2"), Some(0)),
-        (Some("notion"), Some("conn-3"), Some(14)),
-        (Some("gmail"), None, Some(7)),
-    ];
-    assert_eq!(
-        pick_source_sync_depth_days(rows, "gmail", "conn-1"),
-        Some(30)
-    );
-    assert_eq!(
-        pick_source_sync_depth_days(rows, " GMAIL ", "conn-1 "),
-        Some(30)
-    );
-    assert_eq!(pick_source_sync_depth_days(rows, "gmail", "conn-2"), None);
-    assert_eq!(pick_source_sync_depth_days(rows, "gmail", "conn-9"), None);
-    assert_eq!(
-        pick_source_sync_depth_days(rows, "notion", "conn-3"),
-        Some(14)
-    );
-    assert_eq!(pick_source_sync_depth_days([], "gmail", "conn-1"), None);
 }
 
 // ── Backend mode with no session yet (#6176) ──────────────────────────
@@ -576,8 +574,8 @@ fn source_depth_matches_the_row_and_treats_zero_as_unbounded() {
 // with no app-session JWT is the fresh-install / signed-out state.
 // `composio_list_connections` must answer with an empty list instead of
 // letting the connector module report "loaded without a connector route",
-// which the boot-time memory-source reconcile and the 60 s periodic tick
-// would otherwise turn into an error-level report and a Sentry event.
+// which callers would otherwise turn into an error-level report and a Sentry
+// event.
 
 /// Store an app-session JWT in the auth store `config` points at, the same
 /// way `client_tests::config_with_session_token` does.

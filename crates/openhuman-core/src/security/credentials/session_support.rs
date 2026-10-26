@@ -1,6 +1,7 @@
 //! Session/auth helpers used by RPC and [`crate::core_server::helpers`].
 
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 
 use super::profiles::{AuthProfile, AuthProfileKind, TokenSet};
 use super::responses::{AuthProfileSummary, AuthStateResponse};
@@ -65,8 +66,8 @@ pub fn is_local_session_token(token: &str) -> bool {
 /// credential. A backend-only route may report a missing session or 401 while
 /// this credential remains valid; those errors must not broadcast sign-out.
 /// A failed lookup leaves the ordinary session-expiry path in place.
-pub async fn current_session_is_local() -> bool {
-    let Ok(config) = crate::config::rpc::load_config_with_timeout().await else {
+pub async fn current_session_is_local(ctx: &DispatchCtx) -> bool {
+    let Ok(config) = ctx.load_config().await else {
         return false;
     };
     get_session_token(&config)
@@ -220,6 +221,7 @@ pub fn build_session_state(config: &Config) -> Result<AuthStateResponse, String>
             profile_id: None,
             credential: Some(super::responses::CREDENTIAL_API_KEY.to_string()),
             expires_at: None,
+            issuing_backend: None,
         });
     }
     let profile = load_app_session_profile(config)?;
@@ -228,7 +230,66 @@ pub fn build_session_state(config: &Config) -> Result<AuthStateResponse, String>
 
 pub fn get_session_token(config: &Config) -> Result<Option<String>, String> {
     let profile = load_app_session_profile(config)?;
-    Ok(session_token_from_profile(profile.as_ref()))
+    session_token_for_config(config, profile.as_ref())
+}
+
+/// Release an already-loaded profile's token only for its issuing backend.
+/// Snapshot callers may turn a mismatch into `None` while retaining identity.
+pub fn session_token_for_config(
+    config: &Config,
+    profile: Option<&AuthProfile>,
+) -> Result<Option<String>, String> {
+    check_session_backend(config, profile)?;
+    Ok(session_token_from_profile(profile))
+}
+
+/// Non-secret issuing-backend association stored beside the encrypted JWT.
+/// Legacy sessions are unbound: their origin cannot be inferred retroactively.
+pub const SESSION_ISSUING_BACKEND_META: &str = "session_issuing_backend";
+
+pub fn normalize_session_backend(raw: &str) -> Result<String, String> {
+    let mut parsed =
+        url::Url::parse(raw.trim()).map_err(|_| "invalid issuing backend".to_string())?;
+    if !matches!(parsed.scheme(), "http" | "https")
+        || parsed.host_str().is_none()
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
+        return Err("invalid issuing backend".to_string());
+    }
+    // SessionClient addresses auth endpoints at the backend origin.
+    parsed.set_path("");
+    Ok(parsed.as_str().trim_end_matches('/').to_string())
+}
+
+/// Purely verifies that a stored session belongs to the selected config's
+/// control-plane endpoint. It does not publish expiry events or mutate auth state.
+pub fn check_session_backend(config: &Config, profile: Option<&AuthProfile>) -> Result<(), String> {
+    let Some(profile) = profile else {
+        return Ok(());
+    };
+    if session_token_from_profile(Some(profile))
+        .as_deref()
+        .is_some_and(is_local_session_token)
+    {
+        return Ok(());
+    }
+    let Some(issuing) = profile.metadata.get(SESSION_ISSUING_BACKEND_META) else {
+        return Ok(());
+    };
+    let matches = config
+        .resolved_endpoints
+        .control_plane_url
+        .clone()
+        .and_then(|base| normalize_session_backend(&base).ok())
+        .zip(normalize_session_backend(issuing).ok())
+        .is_some_and(|(current, issuing)| current == issuing);
+    if !matches {
+        return Err("SESSION_BACKEND_MISMATCH: stored session belongs to a different backend; restore its backend or sign in again".to_string());
+    }
+    Ok(())
 }
 
 /// Metadata key under which the app-session profile records the decoded JWT
@@ -253,7 +314,7 @@ fn session_expires_at_from_profile(
 /// Liveness verdict for the stored app-session token. Pure + `now`-injected so
 /// the expiry decision is unit-testable without a credential store.
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum SessionTokenCheck {
+pub enum SessionTokenCheck {
     /// No token stored (signed out / never authed).
     Absent,
     /// Token present but its recorded `exp` is in the past (− skew).
@@ -262,7 +323,7 @@ pub(crate) enum SessionTokenCheck {
     Live(String),
 }
 
-pub(crate) fn classify_session_token(
+pub fn classify_session_token(
     profile: Option<&AuthProfile>,
     now: chrono::DateTime<chrono::Utc>,
 ) -> SessionTokenCheck {
@@ -287,7 +348,7 @@ pub(crate) fn classify_session_token(
 ///   **once** (so the credentials subscriber clears state and the UI re-auths,
 ///   exactly as on a real network 401) and returns the `SESSION_EXPIRED`
 ///   sentinel. The doomed 401 is never sent — this is the #3297 RCA that stops
-///   the TAURI-RUST-8WY (`/teams/me/usage`) / 8WZ (`/payments/stripe/currentPlan`)
+///   the TAURI-RUST-8WY (team usage) / 8WZ (current plan)
 ///   flood at its source instead of demoting it after the fact.
 /// - token with no recorded expiry (local offline session / `exp`-less JWT) →
 ///   presence-only check; the `flatten_authed_error` 401 net still covers a
@@ -359,6 +420,16 @@ impl BackendCredential {
 pub const LOCAL_SESSION_BACKEND_UNAVAILABLE: &str =
     "BACKEND_UNAVAILABLE: hosted account data is unavailable for the offline local session";
 
+/// Error returned by the TinyHumans managed-inference host resolver for the
+/// offline local session. The local credential authenticates
+/// no TinyHumans account, so managed inference has nothing to bill or route;
+/// sending the token anyway earned a backend `401` that read to the user as an
+/// expired session (#6932). Distinct from
+/// [`LOCAL_SESSION_BACKEND_UNAVAILABLE`] because the chat surface renders this
+/// one as its own failure class.
+pub const LOCAL_SESSION_MANAGED_INFERENCE_UNAVAILABLE: &str =
+    "BACKEND_UNAVAILABLE: managed inference is unavailable for the offline local session";
+
 /// Resolve the backend credential for `config`: the API key when one is
 /// stored, else the live app-session token with exactly the classification
 /// [`require_live_session_token`] has always applied.
@@ -371,6 +442,7 @@ pub fn resolve_backend_credential(config: &Config) -> Result<BackendCredential, 
         return Ok(BackendCredential::ApiKey(key));
     }
     let profile = load_app_session_profile(config)?;
+    check_session_backend(config, profile.as_ref())?;
     match classify_session_token(profile.as_ref(), chrono::Utc::now()) {
         // The offline local session has no TinyHumans account behind it, so a
         // hosted call is unavailable by construction — the typed sentinel lets
@@ -396,8 +468,8 @@ pub fn resolve_backend_credential(config: &Config) -> Result<BackendCredential, 
 /// Resolve a credential for a direct call to the configured backend.
 /// A missing transport or unusable credential is an expected offline state.
 pub fn direct_backend_credential(config: &Config, op: &str) -> Option<BackendCredential> {
-    if !crate::backend::transport::is_installed() {
-        log::debug!("[backend-direct] {op} skipped: no backend transport installed");
+    if config.resolved_endpoints.control_plane_url.is_none() {
+        log::debug!("[backend-direct] {op} skipped: no control plane resolved");
         return None;
     }
     match resolve_backend_credential(config) {
@@ -451,7 +523,7 @@ pub fn has_backend_credential(config: &Config) -> bool {
 pub fn publish_local_session_expiry(operation: &'static str) {
     // Dedupe the publish via the scheduler gate so N parallel authed
     // callers in one tick don't emit N SessionExpired events.
-    if crate::cron::scheduler_gate::is_signed_out() {
+    if crate::platform::llm_gate::is_signed_out() {
         return;
     }
     // An API-key runtime has no session to expire. Its backend calls never
@@ -491,6 +563,14 @@ pub fn load_app_session_profile(config: &Config) -> Result<Option<AuthProfile>, 
         .map_err(|e| e.to_string())
 }
 
+/// Reads the selected app-session profile for doctor checks without opening
+/// the ordinary mutable auth-profile store.
+pub fn load_app_session_profile_read_only(
+    config: &Config,
+) -> Result<Option<AuthProfile>, super::profiles::ReadOnlyAuthProfileError> {
+    AuthService::get_profile_read_only(config, APP_SESSION_PROVIDER, None)
+}
+
 pub fn session_state_from_profile(profile: Option<&AuthProfile>) -> AuthStateResponse {
     let Some(profile) = profile else {
         return AuthStateResponse {
@@ -500,6 +580,7 @@ pub fn session_state_from_profile(profile: Option<&AuthProfile>) -> AuthStateRes
             profile_id: None,
             credential: None,
             expires_at: None,
+            issuing_backend: None,
         };
     };
 
@@ -516,6 +597,10 @@ pub fn session_state_from_profile(profile: Option<&AuthProfile>) -> AuthStateRes
         profile_id: Some(profile.id.clone()),
         credential,
         expires_at: session_expires_at_from_profile(Some(profile)).map(|dt| dt.to_rfc3339()),
+        issuing_backend: profile
+            .metadata
+            .get(SESSION_ISSUING_BACKEND_META)
+            .and_then(|backend| normalize_session_backend(backend).ok()),
     }
 }
 
@@ -536,8 +621,8 @@ pub fn session_token_from_profile(profile: Option<&AuthProfile>) -> Option<Strin
 /// when there is one; a host that discovers its config from disk has no API
 /// key by construction (it is only ever installed by a library runtime).
 pub fn ambient_config_has_api_key() -> bool {
-    crate::core::runtime::CoreContext::current_embedder_config()
-        .is_some_and(|config| super::api_key::has_api_key(&config))
+    crate::core::runtime::CoreContext::with_current_embedder_config(super::api_key::has_api_key)
+        .unwrap_or(false)
 }
 
 #[cfg(test)]

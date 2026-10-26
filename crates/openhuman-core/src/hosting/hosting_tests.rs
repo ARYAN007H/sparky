@@ -1,22 +1,73 @@
-//! Tests for hosting account resolution, workspace containment, and the tools.
-//!
-//! The provider itself is TinyHosts' problem and is tested there against a mock
-//! of its REST API. What is tested here is the seam: whether an account resolves
-//! from configuration, whether a path an agent named can escape the workspace,
-//! and whether each tool's schema says what its `execute` actually reads.
-
-use serde_json::json;
+//! Tests for OpenHuman's hosting module adapter and its tool contract.
 
 use super::*;
 use crate::config::Config;
-use tinytools::Tool;
+use std::sync::{Arc, Mutex};
 
 fn config_with(workspace: &std::path::Path, enabled: bool, api_key: &str) -> Config {
     let mut config = Config::default();
     config.workspace_dir = workspace.to_path_buf();
-    config.hosting.enabled = enabled;
+    config.components.hosting = enabled;
     config.hosting.api_key = api_key.to_string();
     config
+}
+
+/// A recording adapter fixture for OpenHuman's exact member, tuple, and
+/// confidentiality intent. The TinyBus transport is covered separately by
+/// the generic client fixtures and the released-module verifier.
+fn account_fixture(
+    workspace_dir: PathBuf,
+    calls: Arc<Mutex<Vec<(String, serde_json::Value, bool)>>>,
+) -> Account {
+    let mut config = Config::default();
+    config.workspace_dir = workspace_dir;
+    config.hosting.api_key = "fixture-secret".to_owned();
+    let account = Account::from_config(&config)
+        .expect("configuration")
+        .expect("account");
+    let calls_out = Arc::clone(&calls);
+    let fixture = Arc::new(
+        move |member: &str, args: serde_json::Value, confidential: bool| {
+            calls_out
+                .lock()
+                .unwrap()
+                .push((member.to_owned(), args.clone(), confidential));
+            if member == tinyhosts_bus::METHODS[1] {
+                return Ok(serde_json::json!(["vercel"]).to_string());
+            }
+            let request = args
+                .as_array()
+                .and_then(|args| args.first())
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| anyhow::anyhow!("fixture expected one JSON argument"))?;
+            let request: serde_json::Value = serde_json::from_str(request)?;
+            let response = match request.get("operation").and_then(serde_json::Value::as_str) {
+                Some("prepare_bundle") => serde_json::json!({"result":"prepared_bundle","value":{
+                    "contract_version":[1,2],
+                    "bundle":[{"path":"index.html","contents":"aGVsbG8="}],
+                    "file_count":1,"total_bytes":5,"skipped_entries":0,"scanned_entries":1
+                }}),
+                Some("launch") => serde_json::json!({"result":"launch","value":{
+                    "site":{"id":"site-1","name":"demo"},"created_site":true,
+                    "database":null,"database_env_keys":[],"domains":[],
+                    "deployment":{"id":"deploy-1","site":"demo","status":"building","url":"https://demo.example"}
+                }}),
+                Some("deployment") => serde_json::json!({"result":"deployment","value":{
+                    "id":"deploy-1","site":"demo","status":
+                        if request["id"] == "ready-1" { "ready" } else { "failed" }
+                }}),
+                Some("promote") => serde_json::json!({"result":"done"}),
+                Some("set_env") => serde_json::json!({"result":"done"}),
+                Some("list_sites") => serde_json::json!({"result":"sites","value":[]}),
+                _ => return Err(anyhow::anyhow!("unexpected fixture operation")),
+            };
+            Ok(response.to_string())
+        },
+    );
+    Account {
+        call_fixture: Some(fixture),
+        ..account
+    }
 }
 
 #[test]
@@ -38,7 +89,7 @@ fn a_configured_key_yields_an_account() {
         .expect("resolution does not fail")
         .expect("an account, since a key is configured");
 
-    assert_eq!(account.host().kind().as_str(), "vercel");
+    assert_eq!(account.provider, "vercel");
     assert_eq!(account.workspace_dir(), workspace.path());
 }
 
@@ -100,6 +151,416 @@ fn an_account_exposes_every_hosting_tool() {
             "hosting_analytics",
         ]
     );
+    for tool in account.tools() {
+        assert!(!tool.description().is_empty());
+        assert_eq!(tool.parameters_schema()["type"], "object");
+    }
+}
+
+#[test]
+fn tool_declarations_match_the_released_module_contract() {
+    let workspace = tempfile::tempdir().expect("tempdir");
+    let account = Account::from_config(&config_with(workspace.path(), true, "token"))
+        .expect("resolution")
+        .expect("account");
+    let tools = account.tools();
+    let declarations: Vec<tinyhosts_bus::ToolDeclaration> =
+        serde_json::from_str(tinyhosts_bus::TOOL_DECLARATIONS_JSON).expect("contract json");
+    assert_eq!(tools.len(), declarations.len());
+    for (tool, declaration) in tools.iter().zip(declarations) {
+        assert_eq!(tool.name(), declaration.name);
+        assert_eq!(tool.description(), declaration.description);
+        assert_eq!(tool.parameters_schema(), declaration.parameters_schema);
+        assert_eq!(tool.external_effect(), declaration.external_effect);
+        assert_eq!(
+            tool.permission_level(),
+            match declaration.permission_level {
+                tinyhosts_bus::PermissionLevel::ReadOnly => tinytools::PermissionLevel::ReadOnly,
+                tinyhosts_bus::PermissionLevel::Write => tinytools::PermissionLevel::Write,
+            }
+        );
+    }
+}
+
+#[test]
+fn the_module_registry_pins_the_released_hosts_artifact_set() {
+    let record = crate::modules::registry::find("tinyhosts").expect("registered module");
+    assert_eq!(record.version, "0.4.3");
+    assert_eq!(record.assets.len(), 17);
+    assert!(record.assets.iter().all(|asset| {
+        asset.archive.starts_with("tinyhosts-0.4.3-") && asset.sha256.len() == 64
+    }));
+    assert_eq!(
+        record.asset_for("ubuntu-24.04-x86_64").unwrap().sha256,
+        "70da542ec03e90485c84b8ef1f75867b15f09292ac941d3a457be8bec410f6bc"
+    );
+}
+
+#[cfg(feature = "modules")]
+#[tokio::test]
+#[ignore = "requires a TinyHosts library: node scripts/modules/build.mjs tinyhosts, then OPENHUMAN_MODULE_SOURCE_DIR"]
+async fn released_artifact_serves_providers_and_confidential_local_preparation() {
+    use base64::Engine as _;
+
+    let artifact = crate::modules::local_artifact("tinyhosts").expect(
+        "build tinyhosts with scripts/modules/build.mjs and set OPENHUMAN_MODULE_SOURCE_DIR",
+    );
+    let workspace = tempfile::tempdir().expect("workspace");
+    let site = workspace.path().join("site");
+    std::fs::create_dir(&site).expect("site directory");
+    let html = b"<!doctype html><title>module fixture</title>";
+    std::fs::write(site.join("index.html"), html).expect("fixture HTML");
+
+    let mut config = config_with(workspace.path(), true, "fixture-api-key");
+    config.modules.allow_download = false;
+    config
+        .modules
+        .overrides
+        .push(crate::config::schema::ModuleOverride::with_path(
+            "tinyhosts",
+            artifact.to_string_lossy().into_owned(),
+        ));
+    let account = Account::connect_with_config("vercel", "fixture-api-key", None, config)
+        .expect("account configuration");
+    let workspace = workspace
+        .path()
+        .canonicalize()
+        .expect("canonical workspace");
+    let operation: tinyhosts_bus::rpc::Operation = tinyhosts_bus::rpc::Operation::PrepareBundle {
+        directory: tinyhosts_bus::preparation::AuthorizedDirectory {
+            workspace: workspace.to_string_lossy().into_owned(),
+            path: "site".to_owned(),
+            max_bytes: tinyhosts_bus::preparation::MAX_PREPARATION_BYTES,
+            max_files: tinyhosts_bus::preparation::MAX_PREPARATION_FILES,
+        },
+    };
+    let tinyhosts_bus::rpc::Outcome::PreparedBundle(prepared) = account
+        .execute(operation)
+        .await
+        .expect("released module Providers and PrepareBundle calls")
+    else {
+        panic!("typed prepared bundle");
+    };
+
+    assert_eq!(prepared.contract_version, (1, 2));
+    assert_eq!(prepared.file_count, 1);
+    assert_eq!(prepared.total_bytes, html.len() as u64);
+    assert_eq!(prepared.bundle.len(), 1);
+    assert_eq!(prepared.bundle[0].path, "index.html");
+    assert_eq!(
+        base64::engine::general_purpose::STANDARD
+            .decode(&prepared.bundle[0].contents)
+            .expect("base64 file content"),
+        html,
+        "the native preparation operation returns only the local fixture bytes"
+    );
+}
+
+#[tokio::test]
+async fn providers_and_launch_use_the_declared_bus_members_and_confidential_execute() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    std::fs::create_dir(workspace.path().join("app")).unwrap();
+    std::fs::write(workspace.path().join("app/index.html"), "hello").unwrap();
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let account = account_fixture(workspace.path().to_path_buf(), Arc::clone(&calls));
+    let tools = account.tools();
+    let launch = tools
+        .iter()
+        .find(|tool| tool.name() == "hosting_launch_site")
+        .unwrap();
+    let result = launch
+        .execute(serde_json::json!({"site":"demo","path":"app"}))
+        .await
+        .unwrap();
+    assert!(!result.is_error);
+    assert!(result
+        .markdown_formatted
+        .as_deref()
+        .unwrap()
+        .contains("deploy-1"));
+
+    let calls = calls.lock().unwrap();
+    assert_eq!(
+        calls.len(),
+        3,
+        "Providers and two Execute operations are expected"
+    );
+    assert_eq!(
+        calls[0],
+        ("Providers".to_owned(), serde_json::Value::Null, false)
+    );
+    assert_eq!(calls[1].0, "Execute");
+    assert!(calls[1].2, "PrepareBundle uses confidential Execute");
+    assert_eq!(calls[2].0, "Execute");
+    assert!(
+        calls[2].2,
+        "Launch carries credentials and must be confidential"
+    );
+    let prepared: serde_json::Value =
+        serde_json::from_str(calls[1].1[0].as_str().unwrap()).unwrap();
+    assert_eq!(prepared["operation"], "prepare_bundle");
+    assert_eq!(prepared["directory"]["path"], "app");
+    assert!(prepared["credentials"]["api_key"].as_str().unwrap() == "fixture-secret");
+    let launched: serde_json::Value =
+        serde_json::from_str(calls[2].1[0].as_str().unwrap()).unwrap();
+    assert_eq!(launched["operation"], "launch");
+    assert_eq!(launched["plan"]["bundle"][0]["path"], "index.html");
+}
+
+#[tokio::test]
+async fn rollback_promotes_only_a_ready_deployment() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let account = account_fixture(workspace.path().to_path_buf(), Arc::clone(&calls));
+    let tools = account.tools();
+    let rollback = tools
+        .iter()
+        .find(|tool| tool.name() == "hosting_rollback")
+        .unwrap();
+    let refused = rollback
+        .execute(serde_json::json!({"site":"demo","deployment_id":"bad-1"}))
+        .await
+        .unwrap();
+    assert!(refused.is_error);
+    assert!(refused.content[0].render().contains("Failed"));
+    let done = rollback
+        .execute(serde_json::json!({"site":"demo","deployment_id":"ready-1"}))
+        .await
+        .unwrap();
+    assert!(!done.is_error);
+    let operations: Vec<String> = calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|call| call.0 == "Execute")
+        .map(|call| {
+            let request: serde_json::Value =
+                serde_json::from_str(call.1[0].as_str().unwrap()).unwrap();
+            request["operation"].as_str().unwrap().to_owned()
+        })
+        .collect();
+    assert_eq!(operations, ["deployment", "deployment", "promote"]);
+}
+
+#[tokio::test]
+async fn set_env_renders_the_module_summary_for_the_given_keys() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let account = account_fixture(workspace.path().to_path_buf(), calls);
+    let tools = account.tools();
+    let set_env = tools
+        .iter()
+        .find(|tool| tool.name() == "hosting_set_env")
+        .unwrap();
+    let result = set_env
+        .execute(serde_json::json!({"site":"demo","env":{"A":"1"}}))
+        .await
+        .unwrap();
+    assert!(!result.is_error);
+    assert!(result.content[0].render().contains("Set A on demo."));
+}
+
+#[tokio::test]
+async fn an_environment_credential_is_left_for_the_module_to_read() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let mut account = account_fixture(workspace.path().to_path_buf(), Arc::clone(&calls));
+    account.env_credential = true;
+    let tools = account.tools();
+    let list = tools
+        .iter()
+        .find(|tool| tool.name() == "hosting_list_sites")
+        .unwrap();
+    list.execute(serde_json::json!({})).await.unwrap();
+    let calls = calls.lock().unwrap();
+    let request: serde_json::Value = serde_json::from_str(calls[1].1[0].as_str().unwrap()).unwrap();
+    assert!(request.get("credentials").is_none());
+}
+
+#[tokio::test]
+async fn disabled_module_loader_does_not_fall_back_to_a_linked_provider() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let mut config = config_with(workspace.path(), true, "fixture-secret");
+    config.modules.enabled = false;
+    let account = Account::from_config(&config).unwrap().unwrap();
+    let tools = account.tools();
+    let list = tools
+        .iter()
+        .find(|tool| tool.name() == "hosting_list_sites")
+        .unwrap();
+    let result = list.execute(serde_json::json!({})).await.unwrap();
+    assert!(result.is_error);
+    assert!(result.content[0]
+        .render()
+        .starts_with("MODULE_CALL_REPORTED:"));
+}
+
+#[tokio::test]
+async fn connect_with_config_preserves_embedding_module_policy() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let mut config = Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.modules.enabled = false;
+    let account = Account::connect_with_config("vercel", "fixture-secret", None, config)
+        .expect("account uses the supplied host configuration");
+    assert_eq!(account.workspace_dir(), workspace.path());
+    let list = account
+        .tools()
+        .into_iter()
+        .find(|tool| tool.name() == "hosting_list_sites")
+        .unwrap();
+    let result = list.execute(serde_json::json!({})).await.unwrap();
+    assert!(result.is_error);
+    assert!(result.content[0]
+        .render()
+        .starts_with("MODULE_CALL_REPORTED:"));
+}
+
+#[tokio::test]
+async fn launch_rejects_a_forbidden_workspace_path_before_any_module_call() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    std::fs::create_dir(workspace.path().join(".ssh")).unwrap();
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let account = account_fixture(workspace.path().to_path_buf(), Arc::clone(&calls));
+    let launch = account
+        .tools()
+        .into_iter()
+        .find(|tool| tool.name() == "hosting_launch_site")
+        .unwrap();
+
+    let result = launch
+        .execute(serde_json::json!({"site":"demo", "path":".ssh"}))
+        .await
+        .unwrap();
+    assert!(result.is_error);
+    assert!(calls.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn confidential_execute_failure_is_not_retried_as_an_ordinary_call() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let config = config_with(workspace.path(), true, "never-render-this-secret");
+    let account = Account::from_config(&config).unwrap().unwrap();
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let calls_out = Arc::clone(&calls);
+    let fixture = Arc::new(
+        move |member: &str, args: serde_json::Value, confidential: bool| {
+            calls_out
+                .lock()
+                .unwrap()
+                .push((member.to_owned(), args, confidential));
+            if member == tinyhosts_bus::METHODS[1] {
+                Ok(serde_json::json!(["vercel"]).to_string())
+            } else {
+                Err(anyhow::anyhow!(
+                    "MODULE_CALL_REPORTED: module transport failed"
+                ))
+            }
+        },
+    );
+    let account = Account {
+        call_fixture: Some(fixture),
+        ..account
+    };
+    let list = account
+        .tools()
+        .into_iter()
+        .find(|tool| tool.name() == "hosting_list_sites")
+        .unwrap();
+
+    let result = list.execute(serde_json::json!({})).await.unwrap();
+    assert!(result.is_error);
+    assert!(result.content[0]
+        .render()
+        .contains("MODULE_CALL_REPORTED: module execution failed"));
+    assert!(!result.content[0]
+        .render()
+        .contains("never-render-this-secret"));
+    let calls = calls.lock().unwrap();
+    assert_eq!(calls.len(), 2, "one Providers call and one failed Execute");
+    assert_eq!(calls[0].0, "Providers");
+    assert_eq!(calls[1].0, "Execute");
+    assert!(
+        calls[1].2,
+        "the failed credential-bearing call remains confidential"
+    );
+}
+
+#[cfg(feature = "crash-reporting")]
+#[test]
+fn an_operation_with_the_wrong_typed_outcome_is_reported_once_without_reply_data() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let config = config_with(workspace.path(), true, "never-render-this-secret");
+    let account = Account::from_config(&config).unwrap().unwrap();
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let calls_out = Arc::clone(&calls);
+    let fixture = Arc::new(
+        move |member: &str, args: serde_json::Value, confidential: bool| {
+            calls_out
+                .lock()
+                .unwrap()
+                .push((member.to_owned(), args.clone(), confidential));
+            if member == tinyhosts_bus::METHODS[1] {
+                return Ok(serde_json::json!(["vercel"]).to_string());
+            }
+            Ok(serde_json::json!({"result":"launch","value":{
+                "site":{"id":"private-id","name":"private-site"},
+                "created_site":true,
+                "database":null,
+                "database_env_keys":[],
+                "domains":[],
+                "deployment":{"id":"private-deployment","site":"private-site","status":"building"}
+            }})
+            .to_string())
+        },
+    );
+    let account = Account {
+        call_fixture: Some(fixture),
+        ..account
+    };
+    let list = account
+        .tools()
+        .into_iter()
+        .find(|tool| tool.name() == "hosting_list_sites")
+        .unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let events = sentry::test::with_captured_events(|| {
+        runtime.block_on(async {
+            let result = list.execute(serde_json::json!({})).await.unwrap();
+            assert!(result.is_error);
+            assert!(result.content[0]
+                .render()
+                .contains("MODULE_CALL_REPORTED: module execution failed"));
+            assert!(!result.content[0].render().contains("private-site"));
+        });
+    });
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(
+        events[0].tags.get("reason_code").map(String::as_str),
+        Some("module_fault")
+    );
+    let calls = calls.lock().unwrap();
+    assert_eq!(calls.len(), 2);
+    assert!(calls[1].2);
+}
+
+#[test]
+fn workspace_resolution_refuses_absolute_traversal_and_symlink_escape() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let outside = tempfile::tempdir().expect("outside");
+    std::fs::create_dir(workspace.path().join("app")).unwrap();
+    std::fs::create_dir(workspace.path().join(".ssh")).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(outside.path(), workspace.path().join("escape")).unwrap();
+    assert!(resolve_in_workspace(workspace.path(), "app").is_ok());
+    assert!(resolve_in_workspace(workspace.path(), "../outside").is_err());
+    assert!(resolve_in_workspace(workspace.path(), ".ssh").is_err());
+    assert!(resolve_in_workspace(workspace.path(), outside.path().to_str().unwrap()).is_err());
+    #[cfg(unix)]
+    assert!(resolve_in_workspace(workspace.path(), "escape").is_err());
 }
 
 #[test]
@@ -125,517 +586,10 @@ fn only_the_tools_that_change_the_world_carry_an_external_effect() {
 }
 
 #[test]
-fn every_tool_schema_is_an_object_naming_its_required_arguments() {
-    let workspace = tempfile::tempdir().expect("tempdir");
+fn a_disabled_hosting_component_registers_no_tools_despite_a_credential() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let config = config_with(workspace.path(), false, "token");
+    assert!(Account::from_config(&config).unwrap().is_none());
     let config = config_with(workspace.path(), true, "token");
-    let account = Account::from_config(&config)
-        .expect("resolution does not fail")
-        .expect("an account");
-
-    for tool in account.tools() {
-        let schema = tool.parameters_schema();
-        assert_eq!(schema["type"], "object", "{}", tool.name());
-        assert!(
-            schema["properties"].is_object(),
-            "{} has no properties",
-            tool.name()
-        );
-        assert!(
-            !tool.description().is_empty(),
-            "{} has no description",
-            tool.name()
-        );
-    }
-}
-
-#[test]
-fn a_directory_inside_the_workspace_resolves() {
-    let workspace = tempfile::tempdir().expect("tempdir");
-    std::fs::create_dir(workspace.path().join("site")).expect("mkdir");
-
-    let resolved = resolve_in_workspace(workspace.path(), "site").expect("resolves");
-
-    assert_eq!(
-        resolved,
-        workspace
-            .path()
-            .canonicalize()
-            .expect("canonical root")
-            .join("site")
-    );
-}
-
-#[test]
-fn an_empty_path_is_the_workspace_root() {
-    let workspace = tempfile::tempdir().expect("tempdir");
-
-    let resolved = resolve_in_workspace(workspace.path(), "  ").expect("resolves");
-
-    assert_eq!(
-        resolved,
-        workspace.path().canonicalize().expect("canonical root")
-    );
-}
-
-#[test]
-fn a_path_outside_the_workspace_is_refused() {
-    let workspace = tempfile::tempdir().expect("tempdir");
-    let root = workspace.path();
-
-    // A deployment uploads every byte under the directory to a third party, so
-    // this is the check that decides what may leave the machine.
-    assert!(resolve_in_workspace(root, "/etc").is_err());
-    assert!(resolve_in_workspace(root, "../..").is_err());
-    assert!(resolve_in_workspace(root, "does-not-exist").is_err());
-}
-
-#[test]
-fn a_file_is_not_a_deployable_directory() {
-    let workspace = tempfile::tempdir().expect("tempdir");
-    std::fs::write(workspace.path().join("page.tsx"), b"x").expect("write");
-
-    let error =
-        resolve_in_workspace(workspace.path(), "page.tsx").expect_err("a file is not a directory");
-
-    assert!(error.to_string().contains("not a directory"), "{error}");
-}
-
-#[tokio::test]
-async fn launching_reports_a_missing_directory_instead_of_deploying_nothing() {
-    let workspace = tempfile::tempdir().expect("tempdir");
-    let config = config_with(workspace.path(), true, "token");
-    let account = Account::from_config(&config)
-        .expect("resolution does not fail")
-        .expect("an account");
-
-    let tool = tools::LaunchSiteTool::new(account);
-    let result = tool
-        .execute(json!({"site": "shop", "path": "missing"}))
-        .await
-        .expect("the tool reports rather than panics");
-
-    assert!(result.is_error);
-}
-
-#[tokio::test]
-async fn launching_without_a_site_name_is_refused_before_any_upload() {
-    let workspace = tempfile::tempdir().expect("tempdir");
-    std::fs::write(workspace.path().join("package.json"), b"{}").expect("write");
-    let config = config_with(workspace.path(), true, "token");
-    let account = Account::from_config(&config)
-        .expect("resolution does not fail")
-        .expect("an account");
-
-    let tool = tools::LaunchSiteTool::new(account);
-    let result = tool
-        .execute(json!({"path": "."}))
-        .await
-        .expect("the tool reports rather than panics");
-
-    assert!(result.is_error);
-}
-
-#[tokio::test]
-async fn a_read_tool_reports_a_missing_argument_rather_than_calling_out() {
-    let workspace = tempfile::tempdir().expect("tempdir");
-    let config = config_with(workspace.path(), true, "token");
-    let account = Account::from_config(&config)
-        .expect("resolution does not fail")
-        .expect("an account");
-
-    let result = tools::DeploymentStatusTool::new(account.host())
-        .execute(json!({}))
-        .await
-        .expect("the tool reports rather than panics");
-
-    assert!(result.is_error);
-}
-
-// ── The deployment-history and rollback tools (issue opencompany#913) ────────
-
-#[tokio::test]
-async fn the_new_read_tools_report_a_missing_site_rather_than_calling_out() {
-    let workspace = tempfile::tempdir().expect("tempdir");
-    let config = config_with(workspace.path(), true, "token");
-    let account = Account::from_config(&config)
-        .expect("resolution does not fail")
-        .expect("an account");
-
-    let listed = tools::ListDeploymentsTool::new(account.host())
-        .execute(json!({}))
-        .await
-        .expect("the tool reports rather than panics");
-    assert!(listed.is_error);
-
-    let domains = tools::DomainStatusTool::new(account.host())
-        .execute(json!({}))
-        .await
-        .expect("the tool reports rather than panics");
-    assert!(domains.is_error);
-}
-
-#[tokio::test]
-async fn a_rollback_missing_either_argument_is_refused_before_any_call() {
-    let workspace = tempfile::tempdir().expect("tempdir");
-    let config = config_with(workspace.path(), true, "token");
-    let account = Account::from_config(&config)
-        .expect("resolution does not fail")
-        .expect("an account");
-
-    // A rollback names two things and neither can be guessed: repointing
-    // production at an unnamed deployment is not a recoverable mistake.
-    for args in [
-        json!({}),
-        json!({"site": "shop"}),
-        json!({"deployment_id": "d1"}),
-    ] {
-        let result = tools::RollbackTool::new(account.host())
-            .execute(args.clone())
-            .await
-            .expect("the tool reports rather than panics");
-        assert!(result.is_error, "{args} should have been refused");
-    }
-}
-
-// ── The rollback guard, against a mock of the provider's API ─────────────────
-
-use std::sync::Arc as TestArc;
-
-use wiremock::matchers::{method, path};
-use wiremock::{Mock, MockServer, ResponseTemplate};
-
-/// A real provider client pointed at a local mock rather than at Vercel.
-///
-/// `connect_to`'s own documentation names this case, and loopback `http://` is
-/// accepted precisely so a test can carry a bearer token to a server that never
-/// leaves the machine.
-fn host_against(server: &MockServer) -> TestArc<dyn tinyhosts::Host> {
-    let base_url = server.uri();
-    TestArc::from(
-        tinyhosts::connect_to(
-            tinyhosts::ProviderKind::Vercel,
-            tinyhosts::Credentials::new("token").expect("credentials"),
-            Some(base_url.as_str()),
-        )
-        .expect("a client against the mock"),
-    )
-}
-
-/// **The guard that makes this tool a recovery path rather than a second way to
-/// break the site.**
-///
-/// `hosting_list_deployments` returns failed and still-building deployments too
-/// — they are part of the history an agent reads — so the id it picks is not
-/// necessarily one that can serve traffic. Promoting a failed build would take
-/// the site down during an attempt to bring it back up.
-///
-/// The assertion that matters is `expect(0)` on the promote route: the refusal
-/// has to happen *before* the outward call, not be an error message reported
-/// after production already moved.
-#[tokio::test]
-async fn rolling_back_to_a_deployment_that_never_built_does_not_touch_production() {
-    let server = MockServer::start().await;
-
-    Mock::given(method("GET"))
-        .and(path("/v13/deployments/dpl_broken"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "id": "dpl_broken",
-            "name": "shop",
-            "readyState": "ERROR",
-            "errorMessage": "build failed"
-        })))
-        .mount(&server)
-        .await;
-
-    // Vercel's promote is POST /v10/projects/{project}/promote/{deployment},
-    // reached only after GET /v9/projects/{site} resolves the id. Neither may
-    // be called at all.
-    Mock::given(method("GET"))
-        .and(path("/v9/projects/shop"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "id": "prj_1",
-            "name": "shop"
-        })))
-        .expect(0)
-        .mount(&server)
-        .await;
-
-    let result = tools::RollbackTool::new(host_against(&server))
-        .execute(json!({"site": "shop", "deployment_id": "dpl_broken"}))
-        .await
-        .expect("the tool reports rather than panics");
-
-    assert!(result.is_error, "a failed deployment must not be promoted");
-    // The status is named, so a model can pick a different deployment rather
-    // than retry the same one.
-    let rendered = result.text();
-    assert!(
-        rendered.contains("Failed"),
-        "the refusal should name the state it refused: {rendered}"
-    );
-}
-
-/// The ordinary path: a deployment that built is promoted, and the site's URL
-/// comes back so the agent can say where production now points.
-#[tokio::test]
-async fn rolling_back_to_a_ready_deployment_promotes_it() {
-    let server = MockServer::start().await;
-
-    Mock::given(method("GET"))
-        .and(path("/v13/deployments/dpl_good"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "id": "dpl_good",
-            "name": "shop",
-            "url": "shop-abc.vercel.app",
-            "readyState": "READY",
-            "target": "production"
-        })))
-        .mount(&server)
-        .await;
-    Mock::given(method("GET"))
-        .and(path("/v9/projects/shop"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "id": "prj_1",
-            "name": "shop"
-        })))
-        .mount(&server)
-        .await;
-    Mock::given(method("POST"))
-        .and(path("/v10/projects/prj_1/promote/dpl_good"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
-        .expect(1)
-        .mount(&server)
-        .await;
-
-    let result = tools::RollbackTool::new(host_against(&server))
-        .execute(json!({"site": "shop", "deployment_id": "dpl_good"}))
-        .await
-        .expect("the tool reports rather than panics");
-
-    assert!(!result.is_error, "{result:?}");
-    let rendered = result.text();
-    assert!(
-        rendered.contains("dpl_good") && rendered.contains("shop-abc.vercel.app"),
-        "the result should say what is serving and where: {rendered}"
-    );
-}
-
-/// The history read an agent uses to *find* the id above.
-#[tokio::test]
-async fn listing_deployments_reports_the_history_a_rollback_picks_from() {
-    let server = MockServer::start().await;
-
-    Mock::given(method("GET"))
-        .and(path("/v7/deployments"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "deployments": [
-                {"id": "dpl_new", "name": "shop", "readyState": "ERROR"},
-                {"id": "dpl_old", "name": "shop", "readyState": "READY"}
-            ]
-        })))
-        .mount(&server)
-        .await;
-
-    let result = tools::ListDeploymentsTool::new(host_against(&server))
-        .execute(json!({"site": "shop"}))
-        .await
-        .expect("the tool reports rather than panics");
-
-    assert!(!result.is_error, "{result:?}");
-
-    // Both are reported, and each status is bound to its id. The failed one is
-    // why the agent is here and the ready one is where it is going, so a list
-    // that returned the right ids against the wrong statuses would send the
-    // rollback at the deployment that just broke the site.
-    let deployments: serde_json::Value =
-        serde_json::from_str(&result.text()).expect("the tool answers with JSON");
-    let rows = deployments.as_array().expect("an array of deployments");
-
-    assert_eq!(rows.len(), 2, "{deployments}");
-    // Newest first, as the crate documents and as the provider returned them.
-    assert_eq!(rows[0]["id"], "dpl_new", "{deployments}");
-    assert_eq!(rows[0]["status"], "failed", "{deployments}");
-    assert_eq!(rows[1]["id"], "dpl_old", "{deployments}");
-    assert_eq!(rows[1]["status"], "ready", "{deployments}");
-}
-
-/// A domain that is attached but unverified is not serving, and the tool has to
-/// say so — that difference is the entire reason to read domains.
-#[tokio::test]
-async fn domain_status_distinguishes_a_verified_domain_from_a_pending_one() {
-    let server = MockServer::start().await;
-
-    Mock::given(method("GET"))
-        .and(path("/v9/projects/shop/domains"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "domains": [
-                {"name": "shop.example.com", "verified": true},
-                {"name": "www.example.com", "verified": false}
-            ]
-        })))
-        .mount(&server)
-        .await;
-
-    let result = tools::DomainStatusTool::new(host_against(&server))
-        .execute(json!({"site": "shop"}))
-        .await
-        .expect("the tool reports rather than panics");
-
-    assert!(!result.is_error, "{result:?}");
-
-    // Bound to the name rather than checked for presence: asserting only that a
-    // `true` and a `false` both appear somewhere passes just as happily if the
-    // two are swapped, which is the one thing this tool must not get wrong.
-    let domains: serde_json::Value =
-        serde_json::from_str(&result.text()).expect("the tool answers with JSON");
-    let verified_for = |name: &str| -> bool {
-        let entry = domains
-            .as_array()
-            .expect("an array of domains")
-            .iter()
-            .find(|domain| domain["name"] == name)
-            .unwrap_or_else(|| panic!("{name} is missing from {domains}"));
-        entry["verified"]
-            .as_bool()
-            .expect("`verified` is a boolean")
-    };
-
-    assert!(
-        verified_for("shop.example.com"),
-        "the verified domain must report verified: {domains}"
-    );
-    assert!(
-        !verified_for("www.example.com"),
-        "and the pending one must not — that difference is the entire reason to \
-         read domains: {domains}"
-    );
-}
-
-/// The read an agent reaches for once `hosting_deployment_status` says a build
-/// failed. A status carries one error line; the reason is in the events.
-#[tokio::test]
-async fn deployment_logs_report_the_build_error_behind_a_failed_status() {
-    let server = MockServer::start().await;
-
-    Mock::given(method("GET"))
-        .and(path("/v3/deployments/dpl_broken/events"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!([
-            {"created": 1, "type": "stdout", "payload": "installing dependencies"},
-            {"created": 2, "type": "stderr", "payload": "error TS2304: cannot find name 'foo'"}
-        ])))
-        .mount(&server)
-        .await;
-
-    let result = tools::DeploymentLogsTool::new(host_against(&server))
-        .execute(json!({"deployment_id": "dpl_broken"}))
-        .await
-        .expect("the tool reports rather than panics");
-
-    assert!(!result.is_error, "{result:?}");
-
-    let logs: serde_json::Value =
-        serde_json::from_str(&result.text()).expect("the tool answers with JSON");
-    let rows = logs.as_array().expect("an array of events");
-
-    assert_eq!(rows.len(), 2, "{logs}");
-    // Oldest first, as the crate documents, and each message bound to its kind:
-    // a log that reported the right lines against the wrong streams would show
-    // a build error as ordinary output and hide the one line worth reading.
-    assert_eq!(rows[0]["kind"], "stdout", "{logs}");
-    assert_eq!(rows[1]["kind"], "stderr", "{logs}");
-    assert!(
-        rows[1]["message"]
-            .as_str()
-            .expect("a message")
-            .contains("TS2304"),
-        "the build error must survive to the model: {logs}"
-    );
-}
-
-/// Trimming keeps the tail. A build that fails after a thousand lines of setup
-/// puts its error at the end, so a limit that kept the head would return a
-/// thousand lines of noise and drop the only one an agent came for.
-#[tokio::test]
-async fn a_limited_log_read_keeps_the_end_where_the_failure_is() {
-    let server = MockServer::start().await;
-
-    let events: Vec<serde_json::Value> = (0..10)
-        .map(|n| json!({"created": n, "type": "stdout", "payload": format!("line {n}")}))
-        .collect();
-    Mock::given(method("GET"))
-        .and(path("/v3/deployments/dpl_long/events"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(events))
-        .mount(&server)
-        .await;
-
-    let result = tools::DeploymentLogsTool::new(host_against(&server))
-        .execute(json!({"deployment_id": "dpl_long", "limit": 3}))
-        .await
-        .expect("the tool reports rather than panics");
-
-    assert!(!result.is_error, "{result:?}");
-
-    let logs: serde_json::Value =
-        serde_json::from_str(&result.text()).expect("the tool answers with JSON");
-    let rows = logs.as_array().expect("an array of events");
-
-    assert_eq!(rows.len(), 3, "{logs}");
-    assert_eq!(rows[0]["message"], "line 7", "{logs}");
-    assert_eq!(rows[2]["message"], "line 9", "{logs}");
-}
-
-#[tokio::test]
-async fn a_negative_log_limit_is_clamped_to_one() {
-    let server = MockServer::start().await;
-
-    let events: Vec<serde_json::Value> = (0..3)
-        .map(|n| json!({"created": n, "type": "stdout", "payload": format!("line {n}")}))
-        .collect();
-    Mock::given(method("GET"))
-        .and(path("/v3/deployments/dpl_negative_limit/events"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(events))
-        .mount(&server)
-        .await;
-
-    let result = tools::DeploymentLogsTool::new(host_against(&server))
-        .execute(json!({"deployment_id": "dpl_negative_limit", "limit": -1}))
-        .await
-        .expect("the tool reports rather than panics");
-
-    assert!(!result.is_error, "{result:?}");
-    let logs: serde_json::Value =
-        serde_json::from_str(&result.text()).expect("the tool answers with JSON");
-    let rows = logs.as_array().expect("an array of events");
-
-    assert_eq!(rows.len(), 1, "{logs}");
-    assert_eq!(rows[0]["message"], "line 2", "{logs}");
-}
-
-/// A read tool that calls out before checking its arguments turns a model's
-/// omission into a provider request.
-#[tokio::test]
-async fn reading_logs_without_a_deployment_id_is_refused_before_any_call() {
-    let server = MockServer::start().await;
-
-    let result = tools::DeploymentLogsTool::new(host_against(&server))
-        .execute(json!({}))
-        .await
-        .expect("the tool reports rather than panics");
-
-    assert!(result.is_error, "{result:?}");
-    assert!(
-        result.text().contains("deployment_id"),
-        "the error should name the argument: {}",
-        result.text()
-    );
-    // Nothing was mounted, so any request would have been a miss; assert the
-    // absence rather than trusting that.
-    assert!(
-        server
-            .received_requests()
-            .await
-            .unwrap_or_default()
-            .is_empty(),
-        "a missing argument must not reach the provider"
-    );
+    assert!(Account::from_config(&config).unwrap().is_some());
 }

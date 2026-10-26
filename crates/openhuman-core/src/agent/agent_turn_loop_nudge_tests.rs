@@ -1,5 +1,9 @@
 use super::*;
 use tinyinference_llm::message::Message;
+use tinyinference_llm::usage::BilledUsage;
+use tinytools_agent::dialect::NativeToolCall;
+
+type ChatResponse = tinyinference_llm::model::ChatResponse<BilledUsage, NativeToolCall>;
 
 // #6725: the repeated-failure breaker's corrective nudge reaches the next model
 // request only. It used to be a steering `InjectMessage`, which joined the
@@ -7,6 +11,7 @@ use tinyinference_llm::message::Message;
 
 const NUDGE: &str =
     "The last call failed validation. Correct its schema or arguments once before trying again.";
+const FAILED_TOOL_RESULT_WITH_NUDGE: &str = "{\"status_code\": 422}\n\n[harness note]\nThe last call failed validation. Correct its schema or arguments once before trying again.";
 
 /// A native-tool-calling model that replays scripted responses and records the
 /// messages of every request it receives.
@@ -53,7 +58,9 @@ impl ChatModel<()> for RecordingProvider {
                 guard.remove(0)
             }
         };
-        Ok(crate::agent::tinyagents::model::native_model_response_for_request(&response, &request))
+        Ok(tinyinference_llm::model::response_to_model_response(
+            &response, &request,
+        ))
     }
 }
 
@@ -80,7 +87,7 @@ impl Tool for ValidationFailingTool {
 }
 
 fn call(id: &str, name: &str) -> ChatResponse {
-    tool_response(vec![ToolCall {
+    tool_response(vec![NativeToolCall {
         id: id.into(),
         name: name.into(),
         arguments: "{}".into(),
@@ -91,14 +98,14 @@ fn call(id: &str, name: &str) -> ChatResponse {
 fn nudge_count(messages: &[Message]) -> usize {
     messages
         .iter()
-        .filter(|m| matches!(m, Message::System(_)) && m.text() == NUDGE)
+        .filter(|m| matches!(m, Message::Tool(_)) && m.text() == FAILED_TOOL_RESULT_WITH_NUDGE)
         .count()
 }
 
 async fn run_turn(
     script: Vec<ChatResponse>,
     tools: Vec<Box<dyn Tool>>,
-) -> (Vec<Vec<Message>>, Vec<ConversationMessage>) {
+) -> (Vec<Vec<Message>>, Vec<TranscriptEntry>) {
     let (requests, history, _tmp) = run_turn_failing_from(script, tools, None).await;
     (requests, history)
 }
@@ -107,17 +114,14 @@ async fn run_turn_failing_from(
     script: Vec<ChatResponse>,
     tools: Vec<Box<dyn Tool>>,
     fail_from_call: Option<usize>,
-) -> (
-    Vec<Vec<Message>>,
-    Vec<ConversationMessage>,
-    tempfile::TempDir,
-) {
+) -> (Vec<Vec<Message>>, Vec<TranscriptEntry>, tempfile::TempDir) {
     let provider = Arc::new(RecordingProvider {
         responses: Mutex::new(script),
         requests: Mutex::new(Vec::new()),
         fail_from_call,
     });
     let (mut agent, tmp) = build_agent_with(provider.clone(), tools, Box::new(NativeDialect));
+    crate::storage::local::use_persistent_default_for_test(tmp.path());
     let outcome = agent.turn("do the thing").await;
     assert_eq!(
         outcome.is_err(),
@@ -129,15 +133,15 @@ async fn run_turn_failing_from(
 }
 
 /// No system row may follow the first conversational row of committed history.
-fn committed_system_rows_past_prefix(history: &[ConversationMessage]) -> Vec<String> {
+fn committed_system_rows_past_prefix(history: &[TranscriptEntry]) -> Vec<String> {
     history
         .iter()
         .filter_map(|m| match m {
-            ConversationMessage::Chat(chat) => Some(chat),
+            TranscriptEntry::Chat(chat) => Some(chat),
             _ => None,
         })
-        .skip_while(|chat| chat.role == "system")
-        .filter(|chat| chat.role == "system")
+        .skip_while(|chat| chat.role.as_str() == "system")
+        .filter(|chat| chat.role.as_str() == "system")
         .map(|chat| chat.content.clone())
         .collect()
 }
@@ -152,7 +156,7 @@ async fn validation_nudge_reaches_the_retry_but_is_not_committed() {
 
     assert_eq!(requests.len(), 2, "one failing call, then the retry");
     assert!(
-        matches!(requests[1].last(), Some(m @ Message::System(_)) if m.text() == NUDGE),
+        matches!(requests[1].last(), Some(message) if matches!(message, Message::Tool(_)) && message.text() == FAILED_TOOL_RESULT_WITH_NUDGE),
         "the retry request must end with the nudge, got {:?}",
         requests[1].last()
     );
@@ -161,10 +165,10 @@ async fn validation_nudge_reaches_the_retry_but_is_not_committed() {
     assert!(
         history.iter().any(|m| matches!(
             m,
-            ConversationMessage::Chat(chat) if chat.role == "tool" && chat.content.contains("422")
+            TranscriptEntry::Chat(chat) if chat.role.as_str() == "tool" && chat.content.contains("422")
         )) || history
             .iter()
-            .any(|m| matches!(m, ConversationMessage::ToolResults(r) if r.iter().any(|r| r.content.contains("422")))),
+            .any(|m| matches!(m, TranscriptEntry::ToolResults(r) if r.iter().any(|r| r.content.contains("422")))),
         "the validation failure must be part of the committed turn"
     );
     assert_eq!(
@@ -197,10 +201,13 @@ async fn a_second_validation_failure_rearms_the_nudge() {
     .await;
 
     assert_eq!(requests.len(), 3);
-    assert_eq!(requests.iter().map(|r| nudge_count(r)).collect::<Vec<_>>(), [0, 1, 1],
-        "each failure nudges exactly the request that follows it; a consumed nudge is not carried over");
+    assert_eq!(
+        requests.iter().map(|r| nudge_count(r)).collect::<Vec<_>>(),
+        [0, 1, 1],
+        "each failure nudges exactly the request that follows it; a consumed nudge is not carried over"
+    );
     assert!(
-        matches!(requests[2].last(), Some(m @ Message::System(_)) if m.text() == NUDGE),
+        matches!(requests[2].last(), Some(message) if matches!(message, Message::Tool(_)) && message.text() == FAILED_TOOL_RESULT_WITH_NUDGE),
         "the re-armed nudge must end the request after the second failure"
     );
     assert_eq!(
@@ -212,31 +219,72 @@ async fn a_second_validation_failure_rearms_the_nudge() {
 /// Committed rows carrying the nudge text in any role. A failed turn renders
 /// its unanswered request into the failure note as text (#6281), so a leak can
 /// arrive inside an assistant row, not only as a system row.
-fn committed_rows_mentioning_nudge(history: &[ConversationMessage]) -> Vec<String> {
+fn committed_rows_mentioning_nudge(history: &[TranscriptEntry]) -> Vec<String> {
     history
         .iter()
         .filter_map(|m| match m {
-            ConversationMessage::Chat(chat) if chat.content.contains(NUDGE) => {
-                Some(format!("{}: {}", chat.role, chat.content))
+            TranscriptEntry::Chat(chat) if chat.content.contains(NUDGE) => {
+                Some(format!("{}: {}", chat.role.as_str(), chat.content))
             }
             _ => None,
         })
         .collect()
 }
 
-/// Every persisted file under the workspace, as text.
+#[cfg(feature = "legacy-import")]
+/// Every persisted file under the workspace, as (lossy) text. A session
+/// store database is also read row by row, because TinyAgents keeps transcript
+/// entries zstd-compressed and a byte search of the file would
+/// never see them.
 fn persisted_text(root: &std::path::Path) -> Vec<(std::path::PathBuf, String)> {
     walkdir::WalkDir::new(root)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|entry| entry.file_type().is_file())
         .filter_map(|entry| {
-            let text = std::fs::read_to_string(entry.path()).ok()?;
+            let bytes = std::fs::read(entry.path()).ok()?;
+            let mut text = String::from_utf8_lossy(&bytes).into_owned();
+            if entry.path().extension().and_then(|e| e.to_str()) == Some("db") {
+                text.push_str(&database_rows_text(entry.path()));
+            }
             Some((entry.into_path(), text))
         })
         .collect()
 }
 
+#[cfg(feature = "legacy-import")]
+/// The document bodies of the storage database at `path`, decompressed.
+fn database_rows_text(path: &std::path::Path) -> String {
+    use crate::storage::rusqlite::{types::Value, Connection, OpenFlags};
+    let Ok(conn) = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY) else {
+        return String::new();
+    };
+    let Ok(mut statement) = conn.prepare("SELECT body FROM docs") else {
+        return String::new();
+    };
+    let Ok(rows) = statement.query_map([], |row| row.get::<_, Value>(0)) else {
+        return String::new();
+    };
+    let mut out = String::new();
+    for value in rows.filter_map(Result::ok) {
+        match value {
+            Value::Text(text) => out.push_str(&text),
+            Value::Blob(bytes) => {
+                // One envelope byte (`1` = zstd), then the zstd frame.
+                let decoded = match bytes.split_first() {
+                    Some((1, frame)) => zstd::decode_all(frame).unwrap_or_else(|_| bytes.clone()),
+                    _ => bytes.clone(),
+                };
+                out.push_str(&String::from_utf8_lossy(&decoded));
+            }
+            _ => {}
+        }
+        out.push('\n');
+    }
+    out
+}
+
+#[cfg(feature = "legacy-import")]
 #[tokio::test]
 async fn a_failed_nudged_request_does_not_persist_the_nudge() {
     // When the nudged request itself fails, the driver persists a display-only

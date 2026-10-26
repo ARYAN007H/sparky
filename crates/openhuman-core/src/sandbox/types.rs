@@ -11,7 +11,7 @@ pub enum SandboxBackendKind {
     /// No sandbox — commands execute directly on the host.
     #[default]
     None,
-    /// OS-level process jail via `cwd_jail` (Landlock/Seatbelt/AppContainer).
+    /// Module-owned native process jail selected by TinyBox.
     Local,
     /// Docker container isolation.
     Docker,
@@ -25,8 +25,16 @@ pub struct SandboxPolicy {
     pub backend: SandboxBackendKind,
     /// Workspace root mounted into the sandbox (read/write).
     pub workspace_root: PathBuf,
-    /// Additional read-only mounts (e.g. `/usr/lib`, managed node).
+    /// The core's own state directory (`workspace_dir`), never the user's
+    /// project. Per-call scratch the sandbox needs on the host, such as the
+    /// local jail's output capture, lives under it so nothing appears in
+    /// `workspace_root` while a command runs.
+    pub state_dir: PathBuf,
+    /// Additional read-only mounts (e.g. `/usr/lib`).
     pub read_only_mounts: Vec<PathBuf>,
+    /// Additional read-write mounts (e.g. `~/.cargo`). Local jail only.
+    #[serde(default)]
+    pub read_write_mounts: Vec<PathBuf>,
     /// Whether outbound network is allowed inside the sandbox.
     pub allow_network: bool,
     /// Environment variables to passthrough into the sandbox.
@@ -85,6 +93,20 @@ pub struct SandboxBackendHandle {
     pub status: SandboxStatus,
     /// Container ID for Docker backends; jail label for local.
     pub backend_id: Option<String>,
+    /// How strongly a ready local jail confines commands; `None` otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub isolation: Option<SandboxIsolation>,
+}
+
+/// The confinement a local native jail actually provides.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SandboxIsolation {
+    /// Kernel (or stronger) process isolation: fit for untrusted code.
+    Isolated,
+    /// Writes confined to the selected folder (macOS Seatbelt); no process
+    /// isolation.
+    FolderConfined,
 }
 
 /// Health/lifecycle status of a sandbox backend.

@@ -1,37 +1,50 @@
-use crate::mcp::config_servers::{McpDefinitionAuth, McpRegistrySource, McpServerRegistry};
-use crate::security::{SecurityPolicy, ToolOperation};
-use async_trait::async_trait;
-use base64::Engine as _;
-use serde_json::{json, Value};
-use std::sync::Arc;
-use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolContent, ToolResult};
+//! Host adapters for TinyMCP's generic configured-server bridge.
+//!
+//! TinyMCP owns the generic bridge declarations, transport calls, rendering,
+//! secret scrubbing, and call classification. This module keeps OpenHuman's
+//! act gate and adapts the returned bus vocabulary to `tinytools`.
 
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use serde_json::{json, Value};
+use tinytools::{IndirectCall, PermissionLevel, Tool, ToolCallOptions, ToolResult};
+
+use crate::{
+    config::Config,
+    mcp::{host, module_client::McpConfiguredClient},
+    security::{SecurityPolicy, ToolOperation},
+};
+
+/// Lists configured MCP servers through TinyMCP's safe summary operation.
 pub struct McpListServersTool {
-    registry: Arc<McpServerRegistry>,
+    config: Arc<Config>,
+    spec: tinymcp_bus::agent_tools::AgentToolSpec,
 }
 
 impl McpListServersTool {
-    pub fn new(registry: Arc<McpServerRegistry>) -> Self {
-        Self { registry }
+    /// Builds the server-list tool for one configured workspace.
+    #[must_use]
+    pub fn new(config: Arc<Config>) -> Self {
+        Self {
+            config,
+            spec: bridge_tool_spec("mcp_list_servers"),
+        }
     }
 }
 
 #[async_trait]
 impl Tool for McpListServersTool {
     fn name(&self) -> &str {
-        "mcp_list_servers"
+        &self.spec.name
     }
 
     fn description(&self) -> &str {
-        "List named remote MCP servers registered in OpenHuman core. Use this before browsing tools on a specific MCP server."
+        &self.spec.description
     }
 
     fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "properties": {},
-            "additionalProperties": false
-        })
+        self.spec.parameters.clone()
     }
 
     fn permission_level(&self) -> PermissionLevel {
@@ -43,60 +56,72 @@ impl Tool for McpListServersTool {
     }
 
     async fn execute(&self, _args: Value) -> anyhow::Result<ToolResult> {
-        let servers = self
-            .registry
-            .list()
-            .into_iter()
+        let client = match McpConfiguredClient::for_config(&self.config) {
+            Ok(client) => client,
+            Err(_) => {
+                return Ok(ToolResult::error(
+                    "mcp_list_servers failed: TinyMCP is unavailable",
+                ));
+            }
+        };
+        let config = host::client_config(&self.config);
+        let summaries: Vec<tinymcp_bus::StaticServerSummary> = match client
+            .call_confidential(
+                &config,
+                tinymcp_bus::names::methods::STATIC_SERVER_SUMMARIES,
+                (),
+            )
+            .await
+        {
+            Ok(summaries) => summaries,
+            Err(_) => {
+                return Ok(ToolResult::error(
+                    "mcp_list_servers failed: module call failed",
+                ));
+            }
+        };
+        let servers = summaries
+            .iter()
             .map(|server| {
                 json!({
                     "name": server.name,
-                    "endpoint": endpoint_without_query(&server.endpoint),
+                    "endpoint": server.endpoint,
                     "description": server.description,
                     "timeout_secs": server.timeout_secs,
                     "allowed_tools": server.allowed_tools,
                     "disallowed_tools": server.disallowed_tools,
-                    "auth_configured": !matches!(server.auth, McpDefinitionAuth::None),
-                    "auth_kind": auth_kind(&server.auth),
+                    "auth_configured": server.auth_configured,
+                    "auth_kind": server.auth_kind,
                     "source": server.source,
                 })
             })
             .collect::<Vec<_>>();
-
-        let markdown = if servers.is_empty() {
-            "# MCP Servers\n\nNo remote MCP servers are registered.".to_string()
+        let mut markdown = String::from("# MCP Servers\n");
+        if summaries.is_empty() {
+            markdown.push_str("\nNo remote MCP servers are registered.");
         } else {
-            let mut md = String::from("# MCP Servers\n");
-            for server in self.registry.list() {
-                let source = match server.source {
-                    McpRegistrySource::Config => "config",
-                    McpRegistrySource::Host => "host",
-                    _ => "unknown",
-                };
-                md.push_str(&format!(
-                    "\n- **{}** ({source})\n  - endpoint: `{}`\n  - auth: `{}`",
-                    server.name,
-                    endpoint_without_query(&server.endpoint),
-                    auth_kind(&server.auth)
+            for server in &summaries {
+                markdown.push_str(&format!(
+                    "\n- **{}** ({})\n  - endpoint: `{}`\n  - auth: `{}`",
+                    server.name, server.source, server.endpoint, server.auth_kind
                 ));
                 if let Some(description) = server.description.as_deref() {
-                    md.push_str(&format!("\n  - {description}"));
+                    markdown.push_str(&format!("\n  - {description}"));
                 }
                 if !server.allowed_tools.is_empty() {
-                    md.push_str(&format!(
+                    markdown.push_str(&format!(
                         "\n  - allowed tools: `{}`",
                         server.allowed_tools.join("`, `")
                     ));
                 }
                 if !server.disallowed_tools.is_empty() {
-                    md.push_str(&format!(
+                    markdown.push_str(&format!(
                         "\n  - disallowed tools: `{}`",
                         server.disallowed_tools.join("`, `")
                     ));
                 }
             }
-            md
-        };
-
+        }
         Ok(ToolResult::success_with_markdown(
             json!({ "servers": servers }),
             markdown,
@@ -104,38 +129,33 @@ impl Tool for McpListServersTool {
     }
 }
 
+/// The host adapter for browsing tools on one configured static server.
 pub struct McpListToolsTool {
-    registry: Arc<McpServerRegistry>,
+    config: Arc<Config>,
+    spec: tinymcp_bus::agent_tools::AgentToolSpec,
 }
 
 impl McpListToolsTool {
-    pub fn new(registry: Arc<McpServerRegistry>) -> Self {
-        Self { registry }
+    /// Builds the browsing tool for one configured MCP client.
+    #[must_use]
+    pub fn new(config: Arc<Config>) -> Self {
+        let spec = bridge_tool_spec("mcp_list_tools");
+        Self { config, spec }
     }
 }
 
 #[async_trait]
 impl Tool for McpListToolsTool {
     fn name(&self) -> &str {
-        "mcp_list_tools"
+        &self.spec.name
     }
 
     fn description(&self) -> &str {
-        "List tools exposed by a named remote MCP server. Use this before calling `mcp_call_tool`."
+        &self.spec.description
     }
 
     fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "server": {
-                    "type": "string",
-                    "description": "Registered MCP server name from `mcp_list_servers`."
-                }
-            },
-            "required": ["server"],
-            "additionalProperties": false
-        })
+        self.spec.parameters.clone()
     }
 
     fn permission_level(&self) -> PermissionLevel {
@@ -148,93 +168,152 @@ impl Tool for McpListToolsTool {
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
         let server = required_string_arg(&args, "server")?;
-        let scrubber = SecretScrubber::for_server(&self.registry, &server);
-        let tools = match self.registry.list_tools(&server).await {
-            Ok(tools) => tools,
-            Err(err) => {
+        let client = match McpConfiguredClient::for_config(&self.config) {
+            Ok(client) => client,
+            Err(_) => {
                 return Ok(ToolResult::error(
-                    scrubber.scrub(&format!("mcp_list_tools failed: {err}")),
-                ))
+                    "mcp_list_tools failed: TinyMCP is unavailable",
+                ));
+            }
+        };
+        let server = client
+            .normalize_identifier(&server)
+            .await
+            .map_err(|error| anyhow::anyhow!(input_module_error_message(error)))?;
+        let client_config = host::client_config(&self.config);
+        let remote: Vec<tinymcp_bus::McpRemoteTool> = match client
+            .call(
+                &client_config,
+                tinymcp_bus::names::methods::STATIC_LIST_TOOLS,
+                (server.as_str(),),
+            )
+            .await
+        {
+            Ok(remote) => remote,
+            Err(_) => {
+                return Ok(ToolResult::error(
+                    "mcp_list_tools failed: module call failed",
+                ));
+            }
+        };
+        let remote = match client
+            .scrub_static_tools(&client_config, &server, remote)
+            .await
+        {
+            Ok(remote) => remote,
+            Err(_) => {
+                return Ok(ToolResult::error(
+                    "mcp_list_tools failed: metadata scrubbing failed",
+                ));
             }
         };
 
-        let payload = tools
+        let mut display = Vec::with_capacity(remote.len());
+        for tool in remote {
+            let projected: tinymcp_bus::RemoteToolDisplay = match client
+                .call(
+                    &client_config,
+                    tinymcp_bus::names::methods::DISPLAY_REMOTE_TOOL,
+                    (tool.clone(),),
+                )
+                .await
+            {
+                Ok(projected) => projected,
+                Err(_) => {
+                    return Ok(ToolResult::error(
+                        "mcp_list_tools failed: tool display failed",
+                    ));
+                }
+            };
+            display.push((tool, projected));
+        }
+
+        let policy_tools = display
             .iter()
-            .map(|tool| {
+            .map(|(tool, projected)| tinymcp_bus::McpTool {
+                name: tool.name.clone(),
+                description: projected.description.clone().or(projected.title.clone()),
+                input_schema: tool.input_schema.clone(),
+                meta: None,
+            })
+            .collect();
+        let safe = crate::mcp::registry::tools_safe_for_agent(&server, policy_tools);
+        let safe_names: std::collections::HashSet<_> =
+            safe.into_iter().map(|tool| tool.name).collect();
+        let payload = display
+            .into_iter()
+            .filter(|(tool, _)| safe_names.contains(&tool.name))
+            .map(|(tool, projected)| {
                 json!({
                     "name": tool.name,
-                    "title": tool.display_title(),
-                    "description": tool.display_description(),
+                    "title": projected.title,
+                    "description": projected.description,
                     "input_schema": tool.input_schema,
                 })
             })
             .collect::<Vec<_>>();
-
         let mut markdown = format!("# MCP Tools: `{server}`\n");
-        if tools.is_empty() {
+        if payload.is_empty() {
             markdown.push_str("\nNo tools were returned by the remote server.");
         } else {
-            for tool in &tools {
-                let desc = tool
-                    .display_description()
-                    .unwrap_or_else(|| "No description.".to_string());
+            for tool in &payload {
+                let name = tool["name"].as_str().unwrap_or_default();
+                let description = tool["description"]
+                    .as_str()
+                    .or_else(|| tool["title"].as_str())
+                    .unwrap_or("No description.");
+                let schema = serde_json::to_string(&tool["input_schema"])
+                    .unwrap_or_else(|_| "{}".to_owned());
                 markdown.push_str(&format!(
-                    "\n- **{}**: {}\n  - schema: `{}`",
-                    tool.name,
-                    desc,
-                    serde_json::to_string(&tool.input_schema).unwrap_or_else(|_| "{}".into())
+                    "\n- **{name}**: {description}\n  - schema: `{schema}`"
                 ));
             }
         }
-
-        Ok(scrubber.scrub_result(ToolResult::success_with_markdown(
+        Ok(ToolResult::success_with_markdown(
             json!({ "server": server, "tools": payload }),
             markdown,
-        )))
+        ))
     }
 }
 
+/// The host's `mcp_call_tool`, backed by TinyMCP's module-owned static server
+/// call operation.
 pub struct McpCallTool {
-    registry: Arc<McpServerRegistry>,
+    config: Arc<Config>,
     security: Arc<SecurityPolicy>,
+    spec: tinymcp_bus::agent_tools::AgentToolSpec,
 }
 
 impl McpCallTool {
-    pub fn new(registry: Arc<McpServerRegistry>, security: Arc<SecurityPolicy>) -> Self {
-        Self { registry, security }
+    fn new(config: Arc<Config>, security: Arc<SecurityPolicy>) -> Self {
+        let spec = bridge_tool_spec("mcp_call_tool");
+        Self {
+            config,
+            security,
+            spec,
+        }
     }
+}
+
+fn bridge_tool_spec(name: &str) -> tinymcp_bus::agent_tools::AgentToolSpec {
+    tinymcp_bus::agent_tools::bridge_tool_specs()
+        .into_iter()
+        .find(|spec| spec.name == name)
+        .expect("TinyMCP bridge contract includes the requested tool")
 }
 
 #[async_trait]
 impl Tool for McpCallTool {
     fn name(&self) -> &str {
-        "mcp_call_tool"
+        &self.spec.name
     }
 
     fn description(&self) -> &str {
-        "Call a tool on a named remote MCP server. First inspect available tools with `mcp_list_tools`, then pass the remote tool name and its JSON arguments here."
+        &self.spec.description
     }
 
     fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "server": {
-                    "type": "string",
-                    "description": "Registered MCP server name from `mcp_list_servers`."
-                },
-                "tool": {
-                    "type": "string",
-                    "description": "Remote MCP tool name from `mcp_list_tools`."
-                },
-                "arguments": {
-                    "type": "object",
-                    "description": "Arguments object passed through to the remote MCP tool."
-                }
-            },
-            "required": ["server", "tool", "arguments"],
-            "additionalProperties": false
-        })
+        self.spec.parameters.clone()
     }
 
     fn permission_level(&self) -> PermissionLevel {
@@ -245,6 +324,60 @@ impl Tool for McpCallTool {
         true
     }
 
+    async fn indirect_target_async(&self, args: &Value) -> anyhow::Result<Option<IndirectCall>> {
+        let server = required_string_arg(args, "server")
+            .map_err(|_| anyhow::anyhow!("missing MCP server identifier"))?;
+        let tool = required_string_arg(args, "tool")
+            .map_err(|_| anyhow::anyhow!("missing MCP tool identifier"))?;
+        let client = McpConfiguredClient::for_config(&self.config)
+            .map_err(|_| anyhow::anyhow!("TinyMCP module is unavailable"))?;
+        let server = client
+            .normalize_identifier(&server)
+            .await
+            .map_err(|error| anyhow::anyhow!(input_module_error_message(error)))?;
+        let tool = client
+            .normalize_identifier(&tool)
+            .await
+            .map_err(|error| anyhow::anyhow!(input_module_error_message(error)))?;
+        let prepared = client
+            .prepare_agent_tools(tinymcp_bus::PrepareAgentToolsRequest {
+                sources: vec![tinymcp_bus::McpToolSourceSpec {
+                    server_id: server.clone(),
+                    label: server.clone(),
+                    family: server.clone(),
+                    display_name: server.clone(),
+                    tools: vec![tinymcp_bus::McpTool::new(tool.clone())],
+                    default_exposure: tinymcp_bus::McpToolExposure::Direct,
+                    direct_tools: vec![tool.clone()],
+                }],
+            })
+            .await
+            .map_err(|_| anyhow::anyhow!("TinyMCP target preparation failed"))?;
+        let presentation = prepared
+            .into_iter()
+            .find(|presentation| {
+                presentation.server_id == server && presentation.remote_name == tool
+            })
+            .ok_or_else(|| anyhow::anyhow!("TinyMCP target could not be prepared"))?;
+        let mut target = tinytools::ToolSubject::named(presentation.name)
+            .with_family(presentation.family)
+            .with_permission(PermissionLevel::Execute);
+        for tag in presentation.tags {
+            target = target.with_tag(tag);
+        }
+        target.category = Some(tinytools::ToolCategory::Workflow);
+        let call = tinytools::IndirectCall::new(target);
+        let arguments = args
+            .get("arguments")
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("missing MCP tool arguments"))?;
+        let arguments = client
+            .normalize_tool_arguments(Some(arguments))
+            .await
+            .map_err(|error| anyhow::anyhow!(input_module_error_message(error)))?;
+        Ok(Some(call.with_arguments(Value::Object(arguments))))
+    }
+
     async fn execute_with_options(
         &self,
         args: Value,
@@ -252,7 +385,7 @@ impl Tool for McpCallTool {
     ) -> anyhow::Result<ToolResult> {
         self.security
             .enforce_tool_operation(ToolOperation::Act, self.name())
-            .map_err(|err| anyhow::anyhow!(err))?;
+            .map_err(|error| anyhow::anyhow!(error))?;
 
         let server = required_string_arg(&args, "server")?;
         let tool = required_string_arg(&args, "tool")?;
@@ -260,24 +393,83 @@ impl Tool for McpCallTool {
             .get("arguments")
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("missing required `arguments` object"))?;
-        if !arguments.is_object() {
-            return Ok(ToolResult::error("`arguments` must be an object"));
-        }
-
-        let scrubber = SecretScrubber::for_server(&self.registry, &server);
-        let mut result = match self.registry.call_tool(&server, &tool, arguments).await {
-            Ok(result) => result.rendered,
-            Err(err) => {
-                return Ok(ToolResult::error(
-                    scrubber.scrub(&format!("mcp_call_tool failed: {err}")),
-                ))
+        let client = match McpConfiguredClient::for_config(&self.config) {
+            Ok(client) => client,
+            Err(_) => {
+                let outcome = unavailable_outcome(&server, &tool);
+                return Ok(with_outcome(
+                    ToolResult::error("mcp_call_tool failed: TinyMCP module is unavailable"),
+                    &outcome,
+                ));
+            }
+        };
+        let server = match client.normalize_identifier(&server).await {
+            Ok(server) => server,
+            Err(error) => {
+                let outcome = tinymcp_bus::McpCallOutcome::failed(
+                    &server,
+                    &tool,
+                    tinymcp_bus::McpCallError::new(input_module_error_code(error)),
+                );
+                return Ok(with_outcome(
+                    ToolResult::error(input_module_error_message(error)),
+                    &outcome,
+                ));
+            }
+        };
+        let tool = match client.normalize_identifier(&tool).await {
+            Ok(tool) => tool,
+            Err(error) => {
+                let outcome = tinymcp_bus::McpCallOutcome::failed(
+                    &server,
+                    &tool,
+                    tinymcp_bus::McpCallError::new(input_module_error_code(error)),
+                );
+                return Ok(with_outcome(
+                    ToolResult::error(input_module_error_message(error)),
+                    &outcome,
+                ));
+            }
+        };
+        let client_config = host::client_config(&self.config);
+        let arguments = match client.normalize_tool_arguments(Some(arguments)).await {
+            Ok(arguments) => Value::Object(arguments),
+            Err(error) => {
+                let outcome = tinymcp_bus::McpCallOutcome::failed(
+                    &server,
+                    &tool,
+                    tinymcp_bus::McpCallError::new(input_module_error_code(error)),
+                );
+                return Ok(with_outcome(
+                    ToolResult::error(input_module_error_message(error)),
+                    &outcome,
+                ));
+            }
+        };
+        let call: tinymcp_bus::ClassifiedStaticToolCall = match client
+            .call(
+                &client_config,
+                tinymcp_bus::names::methods::STATIC_CALL_TOOL_CLASSIFIED,
+                (server.as_str(), tool.as_str(), arguments),
+            )
+            .await
+        {
+            Ok(call) => call,
+            Err(_) => {
+                let outcome = unavailable_outcome(&server, &tool);
+                return Ok(with_outcome(
+                    ToolResult::error("mcp_call_tool failed: TinyMCP module call failed"),
+                    &outcome,
+                ));
             }
         };
 
-        if options.prefer_markdown && result.markdown_formatted.is_none() {
-            result.markdown_formatted = Some(result.output());
-        }
-        Ok(scrubber.scrub_result(crate::skills::types::tool_result_from_mcp(result)))
+        Ok(classified_result(
+            call,
+            &server,
+            &tool,
+            options.prefer_markdown,
+        ))
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
@@ -286,267 +478,116 @@ impl Tool for McpCallTool {
     }
 }
 
-const REDACTED: &str = "[redacted]";
-const MIN_QUERY_SECRET_LEN: usize = 8;
-const CREDENTIAL_QUERY_PARAM_NEEDLES: [&str; 7] = [
-    "token",
-    "key",
-    "secret",
-    "password",
-    "auth",
-    "sig",
-    "credential",
-];
-
-pub(super) struct SecretScrubber {
-    secrets: Vec<String>,
-    strict: Vec<String>,
+/// Builds the host-policy adapter for the generic MCP call tool.
+pub fn mcp_call_tool(config: Arc<Config>, security: Arc<SecurityPolicy>) -> McpCallTool {
+    McpCallTool::new(config, security)
 }
 
-impl SecretScrubber {
-    fn for_server(registry: &McpServerRegistry, server: &str) -> Self {
-        let Some(definition) = registry.get(server) else {
-            return Self {
-                secrets: Vec::new(),
-                strict: Vec::new(),
-            };
-        };
-        Self::new(&definition.auth, &definition.endpoint)
+pub(super) fn classified_result(
+    call: tinymcp_bus::ClassifiedStaticToolCall,
+    server: &str,
+    tool: &str,
+    prefer_markdown: bool,
+) -> ToolResult {
+    if !call.outcome.ok {
+        let mut result = ToolResult::error(
+            call.error_message
+                .unwrap_or_else(|| "mcp_call_tool failed".to_owned()),
+        );
+        result.metadata = serde_json::to_value(call.outcome).ok();
+        return result;
     }
 
-    pub(super) fn new(auth: &McpDefinitionAuth, endpoint: &str) -> Self {
-        let mut raw: Vec<String> = Vec::new();
-        let mut strict: Vec<String> = Vec::new();
-        if let Ok(url) = url::Url::parse(endpoint) {
-            if !url.username().is_empty() {
-                strict.push(url.username().to_string());
-            }
-            if let Some(password) = url.password() {
-                strict.push(password.to_string());
-            }
-        }
-        match auth {
-            McpDefinitionAuth::BearerToken { token } => raw.push(token.clone()),
-            McpDefinitionAuth::Basic { username, password } => {
-                raw.push(username.clone());
-                raw.push(password.clone());
-                raw.push(
-                    base64::engine::general_purpose::STANDARD
-                        .encode(format!("{username}:{password}")),
-                );
-            }
-            McpDefinitionAuth::Header { value, .. } => raw.push(value.clone()),
-            McpDefinitionAuth::Headers { headers } => {
-                raw.extend(headers.iter().map(|header| header.value.clone()));
-            }
-            McpDefinitionAuth::QueryParam { value, .. } => raw.push(value.clone()),
-            _ => {}
-        }
-        if endpoint_query(endpoint).is_some() {
-            if let Ok(url) = url::Url::parse(endpoint) {
-                strict.extend(url.query_pairs().filter_map(|(name, value)| {
-                    let name = name.to_ascii_lowercase();
-                    let credential_like = CREDENTIAL_QUERY_PARAM_NEEDLES
-                        .iter()
-                        .any(|needle| name.contains(needle));
-                    let value = value.into_owned();
-                    credential_like.then_some(value)
-                }));
-                // Retain the spelling supplied in the endpoint: form decoding turns
-                // '+' into a space, which ordinary URL encoding does not recreate.
-                if let Some(query) = url.query() {
-                    for pair in query.split('&') {
-                        if let Some((name, value)) = pair.split_once('=') {
-                            let decoded_name = url::form_urlencoded::parse(name.as_bytes())
-                                .next()
-                                .map(|(name, _)| name.to_ascii_lowercase())
-                                .unwrap_or_default();
-                            if CREDENTIAL_QUERY_PARAM_NEEDLES
-                                .iter()
-                                .any(|needle| decoded_name.contains(needle))
-                            {
-                                strict.push(value.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    let Some(mut rendered) = call.rendered else {
+        let outcome = tinymcp_bus::McpCallOutcome::failed(
+            server,
+            tool,
+            tinymcp_bus::McpCallError::new(tinymcp_bus::errors::SERIALIZATION),
+        );
+        return with_outcome(ToolResult::error("mcp_call_tool failed"), &outcome);
+    };
 
-        strict.retain(|value| !value.trim().is_empty());
-        let encoded_strict = strict
-            .iter()
-            .map(|value| urlencoding::encode(value).into_owned())
-            .collect::<Vec<_>>();
-        strict.extend(encoded_strict);
-        raw.extend(strict.iter().cloned());
-
-        let mut secrets: Vec<String> = Vec::new();
-        for value in raw {
-            let value = value.trim();
-            if value.is_empty() {
-                continue;
-            }
-            let encoded = urlencoding::encode(value).into_owned();
-            if encoded != value {
-                secrets.push(encoded);
-            }
-            secrets.push(value.to_string());
-        }
-        secrets.sort_by(|a, b| b.len().cmp(&a.len()).then_with(|| a.cmp(b)));
-        secrets.dedup();
-        Self { secrets, strict }
+    let mut result = map_rendered_result(rendered.clone());
+    if prefer_markdown && rendered.markdown_formatted.is_none() {
+        rendered.markdown_formatted = Some(result.output());
+        result.markdown_formatted = rendered.markdown_formatted;
     }
 
-    fn scrub(&self, text: &str) -> String {
-        self.scrub_text(text, true)
-    }
+    result.metadata = call
+        .envelope
+        .and_then(|envelope| serde_json::to_value(envelope).ok())
+        .or_else(|| serde_json::to_value(call.outcome).ok());
+    result
+}
 
-    fn scrub_key(&self, text: &str) -> String {
-        // Object keys carry structure (tool names and JSON schema fields). Keep
-        // short query credentials from matching inside those names while still
-        // removing them when they are the complete key.
-        self.scrub_text(text, false)
-    }
-
-    fn scrub_text(&self, text: &str, redact_short_substrings: bool) -> String {
-        let mut out = text.to_string();
-        for secret in &self.secrets {
-            if secret.len() < MIN_QUERY_SECRET_LEN
-                && (!self.strict.contains(secret) || !redact_short_substrings)
-            {
-                // Short credentials are common words or field-name fragments;
-                // only replace a complete token so unrelated text stays usable.
-                let mut next = String::with_capacity(out.len());
-                let mut cursor = 0;
-                for (start, _) in out.match_indices(secret.as_str()) {
-                    if start < cursor {
-                        continue;
-                    }
-                    let end = start + secret.len();
-                    let word_char = |ch: char| ch.is_alphanumeric() || ch == '_';
-                    let before = out[..start].chars().next_back().is_some_and(word_char);
-                    let after = out[end..].chars().next().is_some_and(word_char);
-                    if !before && !after {
-                        next.push_str(&out[cursor..start]);
-                        next.push_str(REDACTED);
-                        cursor = end;
-                    }
-                }
-                next.push_str(&out[cursor..]);
-                out = next;
-            } else if out.contains(secret.as_str()) {
-                out = out.replace(secret.as_str(), REDACTED);
-            }
-        }
-        out
-    }
-
-    fn scrub_value(&self, value: &mut Value) {
-        match value {
-            Value::String(text) => *text = self.scrub(text),
-            Value::Array(items) => items.iter_mut().for_each(|item| self.scrub_value(item)),
-            Value::Object(map) => {
-                let entries = std::mem::take(map);
-                for (key, mut item) in entries {
-                    self.scrub_value(&mut item);
-                    let base_key = self.scrub_key(&key);
-                    let mut unique_key = base_key.clone();
-                    let mut suffix = 2;
-                    while map.contains_key(&unique_key) {
-                        unique_key = format!("{base_key} ({suffix})");
-                        suffix += 1;
-                    }
-                    map.insert(unique_key, item);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn scrub_result(&self, mut result: ToolResult) -> ToolResult {
-        if self.secrets.is_empty() {
-            return result;
-        }
-        let mut redactions = 0usize;
-        for block in &mut result.content {
-            match block {
-                ToolContent::Text { text } => {
-                    let scrubbed = self.scrub(text);
-                    if scrubbed != *text {
-                        redactions += 1;
-                        *text = scrubbed;
-                    }
-                }
-                ToolContent::Json { data } => {
-                    let before = data.clone();
-                    self.scrub_value(data);
-                    if *data != before {
-                        redactions += 1;
-                    }
-                }
-                _ => {}
-            }
-        }
-        if let Some(markdown) = result.markdown_formatted.as_mut() {
-            let scrubbed = self.scrub(markdown);
-            if scrubbed != *markdown {
-                redactions += 1;
-                *markdown = scrubbed;
-            }
-        }
-        if redactions > 0 {
-            tracing::debug!(
-                redactions,
-                "[mcp] redacted configured secrets from tool output"
-            );
-        }
-        result
+fn map_rendered_result(rendered: tinymcp_bus::McpToolResult) -> ToolResult {
+    ToolResult {
+        content: rendered
+            .content
+            .into_iter()
+            .map(|block| match block {
+                tinymcp_bus::McpToolContent::Text { text } => tinytools::ToolContent::Text { text },
+                tinymcp_bus::McpToolContent::Json { data } => tinytools::ToolContent::Json { data },
+                other => tinytools::ToolContent::Json {
+                    data: serde_json::to_value(other).unwrap_or(Value::Null),
+                },
+            })
+            .collect(),
+        is_error: rendered.is_error,
+        markdown_formatted: rendered.markdown_formatted,
+        ..ToolResult::default()
     }
 }
 
-fn endpoint_query(endpoint: &str) -> Option<&str> {
-    let (_, rest) = endpoint.split_once('?')?;
-    let query = rest.split('#').next().unwrap_or_default();
-    (!query.is_empty()).then_some(query)
+fn unavailable_outcome(server: &str, tool: &str) -> tinymcp_bus::McpCallOutcome {
+    tinymcp_bus::McpCallOutcome::failed(
+        server,
+        tool,
+        tinymcp_bus::McpCallError::new(tinymcp_bus::errors::BUS),
+    )
 }
 
-fn auth_kind(auth: &McpDefinitionAuth) -> &'static str {
-    match auth {
-        McpDefinitionAuth::None => "none",
-        McpDefinitionAuth::BearerToken { .. } => "bearer_token",
-        McpDefinitionAuth::Basic { .. } => "basic",
-        McpDefinitionAuth::Header { .. } => "header",
-        McpDefinitionAuth::Headers { .. } => "headers",
-        McpDefinitionAuth::QueryParam { .. } => "query_param",
-        _ => "unknown",
+pub(super) fn input_module_error_code(error: tinybus::module::ModuleCallError) -> &'static str {
+    use tinybus::module::ModuleCallError;
+    match error {
+        ModuleCallError::Unavailable | ModuleCallError::IncompatibleContract => {
+            tinymcp_bus::errors::BUS
+        }
+        ModuleCallError::TransportFailed => tinymcp_bus::errors::TRANSPORT,
+        ModuleCallError::ModuleFault => tinymcp_bus::errors::BUS,
     }
 }
 
-fn endpoint_without_query(endpoint: &str) -> String {
-    if let Ok(mut url) = url::Url::parse(endpoint) {
-        let _ = url.set_username("");
-        let _ = url.set_password(None);
-        url.set_query(None);
-        url.set_fragment(None);
-        return url.to_string();
+pub(super) fn input_module_error_message(error: tinybus::module::ModuleCallError) -> &'static str {
+    use tinybus::module::ModuleCallError;
+    match error {
+        ModuleCallError::Unavailable => "TinyMCP module is unavailable",
+        ModuleCallError::IncompatibleContract => "TinyMCP contract is incompatible",
+        ModuleCallError::TransportFailed => "TinyMCP transport failed",
+        ModuleCallError::ModuleFault => "TinyMCP execution failed",
     }
-    endpoint
-        .find(['?', '#'])
-        .map_or(endpoint, |cut| &endpoint[..cut])
-        .to_string()
 }
 
+fn with_outcome(mut result: ToolResult, outcome: &tinymcp_bus::McpCallOutcome) -> ToolResult {
+    result.metadata = serde_json::to_value(outcome).ok();
+    result
+}
+
+/// Reads a required identifier without applying MCP-owned normalization.
 fn required_string_arg(args: &Value, key: &str) -> anyhow::Result<String> {
-    let value = args
-        .get(key)
+    let missing = || anyhow::anyhow!("missing required `{key}`");
+    args.get(key)
         .and_then(Value::as_str)
         .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| anyhow::anyhow!("missing required `{key}`"))?;
-    Ok(value.to_string())
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .ok_or_else(missing)
 }
 
 #[cfg(test)]
 #[path = "mcp_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "mcp_target_tests.rs"]
+mod target_tests;

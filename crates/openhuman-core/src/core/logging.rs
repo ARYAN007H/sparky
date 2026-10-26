@@ -186,7 +186,7 @@ fn level_tag(level: &Level) -> &'static str {
     }
 }
 
-/// Shortens a Rust module path (e.g., `openhuman_core::rpc` -> `rpc`).
+/// Shortens a Rust module path (e.g., `openhuman_core::core` -> `core`).
 fn short_target(target: &str) -> &str {
     target.rsplit("::").next().unwrap_or(target)
 }
@@ -253,6 +253,7 @@ pub fn init_for_cli_run(verbose: bool, default_scope: CliLogDefault) {
         let fmt_layer = tracing_subscriber::fmt::layer()
             .with_ansi(use_color)
             .event_format(CleanCliFormat)
+            .with_writer(io::stderr)
             .with_filter(tracing_subscriber::filter::filter_fn(move |meta| {
                 event_matches_file_constraints(meta, &cli_constraints)
             }));

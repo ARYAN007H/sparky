@@ -17,10 +17,10 @@ use super::state_file::{
 };
 use super::types::{AppStateSnapshot, StoredAppState, StoredAppStatePatch};
 use super::LOG_PREFIX;
-use crate::config::rpc as config_rpc;
-use crate::rpc::RpcOutcome;
+use crate::core::runtime::DispatchCtx;
+use crate::core::Outcome;
 use crate::security::credentials::session_support::{
-    load_app_session_profile, session_state_from_profile, session_token_from_profile,
+    load_app_session_profile, session_state_from_profile,
 };
 use log::{debug, warn};
 use serde_json::Value;
@@ -38,12 +38,12 @@ pub(super) fn sanitize_snapshot_user(user: Option<Value>) -> Option<Value> {
     }
 }
 
-pub async fn snapshot() -> Result<RpcOutcome<AppStateSnapshot>, String> {
+pub async fn snapshot(ctx: &DispatchCtx) -> Result<Outcome<AppStateSnapshot>, String> {
     let req_id = SNAPSHOT_REQ_COUNTER.fetch_add(1, Ordering::Relaxed);
     let t_total = Instant::now();
 
     let t_config = Instant::now();
-    let config = config_rpc::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     // Latch corruption recovery from *this* poll's load, not only from boot.
     // `load_config_with_timeout` re-reads config.toml on every snapshot, so a
     // config that becomes corrupt after boot is healed here — carrying a fresh
@@ -68,7 +68,12 @@ pub async fn snapshot() -> Result<RpcOutcome<AppStateSnapshot>, String> {
             .await
             .unwrap_or_else(|e| Err(format!("[app_state] auth profile load task panicked: {e}")))?;
     let mut auth = session_state_from_profile(session_profile.as_ref());
-    let session_token = session_token_from_profile(session_profile.as_ref());
+    let session_token = crate::security::credentials::session_support::session_token_for_config(
+        &config,
+        session_profile.as_ref(),
+    )
+    .ok()
+    .flatten();
     let current_user = sanitize_snapshot_user(auth.user.clone());
     auth.user = current_user.clone();
     let auth_ms = t_auth.elapsed().as_millis();
@@ -117,7 +122,7 @@ pub async fn snapshot() -> Result<RpcOutcome<AppStateSnapshot>, String> {
     let keyring_status = crate::security::keyring_consent::policy::current_status();
     let health = crate::platform::health::snapshot();
 
-    Ok(RpcOutcome::new(
+    Ok(Outcome::new(
         AppStateSnapshot {
             auth,
             session_token,
@@ -136,9 +141,10 @@ pub async fn snapshot() -> Result<RpcOutcome<AppStateSnapshot>, String> {
 }
 
 pub async fn update_local_state(
+    ctx: &DispatchCtx,
     patch: StoredAppStatePatch,
-) -> Result<RpcOutcome<StoredAppState>, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+) -> Result<Outcome<StoredAppState>, String> {
+    let config = ctx.load_config().await?;
     let _guard = APP_STATE_FILE_LOCK.lock();
     let mut current = load_stored_app_state_unlocked(&config)?;
 
@@ -166,7 +172,7 @@ pub async fn update_local_state(
         current.keyring_consent.is_some(),
     );
 
-    Ok(RpcOutcome::new(
+    Ok(Outcome::new(
         current,
         vec!["core local app state updated".to_string()],
     ))

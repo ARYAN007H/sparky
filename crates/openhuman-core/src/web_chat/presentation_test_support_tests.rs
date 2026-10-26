@@ -1,16 +1,4 @@
-use crate::memory::agent::memory_loader::MemoryCitation;
-
-pub fn segment_for_delivery_for_test(text: &str) -> Vec<String> {
-    super::segment_for_delivery(text)
-}
-
-pub fn segment_delay_for_test(segment: &str) -> u64 {
-    super::segment_delay(segment)
-}
-
-pub fn is_structured_content_for_test(text: &str) -> bool {
-    super::is_structured_content(text)
-}
+use crate::web_chat::TurnCitation;
 
 pub async fn deliver_response_for_test(
     client_id: &str,
@@ -18,7 +6,7 @@ pub async fn deliver_response_for_test(
     request_id: &str,
     full_response: &str,
     user_message: &str,
-    citations: &[MemoryCitation],
+    citations: &[TurnCitation],
 ) {
     deliver_response_in_workspace_for_test(
         client_id,
@@ -45,6 +33,7 @@ pub(crate) async fn deliver_response_with_timing_for_test(
     timing: Option<super::super::turn_timing::TurnTimingSnapshot>,
 ) {
     super::deliver_response(
+        &crate::core::runtime::DispatchCtx::ambient(),
         client_id,
         thread_id,
         request_id,
@@ -67,10 +56,11 @@ pub async fn deliver_response_in_workspace_for_test(
     request_id: &str,
     full_response: &str,
     user_message: &str,
-    citations: &[MemoryCitation],
+    citations: &[TurnCitation],
     workspace_dir: Option<&std::path::Path>,
 ) {
     super::deliver_response(
+        &crate::core::runtime::DispatchCtx::ambient(),
         client_id,
         thread_id,
         request_id,

@@ -1,11 +1,11 @@
 //! OpenHuman observer adapter for TinyChannels listener supervision.
 
-use super::super::traits;
 use super::super::Channel;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use std::sync::Arc;
 use tinychannels::runtime::ListenerObserver;
+use tinychannels_bus as traits;
 
 /// Publishes reusable listener lifecycle facts onto OpenHuman's domain bus.
 struct OpenHumanListenerObserver;
@@ -42,7 +42,41 @@ impl ListenerObserver for OpenHumanListenerObserver {
     }
 }
 
-/// Start a TinyChannels listener with OpenHuman observability attached.
+// Adapt host-owned test doubles to the legacy provider supervisor. Production
+// receives supervision facts from the compiled module instead.
+struct LegacyListenerFixture(Arc<dyn Channel>);
+
+#[async_trait::async_trait]
+impl tinychannels::Channel for LegacyListenerFixture {
+    fn name(&self) -> &str {
+        self.0.name()
+    }
+
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v22 still requires the legacy send method on its provider trait"
+    )]
+    async fn send(&self, message: &traits::SendMessage) -> anyhow::Result<()> {
+        self.0.send(message).await
+    }
+
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v22 still requires the legacy listener method for test fixtures"
+    )]
+    async fn listen(
+        &self,
+        tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
+    ) -> anyhow::Result<()> {
+        self.0.listen(tx).await
+    }
+
+    async fn health_check(&self) -> bool {
+        self.0.health_check().await
+    }
+}
+
+/// Start a legacy listener fixture with OpenHuman observability attached.
 pub(crate) fn spawn_supervised_listener(
     channel: Arc<dyn Channel>,
     tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
@@ -51,7 +85,7 @@ pub(crate) fn spawn_supervised_listener(
 ) -> tokio::task::JoinHandle<()> {
     crate::platform::health::bus::register_health_subscriber();
     tinychannels::runtime::spawn_supervised_listener(
-        channel,
+        Arc::new(LegacyListenerFixture(channel)),
         tx,
         initial_backoff_secs,
         max_backoff_secs,

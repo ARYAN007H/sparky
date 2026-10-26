@@ -1,12 +1,11 @@
-//! Tests for [`super::security_for_tool_context`] — the per-tool-call policy
-//! clone that carries a run's `WorkspaceDescriptor` into the filesystem tools.
-//!
-//! Split out of `mod.rs` to keep the module root export-focused. Declared via
-//! `#[path = "mod_tests.rs"] mod tests;` so `super::*` resolves to the
-//! `filesystem` module.
+//! Tests for the per-tool-call policy scoping that carries a run's
+//! `WorkspaceDescriptor` into the filesystem tools
+//! ([`super::gate::security_scoped_to_root`]).
 
-use super::*;
+use super::gate::security_scoped_to_root;
 use crate::security::policy::TrustedAccess;
+use crate::security::SecurityPolicy;
+use crate::tools::implementations::system::security_for_tool_context;
 use std::path::Path;
 use tinyagents_harness::context::{RunConfig, RunContext};
 use tinyagents_harness::tool::ToolExecutionContext;
@@ -194,4 +193,19 @@ fn descriptor_grant_is_read_write_and_additive() {
     let granted = scoped.trusted_roots.last().expect("granted root");
     assert_eq!(granted.path, project.path().to_string_lossy());
     assert_eq!(granted.access, TrustedAccess::ReadWrite);
+}
+
+#[test]
+fn system_and_filesystem_tools_share_workspace_scoped_policy() {
+    let home = tempfile::tempdir().expect("home");
+    let project = tempfile::tempdir().expect("project");
+    let base = policy_rooted_at(home.path());
+    let ctx = tool_context_with_workspace(project.path());
+
+    let system = security_for_tool_context(&base, Some(&ctx), "shell");
+    let filesystem = security_scoped_to_root(&base, project.path());
+
+    assert_eq!(system.action_dir, filesystem.action_dir);
+    assert_eq!(system.trusted_roots, filesystem.trusted_roots);
+    assert_eq!(system.workspace_dir, filesystem.workspace_dir);
 }

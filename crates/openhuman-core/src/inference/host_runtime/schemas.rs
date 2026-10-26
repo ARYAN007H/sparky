@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -7,43 +8,9 @@ struct LocalAiTestConnectionParams {
     url: String,
 }
 
-use crate::config::rpc as config_rpc;
 use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use crate::rpc::RpcOutcome;
-
-/// Params for `inference.agent_chat` and `inference.agent_chat_simple`.
-///
-/// A near-copy of the params in [`crate::agent::schemas`], which
-/// backs the `agent.chat` / `agent.chat_simple` namespace over the same ops.
-/// The two diverge in one field: only this surface accepts a per-call
-/// `inference_url` + `api_key`, because `agent.chat` describes a turn on the
-/// account's own configured inference.
-#[derive(Debug, Deserialize)]
-struct AgentChatParams {
-    message: String,
-    model_override: Option<String>,
-    temperature: Option<f64>,
-    thread_id: Option<String>,
-    /// Which agent definition to run the turn as. Absent runs the
-    /// orchestrator, as before. Resolved through the definition registry and
-    /// then `config.agent_registry.entries`; an unknown id is an error.
-    #[serde(default)]
-    agent_id: Option<String>,
-    /// Optional per-turn working directory for the agent's filesystem / shell
-    /// tools. Absent or empty keeps the configured `action_dir`. Ignored by the
-    /// `*_simple` variant, which runs a bare provider call with no tools.
-    cwd: Option<String>,
-    /// OpenAI-compatible endpoint this one call should run against. Paired with
-    /// `api_key`; either alone is ignored. See
-    /// [`ephemeral_route`](crate::config::schema::ephemeral_route).
-    #[serde(default)]
-    inference_url: Option<String>,
-    /// Bearer for `inference_url`. Never persisted and never handed to any
-    /// other provider.
-    #[serde(default)]
-    api_key: Option<String>,
-}
 
 #[derive(Debug, Deserialize)]
 struct LocalAiTranscribeParams {
@@ -62,48 +29,17 @@ struct LocalAiTtsParams {
     output_path: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct LocalAiDownloadAssetParams {
-    capability: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct LocalAiInstallPiperParams {
-    /// Optional Piper voice id (e.g. `en_US-lessac-medium`). Defaults to
-    /// the bundled US-English Lessac voice.
-    #[serde(default)]
-    voice_id: Option<String>,
-    /// When true, blow away any existing voice file and re-download.
-    #[serde(default)]
-    force: Option<bool>,
-}
-
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
     vec![
-        schemas("agent_chat"),
-        schemas("agent_chat_simple"),
         schemas("transcribe"),
         schemas("transcribe_bytes"),
         schemas("tts"),
-        schemas("assets_status"),
-        schemas("downloads_progress"),
-        schemas("download_asset"),
-        schemas("install_piper"),
-        schemas("piper_install_status"),
         schemas("test_connection"),
     ]
 }
 
 pub fn all_registered_controllers() -> Vec<RegisteredController> {
     vec![
-        RegisteredController {
-            schema: schemas("agent_chat"),
-            handler: handle_agent_chat,
-        },
-        RegisteredController {
-            schema: schemas("agent_chat_simple"),
-            handler: handle_agent_chat_simple,
-        },
         RegisteredController {
             schema: schemas("transcribe"),
             handler: handle_local_ai_transcribe,
@@ -117,26 +53,6 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
             handler: handle_local_ai_tts,
         },
         RegisteredController {
-            schema: schemas("assets_status"),
-            handler: handle_local_ai_assets_status,
-        },
-        RegisteredController {
-            schema: schemas("downloads_progress"),
-            handler: handle_local_ai_downloads_progress,
-        },
-        RegisteredController {
-            schema: schemas("download_asset"),
-            handler: handle_local_ai_download_asset,
-        },
-        RegisteredController {
-            schema: schemas("install_piper"),
-            handler: handle_local_ai_install_piper,
-        },
-        RegisteredController {
-            schema: schemas("piper_install_status"),
-            handler: handle_local_ai_piper_install_status,
-        },
-        RegisteredController {
             schema: schemas("test_connection"),
             handler: handle_local_ai_test_connection,
         },
@@ -145,57 +61,6 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
 
 pub fn schemas(function: &str) -> ControllerSchema {
     match function {
-        "agent_chat" => ControllerSchema {
-            namespace: "inference",
-            function: "agent_chat",
-            description: "Run one-shot agent chat with optional model overrides.",
-            inputs: vec![
-                required_string("message", "User message."),
-                optional_string("model_override", "Optional model override."),
-                optional_f64("temperature", "Optional temperature override."),
-                optional_string(
-                    "thread_id",
-                    "Optional backend thread id for cache grouping and inference logs.",
-                ),
-                optional_string(
-                    "agent_id",
-                    "Optional agent definition id to run the turn as. Omit for the \
-                     orchestrator.",
-                ),
-                optional_string(
-                    "cwd",
-                    "Optional working directory for this turn: the agent's file and shell \
-                     tools are rooted here, so relative paths resolve inside it. Must be an \
-                     existing directory. Omit (or pass empty) to use the configured action_dir.",
-                ),
-                optional_string(
-                    "inference_url",
-                    "Optional OpenAI-compatible endpoint for this call only. \
-                     Requires api_key; never persisted.",
-                ),
-                optional_string(
-                    "api_key",
-                    "Bearer for inference_url. Scoped to this call and to that \
-                     endpoint alone.",
-                ),
-            ],
-            outputs: vec![json_output("response", "Agent response payload.")],
-        },
-        "agent_chat_simple" => ControllerSchema {
-            namespace: "inference",
-            function: "agent_chat_simple",
-            description: "Run one-shot lightweight provider chat.",
-            inputs: vec![
-                required_string("message", "User message."),
-                optional_string("model_override", "Optional model override."),
-                optional_f64("temperature", "Optional temperature override."),
-                optional_string(
-                    "thread_id",
-                    "Optional backend thread id for cache grouping and inference logs.",
-                ),
-            ],
-            outputs: vec![json_output("response", "Agent response payload.")],
-        },
         "transcribe" => ControllerSchema {
             namespace: "inference",
             function: "transcribe",
@@ -228,50 +93,6 @@ pub fn schemas(function: &str) -> ControllerSchema {
             ],
             outputs: vec![json_output("tts", "TTS result payload.")],
         },
-        "assets_status" => ControllerSchema {
-            namespace: "inference",
-            function: "assets_status",
-            description: "Get local AI asset installation status.",
-            inputs: vec![],
-            outputs: vec![json_output("status", "Assets status payload.")],
-        },
-        "downloads_progress" => ControllerSchema {
-            namespace: "inference",
-            function: "downloads_progress",
-            description: "Get local AI download progress.",
-            inputs: vec![],
-            outputs: vec![json_output("progress", "Download progress payload.")],
-        },
-        "download_asset" => ControllerSchema {
-            namespace: "inference",
-            function: "download_asset",
-            description: "Trigger download for one local AI asset capability.",
-            inputs: vec![required_string("capability", "Asset capability id.")],
-            outputs: vec![json_output("status", "Assets status payload.")],
-        },
-        "install_piper" => ControllerSchema {
-            namespace: "inference",
-            function: "install_piper",
-            description: "Download the Piper binary archive and the bundled en_US-lessac-medium voice files into the workspace.",
-            inputs: vec![
-                optional_string(
-                    "voice_id",
-                    "Piper voice id (e.g. en_US-lessac-medium). Defaults to en_US-lessac-medium.",
-                ),
-                optional_bool(
-                    "force",
-                    "When true, re-download even if the workspace already has the voice files.",
-                ),
-            ],
-            outputs: vec![json_output("status", "Piper install status payload.")],
-        },
-        "piper_install_status" => ControllerSchema {
-            namespace: "inference",
-            function: "piper_install_status",
-            description: "Query the Piper install state (missing / installing / installed / broken / error) plus per-stage download progress.",
-            inputs: vec![],
-            outputs: vec![json_output("status", "Piper install status payload.")],
-        },
         "test_connection" => ControllerSchema {
             namespace: "inference",
             function: "test_connection",
@@ -294,53 +115,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_agent_chat(params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
-        let p = deserialize_params::<AgentChatParams>(params)?;
-        let mut config = config_rpc::load_config_with_timeout().await?;
-        let target = match p.agent_id.as_deref().map(str::trim) {
-            Some(id) if !id.is_empty() => {
-                crate::inference::host_runtime::ops::AgentChatTarget::AgentId(id)
-            }
-            _ => crate::inference::host_runtime::ops::AgentChatTarget::Orchestrator,
-        };
-        to_json(
-            crate::inference::host_runtime::ops::agent_chat_for(
-                &mut config,
-                target,
-                &p.message,
-                p.model_override,
-                p.temperature,
-                p.thread_id,
-                p.cwd,
-                crate::config::schema::EphemeralRoute::from_params(p.inference_url, p.api_key),
-            )
-            .await?,
-        )
-    })
-}
-
-fn handle_agent_chat_simple(params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
-        let p = deserialize_params::<AgentChatParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
-        to_json(
-            crate::inference::host_runtime::ops::agent_chat_simple(
-                &config,
-                &p.message,
-                p.model_override,
-                p.temperature,
-                p.thread_id,
-            )
-            .await?,
-        )
-    })
-}
-
-fn handle_local_ai_transcribe(params: Map<String, Value>) -> ControllerFuture {
+fn handle_local_ai_transcribe(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<LocalAiTranscribeParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(
             crate::inference::host_runtime::ops::local_ai_transcribe(&config, p.audio_path.trim())
                 .await?,
@@ -348,10 +126,13 @@ fn handle_local_ai_transcribe(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_local_ai_transcribe_bytes(params: Map<String, Value>) -> ControllerFuture {
+fn handle_local_ai_transcribe_bytes(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<LocalAiTranscribeBytesParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(
             crate::inference::host_runtime::ops::local_ai_transcribe_bytes(
                 &config,
@@ -363,10 +144,10 @@ fn handle_local_ai_transcribe_bytes(params: Map<String, Value>) -> ControllerFut
     })
 }
 
-fn handle_local_ai_tts(params: Map<String, Value>) -> ControllerFuture {
+fn handle_local_ai_tts(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<LocalAiTtsParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(
             crate::inference::host_runtime::ops::local_ai_tts(
                 &config,
@@ -378,109 +159,14 @@ fn handle_local_ai_tts(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_local_ai_assets_status(_params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
-        to_json(crate::inference::host_runtime::ops::local_ai_assets_status(&config).await?)
-    })
-}
-
-fn handle_local_ai_downloads_progress(_params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
-        to_json(crate::inference::host_runtime::ops::local_ai_downloads_progress(&config).await?)
-    })
-}
-
-fn handle_local_ai_download_asset(params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
-        let p = deserialize_params::<LocalAiDownloadAssetParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
-        to_json(
-            crate::inference::host_runtime::ops::local_ai_download_asset(
-                &config,
-                p.capability.trim(),
-            )
-            .await?,
-        )
-    })
-}
-
-// The install RPCs are intentionally fire-and-forget: a binary+model
-// download can take minutes (1.6 GB GGML model, ~5 MB Piper binary
-// archive) but the core JSON-RPC client times out at
-// VITE_CORE_RPC_TIMEOUT_MS (default 30s). Blocking the handler on the
-// full download would force the UI into a retry loop that deletes the
-// in-flight .part on each retry, looping forever.
-//
-// Shape: mark the engine as `installing(0%)` in the shared status table,
-// spawn the real install on a background tokio task, return the
-// just-written status immediately. The UI's status-polling RPC
-// (handle_local_ai_*_install_status) reads from the same table and
-// renders real-time progress. The eventual `installed` / `error`
-// transition lands on the table when the background task finishes;
-// no caller awaits it.
-
-fn handle_local_ai_install_piper(params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
-        let p = deserialize_params::<LocalAiInstallPiperParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
-        let force = p.force.unwrap_or(false);
-
-        tinyinference_local::download::write_status(
-            tinyinference_local::download::VoiceInstallStatus {
-                engine: tinyinference_local::download::ENGINE_PIPER.to_string(),
-                state: tinyinference_local::download::VoiceInstallState::Installing,
-                progress: Some(0),
-                downloaded_bytes: None,
-                total_bytes: None,
-                stage: Some("queued".to_string()),
-                error_detail: None,
-            },
-        );
-
-        tracing::debug!(
-            voice_id = ?p.voice_id,
-            force,
-            "[voice-install:piper] spawning background install"
-        );
-        let voice_id = p.voice_id.clone();
-        tokio::spawn(async move {
-            let runtime = crate::inference::local_runtime_config(&config);
-            let install = tinyinference_local::piper::PiperInstall::new(
-                tinyinference_local::service::paths::workspace_piper_dir(&runtime),
-            );
-            if let Err(e) =
-                tinyinference_local::piper::install_piper(&install, voice_id, force).await
-            {
-                log::warn!("[voice-install:piper] background install failed: {e}");
-            }
-        });
-
-        let status =
-            tinyinference_local::download::read_status(tinyinference_local::download::ENGINE_PIPER);
-        serde_json::to_value(status).map_err(|e| format!("serialize piper status: {e}"))
-    })
-}
-
-fn handle_local_ai_test_connection(params: Map<String, Value>) -> ControllerFuture {
+fn handle_local_ai_test_connection(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<LocalAiTestConnectionParams>(params)?;
         let result = tinyinference_local::service::test_ollama_connection(&p.url).await?;
         serde_json::to_value(result).map_err(|e| format!("serialize test_connection result: {e}"))
-    })
-}
-
-fn handle_local_ai_piper_install_status(_params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
-        let runtime = crate::inference::local_runtime_config(&config);
-        let install = tinyinference_local::piper::PiperInstall::new(
-            tinyinference_local::service::paths::workspace_piper_dir(&runtime),
-        );
-        let voice_id = tinyinference_local::models::effective_tts_voice_id(&config);
-        let status = tinyinference_local::piper::status(&install, &voice_id);
-        serde_json::to_value(status).map_err(|e| format!("serialize piper status: {e}"))
     })
 }
 
@@ -506,28 +192,10 @@ fn optional_string(name: &'static str, comment: &'static str) -> FieldSchema {
     }
 }
 
-fn optional_bool(name: &'static str, comment: &'static str) -> FieldSchema {
-    FieldSchema {
-        name,
-        ty: TypeSchema::Option(Box::new(TypeSchema::Bool)),
-        comment,
-        required: false,
-    }
-}
-
 fn optional_f64(name: &'static str, comment: &'static str) -> FieldSchema {
     FieldSchema {
         name,
         ty: TypeSchema::Option(Box::new(TypeSchema::F64)),
-        comment,
-        required: false,
-    }
-}
-
-fn optional_u64(name: &'static str, comment: &'static str) -> FieldSchema {
-    FieldSchema {
-        name,
-        ty: TypeSchema::Option(Box::new(TypeSchema::U64)),
         comment,
         required: false,
     }
@@ -542,7 +210,7 @@ fn json_output(name: &'static str, comment: &'static str) -> FieldSchema {
     }
 }
 
-fn to_json<T: serde::Serialize>(outcome: RpcOutcome<T>) -> Result<Value, String> {
+fn to_json<T: serde::Serialize>(outcome: Outcome<T>) -> Result<Value, String> {
     outcome.into_cli_compatible_json()
 }
 

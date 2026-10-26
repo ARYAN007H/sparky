@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 
 import { bootAuthenticatedPage, waitForAppReady } from '../helpers/core-rpc';
 
-test.describe('Local model runtime flow', () => {
-  test('shows direct-runtime guidance instead of app-managed bootstrap controls', async ({
+test.describe('Local model runtime route', () => {
+  test('redirects the retired local-model-debug route to the Connections LLM tab', async ({
     page,
   }) => {
     await bootAuthenticatedPage(page, 'pw-local-model-runtime');
@@ -15,5 +15,8 @@ test.describe('Local model runtime flow', () => {
     await expect
       .poll(async () => page.evaluate(() => window.location.hash))
       .toContain('/connections');
+    const settledHash = await page.evaluate(() => window.location.hash);
+    expect(settledHash).not.toContain('local-model-debug');
+    await expect(page.getByText('Runtime Status')).toHaveCount(0);
   });
 });

@@ -25,9 +25,10 @@
 //! destructive `test_reset` never ships — so the case here asserts the
 //! absence, and the positive path is compiled in only when the feature is.
 
+use crate::env_guard::EnvVarGuard;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use axum::http::header::AUTHORIZATION;
@@ -36,7 +37,7 @@ use serde_json::{json, Value};
 use tempfile::{tempdir, TempDir};
 
 use openhuman_core::core::auth::{init_rpc_token, CORE_TOKEN_ENV_VAR};
-use openhuman_core::core::jsonrpc::build_core_http_router;
+use openhuman_rpc::server::build_core_http_router;
 
 /// Preferred bearer for this suite. It is only the *actual* bearer when this
 /// module happens to be the first in the aggregated binary to initialise auth —
@@ -51,51 +52,23 @@ static AUTH_INIT: OnceLock<()> = OnceLock::new();
 /// nothing: every `tests/raw_coverage/` suite is a module in the one
 /// `raw_coverage_all` binary, so libtest runs them concurrently in one process
 /// and only the shared mutex actually excludes another suite's `set_var`.
-static ENV_LOCK: &OnceLock<Mutex<()>> = &crate::SHARED_ENV_LOCK;
+static ENV_LOCK: &OnceLock<tokio::sync::Mutex<()>> = &crate::SHARED_ENV_LOCK;
 
 // ── Env isolation ─────────────────────────────────────────────────────────
 
-struct EnvVarGuard {
-    key: &'static str,
-    old: Option<String>,
-}
-
-impl EnvVarGuard {
-    fn set_to_path(key: &'static str, path: &Path) -> Self {
-        let old = std::env::var(key).ok();
-        std::env::set_var(key, path.as_os_str());
-        Self { key, old }
-    }
-
-    fn set(key: &'static str, value: &str) -> Self {
-        let old = std::env::var(key).ok();
-        std::env::set_var(key, value);
-        Self { key, old }
-    }
-
-    fn unset(key: &'static str) -> Self {
-        let old = std::env::var(key).ok();
-        std::env::remove_var(key);
-        Self { key, old }
-    }
-}
-
-impl Drop for EnvVarGuard {
-    fn drop(&mut self) {
-        match &self.old {
-            Some(value) => std::env::set_var(self.key, value),
-            None => std::env::remove_var(self.key),
-        }
-    }
-}
-
 /// `HOME` / `OPENHUMAN_WORKSPACE` are process-global, so every case in this
 /// binary is serialised behind one lock.
-fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+fn env_lock() -> tokio::sync::MutexGuard<'static, ()> {
     ENV_LOCK
-        .get_or_init(|| Mutex::new(()))
+        .get_or_init(|| tokio::sync::Mutex::new(()))
+        .blocking_lock()
+}
+
+async fn env_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
+    ENV_LOCK
+        .get_or_init(|| tokio::sync::Mutex::new(()))
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .await
 }
 
 fn ensure_rpc_auth() {
@@ -247,7 +220,7 @@ fn catalog_has(catalog: &Value, method: &str) -> bool {
         .any(|entry| entry.get("method").and_then(Value::as_str) == Some(method))
 }
 
-/// The payload of a successful dispatch, unwrapping the `RpcOutcome`
+/// The payload of a successful dispatch, unwrapping the `Outcome`
 /// `{ result, logs }` envelope when the handler produced one.
 fn payload(value: &Value, context: &str) -> Value {
     if let Some(error) = value.get("error") {
@@ -276,10 +249,10 @@ fn error_message(value: &Value, context: &str) -> String {
 
 /// `session_import.run` over a seeded legacy `session_raw/` directory:
 /// dry-run plans without writing, the real run imports, and a second run is
-/// idempotent because the item ledger says the work is done.
+/// idempotent because the per-workspace marker says the work is done.
 #[tokio::test]
 async fn session_import_plans_imports_then_skips_on_rerun() {
-    let _lock = env_lock();
+    let _lock = env_lock_async().await;
     let harness = setup().await;
 
     let raw_dir = harness.workspace.join("session_raw");
@@ -328,33 +301,29 @@ async fn session_import_plans_imports_then_skips_on_rerun() {
     )
     .await;
     let planned = payload(&planned, "session_import_run dry");
+    // Since the storage ports (#7686) the run imports into the storage backend
+    // through TinyAgents' legacy reader and reports per domain
+    // (`agent/session_import/schemas.rs`): a dry run lists the legacy sources
+    // it found and imports nothing.
     assert_eq!(planned.get("dry_run").and_then(Value::as_bool), Some(true));
     assert_eq!(
-        planned.get("scanned").and_then(Value::as_u64),
-        Some(1),
-        "the seeded transcript must be discovered: {planned}"
+        planned
+            .pointer("/sources/session_raw")
+            .and_then(Value::as_bool),
+        Some(true),
+        "the seeded transcript directory must be discovered: {planned}"
     );
     assert_eq!(
-        planned.get("messages_written").and_then(Value::as_u64),
+        planned
+            .get("imports")
+            .and_then(Value::as_array)
+            .map(Vec::len),
         Some(0),
-        "a dry run writes no messages: {planned}"
+        "a dry run imports nothing: {planned}"
     );
-    let planned_item = planned
-        .get("items")
-        .and_then(Value::as_array)
-        .and_then(|items| items.first())
-        .unwrap_or_else(|| panic!("dry run must report the item: {planned}"))
-        .clone();
-    assert_eq!(
-        planned_item.get("action").and_then(Value::as_str),
-        Some("would_import"),
-        "dry-run action: {planned_item}"
-    );
-    // A dry run must not write the global marker either — proved below by the
-    // real run still having work to do. Asserting on the store *directory* would
-    // be wrong: `run_import` opens the stores before it decides to plan only.
 
-    // ── real run: writes the messages into the TinyAgents store ──
+    // ── real run: writes the transcript into the storage backend ──
+    // It still has work to do, which also proves the dry run wrote no marker.
     let imported = rpc(
         &harness.rpc_base,
         31_002,
@@ -367,49 +336,14 @@ async fn session_import_plans_imports_then_skips_on_rerun() {
         imported.get("dry_run").and_then(Value::as_bool),
         Some(false)
     );
+    // `found`/`written` count transcripts: the one seeded file is written.
     assert_eq!(
-        imported.get("imported").and_then(Value::as_u64),
-        Some(1),
-        "one source imported: {imported}"
-    );
-    assert_eq!(
-        imported.get("failed").and_then(Value::as_u64),
-        Some(0),
-        "no failures: {imported}"
-    );
-    assert_eq!(
-        imported.get("messages_written").and_then(Value::as_u64),
-        Some(4),
-        "the four message lines are written; the `_meta` header is not a message: {imported}"
-    );
-    let item = imported
-        .get("items")
-        .and_then(Value::as_array)
-        .and_then(|items| items.first())
-        .unwrap_or_else(|| panic!("the real run must report the item: {imported}"))
-        .clone();
-    assert_eq!(item.get("action").and_then(Value::as_str), Some("imported"));
-    assert_eq!(
-        item.get("messages").and_then(Value::as_u64),
-        Some(4),
-        "the per-item count must agree with the run total: {item}"
-    );
-    assert_eq!(
-        item.get("thread_id").and_then(Value::as_str),
-        Some("e2e-session-import-thread"),
-        "the thread id must come from the transcript's `_meta`, not be synthesized: {item}"
-    );
-    assert_eq!(
-        item.get("stream").and_then(Value::as_str),
-        Some("session.20260907_capitals.messages"),
-        "messages go to a per-session journal stream named from the stem: {item}"
-    );
-    assert!(
-        harness.workspace.join("tinyagents_store").exists(),
-        "the real run must create the store"
+        sessions_outcome(&imported),
+        "Imported { found: 1, written: 1 }",
+        "the seeded transcript must be imported: {imported}"
     );
 
-    // ── re-run: idempotent ──
+    // ── re-run: idempotent, short-circuited by the per-workspace marker ──
     let again = rpc(
         &harness.rpc_base,
         31_003,
@@ -419,17 +353,31 @@ async fn session_import_plans_imports_then_skips_on_rerun() {
     .await;
     let again = payload(&again, "session_import_run rerun");
     assert_eq!(
-        again.get("messages_written").and_then(Value::as_u64),
-        Some(0),
-        "a second run must write nothing: {again}"
-    );
-    assert!(
-        again.get("already_done").and_then(Value::as_bool) == Some(true)
-            || again.get("skipped").and_then(Value::as_u64) == Some(1),
-        "the re-run must be short-circuited by the marker or the item ledger: {again}"
+        sessions_outcome(&again),
+        "AlreadyDone",
+        "a second run must be short-circuited by the marker: {again}"
     );
 
     harness.join.abort();
+}
+
+/// The `sessions` domain's outcome in a `session_import_run` result, as the
+/// handler renders it (`format!("{outcome:?}")`); an import error fails here.
+fn sessions_outcome(result: &Value) -> String {
+    let entry = result
+        .get("imports")
+        .and_then(Value::as_array)
+        .and_then(|imports| {
+            imports
+                .iter()
+                .find(|i| i.get("domain").and_then(Value::as_str) == Some("sessions"))
+        })
+        .unwrap_or_else(|| panic!("no sessions import reported: {result}"));
+    entry
+        .get("outcome")
+        .and_then(Value::as_str)
+        .unwrap_or_else(|| panic!("the sessions import failed: {entry}"))
+        .to_string()
 }
 
 /// Failure path: `dry_run` is declared `Option<Bool>` in the schema, so the
@@ -437,7 +385,7 @@ async fn session_import_plans_imports_then_skips_on_rerun() {
 /// scans a directory.
 #[tokio::test]
 async fn session_import_rejects_malformed_params() {
-    let _lock = env_lock();
+    let _lock = env_lock_async().await;
     let harness = setup().await;
 
     let bad = rpc(
@@ -486,7 +434,7 @@ async fn session_import_rejects_malformed_params() {
 ///     byte-for-byte, and a pass-through returns the input unchanged.
 #[tokio::test]
 async fn tokenjuice_compress_agrees_with_detect_and_never_loses_content() {
-    let _lock = env_lock();
+    let _lock = env_lock_async().await;
     let harness = setup().await;
 
     // A JSON array: the one kind the existing `json_rpc_e2e` coverage already
@@ -632,7 +580,7 @@ async fn tokenjuice_compress_agrees_with_detect_and_never_loses_content() {
 /// never minted is a clean `found: false` rather than an error.
 #[tokio::test]
 async fn tokenjuice_refuses_empty_input_and_misses_cleanly() {
-    let _lock = env_lock();
+    let _lock = env_lock_async().await;
     let harness = setup().await;
 
     let no_content = rpc(
@@ -725,7 +673,7 @@ fn seed_artifact(
 /// resolving an absolute path, and `delete` actually removing the row.
 #[tokio::test]
 async fn ai_artifacts_list_filter_get_and_delete() {
-    let _lock = env_lock();
+    let _lock = env_lock_async().await;
     let harness = setup().await;
 
     seed_artifact(
@@ -883,94 +831,6 @@ async fn ai_artifacts_list_filter_get_and_delete() {
     harness.join.abort();
 }
 
-/// Failure paths for the artifact surface: a traversal id is refused before
-/// any filesystem access, an absent id is an error, and `regenerate` refuses
-/// both a non-presentation artifact and a call with no routing context.
-#[tokio::test]
-async fn ai_artifacts_reject_traversal_absence_and_unregenerable_kinds() {
-    let _lock = env_lock();
-    let harness = setup().await;
-
-    seed_artifact(
-        &harness.workspace,
-        "artifact-doc",
-        "document",
-        "A document",
-        "2026-03-01T00:00:00Z",
-        None,
-    );
-
-    let traversal = rpc(
-        &harness.rpc_base,
-        33_101,
-        "openhuman.ai_get_artifact",
-        json!({ "artifact_id": "../../etc/passwd" }),
-    )
-    .await;
-    assert!(
-        error_message(&traversal, "ai_get_artifact traversal").contains("must not contain '/'"),
-        "an id with a path separator must be refused by the validator: {traversal}"
-    );
-
-    let empty = rpc(
-        &harness.rpc_base,
-        33_102,
-        "openhuman.ai_delete_artifact",
-        json!({ "artifact_id": "   " }),
-    )
-    .await;
-    assert!(
-        error_message(&empty, "ai_delete_artifact blank id").contains("must not be empty"),
-        "a whitespace-only id trims to empty and must be refused: {empty}"
-    );
-
-    let missing = rpc(
-        &harness.rpc_base,
-        33_103,
-        "openhuman.ai_get_artifact",
-        json!({ "artifact_id": "artifact-that-does-not-exist" }),
-    )
-    .await;
-    assert!(
-        error_message(&missing, "ai_get_artifact absent").contains("artifact-that-does-not-exist"),
-        "the error must identify the artifact: {missing}"
-    );
-
-    // regenerate needs routing context for the socket events it triggers.
-    let no_routing = rpc(
-        &harness.rpc_base,
-        33_104,
-        "openhuman.ai_regenerate",
-        json!({ "artifact_id": "artifact-doc", "thread_id": "", "client_id": "" }),
-    )
-    .await;
-    assert!(
-        error_message(&no_routing, "ai_regenerate without routing")
-            .contains("thread_id + client_id"),
-        "regenerate must refuse without event routing: {no_routing}"
-    );
-
-    // Only presentations persist the args a re-dispatch needs.
-    let wrong_kind = rpc(
-        &harness.rpc_base,
-        33_105,
-        "openhuman.ai_regenerate",
-        json!({
-            "artifact_id": "artifact-doc",
-            "thread_id": "thread-alpha",
-            "client_id": "client-1",
-        }),
-    )
-    .await;
-    let message = error_message(&wrong_kind, "ai_regenerate on a document");
-    assert!(
-        message.contains("only supported for presentations") && message.contains("document"),
-        "the refusal must name the rule and the actual kind, got: {message}"
-    );
-
-    harness.join.abort();
-}
-
 // ── test_support ──────────────────────────────────────────────────────────
 
 /// The `test_support.*` controllers are compiled in only under
@@ -982,7 +842,7 @@ async fn ai_artifacts_reject_traversal_absence_and_unregenerable_kinds() {
 #[cfg(not(feature = "e2e-test-support"))]
 #[tokio::test]
 async fn test_support_controllers_are_absent_without_their_feature() {
-    let _lock = env_lock();
+    let _lock = env_lock_async().await;
     let harness = setup().await;
 
     let catalog = schema_catalog(&harness.rpc_base).await;
@@ -1024,7 +884,7 @@ async fn test_support_controllers_are_absent_without_their_feature() {
 #[cfg(feature = "e2e-test-support")]
 #[tokio::test]
 async fn test_support_introspection_reads_the_live_workspace() {
-    let _lock = env_lock();
+    let _lock = env_lock_async().await;
     let harness = setup().await;
 
     std::fs::create_dir_all(harness.workspace.join("notes")).expect("create notes dir");

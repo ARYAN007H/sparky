@@ -357,16 +357,16 @@ export const SETTINGS_ROUTE_REGISTRY: SettingsRegistryEntry[] = [
     titleKey: 'pages.settings.ai.voice',
     descriptionKey: 'pages.settings.ai.voiceDesc',
     section: 'ai',
-    searchKeywords: ['tts', 'stt', 'speech', 'dictation', 'audio'],
+    searchKeywords: ['tts', 'stt', 'speech', 'audio'],
     // Surfaced on the Connections page (Intelligence group); route kept for
     // deep-link compatibility but no longer in the settings sidebar.
   },
   {
     // usage: merged Usage & Limits surface — cost dashboard, Tokenjuice token
     // savings (formerly the standalone token-usage page), and background loops
-    // (formerly heartbeat / ledger-usage). Surfaced on the Connections page
+    // (formerly ledger-usage). Surfaced on the Connections page
     // (API-keys group); the route redirects there and it's no longer in the
-    // settings sidebar. Legacy heartbeat / ledger-usage / cost-dashboard /
+    // settings sidebar. Legacy ledger-usage / cost-dashboard /
     // token-usage slugs redirect here.
     id: 'usage',
     titleKey: 'settings.usage.title',
@@ -380,7 +380,6 @@ export const SETTINGS_ROUTE_REGISTRY: SettingsRegistryEntry[] = [
       'ledger',
       'cost',
       'spend',
-      'heartbeat',
       'loops',
       'background',
     ],
@@ -479,7 +478,7 @@ export const SETTINGS_ROUTE_REGISTRY: SettingsRegistryEntry[] = [
   // These live ONLY under Settings → Developer & Diagnostics.
   // Items removed from this list compared to the old DeveloperOptionsPanel:
   //   agents, autonomy, agent-access, sandbox-settings, activity-level,
-  //   tools, voice, embeddings, heartbeat,
+  //   tools, voice, embeddings,
   //   ledger-usage, cost-dashboard, task-sources, composio-routing,
   //   webhooks-triggers, migration, security
   //   (all moved to their canonical section pages).
@@ -495,8 +494,10 @@ export const SETTINGS_ROUTE_REGISTRY: SettingsRegistryEntry[] = [
     devOnly: true,
     searchKeywords: ['developer', 'diagnostics', 'debug'],
   },
+  // memory-engine / memory-data / memory-debug are redirects to the Memory
+  // page's chips (Connections → Memory); they have no settings panel.
   // Knowledge & Memory group retired entirely — memory surfaces live on the
-  // Brain page (graph / goals / sources / sync / subconscious).
+  // Memory page (engine / ask / learnings / conversations / documents / context).
   // voice-debug retired from the settings UI.
   {
     id: 'event-log',
@@ -521,13 +522,14 @@ export const SETTINGS_ROUTE_REGISTRY: SettingsRegistryEntry[] = [
   // dev-workflow (the cron-based GitHub dev-automation panel) was retired —
   // superseded by first-level Workflows (/flows) and the skills workflow runner.
   // Composio trigger-triage config merged into the Connections Composio page.
-  // Agent Chat + Local Model Debug are now chips on the Connections → LLM page.
+  // Agent Chat is a chip on the Connections → LLM page; the retired
+  // local-model-debug slug redirects there (settingsRouteElements.tsx).
   // skills-runner moved to Connections → Skills → Runner; the slug redirects.
   // The dev-only "Build / version info" alias was removed: it opened the same
   // About page, so dev builds listed two sidebar entries for one page. About's
   // search keywords already cover "build" and "version".
 
-  // Token & Cost (TokenJuice compression settings + savings) is now the
+  // Token savings (TokenJuice compression settings + savings) is now the
   // "Token savings" tab of the merged Usage & limits surface on Connections —
   // the standalone token-usage entry was retired (route redirects there).
 

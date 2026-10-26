@@ -2,14 +2,15 @@
 //! `/auth/integrations*`) on the SDK's typed `auth()` client.
 //!
 //! RPC names (`openhuman.auth_oauth_connect`, `auth_oauth_list_integrations`,
-//! `auth_oauth_fetch_integration_tokens`, `auth_oauth_revoke_integration`) are
-//! unchanged wire contracts. They share the `auth` namespace with the core's
-//! credential controllers, which stay in the core.
+//! `auth_oauth_fetch_integration_tokens`, `auth_oauth_revoke_integration`,
+//! `auth_oauth_fetch_client_key`) are unchanged wire contracts. They share the
+//! `auth` namespace with the core's credential controllers, which stay in the
+//! core.
 //!
-//! `auth_oauth_fetch_client_key` is **not** here: its route
-//! (`POST /auth/integrations/{id}/client-key`) has no SDK method and is absent
-//! from the SDK's public-route registry, so it stays on the core's pre-SDK path
-//! until the route is added upstream.
+//! `auth_oauth_fetch_client_key`'s route
+//! (`POST /auth/integrations/{id}/client-key`) has no typed SDK method and is
+//! absent from the backend's published contract, so it rides the SDK's raw
+//! request primitive.
 
 mod handoff;
 mod ops;

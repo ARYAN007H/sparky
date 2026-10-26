@@ -18,8 +18,8 @@ use tinyhumans_sdk::api::payments::{
 };
 use tinyhumans_sdk::api::types::{BillingPlan, CodeRequest};
 
-use openhuman_core::config::Config;
-use openhuman_core::rpc::RpcOutcome;
+use openhuman_embed::__host::config::Config;
+use openhuman_embed::__host::core::Outcome;
 
 use crate::hosted::client::HostedClient;
 
@@ -34,41 +34,41 @@ fn parse_enum<T: serde::de::DeserializeOwned>(field: &str, raw: &str) -> Result<
         .map_err(|_| format!("unsupported {field}: {raw}"))
 }
 
-pub async fn get_current_plan(config: &Config) -> Result<RpcOutcome<Value>, String> {
+pub async fn get_current_plan(config: &Config) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "GET /payments/stripe/currentPlan",
         client.sdk().payments().get_current_plan().await,
     )?;
-    Ok(RpcOutcome::single_log(
+    Ok(Outcome::single_log(
         data,
         "current plan fetched from backend",
     ))
 }
 
-pub async fn get_summary(config: &Config) -> Result<RpcOutcome<Value>, String> {
+pub async fn get_summary(config: &Config) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "GET /payments/summary",
         client.sdk().payments().get_summary().await,
     )?;
-    Ok(RpcOutcome::single_log(data, "billing summary fetched"))
+    Ok(Outcome::single_log(data, "billing summary fetched"))
 }
 
-pub async fn get_balance(config: &Config) -> Result<RpcOutcome<Value>, String> {
+pub async fn get_balance(config: &Config) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "GET /payments/credits/balance",
         client.sdk().payments().get_credit_balance().await,
     )?;
-    Ok(RpcOutcome::single_log(data, "credit balance fetched"))
+    Ok(Outcome::single_log(data, "credit balance fetched"))
 }
 
 pub async fn get_transactions(
     config: &Config,
     limit: Option<u64>,
     offset: Option<u64>,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     let limit = limit.unwrap_or(20);
     let offset = offset.unwrap_or(0);
     let client = HostedClient::from_config(config)?;
@@ -84,19 +84,16 @@ pub async fn get_transactions(
             .list_credit_transactions(&query)
             .await,
     )?;
-    Ok(RpcOutcome::single_log(data, "credit transactions fetched"))
+    Ok(Outcome::single_log(data, "credit transactions fetched"))
 }
 
-pub async fn get_auto_recharge(config: &Config) -> Result<RpcOutcome<Value>, String> {
+pub async fn get_auto_recharge(config: &Config) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "GET /payments/credits/auto-recharge",
         client.sdk().payments().get_auto_recharge().await,
     )?;
-    Ok(RpcOutcome::single_log(
-        data,
-        "auto recharge settings fetched",
-    ))
+    Ok(Outcome::single_log(data, "auto recharge settings fetched"))
 }
 
 /// `PATCH /payments/credits/auto-recharge`.
@@ -108,7 +105,7 @@ pub async fn get_auto_recharge(config: &Config) -> Result<RpcOutcome<Value>, Str
 pub async fn update_auto_recharge(
     config: &Config,
     payload: Value,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let data = client.finish(
         "PATCH /payments/credits/auto-recharge",
@@ -124,22 +121,19 @@ pub async fn update_auto_recharge(
             )
             .await,
     )?;
-    Ok(RpcOutcome::single_log(
-        data,
-        "auto recharge settings updated",
-    ))
+    Ok(Outcome::single_log(data, "auto recharge settings updated"))
 }
 
-pub async fn get_cards(config: &Config) -> Result<RpcOutcome<Value>, String> {
+pub async fn get_cards(config: &Config) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "GET /payments/credits/auto-recharge/cards",
         client.sdk().payments().list_auto_recharge_cards().await,
     )?;
-    Ok(RpcOutcome::single_log(data, "saved cards fetched"))
+    Ok(Outcome::single_log(data, "saved cards fetched"))
 }
 
-pub async fn create_setup_intent(config: &Config) -> Result<RpcOutcome<Value>, String> {
+pub async fn create_setup_intent(config: &Config) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "POST /payments/credits/auto-recharge/cards/setup-intent",
@@ -149,14 +143,14 @@ pub async fn create_setup_intent(config: &Config) -> Result<RpcOutcome<Value>, S
             .create_auto_recharge_card_setup_intent()
             .await,
     )?;
-    Ok(RpcOutcome::single_log(data, "setup intent created"))
+    Ok(Outcome::single_log(data, "setup intent created"))
 }
 
 pub async fn update_card(
     config: &Config,
     payment_method_id: &str,
     payload: Value,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     let payment_method_id = payment_method_id.trim();
     if payment_method_id.is_empty() {
         return Err("paymentMethodId is required".to_string());
@@ -175,13 +169,13 @@ pub async fn update_card(
             .update_auto_recharge_card(payment_method_id, &UpdateAutoRechargeCardRequest { fields })
             .await,
     )?;
-    Ok(RpcOutcome::single_log(data, "saved card updated"))
+    Ok(Outcome::single_log(data, "saved card updated"))
 }
 
 pub async fn delete_card(
     config: &Config,
     payment_method_id: &str,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     let payment_method_id = payment_method_id.trim();
     if payment_method_id.is_empty() {
         return Err("paymentMethodId is required".to_string());
@@ -195,13 +189,13 @@ pub async fn delete_card(
             .delete_auto_recharge_card(payment_method_id)
             .await,
     )?;
-    Ok(RpcOutcome::single_log(data, "saved card deleted"))
+    Ok(Outcome::single_log(data, "saved card deleted"))
 }
 
 /// `POST /payments/stripe/purchasePlan`. `plan` is one of the SDK's
 /// [`BillingPlan`] values (`BASIC_MONTHLY`, `BASIC_YEARLY`, `PRO_MONTHLY`,
 /// `PRO_YEARLY` — the frontend's `PlanIdentifier`).
-pub async fn purchase_plan(config: &Config, plan: &str) -> Result<RpcOutcome<Value>, String> {
+pub async fn purchase_plan(config: &Config, plan: &str) -> Result<Outcome<Value>, String> {
     let plan = plan.trim();
     if plan.is_empty() {
         return Err("plan is required".to_string());
@@ -215,22 +209,16 @@ pub async fn purchase_plan(config: &Config, plan: &str) -> Result<RpcOutcome<Val
         "POST /payments/stripe/purchasePlan",
         client.sdk().payments().purchase_stripe_plan(&request).await,
     )?;
-    Ok(RpcOutcome::single_log(
-        data,
-        "plan purchase session created",
-    ))
+    Ok(Outcome::single_log(data, "plan purchase session created"))
 }
 
-pub async fn create_portal_session(config: &Config) -> Result<RpcOutcome<Value>, String> {
+pub async fn create_portal_session(config: &Config) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "POST /payments/stripe/portal",
         client.sdk().payments().create_stripe_portal_session().await,
     )?;
-    Ok(RpcOutcome::single_log(
-        data,
-        "customer portal session created",
-    ))
+    Ok(Outcome::single_log(data, "customer portal session created"))
 }
 
 fn default_gateway() -> String {
@@ -256,7 +244,7 @@ pub async fn top_up_credits(
     config: &Config,
     amount_usd: f64,
     gateway: Option<String>,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     if !amount_usd.is_finite() || amount_usd <= 0.0 {
         return Err("amountUsd must be a finite number greater than 0".to_string());
     }
@@ -271,7 +259,7 @@ pub async fn top_up_credits(
         "POST /payments/credits/top-up",
         client.sdk().payments().create_credit_top_up(&request).await,
     )?;
-    Ok(RpcOutcome::single_log(data, "credit top-up initiated"))
+    Ok(Outcome::single_log(data, "credit top-up initiated"))
 }
 
 /// Create a Coinbase Commerce charge (the "payment link" for crypto / annual billing).
@@ -280,7 +268,7 @@ pub async fn create_coinbase_charge(
     config: &Config,
     plan: &str,
     interval: Option<String>,
-) -> Result<RpcOutcome<Value>, String> {
+) -> Result<Outcome<Value>, String> {
     let plan = plan.trim();
     if plan.is_empty() {
         return Err("plan is required".to_string());
@@ -306,17 +294,14 @@ pub async fn create_coinbase_charge(
             .create_coinbase_charge(&request)
             .await,
     )?;
-    Ok(RpcOutcome::single_log(
-        data,
-        "Coinbase payment link created",
-    ))
+    Ok(Outcome::single_log(data, "Coinbase payment link created"))
 }
 
 // ── Coupon operations ──────────────────────────────────────────────────────
 
 /// Redeem a coupon code to add credits to the user's account.
 /// Maps to `POST /coupons/redeem`.
-pub async fn redeem_coupon(config: &Config, code: &str) -> Result<RpcOutcome<Value>, String> {
+pub async fn redeem_coupon(config: &Config, code: &str) -> Result<Outcome<Value>, String> {
     let code = code.trim();
     if code.is_empty() {
         return Err("code is required".to_string());
@@ -329,18 +314,18 @@ pub async fn redeem_coupon(config: &Config, code: &str) -> Result<RpcOutcome<Val
         "POST /coupons/redeem",
         client.sdk().coupons().redeem_coupon(&request).await,
     )?;
-    Ok(RpcOutcome::single_log(data, "coupon redeemed"))
+    Ok(Outcome::single_log(data, "coupon redeemed"))
 }
 
 /// List coupons redeemed by the current user.
 /// Maps to `GET /coupons/me`.
-pub async fn get_user_coupons(config: &Config) -> Result<RpcOutcome<Value>, String> {
+pub async fn get_user_coupons(config: &Config) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let data = client.finish_value(
         "GET /coupons/me",
         client.sdk().coupons().list_my_coupons().await,
     )?;
-    Ok(RpcOutcome::single_log(data, "user coupons fetched"))
+    Ok(Outcome::single_log(data, "user coupons fetched"))
 }
 
 #[cfg(test)]

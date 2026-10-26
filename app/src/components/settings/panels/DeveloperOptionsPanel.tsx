@@ -1,7 +1,7 @@
 // [settings] Developer & Diagnostics panel — debug-only entries only.
 // User-facing routes (agents, autonomy, agent-access, sandbox-settings,
 // activity-level, tools, voice, embeddings,
-// heartbeat, ledger-usage, cost-dashboard, task-sources, composio-routing,
+// ledger-usage, cost-dashboard, task-sources, composio-routing,
 // webhooks-triggers, migration, security) have been moved to their canonical
 // section pages. Only genuine diagnostics remain here.
 import { type ReactNode, useEffect, useState } from 'react';
@@ -52,7 +52,7 @@ interface DevGroup {
 //   → Settings → Agents
 //   tools
 //   → Settings → Features
-//   voice, embeddings, heartbeat, ledger-usage, cost-dashboard
+//   voice, embeddings, ledger-usage, cost-dashboard
 //   → Settings → AI & Models
 //   task-sources, composio-routing, webhooks-triggers
 //   → Settings → Integrations

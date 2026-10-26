@@ -1,47 +1,51 @@
 use super::*;
 
-use crate::inference::provider::factory::cloud_slug::{
-    openrouter_default_provider_options, OPENROUTER_PROVIDER_SORT,
-};
+use tinyinference_llm::providers::registry::openrouter_default_provider_options;
 
 #[test]
 fn crate_native_chat_model_factory_preserves_invalid_route_diagnostics() {
     let _guard = crate::inference::inference_test_guard();
-    let config = Config::default();
+    super::with_library_test_context(|| {
+        let config = Config::default();
 
-    let unconfigured =
-        create_chat_model_from_string_with_model_id("reasoning", "groq:llama3", &config, 0.7)
-            .err()
-            .expect("unconfigured slug must fail")
-            .to_string();
-    assert!(
-        unconfigured.contains("no cloud provider configured for slug 'groq'"),
-        "unexpected diagnostic: {unconfigured}"
-    );
+        let unconfigured =
+            create_chat_model_from_string_with_model_id("reasoning", "groq:llama3", &config, 0.7)
+                .err()
+                .expect("unconfigured slug must fail")
+                .to_string();
+        assert!(
+            unconfigured.contains("no cloud provider configured for slug 'groq'"),
+            "unexpected diagnostic: {unconfigured}"
+        );
 
-    let bare =
-        create_chat_model_from_string_with_model_id("reasoning", "unknown-provider", &config, 0.7)
-            .err()
-            .expect("bare unknown provider must fail")
-            .to_string();
-    assert!(
-        bare.contains("unrecognised provider string 'unknown-provider'"),
-        "unexpected diagnostic: {bare}"
-    );
+        let bare = create_chat_model_from_string_with_model_id(
+            "reasoning",
+            "unknown-provider",
+            &config,
+            0.7,
+        )
+        .err()
+        .expect("bare unknown provider must fail")
+        .to_string();
+        assert!(
+            bare.contains("unrecognised provider string 'unknown-provider'"),
+            "unexpected diagnostic: {bare}"
+        );
 
-    let byok = create_chat_model_from_string_with_model_id(
-        "reasoning",
-        BYOK_INCOMPLETE_SENTINEL,
-        &config,
-        0.7,
-    )
-    .err()
-    .expect("incomplete BYOK must fail")
-    .to_string();
-    assert!(
-        byok.contains("BYOK_INCOMPLETE"),
-        "unexpected diagnostic: {byok}"
-    );
+        let byok = create_chat_model_from_string_with_model_id(
+            "reasoning",
+            BYOK_INCOMPLETE_SENTINEL,
+            &config,
+            0.7,
+        )
+        .err()
+        .expect("incomplete BYOK must fail")
+        .to_string();
+        assert!(
+            byok.contains("BYOK_INCOMPLETE"),
+            "unexpected diagnostic: {byok}"
+        );
+    });
 }
 
 /// Real-path smoke (privacy epic S2, #4436): driving the actual inference
@@ -59,7 +63,10 @@ async fn from_string_external_provider_emits_egress_realpath() {
 
     let config = Config::default();
     // External provider → real chokepoint must emit BEFORE constructing.
-    let _ = create_test_chat_model_from_string("agentic", "openai:gpt-4o-mini", &config);
+    super::with_library_test_context_async(|| async {
+        let _ = create_test_chat_model_from_string("agentic", "openai:gpt-4o-mini", &config);
+    })
+    .await;
 
     // Bus is process-wide; drain past unrelated events until our descriptor lands.
     let found = tokio::time::timeout(std::time::Duration::from_secs(2), async {
@@ -87,8 +94,11 @@ async fn from_string_external_provider_emits_egress_realpath() {
 
 #[tokio::test]
 async fn caller_owned_models_build_without_openhuman_session() {
-    let _guard = crate::inference::inference_test_guard();
-    let _signed_out = crate::cron::scheduler_gate::SignedOutTestGuard::set(true);
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let _storage = crate::storage::test_support::install_backend_for_test(
+        crate::storage::test_support::memory_backend(),
+    );
+    let _signed_out = crate::platform::llm_gate::SignedOutTestGuard::set(true);
     let dir = tempfile::tempdir().unwrap();
     let config = Config {
         config_path: dir.path().join("config.toml"),
@@ -132,8 +142,8 @@ async fn caller_owned_models_build_without_openhuman_session() {
 }
 #[tokio::test]
 async fn local_aliases_build_without_a_session_and_preserve_model_ids() {
-    let _guard = crate::inference::inference_test_guard();
-    let _signed_out = crate::cron::scheduler_gate::SignedOutTestGuard::set(true);
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let _signed_out = crate::platform::llm_gate::SignedOutTestGuard::set(true);
     let config = Config::default();
     for (prefix, canonical) in [
         ("OLLAMA", "ollama"),
@@ -173,7 +183,6 @@ fn direct_openrouter_endpoints_get_price_sorted_routing_and_nothing_else() {
     // reason in tinyhumansai/backend#1370).
     let options = openrouter_default_provider_options("https://openrouter.ai/api/v1")
         .expect("openrouter endpoint carries routing options");
-    assert_eq!(OPENROUTER_PROVIDER_SORT, "price");
     assert_eq!(
         options,
         serde_json::json!({ "provider": { "sort": "price" } }),

@@ -1,35 +1,39 @@
-//! OpenHuman implementation of the `tinychannels::host` capability boundary.
+//! OpenHuman host callbacks and event subscribers for the TinyChannels module.
 //!
-//! [`build_channel_host`] assembles the concrete [`tinychannels::ChannelHost`]
-//! from OpenHuman internals (voice, inference, approvals, conversation store,
-//! shutdown registry, web event bus). [`build_provider_context`] wraps it into
-//! the [`tinychannels::host::ProviderContext`] handed to channel providers.
-//!
-//! Ported providers reach host capabilities through this context instead of
-//! calling OpenHuman internals directly — the inversion that lets them live in
-//! the standalone `tinychannels` crate. Lean providers ignore the host.
+//! Production startup serves the typed callback surface from `runtime::startup`;
+//! legacy provider-trait adapters remain compiled only for their unit tests.
 
 mod adapters;
+mod channel_events;
+pub(crate) mod remote_control;
 
+pub(crate) use adapters::{ConfigAllowlistStore, OpenHumanEventSink, VoiceTranscriber};
+#[cfg(test)]
 pub use adapters::{
-    ConfigAllowlistStore, ConversationHistoryStore, CoreApprovalGate, CoreShutdownRegistry,
-    InferenceReactionGate, OpenHumanEventSink, VoiceSynthesizer, VoiceTranscriber,
+    ConversationHistoryStore, CoreApprovalGate, CoreShutdownRegistry, VoiceSynthesizer,
 };
+pub use channel_events::{ChannelApprovalSurfaceSubscriber, ChannelTurnStateSubscriber};
 
+#[cfg(test)]
 use std::sync::Arc;
 
-use tinychannels::host::{ChannelHostBuilder, ProviderContext};
+#[cfg(test)]
+use tinychannels::host::ChannelHostBuilder;
+#[cfg(test)]
 use tinychannels::ChannelHost;
 
+#[cfg(test)]
 use crate::config::Config;
 
 /// Assemble the full OpenHuman [`ChannelHost`] from a config snapshot.
 ///
 /// Wires every capability OpenHuman can back today: lifecycle (shutdown),
-/// STT, TTS, reaction gate, approval-reply parsing, conversation history, and
-/// the web-channel event sink. Capabilities OpenHuman cannot yet express
-/// portably (turn dispatch, run ledger, pairing) are simply left unset — a
-/// provider that needs one degrades gracefully.
+/// STT, TTS, approval-reply parsing, conversation history, and the
+/// web-channel event sink. Capabilities OpenHuman cannot yet express portably
+/// (turn dispatch, run ledger, pairing) are simply left unset — a provider
+/// that needs one degrades gracefully. Emoji reactions are deliberately unset:
+/// the local-model reaction gate was removed, so providers never react.
+#[cfg(test)]
 pub fn build_channel_host(config: Arc<Config>) -> Arc<dyn ChannelHost> {
     ChannelHostBuilder::new()
         .lifecycle(Arc::new(CoreShutdownRegistry))
@@ -39,9 +43,6 @@ pub fn build_channel_host(config: Arc<Config>) -> Arc<dyn ChannelHost> {
         .synthesizer(Arc::new(VoiceSynthesizer {
             config: Arc::clone(&config),
         }))
-        .reactions(Arc::new(InferenceReactionGate {
-            config: Arc::clone(&config),
-        }))
         .approvals(Arc::new(CoreApprovalGate))
         .conversations(Arc::new(ConversationHistoryStore {
             workspace_dir: config.workspace_dir.clone(),
@@ -49,16 +50,6 @@ pub fn build_channel_host(config: Arc<Config>) -> Arc<dyn ChannelHost> {
         .events(Arc::new(OpenHumanEventSink))
         .allowlist(Arc::new(ConfigAllowlistStore))
         .build()
-}
-
-/// Build the [`ProviderContext`] handed to a channel provider at construction:
-/// the assembled host + the channels config + a pre-built HTTP client.
-pub fn build_provider_context(config: &Config, http_client: reqwest::Client) -> ProviderContext {
-    ProviderContext::new(
-        build_channel_host(Arc::new(config.clone())),
-        config.channels_config.clone(),
-        http_client,
-    )
 }
 
 #[cfg(test)]

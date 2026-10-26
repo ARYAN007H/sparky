@@ -7,21 +7,29 @@
 //!
 //! Read-only, no side effects, no path/network access.
 
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+
 use async_trait::async_trait;
-use serde_json::json;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
-pub struct RetrieveToolOutputTool;
+/// Looks a stored original up by hash: `Ok(None)` is a cache miss.
+pub type RetrieveFn = Arc<
+    dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<Option<String>, String>> + Send>>
+        + Send
+        + Sync,
+>;
 
-impl RetrieveToolOutputTool {
-    pub fn new() -> Self {
-        Self
-    }
+/// The `retrieve_tool_output` tool, bound to a host-supplied lookup.
+pub struct RetrieveToolOutputTool {
+    retrieve: RetrieveFn,
 }
 
-impl Default for RetrieveToolOutputTool {
-    fn default() -> Self {
-        Self::new()
+impl RetrieveToolOutputTool {
+    /// Build the tool over `retrieve`, which resolves a hash to the original.
+    pub fn new(retrieve: RetrieveFn) -> Self {
+        Self { retrieve }
     }
 }
 
@@ -32,24 +40,11 @@ impl Tool for RetrieveToolOutputTool {
     }
 
     fn description(&self) -> &str {
-        "Retrieve the full, original text of a tool result that was compacted to \
-         save context. When a tool output shows a marker like \
-         `retrieve_tool_output(\"a1b2c3d4e5f6\")`, call this with that hash to get \
-         the complete original back. Use it only when you actually need the dropped \
-         detail — the compacted view is usually enough."
+        tinyjuice_bus::tools::RETRIEVE_TOOL_DESCRIPTION
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "hash": {
-                    "type": "string",
-                    "description": "The hash from a retrieve_tool_output(\"…\") marker."
-                }
-            },
-            "required": ["hash"]
-        })
+        tinyjuice_bus::tools::retrieve_tool_parameters()
     }
 
     fn permission_level(&self) -> PermissionLevel {
@@ -68,7 +63,7 @@ impl Tool for RetrieveToolOutputTool {
             ));
         };
 
-        match crate::inference::tokenjuice::retrieve(hash.to_string(), None).await {
+        match (self.retrieve)(hash.to_string()).await {
             Ok(Some(original)) => {
                 log::debug!(
                     "[compaction][ccr] retrieved hash={} bytes={}",
@@ -96,6 +91,13 @@ impl Tool for RetrieveToolOutputTool {
             Err(error) => Ok(ToolResult::error(error)),
         }
     }
+}
+
+/// Bind the recovery tool to the module-owned cache.
+pub fn retrieve_tool_output_tool() -> RetrieveToolOutputTool {
+    RetrieveToolOutputTool::new(Arc::new(|hash| {
+        Box::pin(async move { crate::inference::tokenjuice::retrieve(hash, None).await })
+    }))
 }
 
 #[cfg(test)]

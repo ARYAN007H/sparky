@@ -24,7 +24,12 @@ async fn pending_for_thread_tracks_request_under_chat_context_and_clears() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             origin,
-            APPROVAL_CHAT_CONTEXT.scope(ctx, g.intercept("shell", "run ls", serde_json::json!({}))),
+            g.intercept(
+                &ApprovalTurnContext::chat(ctx),
+                "shell",
+                "run ls",
+                serde_json::json!({}),
+            ),
         )
         .await
     });
@@ -49,8 +54,8 @@ async fn pending_for_thread_tracks_request_under_chat_context_and_clears() {
 }
 
 /// Regression for #5499: an async-delegated sub-agent carries the `WebChat`
-/// origin across the `tokio::spawn` boundary (`spawn_async_subagent` calls
-/// `turn_origin::propagate`) but NOT the `APPROVAL_CHAT_CONTEXT` task-local.
+/// origin across the `tokio::spawn` boundary (`spawn_subagent` calls
+/// `turn_origin::propagate`) but NOT the chat approval context.
 /// Before the origin-routing fallback the gate parked with `thread_id:
 /// None`, the web-channel surface dropped the `ApprovalRequested` event
 /// ("thread/client absent — NOT surfacing"), and the park silently
@@ -64,7 +69,7 @@ async fn webchat_origin_routes_park_when_approval_chat_context_absent() {
     let (gate, _dir) = test_gate();
     let gate = Arc::new(gate);
 
-    // WebChat origin scoped, but NO `APPROVAL_CHAT_CONTEXT` — exactly the
+    // WebChat origin scoped, but NO chat approval context — exactly the
     // async sub-agent spawn state (origin propagated, approval context not).
     let g = gate.clone();
     let origin = AgentTurnOrigin::WebChat {
@@ -75,7 +80,12 @@ async fn webchat_origin_routes_park_when_approval_chat_context_absent() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             origin,
-            g.intercept("cron_add", "schedule daily reminder", serde_json::json!({})),
+            g.intercept(
+                &ApprovalTurnContext::default(),
+                "cron_add",
+                "schedule daily reminder",
+                serde_json::json!({}),
+            ),
         )
         .await
     });
@@ -93,7 +103,7 @@ async fn webchat_origin_routes_park_when_approval_chat_context_absent() {
         assert!(
             tries < 50,
             "park must be routable via the WebChat origin's thread when \
-             APPROVAL_CHAT_CONTEXT is absent (#5499)"
+             the chat approval context is absent (#5499)"
         );
         tokio::time::sleep(Duration::from_millis(10)).await;
     };
@@ -123,12 +133,10 @@ async fn waiter_future_dropped_mid_park_evicts_waiter_clears_routing_and_denies_
     // `Box::pin` (not `tokio::pin!`) so `drop(fut)` below drops the *future
     // itself* — and thus the `WaiterGuard` saved in its async state — rather
     // than just a `Pin<&mut _>` reference.
+    let turn = ApprovalTurnContext::chat(chat_ctx());
     let mut fut = Box::pin(turn_origin::with_origin(
         web_origin(),
-        APPROVAL_CHAT_CONTEXT.scope(
-            chat_ctx(),
-            g.intercept("shell", "run rm", serde_json::json!({})),
-        ),
+        g.intercept(&turn, "shell", "run rm", serde_json::json!({})),
     ));
 
     // Poll it just long enough to register the waiter, persist the pending
@@ -176,6 +184,45 @@ async fn waiter_future_dropped_mid_park_evicts_waiter_clears_routing_and_denies_
     );
 }
 
+/// The decision channel can drop after `decide()` already committed an
+/// approval. The gate must honour the persisted decision, not deny a call
+/// the durable audit row says was approved.
+#[tokio::test]
+async fn a_dropped_channel_after_a_persisted_approval_allows() {
+    let (gate, _dir) = test_gate();
+    let gate = Arc::new(gate);
+    let g = gate.clone();
+    let handle = tokio::spawn(async move {
+        let turn = ApprovalTurnContext::chat(chat_ctx());
+        turn_origin::with_origin(
+            web_origin(),
+            g.intercept(&turn, "shell", "run ls", serde_json::json!({})),
+        )
+        .await
+    });
+    let mut tries = 0;
+    let request_id = loop {
+        if let Some(id) = gate.pending_for_thread("t-test") {
+            break id;
+        }
+        tries += 1;
+        assert!(tries < 200, "thread mapping never appeared");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    };
+
+    // The approval is persisted, then the waiter's sender goes away without
+    // delivering it.
+    store::decide(&gate.config, &request_id, ApprovalDecision::ApproveOnce)
+        .expect("persist approval")
+        .expect("row was pending");
+    drop(gate.waiters.lock().remove(&request_id));
+
+    assert!(
+        matches!(handle.await.unwrap(), GateOutcome::Allow),
+        "a persisted approval was denied because the channel dropped"
+    );
+}
+
 // ── caller park bound (issue #4756) ──────────────────────────────
 //
 // A caller (composio_connect) can cap the park via
@@ -205,14 +252,12 @@ async fn intercept_audited_bounded_abandons_park_and_leaves_row_pending() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             origin,
-            APPROVAL_CHAT_CONTEXT.scope(
-                ctx,
-                g.intercept_audited_bounded(
-                    "shell",
-                    "run ls",
-                    serde_json::json!({}),
-                    Some(Duration::from_millis(100)),
-                ),
+            g.intercept_audited_bounded(
+                &ApprovalTurnContext::chat(ctx),
+                "shell",
+                "run ls",
+                serde_json::json!({}),
+                Some(Duration::from_millis(100)),
             ),
         )
         .await
@@ -266,9 +311,7 @@ async fn intercept_audited_bounded_abandons_park_and_leaves_row_pending() {
 #[cfg(debug_assertions)]
 #[test]
 fn effective_ttl_uses_env_override_when_valid() {
-    let _env = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env = crate::config::TEST_ENV_LOCK.blocking_lock();
     let (gate, _dir) = test_gate_with_ttl(BOOT_TTL_UNDER_TEST);
     unsafe { std::env::set_var("OPENHUMAN_APPROVAL_TTL_SECS", "42") };
     assert_eq!(
@@ -281,9 +324,7 @@ fn effective_ttl_uses_env_override_when_valid() {
 
 #[test]
 fn effective_ttl_falls_back_to_boot_ttl_for_garbage_value() {
-    let _env = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env = crate::config::TEST_ENV_LOCK.blocking_lock();
     let (gate, _dir) = test_gate_with_ttl(BOOT_TTL_UNDER_TEST);
     unsafe { std::env::set_var("OPENHUMAN_APPROVAL_TTL_SECS", "not-a-number") };
     assert_eq!(
@@ -296,9 +337,7 @@ fn effective_ttl_falls_back_to_boot_ttl_for_garbage_value() {
 
 #[test]
 fn effective_ttl_falls_back_to_boot_ttl_when_unset() {
-    let _env = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env = crate::config::TEST_ENV_LOCK.blocking_lock();
     let (gate, _dir) = test_gate_with_ttl(BOOT_TTL_UNDER_TEST);
     unsafe { std::env::remove_var("OPENHUMAN_APPROVAL_TTL_SECS") };
     assert_eq!(
@@ -319,7 +358,7 @@ mod resolve_park_ttl_tests {
     fn default_park_keeps_the_full_ttl() {
         let default_ttl = DEFAULT_APPROVAL_TTL;
         assert_eq!(
-            ApprovalGate::resolve_park_ttl(default_ttl, false),
+            ApprovalGate::resolve_park_ttl(default_ttl, false, false),
             default_ttl,
             "a plain park (no copilot stream) must not be clamped"
         );
@@ -329,7 +368,7 @@ mod resolve_park_ttl_tests {
     fn copilot_stream_shortens_a_default_ten_minute_park() {
         let default_ttl = DEFAULT_APPROVAL_TTL;
         assert_eq!(
-            ApprovalGate::resolve_park_ttl(default_ttl, true),
+            ApprovalGate::resolve_park_ttl(default_ttl, true, false),
             COPILOT_APPROVAL_TTL,
             "a flows_build copilot-streaming park must clamp to COPILOT_APPROVAL_TTL"
         );
@@ -347,7 +386,7 @@ mod resolve_park_ttl_tests {
         // already shorter than either clamp).
         let short_ttl = Duration::from_secs(60);
         assert_eq!(
-            ApprovalGate::resolve_park_ttl(short_ttl, true),
+            ApprovalGate::resolve_park_ttl(short_ttl, true, false),
             short_ttl,
             "copilot clamp must not extend a boot-time TTL that is already shorter"
         );
@@ -360,8 +399,8 @@ mod resolve_park_ttl_tests {
 /// persists the clamped TTL when the copilot-streaming context is scoped.
 /// Builds a gate with the full `DEFAULT_APPROVAL_TTL` boot TTL (unlike
 /// `test_gate()` before this suite stopped hard-coding a 2s window, which
-/// would make this assertion vacuous), scopes
-/// `APPROVAL_COPILOT_STREAM_CONTEXT` alongside the chat context + WebChat
+/// would make this assertion vacuous), sets
+/// the copilot flag alongside the chat context + WebChat
 /// origin the way `flows::ops::flows_build` does in production, and
 /// inspects the persisted `expires_at` on the pending row.
 #[tokio::test]
@@ -380,12 +419,11 @@ async fn copilot_streaming_park_persists_the_clamped_expiry() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                APPROVAL_COPILOT_STREAM_CONTEXT.scope(
-                    (),
-                    g.intercept("composio", "send slack", serde_json::json!({})),
-                ),
+            g.intercept(
+                &ApprovalTurnContext::chat(chat_ctx()).with_copilot_stream(),
+                "composio",
+                "send slack",
+                serde_json::json!({}),
             ),
         )
         .await

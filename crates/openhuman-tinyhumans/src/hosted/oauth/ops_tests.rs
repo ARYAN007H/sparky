@@ -144,3 +144,55 @@ async fn token_handoff_without_encrypted_payload_errors() {
         .unwrap_err();
     assert_eq!(err, "integration tokens response missing encrypted payload");
 }
+
+#[tokio::test]
+async fn fetch_client_key_validates_the_id_before_the_credential() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_support::config(&tmp, "http://127.0.0.1:9");
+    assert_eq!(
+        oauth_fetch_client_key(&config, "int-1").await.unwrap_err(),
+        "integrationId must be a 24-char hex id"
+    );
+    assert!(oauth_fetch_client_key(&config, ID)
+        .await
+        .unwrap_err()
+        .contains("no backend session token"));
+}
+
+#[tokio::test]
+async fn fetch_client_key_returns_the_one_time_share() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(format!("/auth/integrations/{ID}/client-key")))
+        .respond_with(ok(json!({"clientKey": "share-b64"})))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let tmp = TempDir::new().unwrap();
+    let config = test_support::signed_in(&tmp, &server.uri());
+
+    let outcome = oauth_fetch_client_key(&config, &format!(" {ID} "))
+        .await
+        .unwrap();
+    assert_eq!(
+        outcome.value,
+        json!({"clientKey": "share-b64", "integrationId": ID})
+    );
+}
+
+#[tokio::test]
+async fn fetch_client_key_rejects_a_response_without_the_key() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(format!("/auth/integrations/{ID}/client-key")))
+        .respond_with(ok(json!({})))
+        .mount(&server)
+        .await;
+    let tmp = TempDir::new().unwrap();
+    let config = test_support::signed_in(&tmp, &server.uri());
+
+    assert!(oauth_fetch_client_key(&config, ID)
+        .await
+        .unwrap_err()
+        .contains("missing clientKey"));
+}

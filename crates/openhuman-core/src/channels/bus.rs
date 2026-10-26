@@ -5,23 +5,13 @@
 //! channel provider and sends the reply back through the REST API.
 
 mod delivery;
-mod draft;
-mod filler;
-mod progressive_ui;
-mod streaming_state;
 mod subscriber;
-mod thinking;
+#[cfg(test)]
 mod thread_id;
 
 pub use subscriber::ChannelInboundSubscriber;
 
-// Re-exported at module scope (rather than left as private `pub(super)`
-// items reached only through their owning submodule) so the `#[path]`
-// test modules below — which share this module's scope via `super::*` —
-// can see them exactly as they could when this was one unsplit file.
-use draft::extract_message_id;
-use streaming_state::StreamingState;
-use thinking::latest_thinking_snippet;
+#[cfg(test)]
 pub(crate) use thread_id::derive_inbound_thread_id;
 
 #[cfg(test)]
@@ -32,6 +22,6 @@ mod inbound_thread_id_tests;
 #[path = "bus_tests.rs"]
 mod tests;
 
-#[cfg(any(test, debug_assertions))]
+#[cfg(test)]
 #[path = "bus_test_support_tests.rs"]
 pub mod test_support;

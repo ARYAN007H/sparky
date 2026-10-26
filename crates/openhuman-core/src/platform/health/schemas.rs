@@ -1,8 +1,9 @@
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use crate::rpc::RpcOutcome;
 
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
     vec![schemas("snapshot"), schemas("system_info")]
@@ -89,15 +90,15 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_snapshot(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_snapshot(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async { to_json(crate::platform::health::rpc::health_snapshot()) })
 }
 
-fn handle_system_info(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_system_info(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async { to_json(crate::platform::health::rpc::system_info()) })
 }
 
-fn to_json<T: serde::Serialize>(outcome: RpcOutcome<T>) -> Result<Value, String> {
+fn to_json<T: serde::Serialize>(outcome: Outcome<T>) -> Result<Value, String> {
     outcome.into_cli_compatible_json()
 }
 

@@ -25,15 +25,6 @@ export interface ModelRoute {
 /** Authentication header style. Matches Rust AuthStyle enum. */
 export type AuthStyle = 'bearer' | 'anthropic' | 'openhuman_jwt' | 'none';
 
-/** @deprecated Use AuthStyle. Kept for back-compat with old wire format. */
-export type CloudProviderType =
-  | 'openhuman'
-  | 'openai'
-  | 'anthropic'
-  | 'openrouter'
-  | 'orcarouter'
-  | 'custom';
-
 /**
  * Endpoint config for one cloud LLM provider (new slug-keyed shape).
  * API keys are NOT carried here — they live in `auth-profiles.json`
@@ -48,6 +39,8 @@ export interface CloudProviderCreds {
   label: string;
   endpoint: string;
   auth_style: AuthStyle;
+  /** Optional PEM CA bundle trusted only for this provider. */
+  ca_cert_pem?: string | null;
 }
 
 /**
@@ -115,38 +108,18 @@ export interface ModelSettingsUpdate {
   vision_provider?: string | null;
   memory_provider?: string | null;
   embeddings_provider?: string | null;
-  heartbeat_provider?: string | null;
-  learning_provider?: string | null;
-  subconscious_provider?: string | null;
-}
-
-/**
- * Stepped user-facing memory-context window preset. Mirrors the core
- * `MemoryContextWindow` enum (`crates/openhuman-core/src/config/schema/agent.rs`)
- * — the actual char budgets are owned by the core, this is the label.
- */
-export type MemoryContextWindow = 'minimal' | 'balanced' | 'extended' | 'maximum';
-
-export const MEMORY_CONTEXT_WINDOWS: MemoryContextWindow[] = [
-  'minimal',
-  'balanced',
-  'extended',
-  'maximum',
-];
-
-export interface MemorySettingsUpdate {
-  backend?: string | null;
-  auto_save?: boolean | null;
-  embedding_provider?: string | null;
-  embedding_model?: string | null;
-  embedding_dimensions?: number | null;
-  /** One of `MEMORY_CONTEXT_WINDOWS`. */
-  memory_window?: MemoryContextWindow | null;
 }
 
 export interface RuntimeSettingsUpdate {
   kind?: string | null;
   reasoning_enabled?: boolean | null;
+  /** Default thinking level for agent turns; `''` clears it to the provider default. */
+  reasoning_effort?: string | null;
+  /**
+   * When set, `reasoning_effort` is saved as this model id's own level
+   * (`runtime.reasoning_effort_by_model`) and `''` removes the model's entry.
+   */
+  reasoning_effort_model?: string | null;
 }
 
 export interface BrowserSettingsUpdate {
@@ -161,6 +134,7 @@ export interface BrowserSettingsUpdate {
   download_dir?: string | null;
   max_task_steps?: number;
   task_timeout_secs?: number;
+  learn_from_tasks?: boolean;
 }
 
 export interface LocalAiSettingsUpdate {
@@ -184,9 +158,6 @@ export interface LocalAiSettingsUpdate {
   model_id?: string | null;
   chat_model_id?: string | null;
   usage_embeddings?: boolean | null;
-  usage_heartbeat?: boolean | null;
-  usage_learning_reflection?: boolean | null;
-  usage_subconscious?: boolean | null;
 }
 
 export interface RuntimeFlags {
@@ -238,6 +209,14 @@ export interface ClientConfig {
    */
   inference_url: string | null;
   default_model: string | null;
+  /**
+   * The composer's thinking-level default (`runtime.reasoning_effort`):
+   * `none` | `minimal` | `low` | `medium` | `high` | `xhigh`, or null when the
+   * provider decides. Absent on cores that predate it.
+   */
+  reasoning_effort?: string | null;
+  /** Per-model thinking levels keyed by model id; outrank `reasoning_effort`. */
+  reasoning_effort_by_model?: Record<string, string> | null;
   app_version: string;
   api_key_set: boolean;
   /** Legacy per-task-hint model overrides (deprecated; will be removed). */
@@ -265,9 +244,6 @@ export interface ClientConfig {
   vision_provider: string | null;
   memory_provider: string | null;
   embeddings_provider: string | null;
-  heartbeat_provider: string | null;
-  learning_provider: string | null;
-  subconscious_provider: string | null;
 }
 
 export async function openhumanGetClientConfig(): Promise<CommandResponse<ClientConfig>> {
@@ -326,6 +302,9 @@ export type ClaudeCodeAuthStatus =
  * Recheck, not on a tight loop.
  */
 export async function openhumanClaudeCodeAuthStatus(): Promise<ClaudeCodeAuthStatus> {
+  if (!isTauri()) {
+    throw new Error('Not running in Tauri');
+  }
   // The core handler returns the value via `RpcOutcome::new(_, vec![])` with no
   // logs, which `into_cli_compatible_json` serializes as the BARE value (not a
   // `{ result, logs }` envelope). `callCoreRpc` returns the JSON-RPC `result`,
@@ -390,15 +369,6 @@ export async function openhumanUpdateModelSettings(
 ): Promise<CommandResponse<ConfigSnapshot>> {
   return await callCoreRpc<CommandResponse<ConfigSnapshot>>({
     method: 'openhuman.inference_update_model_settings',
-    params: update,
-  });
-}
-
-export async function openhumanUpdateMemorySettings(
-  update: MemorySettingsUpdate
-): Promise<CommandResponse<ConfigSnapshot>> {
-  return await callCoreRpc<CommandResponse<ConfigSnapshot>>({
-    method: CORE_RPC_METHODS.configUpdateMemorySettings,
     params: update,
   });
 }
@@ -474,8 +444,8 @@ export interface AutonomySettings {
   /**
    * When true, the approval gate auto-approves ALL tool calls without
    * prompting — a blanket bypass, not just the `auto_approve` allowlist
-   * above. Subconscious-tainted and unlabelled origins are still denied by
-   * the gate regardless of this flag; hard security blocks are unaffected.
+   * above. Unlabelled origins are still denied by the gate regardless of
+   * this flag; hard security blocks are unaffected.
    * Defaults to `false`.
    */
   auto_approve_all?: boolean;
@@ -507,7 +477,7 @@ export async function openhumanGetAutonomySettings(): Promise<CommandResponse<Au
  * already-canonicalised path strings; the UI renders them verbatim instead of
  * hard-coding defaults like `~/OpenHuman/projects`.
  *
- * - `action_dir` — agent CWD for `shell` / `node_exec` / `npm_exec` / file
+ * - `action_dir` — agent CWD for `shell` / file
  *   writes. Defaults to `projects_dir`; overridable via `OPENHUMAN_ACTION_DIR`.
  * - `workspace_dir` — internal product state (memory / sessions / vault).
  *   Agent-blocked.
@@ -516,12 +486,18 @@ export async function openhumanGetAutonomySettings(): Promise<CommandResponse<Au
  * - `action_dir_source` — where the effective `action_dir` came from:
  *   `'env'` (pinned by OPENHUMAN_ACTION_DIR — UI must disable editing),
  *   `'override'` (a persisted user choice), or `'default'`.
+ * - `files_dir` — the visible folder agent deliverables are written to
+ *   (#5505); `default_files_dir` is `~/OpenHuman/projects/Files`, and
+ *   `files_dir_source` says whether the user chose another one.
  */
 export interface AgentPaths {
   action_dir: string;
   workspace_dir: string;
   projects_dir: string;
   action_dir_source: 'env' | 'override' | 'default';
+  files_dir: string;
+  default_files_dir: string;
+  files_dir_source: 'override' | 'default';
 }
 
 export async function openhumanGetAgentPaths(): Promise<CommandResponse<AgentPaths>> {
@@ -530,9 +506,14 @@ export async function openhumanGetAgentPaths(): Promise<CommandResponse<AgentPat
   });
 }
 
-/** Partial update for the agent's editable filesystem roots (issue #3240). */
+/**
+ * Partial update for the agent's editable filesystem roots (#3240, #5505).
+ * An empty string reverts a field to its default; an omitted field is left
+ * unchanged.
+ */
 export interface AgentPathsUpdate {
   action_dir?: string;
+  files_dir?: string;
 }
 
 export async function openhumanUpdateAgentPaths(
@@ -594,47 +575,6 @@ export async function openhumanUpdateSandboxSettings(
   });
 }
 
-// ── Memory sync schedule (#3302) ─────────────────────────────────────────────
-
-/** Global memory-sync schedule returned by config_get_memory_sync_settings. */
-export interface MemorySyncSettings {
-  /** Stored value: null = use the default cadence, 0 = Manual only, n>0 = seconds. */
-  sync_interval_secs: number | null;
-  /** Resolved cadence to highlight in the UI (the default when unset; 0 for manual). */
-  selected_secs: number;
-  /** True when the user picked "Manual only" (stored value is 0). */
-  is_manual: boolean;
-  /** True when no explicit choice is stored (falls back to `default_secs`). */
-  is_default: boolean;
-  /** The effective default cadence (seconds) applied when unset (24h). */
-  default_secs: number;
-  /** Preset cadences (seconds) offered in the UI: 4h / 12h / 24h. */
-  presets: number[];
-}
-
-/** Partial update — set `sync_interval_secs` to `null` to reset to default. */
-export interface MemorySyncSettingsUpdate {
-  /** null = default, 0 = Manual only, n>0 = sync every n seconds. */
-  sync_interval_secs?: number | null;
-}
-
-export async function openhumanGetMemorySyncSettings(): Promise<
-  CommandResponse<MemorySyncSettings>
-> {
-  return await callCoreRpc<CommandResponse<MemorySyncSettings>>({
-    method: CORE_RPC_METHODS.configGetMemorySyncSettings,
-  });
-}
-
-export async function openhumanUpdateMemorySyncSettings(
-  update: MemorySyncSettingsUpdate
-): Promise<CommandResponse<MemorySyncSettings>> {
-  return await callCoreRpc<CommandResponse<MemorySyncSettings>>({
-    method: CORE_RPC_METHODS.configUpdateMemorySyncSettings,
-    params: update,
-  });
-}
-
 // ── Agent execution settings (action/tool timeout) ──────────────────────────
 
 /** Agent execution settings as returned by config_get_agent_settings. */
@@ -649,11 +589,19 @@ export interface AgentSettings {
   min_timeout_secs: number;
   /** Highest accepted timeout (seconds). */
   max_timeout_secs: number;
+  /** How tool calls are spoken to the model (`auto` = native/JSON, the default). */
+  tool_dispatcher: ToolDispatcher;
+  /** True when OPENHUMAN_TOOL_DISPATCHER overrides the configured value. */
+  tool_dispatcher_env_override: boolean;
 }
+
+/** Accepted `agent.tool_dispatcher` values. */
+export type ToolDispatcher = 'auto' | 'native' | 'xml' | 'pformat' | 'python' | 'typescript';
 
 /** Partial update — omitted fields are left unchanged. */
 export interface AgentSettingsUpdate {
   agent_timeout_secs?: number;
+  tool_dispatcher?: ToolDispatcher;
 }
 
 export async function openhumanGetAgentSettings(): Promise<CommandResponse<AgentSettings>> {
@@ -694,6 +642,32 @@ export async function openhumanGetAnalyticsSettings(): Promise<
 > {
   return await callCoreRpc<CommandResponse<{ enabled: boolean }>>({
     method: CORE_RPC_METHODS.configGetAnalyticsSettings,
+  });
+}
+
+/** The user's time zone setting (Settings → Account), the device's zone, and the one in effect. */
+export interface UserTimezoneSettings {
+  /** IANA zone the user chose; `null` follows the device. */
+  timezone: string | null;
+  /** The device's IANA zone, when the core can resolve one. */
+  device: string | null;
+  /** The zone dates are read in: the user's, else the device's, else `UTC`. */
+  effective: string;
+}
+
+export async function openhumanGetUserTimezone(): Promise<CommandResponse<UserTimezoneSettings>> {
+  return await callCoreRpc<CommandResponse<UserTimezoneSettings>>({
+    method: CORE_RPC_METHODS.configGetUserTimezone,
+  });
+}
+
+/** Set the user's IANA time zone; `null` follows the device again. */
+export async function openhumanUpdateUserTimezone(
+  timezone: string | null
+): Promise<CommandResponse<ConfigSnapshot>> {
+  return await callCoreRpc<CommandResponse<ConfigSnapshot>>({
+    method: CORE_RPC_METHODS.configUpdateUserTimezone,
+    params: { timezone },
   });
 }
 

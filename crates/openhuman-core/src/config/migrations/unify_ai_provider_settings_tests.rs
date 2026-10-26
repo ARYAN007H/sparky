@@ -13,33 +13,29 @@ fn make_legacy_config_local_on() -> Config {
         usage: LocalAiUsage {
             embeddings: true,
             heartbeat: true,
-            learning_reflection: false,
             subconscious: true,
         },
         ..LocalAiConfig::default()
     };
-    c.memory_tree.llm_backend = crate::config::schema::LlmBackend::Local;
     c
 }
 
 #[test]
-fn empty_config_seeds_openhuman_entry() {
+fn empty_config_does_not_seed_a_hosted_entry_in_core() {
     let mut c = Config::default();
     let stats = run(&mut c).expect("migration must succeed");
 
-    assert_eq!(stats.cloud_providers_seeded, 1);
-    assert_eq!(c.cloud_providers.len(), 1);
-    assert_eq!(c.cloud_providers[0].slug, "openhuman");
-    assert!(c.cloud_providers[0].id.starts_with("p_openhuman_"));
+    assert_eq!(stats.cloud_providers_seeded, 0);
+    assert!(c.cloud_providers.is_empty());
 }
 
 #[test]
-fn primary_cloud_defaults_to_openhuman_id() {
+fn core_migration_leaves_primary_cloud_unset_without_a_hosted_entry() {
     let mut c = Config::default();
     let stats = run(&mut c).expect("migration must succeed");
 
-    assert!(stats.primary_cloud_set);
-    assert_eq!(c.primary_cloud, Some(c.cloud_providers[0].id.clone()));
+    assert!(!stats.primary_cloud_set);
+    assert_eq!(c.primary_cloud, None);
 }
 
 #[test]
@@ -54,7 +50,7 @@ fn legacy_inference_url_becomes_custom_entry() {
 
     let stats = run(&mut c).expect("migration must succeed");
 
-    assert_eq!(stats.cloud_providers_seeded, 2);
+    assert_eq!(stats.cloud_providers_seeded, 1);
     let custom = c
         .cloud_providers
         .iter()
@@ -70,53 +66,49 @@ fn legacy_inference_url_becomes_custom_entry() {
 }
 
 #[test]
-fn openhuman_inference_url_does_not_seed_custom() {
+fn managed_inference_url_does_not_seed_custom() {
     let mut c = Config::default();
-    c.inference_url = Some("https://api.openhuman.ai/v1".into());
+    // The installed host resolved its managed hosts onto the config.
+    c.resolved_endpoints.managed_hosts = vec![".managed.test".into()];
+    c.inference_url = Some("https://api.managed.test/v1".into());
     let _ = run(&mut c).expect("migration must succeed");
-    // Only the openhuman entry should be seeded — no Custom entry.
+    // Hosted entries are installed by TinyHumans, not the core migration.
+    assert!(c.cloud_providers.is_empty());
+}
+
+#[test]
+fn without_managed_hosts_every_inference_url_is_custom() {
+    // With no host registered nothing is a managed endpoint, so the same URL
+    // is migrated as a user-supplied one.
+    let mut c = Config::default();
+    c.inference_url = Some("https://api.managed.test/v1".into());
+    let _ = run(&mut c).expect("migration must succeed");
     assert_eq!(c.cloud_providers.len(), 1);
-    assert_eq!(c.cloud_providers[0].slug, "openhuman");
+    assert_eq!(c.cloud_providers[0].slug, "custom");
 }
 
 #[test]
 fn embeddings_provider_derived_from_legacy_usage() {
     let mut c = make_legacy_config_local_on();
     let stats = run(&mut c).expect("migration must succeed");
-    assert!(stats.workload_fields_filled >= 5);
+    // memory + embeddings.
+    assert_eq!(stats.workload_fields_filled, 2);
     assert_eq!(c.embeddings_provider.as_deref(), Some("ollama:bge-m3"));
 }
 
 #[test]
-fn heartbeat_provider_derived_from_legacy_usage() {
+fn retired_background_usage_flags_derive_no_route() {
+    // `usage.heartbeat` / `usage.subconscious` are on in the fixture, but the
+    // loops they routed are gone: the migration must not turn them into a
+    // workload route, and the serialized config must carry no such field.
     let mut c = make_legacy_config_local_on();
     let _ = run(&mut c).unwrap();
-    assert_eq!(c.heartbeat_provider.as_deref(), Some("ollama:llama3.1:8b"));
-}
-
-#[test]
-fn subconscious_provider_derived_from_legacy_usage() {
-    let mut c = make_legacy_config_local_on();
-    let _ = run(&mut c).unwrap();
-    assert_eq!(
-        c.subconscious_provider.as_deref(),
-        Some("ollama:llama3.1:8b")
+    let serialized = toml::to_string(&c).unwrap();
+    assert!(!serialized.contains("heartbeat_provider"), "{serialized}");
+    assert!(
+        !serialized.contains("subconscious_provider"),
+        "{serialized}"
     );
-}
-
-#[test]
-fn learning_provider_defaults_to_cloud_when_flag_off() {
-    // learning_reflection is `false` in our fixture.
-    let mut c = make_legacy_config_local_on();
-    let _ = run(&mut c).unwrap();
-    assert_eq!(c.learning_provider.as_deref(), Some("cloud"));
-}
-
-#[test]
-fn memory_provider_local_when_llm_backend_local() {
-    let mut c = make_legacy_config_local_on();
-    let _ = run(&mut c).unwrap();
-    assert_eq!(c.memory_provider.as_deref(), Some("ollama:llama3.1:8b"));
 }
 
 #[test]
@@ -144,7 +136,6 @@ fn idempotent_second_run_is_noop() {
     let first = run(&mut c).expect("first run must succeed");
     let providers_after_first = c.cloud_providers.len();
     let primary_after_first = c.primary_cloud.clone();
-    let heartbeat_after_first = c.heartbeat_provider.clone();
 
     let second = run(&mut c).expect("second run must succeed");
 
@@ -154,10 +145,10 @@ fn idempotent_second_run_is_noop() {
     assert_eq!(second.workload_fields_filled, 0);
     assert_eq!(c.cloud_providers.len(), providers_after_first);
     assert_eq!(c.primary_cloud, primary_after_first);
-    assert_eq!(c.heartbeat_provider, heartbeat_after_first);
 
     // Sanity: stats from the first run say we did do work.
-    assert!(first.cloud_providers_seeded >= 1);
+    assert_eq!(first.cloud_providers_seeded, 0);
+    assert!(!first.primary_cloud_set);
     assert!(first.workload_fields_filled >= 1);
 }
 
@@ -167,8 +158,6 @@ fn runtime_disabled_falls_back_to_cloud_even_with_usage_flags() {
     c.local_ai.runtime_enabled = false;
     let _ = run(&mut c).unwrap();
     // With runtime off, every workload routes to cloud regardless of usage.*
-    assert_eq!(c.heartbeat_provider.as_deref(), Some("cloud"));
-    assert_eq!(c.subconscious_provider.as_deref(), Some("cloud"));
     assert_eq!(c.embeddings_provider.as_deref(), Some("cloud"));
     assert_eq!(c.memory_provider.as_deref(), Some("cloud"));
 }

@@ -137,7 +137,7 @@ describe('entriesForSection', () => {
 
   it('returns the surviving developer entries', () => {
     // Most former Developer & Diagnostics entries (agents, autonomy,
-    // agent-access, sandbox-settings, tools, voice, embeddings, heartbeat,
+    // agent-access, sandbox-settings, tools, voice, embeddings,
     // migration, security, etc.) moved to their canonical section pages in
     // the redesign; only a handful of dev-only diagnostics stayed here.
     const devEntries = entriesForSection('developer');

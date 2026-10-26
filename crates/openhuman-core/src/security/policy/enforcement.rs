@@ -2,9 +2,9 @@ use std::path::Path;
 
 use super::types::{
     ActionTracker, AutonomyLevel, SecurityPolicy, ToolOperation, TrustedAccess, TrustedRoot,
-    POLICY_BLOCKED_MARKER,
 };
 use std::sync::Arc;
+use tinytools::status::POLICY_BLOCKED_MARKER;
 use tokio::sync::OnceCell;
 
 impl SecurityPolicy {
@@ -27,8 +27,8 @@ impl SecurityPolicy {
     /// guard, which sits under `MemoryCore::store` and is hit hundreds of times
     /// by one bulk ingest — want the tier refusal and nothing else. That is the
     /// same shape the ~15 acting tools which gate on bare [`Self::can_act`]
-    /// already use (e.g. `tools/impl/filesystem/file_write.rs`,
-    /// `tools/impl/system/python_exec.rs`, `cron/scheduler.rs`).
+    /// already use (e.g. `tinyagents_harness_tools::fs::filesystem::FileWriteTool`,
+    /// `cron/scheduler.rs`).
     pub fn enforce_write_tier(&self, operation_name: &str) -> Result<(), String> {
         if !self.can_act() {
             log::warn!(
@@ -103,6 +103,23 @@ impl SecurityPolicy {
         workspace_dir: &Path,
         action_dir: &Path,
     ) -> Self {
+        Self::from_config_with(
+            crate::core::runtime::is_saas(),
+            autonomy_config,
+            workspace_dir,
+            action_dir,
+        )
+    }
+
+    /// [`from_config`](Self::from_config) with the process mode passed in, so
+    /// the SaaS grants (no shared projects home, no shared `/tmp/openhuman`)
+    /// are testable without the process-wide mode lock.
+    pub(crate) fn from_config_with(
+        saas: bool,
+        autonomy_config: &crate::config::AutonomyConfig,
+        workspace_dir: &Path,
+        action_dir: &Path,
+    ) -> Self {
         log::info!(
             "[openhuman:policy] SecurityPolicy created: autonomy={:?}, workspace_only={}, allowed_cmds={}, max_actions/hr={}, auto_approve_all={}",
             autonomy_config.level,
@@ -131,11 +148,29 @@ impl SecurityPolicy {
         // channels-startup injection is skipped on cores with no listening
         // integrations (web-chat-only), and a freshly reloaded config wouldn't
         // carry an in-memory edit anyway. A user-granted entry is left as-is.
-        let mut trusted_roots = autonomy_config.trusted_roots.clone();
+        // SaaS: the projects home and `/tmp/openhuman` are shared by every user
+        // of the process, so neither is granted there.
+        // A relative or empty root grants nothing (`is_within_trusted_root`), so
+        // drop it here too: the turn prompt lists these roots as grants.
+        let mut trusted_roots: Vec<TrustedRoot> = autonomy_config
+            .trusted_roots
+            .iter()
+            .filter(|root| {
+                let absolute = Path::new(&crate::config::expand_tilde(&root.path)).is_absolute();
+                if !absolute {
+                    log::warn!(
+                        "[openhuman:policy] ignoring non-absolute trusted root {:?}",
+                        root.path
+                    );
+                }
+                absolute
+            })
+            .cloned()
+            .collect();
         let projects_path = crate::config::default_projects_dir()
             .to_string_lossy()
             .to_string();
-        if !trusted_roots.iter().any(|r| r.path == projects_path) {
+        if !saas && !trusted_roots.iter().any(|r| r.path == projects_path) {
             trusted_roots.push(TrustedRoot {
                 path: projects_path,
                 access: TrustedAccess::ReadWrite,
@@ -161,8 +196,13 @@ impl SecurityPolicy {
         // `is_always_forbidden` are checked *before* that shortcut and still
         // hold, but the `forbidden_paths` bypass is not something a working
         // directory should buy, so skip the grant in that shape.
-        let action_path = action_dir.to_string_lossy().to_string();
-        let action_covers_workspace = workspace_dir.starts_with(action_dir);
+        // Path checks resolve tool paths against `action_dir` (absolute after
+        // canonicalising), so a relative action dir is granted as its absolute
+        // form; only an absolute trusted root matches anything.
+        let action_root =
+            std::path::absolute(action_dir).unwrap_or_else(|_| action_dir.to_path_buf());
+        let action_path = action_root.to_string_lossy().to_string();
+        let action_covers_workspace = workspace_dir.starts_with(&action_root);
         if action_path.is_empty() || action_covers_workspace {
             tracing::debug!(
                 action_dir = %action_dir.display(),
@@ -176,13 +216,31 @@ impl SecurityPolicy {
             });
         }
 
+        // Oversized tool outputs are saved to `<workspace_dir>/artifacts/tool-results`
+        // (`tool_result_artifacts_dir`), outside the action dir, and the model is
+        // handed the absolute path to page them back with `file_read`. Under
+        // `workspace_only` an absolute path is refused unless a trusted root
+        // covers it, so without this grant every pointer would be unreadable.
+        // Read-only: the agent reads its own outputs back; it has no reason to
+        // write there. `is_workspace_internal_path` already exempts this one
+        // directory from the internal-state boundary.
+        let tool_results = super::types::tool_result_artifacts_dir(workspace_dir)
+            .to_string_lossy()
+            .to_string();
+        if !trusted_roots.iter().any(|r| r.path == tool_results) {
+            trusted_roots.push(TrustedRoot {
+                path: tool_results,
+                access: TrustedAccess::Read,
+            });
+        }
+
         // Dedicated, namespaced scratch dir (`/tmp/openhuman`) granted ReadWrite
         // so the LLM's natural `/tmp/...` temp-file habit lands in a sandboxed,
         // trusted location instead of the world-shared `/tmp`. Only this subdir
         // is ever trusted — never `/tmp` itself. Created here with restrictive
         // perms and refused if it exists as a symlink (TOCTOU hardening, since
         // `/tmp` is world-writable and the name is predictable).
-        match ensure_openhuman_scratch_dir() {
+        match (!saas).then(ensure_openhuman_scratch_dir).flatten() {
             Some(scratch) => {
                 let scratch_str = scratch.to_string_lossy().to_string();
                 if trusted_roots.iter().any(|r| r.path == scratch_str) {
@@ -230,6 +288,8 @@ impl SecurityPolicy {
             require_approval_for_medium_risk: autonomy_config.require_approval_for_medium_risk,
             block_high_risk_commands: autonomy_config.block_high_risk_commands,
             trusted_roots,
+            media_artifact_paths: Arc::new(std::sync::Mutex::new(std::collections::HashSet::new())),
+            media_files_roots: Arc::new(std::sync::Mutex::new(None)),
             allow_tool_install: autonomy_config.allow_tool_install,
             auto_approve: autonomy_config.auto_approve.clone(),
             auto_approve_all: autonomy_config.auto_approve_all,

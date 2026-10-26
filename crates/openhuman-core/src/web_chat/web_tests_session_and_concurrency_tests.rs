@@ -23,21 +23,21 @@ fn fingerprint_provider_binding_variants_differ() {
 
 #[test]
 fn provider_role_override_routes_hint_workloads() {
+    crate::agent::session_host::test_support::install_model_fixture();
     assert_eq!(
         provider_role_for_model_override(Some("hint:agentic")),
         "agentic"
     );
-    assert_eq!(
-        provider_role_for_model_override(Some("agentic-v1")),
-        "agentic"
-    );
+    // Hosted vocabulary is supplied by the installed provider policy. With
+    // no hosted policy in bare core, an arbitrary model id stays concrete.
+    assert_eq!(provider_role_for_model_override(Some("agentic-v1")), "chat");
     assert_eq!(
         provider_role_for_model_override(Some("hint:coding")),
         "coding"
     );
     assert_eq!(
         provider_role_for_model_override(Some("summarization-v1")),
-        "summarization"
+        "chat"
     );
     assert_eq!(
         provider_role_for_model_override(Some("hint:reasoning")),
@@ -45,13 +45,17 @@ fn provider_role_override_routes_hint_workloads() {
     );
     assert_eq!(
         provider_role_for_model_override(Some("reasoning-v1")),
-        "reasoning"
+        "chat"
     );
     assert_eq!(
         provider_role_for_model_override(Some("gpt-4.1-mini")),
         "chat"
     );
     assert_eq!(provider_role_for_model_override(None), "chat");
+    assert_eq!(
+        provider_role_for_model_override(Some("fixture-reasoning")),
+        "reasoning"
+    );
 }
 
 #[test]
@@ -97,6 +101,20 @@ fn locale_reply_directive_renders_known_locales() {
     );
     let zh = locale_reply_directive("zh-CN").expect("zh-CN directive expected");
     assert!(zh.contains("Simplified Chinese"));
+}
+
+/// Every non-English locale the app offers (`app/src/lib/i18n/types.ts`) gets
+/// a directive; de, ja, ko, pl and tr used to fall through to none.
+#[test]
+fn locale_reply_directive_covers_every_app_locale() {
+    for locale in [
+        "zh-CN", "hi", "es", "ar", "fr", "bn", "pt", "de", "ru", "id", "it", "ja", "ko", "pl", "tr",
+    ] {
+        assert!(
+            locale_reply_directive(locale).is_some(),
+            "no reply directive for app locale {locale}"
+        );
+    }
 }
 
 // ── PTT field additions (Task 1 of global-ptt plan) ─────────────────────────
@@ -197,6 +215,7 @@ async fn start_chat_runs_distinct_threads_concurrently() {
     let thread_b = "concurrent-thread-b";
 
     start_chat(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "client-a",
         thread_a,
         "hello a",
@@ -209,6 +228,7 @@ async fn start_chat_runs_distinct_threads_concurrently() {
     .await
     .expect("thread A should start");
     start_chat(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "client-b",
         thread_b,
         "hello b",
@@ -233,8 +253,20 @@ async fn start_chat_runs_distinct_threads_concurrently() {
     );
 
     // Cleanup: cancel both and clear the test hook.
-    let _ = cancel_chat("client-a", thread_a).await;
-    let _ = cancel_chat("client-b", thread_b).await;
+    let _ = cancel_chat_scoped(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "client-a",
+        thread_a,
+        None,
+    )
+    .await;
+    let _ = cancel_chat_scoped(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "client-b",
+        thread_b,
+        None,
+    )
+    .await;
     set_test_run_chat_task_block(None).await;
 }
 
@@ -249,6 +281,7 @@ async fn cancel_chat_cooperatively_stops_in_flight_turn() {
 
     let thread_id = "cancel-coop-thread";
     let request_id = start_chat(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "cancel-client",
         thread_id,
         "park me",
@@ -269,9 +302,14 @@ async fn cancel_chat_cooperatively_stops_in_flight_turn() {
         "turn should still be parked, not yet dropped"
     );
 
-    let cancelled = cancel_chat("cancel-client", thread_id)
-        .await
-        .expect("cancel_chat should succeed");
+    let cancelled = cancel_chat_scoped(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "cancel-client",
+        thread_id,
+        None,
+    )
+    .await
+    .expect("cancel_chat should succeed");
     assert_eq!(
         cancelled.as_deref(),
         Some(request_id.as_str()),
@@ -289,32 +327,29 @@ async fn cancel_chat_cooperatively_stops_in_flight_turn() {
 /// Issue #4746: a turn that never produces a terminal event on its own — a
 /// wedged main agent stuck mid tool-call, or a delegated sub-agent that never
 /// returns (modeled here by the parked test block) — must still end in a
-/// terminal `chat_error`, never an empty reply / an endless `inference_heartbeat`
+/// terminal event, never an empty reply / an endless `inference_heartbeat`
 /// stream until the socket dies. The web turn driver's wall-clock backstop fires
-/// and emits a graceful, retryable `turn_timeout` chat_error, and tears the
-/// wedged future down cooperatively (its `Drop` guard flips well before the 30s
-/// test sleep would elapse).
+/// and tears the wedged future down cooperatively (its `Drop` guard flips well
+/// before the 30s test sleep would elapse). The block parks before the turn
+/// resolves its config, so there is no workspace to write a closing reply to:
+/// the turn ends in the graceful, retryable `turn_timeout` chat_error.
 #[tokio::test]
 async fn wedged_turn_hits_wall_clock_backstop_and_emits_turn_timeout_chat_error() {
     let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
     // Panic-safe teardown of the process-global env override: if any assertion
     // below unwinds, this guard still clears `OPENHUMAN_WEB_TURN_TIMEOUT_SECS` so
     // a 1s backstop can't leak into unrelated tests sharing this process.
-    struct EnvGuard;
-    impl Drop for EnvGuard {
-        fn drop(&mut self) {
-            std::env::remove_var("OPENHUMAN_WEB_TURN_TIMEOUT_SECS");
-        }
-    }
-    let _env_guard = EnvGuard;
-    // Tight 1s backstop so the parked (30s) turn trips it quickly. Scoped to this
-    // serialized test and cleared by `EnvGuard` on drop (even on unwind).
-    std::env::set_var("OPENHUMAN_WEB_TURN_TIMEOUT_SECS", "1");
+    let _env_guard = crate::config::test_env::EnvVarGuard::locked_set_async(
+        "OPENHUMAN_WEB_TURN_TIMEOUT_SECS",
+        "1",
+    )
+    .await;
     let block = make_block();
     set_test_run_chat_task_block(Some(block.clone())).await;
 
     let mut rx = subscribe_web_channel_events();
     let request_id = start_chat(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "backstop-client",
         "backstop-thread",
         "park me until the wall-clock backstop fires",
@@ -327,32 +362,13 @@ async fn wedged_turn_hits_wall_clock_backstop_and_emits_turn_timeout_chat_error(
     .await
     .expect("turn should start");
 
-    let recv = timeout(Duration::from_secs(20), async move {
-        loop {
-            let event = rx.recv().await.expect("event stream should stay open");
-            if event.event == "chat_error" && event.request_id == request_id {
-                return event;
-            }
-        }
-    })
+    let recv = timeout(
+        Duration::from_secs(20),
+        terminal_event(&mut rx, &request_id),
+    )
     .await
-    .expect("a wedged turn must still emit a terminal chat_error (issue #4746)");
-
-    assert_eq!(
-        recv.error_type.as_deref(),
-        Some("turn_timeout"),
-        "the backstop must surface a graceful turn_timeout, not a generic error"
-    );
-    assert_eq!(
-        recv.error_retryable,
-        Some(true),
-        "a turn_timeout is safe to retry in the same thread"
-    );
-    let message = recv.message.unwrap_or_default();
-    assert!(
-        !message.contains("openhuman_turn_wall_clock_timeout"),
-        "internal marker must not leak into user copy: {message}"
-    );
+    .expect("a wedged turn must still emit a terminal event (issue #4746)");
+    assert_turn_timeout(&recv);
 
     // The wedged future is torn down cooperatively when the backstop drops it
     // (the Drop guard flips), not left sleeping to its 30s test wall.
@@ -360,6 +376,46 @@ async fn wedged_turn_hits_wall_clock_backstop_and_emits_turn_timeout_chat_error(
 
     set_test_run_chat_task_block(None).await;
     // `OPENHUMAN_WEB_TURN_TIMEOUT_SECS` is cleared by `_env_guard`'s Drop.
+}
+
+/// The idle guard ends a turn that emits no progress with nothing in flight,
+/// well inside the wall-clock ceiling. The parked test block emits nothing and
+/// parks before the turn resolves its config, like a turn wedged in session
+/// checkout, so the turn ends in the graceful `turn_timeout` chat_error.
+#[tokio::test]
+async fn silent_turn_hits_idle_guard_and_emits_turn_timeout_chat_error() {
+    let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
+    let _env_guard =
+        crate::config::test_env::EnvVarGuard::locked_set_async("OPENHUMAN_WEB_TURN_IDLE_SECS", "1")
+            .await;
+    let block = make_block();
+    set_test_run_chat_task_block(Some(block.clone())).await;
+
+    let mut rx = subscribe_web_channel_events();
+    let request_id = start_chat(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "idle-client",
+        "idle-thread",
+        "park me until the idle guard fires",
+        None,
+        None,
+        None,
+        None,
+        ChatRequestMetadata::default(),
+    )
+    .await
+    .expect("turn should start");
+
+    let recv = timeout(
+        Duration::from_secs(20),
+        terminal_event(&mut rx, &request_id),
+    )
+    .await
+    .expect("a silent turn must end in a terminal event");
+    assert_turn_timeout(&recv);
+    wait_for_flag(&block.dropped, "silent turn future dropped by idle guard").await;
+
+    set_test_run_chat_task_block(None).await;
 }
 
 /// A `parallel`-mode turn runs CONCURRENTLY with the primary turn on the SAME
@@ -374,6 +430,7 @@ async fn parallel_turn_runs_concurrently_with_primary_on_same_thread() {
 
     // Primary turn (default interrupt mode) parks in IN_FLIGHT.
     start_chat(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "pp-client",
         thread_id,
         "primary",
@@ -390,6 +447,7 @@ async fn parallel_turn_runs_concurrently_with_primary_on_same_thread() {
     // Parallel turn on the SAME thread must NOT interrupt the primary — it
     // lives in the parallel lane while the primary stays in-flight.
     start_chat(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "pp-client",
         thread_id,
         "branch",
@@ -405,7 +463,7 @@ async fn parallel_turn_runs_concurrently_with_primary_on_same_thread() {
     wait_for_parallel(|e| e.iter().any(|(_, t)| t == thread_id)).await;
     // Primary is still in-flight — the parallel send did not interrupt it.
     assert!(
-        in_flight_entries_for_test()
+        in_flight_entries_for_test(&crate::core::runtime::DispatchCtx::ambient())
             .await
             .iter()
             .any(|(k, _)| k == thread_id),
@@ -413,9 +471,14 @@ async fn parallel_turn_runs_concurrently_with_primary_on_same_thread() {
     );
 
     // A thread-level cancel tears down BOTH the primary and the parallel turn.
-    cancel_chat("pp-client", thread_id)
-        .await
-        .expect("cancel should succeed");
+    cancel_chat_scoped(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "pp-client",
+        thread_id,
+        None,
+    )
+    .await
+    .expect("cancel should succeed");
     wait_for_in_flight(|e| !e.iter().any(|(k, _)| k == thread_id)).await;
     wait_for_parallel(|e| !e.iter().any(|(_, t)| t == thread_id)).await;
 
@@ -469,8 +532,8 @@ fn classify_connection_drop_routes_to_network_retryable() {
         "error sending request for url (https://api.tinyhumans.ai/openai/v1/chat/completions): \
          connection closed before message completed",
         "request or response body error: unexpected end of file",
-        // Raw mid-stream SSE drop: managed backend leaves OFF the errorCode, so
-        // it reaches the ladder as a streaming error with a transport body.
+        // Raw mid-stream SSE drop reaches generic classification as a
+        // streaming transport failure.
         "OpenHuman streaming API error: error reading a body from connection: \
          end of file before message length reached",
     ] {
@@ -487,12 +550,12 @@ fn classify_connection_drop_routes_to_network_retryable() {
 
 #[test]
 fn classify_managed_sse_badrequest_not_misread_as_network() {
-    // A managed 400 frame carries errorCode → must stay provider_request_rejected
-    // (claimed by the errorCode short-circuit before the transport arm).
-    let c = classify_inference_error(
-        "OpenHuman streaming API error: {\"error\":{\"message\":\"Message has tool role, \
-         but there was no previous assistant message with a tool call!\",\
-         \"type\":\"stream_error\",\"errorCode\":\"BAD_REQUEST\"}}",
+    // Host classification supplies the semantic kind before generic transport
+    // copy selection, so a streaming rejection is not mistaken for a drop.
+    let c = classify_with_backend_metadata(
+        "generic streaming response: Message has tool role, but there was no previous assistant message with a tool call!",
+        BackendErrorKind::BadRequest,
+        false,
     );
     assert_eq!(c.error_type, "provider_request_rejected");
 }
@@ -510,10 +573,10 @@ fn classify_managed_tool_ordering_400_gets_cleared_resend_copy() {
     // message) arrives as a BAD_REQUEST SSE frame — must read "we cleared it,
     // send again" (not "try a different model") and be retryable, since the
     // de-poison guard already evicted the bad warm session.
-    let c = classify_inference_error(
-        "OpenHuman streaming API error: {\"error\":{\"message\":\"Message at index 3 has role \
-         'tool' but is not preceded by an assistant message with a matching tool_call\",\
-         \"type\":\"stream_error\",\"errorCode\":\"BAD_REQUEST\"}}",
+    let c = classify_with_backend_metadata(
+        "generic streaming response: Message at index 3 has role 'tool' but is not preceded by an assistant message with a matching tool_call",
+        BackendErrorKind::BadRequest,
+        false,
     );
     assert_eq!(c.error_type, "provider_request_rejected");
     assert!(c.retryable, "post-eviction resend works → retryable");
@@ -545,56 +608,29 @@ fn classify_genuine_param_400_keeps_model_mismatch_copy_not_glitch() {
     assert!(!c.message.contains("cleared it"), "got: {}", c.message);
 }
 
-/// The Stop button must reach a thread's detached background sub-agents. They
-/// run on their own tasks and drop the spawning turn's cancellation, so before
-/// this the parent turn stopped but the child kept working — and its result
-/// later started a fresh delivery turn on the thread. A scoped cancel (one named
-/// request) must leave them alone.
-#[tokio::test]
-async fn unscoped_cancel_stops_the_threads_detached_subagents() {
-    let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
-    let _registry = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
-    use crate::agent::orchestration::running_subagents;
+/// The terminal event (`chat_done` or `chat_error`) for `request_id`.
+async fn terminal_event(
+    rx: &mut tokio::sync::broadcast::Receiver<crate::web_chat::WebChannelEvent>,
+    request_id: &str,
+) -> crate::web_chat::WebChannelEvent {
+    loop {
+        let event = rx.recv().await.expect("event stream should stay open");
+        if event.request_id == request_id
+            && matches!(event.event.as_str(), "chat_done" | "chat_error")
+        {
+            return event;
+        }
+    }
+}
 
-    let thread_id = "stop-detached-subagent-thread";
-    let workspace = tempfile::tempdir().expect("workspace");
-    let child = tokio::spawn(std::future::pending::<()>());
-    let (_status_tx, status_rx) = running_subagents::status_channel();
-    running_subagents::register(
-        "task-web-stop-1".into(),
-        "researcher".into(),
-        "session-web-stop".into(),
-        None,
-        None,
-        workspace.path().to_path_buf(),
-        Some(thread_id.into()),
-        std::sync::Arc::new(tinyagents_harness::run_queue::RunQueue::new()),
-        child.abort_handle(),
-        status_rx,
-    );
-
-    // A scoped cancel for some other request is not a Stop: the child lives.
-    let scoped = channel_web_cancel("stop-client", thread_id, Some("req-unrelated"))
-        .await
-        .expect("scoped cancel");
-    assert_eq!(scoped.value["cancelled"], serde_json::json!(false));
-    assert_eq!(scoped.value["subagents_cancelled"], serde_json::json!(0));
+/// A graceful, retryable `turn_timeout` whose user copy hides the marker.
+fn assert_turn_timeout(event: &crate::web_chat::WebChannelEvent) {
+    assert_eq!(event.event, "chat_error", "{event:?}");
+    assert_eq!(event.error_type.as_deref(), Some("turn_timeout"));
+    assert_eq!(event.error_retryable, Some(true));
+    let message = event.message.clone().unwrap_or_default();
     assert!(
-        !child.is_finished(),
-        "scoped cancel must not stop sub-agents"
+        !message.contains("openhuman_turn_wall_clock_timeout"),
+        "internal marker must not leak into user copy: {message}"
     );
-
-    // The Stop button: no turn in flight, but the detached child is stopped.
-    let stop = channel_web_cancel("stop-client", thread_id, None)
-        .await
-        .expect("stop");
-    assert_eq!(stop.value["cancelled"], serde_json::json!(true));
-    assert_eq!(stop.value["request_id"], serde_json::Value::Null);
-    assert_eq!(stop.value["subagents_cancelled"], serde_json::json!(1));
-    let joined = tokio::time::timeout(std::time::Duration::from_secs(2), child)
-        .await
-        .expect("aborted child finishes promptly");
-    assert!(joined.expect_err("child aborted").is_cancelled());
 }

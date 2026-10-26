@@ -165,90 +165,6 @@ fn array_field_redacts_to_count_marker() {
 }
 
 #[test]
-fn home_path_in_unredacted_string_is_scrubbed() {
-    let args = json!({ "action": "list", "cwd": "/Users/oxoxdev/work/openhuman" });
-    let red = redact_args(&args);
-    let cwd = red["cwd"].as_str().unwrap();
-    assert!(!cwd.contains("oxoxdev"), "got {cwd}");
-    assert!(cwd.contains("<HOME>"));
-    assert!(cwd.ends_with("/work/openhuman"));
-}
-
-#[test]
-fn windows_home_path_is_scrubbed() {
-    let args = json!({ "action": "list", "cwd": "C:\\Users\\oxoxdev\\work\\openhuman" });
-    let red = redact_args(&args);
-    let cwd = red["cwd"].as_str().unwrap();
-    assert!(!cwd.contains("oxoxdev"), "got {cwd}");
-    assert!(cwd.contains("<HOME>"));
-    assert!(cwd.ends_with("\\work\\openhuman"));
-}
-
-#[test]
-fn linux_home_path_is_scrubbed() {
-    let args = json!({ "action": "list", "cwd": "/home/jane/project" });
-    let red = redact_args(&args);
-    let cwd = red["cwd"].as_str().unwrap();
-    assert!(!cwd.contains("jane"), "got {cwd}");
-    assert!(cwd.contains("<HOME>"));
-    assert!(cwd.ends_with("/project"));
-}
-
-#[test]
-fn lowercase_windows_home_path_is_scrubbed() {
-    // Regression: the fast-path guard was case-sensitive while the matcher is
-    // case-insensitive, so a lowercase drive/`users` casing slipped through
-    // unredacted and leaked the username.
-    let args = json!({ "action": "list", "cwd": "c:\\users\\alice\\work" });
-    let red = redact_args(&args);
-    let cwd = red["cwd"].as_str().unwrap();
-    assert!(!cwd.contains("alice"), "got {cwd}");
-    assert!(cwd.contains("<HOME>"));
-    assert!(cwd.ends_with("\\work"));
-}
-
-#[test]
-fn uppercase_linux_home_path_is_scrubbed() {
-    let args = json!({ "action": "list", "cwd": "/HOME/alice/work" });
-    let red = redact_args(&args);
-    let cwd = red["cwd"].as_str().unwrap();
-    assert!(!cwd.contains("alice"), "got {cwd}");
-    assert!(cwd.contains("<HOME>"));
-    assert!(cwd.ends_with("/work"));
-}
-
-#[test]
-fn mixed_case_home_path_is_scrubbed() {
-    let args = json!({ "action": "list", "cwd": "/Home/alice/work" });
-    let red = redact_args(&args);
-    let cwd = red["cwd"].as_str().unwrap();
-    assert!(!cwd.contains("alice"), "got {cwd}");
-    assert!(cwd.contains("<HOME>"));
-    assert!(cwd.ends_with("/work"));
-}
-
-#[test]
-fn non_path_string_without_home_marker_is_unchanged() {
-    // The guard's fast-path must still return unrelated strings verbatim.
-    let args = json!({ "action": "run", "command": "echo hello world" });
-    let red = redact_args(&args);
-    assert_eq!(red["command"].as_str().unwrap(), "echo hello world");
-}
-
-#[test]
-fn multiple_home_paths_in_same_string_all_scrubbed() {
-    let args = json!({
-        "action": "list",
-        "summary": "from /Users/alice/a.txt to /Users/bob/b.txt",
-    });
-    let red = redact_args(&args);
-    let summary = red["summary"].as_str().unwrap();
-    assert!(!summary.contains("alice"));
-    assert!(!summary.contains("bob"));
-    assert_eq!(summary.matches("<HOME>").count(), 2);
-}
-
-#[test]
 fn file_handoff_links_are_redacted() {
     // A presigned storage link is a bearer capability: anyone holding the
     // URL can fetch the file until it expires. Redacted args are shown on
@@ -335,4 +251,59 @@ fn summarize_action_skill_install_without_entry_id_falls_back() {
     // Missing slug → generic fallback so we never panic or mislabel.
     assert!(summary.contains("skill_registry_install"));
     assert!(summary.contains("bytes"));
+}
+
+#[test]
+fn non_string_sensitive_values_redact_to_kind_markers_and_nested_values_recurse() {
+    let args = json!({
+        "metadata": {
+            "Subject": "Confidential subject",
+            "auth": true,
+            "message": 42,
+            "password": null,
+            "user": { "id": "user-123", "name": "Alice" },
+            "attempts": 3,
+            "safe_list": [
+                "open /Users/frank/Desktop/report.txt",
+                { "content": "nested secret" }
+            ]
+        }
+    });
+    let red = redact_args(&args);
+    assert_eq!(
+        red.pointer("/metadata/Subject"),
+        Some(&json!("<redacted: string (20 chars)>"))
+    );
+    assert_eq!(red.pointer("/metadata/attempts"), Some(&json!(3)));
+    assert_eq!(
+        red.pointer("/metadata/auth"),
+        Some(&json!("<redacted: bool>"))
+    );
+    assert_eq!(
+        red.pointer("/metadata/message"),
+        Some(&json!("<redacted: number>"))
+    );
+    assert_eq!(
+        red.pointer("/metadata/password"),
+        Some(&serde_json::Value::Null)
+    );
+    assert_eq!(
+        red.pointer("/metadata/user"),
+        Some(&json!("<redacted: object (2 keys)>"))
+    );
+    assert_eq!(
+        red.pointer("/metadata/safe_list/0"),
+        Some(&json!("open <HOME>/Desktop/report.txt"))
+    );
+    assert_eq!(
+        red.pointer("/metadata/safe_list/1/content"),
+        Some(&json!("<redacted: string (13 chars)>"))
+    );
+    assert_eq!(
+        redact_args(&json!(
+            "open /home/carol/report.md and C:\\Users\\dave\\x.txt"
+        )),
+        json!("open <HOME>/report.md and <HOME>\\x.txt")
+    );
+    assert_eq!(redact_args(&json!("/Users/erin")), json!("<HOME>"));
 }

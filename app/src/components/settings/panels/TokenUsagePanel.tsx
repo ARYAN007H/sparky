@@ -11,16 +11,12 @@ import {
   type TokenjuiceSettingsPatch,
   updateTokenjuiceSettings,
 } from '../../../utils/tauriCommands/tokenjuice';
+import { formatCurrency } from '../../dashboard/formatCurrency';
 import { Button, Card, Field, NumberField, StatusLine, Switch } from '../../ui';
 import SettingsPanel from '../layout/SettingsPanel';
 
 function formatInt(n: number): string {
   return Math.round(n).toLocaleString();
-}
-
-function formatUsd(n: number): string {
-  if (n > 0 && n < 0.01) return '<$0.01';
-  return `$${n.toFixed(2)}`;
 }
 
 function formatBytes(n: number): string {
@@ -207,7 +203,7 @@ const TokenUsagePanel = ({ embedded = false }: TokenUsagePanelProps = {}) => {
           />
           <StatTile
             label={t('settings.tokenUsage.costSaved')}
-            value={total ? formatUsd(total.costSavedUsd) : '—'}
+            value={total ? formatCurrency(total.costSavedUsd, 'USD') : '—'}
           />
           <StatTile
             label={t('settings.tokenUsage.cacheOccupancy')}
@@ -234,7 +230,7 @@ const TokenUsagePanel = ({ embedded = false }: TokenUsagePanelProps = {}) => {
                     <span className="tabular-nums text-content-muted">
                       {t('settings.tokenUsage.tokensAndCost', '{tokens} tok · {cost}')
                         .replace('{tokens}', formatInt(b.tokensSaved))
-                        .replace('{cost}', formatUsd(b.costSavedUsd))}
+                        .replace('{cost}', formatCurrency(b.costSavedUsd, 'USD'))}
                     </span>
                   </div>
                 ))}
@@ -278,14 +274,6 @@ const TokenUsagePanel = ({ embedded = false }: TokenUsagePanelProps = {}) => {
           checked={settings?.html_enabled ?? false}
           disabled={settings === null}
           onChange={v => void patch({ html_enabled: v })}
-        />
-        <ToggleRow
-          id="tj-ml-enabled"
-          label={t('settings.tokenUsage.ml')}
-          description={t('settings.tokenUsage.mlDesc')}
-          checked={settings?.ml_compression_enabled ?? false}
-          disabled={settings === null}
-          onChange={v => void patch({ ml_compression_enabled: v })}
         />
       </Card>
 

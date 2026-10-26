@@ -1,10 +1,10 @@
 use crate::config::Config;
-use crate::cron::{self, CronJobPatch};
 use crate::security::SecurityPolicy;
 use async_trait::async_trait;
 use serde_json::json;
 use std::sync::Arc;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolExposure, ToolResult};
+use {crate::cron, tinyflows_bus::schedule::types::CronJobPatch};
 
 pub struct CronUpdateTool {
     config: Arc<Config>,
@@ -70,6 +70,15 @@ impl Tool for CronUpdateTool {
         args: serde_json::Value,
         options: ToolCallOptions,
     ) -> anyhow::Result<ToolResult> {
+        self.execute_with_context(args, options, None).await
+    }
+
+    async fn execute_with_context(
+        &self,
+        args: serde_json::Value,
+        options: ToolCallOptions,
+        tool_context: Option<&dyn tinytools::ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
         if !self.config.cron.enabled {
             return Ok(ToolResult::error(
                 "cron is disabled by config (cron.enabled=false)".to_string(),
@@ -98,14 +107,21 @@ impl Tool for CronUpdateTool {
         };
 
         if let Some(command) = &patch.command {
-            if !self.security.is_command_allowed(command) {
-                return Ok(ToolResult::error(format!(
-                    "Command blocked by security policy: {command}"
-                )));
+            if let Err(reason) = super::super::scheduler::shell_job::authorize_shell_command(
+                &self.config,
+                &self.security,
+                command,
+            )
+            .await
+            {
+                return Ok(ToolResult::error(reason));
             }
         }
 
-        match cron::update_job(&self.config, job_id, patch) {
+        let origin =
+            crate::agent::tinyagents::host::run_context::turn_origin_for_tool(tool_context)
+                .and_then(|origin| crate::cron::origin::current_job_origin(Some(&origin)));
+        match cron::store::update_job_with_origin(&self.config, job_id, patch, origin) {
             Ok(job) => {
                 let mut tr = ToolResult::success(serde_json::to_string_pretty(&job)?);
                 if options.prefer_markdown {

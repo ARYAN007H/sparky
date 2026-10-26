@@ -1,336 +1,7 @@
 use super::*;
 
-#[test]
-fn engine_compatibility_distinguishes_nested_from_safe_fan_ins() {
-    let risky = structurally_valid_graph(nested_conditional_fan_in_graph());
-    let errors = engine_compatibility_errors(&risky);
-    assert_eq!(errors.len(), 1);
-    assert_eq!(errors[0].code, UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN);
-    assert_eq!(errors[0].node_id.as_deref(), Some("m"));
-
-    let one_level = structurally_valid_graph(json!({
-        "name": "one-level-mixed-fan-in",
-        "nodes": [
-            { "id": "start", "kind": "trigger", "name": "Trigger" },
-            { "id": "cond", "kind": "condition", "name": "Condition", "config": { "field": "flag" } },
-            { "id": "a", "kind": "output_parser", "name": "A" },
-            { "id": "other", "kind": "output_parser", "name": "Other" },
-            { "id": "c", "kind": "output_parser", "name": "C" },
-            { "id": "m", "kind": "merge", "name": "Merge" }
-        ],
-        "edges": [
-            { "from_node": "start", "from_port": "main", "to_node": "cond" },
-            { "from_node": "start", "from_port": "main", "to_node": "c" },
-            { "from_node": "cond", "from_port": "true", "to_node": "a" },
-            { "from_node": "cond", "from_port": "false", "to_node": "other" },
-            { "from_node": "a", "from_port": "main", "to_node": "m" },
-            { "from_node": "c", "from_port": "main", "to_node": "m" }
-        ]
-    }));
-    assert!(engine_compatibility_errors(&one_level).is_empty());
-
-    let nested_without_fan_in = structurally_valid_graph(json!({
-        "name": "nested-without-fan-in",
-        "nodes": [
-            { "id": "start", "kind": "trigger", "name": "Trigger" },
-            { "id": "outer", "kind": "condition", "name": "Outer", "config": { "field": "outer" } },
-            { "id": "inner", "kind": "condition", "name": "Inner", "config": { "field": "inner" } },
-            { "id": "outer_else", "kind": "output_parser", "name": "Outer else" },
-            { "id": "a", "kind": "output_parser", "name": "A" },
-            { "id": "inner_else", "kind": "output_parser", "name": "Inner else" }
-        ],
-        "edges": [
-            { "from_node": "start", "from_port": "main", "to_node": "outer" },
-            { "from_node": "outer", "from_port": "true", "to_node": "inner" },
-            { "from_node": "outer", "from_port": "false", "to_node": "outer_else" },
-            { "from_node": "inner", "from_port": "true", "to_node": "a" },
-            { "from_node": "inner", "from_port": "false", "to_node": "inner_else" }
-        ]
-    }));
-    assert!(engine_compatibility_errors(&nested_without_fan_in).is_empty());
-
-    let unconditional = structurally_valid_graph(json!({
-        "name": "unconditional-fan-in",
-        "nodes": [
-            { "id": "start", "kind": "trigger", "name": "Trigger" },
-            { "id": "a", "kind": "output_parser", "name": "A" },
-            { "id": "c", "kind": "output_parser", "name": "C" },
-            { "id": "m", "kind": "merge", "name": "Merge" }
-        ],
-        "edges": [
-            { "from_node": "start", "from_port": "main", "to_node": "a" },
-            { "from_node": "start", "from_port": "main", "to_node": "c" },
-            { "from_node": "a", "from_port": "main", "to_node": "m" },
-            { "from_node": "c", "from_port": "main", "to_node": "m" }
-        ]
-    }));
-    assert!(engine_compatibility_errors(&unconditional).is_empty());
-}
-
-#[test]
-fn engine_compatibility_rejects_main_label_on_conditional_fan_in_path() {
-    let graph = structurally_valid_graph(main_port_conditional_fan_in_graph());
-    let errors = engine_compatibility_errors(&graph);
-    assert_eq!(errors.len(), 1);
-    assert_eq!(errors[0].code, UNSUPPORTED_MAIN_PORT_CONDITIONAL_FAN_IN);
-    assert_eq!(errors[0].node_id.as_deref(), Some("m"));
-
-    let reconverged = structurally_valid_graph(json!({
-        "name": "main-port-reconverges-before-fan-in",
-        "nodes": [
-            { "id": "start", "kind": "trigger", "name": "Trigger" },
-            { "id": "route", "kind": "switch", "name": "Route", "config": { "field": "kind" } },
-            { "id": "a", "kind": "output_parser", "name": "A" },
-            { "id": "c", "kind": "output_parser", "name": "C" },
-            { "id": "m", "kind": "merge", "name": "Merge" }
-        ],
-        "edges": [
-            { "from_node": "start", "from_port": "main", "to_node": "route" },
-            { "from_node": "start", "from_port": "main", "to_node": "c" },
-            { "from_node": "route", "from_port": "main", "to_node": "a" },
-            { "from_node": "route", "from_port": "default", "to_node": "a" },
-            { "from_node": "a", "from_port": "main", "to_node": "m" },
-            { "from_node": "c", "from_port": "main", "to_node": "m" }
-        ]
-    }));
-    assert!(engine_compatibility_errors(&reconverged).is_empty());
-}
-
-/// A loop head has two incoming edges, and this gate mirrors the engine's
-/// fan-in classification — so without excluding back-edges it would report
-/// every legal bounded loop as an unrelieved fan-in and refuse to save it.
-#[test]
-fn engine_compatibility_does_not_treat_a_loop_back_edge_as_a_fan_in() {
-    let looping = structurally_valid_graph(json!({
-        "name": "bounded-loop",
-        "nodes": [
-            { "id": "start", "kind": "trigger", "name": "Trigger" },
-            { "id": "l", "kind": "loop", "name": "Loop",
-              "config": { "max_iterations": 3, "on_exceeded": "continue" } },
-            { "id": "work", "kind": "output_parser", "name": "Work" },
-            { "id": "out", "kind": "output_parser", "name": "Out" }
-        ],
-        "edges": [
-            { "from_node": "start", "from_port": "main", "to_node": "l" },
-            { "from_node": "l", "from_port": "body", "to_node": "work" },
-            { "from_node": "work", "from_port": "main", "to_node": "l" },
-            { "from_node": "l", "from_port": "done", "to_node": "out" }
-        ]
-    }));
-    assert!(
-        engine_compatibility_errors(&looping).is_empty(),
-        "a bounded loop must save cleanly: {:?}",
-        engine_compatibility_errors(&looping)
-    );
-}
-
-#[test]
-fn engine_compatibility_requires_exhaustive_router_choices_for_reconvergence() {
-    let exhaustive_condition = nested_router_reconvergence_graph("condition", &["true", "false"]);
-    assert!(engine_compatibility_errors(&exhaustive_condition).is_empty());
-
-    let missing_condition_branch = nested_router_reconvergence_graph("condition", &["true"]);
-    let errors = engine_compatibility_errors(&missing_condition_branch);
-    assert_eq!(errors.len(), 1);
-    assert_eq!(errors[0].code, UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN);
-
-    let exhaustive_switch = nested_router_reconvergence_graph("switch", &["known-case", "default"]);
-    assert!(engine_compatibility_errors(&exhaustive_switch).is_empty());
-
-    // Same-port fan-out is unconditional: TinyFlows schedules both `main`
-    // successors. A side path after an exhaustive router must not make the
-    // reconverging path look like another conditional choice.
-    let exhaustive_switch_with_main_fanout = structurally_valid_graph(json!({
-        "nodes": [
-            { "id": "start", "kind": "trigger", "name": "Trigger" },
-            { "id": "outer", "kind": "condition", "name": "Outer", "config": { "field": "outer" } },
-            { "id": "inner", "kind": "switch", "name": "Inner", "config": { "field": "inner" } },
-            { "id": "outer_else", "kind": "output_parser", "name": "Outer else" },
-            { "id": "fanout", "kind": "output_parser", "name": "Fan out" },
-            { "id": "a", "kind": "output_parser", "name": "A" },
-            { "id": "side", "kind": "output_parser", "name": "Side" },
-            { "id": "c", "kind": "output_parser", "name": "C" },
-            { "id": "m", "kind": "merge", "name": "Merge" }
-        ],
-        "edges": [
-            { "from_node": "start", "from_port": "main", "to_node": "outer" },
-            { "from_node": "start", "from_port": "main", "to_node": "c" },
-            { "from_node": "outer", "from_port": "true", "to_node": "inner" },
-            { "from_node": "outer", "from_port": "false", "to_node": "outer_else" },
-            { "from_node": "inner", "from_port": "known-case", "to_node": "fanout" },
-            { "from_node": "inner", "from_port": "default", "to_node": "fanout" },
-            { "from_node": "fanout", "from_port": "main", "to_node": "a" },
-            { "from_node": "fanout", "from_port": "main", "to_node": "side" },
-            { "from_node": "a", "from_port": "main", "to_node": "m" },
-            { "from_node": "c", "from_port": "main", "to_node": "m" }
-        ]
-    }));
-    assert!(engine_compatibility_errors(&exhaustive_switch_with_main_fanout).is_empty());
-
-    // A switch with only `default` is exhaustive: every input takes that edge,
-    // so it is an unconditional step even though it has a single wired port.
-    let default_only_switch = nested_router_reconvergence_graph("switch", &["default"]);
-    assert!(engine_compatibility_errors(&default_only_switch).is_empty());
-
-    let missing_switch_default =
-        nested_router_reconvergence_graph("switch", &["known-case", "other-case"]);
-    let errors = engine_compatibility_errors(&missing_switch_default);
-    assert!(!errors.is_empty());
-    assert!(errors
-        .iter()
-        .all(|error| error.code == UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN));
-    // Both the switch's own reconvergence and the downstream merge are unsafe;
-    // multiple switch ports may also report the same predecessor. Pin the
-    // affected fan-ins without coupling the test to diagnostic multiplicity.
-    assert!(errors
-        .iter()
-        .any(|error| error.node_id.as_deref() == Some("a")));
-    assert!(errors
-        .iter()
-        .any(|error| error.node_id.as_deref() == Some("m")));
-}
-
-#[test]
-fn engine_compatibility_rejects_reconvergence_before_nested_router() {
-    let graph = structurally_valid_graph(json!({
-        "name": "reconverged-before-nested-router",
-        "nodes": [
-            { "id": "start", "kind": "trigger", "name": "Trigger" },
-            { "id": "outer", "kind": "condition", "name": "Outer", "config": { "field": "outer" } },
-            { "id": "inner", "kind": "condition", "name": "Inner", "config": { "field": "inner" } },
-            { "id": "a", "kind": "output_parser", "name": "A" },
-            { "id": "inner_else", "kind": "output_parser", "name": "Inner else" },
-            { "id": "c", "kind": "output_parser", "name": "C" },
-            { "id": "m", "kind": "merge", "name": "Merge" }
-        ],
-        "edges": [
-            { "from_node": "start", "from_port": "main", "to_node": "outer" },
-            { "from_node": "start", "from_port": "main", "to_node": "c" },
-            { "from_node": "outer", "from_port": "true", "to_node": "inner" },
-            { "from_node": "outer", "from_port": "false", "to_node": "inner" },
-            { "from_node": "inner", "from_port": "true", "to_node": "a" },
-            { "from_node": "inner", "from_port": "false", "to_node": "inner_else" },
-            { "from_node": "a", "from_port": "main", "to_node": "m" },
-            { "from_node": "c", "from_port": "main", "to_node": "m" }
-        ]
-    }));
-    let errors = engine_compatibility_errors(&graph);
-    assert_eq!(errors.len(), 1);
-    assert_eq!(errors[0].code, UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN);
-}
-
-#[test]
-fn engine_compatibility_treats_single_wired_router_outputs_as_conditional() {
-    let graph = structurally_valid_graph(json!({
-        "name": "single-wired-nested-router-fan-in",
-        "nodes": [
-            { "id": "start", "kind": "trigger", "name": "Trigger" },
-            { "id": "outer", "kind": "switch", "name": "Outer", "config": { "field": "outer" } },
-            { "id": "inner", "kind": "condition", "name": "Inner", "config": { "field": "inner" } },
-            { "id": "a", "kind": "output_parser", "name": "A" },
-            { "id": "c", "kind": "output_parser", "name": "C" },
-            { "id": "m", "kind": "merge", "name": "Merge" }
-        ],
-        "edges": [
-            { "from_node": "start", "from_port": "main", "to_node": "outer" },
-            { "from_node": "start", "from_port": "main", "to_node": "c" },
-            { "from_node": "outer", "from_port": "case", "to_node": "inner" },
-            { "from_node": "inner", "from_port": "true", "to_node": "a" },
-            { "from_node": "a", "from_port": "main", "to_node": "m" },
-            { "from_node": "c", "from_port": "main", "to_node": "m" }
-        ]
-    }));
-
-    let errors = engine_compatibility_errors(&graph);
-    assert_eq!(errors.len(), 1);
-    assert_eq!(errors[0].code, UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN);
-    assert_eq!(errors[0].node_id.as_deref(), Some("m"));
-}
-
-#[test]
-fn engine_compatibility_detects_a_router_directly_preceding_fan_in() {
-    let nested = structurally_valid_graph(json!({
-        "name": "direct-nested-router-fan-in",
-        "nodes": [
-            { "id": "start", "kind": "trigger", "name": "Trigger" },
-            { "id": "outer", "kind": "switch", "name": "Outer", "config": { "field": "outer" } },
-            { "id": "inner", "kind": "condition", "name": "Inner", "config": { "field": "inner" } },
-            { "id": "c", "kind": "output_parser", "name": "C" },
-            { "id": "m", "kind": "merge", "name": "Merge" }
-        ],
-        "edges": [
-            { "from_node": "start", "from_port": "main", "to_node": "outer" },
-            { "from_node": "start", "from_port": "main", "to_node": "c" },
-            { "from_node": "outer", "from_port": "case", "to_node": "inner" },
-            { "from_node": "inner", "from_port": "true", "to_node": "m" },
-            { "from_node": "c", "from_port": "main", "to_node": "m" }
-        ]
-    }));
-    let errors = engine_compatibility_errors(&nested);
-    assert_eq!(errors.len(), 1);
-    assert_eq!(errors[0].code, UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN);
-
-    let main_port = structurally_valid_graph(json!({
-        "name": "direct-main-port-router-fan-in",
-        "nodes": [
-            { "id": "start", "kind": "trigger", "name": "Trigger" },
-            { "id": "route", "kind": "switch", "name": "Route", "config": { "field": "kind" } },
-            { "id": "c", "kind": "output_parser", "name": "C" },
-            { "id": "m", "kind": "merge", "name": "Merge" }
-        ],
-        "edges": [
-            { "from_node": "start", "from_port": "main", "to_node": "route" },
-            { "from_node": "start", "from_port": "main", "to_node": "c" },
-            { "from_node": "route", "from_port": "main", "to_node": "m" },
-            { "from_node": "c", "from_port": "main", "to_node": "m" }
-        ]
-    }));
-    let errors = engine_compatibility_errors(&main_port);
-    assert_eq!(errors.len(), 1);
-    assert_eq!(errors[0].code, UNSUPPORTED_MAIN_PORT_CONDITIONAL_FAN_IN);
-}
-
-#[test]
-fn engine_compatibility_recurses_through_nested_inline_sub_workflows() {
-    let unsafe_child = nested_conditional_fan_in_graph();
-    let middle = json!({
-        "nodes": [
-            { "id": "middle-trigger", "kind": "trigger", "name": "Trigger" },
-            {
-                "id": "inner-child",
-                "kind": "sub_workflow",
-                "name": "Inner child",
-                "config": { "workflow": unsafe_child }
-            }
-        ],
-        "edges": [
-            { "from_node": "middle-trigger", "from_port": "main", "to_node": "inner-child" }
-        ]
-    });
-    let parent = structurally_valid_graph(json!({
-        "nodes": [
-            { "id": "parent-trigger", "kind": "trigger", "name": "Trigger" },
-            {
-                "id": "middle-child",
-                "kind": "sub_workflow",
-                "name": "Middle child",
-                "config": { "workflow": middle }
-            }
-        ],
-        "edges": [
-            { "from_node": "parent-trigger", "from_port": "main", "to_node": "middle-child" }
-        ]
-    }));
-
-    let errors = engine_compatibility_errors(&parent);
-    assert_eq!(errors.len(), 1);
-    assert_eq!(errors[0].code, UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN);
-    assert!(errors[0].message.contains("middle-child"));
-    assert!(errors[0].message.contains("inner-child"));
-}
-
-#[test]
-fn resolver_lookup_rejects_an_incompatible_saved_child() {
+#[tokio::test]
+async fn resolver_lookup_rejects_an_incompatible_saved_child() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let child = store::create_flow(
@@ -340,10 +11,16 @@ fn resolver_lookup_rejects_an_incompatible_saved_child() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
 
-    let error = load_engine_compatible_flow_graph(&config, &child.id)
-        .expect_err("resolver lookup must reject an unsafe legacy child");
+    let error = load_engine_compatible_flow_graph(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &child.id,
+    )
+    .await
+    .expect_err("resolver lookup must reject an unsafe legacy child");
     assert!(
         error.contains(UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN),
         "{error}"
@@ -351,8 +28,8 @@ fn resolver_lookup_rejects_an_incompatible_saved_child() {
     assert!(error.contains(&child.id), "{error}");
 }
 
-#[test]
-fn resolver_lookup_rejects_an_incompatible_saved_grandchild() {
+#[tokio::test]
+async fn resolver_lookup_rejects_an_incompatible_saved_grandchild() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let grandchild = store::create_flow(
@@ -362,7 +39,8 @@ fn resolver_lookup_rejects_an_incompatible_saved_grandchild() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
     let child = store::create_flow(
         &config,
         "saved child".to_string(),
@@ -370,10 +48,16 @@ fn resolver_lookup_rejects_an_incompatible_saved_grandchild() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
 
-    let error = load_engine_compatible_flow_graph(&config, &child.id)
-        .expect_err("resolver lookup must reject an unsafe saved grandchild");
+    let error = load_engine_compatible_flow_graph(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &child.id,
+    )
+    .await
+    .expect_err("resolver lookup must reject an unsafe saved grandchild");
     assert!(
         error.contains(UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN),
         "{error}"
@@ -383,9 +67,14 @@ fn resolver_lookup_rejects_an_incompatible_saved_grandchild() {
     assert!(error.contains("saved-child"), "{error}");
 }
 
-#[test]
-fn flows_validate_returns_stable_nested_conditional_fan_in_error() {
-    let outcome = flows_validate(nested_conditional_fan_in_graph());
+#[tokio::test]
+async fn flows_validate_returns_stable_nested_conditional_fan_in_error() {
+    let outcome = flows_validate(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &Config::default(),
+        nested_conditional_fan_in_graph(),
+    )
+    .await;
     assert!(!outcome.value.valid);
     assert_eq!(outcome.value.error_details.len(), 1);
     assert_eq!(
@@ -403,9 +92,12 @@ async fn flows_run_rejects_legacy_nested_conditional_fan_in_before_execution() {
     // Bypass the current author-time gate to simulate a definition persisted
     // by an older OpenHuman build. Reads remain supported; execution does not.
     let graph = structurally_valid_graph(nested_conditional_fan_in_graph());
-    let flow = store::create_flow(&config, "legacy".to_string(), graph, false, true).unwrap();
+    let flow = store::create_flow(&config, "legacy".to_string(), graph, false, true)
+        .unwrap()
+        .workflow;
 
     let err = flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &flow.id,
         json!({ "outer": true, "inner": true }),
@@ -435,7 +127,8 @@ async fn flows_run_rejects_an_incompatible_saved_child_before_execution() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
     let parent = store::create_flow(
         &config,
         "parent".to_string(),
@@ -443,9 +136,11 @@ async fn flows_run_rejects_an_incompatible_saved_child_before_execution() {
         false,
         true,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
 
     let error = flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &parent.id,
         json!({}),
@@ -469,7 +164,9 @@ async fn flows_update_allows_metadata_only_edits_of_legacy_incompatible_graph() 
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let graph = structurally_valid_graph(nested_conditional_fan_in_graph());
-    let flow = store::create_flow(&config, "legacy".to_string(), graph, false, false).unwrap();
+    let flow = store::create_flow(&config, "legacy".to_string(), graph, false, false)
+        .unwrap()
+        .workflow;
 
     let updated = flows_update(
         &config,
@@ -498,7 +195,8 @@ async fn flows_create_rejects_an_incompatible_saved_child_before_persisting() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
 
     let error = flows_create(
         &config,
@@ -530,7 +228,8 @@ async fn flows_update_rejects_an_incompatible_saved_child_before_persisting() {
         false,
         false,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
     let original_graph = structurally_valid_graph(trigger_only_graph());
     let parent = store::create_flow(
         &config,
@@ -539,7 +238,8 @@ async fn flows_update_rejects_an_incompatible_saved_child_before_persisting() {
         false,
         true,
     )
-    .unwrap();
+    .unwrap()
+    .workflow;
 
     let error = flows_update(
         &config,

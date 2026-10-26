@@ -1,20 +1,20 @@
 //! Serde types exchanged with the frontend: the persisted local app-state
 //! blob, the patch applied to it, and the polled `app_state_snapshot` shape.
 
-use crate::inference::LocalAiStatus;
 use crate::platform::service::ServiceStatus;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tinyinference_local::status::LocalAiStatus;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct StoredOnboardingTasks {
     #[serde(default)]
     pub accessibility_permission_granted: bool,
-    #[serde(default)]
-    pub local_model_consent_given: bool,
-    #[serde(default)]
-    pub local_model_download_started: bool,
+    // `localModelConsentGiven` / `localModelDownloadStarted` were dropped with
+    // local model downloads. Older app-state files still carry them; serde
+    // ignores unknown fields here (no `deny_unknown_fields`), so those files
+    // keep loading and the keys are dropped on the next save.
     #[serde(default)]
     pub enabled_tools: Vec<String>,
     #[serde(default)]

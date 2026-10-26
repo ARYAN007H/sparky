@@ -103,9 +103,10 @@ workflow
 overlay/src-tauri/target/
 .claude/*.lock
 app/.claude/scheduled_tasks.lock
-# Subagent lifecycle checkpoints written by crate-local test runs that have no
+# Subagent lifecycle checkpoints written by test runs that have no
 # workspace_dir (the `.openhuman/subagent_checkpoints` fallback in lifecycle.rs).
 crates/*/.openhuman/
+/.openhuman/
 target-test-run
 # CocoIndex Code (ccc)
 /.cocoindex_code/
@@ -119,7 +120,8 @@ test-map.md
 # Local AI assistant state and scratch files
 .kimi/
 .specify/
-.claude/skills/
+.claude/skills/*
+!.claude/skills/migrate-to-submodule/
 .claude/memory.md
 .claude/projects/
 .claude/scratch/
@@ -150,3 +152,24 @@ diff-coverage.md
 
 # CI lane runner output (scripts/ci/self-hosted/lanes.mjs)
 /ci-out/
+
+# Local/self-hosted CI run output (never commit)
+ci-out/
+ci-out-ex63/
+
+# Proptest failures are promoted to named unit tests.
+proptest-regressions/
+
+# Stray SQLite files a test run can leave beside the crate when a storage
+# path is not pointed at a tempdir.
+crates/openhuman-core/storage/*.db
+crates/openhuman-core/storage/*.db-wal
+crates/openhuman-core/storage/*.db-shm
+
+# Local root-profile SQLite state is runtime data, never repository source.
+/storage/storage.db
+/storage/storage.db-shm
+/storage/storage.db-wal
+
+# Retired generated app schema snapshot; the runtime schema is registered in Rust.
+/app/schema.json

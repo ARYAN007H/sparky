@@ -2,8 +2,7 @@
  * Vitest for the task-sources tauriCommands surface.
  *
  * Covers each `openhuman.task_sources_*` RPC wrapper plus the
- * `isTauri()` guard. Mirrors the mocking pattern in
- * `subconscious.test.ts` — validates the wrappers against the
+ * `isTauri()` guard. Validates the wrappers against the
  * `callCoreRpc` contract without a real Tauri runtime.
  */
 import { afterEach, beforeEach, describe, expect, type Mock, test, vi } from 'vitest';

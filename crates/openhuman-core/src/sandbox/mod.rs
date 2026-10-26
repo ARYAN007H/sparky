@@ -10,17 +10,20 @@
 //! workspace mounts, network policy, environment passthrough, and
 //! explicit elevated escape paths.
 
-// The CWD jail is the path-confinement half of the sandbox family: an in-Rust
-// path guard that applies regardless of which sandbox backend is selected.
-pub mod cwd_jail;
 pub mod docker;
+pub(crate) mod local_grants;
+pub(crate) mod native_jail;
 pub mod ops;
 pub mod schemas;
+pub(crate) mod shell_exec;
+pub(crate) mod shell_live;
+pub(crate) mod shell_processes;
+pub(crate) mod shell_progress;
 pub mod types;
 
 pub use ops::{
-    build_elevated_op, create_sandbox_backend, execute_in_sandbox, is_elevated_op,
-    resolve_sandbox_policy,
+    build_elevated_op, command_requires_sandbox, create_sandbox_backend, execute_in_sandbox,
+    is_elevated_op, resolve_sandbox_policy,
 };
 pub use schemas::{
     all_controller_schemas as all_sandbox_controller_schemas,
@@ -28,5 +31,5 @@ pub use schemas::{
 };
 pub use types::{
     DockerOverrides, ElevatedOp, SandboxBackendHandle, SandboxBackendKind, SandboxExecRequest,
-    SandboxExecResult, SandboxPolicy, SandboxStatus,
+    SandboxExecResult, SandboxIsolation, SandboxPolicy, SandboxStatus,
 };

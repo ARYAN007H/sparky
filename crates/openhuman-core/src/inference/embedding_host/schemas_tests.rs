@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 #[test]
 fn all_schemas_count() {
@@ -20,13 +21,6 @@ fn schemas_and_controllers_match() {
     }
 }
 
-#[test]
-fn unknown_function_returns_unknown() {
-    let s = schemas("bad");
-    assert_eq!(s.function, "unknown");
-    assert_eq!(s.namespace, "embeddings");
-}
-
 #[tokio::test]
 async fn all_handlers_accept_empty_params_without_panic() {
     // Every handler should return a result (Ok or Err) when called with
@@ -38,7 +32,7 @@ async fn all_handlers_accept_empty_params_without_panic() {
         // The handler is an async fn pointer; calling it with empty params
         // must not panic. We don't assert Ok because mandatory-param
         // handlers legitimately return Err("invalid params: ...").
-        let _result = (ctrl.handler)(params).await;
+        let _result = (ctrl.handler)(DispatchCtx::process_default(), params).await;
         // If we reach here the handler did not panic.
     }
 }

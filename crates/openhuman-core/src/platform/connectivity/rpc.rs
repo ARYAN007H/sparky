@@ -13,8 +13,8 @@ use tokio::net::TcpListener;
 use tokio::time::{sleep, Duration};
 use tracing::{debug, warn};
 
+use crate::core::Outcome;
 use crate::platform::socket::manager::global_socket_manager;
-use crate::rpc::RpcOutcome;
 
 use super::ops::is_port_in_use;
 
@@ -555,7 +555,7 @@ pub fn snapshot() -> ConnectivityDiagResponse {
     }
 }
 
-pub async fn diag() -> Result<RpcOutcome<serde_json::Value>, String> {
+pub async fn diag() -> Result<Outcome<serde_json::Value>, String> {
     debug!("[connectivity][rpc] diag: entry");
     let payload = snapshot();
     debug!(
@@ -566,7 +566,7 @@ pub async fn diag() -> Result<RpcOutcome<serde_json::Value>, String> {
     );
     let value = serde_json::to_value(&payload)
         .map_err(|e| format!("connectivity diag: serialize failed: {e}"))?;
-    Ok(RpcOutcome::single_log(
+    Ok(Outcome::single_log(
         json!({ "diag": value }),
         "connectivity diag returned",
     ))

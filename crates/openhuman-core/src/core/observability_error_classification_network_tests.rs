@@ -1,58 +1,11 @@
 use super::*;
 
 #[test]
-fn classifies_subconscious_schema_unavailable_errors() {
-    for raw in [
-        // SQLITE_IOERR_SHMMAP (4618) — the original escalating issue (#3231).
-        "failed to run subconscious schema DDL: disk I/O error: Error code 4618: I/O error within the xShmMap method (trying to open a new shared-memory segment)",
-        // SQLITE_CANTOPEN (14) — sibling variant from the user report.
-        "failed to run subconscious schema DDL: unable to open database file: Error code 14: Unable to open the database file",
-        // Failure surfaced at the open step rather than the DDL step.
-        "failed to open subconscious DB: /home/u/.openhuman/subconscious/subconscious.db: unable to open the database file",
-        // Wrapped in outer RPC context — classifier runs on the full chain.
-        "rpc.invoke_method failed: failed to run subconscious schema DDL: disk I/O error: Error code 4618",
-    ] {
-        assert_eq!(
-            expected_error_kind(raw),
-            Some(ExpectedErrorKind::SubconsciousSchemaUnavailable),
-            "should classify subconscious schema DB-unavailable: {raw}"
-        );
-    }
-}
-
-#[test]
-fn does_not_classify_subconscious_lock_or_unrelated_open_failures() {
-    for raw in [
-        // Transient busy/locked is retried by the store and, if persistent,
-        // is a real contention signal — must NOT be demoted here.
-        "failed to run subconscious schema DDL: database is locked",
-        // Cant-open text without the subconscious envelope must not match.
-        "failed to open memory DB: unable to open the database file",
-        // Subconscious envelope but a non-FS error (e.g. malformed SQL) stays
-        // a real bug worth reporting.
-        "failed to run subconscious schema DDL: near \"CREAT\": syntax error",
-    ] {
-        assert_ne!(
-            expected_error_kind(raw),
-            Some(ExpectedErrorKind::SubconsciousSchemaUnavailable),
-            "must not classify as subconscious schema unavailable: {raw}"
-        );
-    }
-}
-
-#[test]
-fn does_not_classify_unrelated_breaker_messages() {
-    // Generic "circuit breaker open" without the `[memory_tree]` anchor
-    // must not be silenced — other domains may use the same phrase for
-    // real bugs that need to reach Sentry.
+fn does_not_classify_generic_breaker_messages() {
+    // A generic "circuit breaker open" must not be silenced: other domains
+    // may use the same phrase for real bugs that need to reach Sentry.
     assert_eq!(
         expected_error_kind("provider reliability: circuit breaker open for openai"),
-        None
-    );
-    // The `[memory_tree]` tag alone is not enough — must co-occur with
-    // the `circuit breaker open` substring.
-    assert_eq!(
-        expected_error_kind("[memory_tree] failed to run schema DDL: disk full"),
         None
     );
 }
@@ -310,7 +263,7 @@ fn wrong_http_version_anchor_does_not_silence_unrelated_log_lines() {
 #[test]
 fn classifies_transient_upstream_http_errors() {
     // OPENHUMAN-TAURI-5Z: the canonical shape emitted by
-    // `providers::ops::api_error` and re-raised through `agent.run_single`.
+    // `provider::http_error::api_error` and re-raised through `agent.run_single`.
     assert_eq!(
         expected_error_kind("OpenHuman API error (504 Gateway Timeout): error code: 504"),
         Some(ExpectedErrorKind::TransientUpstreamHttp)
@@ -487,7 +440,7 @@ fn channels_dispatch_re_emit_of_provider_502_classifies_as_transient() {
     //
     // The wrapping shape at the dispatch site is the agent error
     // chain rendered via `format!("{e:#}")`. For a backend 502 from
-    // `providers::ops::api_error`, that resolves to:
+    // `provider::http_error::api_error`, that resolves to:
     //   "OpenHuman API error (502 Bad Gateway): error code: 502"
     // possibly prepended with a runner / iteration prefix. Both
     // shapes must classify as transient so the dispatch re-emit

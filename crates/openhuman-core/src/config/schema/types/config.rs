@@ -8,6 +8,47 @@ use std::path::PathBuf;
 
 use crate::config::schema::*;
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ConfigDocumentSnapshot {
+    pub version: Option<tinystoragedrivers::Version>,
+    pub anchor: Option<super::super::load::source::ConfigSourceAnchor>,
+}
+
+/// Opaque runtime bookkeeping that accompanies a [`Config`] snapshot.
+///
+/// Public only to preserve `Config { ..Default::default() }` construction in
+/// downstream crates; its fields remain private to this crate.
+#[doc(hidden)]
+#[derive(Debug, Default)]
+pub struct ConfigRuntimeState {
+    pub(crate) provenance: super::super::load::ConfigProvenance,
+    pub(crate) load_diagnostics: super::super::load::LoadDiagnostics,
+    pub(crate) doctor_profile_layout_version:
+        Option<crate::config::schema::profile_layout::LayoutVersion>,
+    pub(crate) doctor_profile_resolution_source: Option<String>,
+    pub(crate) document_snapshot: std::sync::Mutex<ConfigDocumentSnapshot>,
+    pub(crate) context_snapshot: Option<std::sync::Weak<std::sync::Mutex<Config>>>,
+    pub(crate) context_overlay: std::sync::Mutex<
+        Option<std::sync::Arc<super::super::load::context_overlay::ConfigContextOverlay>>,
+    >,
+}
+
+impl Clone for ConfigRuntimeState {
+    fn clone(&self) -> Self {
+        Self {
+            provenance: self.provenance.clone(),
+            load_diagnostics: self.load_diagnostics.clone(),
+            doctor_profile_layout_version: self.doctor_profile_layout_version,
+            doctor_profile_resolution_source: self.doctor_profile_resolution_source.clone(),
+            document_snapshot: std::sync::Mutex::new(
+                self.document_snapshot.lock().unwrap().clone(),
+            ),
+            context_snapshot: self.context_snapshot.clone(),
+            context_overlay: std::sync::Mutex::new(self.context_overlay.lock().unwrap().clone()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct ModelRegistryEntry {
     pub id: String,
@@ -50,8 +91,21 @@ pub struct CustomEmbeddingsConfig {
 }
 
 /// Top-level configuration (config.toml root).
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+///
+/// `Clone` is implemented by hand in `config_clone.rs` so it is emitted once.
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct Config {
+    /// Non-serialized persistence and context bookkeeping.
+    #[serde(skip)]
+    #[schemars(skip)]
+    #[doc(hidden)]
+    pub runtime_state: ConfigRuntimeState,
+    /// Immutable operator provider binding, absent from the user wire format.
+    #[serde(skip)]
+    #[schemars(skip)]
+    #[doc(hidden)]
+    pub profile_providers:
+        Option<std::sync::Arc<crate::profiles::provider_settings::ProfileProviderSettings>>,
     #[serde(skip)]
     pub workspace_dir: PathBuf,
     /// Agent action sandbox root — the default cwd for shell/file/git tools.
@@ -73,6 +127,20 @@ pub struct Config {
     /// overrides at runtime so existing env-driven deployments are unaffected.
     #[serde(default)]
     pub action_dir_override: Option<PathBuf>,
+    /// Persisted user choice for the folder agent deliverables are written to,
+    /// set via Settings → Agent OS access (`config.update_agent_paths`,
+    /// #5505). `None` means the default, `~/OpenHuman/projects/Files`. Read it
+    /// through [`Self::files_dir`]. Changing it affects new artifacts only;
+    /// existing ones keep the folder recorded in their metadata.
+    #[serde(default)]
+    pub files_dir_override: Option<PathBuf>,
+    /// Files folders used before the current one. Artifacts created there keep
+    /// resolving, because the artifact escape guard trusts only folders the
+    /// core records here (plus the current one and the default), never a
+    /// folder an artifact's own metadata claims. Appended by
+    /// `config.update_agent_paths`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files_dir_history: Vec<PathBuf>,
     #[serde(skip)]
     pub config_path: PathBuf,
     /// Per-load snapshot used to remove standalone CLI inference overrides
@@ -111,12 +179,18 @@ pub struct Config {
     #[serde(default = "default_temperature_value")]
     pub default_temperature: f64,
 
-    /// Optional language for background LLM artifacts such as memory-tree
-    /// summaries, extraction reasons, and learning reflections. Accepts either
+    /// Optional language for background LLM artifacts such as
+    /// summaries and generated briefs. Accepts either
     /// a known UI locale tag (for example `zh-CN`) or a human-readable language
     /// name. `None` preserves the existing default-language behaviour.
     #[serde(default)]
     pub output_language: Option<String>,
+
+    /// The user's IANA time zone (`Asia/Kolkata`), chosen in Settings →
+    /// Account. `None` follows the device. Read it through
+    /// [`Config::time_zone`], which also validates it.
+    #[serde(default)]
+    pub user_timezone: Option<String>,
 
     /// Models (by exact ID match OR shell-style glob like `gpt-5*`, `o1-*`) that
     /// MUST NOT receive a `temperature` parameter. Used for reasoning models
@@ -132,6 +206,14 @@ pub struct Config {
 
     #[serde(default)]
     pub autonomy: AutonomyConfig,
+
+    /// Operator tool rules (`[tool_rules]`): allow / deny / hide / approval
+    /// patterns over tool names, families and tags, applied to every agent's
+    /// catalogue, `tool_search` and calls. See `tinytools::ToolRules` and
+    /// `crate::tools::rules`. Empty by default, which restricts nothing.
+    #[serde(default)]
+    #[schemars(with = "serde_json::Value")]
+    pub tool_rules: tinytools::ToolRules,
 
     #[serde(default)]
     pub desktop: DesktopConfig,
@@ -172,29 +254,12 @@ pub struct Config {
     #[serde(default)]
     pub scheduler: SchedulerConfig,
 
-    /// Background-AI scheduler gate — throttles memory-tree digests,
-    /// embeddings, and other LLM-bound background work based on power
+    /// Background-AI scheduler gate — throttles embeddings and other
+    /// LLM-bound background work based on power
     /// state, CPU pressure, and deployment mode. See
-    /// [`crate::cron::scheduler_gate`].
+    /// [`crate::platform::llm_gate`].
     #[serde(default)]
     pub scheduler_gate: SchedulerGateConfig,
-
-    /// Global memory-sync cadence applied to **all** opted-in memory
-    /// sources, presented to the user like a backup schedule ("Sync
-    /// every 4h / 12h / 24h", plus "Manual only"). See issue #3302.
-    ///
-    /// Semantics consumed by `memory_sync::composio::periodic`:
-    /// - `None` — no explicit user choice; the effective cadence falls
-    ///   back to [`DEFAULT_MEMORY_SYNC_INTERVAL_SECS`] (24h).
-    /// - `Some(0)` — **Manual only**: the periodic scheduler skips
-    ///   auto-sync entirely; manual `memory_sources_sync` still works.
-    /// - `Some(n)` — sync every `n` seconds, applied per connection as
-    ///   `max(n, provider_default)` so it overrides the provider's own
-    ///   cadence while never syncing more often than the provider intends.
-    ///
-    /// Overridable via `OPENHUMAN_MEMORY_SYNC_INTERVAL_SECS` (`0` = manual).
-    #[serde(default)]
-    pub memory_sync_interval_secs: Option<u64>,
 
     #[serde(default)]
     pub agent: AgentConfig,
@@ -215,8 +280,9 @@ pub struct Config {
     /// Global context management configuration — budget thresholds,
     /// summarization trigger, microcompact/autocompact toggles, and the
     /// session-memory extraction cadence. Consumed by
-    /// [`crate::agent::context::ContextManager`].
+    /// the agent context middleware configuration.
     #[serde(default)]
+    #[schemars(with = "super::super::context::ContextConfigSchema")]
     pub context: ContextConfig,
 
     #[serde(default)]
@@ -224,15 +290,6 @@ pub struct Config {
 
     #[serde(default)]
     pub embedding_routes: Vec<EmbeddingRouteConfig>,
-
-    #[serde(default)]
-    pub heartbeat: HeartbeatConfig,
-
-    /// Subconscious engine selection (local tinyagents graph vs. local
-    /// retired engine). Default `local` — omitting this block preserves
-    /// the historical behavior exactly.
-    #[serde(default)]
-    pub subconscious: crate::config::schema::SubconsciousConfig,
 
     #[serde(default)]
     pub cron: CronConfig,
@@ -248,24 +305,6 @@ pub struct Config {
 
     #[serde(default)]
     pub memory: MemoryConfig,
-
-    /// Phase 4 memory-tree embedding wiring (#710). Controls whether
-    /// ingest/seal pass new chunks/summaries through an Ollama embedder,
-    /// and whether missing endpoint config is fatal or warns and falls
-    /// back to inert zero vectors.
-    #[serde(default)]
-    pub memory_tree: MemoryTreeConfig,
-
-    #[serde(default)]
-    pub storage: StorageConfig,
-
-    /// `[subsystems.*]` — the uniform cross-subsystem driver-binding config
-    /// (kernel.md §3.6 / plan-memory.md §4.5). Currently only `subsystems.memory` is
-    /// populated; nothing reads this yet (zero behaviour change). The
-    /// existing `[memory]`, `[memory_tree]`, `[[memory_sources]]` blocks
-    /// above are unaffected.
-    #[serde(default)]
-    pub subsystems: SubsystemsConfig,
 
     #[serde(default)]
     pub composio: ComposioConfig,
@@ -325,19 +364,18 @@ pub struct Config {
     #[serde(default)]
     pub cost: CostConfig,
 
-    /// User-configured memory sources — each `[[memory_sources]]` entry
-    /// describes a data connector (Composio OAuth, local folder, GitHub
-    /// repo, RSS feed, Twitter query, web page) that feeds memory.
-    #[serde(default)]
-    pub memory_sources: Vec<crate::memory::sources::types::MemorySourceEntry>,
+    /// Legacy v1 `[[memory_sources]]` entries, read only so they can be
+    /// migrated into `[[memory.sources]]` on load
+    /// (`config::ops::loader::normalize_loaded_config`). Each entry is kept as
+    /// raw JSON, so a kind this build no longer knows (`twitter_query`) never
+    /// fails the parse. Never written back.
+    #[serde(default, rename = "memory_sources", skip_serializing)]
+    pub legacy_memory_sources: Vec<serde_json::Value>,
 
     /// User-facing agent registry — shipped default agents plus user-authored
     /// custom agents and persisted enable/disable/tool-policy overrides.
     #[serde(default)]
-    pub agent_registry: crate::agent::registry::types::AgentRegistryConfig,
-
-    #[serde(default)]
-    pub agents: HashMap<String, DelegateAgentConfig>,
+    pub agent_registry: crate::agent_registry::types::AgentRegistryConfig,
 
     #[serde(default)]
     pub local_ai: LocalAiConfig,
@@ -369,6 +407,10 @@ pub struct Config {
     #[serde(default)]
     pub cloud_providers: Vec<crate::config::schema::cloud_providers::CloudProviderCreds>,
 
+    /// Optional PEM CA bundles keyed by cloud provider slug.
+    #[serde(default)]
+    pub cloud_provider_ca_certs: HashMap<String, String>,
+
     /// Id of the `cloud_providers` entry that "cloud" and "primary" resolve to.
     /// When `None`, the factory falls back to the OpenHuman entry.
     #[serde(default)]
@@ -384,6 +426,14 @@ pub struct Config {
     #[serde(skip)]
     #[schemars(skip)]
     pub ephemeral_route: Option<crate::config::schema::ephemeral_route::EphemeralRoute>,
+
+    /// Runtime only — service endpoints and identity a host's config enricher
+    /// resolved ([`crate::config::register_enricher`]). Empty until one runs;
+    /// never serialized. See
+    /// [`resolved_endpoints`](crate::config::schema::resolved_endpoints).
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub resolved_endpoints: crate::config::schema::resolved_endpoints::ResolvedEndpoints,
 
     /// Provider string for direct conversational chat (simple back-and-forth).
     #[serde(default)]
@@ -406,7 +456,7 @@ pub struct Config {
     #[serde(default)]
     pub vision_provider: Option<String>,
 
-    /// Provider string for memory-tree extract + summarise workloads.
+    /// Provider string for the summarisation workload.
     #[serde(default)]
     pub memory_provider: Option<String>,
 
@@ -419,39 +469,31 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_embeddings: Option<CustomEmbeddingsConfig>,
 
-    /// Provider string for the heartbeat background-reasoning loop.
-    #[serde(default)]
-    pub heartbeat_provider: Option<String>,
-
-    /// Provider string for learning / reflection passes.
-    #[serde(default)]
-    pub learning_provider: Option<String>,
-
-    /// Provider string for subconscious evaluation and drift checks.
-    #[serde(default)]
-    pub subconscious_provider: Option<String>,
-
-    /// Node.js managed runtime configuration (skills that need `node`/`npm`).
-    #[serde(default)]
-    pub node: NodeConfig,
-
-    /// Python managed runtime configuration (Python-backed MCP servers and
-    /// other Python subprocess integrations).
-    #[serde(default)]
-    pub runtime_python: RuntimePythonConfig,
-
-    /// Shared language-runtime pool (long-lived `node`/`python` workers reused
-    /// across skill runs and `node_exec` instead of one child per run, #5106).
-    #[serde(default)]
-    pub runtime_pool: RuntimePoolConfig,
-
     /// TokenJuice content-router / compaction configuration.
     #[serde(default)]
     pub tokenjuice: TokenjuiceConfig,
 
+    /// Inbound event queues (`[inbound]`); the switch is
+    /// `[components] eventqueues`.
+    #[serde(default)]
+    pub inbound: InboundConfig,
+    /// Per-conversation batching of inbound channel messages (`[inbound_debounce]`).
+    #[serde(default)]
+    pub inbound_debounce: InboundDebounceConfig,
+
+    /// Per-dependency switches (`[components]`). Narrow-only; applied at the
+    /// next core start.
+    #[serde(default)]
+    pub components: ComponentsConfig,
+
     /// Hosting provider credentials and switch (`hosting` feature).
     #[serde(default)]
     pub hosting: HostingConfig,
+
+    /// Storage backend for state on the `tinystoragedrivers` ports
+    /// (`[storage]`). Empty uses the default, `sqlite:<workspace>/storage`.
+    #[serde(default)]
+    pub storage: StorageConfig,
 
     #[serde(default)]
     pub voice_server: VoiceServerConfig,
@@ -484,17 +526,16 @@ pub struct Config {
     #[serde(default)]
     pub tts_provider: Option<String>,
 
+    /// Live voice agent settings: the default live provider and each
+    /// provider's model / voice / language (`voice::live`).
+    #[serde(default)]
+    pub voice_live: crate::config::schema::voice_live::LiveVoiceConfig,
+
     #[serde(default)]
     pub integrations: IntegrationsConfig,
 
     #[serde(default)]
-    pub learning: LearningConfig,
-
-    #[serde(default)]
     pub update: UpdateConfig,
-
-    #[serde(default)]
-    pub dictation: DictationConfig,
 
     /// Whether the user has completed the **React UI** onboarding flow.
     ///
@@ -516,18 +557,41 @@ pub struct Config {
 
     #[serde(default)]
     pub model_registry: Vec<ModelRegistryEntry>,
+}
 
-    /// Migration version guard for `apply_composio_source_caps_migration`.
-    ///
-    /// The migration runs whenever this is `< CURRENT_CAPS_MIGRATION_VERSION`
-    /// (see `memory_sources::reconcile`), then is bumped to that version. Using a
-    /// monotonic version (rather than a bool) lets an improved migration re-run
-    /// once for installs that already ran an earlier revision. Defaults to `0`
-    /// (`#[serde(default)]`); the retired `composio_source_caps_migrated` bool is
-    /// silently ignored (Config does not `deny_unknown_fields`), so prior installs
-    /// re-run the current migration exactly once.
-    #[serde(default)]
-    pub composio_source_caps_migration_version: u32,
+impl Config {
+    /// Pins read-only doctor selection metadata to this in-memory snapshot.
+    pub(crate) fn set_doctor_profile_metadata(
+        &mut self,
+        layout_version: Option<crate::config::schema::profile_layout::LayoutVersion>,
+        resolution_source: Option<String>,
+    ) {
+        self.runtime_state.doctor_profile_layout_version = layout_version;
+        self.runtime_state.doctor_profile_resolution_source = resolution_source;
+    }
+
+    /// Metadata recorded when this snapshot was selected for doctor inspection.
+    pub(crate) fn doctor_profile_metadata(
+        &self,
+    ) -> (
+        Option<crate::config::schema::profile_layout::LayoutVersion>,
+        Option<String>,
+    ) {
+        (
+            self.runtime_state.doctor_profile_layout_version,
+            self.runtime_state.doctor_profile_resolution_source.clone(),
+        )
+    }
+
+    /// Diagnostics captured while the loader parsed or migrated this snapshot.
+    pub(crate) fn load_diagnostics(&self) -> &super::super::load::LoadDiagnostics {
+        &self.runtime_state.load_diagnostics
+    }
+
+    /// Mutable access for the config loader while it assembles diagnostics.
+    pub(crate) fn load_diagnostics_mut(&mut self) -> &mut super::super::load::LoadDiagnostics {
+        &mut self.runtime_state.load_diagnostics
+    }
 }
 
 /// Shared default so `#[serde(default)]` and `Config::default()` stay in sync.

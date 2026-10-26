@@ -1,8 +1,9 @@
 use serde_json::{Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::runtime::DispatchCtx;
+use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use crate::rpc::RpcOutcome;
 use crate::test_support::{introspect, rpc};
 
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
@@ -51,7 +52,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
             namespace: "test",
             function: "reset",
             description:
-                "Wipe persistent sidecar state in-place: clears auth, onboarding, cron jobs, and memory tree. \
+                "Wipe persistent sidecar state in-place: clears auth, onboarding, and cron jobs. \
                  E2E specs call this between tests so each starts from a fresh-install baseline.",
             inputs: vec![],
             outputs: vec![FieldSchema {
@@ -62,24 +63,6 @@ pub fn schemas(function: &str) -> ControllerSchema {
                             name: "cron_jobs_removed",
                             ty: TypeSchema::U64,
                             comment: "Number of cron jobs deleted from the workspace database.",
-                            required: true,
-                        },
-                        FieldSchema {
-                            name: "memory_tree_rows_deleted",
-                            ty: TypeSchema::U64,
-                            comment: "Number of memory-tree SQLite rows deleted.",
-                            required: true,
-                        },
-                        FieldSchema {
-                            name: "memory_tree_dirs_removed",
-                            ty: TypeSchema::Array(Box::new(TypeSchema::String)),
-                            comment: "Memory-tree content directories removed.",
-                            required: true,
-                        },
-                        FieldSchema {
-                            name: "memory_tree_sync_state_cleared",
-                            ty: TypeSchema::U64,
-                            comment: "Number of Composio memory-tree sync-state rows deleted.",
                             required: true,
                         },
                         FieldSchema {
@@ -287,15 +270,15 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_reset(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_reset(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move { to_json(rpc::reset().await?) })
 }
 
-fn handle_workspace_root(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_workspace_root(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move { to_json(introspect::workspace_root().await?) })
 }
 
-fn handle_list_workspace_files(params: Map<String, Value>) -> ControllerFuture {
+fn handle_list_workspace_files(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let rel_root = params
             .get("rel_root")
@@ -309,7 +292,7 @@ fn handle_list_workspace_files(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_read_workspace_file(params: Map<String, Value>) -> ControllerFuture {
+fn handle_read_workspace_file(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let rel_path = params
             .get("rel_path")
@@ -321,14 +304,17 @@ fn handle_read_workspace_file(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_in_flight_chats(_params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move { to_json(introspect::in_flight_chats().await?) })
+fn handle_in_flight_chats(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move { to_json(introspect::in_flight_chats(&ctx).await?) })
 }
 
-fn handle_wallet_prepared_quotes(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_wallet_prepared_quotes(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move { to_json(introspect::wallet_prepared_quotes().await?) })
 }
 
-fn to_json<T: serde::Serialize>(outcome: RpcOutcome<T>) -> Result<Value, String> {
+fn to_json<T: serde::Serialize>(outcome: Outcome<T>) -> Result<Value, String> {
     outcome.into_cli_compatible_json()
 }

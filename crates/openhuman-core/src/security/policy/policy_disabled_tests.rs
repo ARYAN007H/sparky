@@ -6,6 +6,7 @@
 //! likely to break, so it is asserted here beside the first.
 
 use super::*;
+use crate::security::policy::CommandClass;
 use std::path::PathBuf;
 
 fn disabled_policy() -> SecurityPolicy {
@@ -48,6 +49,34 @@ fn disabled_policy_runs_ordinary_shell_syntax() {
         assert!(
             policy.is_command_allowed(command),
             "disabled policy should allow: {command}"
+        );
+    }
+}
+
+#[test]
+fn disabled_policy_blocks_literal_credential_paths_in_commands() {
+    let policy = disabled_policy();
+    for command in [
+        "cat ~/.ssh/id_rsa",
+        "cat $HOME/.aws/credentials",
+        "cat ${HOME}/.gnupg/private-keys-v1.d/key",
+        "cat %USERPROFILE%/.git-credentials",
+        "node -e 'require(\"fs\").readFileSync(\"~/.netrc\")'",
+    ] {
+        assert!(
+            policy.check_gated_command(command).is_err(),
+            "protected literal should be refused: {command}"
+        );
+    }
+}
+
+#[test]
+fn disabled_policy_allows_unrelated_literal_paths_in_commands() {
+    let policy = disabled_policy();
+    for command in ["cat ./notes.txt", "echo ~/.config/app/theme.json"] {
+        assert!(
+            policy.check_gated_command(command).is_ok(),
+            "ordinary literal should remain allowed: {command}"
         );
     }
 }

@@ -37,11 +37,13 @@ use std::time::Duration;
 use parking_lot::Mutex;
 use tokio::sync::oneshot;
 
-use crate::agent::turn_origin::{self, AgentTurnOrigin, TrustedAutomationSource};
 use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::security::POLICY_DENIED_MARKER;
+#[cfg(test)]
+use crate::security::turn_origin;
+use crate::security::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
+use tinytools::status::POLICY_DENIED_MARKER;
 
 use super::store;
 use super::types::{
@@ -60,6 +62,36 @@ pub enum DecideMiss {
     NeverRegistered,
 }
 
+/// A decision refused by the gate before it reached the store.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ApprovalError {
+    /// The request was parked by a different agent than the one deciding it.
+    #[error("approval request {request_id} belongs to another agent")]
+    WrongAgent { request_id: String },
+}
+
+/// The key `thread_to_request` files a parked chat thread under, keyed by
+/// the tenant that parked it: the thread id alone for the process's own
+/// sessions, `<agent>\x1f<thread>` for an embedded agent (both unchanged),
+/// and the [`tenant_key`](crate::core::runtime::tenant_key) of the thread for
+/// a SaaS profile, so two profiles' default agents (which have no agent id)
+/// never share a route. A profile key starts with `\x1e`, which no agent id
+/// contains, and the desktop and SaaS modes never share a process.
+pub(crate) fn thread_route_key(tenant: &crate::core::runtime::Tenant, thread_id: &str) -> String {
+    match (&tenant.profile, &tenant.agent) {
+        (Some(_), _) => crate::core::runtime::tenant_key(tenant, thread_id),
+        (None, Some(agent)) => format!("{agent}\u{1f}{thread_id}"),
+        (None, None) => thread_id.to_string(),
+    }
+}
+
+/// The tenant whose approvals the calling task parks and answers. A SaaS
+/// task with no scope gets a tenant nothing else shares, so it can neither
+/// find nor clear another user's route.
+pub(crate) fn current_route_tenant() -> crate::core::runtime::Tenant {
+    crate::core::runtime::tenant::current_tenant_or_isolated("approval_gate")
+}
+
 /// How long the gate will park a future before timing out and
 /// returning `Deny`. 10 minutes matches the default `expires_at`
 /// written into the persisted row.
@@ -72,19 +104,50 @@ const DEFAULT_APPROVAL_TTL: Duration = Duration::from_secs(60 * 10);
 /// to leave a live Slack/Gmail/HTTP node waiting; if nobody approves within
 /// three minutes, deny and let the authoring turn continue (the user can
 /// still re-trigger the run from the Runs rail). Scoped by
-/// [`APPROVAL_COPILOT_STREAM_CONTEXT`]. Deliberately NOT applied to
+/// [`ApprovalTurnContext::copilot_stream`]. Deliberately NOT applied to
 /// main-chat `WebChat` parks — only `flows::ops::flows_build`'s streaming
-/// branch scopes the task-local below.
+/// branch sets the flag.
 const COPILOT_APPROVAL_TTL: Duration = Duration::from_secs(180);
 
+/// Shorter park window for approvals raised inside a sub-agent run — a
+/// delegated worker (`image_agent`, `video_agent`, `skill_setup`, …) calling
+/// an external-effect tool. Same three-minute window and the same rationale
+/// as [`COPILOT_APPROVAL_TTL`]: the prompt is one level removed from what the
+/// user is looking at (an async sub-agent's card lands on a parent turn that
+/// may already have finished), and a ten-minute park left every failed
+/// `media_generate_image` / `media_generate_video` / `skill_registry_install`
+/// blocking for exactly 600s with the result never delivered. If nobody answers
+/// in three minutes the call is denied with an "approval wasn't answered"
+/// result so the parent agent can tell the user and they can ask again.
+const SUBAGENT_APPROVAL_TTL: Duration = Duration::from_secs(180);
+
+/// Phrase every TTL-expiry denial carries, so a caller that renders its own
+/// refusal (the hosted `OpenHumanSecurityGate`) can tell "nobody answered" from
+/// "the user said no" without parsing the rest of the reason. See
+/// [`is_unanswered_approval_reason`].
+pub const APPROVAL_UNANSWERED_PHRASE: &str = "nobody answered the approval prompt";
+
+/// Whether the parked `request_id` was routed to its chat thread from a task
+/// detached from that turn (an async-delegated sub-agent, #5499), so its card
+/// can outlive the turn. Read by the web-channel surface when it bridges
+/// `ApprovalRequested` (the route is recorded before the event is published);
+/// `false` when no gate is installed or the request is unknown.
+pub fn is_detached_request(request_id: &str) -> bool {
+    ApprovalGate::try_global().is_some_and(|gate| gate.request_is_detached(request_id))
+}
+
+/// Whether a [`GateOutcome::Deny`] reason is a TTL expiry (the prompt went
+/// unanswered) rather than a refusal.
+pub fn is_unanswered_approval_reason(reason: &str) -> bool {
+    reason.contains(APPROVAL_UNANSWERED_PHRASE)
+}
+
 /// Per-turn chat context for routing a parked approval's yes/no reply back to
-/// the originating thread. The web channel scopes this task-local around the
-/// agent run (`web_chat`); because the `run_turn` handler, the
-/// tool loop, and `intercept` all run inline (`.await`) within that spawned
-/// task, it propagates down to `intercept` with no signature plumbing. Absent
-/// for non-chat callers (CLI, sub-agents) — their approvals are simply not
-/// chat-routable.
-#[derive(Clone, Debug)]
+/// the originating thread. The web channel hands it to the turn it starts
+/// (inside an [`ApprovalTurnContext`]); the turn's run context carries it to
+/// the gate and to the tools that read it. Absent for non-chat callers (CLI,
+/// detached sub-agents) — their approvals are simply not chat-routable.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ApprovalChatContext {
     pub thread_id: String,
     pub client_id: String,
@@ -95,40 +158,75 @@ pub struct ApprovalChatContext {
     pub request_id: Option<String>,
 }
 
-tokio::task_local! {
-    pub static APPROVAL_CHAT_CONTEXT: ApprovalChatContext;
-}
-
-tokio::task_local! {
-    /// Marks a park as originating from the Flow Canvas copilot's streaming
-    /// `flows_build` path — scoped by `flows::ops::flows_build` around the
-    /// streaming `agent.run_single(&prompt)` call, alongside the existing
-    /// `AgentTurnOrigin::WebChat` + [`APPROVAL_CHAT_CONTEXT`] double-scope that
-    /// path already uses. Presence alone is the signal (no fields needed): when
-    /// set, the park window is clamped to [`COPILOT_APPROVAL_TTL`] instead of
-    /// the gate's own (possibly env-overridden) TTL. Absent for every other
-    /// caller — in particular, plain main-chat `WebChat` turns do not scope
-    /// this, so they keep the full [`DEFAULT_APPROVAL_TTL`].
-    pub static APPROVAL_COPILOT_STREAM_CONTEXT: ();
-}
-
 /// Per-run flow context (flow-approval-surface, PR2 of the tinyflows
 /// approval-surfacing design). `flows::ops::flows_run` / `flows_resume`
-/// scope this around the engine invocation, alongside the existing
-/// `Workflow` [`AgentTurnOrigin`](crate::agent::turn_origin::AgentTurnOrigin),
+/// hand it to the engine's capabilities, alongside the existing
+/// `Workflow` [`AgentTurnOrigin`](crate::security::turn_origin::AgentTurnOrigin),
 /// so a tool call parked from that run can correlate
 /// [`PendingApproval::source_context`](super::types::PendingApproval) back to
 /// the exact flow + run (the origin alone only carries `flow_id`, not
-/// `run_id`). Absent for every non-flow caller — chat, cron, subconscious,
-/// CLI never scope this.
+/// `run_id`). Absent for every non-flow caller — chat, cron, background
+/// jobs, CLI never scope this.
 #[derive(Clone, Debug)]
 pub struct FlowRunContext {
     pub flow_id: String,
     pub run_id: String,
 }
 
-tokio::task_local! {
-    pub static APPROVAL_FLOW_RUN_CONTEXT: FlowRunContext;
+/// What the approval gate needs to know about the turn that owns a gated call,
+/// beyond the turn origin: where to route the yes/no reply, whether the turn is
+/// the Flow Canvas copilot, and which flow run it belongs to.
+///
+/// This is an explicit value, handed from the entry point that starts the turn
+/// to the gate check (and to the tools that route their own prompts) through
+/// the turn's run context. It used to be three ambient task-locals, which meant
+/// "no chat context" was indistinguishable from "this task lost its scope".
+///
+/// Deliberately **not** carried across a detached spawn: a detached sub-agent
+/// (`OpenHumanRunContext::detached_child`) starts with the default value, so
+/// its parks route via the origin as `detached` and survive the parent turn
+/// (#5499). Inline children clone their parent's value.
+#[derive(Clone, Debug, Default)]
+pub struct ApprovalTurnContext {
+    /// Thread/client to surface a parked approval to. `None` for non-chat
+    /// callers (CLI, cron, background, detached sub-agents).
+    pub chat: Option<ApprovalChatContext>,
+    /// The turn is the Flow Canvas copilot's streaming `flows_build` path: the
+    /// park window is clamped to [`COPILOT_APPROVAL_TTL`] instead of the gate's
+    /// own (possibly env-overridden) TTL. Plain main-chat `WebChat` turns leave
+    /// it `false` and keep the full [`DEFAULT_APPROVAL_TTL`].
+    pub copilot_stream: bool,
+    /// The flow run the turn belongs to, so a park stamps its
+    /// `PendingApproval::source_context` with the exact flow and run. `None`
+    /// for every non-flow caller.
+    pub flow_run: Option<FlowRunContext>,
+}
+
+impl ApprovalTurnContext {
+    /// A chat-routed turn.
+    pub fn chat(chat: ApprovalChatContext) -> Self {
+        Self {
+            chat: Some(chat),
+            ..Self::default()
+        }
+    }
+
+    /// Marks the turn as the Flow Canvas copilot's streaming build.
+    pub fn with_copilot_stream(mut self) -> Self {
+        self.copilot_stream = true;
+        self
+    }
+
+    /// Binds the turn to one flow run.
+    pub fn with_flow_run(mut self, flow_run: FlowRunContext) -> Self {
+        self.flow_run = Some(flow_run);
+        self
+    }
+
+    /// Whether the turn is interactive: a chat surface is attached to it.
+    pub fn is_interactive(&self) -> bool {
+        self.chat.is_some()
+    }
 }
 
 /// Parse a chat reply to a parked approval into a binary decision (v1). Only an
@@ -204,6 +302,20 @@ pub(crate) struct RequestRoute {
     pub(crate) client_id: Option<String>,
     pub(crate) tool_call_id: Option<String>,
     pub(crate) forced: bool,
+    pub(crate) agent_id: Option<String>,
+    /// Instance barrier captured at registration, independent of decision context.
+    pub(crate) approval_scope: Option<Arc<super::ApprovalScope>>,
+    /// The [`thread_route_key`] the request was parked under, so a decision
+    /// made outside the parking task's scope clears the right route.
+    pub(crate) thread_key: Option<String>,
+    /// The park can outlive the chat turn it is shown on — an async-delegated
+    /// sub-agent routed through the origin fallback (#5499). Carried so the
+    /// replay path re-emits the same `detached` flag the live event had.
+    pub(crate) detached: bool,
+    /// The store the request was parked in, captured under the parking task's
+    /// storage scope, so a decision made from outside that scope (an RPC with
+    /// no agent or profile of its own) reaches the row where it was written.
+    pub(super) docs: Option<super::store_documents::Docs>,
 }
 
 /// Coordinator for pending approvals.
@@ -212,8 +324,9 @@ pub struct ApprovalGate {
     session_id: String,
     ttl: Duration,
     waiters: Mutex<HashMap<String, oneshot::Sender<ApprovalDecision>>>,
-    /// thread_id → request_id for the approval currently parked on that chat
-    /// thread, so the web channel can route a yes/no reply to `approval_decide`.
+    /// [`thread_route_key`] → request_id for the approval currently parked on
+    /// that chat thread, so the web channel can route a yes/no reply to
+    /// `approval_decide`.
     /// In-memory only (session-scoped — a parked approval doesn't survive a
     /// restart, and the oneshot waiter is in-memory anyway).
     thread_to_request: Mutex<HashMap<String, String>>,
@@ -245,7 +358,10 @@ pub struct ApprovalGate {
 struct WaiterGuard<'a> {
     gate: &'a ApprovalGate,
     request_id: String,
-    thread_id: Option<String>,
+    thread_key: Option<String>,
+    /// Storage scope of the parking call, kept for `Drop`: the acting agent's
+    /// task-local is gone by then.
+    docs: Result<super::store_documents::Docs, String>,
     armed: bool,
 }
 
@@ -273,11 +389,11 @@ impl Drop for WaiterGuard<'_> {
         // an unconditional `remove` would delete the *new* request's routing, so
         // the next typed yes/no would fall through as a fresh chat turn instead
         // of resolving the live gate (#4774).
-        if let Some(thread_id) = &self.thread_id {
+        if let Some(thread_key) = &self.thread_key {
             self.gate
-                .clear_thread_route_if_owned(thread_id, &self.request_id);
+                .clear_thread_route_if_owned(thread_key, &self.request_id);
         }
-        let decided = store::decide(&self.gate.config, &self.request_id, ApprovalDecision::Deny);
+        let decided = store::decide_captured(&self.docs, &self.request_id, ApprovalDecision::Deny);
         if let Ok(Some(row)) = decided {
             let route = self.gate.take_request_route(&self.request_id);
             BUS.publish(DomainEvent::ApprovalDecided {
@@ -288,6 +404,7 @@ impl Drop for WaiterGuard<'_> {
                 client_id: route.as_ref().and_then(|r| r.client_id.clone()),
                 tool_call_id: route.and_then(|r| r.tool_call_id),
                 resolution: Some("cancelled".to_string()),
+                agent_id: row.agent_id,
             });
         }
         tracing::warn!(

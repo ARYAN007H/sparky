@@ -11,7 +11,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { waitForApp } from '../helpers/app-helpers';
 import { callOpenhumanRpc } from '../helpers/core-rpc';
-import { clickTestId, waitForTestId } from '../helpers/element-helpers';
+import { clickTestId, setValueByTestId, waitForTestId } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
 import { startMockServer, stopMockServer } from '../mock-server';
@@ -67,6 +67,7 @@ describe('Settings - Search', () => {
     await navigateViaHash('/settings/search');
     await waitForTestId('search-settings-panel', 15_000);
     await waitForTestId('search-provider-exa', 15_000);
+    await clickTestId('search-tab-routing');
     await waitForTestId('search-role-search', 15_000);
 
     await clickTestId('search-enabled-toggle');
@@ -93,8 +94,20 @@ describe('Settings - Search', () => {
   });
 
   it('enables a bring-your-own-key provider without making it serve a role', async () => {
-    await waitForTestId('search-provider-brave-toggle', 15_000);
-    await clickTestId('search-provider-brave-toggle');
+    const reset = await callOpenhumanRpc('openhuman.config_update_search_settings', {
+      enabled: true,
+      providers: { brave: { enabled: false } },
+      roles: { search: ['exa'] },
+    });
+    expect(reset.ok).toBe(true);
+
+    await clickTestId('search-tab-providers');
+    await waitForTestId('search-settings-panel', 15_000);
+    await waitForTestId('search-catalog-brave', 15_000);
+    await clickTestId('search-catalog-brave');
+    await waitForTestId('search-connect-brave-key', 15_000);
+    await setValueByTestId('search-connect-brave-key', 'e2e-fake-brave-key');
+    await clickTestId('search-connect-brave-submit');
 
     await waitForSettings(
       settings => providerOf(settings, 'brave')?.enabled === true,
@@ -103,9 +116,11 @@ describe('Settings - Search', () => {
 
     const settings = await getSearchSettings();
     const brave = providerOf(settings, 'brave');
-    // No key stored in a fresh profile, so Brave needs one and serves nothing.
-    expect(brave.status).toBe('needs_key');
+    // The dialog accepted a fixture key, but routing stays an explicit choice.
+    expect(brave.key_configured).toBe(true);
     expect(settings.effective_roles.search).not.toContain('brave');
-    await waitForTestId('search-role-search-provider-brave', 10_000);
+    await clickTestId('search-tab-routing');
+    await clickTestId('search-role-search-edit');
+    await waitForTestId('search-role-search-add-brave', 10_000);
   });
 });

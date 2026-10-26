@@ -9,8 +9,8 @@
 use serde_json::Value;
 use tinyhumans_sdk::Error as SdkError;
 
-use openhuman_core::config::Config;
-use openhuman_core::rpc::RpcOutcome;
+use openhuman_embed::__host::config::Config;
+use openhuman_embed::__host::core::Outcome;
 
 use crate::hosted::client::HostedClient;
 
@@ -30,7 +30,7 @@ fn is_not_found<T>(result: &Result<T, SdkError>) -> bool {
 /// signal (TAURI-RUST-HW0, TAURI-RUST-KHX). Any other error (5xx, a response
 /// that no longer matches the announcement schema, session expiry, …) still
 /// propagates.
-pub async fn get_latest_announcement(config: &Config) -> Result<RpcOutcome<Value>, String> {
+pub async fn get_latest_announcement(config: &Config) -> Result<Outcome<Value>, String> {
     let client = HostedClient::from_config(config)?;
     let result = client
         .sdk()
@@ -39,7 +39,7 @@ pub async fn get_latest_announcement(config: &Config) -> Result<RpcOutcome<Value
         .await;
     if is_not_found(&result) {
         log::debug!("[hosted][announcements] 404 on GET /announcements/latest — no announcement");
-        return Ok(RpcOutcome::single_log(
+        return Ok(Outcome::single_log(
             Value::Null,
             "no announcement available (404)",
         ));
@@ -47,7 +47,7 @@ pub async fn get_latest_announcement(config: &Config) -> Result<RpcOutcome<Value
     let announcement = client.finish("GET /announcements/latest", result)?;
     let data = serde_json::to_value(announcement)
         .map_err(|e| format!("failed to encode announcement: {e}"))?;
-    Ok(RpcOutcome::single_log(data, "latest announcement fetched"))
+    Ok(Outcome::single_log(data, "latest announcement fetched"))
 }
 
 #[cfg(test)]

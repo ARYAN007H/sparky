@@ -1,25 +1,31 @@
 use super::*;
-use crate::flows::Flow;
 use serde_json::json;
-use tinyflows::model::{Node, NodeKind, WorkflowGraph};
+use tinyflows::model::{Node, NodeKind};
+use tinyflows_bus::catalog::Workflow as Flow;
 
-/// A directly-constructed, isolated [`Memory`] for the digest tests — NOT
-/// the process-global `OnceLock` client. The global is one-shot, so an
-/// earlier test in the same binary may already have bound it to a different
-/// workspace, making `global::init(..)` here a silent no-op (see
-/// `memory::global`'s own test notes). Injecting this instance into the
-/// subscriber via [`FlowRunDigestSubscriber::with_memory`] makes writes and
-/// read-backs go through the SAME store deterministically — the same shape
-/// `flows::memory_tools`' tests use.
-/// A guard over an in-memory store.
-///
-/// This used to build a real `UnifiedMemory` over `tmp` so writes and
-/// read-backs went through one store. The digest writes through the guarded
-/// driver now, so the fake sits behind a real `MemoryGuard` — same
-/// determinism, same round trip, and the policy layer is on the path where
-/// production has it.
-fn digest_test_memory(_tmp: &tempfile::TempDir) -> Arc<crate::memory::guard::MemoryGuard> {
-    crate::memory::guard::in_memory::guarded_in_memory().1
+/// Binds a fresh in-memory reference engine to `config`'s workspace and
+/// returns it, so the digest tests write and read back through one store.
+fn digest_test_engine(config: &Config) -> Arc<tinymemory_api::conformance::ReferenceEngine> {
+    let engine = Arc::new(tinymemory_api::conformance::ReferenceEngine::new());
+    crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
+    engine
+}
+
+/// The run digests stored for `flow_id`.
+async fn stored_digests(config: &Config, flow_id: &str) -> Vec<tinymemory_api::Hit> {
+    crate::memory::ops::items_list(
+        config,
+        crate::memory::types::ItemsListParams {
+            filter: Some(digest_filter(flow_id)),
+            limit: Some(100),
+            cursor: None,
+            path: Vec::new(),
+            preview: false,
+        },
+    )
+    .await
+    .unwrap()
+    .items
 }
 
 fn test_config(tmp: &tempfile::TempDir) -> Arc<Config> {
@@ -50,10 +56,10 @@ fn flow_with_trigger_config(id: &str, enabled: bool, trigger_config: Value) -> F
         id: id.to_string(),
         name: id.to_string(),
         enabled,
-        graph: WorkflowGraph {
-            nodes: vec![trigger_node(trigger_config)],
-            ..Default::default()
-        },
+        graph: json!({
+            "nodes": [serde_json::to_value(trigger_node(trigger_config)).unwrap()],
+            "edges": []
+        }),
         created_at: "2026-01-01T00:00:00Z".to_string(),
         updated_at: "2026-01-01T00:00:00Z".to_string(),
         last_run_at: None,
@@ -62,49 +68,37 @@ fn flow_with_trigger_config(id: &str, enabled: bool, trigger_config: Value) -> F
     }
 }
 
-fn dedup_node(id: &str) -> Node {
-    Node {
-        id: id.to_string(),
-        kind: NodeKind::Dedup,
-        type_version: 1,
-        name: id.to_string(),
-        config: json!({ "key": "=item.id" }),
-        ports: Vec::new(),
-        position: None,
-    }
-}
-
-/// A saved flow with a `trigger` node plus one `dedup` node with id
-/// `dedup_id` — the minimal graph [`DedupCommitSubscriber::dedup_node_ids`]
-/// needs to find something to settle.
-fn flow_with_dedup_node(id: &str, dedup_id: &str) -> Flow {
-    Flow {
-        id: id.to_string(),
-        name: id.to_string(),
-        enabled: true,
-        graph: WorkflowGraph {
-            nodes: vec![trigger_node(json!({})), dedup_node(dedup_id)],
-            ..Default::default()
-        },
-        created_at: "2026-01-01T00:00:00Z".to_string(),
-        updated_at: "2026-01-01T00:00:00Z".to_string(),
-        last_run_at: None,
-        last_status: None,
-        require_approval: false,
-    }
-}
-
-// ── DedupCommitSubscriber ────────────────────────────────────────
-
-fn dedup_state_namespace(flow_id: &str) -> String {
-    // MUST match `tinyflows::build_capabilities`'s `state_namespace`
-    // (`crates/openhuman-core/src/flows/tinyflows/caps.rs`) — this test asserts the
-    // subscriber collides with the SAME keys the engine's `dedup` node
-    // itself reads/writes, not just "some" namespace.
-    format!("flow:{flow_id}")
-}
-
-#[path = "bus_dedup_commit_lock_tests.rs"]
-mod dedup_commit_lock_tests;
 #[path = "bus_subscriber_tests.rs"]
 mod subscriber_tests;
+#[path = "bus_trigger_queue_tests.rs"]
+mod trigger_queue_tests;
+
+#[tokio::test]
+async fn a_trigger_handled_as_an_agent_uses_the_agent_config() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    let registered = crate::config::Config {
+        workspace_dir: std::path::PathBuf::from("/tmp/flows-trigger-registered"),
+        ..crate::config::Config::default()
+    };
+    let subscriber = FlowTriggerSubscriber::new(std::sync::Arc::new(registered));
+    assert_eq!(
+        subscriber
+            .config_for_scope(&crate::core::runtime::DispatchCtx::unbound())
+            .workspace_dir,
+        std::path::PathBuf::from("/tmp/flows-trigger-registered"),
+        "outside an agent the registered config is used"
+    );
+    let agent_config = crate::config::Config {
+        workspace_dir: std::path::PathBuf::from("/tmp/flows-trigger-agent"),
+        ..crate::config::Config::default()
+    };
+    let agent = CoreContext::for_test(DomainSet::full(), None).derive_with(
+        ContextOverlay::new(agent_config, DomainSet::full(), Default::default())
+            .session_agent("flows-trigger-agent"),
+    );
+    let seen = subscriber
+        .config_for_scope(&crate::core::runtime::DispatchCtx::new(agent))
+        .workspace_dir
+        .clone();
+    assert_eq!(seen, std::path::PathBuf::from("/tmp/flows-trigger-agent"));
+}

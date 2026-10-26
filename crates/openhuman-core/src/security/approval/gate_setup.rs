@@ -25,6 +25,18 @@ impl ApprovalGate {
         GLOBAL_GATE.get().cloned()
     }
 
+    /// A gate on its own store under `workspace`, for tests outside this
+    /// module that must not install the process-wide gate.
+    #[cfg(test)]
+    pub(crate) fn for_test(workspace: &std::path::Path) -> Self {
+        let config = Config {
+            workspace_dir: workspace.to_path_buf(),
+            ..Config::default()
+        };
+        let session = format!("session-{}", uuid::Uuid::new_v4());
+        Self::new(config, session, DEFAULT_APPROVAL_TTL)
+    }
+
     fn new(config: Config, session_id: String, ttl: Duration) -> Self {
         // Regression guard: the gate's session_id must be the per-launch
         // UUID minted by `bootstrap_core_runtime` (shape:
@@ -74,24 +86,31 @@ impl ApprovalGate {
     }
 
     /// Resolve the actual park duration from the gate's own `effective_ttl`
-    /// plus the `copilot_stream` clamp ([`COPILOT_APPROVAL_TTL`]) when that
-    /// origin is active. A clamp only ever *shortens* the park — it can never
+    /// plus the `copilot_stream` clamp ([`COPILOT_APPROVAL_TTL`]) and the
+    /// sub-agent clamp ([`SUBAGENT_APPROVAL_TTL`]) when those apply. A clamp only ever *shortens* the park — it can never
     /// extend `effective_ttl` past what the gate itself allows (e.g. a debug
     /// env override). Split out (rather than inlined at the call site) so it is
     /// unit testable without needing to actually park a future.
-    fn resolve_park_ttl(effective_ttl: Duration, copilot_stream: bool) -> Duration {
+    fn resolve_park_ttl(effective_ttl: Duration, copilot_stream: bool, subagent: bool) -> Duration {
         let mut ttl = effective_ttl;
         if copilot_stream {
             ttl = ttl.min(COPILOT_APPROVAL_TTL);
         }
+        if subagent {
+            ttl = ttl.min(SUBAGENT_APPROVAL_TTL);
+        }
         ttl
     }
 
-    /// Whether `tool_name` is on the user's "Always allow" list. Prefers the
+    /// Whether `tool_name` is on the user's "Always allow" list. Prefers the agent or
     /// process-global live policy (so a grant made this session is seen
     /// immediately) and falls back to the gate's boot-time config snapshot.
-    fn tool_is_auto_approved(&self, tool_name: &str) -> bool {
-        if let Some(policy) = crate::security::live_policy::current() {
+    fn tool_is_auto_approved(
+        &self,
+        ctx: &crate::core::runtime::DispatchCtx,
+        tool_name: &str,
+    ) -> bool {
+        if let Some(policy) = crate::security::live_policy::effective_in(ctx) {
             return policy.auto_approve.iter().any(|t| t == tool_name);
         }
         self.config
@@ -107,12 +126,11 @@ impl ApprovalGate {
     /// fallback pattern so a toggle made this session (config save + live
     /// policy reload) takes effect on the very next tool call.
     ///
-    /// Callers MUST still exclude `TrustedAutomationSource::SubconsciousTainted`
-    /// and `AgentTurnOrigin::Unknown` before trusting this flag — see the
-    /// `matches!` guard at the call site below. This method only reports the
+    /// Callers MUST still exclude `AgentTurnOrigin::Unknown` before trusting
+    /// this flag — see the `matches!` guard at the call site below. This method only reports the
     /// user's setting; it does not know about origin.
-    fn is_auto_approve_all_enabled(&self) -> bool {
-        if let Some(policy) = crate::security::live_policy::current() {
+    fn is_auto_approve_all_enabled(&self, ctx: &crate::core::runtime::DispatchCtx) -> bool {
+        if let Some(policy) = crate::security::live_policy::effective_in(ctx) {
             return policy.auto_approve_all;
         }
         self.config.autonomy.auto_approve_all
@@ -127,13 +145,14 @@ impl ApprovalGate {
     /// rows when both sides report in. See #2135.
     pub async fn intercept(
         &self,
+        turn: &ApprovalTurnContext,
         tool_name: &str,
         action_summary: &str,
         args_redacted: serde_json::Value,
     ) -> GateOutcome {
         // Drop the request_id; callers using the legacy entry point
         // don't record execution.
-        self.intercept_audited(tool_name, action_summary, args_redacted)
+        self.intercept_audited(turn, tool_name, action_summary, args_redacted)
             .await
             .0
     }
@@ -148,7 +167,11 @@ impl ApprovalGate {
         args_redacted: serde_json::Value,
     ) -> GateOutcome {
         let mut _park_bound_elapsed = false;
+        // A forced approval routes from the validated WebChat origin alone and
+        // never reads a chat context, a copilot flag or a flow run, so it takes
+        // none.
         self.intercept_audited_inner(
+            &ApprovalTurnContext::default(),
             tool_name,
             action_summary,
             args_redacted,
@@ -176,11 +199,12 @@ impl ApprovalGate {
     /// whether to invoke `record_execution`.
     pub async fn intercept_audited(
         &self,
+        turn: &ApprovalTurnContext,
         tool_name: &str,
         action_summary: &str,
         args_redacted: serde_json::Value,
     ) -> (GateOutcome, Option<String>) {
-        self.intercept_audited_for_call(tool_name, action_summary, args_redacted, None)
+        self.intercept_audited_for_call(turn, tool_name, action_summary, args_redacted, None)
             .await
     }
 
@@ -192,6 +216,7 @@ impl ApprovalGate {
     /// not driven through the tinyagents harness).
     pub async fn intercept_audited_for_call(
         &self,
+        turn: &ApprovalTurnContext,
         tool_name: &str,
         action_summary: &str,
         args_redacted: serde_json::Value,
@@ -202,6 +227,7 @@ impl ApprovalGate {
         // path, so the out-flag stays `false` and is discarded here.
         let mut _park_bound_elapsed = false;
         self.intercept_audited_inner(
+            turn,
             tool_name,
             action_summary,
             args_redacted,
@@ -232,6 +258,7 @@ impl ApprovalGate {
     /// [`Self::intercept_audited`] and always returns `Some`.
     pub async fn intercept_audited_bounded(
         &self,
+        turn: &ApprovalTurnContext,
         tool_name: &str,
         action_summary: &str,
         args_redacted: serde_json::Value,
@@ -240,6 +267,7 @@ impl ApprovalGate {
         let mut park_bound_elapsed = false;
         let resolved = self
             .intercept_audited_inner(
+                turn,
                 tool_name,
                 action_summary,
                 args_redacted,

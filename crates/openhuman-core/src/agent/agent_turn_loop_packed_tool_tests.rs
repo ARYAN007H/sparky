@@ -36,7 +36,7 @@ impl Tool for RecordingPackedTool {
 #[tokio::test]
 async fn turn_routes_a_bare_packed_tool_call_through_use_skill() {
     let provider = Arc::new(ScriptedProvider::new(vec![
-        tool_response(vec![ToolCall {
+        tool_response(vec![NativeToolCall {
             id: "tc1".into(),
             name: "skill_registry_search".into(),
             arguments: r#"{"query": "code review"}"#.into(),
@@ -46,13 +46,15 @@ async fn turn_routes_a_bare_packed_tool_call_through_use_skill() {
     ]));
     let ran = Arc::new(Mutex::new(None));
     let mut tools: Vec<Box<dyn Tool>> = vec![Box::new(RecordingPackedTool(ran.clone()))];
-    crate::tools::toolpacks::append_pack_tools(&mut tools);
-
+    // The public registry helper only returns its tool vector. The session
+    // builder must replace the canonical proxy with a session-owned handle.
+    let _pack_registry_handle = crate::tools::toolpacks::append_pack_tools(&mut tools);
     let (mut agent, _tmp) = build_agent_with(provider, tools, Box::new(NativeDialect));
     assert!(
         !agent
-            .visible_tool_names_for_test()
-            .contains("skill_registry_search"),
+            .visible_tool_specs_arc()
+            .iter()
+            .any(|spec| spec.name == "skill_registry_search"),
         "precondition: the tool is withheld behind its pack"
     );
 
@@ -67,13 +69,13 @@ async fn turn_routes_a_bare_packed_tool_call_through_use_skill() {
         .history()
         .iter()
         .filter_map(|msg| match msg {
-            ConversationMessage::ToolResults(results) => Some(
+            TranscriptEntry::ToolResults(results) => Some(
                 results
                     .iter()
                     .map(|r| r.content.clone())
                     .collect::<Vec<_>>(),
             ),
-            ConversationMessage::Chat(message) if message.role == "tool" => {
+            TranscriptEntry::Chat(message) if message.role.as_str() == "tool" => {
                 Some(vec![message.content.clone()])
             }
             _ => None,
@@ -120,7 +122,7 @@ impl Tool for WritePackedTool {
 #[tokio::test]
 async fn turn_does_not_route_a_bare_call_the_session_would_refuse() {
     let provider = Arc::new(ScriptedProvider::new(vec![
-        tool_response(vec![ToolCall {
+        tool_response(vec![NativeToolCall {
             id: "tc1".into(),
             name: "skill_registry_install".into(),
             arguments: r#"{"entry_id": "code-reviewer"}"#.into(),
@@ -130,7 +132,7 @@ async fn turn_does_not_route_a_bare_call_the_session_would_refuse() {
     ]));
     let ran = Arc::new(Mutex::new(false));
     let mut tools: Vec<Box<dyn Tool>> = vec![Box::new(WritePackedTool(ran.clone()))];
-    crate::tools::toolpacks::append_pack_tools(&mut tools);
+    let _pack_registry_handle = crate::tools::toolpacks::append_pack_tools(&mut tools);
     // The builder's default event channel is `internal`; cap it at read-only.
     let config = AgentConfig {
         channel_permissions: std::collections::HashMap::from([(
@@ -148,11 +150,11 @@ async fn turn_does_not_route_a_bare_call_the_session_would_refuse() {
         "a packed tool the session blocks must not run through a bare call"
     );
     let unrouted = agent.history().iter().any(|msg| match msg {
-        ConversationMessage::ToolResults(results) => results
+        TranscriptEntry::ToolResults(results) => results
             .iter()
             .any(|r| r.content.contains("unknown tool `skill_registry_install`")),
-        ConversationMessage::Chat(message) => {
-            message.role == "tool"
+        TranscriptEntry::Chat(message) => {
+            message.role.as_str() == "tool"
                 && message
                     .content
                     .contains("unknown tool `skill_registry_install`")

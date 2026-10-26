@@ -1,34 +1,8 @@
 use super::*;
+use crate::config::test_env::EnvVarGuard;
 use crate::config::TEST_ENV_LOCK as ENV_LOCK;
+use crate::core::runtime::DispatchCtx;
 use tempfile::tempdir;
-
-/// RAII guard for `OPENHUMAN_WORKSPACE`. Sets the env var on
-/// construction and clears it on drop so a panicking test doesn't
-/// leak the override into sibling tests. Must be constructed while
-/// holding `ENV_LOCK` — mutating process env vars concurrently is
-/// unsafe and the lock serialises every test in this module.
-struct WorkspaceEnvGuard;
-
-impl WorkspaceEnvGuard {
-    fn set(path: &std::path::Path) -> Self {
-        // SAFETY: Caller holds `ENV_LOCK`, so no other thread in
-        // this process is reading or mutating this env var.
-        unsafe {
-            std::env::set_var("OPENHUMAN_WORKSPACE", path);
-        }
-        Self
-    }
-}
-
-impl Drop for WorkspaceEnvGuard {
-    fn drop(&mut self) {
-        // SAFETY: Same contract as `set()` — `ENV_LOCK` is held for
-        // the whole test, so no concurrent env access is possible.
-        unsafe {
-            std::env::remove_var("OPENHUMAN_WORKSPACE");
-        }
-    }
-}
 
 // ── ensure_workspace_file ──────────────────────────────────────
 
@@ -99,11 +73,11 @@ fn bootstrap_files_contain_soul_and_identity() {
 
 #[tokio::test]
 async fn init_workspace_creates_dirs_and_files_in_fresh_workspace() {
-    let _g = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let _g = ENV_LOCK.lock().await;
     let tmp = tempdir().unwrap();
-    let _env = WorkspaceEnvGuard::set(tmp.path());
+    let _env = EnvVarGuard::workspace_unlocked(tmp.path());
 
-    let value = init_workspace(false)
+    let value = init_workspace(&DispatchCtx::process_default(), false)
         .await
         .expect("init_workspace on empty temp should succeed");
 
@@ -131,23 +105,28 @@ async fn init_workspace_creates_dirs_and_files_in_fresh_workspace() {
     assert!(created.iter().any(|s| s.ends_with("IDENTITY.md")));
 
     let logs = value["logs"].as_array().expect("logs array");
-    assert!(logs.iter().any(|l| l
-        .as_str()
-        .unwrap_or("")
-        .contains("workspace initialization completed")));
+    assert!(logs.iter().any(|l| {
+        l.as_str()
+            .unwrap_or("")
+            .contains("workspace initialization completed")
+    }));
 }
 
 #[tokio::test]
 async fn init_workspace_reports_existing_entries_on_second_call_without_force() {
-    let _g = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let _g = ENV_LOCK.lock().await;
     let tmp = tempdir().unwrap();
-    let _env = WorkspaceEnvGuard::set(tmp.path());
+    let _env = EnvVarGuard::workspace_unlocked(tmp.path());
 
     // First call populates the workspace.
-    init_workspace(false).await.expect("first init ok");
+    init_workspace(&DispatchCtx::process_default(), false)
+        .await
+        .expect("first init ok");
     // Second call without force should report everything as existing
     // and nothing as created / overwritten.
-    let value = init_workspace(false).await.expect("second init ok");
+    let value = init_workspace(&DispatchCtx::process_default(), false)
+        .await
+        .expect("second init ok");
 
     let created = value["result"]["files"]["created"].as_array().unwrap();
     let overwritten = value["result"]["files"]["overwritten"].as_array().unwrap();
@@ -173,11 +152,13 @@ async fn init_workspace_reports_existing_entries_on_second_call_without_force() 
 
 #[tokio::test]
 async fn init_workspace_with_force_overwrites_existing_bootstrap_files() {
-    let _g = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let _g = ENV_LOCK.lock().await;
     let tmp = tempdir().unwrap();
-    let _env = WorkspaceEnvGuard::set(tmp.path());
+    let _env = EnvVarGuard::workspace_unlocked(tmp.path());
 
-    let first = init_workspace(false).await.expect("initial init");
+    let first = init_workspace(&DispatchCtx::process_default(), false)
+        .await
+        .expect("initial init");
     // The config loader may place the workspace at a subpath of the
     // env override (e.g. `{tmp}/workspace`), so discover the real
     // location from the first result rather than assuming it is
@@ -190,7 +171,9 @@ async fn init_workspace_with_force_overwrites_existing_bootstrap_files() {
     let soul = workspace_dir.join("SOUL.md");
     std::fs::write(&soul, "corrupted").unwrap();
 
-    let value = init_workspace(true).await.expect("forced init");
+    let value = init_workspace(&DispatchCtx::process_default(), true)
+        .await
+        .expect("forced init");
 
     let overwritten: Vec<&str> = value["result"]["files"]["overwritten"]
         .as_array()

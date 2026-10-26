@@ -1,23 +1,16 @@
 //! Debug-build harnesses for raw integration coverage of the channel runtime.
 
-pub use super::dispatch::test_support::{
-    build_channel_context_block_for_test, select_acknowledgment_reaction_for_test,
-};
-use super::dispatch::{
-    process_channel_message, process_channel_runtime_message, RuntimeChannelMessage,
-};
+pub use super::dispatch::test_support::build_channel_context_block_for_test;
+use super::dispatch::{process_channel_runtime_message, RuntimeChannelMessage};
 pub use super::startup::test_support::resolve_yuanbao_app_secret_for_test;
 use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, AGENT_RUN_TURN_METHOD};
-use crate::agent::messages::ChatMessage;
-use crate::agent::progress::AgentProgress;
 use crate::channels::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
-use crate::channels::traits::{ChannelMessage, SendMessage};
 use crate::channels::Channel;
 use crate::channels::ChannelSystemPrompt;
 use crate::config::{MultimodalConfig, MultimodalFileConfig, ReliabilityConfig};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::inference::provider::ProviderRuntimeOptions;
+use crate::progress::AgentProgress;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -25,8 +18,11 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tinychannels_bus::context::ChatMessage;
+use tinychannels_bus::{
+    ChannelInboundEnvelope, ChannelOutboundMessage, ChannelRef, ConversationRef, SenderRef,
+};
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
-use tinymemory_api::types::{MemoryCategory, MemoryEntry};
 use tinytools::{Tool, ToolResult};
 
 #[derive(Debug, Clone)]
@@ -34,7 +30,7 @@ pub struct DispatchHarnessOptions {
     pub channel_name: String,
     pub content: String,
     pub thread_ts: Option<String>,
-    pub inbound_envelope: Option<tinychannels::ChannelInboundEnvelope>,
+    pub inbound_envelope: Option<tinychannels_bus::ChannelInboundEnvelope>,
     pub streaming: bool,
     pub supports_reactions: bool,
     pub response_text: Option<String>,
@@ -42,7 +38,6 @@ pub struct DispatchHarnessOptions {
     pub handler_delay_ms: u64,
     pub timeout_secs: u64,
     pub seed_history_len: usize,
-    pub memory_entries: Vec<TestMemoryEntry>,
     /// Workspace the runtime context reports; `None` falls back to the OS temp dir.
     ///
     /// `pub`, like every other field here, and it has to be: integration tests
@@ -114,18 +109,10 @@ impl Default for DispatchHarnessOptions {
             handler_delay_ms: 0,
             timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
             seed_history_len: 0,
-            memory_entries: Vec::new(),
             workspace_dir: None,
             system_prompt: HarnessSystemPrompt::default(),
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct TestMemoryEntry {
-    pub key: String,
-    pub content: String,
-    pub score: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -141,7 +128,7 @@ pub struct DispatchHarnessObservation {
     pub sends: Vec<ObservedSend>,
     pub start_typing_calls: usize,
     pub stop_typing_calls: usize,
-    pub received_event_envelope: Option<tinychannels::ChannelInboundEnvelope>,
+    pub received_event_envelope: Option<tinychannels_bus::ChannelInboundEnvelope>,
     pub handler_history_roles: Vec<String>,
     pub handler_history_text: String,
     pub handler_provider_name: String,
@@ -170,7 +157,11 @@ impl Channel for HarnessChannel {
         &self.name
     }
 
-    async fn send(&self, message: &SendMessage) -> Result<()> {
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v0.1.39 requires the v21 Channel::send test-double method"
+    )]
+    async fn send(&self, message: &tinychannels_bus::SendMessage) -> Result<()> {
         self.state.sends.lock().await.push(ObservedSend {
             kind: "send",
             recipient: message.recipient.clone(),
@@ -180,7 +171,24 @@ impl Channel for HarnessChannel {
         Ok(())
     }
 
-    async fn listen(&self, _tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> Result<()> {
+    async fn send_typed(&self, message: &ChannelOutboundMessage) -> Result<()> {
+        self.state.sends.lock().await.push(ObservedSend {
+            kind: "send",
+            recipient: message.conversation_id.clone(),
+            content: outbound_text(message)?,
+            thread_ts: message.thread_id.clone(),
+        });
+        Ok(())
+    }
+
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v0.1.39 still requires the legacy listener method on Channel"
+    )]
+    async fn listen(
+        &self,
+        _tx: tokio::sync::mpsc::Sender<tinychannels_bus::ChannelMessage>,
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -202,7 +210,11 @@ impl Channel for HarnessChannel {
         self.streaming
     }
 
-    async fn send_draft(&self, message: &SendMessage) -> Result<Option<String>> {
+    #[allow(
+        deprecated,
+        reason = "TinyChannels v0.1.39 exposes drafts only through its v21 test-double method"
+    )]
+    async fn send_draft(&self, message: &tinychannels_bus::SendMessage) -> Result<Option<String>> {
         self.state.sends.lock().await.push(ObservedSend {
             kind: "draft",
             recipient: message.recipient.clone(),
@@ -239,6 +251,19 @@ impl Channel for HarnessChannel {
     }
 }
 
+fn outbound_text(message: &ChannelOutboundMessage) -> Result<String> {
+    let mut text = String::new();
+    for part in &message.parts {
+        match part {
+            tinychannels_bus::channel::OutboundContentPart::Content {
+                part: tinychannels_bus::channel::ContentPart::Text { text: segment, .. },
+            } => text.push_str(segment),
+            _ => anyhow::bail!("test channel supports text outbound content only"),
+        }
+    }
+    Ok(text)
+}
+
 struct HarnessModel;
 
 #[async_trait]
@@ -254,122 +279,6 @@ impl ChatModel<()> for HarnessModel {
             .map(|message| message.text())
             .unwrap_or_default();
         Ok(ModelResponse::assistant(format!("model echo: {message}")))
-    }
-}
-
-/// A provider whose `recall` answers with a fixed entry list regardless of
-/// query.
-///
-/// Deliberately not [`InMemoryProvider`](crate::memory::guard::in_memory::InMemoryProvider):
-/// that one substring-matches, and these harness entries are scripted to come
-/// back for whatever the test sends. The point here is the channel pipeline
-/// downstream of recall, not recall itself.
-struct HarnessMemory {
-    entries: Vec<MemoryEntry>,
-}
-
-#[async_trait]
-impl tinymemory_api::provider::MemoryCore for HarnessMemory {
-    async fn store(
-        &self,
-        _namespace: &str,
-        _key: &str,
-        _content: &str,
-        _category: MemoryCategory,
-        _session_id: Option<&str>,
-        _taint: tinymemory_api::types::MemoryTaint,
-    ) -> std::result::Result<(), tinymemory_api::error::MemoryError> {
-        Ok(())
-    }
-
-    async fn get(
-        &self,
-        _namespace: &str,
-        _key: &str,
-    ) -> std::result::Result<Option<MemoryEntry>, tinymemory_api::error::MemoryError> {
-        Ok(None)
-    }
-
-    async fn forget(
-        &self,
-        _namespace: &str,
-        _key: &str,
-    ) -> std::result::Result<bool, tinymemory_api::error::MemoryError> {
-        Ok(false)
-    }
-
-    async fn list(
-        &self,
-        _namespace: Option<&str>,
-        _category: Option<&MemoryCategory>,
-        _session_id: Option<&str>,
-    ) -> std::result::Result<Vec<MemoryEntry>, tinymemory_api::error::MemoryError> {
-        Ok(Vec::new())
-    }
-
-    async fn namespaces(
-        &self,
-    ) -> std::result::Result<
-        Vec<tinymemory_api::types::NamespaceSummary>,
-        tinymemory_api::error::MemoryError,
-    > {
-        Ok(Vec::new())
-    }
-}
-
-#[async_trait]
-impl tinymemory_api::provider::MemoryRecall for HarnessMemory {
-    async fn recall(
-        &self,
-        _query: &str,
-        _limit: usize,
-        _opts: &tinymemory_api::recall::OwnedRecallOpts,
-        _scope: Option<&tinymemory_api::provider::types::SourceScope>,
-    ) -> std::result::Result<Vec<MemoryEntry>, tinymemory_api::error::MemoryError> {
-        Ok(self.entries.clone())
-    }
-}
-
-#[async_trait]
-impl tinymemory_api::provider::MemoryPortability for HarnessMemory {
-    async fn export_page(
-        &self,
-        _cursor: Option<&str>,
-        _limit: usize,
-    ) -> std::result::Result<
-        tinymemory_api::provider::types::ExportPage,
-        tinymemory_api::error::MemoryError,
-    > {
-        Err(tinymemory_api::error::MemoryError::Other(anyhow::anyhow!(
-            "harness memory does not export"
-        )))
-    }
-
-    async fn import_records(
-        &self,
-        _records: Vec<tinymemory_api::provider::types::ExportRecord>,
-    ) -> std::result::Result<
-        tinymemory_api::provider::types::ImportOutcome,
-        tinymemory_api::error::MemoryError,
-    > {
-        Err(tinymemory_api::error::MemoryError::Other(anyhow::anyhow!(
-            "harness memory does not import"
-        )))
-    }
-}
-
-#[async_trait]
-impl tinymemory_api::provider::MemoryProvider for HarnessMemory {
-    fn driver_id(&self) -> &str {
-        "harness-memory"
-    }
-
-    fn capabilities(&self) -> tinymemory_api::capabilities::Capabilities {
-        tinymemory_api::capabilities::Capabilities::mandatory()
-    }
-
-    async fn health(&self) -> tinymemory_api::health::MemoryHealth {
-        tinymemory_api::health::MemoryHealth::Ready
     }
 }
 
@@ -394,20 +303,6 @@ impl Tool for HarnessTool {
     }
 }
 
-fn memory_entry(input: TestMemoryEntry) -> MemoryEntry {
-    MemoryEntry {
-        id: input.key.clone(),
-        key: input.key,
-        content: input.content,
-        namespace: None,
-        category: MemoryCategory::Conversation,
-        timestamp: "now".to_string(),
-        session_id: None,
-        score: input.score,
-        taint: tinymemory_api::types::MemoryTaint::Internal,
-    }
-}
-
 /// Acquire the shared agent-handler guard. Hold the returned guard across any
 /// call that re-registers `AGENT_RUN_TURN_METHOD` (the harness, or
 /// `start_channels`) so concurrent registrations cannot race in the same
@@ -429,7 +324,7 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         .get()
         .expect("bus initialised")
         .receiver();
-    let _ = crate::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
 
     let handler_roles = Arc::new(Mutex::new(Vec::new()));
     let handler_text = Arc::new(Mutex::new(String::new()));
@@ -553,57 +448,74 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         .clone()
         .unwrap_or_else(std::env::temp_dir);
     let ctx = Arc::new(ChannelRuntimeContext {
+        relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(model)),
         default_provider: Arc::new("harness-provider".to_string()),
-        memory: crate::memory::guard::in_memory::guard_over(Arc::new(HarnessMemory {
-            entries: options
-                .memory_entries
-                .into_iter()
-                .map(memory_entry)
-                .collect(),
-        })),
         tools_registry: Arc::new(vec![Box::new(HarnessTool) as Box<dyn Tool>]),
         system_prompt: harness_system_prompt,
         model: Arc::new("harness-model".to_string()),
         temperature: 0.0,
-        auto_save_memory: true,
         max_tool_iterations: 3,
-        min_relevance_score: 0.2,
         conversation_histories: Arc::clone(&conversation_histories),
         turn_model_source_cache: Arc::new(Mutex::new(provider_cache)),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
         inference_url: None,
         reliability: Arc::new(ReliabilityConfig::default()),
-        provider_runtime_options: ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(harness_workspace_dir),
         message_timeout_secs: options.timeout_secs,
         multimodal: MultimodalConfig::default(),
         multimodal_files: MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     let expected_event_channel = options.channel_name.clone();
 
-    let message = ChannelMessage {
-        id: "m1".to_string(),
-        sender: "alice".to_string(),
-        reply_target: "reply".to_string(),
-        content: options.content,
-        channel: options.channel_name,
-        timestamp: 1,
-        thread_ts: options.thread_ts,
+    let message = options
+        .inbound_envelope
+        .unwrap_or_else(|| ChannelInboundEnvelope {
+            channel: ChannelRef {
+                id: options.channel_name,
+                account_id: None,
+            },
+            message_id: "m1".to_string(),
+            conversation: ConversationRef {
+                id: "reply".to_string(),
+                thread_id: options.thread_ts,
+                ..Default::default()
+            },
+            sender: SenderRef {
+                id: "alice".to_string(),
+                ..Default::default()
+            },
+            timestamp_unix_ms: Some(1),
+            text: options.content.clone(),
+            parts: vec![tinychannels_bus::channel::ContentPart::Text {
+                text: options.content,
+                markdown_dialect: None,
+            }],
+            ..Default::default()
+        });
+    let prepared = tinychannels_bus::module_inbound::PreparedChannelInbound {
+        message: crate::channels::routes::route_compat_message(&message),
+        envelope: message.clone(),
+        history_key: history_key.clone(),
+        history_key_ignores_thread: expected_event_channel == "telegram",
+        thread_id: history_key.clone(),
+        client_id: expected_event_channel.clone(),
+        session_key: history_key.clone(),
     };
-    if let Some(inbound_envelope) = options.inbound_envelope {
-        process_channel_runtime_message(
-            Arc::clone(&ctx),
-            RuntimeChannelMessage::with_inbound_envelope(message, inbound_envelope),
-        )
-        .await;
-    } else {
-        process_channel_message(Arc::clone(&ctx), message).await;
-    }
+    process_channel_runtime_message(
+        Arc::clone(&ctx),
+        RuntimeChannelMessage {
+            message,
+            authenticated_relay: false,
+            prepared_inbound: Some(prepared),
+        },
+    )
+    .await;
 
     let received_event_envelope = loop {
         match event_rx.try_recv() {

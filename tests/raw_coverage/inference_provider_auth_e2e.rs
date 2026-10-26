@@ -27,9 +27,11 @@
 //! Env is process-global and every aggregated suite shares one process, so
 //! each case takes the **crate-wide** [`env_lock`] for its whole body.
 
+use crate::env_guard::EnvVarGuard;
+use crate::rpc_harness::payload;
 use std::net::SocketAddr;
 use std::path::Path;
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use axum::http::header::AUTHORIZATION;
@@ -38,8 +40,8 @@ use serde_json::{json, Value};
 use tempfile::{tempdir, TempDir};
 
 use openhuman_core::core::auth::{get_rpc_token, init_rpc_token, CORE_TOKEN_ENV_VAR};
-use openhuman_core::core::jsonrpc::build_core_http_router;
 use openhuman_core::inference::auth_error_registry;
+use openhuman_rpc::server::build_core_http_router;
 
 const TEST_RPC_TOKEN: &str = "inference-provider-auth-e2e-token";
 
@@ -47,54 +49,27 @@ static AUTH_INIT: OnceLock<()> = OnceLock::new();
 
 /// Crate-wide, not file-local: all aggregated suites share one process, so a
 /// private mutex would not mutually exclude with anyone else's env mutation.
-static ENV_LOCK: &OnceLock<Mutex<()>> = &crate::SHARED_ENV_LOCK;
+static ENV_LOCK: &OnceLock<tokio::sync::Mutex<()>> = &crate::SHARED_ENV_LOCK;
 
-fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+fn env_lock() -> tokio::sync::MutexGuard<'static, ()> {
     ENV_LOCK
-        .get_or_init(|| Mutex::new(()))
+        .get_or_init(|| tokio::sync::Mutex::new(()))
+        .blocking_lock()
+}
+
+async fn env_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
+    ENV_LOCK
+        .get_or_init(|| tokio::sync::Mutex::new(()))
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .await
 }
 
-struct EnvVarGuard {
-    key: &'static str,
-    old: Option<std::ffi::OsString>,
-}
-
-impl EnvVarGuard {
-    fn set_to_path(key: &'static str, path: &Path) -> Self {
-        let old = std::env::var_os(key);
-        std::env::set_var(key, path.as_os_str());
-        Self { key, old }
-    }
-
-    fn set(key: &'static str, value: &str) -> Self {
-        let old = std::env::var_os(key);
-        std::env::set_var(key, value);
-        Self { key, old }
-    }
-
-    fn unset(key: &'static str) -> Self {
-        let old = std::env::var_os(key);
-        std::env::remove_var(key);
-        Self { key, old }
-    }
-}
-
-impl Drop for EnvVarGuard {
-    fn drop(&mut self) {
-        match &self.old {
-            Some(value) => std::env::set_var(self.key, value),
-            None => std::env::remove_var(self.key),
-        }
-    }
-}
-
-/// See the note in `sandbox_runtime_platform_e2e.rs`: `core::auth::RPC_TOKEN`
+/// `core::auth::RPC_TOKEN`
 /// is a process-global `OnceLock` and `init_rpc_token` is idempotent, so inside
 /// the aggregated binary the first suite to initialise pins the bearer. Use the
 /// token this process actually validates rather than assuming ours won.
 fn ensure_rpc_auth() -> String {
+    crate::tinyhumans_boot::boot();
     AUTH_INIT.get_or_init(|| {
         if std::env::var(CORE_TOKEN_ENV_VAR)
             .ok()
@@ -239,15 +214,6 @@ async fn setup(extra: &str) -> TestHarness {
     }
 }
 
-fn ok<'a>(value: &'a Value, context: &str) -> &'a Value {
-    if let Some(error) = value.get("error") {
-        panic!("{context}: unexpected JSON-RPC error: {error}");
-    }
-    value
-        .get("result")
-        .unwrap_or_else(|| panic!("{context}: missing result: {value}"))
-}
-
 fn err_message(value: &Value, context: &str) -> String {
     let error = value
         .get("error")
@@ -257,11 +223,6 @@ fn err_message(value: &Value, context: &str) -> String {
         .and_then(Value::as_str)
         .unwrap_or_else(|| panic!("{context}: error without message: {error}"))
         .to_string()
-}
-
-fn payload<'a>(value: &'a Value, context: &str) -> &'a Value {
-    let result = ok(value, context);
-    result.get("result").unwrap_or(result)
 }
 
 /// Write an executable stub `claude` and return its path. `body` is a POSIX
@@ -291,7 +252,7 @@ fn unsigned_jwt(claims: Value) -> String {
 
 #[tokio::test]
 async fn inference_resolve_model_maps_hints_and_tiers_to_the_routed_model() {
-    let _lock = env_lock();
+    let _lock = env_lock_async().await;
     let harness = setup("").await;
 
     // ---- Phase A: nothing routed. Every hint resolves to its managed tier. --
@@ -502,7 +463,7 @@ async fn inference_resolve_model_maps_hints_and_tiers_to_the_routed_model() {
 
 #[tokio::test]
 async fn inference_provider_auth_errors_surfaces_recorded_byo_key_rejections() {
-    let _lock = env_lock();
+    let _lock = env_lock_async().await;
     let harness = setup("").await;
 
     // Start from a known state — another suite in this binary may have
@@ -627,7 +588,7 @@ async fn inference_provider_auth_errors_surfaces_recorded_byo_key_rejections() {
 #[cfg(unix)]
 #[tokio::test]
 async fn inference_claude_code_status_classifies_ok_outdated_unusable_and_missing() {
-    let _lock = env_lock();
+    let _lock = env_lock_async().await;
     let harness = setup("").await;
     let stub_dir = harness.home().join("stub-cli");
 
@@ -749,7 +710,7 @@ async fn inference_claude_code_status_classifies_ok_outdated_unusable_and_missin
 #[cfg(unix)]
 #[tokio::test]
 async fn inference_claude_code_auth_status_prefers_the_env_key_then_reads_the_cli() {
-    let _lock = env_lock();
+    let _lock = env_lock_async().await;
     let harness = setup("").await;
     let stub_dir = harness.home().join("stub-auth-cli");
 
@@ -890,7 +851,10 @@ async fn inference_claude_code_auth_status_prefers_the_env_key_then_reads_the_cl
 
 #[tokio::test]
 async fn inference_claude_code_full_access_toggle_round_trips_through_the_workspace() {
-    let _lock = env_lock();
+    let _lock = env_lock_async().await;
+    // A host installs its storage backend; the toggle and the Claude provider
+    // both read it from there.
+    let _storage = crate::HostStorage::install(&_lock);
     let harness = setup("").await;
 
     // The safe posture is the default, and it must be the default on a fresh
@@ -920,30 +884,9 @@ async fn inference_claude_code_full_access_toggle_round_trips_through_the_worksp
         payload(&enabled, "set_full_access true").get("full_access"),
         Some(&json!(true))
     );
-    // NOTE: despite the RPC description ("stored under the workspace") and the
-    // helper's name (`workspace_dir_from_config`), the file lands in the
-    // **config** directory — the function returns `config.config_path.parent()`,
-    // i.e. `~/.openhuman`. Asserting the real location so this test documents
-    // where the toggle actually is; the wording mismatch is filed in
-    // ~/tinyhuman/bugs/e2e-wave-inference-stale-vision-and-workspace-docs.md.
-    let settings_file = harness
-        .home()
-        .join(".openhuman")
-        .join("claude_code_settings.json");
-    assert!(
-        settings_file.exists(),
-        "the toggle must land on disk at {}",
-        settings_file.display()
-    );
-    let on_disk: Value =
-        serde_json::from_str(&std::fs::read_to_string(&settings_file).expect("read settings file"))
-            .expect("settings file must be JSON");
-    assert_eq!(
-        on_disk.get("full_access"),
-        Some(&json!(true)),
-        "the persisted file must agree with the reply: {on_disk}"
-    );
-
+    // The toggle is persisted in the workspace's host storage (the
+    // `tinyagents-harness` / `claude_code_settings` KV namespace, e15c33a68f),
+    // not a JSON file, so persistence is proven by reading it back.
     let read_back = harness
         .rpc(
             75_003,
@@ -978,21 +921,6 @@ async fn inference_claude_code_full_access_toggle_round_trips_through_the_worksp
     assert_eq!(
         payload(&read_back, "claude_code_settings after disable").get("full_access"),
         Some(&json!(false))
-    );
-
-    // A corrupt settings file must fail *safe* — defaults, not full access.
-    std::fs::write(&settings_file, "{ this is not json").expect("corrupt the settings file");
-    let corrupt = harness
-        .rpc(
-            75_006,
-            "openhuman.inference_claude_code_settings",
-            json!({}),
-        )
-        .await;
-    assert_eq!(
-        payload(&corrupt, "claude_code_settings corrupt").get("full_access"),
-        Some(&json!(false)),
-        "a corrupt settings file must never fail open into bypassPermissions"
     );
 
     // Failure path: `enabled` is required and must be a bool.
@@ -1033,7 +961,7 @@ async fn inference_claude_code_full_access_toggle_round_trips_through_the_worksp
 
 #[tokio::test]
 async fn inference_openai_oauth_import_codex_cli_imports_a_real_auth_file() {
-    let _lock = env_lock();
+    let _lock = env_lock_async().await;
     let harness = setup("").await;
 
     let codex_home = harness.home().join("codex-home");

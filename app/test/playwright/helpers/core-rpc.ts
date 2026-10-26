@@ -14,6 +14,16 @@ interface JsonRpcFailure {
   error: { message?: string; code?: number; data?: unknown };
 }
 
+class CoreRpcError extends Error {
+  readonly code: number | undefined;
+
+  constructor(method: string, error: JsonRpcFailure['error']) {
+    super(`RPC ${method} failed: ${error.message || 'unknown error'}`);
+    this.name = 'CoreRpcError';
+    this.code = error.code;
+  }
+}
+
 function buildBypassJwt(userId: string): string {
   const payload = Buffer.from(
     JSON.stringify({ sub: userId, userId, exp: Math.floor(Date.now() / 1000) + 3600 })
@@ -37,14 +47,14 @@ export async function callCoreRpc<T>(
 
   const payload = (await response.json()) as JsonRpcSuccess<T> & JsonRpcFailure;
   if (payload.error) {
-    throw new Error(`RPC ${method} failed: ${payload.error.message || 'unknown error'}`);
+    throw new CoreRpcError(method, payload.error);
   }
   return payload.result;
 }
 
-async function resetCoreForWebUser(userId: string): Promise<void> {
+async function resetCoreForWebUser(userId: string, onboardingCompleted = true): Promise<void> {
   await callCoreRpc('openhuman.auth_clear_session', {});
-  await callCoreRpc('openhuman.config_set_onboarding_completed', { value: true });
+  await callCoreRpc('openhuman.config_set_onboarding_completed', { value: onboardingCompleted });
   await callCoreRpc('openhuman.auth_store_session', {
     token: buildBypassJwt(userId),
     userId,
@@ -52,16 +62,25 @@ async function resetCoreForWebUser(userId: string): Promise<void> {
   });
 }
 
-export async function seedBrowserCoreMode(page: Page): Promise<void> {
+export async function seedBrowserCoreMode(
+  page: Page,
+  options: { markWalkthroughComplete?: boolean } = {}
+): Promise<void> {
   await page.addInitScript(
-    ({ rpcUrl, token }) => {
+    ({ rpcUrl, token, markWalkthroughComplete }) => {
       window.localStorage.setItem('openhuman_core_mode', 'cloud');
       window.localStorage.setItem('openhuman_core_rpc_url', rpcUrl);
       window.localStorage.setItem('openhuman_core_rpc_token', token);
-      window.localStorage.setItem('openhuman:walkthrough_completed', 'true');
-      window.localStorage.removeItem('openhuman:walkthrough_pending');
+      if (markWalkthroughComplete) {
+        window.localStorage.setItem('openhuman:walkthrough_completed', 'true');
+        window.localStorage.removeItem('openhuman:walkthrough_pending');
+      }
     },
-    { rpcUrl: CORE_RPC_URL, token: CORE_RPC_TOKEN }
+    {
+      rpcUrl: CORE_RPC_URL,
+      token: CORE_RPC_TOKEN,
+      markWalkthroughComplete: options.markWalkthroughComplete !== false,
+    }
   );
 }
 
@@ -149,8 +168,63 @@ export async function signInViaCallbackToken(page: Page, token: string): Promise
   await waitForAppReady(page);
 }
 
-export async function signInViaBypassUser(page: Page, userId: string): Promise<void> {
-  await resetCoreForWebUser(userId);
+export async function signInViaBypassUser(
+  page: Page,
+  userId: string,
+  options: { waitForInitialThread?: boolean; onboardingCompleted?: boolean } = {}
+): Promise<void> {
+  await resetCoreForWebUser(userId, options.onboardingCompleted ?? true);
+  await applyBrowserCoreModeInPage(page);
+  await page.goto('/#/home');
+  await waitForAuthenticatedSnapshot(page);
+  await expect
+    .poll(async () => page.evaluate(() => window.location.hash), {
+      timeout: AUTH_CALLBACK_HOME_TIMEOUT_MS,
+    })
+    .toMatch(/^#\/chat/);
+  await waitForAppReady(page);
+  if (options.waitForInitialThread) {
+    // Some fresh profiles create an initial thread asynchronously; others
+    // leave the valid `/chat` landing route without one. Route-only tests need
+    // a settled thread route before setting another hash, so select the chat
+    // Select the current row explicitly: Redux can restore a selected ID while
+    // the URL remains at `/chat`, and clicking New Conversation in that gap can
+    // race with the pending route update.
+    const selectedThreadId = await page.evaluate(() => {
+      const store = (
+        window as unknown as {
+          __OPENHUMAN_STORE__?: {
+            getState?: () => { thread?: { selectedThreadId?: string | null } };
+          };
+        }
+      ).__OPENHUMAN_STORE__;
+      return store?.getState?.().thread?.selectedThreadId ?? null;
+    });
+    if (selectedThreadId) {
+      const selectedRow = page.getByTestId(`thread-row-${selectedThreadId}`);
+      await expect(selectedRow).toBeVisible();
+      await selectedRow.click();
+    } else {
+      await page.getByTestId('new-thread-button').click({ force: true });
+    }
+    await expect
+      .poll(async () => page.evaluate(() => window.location.hash), {
+        timeout: AUTH_CALLBACK_HOME_TIMEOUT_MS,
+      })
+      .toMatch(/^#\/chat\/thread-[^/?]+/);
+  }
+}
+
+/** Re-authenticate the same local test user without resetting persisted config. */
+export async function signInViaBypassUserPreservingConfig(
+  page: Page,
+  userId: string
+): Promise<void> {
+  await callCoreRpc('openhuman.auth_store_session', {
+    token: buildBypassJwt(userId),
+    userId,
+    user: { _id: userId, id: userId, displayName: 'Playwright User' },
+  });
   await applyBrowserCoreModeInPage(page);
   await page.goto('/#/home');
   await waitForAuthenticatedSnapshot(page);
@@ -165,10 +239,11 @@ export async function signInViaBypassUser(page: Page, userId: string): Promise<v
 export async function bootAuthenticatedPage(
   page: Page,
   userId: string,
-  hash: string = '/home'
+  hash: string = '/home',
+  options: { markWalkthroughComplete?: boolean } = {}
 ): Promise<void> {
   await resetCoreForWebUser(userId);
-  await seedBrowserCoreMode(page);
+  await seedBrowserCoreMode(page, options);
   await page.goto('/#/home');
   await waitForAuthenticatedSnapshot(page);
   await page.goto(`/#${hash}`);
@@ -206,18 +281,83 @@ export async function waitForAppReady(page: Page): Promise<void> {
     .toBeGreaterThan(20);
   await expect
     .poll(async () =>
-      page.evaluate(() => {
-        const candidates = Array.from(document.querySelectorAll('h2, button, p, div, span'));
-        return candidates.some(node => {
-          const text = node.textContent?.trim() ?? '';
-          if (!/Select a Runtime|Connect to Your Runtime/.test(text)) return false;
-          const el = node as HTMLElement;
-          const rect = el.getBoundingClientRect();
-          return rect.width > 0 && rect.height > 0;
-        });
-      })
+      // Keyed off a test id, not the picker's heading. Matching the copy meant
+      // that renaming it left this wait matching nothing, so it resolved
+      // immediately and every spec raced the boot gate.
+      page.evaluate(() => document.querySelector('[data-testid="boot-check-picker"]') !== null)
     )
     .toBe(false);
+
+  // Harness setup can install runtimes on a cold core. It deliberately blocks
+  // user input behind a full-screen dialog until the user chooses to continue
+  // in the background, so settle that product flow before a spec drives UI.
+  const readInitStatus = async (): Promise<{
+    overall?: string;
+    started_at?: string | null;
+  } | null> => {
+    try {
+      const result = await callCoreRpc<{
+        snapshot?: { overall?: string; started_at?: string | null };
+      }>('openhuman.harness_init_status');
+      return result.snapshot ?? null;
+    } catch (error) {
+      // Some slim or older cores do not expose this optional status method.
+      if (
+        error instanceof Error &&
+        ((error as CoreRpcError).code === -32601 ||
+          /(?:unknown method|method not found)/i.test(error.message))
+      ) {
+        return null;
+      }
+      throw error;
+    }
+  };
+  const init = await readInitStatus();
+  if (init?.overall === 'done' || init?.overall === 'idle') return;
+  if (init?.overall && init.overall !== 'running' && init.overall !== 'failed') return;
+  if (init?.overall === 'running' || init?.overall === 'failed') {
+    const alreadyDismissed = await page.evaluate(
+      startedAt =>
+        window.sessionStorage.getItem('harness-init-dismissed-run') === (startedAt ?? 'pending'),
+      init.started_at
+    );
+    if (alreadyDismissed) return;
+  }
+
+  const dialog = page.getByTestId('harness-init-dialog');
+  const actionButton = dialog
+    .getByTestId(/harness-init-(background|continue-anyway)/)
+    .filter({ visible: true })
+    .first();
+  const action: { value: 'background' | 'continue' | 'terminal' } = { value: 'terminal' };
+  await expect
+    .poll(
+      async () => {
+        if (await actionButton.isVisible().catch(() => false)) {
+          action.value =
+            (await actionButton.getAttribute('data-testid')) === 'harness-init-background'
+              ? 'background'
+              : 'continue';
+          return true;
+        }
+        const current = await readInitStatus();
+        if (current?.overall === 'done' || current?.overall === 'idle') {
+          action.value = 'terminal';
+          return true;
+        }
+        if (current === null && !(await dialog.isVisible().catch(() => false))) {
+          action.value = 'terminal';
+          return true;
+        }
+        return false;
+      },
+      { timeout: 10_000 }
+    )
+    .toBe(true);
+  if (action.value === 'background' || action.value === 'continue') {
+    await actionButton.click();
+    await expect(dialog).toBeHidden({ timeout: 5_000 });
+  }
 }
 
 export async function dismissWalkthroughIfPresent(page: Page): Promise<void> {

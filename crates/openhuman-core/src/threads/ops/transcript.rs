@@ -1,8 +1,9 @@
 //! Paginated projection of a thread's settled transcript.
 
-use super::support::{counts, envelope, workspace_dir};
-use crate::memory::{ApiEnvelope, PaginationMeta};
-use crate::rpc::RpcOutcome;
+use super::support::{counts, envelope, transcript_store};
+use crate::core::runtime::DispatchCtx;
+use crate::core::Outcome;
+use crate::threads::{ApiEnvelope, PaginationMeta};
 
 /// Request for [`transcript_get`]: the thread to project, plus newest-first
 /// pagination controls. `cursor` is the opaque token from a prior page's
@@ -16,23 +17,33 @@ pub struct TranscriptGetRequest {
     pub limit: Option<usize>,
 }
 
-/// Project a thread's settled transcript (derived from `session_raw/*.jsonl`)
-/// into typed display items, newest-first paginated. Returns an empty page with
-/// `hasTranscript: false` when the thread has no persisted transcript yet.
+/// Project a thread's settled transcript (read from the session store the
+/// request's tenant wrote it to) into typed display items, newest-first
+/// paginated. Returns an empty page with `hasTranscript: false` when the
+/// thread has no persisted transcript yet.
 pub async fn transcript_get(
+    ctx: &DispatchCtx,
     request: TranscriptGetRequest,
-) -> Result<RpcOutcome<ApiEnvelope<crate::threads::transcript_view::TranscriptPage>>, String> {
-    let dir = workspace_dir().await?;
-    let thread_id = request.thread_id.trim();
+) -> Result<Outcome<ApiEnvelope<tinyagents_session::transcript::view::TranscriptPage>>, String> {
+    let thread_id = request.thread_id.trim().to_string();
     if thread_id.is_empty() {
         return Err("thread_id is required".to_string());
     }
-    let page = crate::threads::transcript_view::get_page(
-        &dir,
-        thread_id,
-        request.cursor.as_deref(),
-        request.limit,
-    );
+    // Resolved here, in the request's scope; the projection itself is blocking.
+    let locator = transcript_store(ctx, &thread_id).await?.locator();
+    let cursor = request.cursor.clone();
+    let limit = request.limit;
+    let page = tokio::task::spawn_blocking(move || {
+        tinyagents_session::transcript::view::get_page_in(
+            locator.as_ref(),
+            &thread_id,
+            None,
+            cursor.as_deref(),
+            limit,
+        )
+    })
+    .await
+    .map_err(|e| format!("transcript page task: {e}"))?;
     let counts = counts([
         ("items", page.items.len()),
         ("total", page.total),
@@ -41,7 +52,7 @@ pub async fn transcript_get(
     let pagination = Some(PaginationMeta {
         limit: request
             .limit
-            .unwrap_or(crate::threads::transcript_view::DEFAULT_LIMIT),
+            .unwrap_or(tinyagents_session::transcript::view::DEFAULT_LIMIT),
         offset: request
             .cursor
             .as_deref()
@@ -51,3 +62,7 @@ pub async fn transcript_get(
     });
     Ok(envelope(page, Some(counts), pagination))
 }
+
+#[cfg(test)]
+#[path = "transcript_tests.rs"]
+mod tests;

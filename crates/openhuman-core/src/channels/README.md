@@ -1,62 +1,56 @@
 # Channels
 
-Multi-platform messaging integration. Re-exports the `Channel` trait vocabulary, owns the host glue for every provider (Slack, Discord, Telegram, WhatsApp, WhatsApp Web, IRC, Signal, iMessage, Email, Lark, Mattermost, DingTalk, QQ, Linq, Yuanbao, and the local CLI REPL), the runtime supervisor that brings channels online, inbound dispatch into the agent loop, and proactive outbound delivery. Does NOT own the channel system prompt copy (lives in `agent/context/channels_prompt.rs`; `system_prompt.rs` here owns only when it is re-rendered), per-channel credential storage (delegated to `security/credentials/`), or provider transport implementations (vendored in `tinychannels`; see below).
+This domain owns OpenHuman's channel configuration, RPC surface, account
+policy, and agent-turn integration. Provider transports and construction live
+in the TinyChannels module, which OpenHuman loads through TinyBus. The host
+does not build provider implementations or fall back to local listeners when
+the module is unavailable.
 
-## Feature gate
+## Native runtime
 
-The domain lives behind the `channels` feature (default-ON, #4801), except two dependency-free carve-outs that always-on code reaches directly: `traits` (the `Channel`/`SendMessage` re-export, named by the always-on agent-harness interactive loop in `agent/session_host/`) and `cli` (`CliChannel`, the stdin/stdout REPL that loop drives in every build). Everything else (`providers`, `host`, `controllers`, `runtime`, `bus`, `proactive`, `commands`, `context`, `routes`, `relay_runtime`, `system_prompt`, the provider re-exports, `doctor_channels`, `start_channels`, `build_system_prompt` and the `test_support` re-export) is `#[cfg(feature = "channels")]`. The feature owns the optional `tinychannels` crate (`channels = ["dep:tinychannels", "tinychannels/email", "tinychannels/lark"]`); the always-on pins (config schema, the `DomainEvent` inbound envelope, security pairing) resolve through the unconditional `tinychannels-bus` contract crate instead. Measured, the gate sheds no transitive packages: its value is compile surface and binary size. `voice` also re-enables `dep:tinychannels`, for `EmailChannel` alone. The full rationale is the comment above the `channels` feature in `crates/openhuman-core/Cargo.toml`.
+[`runtime/`](./runtime/README.md) opens an identity-scoped module lease for
+configured native listeners and an optional gateway relay. Before dispatch,
+the host asks the module to prepare effective timeout and concurrency limits.
+The host supplies typed callbacks for host-owned operations such as voice,
+allowlist persistence, event publication, and remote-control access. The
+module owns provider-specific startup, supervision, transport, and interaction
+behavior; OpenHuman owns routing, approvals, agent execution, and the session
+cancellation lifetime.
 
-## Public surface
+The normal provider type and provider re-exports are available only to tests
+that retain legacy compatibility fixtures. Production code uses the portable
+TinyChannels bus contracts from `tinychannels-bus` and the module client.
 
-- `pub use tinychannels_bus::{Channel, ChannelMessage, ChannelSendExt, SendMessage}` (`traits.rs`): the provider contract, sourced from the transport-free `tinychannels-bus` contract crate so it resolves even in `channels`-less builds.
-- `ChannelDefinition` / `ChannelAuthMode` (re-exported from `tinychannels::controllers` through `controllers/definitions.rs` and `mod.rs`): declarative provider metadata.
-- `pub fn start_channels` (`runtime/startup.rs`, re-exported from `mod.rs`): boots all enabled channels under the supervisor.
-- `pub fn doctor_channels` (`commands.rs`): diagnoses connectivity for the doctor CLI.
-- `pub fn build_system_prompt`: re-exported from `crate::agent::context::channels_prompt`.
-- `pub(crate) enum ChannelSystemPrompt` (`system_prompt.rs`): the prompt a turn is seeded with, `fixed` (tests) or `refreshing` (production), which renders `build_system_prompt_with_identity` for the active agent definition.
-- Per-provider channel structs re-exported from `providers/<name>.rs` (all thin `pub use tinychannels::providers::...` shims): `DingTalkChannel`, `DiscordChannel`, `EmailChannel`, `IMessageChannel`, `IrcChannel`, `LarkChannel`, `LinqChannel`, `MattermostChannel`, `QQChannel`, `SignalChannel`, `SlackChannel`, `TelegramChannel`, `WhatsAppChannel`, `YuanbaoChannel`. Cargo-feature-gated: `WhatsAppWebChannel` (`whatsapp-web`). `CliChannel` (`cli.rs`) is the one local implementation and is ungated.
-- Stable `pub use providers::<name>` paths for every provider, in `mod.rs`.
-- RPC `channels.{list, describe, connect, disconnect, status, set_default, get_default, test, telegram_login_start, telegram_login_check, discord_link_start, discord_link_check, discord_list_guilds, discord_list_channels, discord_check_permissions, send_message, send_reaction, create_thread, update_thread, list_threads}`, declared in `controllers/schemas.rs`.
+## Hosted and relay paths
 
-## Submodule map
+Hosted-channel messages arrive through the backend socket and are handled by
+[`bus/subscriber.rs`](./bus/subscriber.rs). The host prepares the caller identity and opens a
+private module runtime for progressive delivery. The module owns drafts,
+typing, retries, and idempotent final delivery; the host callback provides the
+captured managed REST transport.
+
+Gateway-relayed inbound messages use [`providers/relay/`](./providers/relay/README.md).
+The host preserves authenticated relay provenance outside serialized message
+metadata, then runs the message through the same routing and agent policy as a
+native listener. Channel operations and relay delivery use typed module
+requests rather than a local provider implementation.
+
+## Host policy
+
+OpenHuman remains responsible for selecting the target agent, enforcing
+channel permissions, handling chat approvals, and applying the captured
+account/session lifetime. A missing module or malformed module response fails
+the affected operation with a sanitized error. There is no host-side provider
+or shell-based substitute.
+
+## Layout
 
 | Path | Purpose |
 | --- | --- |
-| `providers/` | Per-provider re-exports from `tinychannels`, plus Telegram's host-coupled glue ([README](providers/README.md)) |
-| `host/` | `build_channel_host` / `build_provider_context`, the OpenHuman implementation of `tinychannels::host` that ported providers call back into (adapters in `host/adapters.rs`: `VoiceTranscriber`, `VoiceSynthesizer`, `CoreApprovalGate`, `ConversationHistoryStore`, `InferenceReactionGate`, `OpenHumanEventSink`, `CoreShutdownRegistry`, `ConfigAllowlistStore`) |
-| `runtime/` | Startup, supervision, and the inbound dispatch loop into the agent ([README](runtime/README.md)) |
-| `controllers/` | `channels.*` RPC namespace, `OpenHumanChannelBackend`, provider definitions ([README](controllers/README.md)) |
-| `tests/` | Cross-channel integration test suite (`#[cfg(all(feature = "channels", test))]`) |
-
-Flat files: `bus.rs` (`ChannelInboundSubscriber`, handles `DomainEvent::ChannelInboundMessage` published by the socket transport layer in `platform/socket/event_handlers.rs` and replies through the REST API; registered by `register_domain_subscribers` in `core/jsonrpc.rs`, not here), `cli.rs` (ungated `CliChannel`), `commands.rs` (`doctor_channels` and listener health classification), `context.rs` (`ChannelRuntimeContext`, per-sender conversation history, timeouts), `proactive.rs` (`ProactiveMessageSubscriber`, subscribes `DomainEvent::ProactiveMessageRequested` and delivers to the active channel), `relay_runtime.rs` (`relay_runtime_fronts_channel` / `send_outbound_intent`, the process-local relay-websocket transport handle controller sends go through when the relay fronts a channel), `routes.rs` (per-sender route overrides and runtime commands), `system_prompt.rs`, `traits.rs` (ungated `Channel`/`SendMessage` re-export).
-
-## Calls into
-
-- `crates/openhuman-core/src/agent/` — the agent turn is dispatched over `BUS.native()` to the `agent.run_turn` handler registered by `agent::bus::register_agent_handlers`, so `runtime/dispatch/` never imports the harness directly.
-- `crates/openhuman-core/src/agent/context/channels_prompt.rs` — channel system prompt rendering, re-exported as `build_system_prompt`.
-- `crates/openhuman-core/src/security/credentials/` — `AuthService` lookups for connect/disconnect and for secret hydration at startup (email password, Yuanbao app secret).
-- `crates/openhuman-core/src/security/approval/` — `ApprovalGate` for the approval-reply intercept and `ApprovalChatContext` scoping of Telegram turns.
-- `crates/openhuman-core/src/config/` — `Config` / `ChannelsConfig` (schema types come from `tinychannels_bus::config` via `config/schema/channels.rs`).
-- `crates/openhuman-core/src/memory/conversations/` and `memory/guard` — conversation history persistence and the active memory guard.
-- `crates/openhuman-core/src/backend/client.rs` — `BackendClient` for controller messaging ops and Telegram/Discord link flows.
-- `crates/openhuman-core/src/web_chat/` — web-channel event publishing, session invalidation (`/new`), and the web surface subscribers registered at startup.
-- `crates/openhuman-core/src/voice/` — STT/TTS behind the `host/` adapters.
-- `crates/openhuman-core/src/core/bus.rs` and `core/events.rs` — the process-wide `BUS` and the `DomainEvent::Channel*` variants published from `runtime/dispatch/` and `runtime/supervision.rs`.
-- `vendor/tinychannels/` — provider transports, `tinychannels::build_channels` (provider construction), `ChannelManager`/`ChannelBackend`, and the `tinychannels::host` capability boundary; `vendor/tinychannels/crates/tinychannels-bus` — the transport-free trait/type contract.
-
-## Called by
-
-- `crates/openhuman-core/src/core/all.rs`: registers `controllers::all_channels_registered_controllers()` under the `channels` feature gate.
-- `crates/openhuman-core/src/core/runtime/services.rs`: `spawn_channels_service` calls `channels::start_channels(config)` unless `OPENHUMAN_DISABLE_CHANNEL_LISTENERS` is set or `has_listening_integrations()` is false.
-- `crates/openhuman-core/src/core/jsonrpc.rs`: `bootstrap_core_runtime` subscribes `bus::ChannelInboundSubscriber` and calls `proactive::register_web_only_proactive_subscriber()`.
-- `crates/openhuman-core/src/agent/session_host/`: the interactive loop drives the ungated `CliChannel`.
-- `crates/openhuman-core/src/cron/bus.rs`: `CronDeliverySubscriber` is handed the started channel map by `runtime/startup.rs`; it names channels only through `tinychannels_bus`.
-
-## Tests
-
-- Unit, flat files: `bus_tests.rs`, `bus_inbound_thread_id_tests_tests.rs`, `cli_tests.rs`, `commands_tests.rs`, `context_tests.rs`, `proactive_tests.rs`, `relay_runtime_tests.rs`, `routes_tests.rs`, `system_prompt_tests.rs`, `traits_tests.rs` (`bus/`'s `delivery.rs`, `draft.rs`, `filler.rs`, `progressive_ui.rs`, `streaming_state.rs`, `subscriber.rs`, `thinking.rs`, and `thread_id.rs` are source submodules, not tests; `bus_test_support_tests.rs` is a debug-build helper module).
-- Cross-channel integration suite (`tests/`, see its module doc): `common.rs` fixtures plus `discord_integration`, `health`, `identity`, `memory`, `personality`, `prompt`, `runtime_dispatch`, `runtime_tool_calls`, `telegram_integration`.
-- Host adapters: `host/host_tests.rs`.
-- Provider host glue: `providers/telegram/{approval_surface_tests,bus_tests,remote_control_tests}.rs`.
-- Controllers: `controllers/{backend_tests,ops_tests,schemas_tests}.rs` (+ `ops_connect_status_tests.rs`/`ops_yuanbao_email_tests.rs`), `controllers/ops/connect_email_config_tests_tests.rs`.
-- Runtime: `runtime/{startup_tests,startup_email_secret_tests_tests,startup_yuanbao_secret_tests_tests,supervision_tests,dispatch_tests}.rs`, `runtime/dispatch/{mod_scoping_tests_tests,mod_approval_surface_gating_tests_tests,routing_connected_fallback_tests_tests}.rs`.
+| [`mod.rs`](./mod.rs) | Feature gates and the public channel contract exports. Concrete provider exports are test-only. |
+| [`traits.rs`](./traits.rs) | Portable message and send contracts re-exported from `tinychannels-bus`. |
+| [`controllers/`](./controllers/) | OpenHuman `channels.*` operations and host-side adaptation of the registered channel callback. |
+| [`host/`](./host/) | Typed module callbacks, event subscribers, and remote-control host operations. |
+| [`runtime/`](./runtime/README.md) | Module lease startup, account lifetime, and the OpenHuman dispatch pipeline. |
+| [`bus/`](./bus/) | Hosted-channel inbound and durable progressive delivery integration. |
+| [`providers/relay/`](./providers/relay/README.md) | Gateway relay RPC surface and host-side relay orchestration. |

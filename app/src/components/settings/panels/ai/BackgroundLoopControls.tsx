@@ -1,11 +1,9 @@
 /*
  * Background loop map + usage diagnostics.
  *
- * The heartbeat planner, its calendar collector and the subconscious tick were
- * retired upstream along with the subconscious domain, so the planner controls
- * that used to occupy the left column are gone. What remains is the loop map of
- * the background work that still runs, plus the recent-usage ledger + budget
- * math. `view` lets a host panel (UsagePanel) mount just the ledger.
+ * The loop map of the background work that runs without a chat message
+ * (connection sync), plus the
+ * recent-usage ledger + budget math. `view` lets a host panel (UsagePanel) mount just the ledger.
  */
 import debug from 'debug';
 import { RefreshCw } from 'lucide-react';
@@ -20,16 +18,10 @@ import {
   type TeamUsage,
 } from '../../../../services/api/creditsApi';
 import { Badge, Button, Card, StatusLine } from '../../../ui';
-import type { RoutingMap } from './aiPanelTypes';
 import {
   activeConnection,
-  type BackgroundLoopProviderView,
   COMPOSIO_PERIODIC_TICK_MINUTES,
-  describeProvider,
   formatCount,
-  LEARNING_REBUILD_MINUTES,
-  MEMORY_POLL_SECONDS,
-  MEMORY_WORKERS,
   spendAmount,
   summarizeSpendByAction,
   summarizeSpendByHour,
@@ -43,13 +35,9 @@ const log = debug('settings:background-loops');
 type BackgroundLoopControlsView = 'all' | 'ledger';
 
 export const BackgroundLoopControls = ({
-  routing,
-  cloudProviders,
   view = 'all',
   hideHeader = false,
 }: {
-  routing: RoutingMap;
-  cloudProviders: BackgroundLoopProviderView[];
   view?: BackgroundLoopControlsView;
   hideHeader?: boolean;
 }) => {
@@ -107,23 +95,10 @@ export const BackgroundLoopControls = ({
   const hourSummary = summarizeSpendByHour(transactions);
   const latestSpend = spendRows[0] ?? null;
   const activeConnections = connections.filter(activeConnection);
-  // The heartbeat planner, its calendar collector and the subconscious tick
-  // went with the subconscious domain, so none of them contributes scheduled
-  // wakeups or background API reads any more. Kept as named zeros so the
-  // ledger arithmetic below still reads as "everything that runs in the
-  // background" instead of silently dropping the terms.
-  const heartbeatTicksPerWeek = 0;
-  const calendarPlannerCallsPerWeek = 0;
   const composioPeriodicTicksPerWeek = Math.ceil(WEEK_MINUTES / COMPOSIO_PERIODIC_TICK_MINUTES);
-  const learningTicksPerWeek = Math.ceil(WEEK_MINUTES / LEARNING_REBUILD_MINUTES);
-  const memoryPollsPerWeek = Math.ceil((WEEK_MINUTES * 60 * MEMORY_WORKERS) / MEMORY_POLL_SECONDS);
   const composioConnectionScansPerWeek = composioPeriodicTicksPerWeek * activeConnections.length;
-  const backgroundApiReadsPerWeek = calendarPlannerCallsPerWeek + composioConnectionScansPerWeek;
-  const backgroundWakeupsPerWeek =
-    heartbeatTicksPerWeek +
-    composioPeriodicTicksPerWeek +
-    learningTicksPerWeek +
-    memoryPollsPerWeek;
+  const backgroundApiReadsPerWeek = composioConnectionScansPerWeek;
+  const backgroundWakeupsPerWeek = composioPeriodicTicksPerWeek;
   const scheduledCallsPerRemainingDollar =
     usage && usage.remainingUsd > 0 ? backgroundApiReadsPerWeek / usage.remainingUsd : null;
   const estimatedRowsLeft =
@@ -148,27 +123,6 @@ export const BackgroundLoopControls = ({
       : 'n/a';
 
   const loops = [
-    {
-      name: t('settings.ai.loops.memoryTreeWorkers.name'),
-      enabled: true,
-      cadence: t('settings.ai.loops.cadence.queue'),
-      route: describeProvider(routing.memory, cloudProviders),
-      work: t('settings.ai.loops.memoryTreeWorkers.work'),
-      risk: t('settings.ai.loops.memoryTreeWorkers.risk')
-        .replace('{workers}', String(MEMORY_WORKERS))
-        .replace('{seconds}', String(MEMORY_POLL_SECONDS)),
-    },
-    {
-      name: t('settings.ai.loops.reflectionRebuild.name'),
-      enabled: true,
-      cadence: t('settings.ai.loops.cadence.thirtyMin'),
-      route: describeProvider(routing.learning, cloudProviders),
-      work: t('settings.ai.loops.reflectionRebuild.work'),
-      risk: t('settings.ai.loops.reflectionRebuild.risk').replace(
-        '{count}',
-        formatCount(learningTicksPerWeek)
-      ),
-    },
     {
       name: t('settings.ai.loops.composioSync.name'),
       enabled: true,
@@ -252,9 +206,7 @@ export const BackgroundLoopControls = ({
           formatSpendAmount={spendAmount}
           backgroundApiReadsPerWeek={backgroundApiReadsPerWeek}
           backgroundWakeupsPerWeek={backgroundWakeupsPerWeek}
-          calendarPlannerCallsPerWeek={calendarPlannerCallsPerWeek}
           composioConnectionScansPerWeek={composioConnectionScansPerWeek}
-          memoryPollsPerWeek={memoryPollsPerWeek}
           estimatedRowsLeft={estimatedRowsLeft}
           estimatedRowsPerBudget={estimatedRowsPerBudget}
           projectedExhaustAt={projectedExhaustAt}

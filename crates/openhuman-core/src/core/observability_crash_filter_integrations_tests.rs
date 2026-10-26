@@ -75,7 +75,6 @@ fn integrations_filter_keeps_non_transient_failures() {
 /// `SKILL.md`) is expected user-input state — the before_send net must drop
 /// it, while a genuine 5xx remote failure and unrelated domains stay
 /// reportable.
-
 #[cfg(feature = "crash-reporting")]
 #[test]
 fn skills_install_client_error_filter_drops_4xx_keeps_5xx() {
@@ -123,6 +122,22 @@ fn skills_install_client_error_filter_drops_4xx_keeps_5xx() {
         !is_skills_install_client_error_event(&skills_transport),
         "skills transport failures are out of scope for the 4xx filter"
     );
+}
+
+/// Skill-registry defects (a malformed catalog, a transport that broke its
+/// contract) are not user input: neither skills filter may drop them.
+#[cfg(feature = "crash-reporting")]
+#[test]
+fn skill_registry_defects_pass_the_skills_filters() {
+    for failure in ["malformed", "transport_contract"] {
+        let event = event_with_tags(&[
+            ("domain", "skills"),
+            ("operation", "registry"),
+            ("failure", failure),
+        ]);
+        assert!(!is_skills_install_client_error_event(&event), "{failure}");
+        assert!(!is_skill_install_user_fetch_failure(&event), "{failure}");
+    }
 }
 
 #[cfg(feature = "crash-reporting")]
@@ -477,11 +492,11 @@ fn quota_exhausted_filter_matches_responses_usage_limit_reached_event() {
     // emit site — the Codex/ChatGPT OAuth `/responses` plan cap. Mirrors the
     // real production shape `"<name> Responses API error (<status>): <body>"`
     // (`compatible_helpers.rs:135`), including the `(429)` status segment and
-    // the full AFE payload (`plan_type` + `resets_at`) from `ops/http_error.rs`,
+    // the full AFE payload (`plan_type` + `resets_at`) from `provider/http_error.rs`,
     // so this stays coupled to the actual wire format rather than a loose
     // substring. No "monthly"/"quota" co-marker, so it exercises the AFE
     // phrase extension reaching the before_send net on both message and
-    // exception paths (the subconscious loop retries until `resets_at`).
+    // exception paths (a background retry loop waits until `resets_at`).
     let body = "openai Responses API error (429): {\"error\":{\"type\":\
         \"usage_limit_reached\",\"message\":\"The usage limit has been reached\",\
         \"plan_type\":\"plus\",\"resets_at\":1750000000}}";
@@ -614,9 +629,9 @@ fn ollama_cloud_internal_500_reraise_routes_through_expected_path() {
     // demote to `TransientUpstreamHttp` when re-reported at the agent / RPC
     // boundary (`provider_chat` → `report_error_or_expected`), so the
     // `domain=agent` half of the flood is suppressed too.
-    let reraise = crate::inference::provider::ollama_cloud_internal_500_user_message(
+    let reraise = tinyinference_llm::failure::ollama_cloud_internal_500_user_message(
         Some("minimax-m3:cloud"),
-        reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+        500,
     );
     assert_eq!(
         expected_error_kind(&reraise),
@@ -636,10 +651,7 @@ fn ollama_cloud_internal_500_before_send_matches_raw_and_reraised_shapes() {
         &event_with_exception_value(raw)
     ));
 
-    let reraise = crate::inference::provider::ollama_cloud_internal_500_user_message(
-        None,
-        reqwest::StatusCode::INTERNAL_SERVER_ERROR,
-    );
+    let reraise = tinyinference_llm::failure::ollama_cloud_internal_500_user_message(None, 500);
     assert!(is_ollama_cloud_internal_500_event(&event_with_message(
         &reraise
     )));

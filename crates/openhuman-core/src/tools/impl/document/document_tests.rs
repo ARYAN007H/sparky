@@ -36,7 +36,11 @@ fn test_security(workspace: &Path) -> Arc<SecurityPolicy> {
 }
 
 fn make_tool(workspace: &Path) -> DocumentTool {
-    DocumentTool::new(workspace.to_path_buf(), test_security(workspace))
+    DocumentTool::new(
+        workspace.to_path_buf(),
+        workspace.join("Files"),
+        test_security(workspace),
+    )
 }
 
 fn minimal_input_json() -> serde_json::Value {
@@ -51,7 +55,7 @@ fn minimal_input_json() -> serde_json::Value {
 /// Pull the JSON payload out of a tool result.
 fn payload_of(result: &ToolResult) -> serde_json::Value {
     match result.content.first().expect("a content block") {
-        crate::skills::types::ToolContent::Json { data } => data.clone(),
+        tinytools::ToolContent::Json { data } => data.clone(),
         other => panic!("expected Json content block, got {other:?}"),
     }
 }
@@ -91,51 +95,6 @@ fn description_includes_router_rules() {
 }
 
 #[tokio::test]
-async fn execute_rejects_empty_title() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let args = json!({ "title": "", "sections": [{ "heading": "x", "paragraphs": ["y"] }] });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-    assert!(result.text().contains("title"));
-}
-
-#[tokio::test]
-async fn execute_rejects_empty_sections_array() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let args = json!({ "title": "Doc", "sections": [] });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-    assert!(result.text().contains("section"));
-}
-
-#[tokio::test]
-async fn execute_rejects_section_with_no_content() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let args = json!({
-        "title": "Doc",
-        "sections": [{ "heading": "", "paragraphs": ["   "], "bullets": [] }]
-    });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-}
-
-#[tokio::test]
-async fn execute_rejects_oversize_heading() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let big = "x".repeat(MAX_TEXT_CHARS + 1);
-    let args = json!({
-        "title": "Doc",
-        "sections": [{ "heading": big, "paragraphs": ["ok"] }]
-    });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-}
-
-#[tokio::test]
 async fn execute_rejects_too_many_sections() {
     let ws = workspace();
     let tool = make_tool(ws.path());
@@ -145,7 +104,13 @@ async fn execute_rejects_too_many_sections() {
     let args = json!({ "title": "Big doc", "sections": sections });
     let result = tool.execute(args).await.expect("execute returns Ok");
     assert!(result.is_error);
-    assert!(result.text().contains(&MAX_SECTIONS.to_string()));
+    assert!(
+        result
+            .text()
+            .contains(&format!("must contain ≤ {MAX_SECTIONS} sections")),
+        "the tool should preserve the bus limit in its error: {}",
+        result.text()
+    );
 }
 
 #[tokio::test]
@@ -160,9 +125,13 @@ async fn execute_rejects_unknown_field() {
 }
 
 #[tokio::test]
-#[ignore = "needs a built tinydocs module (OPENHUMAN_MODULE_PATH) and its own process: \
-the module bus belongs to the runtime that creates it, so run this test alone"]
 async fn execute_happy_path_returns_artifact_metadata() {
+    if crate::util::module_test_process::run(
+        module_path!(),
+        "execute_happy_path_returns_artifact_metadata",
+    ) {
+        return;
+    }
     // End-to-end: drives the real docx-rs engine + artifact pipeline.
     // Asserts the success contract — the artifact is finalised on disk and
     // the markdown reply quotes the path + id.

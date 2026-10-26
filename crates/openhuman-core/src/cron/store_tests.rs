@@ -1,13 +1,21 @@
+//! The store itself is tested upstream (`tinyflows-drivers`); these pin the
+//! host mapping from `Config` to its options and the import of the `jobs.db`
+//! tinyflows used to write.
+
 use super::*;
-use crate::config::Config;
-use crate::cron::ActiveHours;
 use chrono::Duration as ChronoDuration;
-use chrono::Utc;
 use tempfile::TempDir;
 
-use crate::cron::CronJobPatch;
-use crate::cron::JobType;
-use crate::cron::Schedule;
+/// Move one scheduled row into the past for scheduler tests. The document
+/// representation belongs to the module store; this helper is test-only.
+pub(crate) fn force_next_run_for_test(
+    config: &Config,
+    job_id: &str,
+    at: DateTime<Utc>,
+) -> Result<()> {
+    super::force_next_run_for_test(config, job_id, at)
+}
+
 fn test_config(tmp: &TempDir) -> Config {
     let config = Config {
         workspace_dir: tmp.path().join("workspace"),
@@ -16,528 +24,433 @@ fn test_config(tmp: &TempDir) -> Config {
         ..Config::default()
     };
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
     config
 }
 
 #[test]
-fn add_job_accepts_five_field_expression() {
+fn remove_job_does_not_write_to_stdout() {
+    use std::process::Command;
+
+    const CHILD: &str = "OPENHUMAN_CRON_REMOVE_STDOUT_CHILD";
+    if let Ok(workspace) = std::env::var(CHILD) {
+        let config = Config {
+            workspace_dir: workspace.into(),
+            action_dir: std::env::temp_dir(),
+            ..Config::default()
+        };
+        crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
+        println!("BEGIN_CRON_REMOVE_CAPTURE");
+        use std::io::Write;
+        std::io::stdout().flush().unwrap();
+        remove_job(
+            &config,
+            &std::env::var("OPENHUMAN_CRON_REMOVE_JOB").unwrap(),
+        )
+        .unwrap();
+        println!("END_CRON_REMOVE_CAPTURE");
+        std::io::stdout().flush().unwrap();
+        return;
+    }
+
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-
-    let job = add_job(&config, "*/5 * * * *", "echo ok").unwrap();
-    assert_eq!(job.expression, "*/5 * * * *");
-    assert_eq!(job.command, "echo ok");
-    assert!(matches!(job.schedule, Schedule::Cron { .. }));
-}
-
-#[test]
-fn add_shell_job_persists_active_hours_schedule() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let active_hours = ActiveHours {
-        start: "09:00".into(),
-        end: "17:00".into(),
-    };
-
-    let job = add_shell_job(
-        &config,
-        Some("business-hours".into()),
-        Schedule::Cron {
-            expr: "0 9 * * *".into(),
-            tz: Some("UTC".into()),
-            active_hours: Some(active_hours.clone()),
-        },
-        "echo ok",
-    )
-    .unwrap();
-
-    let stored = get_job(&config, &job.id).unwrap();
-    assert_eq!(stored.expression, "0 9 * * *");
-    assert_eq!(
-        stored.schedule,
-        Schedule::Cron {
-            expr: "0 9 * * *".into(),
-            tz: Some("UTC".into()),
-            active_hours: Some(active_hours),
-        }
-    );
-}
-
-#[test]
-fn add_list_remove_roundtrip() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-
-    let job = add_job(&config, "*/10 * * * *", "echo roundtrip").unwrap();
-    let listed = list_jobs(&config).unwrap();
-    assert_eq!(listed.len(), 1);
-    assert_eq!(listed[0].id, job.id);
-
-    remove_job(&config, &job.id).unwrap();
-    assert!(list_jobs(&config).unwrap().is_empty());
-}
-
-#[test]
-fn due_jobs_filters_by_timestamp_and_enabled() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-
-    let job = add_job(&config, "* * * * *", "echo due").unwrap();
-
-    let before_next_run = job.next_run - ChronoDuration::seconds(1);
-    let due_before_next_run = due_jobs(&config, before_next_run).unwrap();
+    let job = add_job(&config, "*/5 * * * *", "echo remove").unwrap();
+    let output = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "cron::store::tests::remove_job_does_not_write_to_stdout",
+            "--nocapture",
+        ])
+        .env(CHILD, &config.workspace_dir)
+        .env("OPENHUMAN_CRON_REMOVE_JOB", &job.id)
+        .output()
+        .unwrap();
     assert!(
-        due_before_next_run.is_empty(),
-        "job should not be due before its next_run timestamp"
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
     );
-
-    let due_at_next_run = due_jobs(&config, job.next_run).unwrap();
-    assert_eq!(due_at_next_run.len(), 1, "job should be due at next_run");
-
-    let _ = update_job(
-        &config,
-        &job.id,
-        CronJobPatch {
-            enabled: Some(false),
-            ..CronJobPatch::default()
-        },
-    )
-    .unwrap();
-    let due_after_disable = due_jobs(&config, job.next_run).unwrap();
-    assert!(due_after_disable.is_empty());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let captured = stdout.split("BEGIN_CRON_REMOVE_CAPTURE\n").nth(1).unwrap();
+    let captured = captured.split("END_CRON_REMOVE_CAPTURE\n").next().unwrap();
+    assert!(captured.is_empty(), "unexpected stdout: {captured}");
 }
 
+#[cfg(feature = "storage-sqlite")]
 #[test]
-fn enabling_stale_disabled_job_refreshes_next_run() {
+fn jobs_live_in_the_workspace_default_database() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-
-    // Daily 7 AM job, then disable it (mimics a seeded opt-in morning briefing).
-    let job = add_job(&config, "0 7 * * *", "echo briefing").unwrap();
-    update_job(
-        &config,
-        &job.id,
-        CronJobPatch {
-            enabled: Some(false),
-            ..CronJobPatch::default()
-        },
-    )
-    .unwrap();
-
-    // Force a stale next_run in the past, as if the user onboarded before the
-    // job's first scheduled fire and only opted in later (hours or days after).
-    let stale = Utc::now() - ChronoDuration::hours(2);
-    with_connection(&config, |conn| {
-        conn.execute(
-            "UPDATE cron_jobs SET next_run = ?1 WHERE id = ?2",
-            params![stale.to_rfc3339(), job.id],
-        )?;
-        Ok(())
-    })
-    .unwrap();
-
-    // Opt in: disabled -> enabled, with the schedule unchanged.
-    let enabled = update_job(
-        &config,
-        &job.id,
-        CronJobPatch {
-            enabled: Some(true),
-            ..CronJobPatch::default()
-        },
-    )
-    .unwrap();
-
-    assert!(enabled.enabled);
-    assert!(
-        enabled.next_run > Utc::now(),
-        "enabling a job with a stale next_run must refresh it to the future, got {}",
-        enabled.next_run
-    );
-    assert!(
-        due_jobs(&config, Utc::now()).unwrap().is_empty(),
-        "freshly opted-in job must not fire immediately on enable"
-    );
+    add_job(&config, "*/5 * * * *", "echo ok").unwrap();
+    assert!(tmp.path().join("workspace/storage/storage.db").is_file());
 }
 
 #[test]
-fn enabling_job_with_future_next_run_preserves_it() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-
-    let job = add_job(&config, "0 7 * * *", "echo briefing").unwrap();
-    update_job(
-        &config,
-        &job.id,
-        CronJobPatch {
-            enabled: Some(false),
-            ..CronJobPatch::default()
-        },
-    )
-    .unwrap();
-
-    // A future next_run is still valid and must be left untouched on enable.
-    let future = Utc::now() + ChronoDuration::hours(3);
-    with_connection(&config, |conn| {
-        conn.execute(
-            "UPDATE cron_jobs SET next_run = ?1 WHERE id = ?2",
-            params![future.to_rfc3339(), job.id],
-        )?;
-        Ok(())
-    })
-    .unwrap();
-
-    let enabled = update_job(
-        &config,
-        &job.id,
-        CronJobPatch {
-            enabled: Some(true),
-            ..CronJobPatch::default()
-        },
-    )
-    .unwrap();
-
-    assert_eq!(
-        enabled.next_run.to_rfc3339(),
-        future.to_rfc3339(),
-        "enabling a job whose next_run is in the future must not reschedule it"
-    );
-}
-
-#[test]
-fn due_jobs_respects_scheduler_max_tasks_limit() {
-    let tmp = TempDir::new().unwrap();
-    let mut config = test_config(&tmp);
-    config.scheduler.max_tasks = 2;
-
-    let _ = add_job(&config, "* * * * *", "echo due-1").unwrap();
-    let _ = add_job(&config, "* * * * *", "echo due-2").unwrap();
-    let _ = add_job(&config, "* * * * *", "echo due-3").unwrap();
-
-    let far_future = Utc::now() + ChronoDuration::days(365);
-    let due = due_jobs(&config, far_future).unwrap();
-    assert_eq!(due.len(), 2);
-}
-
-#[test]
-fn reschedule_after_run_persists_last_status_and_last_run() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-
-    let job = add_job(&config, "*/15 * * * *", "echo run").unwrap();
-    reschedule_after_run(&config, &job, false, "failed output").unwrap();
-
-    let listed = list_jobs(&config).unwrap();
-    let stored = listed.iter().find(|j| j.id == job.id).unwrap();
-    assert_eq!(stored.last_status.as_deref(), Some("error"));
-    assert!(stored.last_run.is_some());
-    assert_eq!(stored.last_output.as_deref(), Some("failed output"));
-}
-
-#[test]
-fn migration_falls_back_to_legacy_expression() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-
-    with_connection(&config, |conn| {
-        conn.execute(
-            "INSERT INTO cron_jobs (id, expression, command, created_at, next_run)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                "legacy-id",
-                "*/5 * * * *",
-                "echo legacy",
-                Utc::now().to_rfc3339(),
-                (Utc::now() + ChronoDuration::minutes(5)).to_rfc3339(),
-            ],
-        )?;
-        conn.execute(
-            "UPDATE cron_jobs SET schedule = NULL WHERE id = 'legacy-id'",
-            [],
-        )?;
-        Ok(())
-    })
-    .unwrap();
-
-    let job = get_job(&config, "legacy-id").unwrap();
-    assert!(matches!(job.schedule, Schedule::Cron { .. }));
-}
-
-#[test]
-fn record_and_prune_runs() {
+fn run_history_cap_follows_cron_max_run_history() {
     let tmp = TempDir::new().unwrap();
     let mut config = test_config(&tmp);
     config.cron.max_run_history = 2;
-    let job = add_job(&config, "*/5 * * * *", "echo ok").unwrap();
-    let base = Utc::now();
+    let job = add_job(&config, "*/15 * * * *", "echo run").unwrap();
+    for i in 0..5 {
+        let t = Utc::now() + ChronoDuration::seconds(i);
+        record_run(&config, &job.id, t, t, "ok", Some("x"), 1).unwrap();
+    }
+    assert_eq!(list_runs(&config, &job.id, 10).unwrap().len(), 2);
+}
 
-    for idx in 0..3 {
-        let start = base + ChronoDuration::seconds(idx);
-        let end = start + ChronoDuration::milliseconds(100);
-        record_run(&config, &job.id, start, end, "ok", Some("done"), 100).unwrap();
+#[test]
+fn a_stale_routing_patch_cannot_combine_with_a_newer_unvalidated_route() {
+    use tinyflows_bus::schedule::AgentJobSpec;
+
+    let tmp = TempDir::new().unwrap();
+    let mut config = test_config(&tmp);
+    config.channels_config.telegram = Some(crate::config::TelegramConfig {
+        bot_token: "test-token".into(),
+        chat_id: None,
+        allowed_users: vec!["42".into()],
+        stream_mode: Default::default(),
+        draft_update_interval_ms: 1000,
+        silent_streaming: true,
+        mention_only: false,
+    });
+    let channel_origin = |target: &str| tinyflows_bus::schedule::types::JobOrigin::Channel {
+        channel: "telegram".into(),
+        reply_target: target.into(),
+        history_key: format!("telegram-target-{target}"),
+        sender: None,
+        thread_id: None,
+        session_identity: None,
+    };
+    let origin_42 = channel_origin("42");
+    let origin_999 = channel_origin("999");
+    let mut spec = AgentJobSpec::new(Schedule::Every { every_ms: 300_000 }, "remind me");
+    spec.delivery = Some(DeliveryConfig::default());
+    spec.origin = Some(origin_42.clone());
+    let job = add_agent_job_from_spec(&config, spec).unwrap();
+    let initial = get_job(&config, &job.id).unwrap();
+
+    // Both callers validate against the same initial row. A routes through
+    // the authorized chat 42; B changes only the origin while delivery is
+    // `none`. Pause before either request reaches the module store.
+    let stale_a = validate_and_complete_route_patch(
+        &config,
+        &initial,
+        CronJobPatch {
+            delivery: Some(DeliveryConfig {
+                mode: "origin".into(),
+                ..DeliveryConfig::default()
+            }),
+            ..CronJobPatch::default()
+        },
+        None,
+    )
+    .unwrap();
+    let stale_b = validate_and_complete_route_patch(
+        &config,
+        &initial,
+        CronJobPatch {
+            origin: Some(Some(origin_999.clone())),
+            ..CronJobPatch::default()
+        },
+        None,
+    )
+    .unwrap();
+
+    store_blocking::<CronJob>(
+        &config,
+        StoreOperation::Update {
+            job_id: job.id.clone(),
+            patch: stale_a,
+        },
+    )
+    .unwrap();
+    store_blocking::<CronJob>(
+        &config,
+        StoreOperation::Update {
+            job_id: job.id.clone(),
+            patch: stale_b,
+        },
+    )
+    .unwrap();
+
+    let saved = get_job(&config, &job.id).unwrap();
+    assert_eq!(saved.delivery.mode, "none");
+    assert_eq!(saved.origin.as_ref(), Some(&origin_999));
+}
+
+fn agent_context(
+    config: &Config,
+    agent: &str,
+) -> std::sync::Arc<crate::core::runtime::CoreContext> {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(
+            config.clone(),
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .session_agent(agent),
+    )
+}
+
+#[cfg(feature = "storage-sqlite")]
+#[tokio::test]
+async fn an_agents_jobs_live_in_its_own_scope() {
+    use crate::core::runtime::CoreContext;
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+
+    let job = CoreContext::scope(agent_context(&config, "alpha"), async {
+        add_job(&config, "*/5 * * * *", "echo alpha").unwrap()
+    })
+    .await;
+
+    let alpha_ids = CoreContext::scope(agent_context(&config, "alpha"), async {
+        list_jobs(&config)
+            .unwrap()
+            .into_iter()
+            .map(|job| job.id)
+            .collect::<Vec<_>>()
+    })
+    .await;
+    assert_eq!(alpha_ids, std::slice::from_ref(&job.id));
+    let beta_jobs = CoreContext::scope(agent_context(&config, "beta"), async {
+        list_jobs(&config).unwrap()
+    })
+    .await;
+    assert!(beta_jobs.is_empty());
+    assert!(
+        list_jobs(&config).unwrap().is_empty(),
+        "the workspace store stays empty"
+    );
+}
+
+#[tokio::test]
+async fn a_job_whose_agent_is_not_live_stays_dormant() {
+    use crate::core::runtime::CoreContext;
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let ctx = agent_context(&config, "dormant-agent");
+    let job = CoreContext::scope(std::sync::Arc::clone(&ctx), async {
+        add_job(&config, "* * * * *", "echo dormant").unwrap()
+    })
+    .await;
+    drop(ctx);
+
+    let mut agents = crate::cron::scheduler::LiveAgentSchedulers::default();
+    agents.tick().await;
+    agents.drain().await;
+
+    let after = CoreContext::scope(agent_context(&config, "dormant-agent"), async {
+        get_job(&config, &job.id).unwrap()
+    })
+    .await;
+    assert!(
+        after.last_run.is_none(),
+        "nothing ran the dormant agent's job"
+    );
+}
+
+#[cfg(feature = "legacy-import")]
+fn legacy_fixture() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src/storage/import/fixtures/tinyflows/workspace/cron/jobs.db")
+}
+
+#[cfg(all(feature = "storage-sqlite", feature = "legacy-import"))]
+#[test]
+fn a_legacy_jobs_db_is_imported_by_the_storage_importer_and_left_untouched() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    // The importer binds its claim to atomic conditional writes, which the
+    // in-memory test default does not support: use the workspace's sqlite.
+    crate::storage::local::use_persistent_default_for_test(&config.workspace_dir);
+    let legacy = crate::storage::import::tinyflows::legacy_jobs_db(
+        &crate::core::runtime::agent_scope_dir(&config),
+    );
+    std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
+    std::fs::copy(legacy_fixture(), &legacy).unwrap();
+    let before = std::fs::read(&legacy).unwrap();
+
+    let backend = crate::storage::local::backend_for(&config.workspace_dir).unwrap();
+    for report in crate::storage::import::tinyflows::run_with(&backend, &config) {
+        report.outcome.unwrap();
     }
 
-    let runs = list_runs(&config, &job.id, 10).unwrap();
-    assert_eq!(runs.len(), 2);
-}
-
-#[test]
-fn remove_job_cascades_run_history() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let job = add_job(&config, "*/5 * * * *", "echo ok").unwrap();
-    let start = Utc::now();
-    record_run(
-        &config,
-        &job.id,
-        start,
-        start + ChronoDuration::milliseconds(5),
-        "ok",
-        Some("ok"),
-        5,
-    )
-    .unwrap();
-
-    remove_job(&config, &job.id).unwrap();
-    let runs = list_runs(&config, &job.id, 10).unwrap();
-    assert!(runs.is_empty());
-}
-
-#[test]
-fn record_run_truncates_large_output() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let job = add_job(&config, "*/5 * * * *", "echo trunc").unwrap();
-    let output = "x".repeat(MAX_CRON_OUTPUT_BYTES + 512);
-
-    record_run(
-        &config,
-        &job.id,
-        Utc::now(),
-        Utc::now(),
-        "ok",
-        Some(&output),
-        1,
-    )
-    .unwrap();
-
-    let runs = list_runs(&config, &job.id, 1).unwrap();
-    let stored = runs[0].output.as_deref().unwrap_or_default();
-    assert!(stored.ends_with(TRUNCATED_OUTPUT_MARKER));
-    assert!(stored.len() <= MAX_CRON_OUTPUT_BYTES);
-}
-
-#[test]
-fn reschedule_after_run_truncates_last_output() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let job = add_job(&config, "*/5 * * * *", "echo trunc").unwrap();
-    let output = "y".repeat(MAX_CRON_OUTPUT_BYTES + 1024);
-
-    reschedule_after_run(&config, &job, false, &output).unwrap();
-
-    let stored = get_job(&config, &job.id).unwrap();
-    let last_output = stored.last_output.as_deref().unwrap_or_default();
-    assert!(last_output.ends_with(TRUNCATED_OUTPUT_MARKER));
-    assert!(last_output.len() <= MAX_CRON_OUTPUT_BYTES);
-}
-
-// ── dedup_named_jobs ─────────────────────────────────────────────
-
-#[test]
-fn dedup_named_jobs_no_op_on_empty_db() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let removed = dedup_named_jobs(&config).unwrap();
-    assert_eq!(removed, 0);
-}
-
-#[test]
-fn dedup_named_jobs_no_op_when_no_duplicates() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    add_shell_job(
-        &config,
-        Some("job_a".into()),
-        Schedule::Cron {
-            expr: "*/5 * * * *".into(),
-            tz: None,
-            active_hours: None,
-        },
-        "echo a",
-    )
-    .unwrap();
-    add_shell_job(
-        &config,
-        Some("job_b".into()),
-        Schedule::Cron {
-            expr: "*/10 * * * *".into(),
-            tz: None,
-            active_hours: None,
-        },
-        "echo b",
-    )
-    .unwrap();
-    let removed = dedup_named_jobs(&config).unwrap();
-    assert_eq!(removed, 0);
-    assert_eq!(list_jobs(&config).unwrap().len(), 2);
-}
-
-#[test]
-fn dedup_named_jobs_removes_duplicates_keeping_history() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-
-    // Insert two jobs with the same name directly — simulating the old double-seed bug.
-    let job_a = add_shell_job(
-        &config,
-        Some("morning_briefing".into()),
-        Schedule::Cron {
-            expr: "0 7 * * *".into(),
-            tz: None,
-            active_hours: None,
-        },
-        "echo briefing",
-    )
-    .unwrap();
-    let job_b = add_shell_job(
-        &config,
-        Some("morning_briefing".into()),
-        Schedule::Cron {
-            expr: "0 7 * * *".into(),
-            tz: None,
-            active_hours: None,
-        },
-        "echo briefing",
-    )
-    .unwrap();
-
-    // Add run history to job_a — it should survive.
-    let now = Utc::now();
-    record_run(
-        &config,
-        &job_a.id,
-        now,
-        now + ChronoDuration::seconds(1),
-        "ok",
-        Some("output"),
-        1000,
-    )
-    .unwrap();
-
-    let removed = dedup_named_jobs(&config).unwrap();
-    assert_eq!(removed, 1);
-
-    let remaining = list_jobs(&config).unwrap();
-    assert_eq!(remaining.len(), 1);
-    assert_eq!(
-        remaining[0].id, job_a.id,
-        "job with run history should be kept"
-    );
-    assert!(
-        get_job(&config, &job_b.id).is_err(),
-        "duplicate without history should be removed"
-    );
-}
-
-#[test]
-fn dedup_named_jobs_keeps_earliest_when_history_tied() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-
-    // Both jobs have no run history — tie broken by earliest created_at.
-    let job_a = add_shell_job(
-        &config,
-        Some("routine".into()),
-        Schedule::Cron {
-            expr: "0 8 * * *".into(),
-            tz: None,
-            active_hours: None,
-        },
-        "echo first",
-    )
-    .unwrap();
-    let job_b = add_shell_job(
-        &config,
-        Some("routine".into()),
-        Schedule::Cron {
-            expr: "0 8 * * *".into(),
-            tz: None,
-            active_hours: None,
-        },
-        "echo second",
-    )
-    .unwrap();
-
-    let removed = dedup_named_jobs(&config).unwrap();
-    assert_eq!(removed, 1);
-
-    let remaining = list_jobs(&config).unwrap();
-    assert_eq!(remaining.len(), 1);
-    // job_a was created first — it should win the tie.
-    assert_eq!(remaining[0].id, job_a.id, "earliest job should be kept");
-    assert!(get_job(&config, &job_b.id).is_err());
-}
-
-// ── add_flow_schedule_job race-safety (CodeRabbit finding A) ────────
-
-#[test]
-fn add_flow_schedule_job_twice_yields_a_single_row() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let schedule = Schedule::Cron {
-        expr: "0 9 * * *".into(),
-        tz: None,
-        active_hours: None,
-    };
-
-    let first = add_flow_schedule_job(&config, "flow-1", schedule.clone()).unwrap();
-    let second = add_flow_schedule_job(&config, "flow-1", schedule).unwrap();
-
-    // Calling it twice for the same flow must not create a duplicate — the
-    // second call returns the same row the first one created.
-    assert_eq!(first.id, second.id);
-
-    let flow_jobs: Vec<_> = list_jobs(&config)
+    let jobs = list_jobs(&config).unwrap();
+    assert_eq!(jobs.len(), 3);
+    assert!(jobs.iter().any(|job| job.name.as_deref() == Some("inbox")));
+    assert!(find_flow_schedule_job(&config, "flow-beta")
         .unwrap()
-        .into_iter()
-        .filter(|j| j.job_type == JobType::Flow && j.command == "flow-1")
-        .collect();
+        .is_some());
     assert_eq!(
-        flow_jobs.len(),
-        1,
-        "exactly one job_type='flow' row should exist for flow-1"
+        std::fs::read(&legacy).unwrap(),
+        before,
+        "jobs.db was modified"
+    );
+
+    // Imported once: a job removed afterwards stays removed.
+    let inbox = jobs
+        .iter()
+        .find(|job| job.name.as_deref() == Some("inbox"))
+        .unwrap();
+    remove_job(&config, &inbox.id).unwrap();
+    for report in crate::storage::import::tinyflows::run_with(&backend, &config) {
+        report.outcome.unwrap();
+    }
+    assert_eq!(list_jobs(&config).unwrap().len(), 2);
+}
+
+#[test]
+fn a_patch_over_the_bus_keeps_the_agent_definition_it_does_not_mention() {
+    use tinyflows_bus::schedule::types::{CronJobPatch, SessionTarget};
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let job = add_agent_job_with_definition(
+        &config,
+        Some("patched".into()),
+        Schedule::Every {
+            every_ms: 3_600_000,
+        },
+        "say hi",
+        SessionTarget::Isolated,
+        None,
+        None,
+        false,
+        Some("teeny".into()),
+        true,
+    )
+    .unwrap();
+
+    assert_eq!(
+        job.agent_id.as_deref(),
+        Some("teeny"),
+        "the definition id is stored"
+    );
+    let renamed = update_job(
+        &config,
+        &job.id,
+        CronJobPatch {
+            prompt: Some("check in".into()),
+            ..CronJobPatch::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(renamed.prompt.as_deref(), Some("check in"));
+
+    let policy = update_job(
+        &config,
+        &job.id,
+        CronJobPatch {
+            policy: Some(Default::default()),
+            ..CronJobPatch::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        policy.prompt.as_deref(),
+        Some("check in"),
+        "a policy-only patch must not undo the earlier prompt patch"
+    );
+    assert_eq!(
+        get_job(&config, &job.id).unwrap().prompt.as_deref(),
+        Some("check in")
+    );
+    // Regression: `CronJobPatch.agent_id` is `Option<Option<_>>` and a present
+    // `null` means "clear it". A patch that never mentioned the agent used to
+    // serialize `agent_id: null` across the bus, so every update (pausing a
+    // job, a policy change) silently dropped the job's agent definition.
+    assert_eq!(
+        policy.agent_id.as_deref(),
+        Some("teeny"),
+        "an unrelated patch cleared the agent definition"
+    );
+    assert_eq!(
+        get_job(&config, &job.id).unwrap().agent_id.as_deref(),
+        Some("teeny")
     );
 }
 
-#[test]
-fn add_flow_schedule_job_unique_index_does_not_affect_shell_jobs() {
+fn assert_force_next_run_updates_collection(
+    collection: &'static str,
+    other_collection: &'static str,
+) {
+    use serde_json::json;
+    use tinystoragedrivers::{CollectionSpec, Precondition};
+
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
+    let opened = crate::storage::local::open("cron::store-test", &config.workspace_dir).unwrap();
+    let docs = std::sync::Arc::clone(opened.scoped().unwrap().documents());
+    let seed_docs = std::sync::Arc::clone(&docs);
+    crate::storage::block_on_anyhow(async move {
+        seed_docs
+            .ensure_collection(&CollectionSpec::new(collection))
+            .await?;
+        let seeded_job = if collection == "cron_jobs" {
+            json!({
+                "next_run": "2030-01-01T00:00:00Z",
+                "next_run_ms": 1_893_456_000_000_i64,
+                "next_run_ns": 1_893_456_000_000_000_000_i64,
+                "marker": "keep-me",
+            })
+        } else {
+            json!({ "next_run_ms": 123, "marker": "keep-me" })
+        };
+        seed_docs
+            .put(collection, "seeded-job", seeded_job, Precondition::Absent)
+            .await?;
+        anyhow::Ok(())
+    })
+    .unwrap();
 
-    // Two shell jobs sharing the same command must both persist — the new
-    // partial unique index is scoped to job_type = 'flow' and must not
-    // constrain shell/agent jobs, which may legitimately share a command.
-    let shell_a = add_job(&config, "*/5 * * * *", "echo shared").unwrap();
-    let shell_b = add_job(&config, "*/10 * * * *", "echo shared").unwrap();
+    let before_docs = std::sync::Arc::clone(&docs);
+    let collections_before =
+        crate::storage::block_on_anyhow(async move { Ok(before_docs.collections("").await?) })
+            .unwrap();
+    assert!(collections_before.contains(&collection.to_string()));
 
-    assert!(get_job(&config, &shell_a.id).is_ok());
-    assert!(get_job(&config, &shell_b.id).is_ok());
-    assert_eq!(list_jobs(&config).unwrap().len(), 2);
+    let next = chrono::DateTime::<Utc>::from_timestamp_millis(456).unwrap();
+    force_next_run_for_test(&config, "seeded-job", next).unwrap();
+
+    let read_docs = std::sync::Arc::clone(&docs);
+    let (updated, other, collections) = crate::storage::block_on_anyhow(async move {
+        Ok((
+            read_docs.get(collection, "seeded-job").await?,
+            read_docs.get(other_collection, "seeded-job").await?,
+            read_docs.collections("").await?,
+        ))
+    })
+    .unwrap();
+    let updated = updated.expect("seeded document remains present").doc;
+    assert_eq!(updated["next_run_ms"], json!(456));
+    assert_eq!(updated["marker"], json!("keep-me"));
+    if collection == "cron_jobs" {
+        assert_eq!(
+            chrono::DateTime::parse_from_rfc3339(updated["next_run"].as_str().unwrap())
+                .unwrap()
+                .timestamp_millis(),
+            456
+        );
+        assert_eq!(updated["next_run_ns"], json!(456_000_000));
+    } else {
+        assert!(updated.get("next_run").is_none());
+        assert!(updated.get("next_run_ns").is_none());
+    }
+    assert!(
+        other.is_none(),
+        "helper must not create or write {other_collection}"
+    );
+    assert_eq!(collections, collections_before);
 }
 
 #[test]
-fn dedup_named_jobs_ignores_unnamed_jobs() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-
-    // Unnamed jobs (name = NULL) — dedup should not touch them.
-    add_job(&config, "*/5 * * * *", "echo unnamed-1").unwrap();
-    add_job(&config, "*/5 * * * *", "echo unnamed-2").unwrap();
-
-    let removed = dedup_named_jobs(&config).unwrap();
-    assert_eq!(removed, 0);
-    assert_eq!(list_jobs(&config).unwrap().len(), 2);
+fn force_next_run_updates_current_cron_jobs_collection() {
+    assert_force_next_run_updates_collection("cron.jobs", "cron_jobs");
 }
 
-#[path = "store_agent_floor_tests.rs"]
-mod agent_floor_tests;
+#[test]
+fn force_next_run_updates_legacy_cron_jobs_collection() {
+    assert_force_next_run_updates_collection("cron_jobs", "cron.jobs");
+}

@@ -53,29 +53,46 @@ impl ApprovalGate {
                     tool = tool_name,
                     "[approval::gate] decision channel dropped — denying"
                 );
-                if let Ok(Some(row)) =
-                    store::decide(&self.config, request_id, ApprovalDecision::Deny)
-                {
-                    let route = self.take_request_route(request_id);
-                    BUS.publish(DomainEvent::ApprovalDecided {
-                        request_id: row.request_id,
-                        tool_name: row.tool_name,
-                        decision: ApprovalDecision::Deny.as_str().to_string(),
-                        thread_id: route.as_ref().and_then(|r| r.thread_id.clone()),
-                        client_id: route.as_ref().and_then(|r| r.client_id.clone()),
-                        tool_call_id: route.and_then(|r| r.tool_call_id),
-                        resolution: Some("cancelled".to_string()),
-                    });
+                // Same race as the TTL arm below: a decision may already be
+                // persisted (the sender dropped after `decide()` committed).
+                // Deny only an undecided row, and honour a persisted approval.
+                let denied = store::decide(&self.config, request_id, ApprovalDecision::Deny);
+                let persisted_approve = matches!(&denied, Ok(None))
+                    && store::get_decision(&self.config, request_id)
+                        .ok()
+                        .flatten()
+                        .is_some_and(|decision| decision.is_approve());
+                if persisted_approve {
+                    tracing::info!(
+                        request_id = %request_id,
+                        tool = tool_name,
+                        "[approval::gate] channel dropped after an approval was persisted, honoring it"
+                    );
+                    (GateOutcome::Allow, Some(request_id.to_string()))
+                } else {
+                    if let Ok(Some(row)) = denied {
+                        let route = self.take_request_route(request_id);
+                        BUS.publish(DomainEvent::ApprovalDecided {
+                            request_id: row.request_id,
+                            tool_name: row.tool_name,
+                            decision: ApprovalDecision::Deny.as_str().to_string(),
+                            thread_id: route.as_ref().and_then(|r| r.thread_id.clone()),
+                            client_id: route.as_ref().and_then(|r| r.client_id.clone()),
+                            tool_call_id: route.and_then(|r| r.tool_call_id),
+                            resolution: Some("cancelled".to_string()),
+                            agent_id: row.agent_id.clone(),
+                        });
+                    }
+                    (
+                        GateOutcome::Deny {
+                            reason: format!(
+                                "{POLICY_DENIED_MARKER} Approval channel for '{tool_name}' closed \
+                                 before a decision was made."
+                            ),
+                        },
+                        None,
+                    )
                 }
-                (
-                    GateOutcome::Deny {
-                        reason: format!(
-                            "{POLICY_DENIED_MARKER} Approval channel for '{tool_name}' closed \
-                             before a decision was made."
-                        ),
-                    },
-                    None,
-                )
             }
             Err(_elapsed) if park_bound_active => {
                 // Caller park bound elapsed (#4756) — NOT the gate's own TTL.
@@ -122,9 +139,7 @@ impl ApprovalGate {
                 let denied = store::decide(&self.config, request_id, ApprovalDecision::Deny);
                 let persisted = match &denied {
                     Ok(Some(_)) => Some(ApprovalDecision::Deny),
-                    Ok(None) => store::get_decision(&self.config, request_id)
-                        .ok()
-                        .flatten(),
+                    Ok(None) => store::get_decision(&self.config, request_id).ok().flatten(),
                     Err(_) => None,
                 };
                 if matches!(persisted, Some(d) if d.is_approve()) {
@@ -164,14 +179,17 @@ impl ApprovalGate {
                             client_id: route.as_ref().and_then(|r| r.client_id.clone()),
                             tool_call_id: route.and_then(|r| r.tool_call_id),
                             resolution: Some("expired".to_string()),
+                            agent_id: row.agent_id.clone(),
                         });
                     }
                     (
                         GateOutcome::Deny {
                             reason: format!(
                                 "{POLICY_DENIED_MARKER} Approval for '{tool_name}' timed out after \
-                                 {}s. Do not re-request the same call this turn; take a different \
-                                 approach or stop.",
+                                 {}s: {APPROVAL_UNANSWERED_PHRASE}, so it was not run. Tell the \
+                                 user it was not done because the approval was not answered, and \
+                                 that they can ask again to retry. Do not re-request the same call \
+                                 this turn.",
                                 effective_ttl.as_secs()
                             ),
                         },

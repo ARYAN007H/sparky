@@ -3,12 +3,11 @@ use super::super::context::{
     CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
 use super::super::runtime::process_channel_message;
-use super::super::{traits, Channel};
+use super::super::Channel;
 use super::common::{
-    IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
+    channel_envelope, IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
     TelegramRecordingChannel, ToolCallingModel,
 };
-use crate::inference::provider;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
@@ -24,44 +23,43 @@ async fn process_channel_message_executes_native_tool_calls() {
     channels_by_name.insert(channel.name().to_string(), channel);
 
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
+        relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(ToolCallingModel),
         )),
         default_provider: Arc::new("test-provider".to_string()),
-        memory: crate::memory::guard::in_memory::FixedRecallProvider::guarded(Vec::new()),
         tools_registry: Arc::new(vec![Box::new(MockPriceTool)]),
         system_prompt: crate::channels::ChannelSystemPrompt::fixed("test-system-prompt"),
         model: Arc::new("test-model".to_string()),
         temperature: 0.0,
-        auto_save_memory: false,
         max_tool_iterations: 10,
-        min_relevance_score: 0.0,
         conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     process_channel_message(
         runtime_ctx,
-        traits::ChannelMessage {
-            id: "msg-2".to_string(),
-            sender: "bob".to_string(),
-            reply_target: "chat-84".to_string(),
-            content: "What is the BTC price now?".to_string(),
-            channel: "test-channel".to_string(),
-            timestamp: 2,
-            thread_ts: None,
-        },
+        channel_envelope(
+            "test-channel",
+            "bob",
+            "chat-84",
+            "What is the BTC price now?",
+            "msg-2",
+            2,
+            None,
+            None,
+        ),
     )
     .await;
 
@@ -74,6 +72,7 @@ async fn process_channel_message_executes_native_tool_calls() {
 
 #[tokio::test]
 async fn process_channel_message_handles_models_command_without_llm_call() {
+    crate::channels::register_hosted_route_test_policy();
     let _bus_guard = super::common::use_real_agent_handler().await;
     let channel_impl = Arc::new(TelegramRecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
@@ -96,43 +95,54 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         crate::agent::tinyagents::TurnModelSource::from_model(fallback_provider),
     );
 
+    let mut config = crate::config::Config::default();
+    config
+        .cloud_providers
+        .push(crate::config::schema::CloudProviderCreds {
+            id: "p_managed_models_test".to_string(),
+            slug: "openhuman".to_string(),
+            label: "Managed Backend".to_string(),
+            endpoint: "https://api.openhuman.ai/v1".to_string(),
+            auth_style: crate::config::schema::AuthStyle::OpenhumanJwt,
+            default_model: Some("default-model".to_string()),
+        });
+
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
+        relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::clone(&default_provider),
         )),
         default_provider: Arc::new("test-provider".to_string()),
-        memory: crate::memory::guard::in_memory::FixedRecallProvider::guarded(Vec::new()),
         tools_registry: Arc::new(vec![]),
         system_prompt: crate::channels::ChannelSystemPrompt::fixed("test-system-prompt"),
         model: Arc::new("default-model".to_string()),
         temperature: 0.0,
-        auto_save_memory: false,
         max_tool_iterations: 5,
-        min_relevance_score: 0.0,
         conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(provider_cache_seed)),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
-        config: None,
+        config: Some(Arc::new(config)),
+        core: None,
     });
 
-    let cmd_msg = traits::ChannelMessage {
-        id: "msg-cmd-1".to_string(),
-        sender: "alice".to_string(),
-        reply_target: "chat-1".to_string(),
-        content: "/models openhuman".to_string(),
-        channel: "telegram".to_string(),
-        timestamp: 1,
-        thread_ts: None,
-    };
+    let cmd_msg = channel_envelope(
+        "telegram",
+        "alice",
+        "chat-1",
+        "/models openhuman",
+        "msg-cmd-1",
+        1,
+        None,
+        None,
+    );
     let route_key = conversation_history_key(&cmd_msg);
     process_channel_message(runtime_ctx.clone(), cmd_msg).await;
 
@@ -178,15 +188,16 @@ async fn process_channel_message_uses_route_override_provider_and_model() {
         crate::agent::tinyagents::TurnModelSource::from_model(routed_provider),
     );
 
-    let routed_msg = traits::ChannelMessage {
-        id: "msg-routed-1".to_string(),
-        sender: "alice".to_string(),
-        reply_target: "chat-1".to_string(),
-        content: "hello routed provider".to_string(),
-        channel: "telegram".to_string(),
-        timestamp: 2,
-        thread_ts: None,
-    };
+    let routed_msg = channel_envelope(
+        "telegram",
+        "alice",
+        "chat-1",
+        "hello routed provider",
+        "msg-routed-1",
+        2,
+        None,
+        None,
+    );
     let route_key = conversation_history_key(&routed_msg);
     let mut route_overrides = HashMap::new();
     route_overrides.insert(
@@ -198,31 +209,29 @@ async fn process_channel_message_uses_route_override_provider_and_model() {
     );
 
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
+        relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::clone(&default_provider),
         )),
         default_provider: Arc::new("test-provider".to_string()),
-        memory: crate::memory::guard::in_memory::FixedRecallProvider::guarded(Vec::new()),
         tools_registry: Arc::new(vec![]),
         system_prompt: crate::channels::ChannelSystemPrompt::fixed("test-system-prompt"),
         model: Arc::new("default-model".to_string()),
         temperature: 0.0,
-        auto_save_memory: false,
         max_tool_iterations: 5,
-        min_relevance_score: 0.0,
         conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(provider_cache_seed)),
         route_overrides: Arc::new(Mutex::new(route_overrides)),
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     process_channel_message(runtime_ctx, routed_msg).await;
@@ -249,6 +258,7 @@ async fn process_channel_message_respects_configured_max_tool_iterations_above_d
     channels_by_name.insert(channel.name().to_string(), channel);
 
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
+        relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(IterativeToolModel {
@@ -256,39 +266,37 @@ async fn process_channel_message_respects_configured_max_tool_iterations_above_d
             }),
         )),
         default_provider: Arc::new("test-provider".to_string()),
-        memory: crate::memory::guard::in_memory::FixedRecallProvider::guarded(Vec::new()),
         tools_registry: Arc::new(vec![Box::new(MockPriceTool)]),
         system_prompt: crate::channels::ChannelSystemPrompt::fixed("test-system-prompt"),
         model: Arc::new("test-model".to_string()),
         temperature: 0.0,
-        auto_save_memory: false,
         max_tool_iterations: 12,
-        min_relevance_score: 0.0,
         conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     process_channel_message(
         runtime_ctx,
-        traits::ChannelMessage {
-            id: "msg-iter-success".to_string(),
-            sender: "alice".to_string(),
-            reply_target: "chat-iter-success".to_string(),
-            content: "Loop until done".to_string(),
-            channel: "test-channel".to_string(),
-            timestamp: 1,
-            thread_ts: None,
-        },
+        channel_envelope(
+            "test-channel",
+            "alice",
+            "chat-iter-success",
+            "Loop until done",
+            "msg-iter-success",
+            1,
+            None,
+            None,
+        ),
     )
     .await;
 
@@ -309,6 +317,7 @@ async fn process_channel_message_reports_configured_max_tool_iterations_limit() 
     channels_by_name.insert(channel.name().to_string(), channel);
 
     let runtime_ctx = Arc::new(ChannelRuntimeContext {
+        relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
             Arc::new(IterativeToolModel {
@@ -316,39 +325,37 @@ async fn process_channel_message_reports_configured_max_tool_iterations_limit() 
             }),
         )),
         default_provider: Arc::new("test-provider".to_string()),
-        memory: crate::memory::guard::in_memory::FixedRecallProvider::guarded(Vec::new()),
         tools_registry: Arc::new(vec![Box::new(MockPriceTool)]),
         system_prompt: crate::channels::ChannelSystemPrompt::fixed("test-system-prompt"),
         model: Arc::new("test-model".to_string()),
         temperature: 0.0,
-        auto_save_memory: false,
         max_tool_iterations: 3,
-        min_relevance_score: 0.0,
         conversation_histories: Arc::new(Mutex::new(HashMap::new())),
         turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
         route_overrides: Arc::new(Mutex::new(HashMap::new())),
         api_url: None,
         inference_url: None,
         reliability: Arc::new(crate::config::ReliabilityConfig::default()),
-        provider_runtime_options: provider::ProviderRuntimeOptions::default(),
         workspace_dir: Arc::new(std::env::temp_dir()),
         message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     process_channel_message(
         runtime_ctx,
-        traits::ChannelMessage {
-            id: "msg-iter-fail".to_string(),
-            sender: "bob".to_string(),
-            reply_target: "chat-iter-fail".to_string(),
-            content: "Loop forever".to_string(),
-            channel: "test-channel".to_string(),
-            timestamp: 2,
-            thread_ts: None,
-        },
+        channel_envelope(
+            "test-channel",
+            "bob",
+            "chat-iter-fail",
+            "Loop forever",
+            "msg-iter-fail",
+            2,
+            None,
+            None,
+        ),
     )
     .await;
 

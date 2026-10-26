@@ -9,10 +9,10 @@
 //! Business logic lives one directory per domain family under `src/`, listed
 //! below in the order they are declared (module declarations are kept
 //! alphabetical, with the `rpc` re-export sitting between `platform` and
-//! `runtime` — keep new modules sorted the same way): `agent`, `api`,
-//! `channels`, `config`, `core`, `cron`, `desktop`, `flows` (feature
-//! `flows`), `hooks`, `hosting` (feature `hosting`), `http_host`
-//! (feature `http-server`), `inference`, `integrations`, `json_schema`,
+//! `runtime` — keep new modules sorted the same way): `agent`, `agent_registry`, `api`, `artifacts`, `attachments`,
+//! `channels`, `config`, `core`, `cron`, `desktop`, `doctor`, `flows` (feature
+//! `flows`), `hooks`, `hosting` (feature `hosting`),
+//! `inference`, `integrations`,
 //! `mcp`, `media` (feature `media`), `memory`, `modules` (feature
 //! `modules`), `platform`, `runtime`, `sandbox`, `search`, `security`,
 //! `skills`, `test_support` (feature `e2e-test-support`), `threads`, `tools`,
@@ -24,10 +24,11 @@
 //! composition (`core::runtime`). See `README.md` and AGENTS.md ("Rust domain
 //! structure") for the preferred per-domain module shape.
 //!
-//! `pub use openhuman_rpc as rpc;` re-exports the `openhuman-rpc` crate, so
-//! `crate::rpc::{RpcOutcome, StructuredRpcError, ...}` are the same types the
-//! app and TUI decode responses with — there is no separate RPC contract
-//! layer in this crate.
+//! The controller contract lives in `core`: every domain operation returns
+//! [`core::Outcome`], controllers are described by `core::ControllerSchema`,
+//! and `core::invoke::invoke_method` dispatches them in-process. The JSON-RPC
+//! protocol and server that expose them live in `openhuman-rpc`, which depends
+//! on this crate.
 //!
 //! [`CoreBuilder`], [`CoreRuntime`], [`DomainSet`], [`ServiceSet`],
 //! [`TokenSource`] and [`HostKind`] are the embeddable composition API;
@@ -52,40 +53,60 @@
 #![allow(dead_code)]
 
 pub mod agent;
-pub mod backend;
+pub mod agent_registry;
+pub mod agent_runs;
+pub mod artifacts;
+pub mod attachments;
+// These host adapters still call TinyChannels' v21 compatibility surface.
+// Keep the deprecation exception scoped here while the v22 adapter migration
+// is handled separately.
+#[allow(deprecated)]
 pub mod channels;
 pub mod commands;
 pub mod config;
 pub mod core;
+// These host adapters still call TinyChannels' v21 compatibility surface.
+// Keep the deprecation exception scoped here while the v22 adapter migration
+// is handled separately.
+#[allow(deprecated)]
 pub mod cron;
 pub mod desktop;
+pub mod doctor;
 #[cfg(feature = "flows")]
 pub mod flows;
 pub mod hooks;
 #[cfg(feature = "hosting")]
 pub mod hosting;
-#[cfg(feature = "http-server")]
-pub mod http_host;
+#[cfg(feature = "inbound-queues")]
+pub mod inbound;
+pub mod inbound_debounce;
 pub mod inference;
 pub mod integrations;
-pub mod json_schema;
 pub mod mcp;
 #[cfg(feature = "media")]
 pub mod media;
 pub mod memory;
-#[cfg(feature = "modules")]
 pub mod modules;
+pub mod plan_review;
 pub mod platform;
-pub use openhuman_rpc as rpc;
-pub mod runtime;
+pub mod profiles;
+pub mod progress;
+pub mod prompts;
 pub mod sandbox;
 pub mod search;
 pub mod security;
+pub mod sessions;
 pub mod skills;
+pub mod storage;
 #[cfg(feature = "e2e-test-support")]
 pub mod test_support;
+// These host adapters still call TinyChannels' v21 compatibility surface.
+// Keep the deprecation exception scoped here while the v22 adapter migration
+// is handled separately.
+#[allow(deprecated)]
 pub mod threads;
 pub mod tools;
+pub mod triage;
 pub mod util;
 pub mod voice;
 pub mod web3;
@@ -97,7 +118,9 @@ pub use config::DaemonConfig;
 /// the Tauri shell, a CLI, a stdio MCP server, or a cloud/team server — via
 /// [`CoreBuilder`] → [`CoreRuntime`]. See `crates/openhuman-embed/README.md`
 /// and [`crate::core::runtime`] for the composition this builds on.
-pub use core::runtime::{CoreBuilder, CoreRuntime, DomainSet, ServiceSet, TokenSource};
+pub use core::runtime::{
+    CoreBootMode, CoreBuilder, CoreRuntime, DomainSet, ServiceSet, TokenSource,
+};
 pub use core::types::HostKind;
 
 /// Runs the core logic based on the provided command-line arguments.
@@ -113,8 +136,31 @@ pub use core::types::HostKind;
 ///
 /// Returns an error if command execution fails.
 pub fn run_core_from_args(args: &[String]) -> anyhow::Result<()> {
+    run_core_from_args_with(args, None)
+}
+
+/// [`run_core_from_args`] with a host-supplied boot description.
+///
+/// `host_boot` rides on the `run` / `serve` [`ServeRequest`] to the installed
+/// server launcher, which boots from it instead of its own default preset.
+/// Explicit command-line flags still apply on top of it; see [`ServeRequest`]
+/// for the precedence. Subcommands that do not start a server ignore it.
+///
+/// # Errors
+///
+/// Returns an error if command execution fails.
+pub fn run_core_from_args_with(
+    args: &[String],
+    host_boot: Option<core::server_launcher::HostBoot>,
+) -> anyhow::Result<()> {
     core::cli::load_dotenv_for_cli()?;
     platform::service::apply_startup_restart_delay_from_env();
-    security::keyring::init_master_key();
-    core::cli::run_from_cli_args(args)
+    // A SaaS boot roots secret storage under its operator directory
+    // (`saas::build`), so it must not be latched to the home directory here.
+    if !core::cli::is_help_only(args)
+        && !core::runtime::mode::requested_in(args, std::env::var("OPENHUMAN_MODE").ok().as_deref())
+    {
+        security::secret_storage::init_master_key().map_err(anyhow::Error::msg)?;
+    }
+    core::cli::run_from_cli_args_with(args, host_boot)
 }

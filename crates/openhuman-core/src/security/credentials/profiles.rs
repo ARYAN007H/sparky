@@ -1,4 +1,4 @@
-use crate::security::keyring::SecretStore;
+use crate::security::secret_storage::SecretStore;
 use crate::util::retry_with_backoff;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -22,7 +22,18 @@ mod keychain;
 mod lock;
 mod migration;
 mod persistence;
+mod readonly;
+pub(crate) use persistence::STORAGE_SECRET_NAME as PROFILES_SECRET_NAME;
 mod store_core;
+pub use readonly::ReadOnlyAuthProfileError;
+
+pub(crate) fn load_profile_read_only(
+    config: &crate::config::Config,
+    provider: &str,
+    profile_override: Option<&str>,
+) -> Result<Option<AuthProfile>, ReadOnlyAuthProfileError> {
+    readonly::load_profile(config, provider, profile_override)
+}
 
 const CURRENT_SCHEMA_VERSION: u32 = 1;
 
@@ -38,7 +49,11 @@ struct KeychainSecrets {
     #[serde(default)]
     pub id_token: Option<String>,
 }
-const PROFILES_FILENAME: &str = "auth-profiles.json";
+pub(crate) const PROFILES_FILENAME: &str = "auth-profiles.json";
+/// The auth-profiles file a store over `state_dir` keeps.
+pub(crate) fn profiles_file(state_dir: &Path) -> PathBuf {
+    state_dir.join(PROFILES_FILENAME)
+}
 const LOCK_FILENAME: &str = "auth-profiles.lock";
 const LOCK_WAIT_MS: u64 = 50;
 /// A lock file that has existed for longer than this is treated as leaked
@@ -204,6 +219,11 @@ impl Default for AuthProfilesData {
 /// Full key format (as handled by the keyring module): `"{user_id}:auth:{profile_id}"`.
 const KEYCHAIN_AUTH_PREFIX: &str = "auth:";
 
+/// The logical key used for an auth profile's secret payload.
+pub(crate) fn auth_profile_secret_key(profile_id: &str) -> String {
+    format!("{KEYCHAIN_AUTH_PREFIX}{profile_id}")
+}
+
 /// Derive a stable keychain user-id from a state directory path.
 ///
 /// For a typical path like `/home/alice/.openhuman/users/uid-123` this
@@ -270,7 +290,7 @@ pub struct AuthProfilesStore {
 /// ciphertext, leaving `.secret_key` as the only remaining control.
 ///
 /// Same shape as the fix #2360 landed for the secret key in
-/// `keyring/encrypted_store.rs`: create with the mode already set rather than
+/// `secret_storage/encrypted_store.rs`: create with the mode already set rather than
 /// widening then narrowing, so the file is never briefly world-readable.
 ///
 /// `.mode()` only applies when the file is *created*, so a leftover tmp from an
@@ -433,6 +453,12 @@ impl Drop for AuthProfileLockGuard {
             }
         }
     }
+}
+
+/// Whether `bytes` parse as the persisted profiles document (what a read from
+/// the storage backend requires).
+pub(crate) fn is_persisted_document(bytes: &[u8]) -> bool {
+    serde_json::from_slice::<PersistedAuthProfiles>(bytes).is_ok()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

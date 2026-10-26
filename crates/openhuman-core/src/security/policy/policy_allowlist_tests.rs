@@ -1,4 +1,5 @@
 use super::*;
+use crate::security::policy::CommandClass;
 
 // -- AutonomyLevel ------------------------------------------------
 
@@ -349,6 +350,9 @@ fn classify_reads_are_read() {
         "find . -name '*.rs'",
         "cargo tree",
         "npm ls",
+        "npm list",
+        "pnpm list",
+        "yarn list",
         "dir",
         "type f.txt",
         "Get-Content f",

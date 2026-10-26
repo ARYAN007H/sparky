@@ -7,10 +7,11 @@
 //! builder caller had no equivalent, and fell back to the process registry.
 //! These tests pin the route that closes that gap.
 
-use crate::agent::harness::definition::{AgentDefinition, AgentDefinitionRegistry, ToolScope};
 use crate::agent::tinyagents::host::OpenHumanDefinitionRegistry;
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use std::sync::Arc;
 use tinyagents_definition::DefinitionRegistry;
+use tinyagents_definition::ToolScope;
 
 /// An id no built-in definition uses, so a hit can only have come from the
 /// caller's own definition.
@@ -35,8 +36,8 @@ fn bare() -> crate::agent::SessionHostBuilder {
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
     crate::agent::SessionHostBuilder::new()
         .chat_model(model)
+        .model_name("test/session-fixture".to_string())
         .tools(Vec::new())
-        .memory(crate::memory::test_support::noop_memory())
         .tool_dispatcher(Box::new(tinytools_agent::dialect::XmlDialect))
 }
 
@@ -80,7 +81,7 @@ async fn a_definition_the_builder_was_given_resolves_for_the_turn() {
         .expect("the caller's own definition answers the lookup");
 
     assert_eq!(resolved.id, SEAT);
-    assert_eq!(resolved.name, "Library host seat");
+    assert_eq!(resolved.display_name(), "Library host seat");
     assert!(
         resolved.is_valid(),
         "a hosted turn refuses an invalid definition: {:?}",
@@ -101,7 +102,10 @@ async fn the_definition_carries_the_belt_the_turn_is_allowed_to_call() {
         .expect("resolution never errors")
         .expect("resolves");
 
-    assert_eq!(resolved.tools, vec!["desk_say", "publish_artifact"]);
+    assert_eq!(
+        resolved.tools,
+        tinyagents_definition::ToolScope::Named(vec!["desk_say".into(), "publish_artifact".into()])
+    );
 }
 
 #[tokio::test]
@@ -122,8 +126,11 @@ async fn the_sessions_own_definition_outranks_a_registry_entry_sharing_its_id() 
         .expect("resolution never errors")
         .expect("resolves");
 
-    assert_eq!(resolved.name, "Library host seat");
-    assert_eq!(resolved.tools, vec!["desk_say"]);
+    assert_eq!(resolved.display_name(), "Library host seat");
+    assert_eq!(
+        resolved.tools,
+        tinyagents_definition::ToolScope::Named(vec!["desk_say".into()])
+    );
 }
 
 #[tokio::test]

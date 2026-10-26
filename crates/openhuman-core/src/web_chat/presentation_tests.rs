@@ -1,292 +1,22 @@
 use super::*;
 
 #[test]
-fn short_messages_are_never_split() {
-    let result = segment_for_delivery("Hello there!");
-    assert_eq!(result, vec!["Hello there!"]);
-}
-
-#[test]
-fn code_fences_prevent_splitting() {
-    let text = "Here is some code:\n\n```rust\nfn main() {}\n```\n\nAnd more text after.";
-    let result = segment_for_delivery(text);
-    assert_eq!(result.len(), 1);
-}
-
-#[test]
-fn paragraph_splitting_works() {
-    let text = "This is the first paragraph with enough content to stand alone.\n\n\
-                 This is the second paragraph that also has sufficient length.";
-    let result = segment_for_delivery(text);
-    assert_eq!(result.len(), 2);
-}
-
-#[test]
-fn structured_content_not_split() {
-    let text = "Here are the steps:\n\n- First do this thing\n- Then do that thing\n- Finally wrap up\n\nThat should cover it.";
-    let result = segment_for_delivery(text);
-    assert_eq!(result.len(), 1);
-}
-
-#[test]
-fn sentence_splitting_works() {
-    let text = "This is the first sentence and it has some length. This is the second sentence that continues the thought. And here is a third sentence to round things out.";
-    let result = segment_for_delivery(text);
-    assert!(
-        result.len() >= 2,
-        "expected >= 2 segments, got {}",
-        result.len()
-    );
-}
-
-#[test]
-fn segment_delay_bounds() {
-    assert_eq!(segment_delay(""), 500);
-    assert_eq!(segment_delay(&"x".repeat(1000)), 1400);
-    assert!(segment_delay("Hello world") > 500);
-}
-
-#[test]
-fn numbered_list_detection() {
-    assert!(is_numbered_list_item("1. First item"));
-    assert!(is_numbered_list_item("12. Twelfth item"));
-    assert!(!is_numbered_list_item("2024. Was a good year")); // too many digits
-    assert!(!is_numbered_list_item("hello 1. world")); // digits not at start
-    assert!(!is_numbered_list_item("1.5 seconds")); // no space after dot
-}
-
-#[test]
-fn max_segments_respected_without_dropping_content() {
-    // Regression: the prior `.take(MAX_SEGMENTS)` silently dropped every
-    // paragraph past the cap (issue #1041). Verify the cap holds AND no
-    // input paragraph disappears from the delivered output.
-    let paras: Vec<String> = (0..10)
-        .map(|i| {
-            format!(
-                "Paragraph number {} has enough content to stand on its own.",
-                i
-            )
-        })
-        .collect();
-    let text = paras.join("\n\n");
-    let result = segment_for_delivery(&text);
-    assert!(result.len() <= MAX_SEGMENTS);
-    let joined = result.join("\n\n");
-    // Assert the full paragraph body survives, not just the prefix —
-    // a mid-text truncation would slip past a substring-only check.
-    for (i, original) in paras.iter().enumerate() {
-        assert!(
-            joined.contains(original),
-            "paragraph {} truncated or missing from delivered segments",
-            i
-        );
-    }
-}
-
-#[test]
-fn cap_segments_passthrough_when_under_cap() {
-    let segs = vec!["one".to_string(), "two".to_string(), "three".to_string()];
-    assert_eq!(cap_segments(segs.clone(), 5, "\n\n"), segs);
-    assert_eq!(cap_segments(segs.clone(), 3, "\n\n"), segs);
-}
-
-#[test]
-fn cap_segments_merges_overflow_into_tail() {
-    let segs = vec![
-        "one".to_string(),
-        "two".to_string(),
-        "three".to_string(),
-        "four".to_string(),
-        "five".to_string(),
-        "six".to_string(),
-    ];
-    let out = cap_segments(segs, 3, "\n\n");
-    assert_eq!(out.len(), 3);
-    assert_eq!(out[0], "one");
-    assert_eq!(out[1], "two");
-    assert_eq!(out[2], "three\n\nfour\n\nfive\n\nsix");
-}
-
-#[test]
-fn cap_segments_handles_zero_max() {
-    let segs = vec!["one".to_string(), "two".to_string()];
-    // max=0 is a no-op: returns input unchanged rather than panicking.
-    assert_eq!(cap_segments(segs.clone(), 0, " "), segs);
-}
-
-#[test]
-fn issue_1041_transcript_preserves_bullets_and_trailing_paragraphs() {
-    // The exact shape of the agent reply that triggered issue #1041:
-    // 11 paragraphs including a bullet list and 4 trailing paragraphs.
-    // Pre-fix `.take(MAX_SEGMENTS)` dropped paragraphs 6-11 entirely;
-    // post-fix they must survive (merged into the final segment).
-    let text = "here's the full message with a sharper CTA:\n\n\
-        ---\n\n\
-        hey [name], great meeting you at Startup Grind SF last week. really enjoyed our conversation about [insert 1 specific detail if you remember, otherwise remove this line].\n\n\
-        i'm reaching out to share what we're building at TinyHumans. we just launched OpenHuman, and the insight is simple: AI agents are incredibly powerful, but today they're locked behind developer workflows. setup, API keys, terminals. the 99% who can't code are completely left out.\n\n\
-        OpenHuman fixes that. it's AI agents that work out of the box. no setup, no API keys, no copy-paste. just plain English.\n\n\
-        we launched a week ago and the response has been strong:\n\n\
-        - 100+ paying users\n- 200+ GitHub stars, growing ~150% week over week\n- 50+ outside PRs merged\n\n\
-        attaching a screenshot of our growth curve since day one.\n\n\
-        we're second-time founders. previously scaled products to 100k DAUs, had a 1.5M exit, and built to 3M ARR. now we're going after the \"Apple moment\" for AI agents, making them actually usable for everyone.\n\n\
-        are you open to a 15-min demo next week? happy to work around your schedule.\n\n\
-        cheers,\n[your name]";
-
-    let result = segment_for_delivery(text);
-    assert!(
-        result.len() <= MAX_SEGMENTS,
-        "segment count {} exceeds cap",
-        result.len()
-    );
-
-    let joined = result.join("\n\n");
-    // Bullet list — the highest-priority symptom of #1041
-    assert!(joined.contains("100+ paying users"), "bullet 1 dropped");
-    assert!(joined.contains("200+ GitHub stars"), "bullet 2 dropped");
-    assert!(
-        joined.contains("50+ outside PRs merged"),
-        "bullet 3 dropped"
-    );
-    // Trailing paragraphs — also dropped pre-fix
-    assert!(
-        joined.contains("attaching a screenshot"),
-        "screenshot paragraph dropped"
-    );
-    assert!(
-        joined.contains("second-time founders"),
-        "founders paragraph dropped"
-    );
-    assert!(
-        joined.contains("15-min demo next week"),
-        "demo ask paragraph dropped"
-    );
-    assert!(joined.contains("[your name]"), "signature dropped");
-}
-
-#[test]
-fn split_sentences_splits_on_sentence_terminators() {
-    let out = split_sentences("Hello world. How are you? I am fine!");
-    assert!(out.len() >= 3);
-}
-
-#[test]
-fn split_sentences_handles_empty_string() {
-    assert!(split_sentences("").is_empty());
-}
-
-#[test]
-fn split_sentences_single_sentence_without_terminator() {
-    let out = split_sentences("Just one thing");
-    assert_eq!(out.len(), 1);
-}
-
-#[test]
-fn split_sentences_splits_on_cjk_terminators() {
-    let out = split_sentences("你好世界。今天天气很好！你觉得呢？");
-    assert_eq!(out.len(), 3);
-    assert_eq!(out[0], "你好世界。");
-    assert_eq!(out[1], "今天天气很好！");
-    assert_eq!(out[2], "你觉得呢？");
-}
-
-#[test]
-fn group_sentences_single_entry_roundtrip() {
-    let v: Vec<String> = vec!["Hello world".into()];
-    let out = group_sentences(&v);
-    assert!(!out.is_empty());
-}
-
-#[test]
-fn group_sentences_multi_entry_produces_output() {
-    let v: Vec<String> = vec![
-        "First sentence.".into(),
-        "Second sentence.".into(),
-        "Third sentence.".into(),
-    ];
-    let out = group_sentences(&v);
-    assert!(!out.is_empty());
-}
-
-#[test]
-fn merge_short_joins_small_parts_with_separator() {
-    let out = merge_short(&["hi", "there"], " ");
-    assert!(!out.is_empty());
-}
-
-#[test]
-fn merge_short_empty_input_returns_empty() {
-    let out: Vec<String> = merge_short(&[], " ");
-    assert!(out.is_empty());
-}
-
-#[test]
-fn segment_delay_is_monotonic_in_length() {
-    let short = segment_delay("hi");
-    let longer = segment_delay(&"a".repeat(500));
-    assert!(longer >= short);
-}
-
-#[test]
-fn segment_delay_is_finite_for_huge_text() {
-    let huge = "a".repeat(10_000);
-    assert!(segment_delay(&huge) < 1_000_000);
-}
-
-#[test]
-fn segment_delay_works_on_empty_text() {
-    let _ = segment_delay("");
-}
-
-#[test]
-fn is_structured_content_detects_markdown_headings() {
-    assert!(is_structured_content("# Heading\n\nbody"));
-}
-
-#[test]
-fn is_structured_content_detects_bullet_list() {
-    assert!(is_structured_content("- item 1\n- item 2"));
-}
-
-#[test]
-fn is_structured_content_detects_numbered_list() {
-    assert!(is_structured_content("1. First\n2. Second"));
-}
-
-#[test]
-fn is_structured_content_false_for_plain_prose() {
-    assert!(!is_structured_content("Just a plain sentence."));
-}
-
-#[test]
-fn segment_for_delivery_whitespace_only_is_empty_or_single() {
-    let r = segment_for_delivery("   ");
-    // Whitespace may return a single segment or empty depending on how
-    // the code treats leading/trailing whitespace. Either is acceptable.
-    assert!(r.len() <= 1);
-}
-
-#[test]
-fn segment_for_delivery_single_short_returns_one() {
-    let r = segment_for_delivery("Quick.");
-    assert_eq!(r.len(), 1);
-}
-
-#[test]
-fn single_bubble_delivery_emits_one_unsegmented_chat_done_without_reaction() {
+fn single_bubble_delivery_emits_one_unsegmented_chat_done() {
     let mut rx = crate::web_chat::subscribe_web_channel_events();
-    // Prose `deliver_response` WOULD split into several `chat_segment` bubbles
-    // (long, multi-paragraph, no fences) — the shape a background delivery turn
-    // produces. A core-persisted single row must be announced as one bubble.
+    // Multi-paragraph prose remains one byte-for-byte terminal reply.
     let text = "Same three meetings as before, and nothing on the calendar moved since the last check.\n\n\
         The product standup is still at noon and the design review still follows it at two.\n\n\
         Nothing needs input from you right now, so I have not rescheduled anything on your behalf.";
-    assert!(
-        segment_for_delivery(text).len() > 1,
-        "fixture must be one the conversational path would segment"
-    );
     let request_id = format!("single-bubble-{}", uuid::Uuid::new_v4());
 
-    deliver_response_single_bubble("system", "thread-1", &request_id, text, None);
+    deliver_response_single_bubble(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "system",
+        "thread-1",
+        &request_id,
+        text,
+        None,
+    );
 
     // Other tests publish on the same process-global bus; keep only ours.
     let mut mine = Vec::new();
@@ -306,7 +36,6 @@ fn single_bubble_delivery_emits_one_unsegmented_chat_done_without_reaction() {
     assert_eq!(done.full_response.as_deref(), Some(text));
     assert_eq!(done.segment_total, None);
     assert_eq!(done.segment_index, None);
-    assert_eq!(done.reaction_emoji, None);
     assert!(done.usage.is_none());
 }
 
@@ -324,9 +53,12 @@ async fn chat_done_carries_timing_when_a_snapshot_is_supplied() {
         input_tokens: 100,
         output_tokens: 40,
         cached_input_tokens: 0,
-        cost_usd: 0.01,
+        cost_usd: Some(0.01),
+        cost_source: tinyagents_harness::cost::CostSource::Charged,
         context_window: 8000,
+        context_tokens: 60,
         subagents: Vec::new(),
+        reasoning_tokens: 0,
     };
     let timing = crate::web_chat::turn_timing::TurnTimingSnapshot {
         first_token_ms: Some(120),
@@ -362,6 +94,9 @@ async fn chat_done_carries_timing_when_a_snapshot_is_supplied() {
     assert_eq!(payload.total_ms, Some(2000));
     // 40 output tokens / (2000ms / 1000) = 20 tokens/sec.
     assert_eq!(payload.tokens_per_second, Some(20.0));
+    // The gauge numerator travels beside the spend totals, unsummed.
+    let usage = done.usage.expect("chat_done.usage must be Some");
+    assert_eq!((usage.input_tokens, usage.context_tokens), (100, 60));
 }
 
 /// A caller with no timing snapshot in scope (e.g. the flows stream
@@ -401,11 +136,12 @@ async fn chat_done_omits_timing_when_no_snapshot_is_supplied() {
 
 #[tokio::test]
 async fn delivery_stores_the_reply_before_announcing_it() {
-    use crate::memory::conversations::{self, CreateConversationThread};
+    use crate::threads::store::{self as conversations, CreateConversationThread};
 
     let ws = std::env::temp_dir().join(format!("deliver-persist-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&ws).unwrap();
     conversations::ensure_thread(
+        &crate::core::runtime::DispatchCtx::ambient(),
         ws.clone(),
         CreateConversationThread {
             id: "t-deliver".to_string(),
@@ -414,11 +150,12 @@ async fn delivery_stores_the_reply_before_announcing_it() {
             parent_thread_id: None,
             labels: None,
             personality_id: None,
+            working_dir: None,
         },
     )
     .expect("thread created");
 
-    let citation = crate::memory::agent::memory_loader::MemoryCitation {
+    let citation = crate::web_chat::TurnCitation {
         id: "mem-deliver".to_string(),
         key: "summary-source".to_string(),
         namespace: None,
@@ -441,7 +178,12 @@ async fn delivery_stores_the_reply_before_announcing_it() {
     // a row present here proves the write happened no later than the announce.
     // A client that never receives that event, or fails to append it, no longer
     // decides whether the reply exists.
-    let messages = conversations::get_messages(ws.clone(), "t-deliver").expect("messages");
+    let messages = conversations::get_messages(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        ws.clone(),
+        "t-deliver",
+    )
+    .expect("messages");
     assert_eq!(messages.len(), 1, "delivery must leave exactly one row");
     assert_eq!(messages[0].id, "agent:req-deliver");
     assert_eq!(messages[0].content, "Here is the summary you asked for.");
@@ -477,8 +219,12 @@ async fn delivery_still_announces_when_the_reply_cannot_be_stored() {
     // `get_messages` answers `Ok(vec![])` for a thread it has never seen — only
     // `append_message` refuses one — so absence is what proves the write was
     // rejected and swallowed rather than silently creating a thread.
-    let messages = crate::memory::conversations::get_messages(ws.clone(), "absent-thread")
-        .expect("reading an unknown thread is not an error");
+    let messages = crate::threads::store::get_messages(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        ws.clone(),
+        "absent-thread",
+    )
+    .expect("reading an unknown thread is not an error");
     assert!(
         messages.is_empty(),
         "the thread was never created, so nothing should have been written"

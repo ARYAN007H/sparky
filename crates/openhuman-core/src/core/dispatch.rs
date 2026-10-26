@@ -27,6 +27,7 @@ use serde_json::{json, Map, Value};
 /// A `Result` containing the JSON-formatted response or an error message if
 /// the method is unknown or invocation fails.
 pub async fn dispatch(
+    ctx: crate::core::runtime::DispatchCtx,
     state: AppState,
     method: &str,
     params: serde_json::Value,
@@ -78,7 +79,7 @@ pub async fn dispatch(
     }
 
     // Tier 2: Registered domain controllers.
-    if let Some(result) = try_registry_dispatch(method, params).await {
+    if let Some(result) = try_registry_dispatch(ctx, method, params).await {
         log::debug!(
             "[rpc:dispatch] routed method={} subsystem=controller_registry",
             method
@@ -122,17 +123,6 @@ pub const UNKNOWN_METHOD_PREFIX: &str = "unknown method: ";
 /// This also covers retired feature calls from older clients when no safe
 /// canonical handler exists (#3565: `openhuman.memory_tree_create_namespace`).
 ///
-/// `openhuman.harness_init_status` (#5157) is in the list for a *different*
-/// reason and must not be read as retired — it is a **live, registered**
-/// method (`harness_init::all_harness_init_registered_controllers`, tagged
-/// `DomainGroup::Platform`). It only misses when the caller and the running
-/// core disagree about the surface: an older core behind a newer UI bundle, a
-/// runtime `DomainSet` without `Platform` (e.g. `DomainSet::harness()`), or a
-/// slim feature build. Those are legitimate configurations, not core defects,
-/// so the miss stays debug-only — but do **not** delete the controller on the
-/// strength of this entry. `harness_init_status_is_registered_in_a_full_build`
-/// below pins that the method really is served, so a genuine regression fails
-/// a test instead of being silently swallowed by this allow-list.
 ///
 /// Each miss previously produced recurring Sentry events with zero user
 /// impact. The transport layer keeps these debug-only (never captured). The
@@ -145,7 +135,6 @@ const KNOWN_PROBE_METHODS: &[&str] = &[
     "auth.status",
     "config/get",
     "openhuman.memory_tree_create_namespace",
-    "openhuman.harness_init_status",
 ];
 
 /// Returns `true` when `method` is a known non-actionable unknown method name
@@ -243,10 +232,16 @@ fn handle_events_subscribe_token(params: serde_json::Value) -> Result<Invocation
 }
 
 async fn try_registry_dispatch(
+    ctx: crate::core::runtime::DispatchCtx,
     method: &str,
     params: Value,
 ) -> Option<Result<serde_json::Value, String>> {
-    let schema = crate::core::all::schema_for_rpc_method(method)?;
+    let Some(schema) = crate::core::all::schema_for_rpc_method(method) else {
+        // Hidden because a `[components]` switch is off: say so, rather than
+        // reporting a method that exists as unknown.
+        return crate::core::all::disabled_component_for_method(&ctx, method)
+            .map(|name| Err(crate::core::runtime::components::component_disabled(name).encode()));
+    };
     let params_obj = match params_to_object(params) {
         Ok(params_obj) => params_obj,
         Err(err) => return Some(Err(err)),
@@ -254,7 +249,7 @@ async fn try_registry_dispatch(
     if let Err(err) = crate::core::all::validate_params(&schema, &params_obj) {
         return Some(Err(err));
     }
-    crate::core::all::try_invoke_registered_rpc(method, params_obj).await
+    crate::core::all::try_invoke_registered_rpc(ctx, method, params_obj).await
 }
 
 fn params_to_object(params: Value) -> Result<Map<String, Value>, String> {

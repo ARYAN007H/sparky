@@ -9,8 +9,29 @@ fn applies_only_present_fields() {
     assert_eq!(cfg.ccr_min_tokens, 1200);
     assert!(!cfg.search_enabled);
     // Untouched fields keep defaults.
-    assert!(!cfg.router_enabled);
+    assert!(cfg.router_enabled);
     assert!(cfg.code_enabled);
+}
+
+#[test]
+fn repl_handle_switch_can_be_flipped() {
+    let mut cfg = TokenjuiceConfig::default();
+    let patch: TokenjuiceSettingsPatch =
+        serde_json::from_str(r#"{ "repl_handle_enabled": false }"#).unwrap();
+    patch.apply(&mut cfg);
+    assert!(!cfg.repl_handle_enabled);
+}
+
+#[test]
+fn legacy_repl_save_patch_field_is_ignored() {
+    let mut cfg = TokenjuiceConfig::default();
+    let patch: TokenjuiceSettingsPatch =
+        serde_json::from_str(r#"{ "repl_save_enabled": true }"#).unwrap();
+    patch.apply(&mut cfg);
+    assert!(cfg.repl_handle_enabled);
+    assert!(!serde_json::to_string(&cfg)
+        .unwrap()
+        .contains("repl_save_enabled"));
 }
 
 #[test]

@@ -1,11 +1,11 @@
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-use crate::config::rpc as config_rpc;
 use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use crate::rpc::RpcOutcome;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,12 +36,6 @@ struct AuthListProviderCredentialsParams {
     provider: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AuthOauthFetchClientKeyParams {
-    integration_id: String,
-}
-
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct AuthClearCredentialParams {
@@ -58,7 +52,6 @@ pub fn all_controller_schemas() -> Vec<ControllerSchema> {
         schemas("auth_store_provider_credentials"),
         schemas("auth_remove_provider_credentials"),
         schemas("auth_list_provider_credentials"),
-        schemas("auth_oauth_fetch_client_key"),
     ]
 }
 
@@ -92,10 +85,6 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
             schema: schemas("auth_list_provider_credentials"),
             handler: handle_auth_list_provider_credentials,
         },
-        RegisteredController {
-            schema: schemas("auth_oauth_fetch_client_key"),
-            handler: handle_auth_oauth_fetch_client_key,
-        },
     ]
 }
 
@@ -123,6 +112,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
                 // Accepted spelling for callers that still send the historical
                 // `auth_store_session` shape through the legacy alias.
                 optional_string("user_id", "Alias of `userId`."),
+                optional_string(
+                    "issuingBackend",
+                    "Backend origin used by the host to validate this session; binds future credential use to that deployment.",
+                ),
                 optional_json(
                     "user",
                     "User payload (the host's /auth/me answer, or the local user).",
@@ -187,16 +180,6 @@ pub fn schemas(function: &str) -> ControllerSchema {
             inputs: vec![optional_string("provider", "Optional provider filter.")],
             outputs: vec![json_output("profiles", "Listed provider credentials.")],
         },
-        "auth_oauth_fetch_client_key" => ControllerSchema {
-            namespace: "auth",
-            function: "oauth_fetch_client_key",
-            description: "Fetch one-time client key share for an encrypted OAuth integration.",
-            inputs: vec![required_string(
-                "integrationId",
-                "Integration id (24-char hex).",
-            )],
-            outputs: vec![json_output("result", "Client key share payload (base64).")],
-        },
         _ => ControllerSchema {
             namespace: "auth",
             function: "unknown",
@@ -212,18 +195,18 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_auth_set_credential(params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_set_credential(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let payload =
             deserialize_params::<crate::security::credentials::SetCredentialRequest>(params)?;
-        to_json(crate::security::credentials::rpc::set_credential(&config, payload).await?)
+        to_json(crate::security::credentials::rpc::set_credential(&ctx, &config, payload).await?)
     })
 }
 
-fn handle_auth_clear_credential(params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_clear_credential(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let payload = deserialize_params::<AuthClearCredentialParams>(params)?;
         let kind = match payload
             .kind
@@ -237,27 +220,33 @@ fn handle_auth_clear_credential(params: Map<String, Value>) -> ControllerFuture 
             ),
             None => None,
         };
-        to_json(crate::security::credentials::rpc::clear_credential(&config, kind).await?)
+        to_json(crate::security::credentials::rpc::clear_credential(&ctx, &config, kind).await?)
     })
 }
 
-fn handle_auth_get_state(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_get_state(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(crate::security::credentials::rpc::auth_get_state(&config).await?)
     })
 }
 
-fn handle_auth_get_session_token(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_get_session_token(
+    ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(crate::security::credentials::rpc::auth_get_session_token_json(&config).await?)
     })
 }
 
-fn handle_auth_store_provider_credentials(params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_store_provider_credentials(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let payload = deserialize_params::<AuthStoreProviderCredentialsParams>(params)?;
         to_json(
             crate::security::credentials::rpc::store_provider_credentials(
@@ -273,9 +262,12 @@ fn handle_auth_store_provider_credentials(params: Map<String, Value>) -> Control
     })
 }
 
-fn handle_auth_remove_provider_credentials(params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_remove_provider_credentials(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let payload = deserialize_params::<AuthRemoveProviderCredentialsParams>(params)?;
         to_json(
             crate::security::credentials::rpc::remove_provider_credentials(
@@ -288,9 +280,12 @@ fn handle_auth_remove_provider_credentials(params: Map<String, Value>) -> Contro
     })
 }
 
-fn handle_auth_list_provider_credentials(params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_list_provider_credentials(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let payload = if params.is_empty() {
             AuthListProviderCredentialsParams::default()
         } else {
@@ -305,20 +300,6 @@ fn handle_auth_list_provider_credentials(params: Map<String, Value>) -> Controll
         to_json(
             crate::security::credentials::rpc::list_provider_credentials(&config, provider_filter)
                 .await?,
-        )
-    })
-}
-
-fn handle_auth_oauth_fetch_client_key(params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
-        let payload = deserialize_params::<AuthOauthFetchClientKeyParams>(params)?;
-        to_json(
-            crate::security::credentials::rpc::oauth_fetch_client_key(
-                &config,
-                payload.integration_id.trim(),
-            )
-            .await?,
         )
     })
 }
@@ -372,7 +353,7 @@ fn json_output(name: &'static str, comment: &'static str) -> FieldSchema {
     }
 }
 
-fn to_json<T: serde::Serialize>(outcome: RpcOutcome<T>) -> Result<Value, String> {
+fn to_json<T: serde::Serialize>(outcome: Outcome<T>) -> Result<Value, String> {
     outcome.into_cli_compatible_json()
 }
 

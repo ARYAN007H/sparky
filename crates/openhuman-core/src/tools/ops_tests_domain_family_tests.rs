@@ -1,87 +1,8 @@
 use super::*;
-
-#[tokio::test]
-async fn all_tools_executes_stock_and_twilio_family_against_fake_backend() {
-    let backend = integration_test_support::spawn_fake_integration_backend().await;
-    let tmp = TempDir::new().unwrap();
-    let cfg = integration_test_config(&tmp, &backend.base_url);
-    store_test_session_token(&cfg);
-    let tools = integration_tools_for_config(&tmp, &cfg);
-
-    let quote = find_tool(&tools, "stock_quote")
-        .execute(serde_json::json!({ "symbol": "AAPL" }))
-        .await
-        .expect("stock_quote execute");
-    assert!(quote.output().contains("AAPL"));
-    assert!(quote.output().contains("latest trading day 2026-05-16"));
-
-    let exchange = find_tool(&tools, "stock_exchange_rate")
-        .execute(serde_json::json!({
-            "from_currency": "BTC",
-            "to_currency": "USD"
-        }))
-        .await
-        .expect("stock_exchange_rate execute");
-    assert!(exchange.output().contains("BTC/USD = 42.5"));
-
-    let options = find_tool(&tools, "stock_options")
-        .execute(serde_json::json!({
-            "symbol": "AAPL",
-            "require_greeks": true
-        }))
-        .await
-        .expect("stock_options execute");
-    assert!(options.output().contains("AAPL options chain"));
-    assert!(options.output().contains("call 2026-06-19 @ 250"));
-
-    let crypto = find_tool(&tools, "stock_crypto_series")
-        .execute(serde_json::json!({
-            "symbol": "BTC",
-            "market": "USD",
-            "limit": 2
-        }))
-        .await
-        .expect("stock_crypto_series execute");
-    assert!(crypto.output().contains("BTC/USD"));
-    assert!(crypto.output().contains("2026-05-16"));
-
-    let commodity = find_tool(&tools, "stock_commodity")
-        .execute(serde_json::json!({
-            "commodity": "WTI",
-            "interval": "weekly",
-            "limit": 2
-        }))
-        .await
-        .expect("stock_commodity execute");
-    assert!(commodity.output().contains("WTI (weekly)"));
-    assert!(commodity.output().contains("2026-05-16  80.1000"));
-
-    let twilio = find_tool(&tools, "twilio_call")
-        .execute(serde_json::json!({
-            "to": "+14155551234",
-            "message": "Hello from tests"
-        }))
-        .await
-        .expect("twilio_call execute");
-    assert!(twilio.output().contains("Call SID: CA1234"));
-    assert!(twilio.output().contains("Status: queued"));
-
-    let requests = backend.requests();
-    let paths: Vec<&str> = requests.iter().map(|req| req.path.as_str()).collect();
-    assert_eq!(
-        paths,
-        vec![
-            "/agent-integrations/financial-apis/quote",
-            "/agent-integrations/financial-apis/exchange-rate",
-            "/agent-integrations/financial-apis/options",
-            "/agent-integrations/financial-apis/crypto-series",
-            "/agent-integrations/financial-apis/commodity",
-            "/agent-integrations/twilio/call",
-        ]
-    );
-    assert_eq!(requests[2].body["requireGreeks"], serde_json::json!(true));
-    assert_eq!(requests[5].body["to"], serde_json::json!("+14155551234"));
-}
+#[cfg(feature = "modules")]
+use crate::tools::BrowserOpenTool;
+use crate::tools::{filter_tools_by_user_preference, http_request_tool};
+use tinyagents_harness_tools::fs::filesystem::{ApplyPatchTool, CsvExportTool};
 
 /// Every acting tool gates on `can_act()` and returns its own read-only refusal
 /// string. Each of those must carry [`POLICY_BLOCKED_MARKER`] so the agent
@@ -93,7 +14,8 @@ async fn all_tools_executes_stock_and_twilio_family_against_fake_backend() {
 /// needed to reach the `can_act()` check in each tool.
 #[tokio::test]
 async fn readonly_acting_tools_carry_policy_blocked_marker() {
-    use crate::security::{AutonomyLevel, POLICY_BLOCKED_MARKER};
+    use crate::security::AutonomyLevel;
+    use tinytools::status::POLICY_BLOCKED_MARKER;
 
     let tmp = TempDir::new().unwrap();
     let sec = Arc::new(SecurityPolicy {
@@ -126,7 +48,13 @@ async fn readonly_acting_tools_carry_policy_blocked_marker() {
             serde_json::json!({ "url": "https://example.com" }),
         ),
         (
-            Box::new(HttpRequestTool::new(sec.clone(), vec![], 0, 0)),
+            Box::new(http_request_tool(
+                &crate::core::runtime::DispatchCtx::ambient(),
+                sec.clone(),
+                vec![],
+                0,
+                0,
+            )),
             serde_json::json!({ "url": "https://example.com" }),
         ),
     ];
@@ -192,16 +120,24 @@ fn productivity_default_off_tools_retained_when_opted_in() {
 }
 
 #[tokio::test]
-async fn artifact_list_through_registry_returns_envelope() {
+async fn artifacts_created_through_the_registry_are_listed() {
     let tmp = TempDir::new().unwrap();
     let tools = expansion_tools_for(&tmp);
-    let out = find_tool(&tools, "artifact_list")
-        .execute(serde_json::json!({ "limit": 10 }))
+    let created = find_tool(&tools, "create_artifact")
+        .execute(serde_json::json!({ "kind": "markdown", "title": "Notes", "body": "# hi" }))
         .await
-        .expect("artifact_list execute");
+        .expect("create_artifact execute");
+    assert!(!created.is_error, "{}", created.output_for_llm(false));
+
+    let out = find_tool(&tools, "list_artifacts")
+        .execute(serde_json::json!({}))
+        .await
+        .expect("list_artifacts execute");
     let body = out.output_for_llm(false);
-    assert!(body.contains("artifacts"), "envelope missing: {body}");
-    assert!(body.contains("total"), "envelope missing total: {body}");
+    assert!(
+        body.contains("\"title\":\"Notes\""),
+        "listing missing the artifact: {body}"
+    );
 }
 
 #[test]
@@ -209,20 +145,7 @@ fn knowledge_tools_are_registered() {
     let tmp = TempDir::new().unwrap();
     let names = tool_names(&expansion_tools_for(&tmp));
 
-    // Base knowledge tools that are always present
-    let mut expected_tools = vec![
-        "learning_list_facets",
-        "learning_get_facet",
-        "learning_cache_stats",
-        "learning_update_facet",
-        "learning_pin_facet",
-        "learning_unpin_facet",
-        "learning_forget_facet",
-        "learning_rebuild_cache",
-        "learning_reset_cache",
-        "learning_save_profile",
-        "learning_enrich_profile",
-    ];
+    let mut expected_tools: Vec<&str> = Vec::new();
 
     // Add gated tools only when their feature is enabled. All of these —
     // list/describe/read_resource/recent_runs/read_run_log,
@@ -292,10 +215,7 @@ fn knowledge_default_off_tools_are_filtered_when_not_opted_in() {
 fn knowledge_default_off_tools_retained_when_opted_in() {
     let tmp = TempDir::new().unwrap();
     let mut tools = expansion_tools_for(&tmp);
-    filter_tools_by_user_preference(
-        &mut tools,
-        &["workflow_manage".to_string(), "learning_manage".to_string()],
-    );
+    filter_tools_by_user_preference(&mut tools, &["workflow_manage".to_string()]);
     let names = tool_names(&tools);
     let off_tools = knowledge_default_off();
     for on in &off_tools {

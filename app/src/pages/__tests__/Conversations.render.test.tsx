@@ -9,11 +9,13 @@
  */
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SidebarSlotOutlet, SidebarSlotProvider } from '../../components/layout/shell/SidebarSlot';
+import { draftStorageKey } from '../../features/conversations/hooks/useThreadDraft';
 import { threadApi } from '../../services/api/threadApi';
 import { chatCancel, chatRemoveQueueItem, chatSend } from '../../services/chatService';
 import { CoreRpcError } from '../../services/coreRpcClient';
@@ -33,8 +35,9 @@ import runModeReducer from '../../store/runModeSlice';
 import socketReducer from '../../store/socketSlice';
 import themeReducer from '../../store/themeSlice';
 import threadGoalReducer from '../../store/threadGoalSlice';
-import threadReducer from '../../store/threadSlice';
+import threadReducer, { setSelectedThread } from '../../store/threadSlice';
 import threadTodosReducer from '../../store/threadTodosSlice';
+import { userScopedStorage } from '../../store/userScopedStorage';
 import type { Thread, ThreadMessage } from '../../types/thread';
 
 // ── Hoisted mock state ─────────────────────────────────────────────────────
@@ -62,6 +65,15 @@ const { mockGetThreads, mockGetThreadMessages, mockUseUsageState } = vi.hoisted(
   })),
 }));
 // ── Module mocks ───────────────────────────────────────────────────────────
+// The chat mascot context is absent in this harness (no provider) unless a test
+// installs one, which is how the Tiny-click → live voice path is exercised.
+const { mascotContext } = vi.hoisted(() => ({
+  mascotContext: { current: undefined as undefined | { expandWithVoice: () => void } },
+}));
+vi.mock('../../features/human/chatMascot', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../features/human/chatMascot')>()),
+  useChatMascotOptional: () => mascotContext.current,
+}));
 
 vi.mock('../../services/chatService', () => ({
   chatCancel: vi.fn().mockResolvedValue({ accepted: true, turnCancelled: true }),
@@ -70,6 +82,16 @@ vi.mock('../../services/chatService', () => ({
   chatSend: vi.fn().mockResolvedValue(undefined),
   subscribeChatEvents: vi.fn(() => () => {}),
   useRustChat: vi.fn(() => true),
+}));
+
+const { mockGetClientConfig, mockUpdateRuntimeSettings } = vi.hoisted(() => ({
+  mockGetClientConfig: vi.fn(() => Promise.resolve({ result: {} })),
+  mockUpdateRuntimeSettings: vi.fn(() => Promise.resolve({})),
+}));
+vi.mock('../../utils/tauriCommands/config', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../utils/tauriCommands/config')>()),
+  openhumanGetClientConfig: mockGetClientConfig,
+  openhumanUpdateRuntimeSettings: mockUpdateRuntimeSettings,
 }));
 
 vi.mock('../../services/api/threadApi', () => ({
@@ -247,6 +269,7 @@ async function openSidebar() {
 const emptyThreadState = {
   threads: [],
   selectedThreadId: null,
+  selectionIntentVersion: 0,
   activeThreadIds: {},
   welcomeThreadId: null,
   messagesByThreadId: {},
@@ -352,6 +375,8 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    mockGetClientConfig.mockResolvedValue({ result: {} });
+    mockUpdateRuntimeSettings.mockResolvedValue({});
     // Reset the mock to defaults for each test
     mockGetThreads.mockResolvedValue({ threads: [], count: 0 });
     mockGetThreadMessages.mockResolvedValue({ messages: [], count: 0 });
@@ -371,7 +396,7 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
   });
 
   // Covers the page-mode sidebar (TwoPanelLayout, id `chat`) once opened. The
-  // General/Subconscious/Tasks filter chips were removed, and so was the thread
+  // General/Tasks filter chips were removed, and so was the thread
   // search; the section header's "new conversation" affordance is now the stable
   // top-of-sidebar control.
   it('renders the sidebar thread list chrome in page mode', async () => {
@@ -461,9 +486,8 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     });
 
     const betaRow = await screen.findByRole('button', { name: /Thread Beta/ });
-    await act(async () => {
-      fireEvent.keyDown(betaRow, { key: 'Enter' });
-    });
+    betaRow.focus();
+    await userEvent.keyboard('{Enter}');
     await waitFor(() => {
       expect(screen.getByTestId('route-path')).toHaveTextContent('/chat/t-2');
     });
@@ -713,6 +737,45 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     });
   });
 
+  it('keeps an explicit sidebar selection made while initial thread loading is pending', async () => {
+    const threads = [
+      makeThread({ id: 't-1', title: 'Initial Thread' }),
+      makeThread({ id: 't-2', title: 'Explicitly Selected Thread' }),
+    ];
+    let resolveThreads: ((value: { threads: Thread[]; count: number }) => void) | undefined;
+    mockGetThreads.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveThreads = resolve;
+        })
+    );
+
+    let store: ReturnType<typeof buildStore> | undefined;
+    await act(async () => {
+      store = await renderConversations({
+        thread: {
+          ...emptyThreadState,
+          threads,
+          selectedThreadId: 't-1',
+          messagesByThreadId: { 't-1': [], 't-2': [] },
+        },
+      });
+    });
+    await waitFor(() => expect(mockGetThreads).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByTestId('thread-row-t-2'));
+    expect(store?.getState().thread.selectedThreadId).toBe('t-2');
+
+    await act(async () => {
+      resolveThreads?.({ threads, count: threads.length });
+    });
+
+    expect(store?.getState().thread.selectedThreadId).toBe('t-2');
+    expect(
+      screen.getByTestId('thread-row-t-2').closest('[data-slot="aui_thread-list-item"]')
+    ).toHaveAttribute('data-active');
+  });
+
   // Sidebar "New thread" button was removed in the composer flattening refactor.
   // The "+ New" header button (tested below) is the remaining create-thread entry point.
 
@@ -756,11 +819,8 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
       expect(screen.getAllByText('Deletable Thread').length).toBeGreaterThan(0);
     });
 
-    // The delete button has title="Delete thread"
-    const deleteBtn = screen.getByTitle('Delete thread');
-    await act(async () => {
-      fireEvent.click(deleteBtn);
-    });
+    await userEvent.click(screen.getByRole('button', { name: 'More options' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
 
     // The modal should now be open — "Are you sure you want to delete" text
     // This verifies lines 981, 982, 985 inside the delete onClick callback executed
@@ -776,10 +836,8 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     });
     await openSidebar();
 
-    const deleteBtn = await screen.findByTitle('Delete thread');
-    await act(async () => {
-      fireEvent.click(deleteBtn);
-    });
+    await userEvent.click(await screen.findByRole('button', { name: 'More options' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     });
@@ -818,6 +876,85 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     expect(chatSend).not.toHaveBeenCalled();
   });
 
+  it('loads the thinking level from config, persists a new pick and sends it', async () => {
+    mockGetClientConfig.mockResolvedValue({ result: { reasoning_effort: 'low' } });
+    const { textarea, thread } = await renderSelectedConversation();
+
+    const picker = (await screen.findByTestId('composer-reasoning-effort')) as HTMLSelectElement;
+    await waitFor(() => expect(picker.value).toBe('low'));
+
+    fireEvent.change(picker, { target: { value: 'high' } });
+    expect(mockUpdateRuntimeSettings).toHaveBeenCalledWith({ reasoning_effort: 'high' });
+
+    await submitComposerText(textarea, 'think hard');
+    await waitFor(() => {
+      expect(chatSend).toHaveBeenCalledWith(
+        expect.objectContaining({ threadId: thread.id, reasoningEffort: 'high' })
+      );
+    });
+
+    fireEvent.change(picker, { target: { value: 'default' } });
+    expect(mockUpdateRuntimeSettings).toHaveBeenLastCalledWith({ reasoning_effort: '' });
+  });
+
+  it('remembers the thinking level per model and sends that model its own level', async () => {
+    mockGetClientConfig.mockResolvedValue({
+      result: {
+        reasoning_effort: 'low',
+        default_model: 'deep-model',
+        reasoning_effort_by_model: { 'deep-model': 'xhigh' },
+      },
+    });
+    const { textarea, thread } = await renderSelectedConversation();
+
+    const picker = (await screen.findByTestId('composer-reasoning-effort')) as HTMLSelectElement;
+    await waitFor(() => expect(picker.value).toBe('xhigh'));
+
+    fireEvent.change(picker, { target: { value: 'medium' } });
+    expect(mockUpdateRuntimeSettings).toHaveBeenCalledWith({
+      reasoning_effort: 'medium',
+      reasoning_effort_model: 'deep-model',
+    });
+
+    await submitComposerText(textarea, 'think a bit');
+    await waitFor(() => {
+      expect(chatSend).toHaveBeenCalledWith(
+        expect.objectContaining({ threadId: thread.id, reasoningEffort: 'medium' })
+      );
+    });
+
+    // Dropping the model's own level falls back to the global one.
+    fireEvent.change(picker, { target: { value: 'default' } });
+    expect(mockUpdateRuntimeSettings).toHaveBeenLastCalledWith({
+      reasoning_effort: '',
+      reasoning_effort_model: 'deep-model',
+    });
+    await waitFor(() => expect(picker.value).toBe('low'));
+  });
+
+  it('recalls the last prompt with ArrowUp and switches the placeholder while running', async () => {
+    let finishChatSend: (() => void) | undefined;
+    vi.mocked(chatSend).mockImplementationOnce(
+      () =>
+        new Promise<string | undefined>(resolve => {
+          finishChatSend = () => resolve(undefined);
+        })
+    );
+    const { textarea } = await renderSelectedConversation();
+
+    await submitComposerText(textarea, 'recall me later');
+    await waitFor(() => expect(chatSend).toHaveBeenCalled());
+
+    // The turn is in flight: typed text would queue, and the placeholder says so.
+    await waitFor(() => expect(screen.getByText('Queue a follow-up…')).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.keyDown(textarea, { key: 'ArrowUp' });
+    });
+    await waitFor(() => expect(textarea.textContent).toBe('recall me later'));
+    await act(async () => finishChatSend?.());
+  });
+
   it('persists a local user message and sends through chat service for valid input', async () => {
     const { textarea, thread } = await renderSelectedConversation();
 
@@ -829,49 +966,15 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
         expect.objectContaining({ content: 'hello cloud', sender: 'user', type: 'text' })
       );
     });
-    expect(chatSend).toHaveBeenCalledWith({
-      threadId: thread.id,
-      message: 'hello cloud',
-      model: 'hint:chat',
-      locale: 'en',
-    });
-  });
-
-  it('auto-sends a dictation transcript (autoSend) straight to chat without the composer', async () => {
-    const { thread } = await renderSelectedConversation();
-
-    // Hotkey dictation dispatches this event with autoSend:true (see
-    // useDictationHotkey). Conversations must route it directly to chatSend,
-    // bypassing the text composer.
-    await act(async () => {
-      window.dispatchEvent(
-        new CustomEvent('dictation://insert-text', {
-          detail: { text: '  play highway to hell  ', autoSend: true },
-        })
-      );
-    });
-
-    await waitFor(() => {
-      expect(chatSend).toHaveBeenCalledWith({
+    expect(chatSend).toHaveBeenCalledWith(
+      expect.objectContaining({
         threadId: thread.id,
-        message: 'play highway to hell',
-        model: 'hint:chat',
+        message: 'hello cloud',
         locale: 'en',
-      });
-    });
-  });
-
-  it('ignores a blank autoSend dictation event (no send)', async () => {
-    await renderSelectedConversation();
-    vi.mocked(chatSend).mockClear();
-
-    await act(async () => {
-      window.dispatchEvent(
-        new CustomEvent('dictation://insert-text', { detail: { text: '   ', autoSend: true } })
-      );
-    });
-
-    expect(chatSend).not.toHaveBeenCalled();
+        reasoningEffort: 'default',
+      })
+    );
+    expect(vi.mocked(chatSend).mock.calls[0][0]).not.toHaveProperty('model');
   });
 
   it('blocks duplicate sends while the first send is still pending', async () => {
@@ -903,12 +1006,15 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
       expect(chatSend).toHaveBeenCalledTimes(1);
     });
     expect(threadApi.appendMessage).toHaveBeenCalledTimes(1);
-    expect(chatSend).toHaveBeenCalledWith({
-      threadId: thread.id,
-      message: 'slow backend',
-      model: 'hint:chat',
-      locale: 'en',
-    });
+    expect(chatSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        threadId: thread.id,
+        message: 'slow backend',
+        locale: 'en',
+        reasoningEffort: 'default',
+      })
+    );
+    expect(vi.mocked(chatSend).mock.calls[0][0]).not.toHaveProperty('model');
     // The send cleared the composer; with an empty composer mid-send the Send
     // button morphs into the Stop button, so there is no Send affordance left
     // to fire a duplicate send.
@@ -1257,6 +1363,80 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     expect(threadApi.appendMessage).not.toHaveBeenCalled();
   });
 
+  it('re-issues a Stop pressed before the core had registered the turn', async () => {
+    // The send RPC is still in flight, so the core has no turn yet and the
+    // first cancel finds nothing. Once the RPC returns the turn exists, and the
+    // Stop must be sent again rather than letting the turn run to completion.
+    let resolveSend: (() => void) | undefined;
+    vi.mocked(chatSend).mockImplementationOnce(
+      () =>
+        new Promise<string | undefined>(resolve => {
+          resolveSend = () => resolve('req-late');
+        })
+    );
+    vi.mocked(chatCancel)
+      .mockResolvedValueOnce({ accepted: true, turnCancelled: false })
+      .mockResolvedValueOnce({ accepted: true, turnCancelled: true });
+    const { textarea, thread } = await renderSelectedConversation();
+
+    await act(async () => {
+      setComposerText(textarea, 'stop me early');
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    });
+    const stopButton = await screen.findByRole('button', { name: 'Stop generating' });
+    await act(async () => {
+      fireEvent.click(stopButton);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(chatCancel).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSend?.();
+      await Promise.resolve();
+    });
+
+    expect(chatCancel).toHaveBeenCalledTimes(2);
+    expect(chatCancel).toHaveBeenNthCalledWith(2, thread.id);
+  });
+
+  it.each([
+    ['the cancel event never arrives', { accepted: true, turnCancelled: true }],
+    ['the cancel RPC fails', { accepted: false, turnCancelled: false }],
+  ])('settles the running state after a Stop when %s', async (_label, outcome) => {
+    vi.mocked(chatCancel).mockResolvedValueOnce(outcome);
+    const { thread, store } = await renderStreamingConversation({
+      streamingContent: 'half a thought',
+    });
+    const stopButton = await screen.findByRole('button', { name: 'Stop generating' });
+
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        fireEvent.click(stopButton);
+        await Promise.resolve();
+      });
+      // Still waiting on the core's confirmation.
+      expect(store.getState().chatRuntime.inferenceTurnLifecycleByThread[thread.id]).toBe(
+        'streaming'
+      );
+
+      await act(async () => {
+        vi.advanceTimersByTime(5_000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(chatCancel).toHaveBeenCalledWith(thread.id);
+    expect(store.getState().chatRuntime.inferenceTurnLifecycleByThread[thread.id]).toBeUndefined();
+    expect(store.getState().thread.activeThreadIds[thread.id]).toBeUndefined();
+    expect(screen.queryByRole('button', { name: 'Stop generating' })).toBeNull();
+  });
+
   it('does not locally persist a partial across repeated Stop clicks (#4862)', async () => {
     const { thread } = await renderStreamingConversation({ streamingContent: 'half a thought' });
 
@@ -1316,7 +1496,7 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     expect(textarea).toHaveTextContent('a fresh follow-up');
   });
 
-  it('renders a Stopped marker on a stopped partial reply (#4862)', async () => {
+  it('renders a stopped partial reply as markdown with a Stopped marker (#4862, #7729)', async () => {
     const thread = makeThread({ id: 'stopped-marker-thread', title: 'Stopped' });
     const messages: ThreadMessage[] = [
       {
@@ -1331,7 +1511,12 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
         id: 'a',
         sender: 'agent',
         type: 'text',
-        content: 'partial reply that got cut off',
+        content: [
+          '## Verification',
+          'First paragraph.',
+          'Second paragraph.',
+          '| Check | Result |\n|---|---|\n| npm test | pass |',
+        ].join('\n\n'),
         extraMetadata: { stopped: true },
         createdAt: '2026-01-01T00:01:00.000Z',
       },
@@ -1350,7 +1535,15 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
       });
     });
 
-    expect(screen.getByTestId('stopped-marker')).toHaveTextContent('Stopped');
+    const marker = screen.getByTestId('stopped-marker');
+    expect(marker).toHaveTextContent('Stopped');
+    // The partial keeps its structure instead of one flattened paragraph, and
+    // renders once: the marker holds only the reason and actions.
+    expect(screen.getByRole('heading', { level: 2, name: 'Verification' })).toBeInTheDocument();
+    expect(screen.getByText('First paragraph.').tagName).toBe('P');
+    expect(screen.getByText('Second paragraph.').tagName).toBe('P');
+    expect(screen.getByRole('table')).toHaveTextContent('npm test');
+    expect(marker).not.toHaveTextContent('First paragraph.');
   });
 
   it('shows no Stop button while the thread is idle (#4862)', async () => {
@@ -1364,6 +1557,20 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     // pins here is the absence of Stop.
     expect(screen.getByTestId('composer-human-mode')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Send message' })).not.toBeInTheDocument();
+  });
+
+  it('clicking Tiny in the idle composer starts live voice on the mascot stage', async () => {
+    const expandWithVoice = vi.fn();
+    mascotContext.current = { expandWithVoice };
+    try {
+      await renderSelectedConversation();
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('composer-human-mode'));
+      });
+      expect(expandWithVoice).toHaveBeenCalledTimes(1);
+    } finally {
+      mascotContext.current = undefined;
+    }
   });
 
   it('releases the pending-send lock when appendMessage rejects with a generic error', async () => {
@@ -1422,10 +1629,14 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     });
   });
 
-  it('clears the pending guard when the 120s silence timer fires', async () => {
+  it('warns but keeps the turn when the 120s silence window elapses', async () => {
+    // Regression: the watchdog used to clear the runtime and drop the thread
+    // from the active set after 120s of silence, killing a turn that was still
+    // reasoning or running a long tool. Silence now only warns; the turn stays
+    // live and Stop remains the way to end it.
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
-      const { textarea } = await renderSelectedConversation();
+      const { textarea, store, thread } = await renderSelectedConversation();
 
       await act(async () => {
         setComposerText(textarea, 'hang the backend');
@@ -1443,13 +1654,19 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
         await vi.advanceTimersByTimeAsync(120_000);
       });
 
-      // After the safety timeout, typing should re-enable Send — proves the
-      // pending guard was reset inside the timeout callback.
+      const warning = await screen.findByTestId('chat-stall-warning');
+      expect(warning).toHaveAttribute('data-chat-stall-phase', 'thinking');
+      expect(warning).toHaveTextContent('Still thinking');
+      expect(screen.queryByTestId('chat-send-error')).toBeNull();
+      expect(store!.getState().thread.activeThreadIds[thread.id]).toBe(true);
+      expect(threadApi.getTurnState).toHaveBeenCalledWith(thread.id);
+
+      // The next signal clears the warning — the turn was alive all along.
       await act(async () => {
-        setComposerText(textarea, 'retry after timeout');
+        store!.dispatch(bumpInferenceHeartbeatForThread({ threadId: thread.id }));
       });
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Send message' })).not.toBeDisabled();
+        expect(screen.queryByTestId('chat-stall-warning')).toBeNull();
       });
     } finally {
       vi.useRealTimers();
@@ -1496,9 +1713,10 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
         await vi.advanceTimersByTimeAsync(120_000);
       });
 
-      const banner = await screen.findByTestId('chat-send-error');
-      expect(banner).toHaveAttribute('data-chat-send-error-code', 'safety_timeout');
-      expect(store?.getState().chatRuntime.inferenceStatusByThread['send-thread']).toBeUndefined();
+      // Warned, not torn down: the core still reports the turn running.
+      expect(await screen.findByTestId('chat-stall-warning')).toBeInTheDocument();
+      expect(screen.queryByTestId('chat-send-error')).toBeNull();
+      expect(store?.getState().chatRuntime.inferenceStatusByThread['send-thread']).toBeDefined();
     } finally {
       vi.mocked(threadApi.getTurnState).mockResolvedValue(null);
       vi.useRealTimers();
@@ -1509,7 +1727,7 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     'does not arm the silence timer for a %s snapshot',
     async lifecycle => {
       // A terminal snapshot has no live driver. Arming here would fire a
-      // spurious `safety_timeout` on a thread that has already settled.
+      // spurious silence warning on a thread that has already settled.
       vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.mocked(threadApi.getTurnState).mockResolvedValue({ ...inFlightSnapshot(), lifecycle });
       try {
@@ -1520,6 +1738,7 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
         });
 
         expect(screen.queryByTestId('chat-send-error')).toBeNull();
+        expect(screen.queryByTestId('chat-stall-warning')).toBeNull();
         expect(
           store?.getState().chatRuntime.inferenceStatusByThread['send-thread']
         ).toBeUndefined();
@@ -1553,7 +1772,7 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
       });
 
       // 160s since hydration, but only 80s since the beat — still armed.
-      expect(screen.queryByTestId('chat-send-error')).toBeNull();
+      expect(screen.queryByTestId('chat-stall-warning')).toBeNull();
 
       // Control: the timer was rearmed, NOT cancelled. Without this, the
       // assertion above would pass just as well if the heartbeat had cleared
@@ -1561,8 +1780,7 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(60_000);
       });
-      const banner = await screen.findByTestId('chat-send-error');
-      expect(banner).toHaveAttribute('data-chat-send-error-code', 'safety_timeout');
+      expect(await screen.findByTestId('chat-stall-warning')).toBeInTheDocument();
     } finally {
       vi.mocked(threadApi.getTurnState).mockResolvedValue(null);
       vi.useRealTimers();
@@ -1599,8 +1817,7 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
         await vi.advanceTimersByTimeAsync(120_000);
       });
 
-      const banner = await screen.findByTestId('chat-send-error');
-      expect(banner).toHaveAttribute('data-chat-send-error-code', 'safety_timeout');
+      expect(await screen.findByTestId('chat-stall-warning')).toBeInTheDocument();
     } finally {
       vi.mocked(threadApi.getTurnState).mockResolvedValue(null);
       vi.useRealTimers();
@@ -1674,7 +1891,7 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     // `streamingAssistantByThread` references can stay put while
     // `toolTimelineByThread` ticks. The rearm effect must watch that timeline —
     // otherwise a long sub-agent loop
-    // trips the 120s safety timer even though the user can see tools
+    // trips the 120s silence warning even though the user can see tools
     // firing in the timeline.
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
@@ -1715,14 +1932,11 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
       // window). The tool-timeline dispatch should have re-armed the
       // timer at the 80s mark, so the silence timer is now at 80s of
       // its fresh 120s budget and has NOT fired — the thread therefore
-      // stays marked active. (The safety timeout would have dispatched
-      // `clearThreadInferenceActive`, dropping it from `activeThreadIds`.)
-      // We assert the active flag directly rather than the Send button:
-      // a streaming thread now keeps the composer open for follow-up
-      // queueing, so Send is intentionally enabled here.
+      // shows no silence warning.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(80_000);
       });
+      expect(screen.queryByTestId('chat-stall-warning')).toBeNull();
       expect(store!.getState().thread.activeThreadIds[thread.id]).toBe(true);
     } finally {
       vi.useRealTimers();
@@ -1760,18 +1974,19 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
         });
       }
 
-      // The beats kept rearming the timer → the turn is still marked active
-      // (a fired safety timeout would have dispatched `clearThreadInferenceActive`).
+      // The beats kept rearming the timer → no warning, turn still active.
+      expect(screen.queryByTestId('chat-stall-warning')).toBeNull();
       expect(store!.getState().thread.activeThreadIds[thread.id]).toBe(true);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('still fails fast when heartbeats stop — genuine disconnect surfaces (#4270 regression safety)', async () => {
-    // Regression safety: the heartbeat is the liveness signal, so a real
-    // connectivity drop (core/socket dead → no more beats) MUST still trip the
-    // 120s silence timer rather than hanging forever.
+  it('surfaces a warning when heartbeats stop, without killing the turn (#4270)', async () => {
+    // The heartbeat is the liveness signal, so a real connectivity drop
+    // (core/socket dead → no more beats) must still be surfaced after 120s —
+    // as a warning. The turn is not cleared: the core may still be working,
+    // and Stop is how the user ends it.
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       const { textarea, store, thread } = await renderSelectedConversation();
@@ -1794,13 +2009,161 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
         store!.dispatch(bumpInferenceHeartbeatForThread({ threadId: thread.id }));
       });
 
-      // No more beats for a full 120s window → the silence timer fires and
-      // drops the thread from the active set.
+      // No more beats for a full 120s window → the warning appears, and the
+      // thread stays active.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(120_000);
       });
-      expect(store!.getState().thread.activeThreadIds[thread.id]).toBeFalsy();
+      expect(await screen.findByTestId('chat-stall-warning')).toBeInTheDocument();
+      expect(store!.getState().thread.activeThreadIds[thread.id]).toBe(true);
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('warns the turn may be stuck when nothing is running past the window', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { textarea, store, thread } = await renderSelectedConversation();
+      await act(async () => {
+        setComposerText(textarea, 'run a slow shell loop');
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+      });
+      await waitFor(() => {
+        expect(chatSend).toHaveBeenCalledTimes(1);
+      });
+      await act(async () => {
+        store!.dispatch(
+          setInferenceStatusForThread({
+            threadId: thread.id,
+            status: { phase: 'tool_use', iteration: 2, maxIterations: 8 },
+          })
+        );
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(120_000);
+      });
+
+      const warning = await screen.findByTestId('chat-stall-warning');
+      expect(warning).toHaveAttribute('data-chat-stall-phase', 'tool_use');
+      expect(warning).toHaveTextContent('No new output for');
+      expect(store!.getState().thread.activeThreadIds[thread.id]).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('names a still-running tool instead of warning the turn is stuck', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { textarea, store, thread } = await renderSelectedConversation();
+      await act(async () => {
+        setComposerText(textarea, 'run a slow shell loop');
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+      });
+      await waitFor(() => {
+        expect(chatSend).toHaveBeenCalledTimes(1);
+      });
+      await act(async () => {
+        store!.dispatch(
+          setInferenceStatusForThread({
+            threadId: thread.id,
+            status: { phase: 'tool_use', iteration: 2, maxIterations: 8 },
+          })
+        );
+      });
+
+      await act(async () => {
+        store!.dispatch(
+          setToolTimelineForThread({
+            threadId: thread.id,
+            entries: [
+              {
+                id: 'tl-shell',
+                name: 'shell',
+                round: 2,
+                seq: 0,
+                status: 'running',
+                argsBuffer: '{"command":"cargo build"}',
+              },
+              // A detached run from an earlier turn, hydrated from the run
+              // ledger after this turn's call: issued later, still running,
+              // but not this turn's work.
+              {
+                id: 'subagent:run-old',
+                name: 'subagent:researcher',
+                round: 0,
+                seq: 1,
+                status: 'running',
+                sourceToolName: 'run_ledger',
+              },
+            ],
+          })
+        );
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(120_000);
+      });
+
+      const warning = await screen.findByTestId('chat-stall-warning');
+      expect(warning).toHaveAttribute('data-chat-stall-phase', 'tool_use');
+      expect(warning).toHaveAttribute('data-chat-stall-state', 'tool');
+      expect(warning).toHaveTextContent('Running command.');
+      expect(warning).not.toHaveTextContent('may be stuck');
+      expect(store!.getState().thread.activeThreadIds[thread.id]).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('settles quietly when the core reports the silent turn already completed', async () => {
+    // The one case the watchdog may clear local state: the core says the turn
+    // is over, so its terminal event was lost. Nothing live is discarded, and
+    // no warning is shown for a turn that finished.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { textarea, store, thread } = await renderSelectedConversation();
+      await act(async () => {
+        setComposerText(textarea, 'turn whose done event is lost');
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+      });
+      await waitFor(() => {
+        expect(chatSend).toHaveBeenCalledTimes(1);
+      });
+      expect(store!.getState().thread.activeThreadIds[thread.id]).toBe(true);
+
+      vi.mocked(threadApi.getTurnState).mockResolvedValue({
+        threadId: thread.id,
+        requestId: 'req-done',
+        lifecycle: 'completed',
+        iteration: 3,
+        maxIterations: 8,
+        phase: 'thinking' as const,
+        streamingText: '',
+        thinking: '',
+        toolTimeline: [],
+        startedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(120_000);
+      });
+
+      await waitFor(() => {
+        expect(store!.getState().thread.activeThreadIds[thread.id]).toBeFalsy();
+      });
+      expect(screen.queryByTestId('chat-stall-warning')).toBeNull();
+      expect(screen.queryByTestId('chat-send-error')).toBeNull();
+    } finally {
+      vi.mocked(threadApi.getTurnState).mockResolvedValue(null);
       vi.useRealTimers();
     }
   });
@@ -1809,7 +2172,7 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     // Regression for the per-thread dependency scoping: the rearm effect must
     // react only to the SENDING thread's slices. A different thread churning
     // (background triage, another conversation) must not keep the foreground
-    // turn's 120s timer alive — otherwise a truly hung send never fails fast.
+    // turn's 120s timer alive — otherwise a truly silent send never warns.
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       const { textarea, store } = await renderSelectedConversation();
@@ -1846,17 +2209,11 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
       });
 
       // Cross the original 120s deadline (80s + 50s = 130s). Because the
-      // unrelated-thread churn did NOT rearm, the safety timer fires: the
-      // pending guard is released and Send re-enables once the user types.
+      // unrelated-thread churn did NOT rearm, the silence warning fires.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(50_000);
       });
-      await act(async () => {
-        setComposerText(textarea, 'retry after timeout');
-      });
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Send message' })).not.toBeDisabled();
-      });
+      expect(await screen.findByTestId('chat-stall-warning')).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -1892,6 +2249,55 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     });
   });
 
+  it('restores the draft when saving the prompt locally fails', async () => {
+    vi.mocked(threadApi.appendMessage).mockRejectedValueOnce(new Error('disk full'));
+    const { textarea } = await renderSelectedConversation();
+    await act(async () => {
+      setComposerText(textarea, 'do not lose me');
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    });
+    await waitFor(() => expect(threadApi.appendMessage).toHaveBeenCalled());
+    expect(chatSend).not.toHaveBeenCalled();
+    await waitFor(() => expect(textarea).toHaveTextContent('do not lose me'));
+  });
+
+  it('gives a failed draft back to its own thread after the user switched away', async () => {
+    const saveDraft = vi.spyOn(userScopedStorage, 'setItem').mockResolvedValue(undefined);
+    let rejectPersist!: (reason: unknown) => void;
+    vi.mocked(threadApi.appendMessage).mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        rejectPersist = reject;
+      })
+    );
+    const { store, textarea, thread } = await renderSelectedConversation();
+    await act(async () => {
+      setComposerText(textarea, 'draft for the first thread');
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    });
+    await waitFor(() => expect(threadApi.appendMessage).toHaveBeenCalled());
+
+    await act(async () => {
+      store!.dispatch(setSelectedThread('another-thread'));
+    });
+    await act(async () => {
+      rejectPersist(new Error('disk full'));
+    });
+
+    const composer = await screen.findByRole('textbox', { name: 'Message input' });
+    expect(composer).not.toHaveTextContent('draft for the first thread');
+    await waitFor(() =>
+      expect(saveDraft).toHaveBeenCalledWith(
+        draftStorageKey(thread.id),
+        'draft for the first thread'
+      )
+    );
+    saveDraft.mockRestore();
+  });
+
   it('sends with Enter when the composer is not composing text', async () => {
     const { textarea, thread } = await renderSelectedConversation();
 
@@ -1908,12 +2314,15 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     });
 
     await waitFor(() => {
-      expect(chatSend).toHaveBeenCalledWith({
-        threadId: thread.id,
-        message: 'enter send',
-        model: 'hint:chat',
-        locale: 'en',
-      });
+      expect(chatSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          threadId: thread.id,
+          message: 'enter send',
+          locale: 'en',
+          reasoningEffort: 'default',
+        })
+      );
+      expect(vi.mocked(chatSend).mock.calls[0][0]).not.toHaveProperty('model');
     });
   });
 
@@ -1982,18 +2391,21 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     });
 
     await waitFor(() => {
-      expect(chatSend).toHaveBeenCalledWith({
-        threadId: thread.id,
-        message: '안녕',
-        model: 'hint:chat',
-        locale: 'en',
-      });
+      expect(chatSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          threadId: thread.id,
+          message: '안녕',
+          locale: 'en',
+          reasoningEffort: 'default',
+        })
+      );
+      expect(vi.mocked(chatSend).mock.calls[0][0]).not.toHaveProperty('model');
     });
   });
 
-  // The General/Subconscious/Tasks filter chips were removed — the thread list
-  // is now fixed to the General bucket with no in-sidebar bucket switcher.
-  // Subconscious reflections and task/worker threads have dedicated surfaces.
+  // The General/Tasks filter chips were removed — the thread list is now fixed
+  // to the General bucket with no in-sidebar bucket switcher. Task/worker
+  // threads have a dedicated surface.
   it('does not render the removed bucket filter tabs', async () => {
     await act(async () => {
       await renderConversations({ thread: emptyThreadState });
@@ -2003,7 +2415,6 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
     await openSidebar();
 
     expect(screen.queryByRole('tab', { name: 'General' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: 'Subconscious' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Tasks' })).not.toBeInTheDocument();
   });
 });
@@ -2069,7 +2480,7 @@ describe('Conversations — active-thread restore across in-app navigation', () 
     await waitFor(() => {
       expect(threadApi.createNewThread).not.toHaveBeenCalled();
     });
-    // Main removed the visible General/Subconscious/Tasks chips; restoring a
+    // Main removed the visible General/Tasks chips; restoring a
     // task session should not reintroduce that tab UI.
     await openSidebar();
     expect(screen.queryByRole('tab', { name: 'Tasks' })).not.toBeInTheDocument();

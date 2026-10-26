@@ -10,6 +10,7 @@ import type {
   ThreadDeleteData,
   ThreadMessage,
   ThreadMessagesData,
+  ThreadSearchHit,
   ThreadsListData,
 } from '../../types/thread';
 import type {
@@ -25,6 +26,7 @@ import type {
 } from '../../types/turnState';
 import type { ChatThreadTodoItem, ThreadGoal } from '../chatService';
 import { callCoreRpc } from '../coreRpcClient';
+import { attachArtifactRows } from './artifactRows';
 
 interface Envelope<T> {
   data?: T;
@@ -77,7 +79,19 @@ export const threadApi = {
       params: { thread_id: threadId },
     });
     const data = unwrapEnvelope(response);
-    return { ...data, messages: data.messages.map(normalizeThreadMessage) };
+    // Artifact rows place artifact cards; they are attached to their replies
+    // here so no caller ever sees them as messages.
+    const messages = attachArtifactRows(data.messages.map(normalizeThreadMessage));
+    return { ...data, messages, count: messages.length };
+  },
+
+  /** Message text search across every thread, newest first. */
+  searchMessages: async (query: string, limit?: number): Promise<ThreadSearchHit[]> => {
+    const response = await callCoreRpc<Envelope<{ hits?: ThreadSearchHit[] }>>({
+      method: 'openhuman.threads_search',
+      params: { query, limit },
+    });
+    return unwrapEnvelope(response)?.hits ?? [];
   },
 
   appendMessage: async (threadId: string, message: ThreadMessage): Promise<ThreadMessage> => {
@@ -258,6 +272,19 @@ export const threadApi = {
     const response = await callCoreRpc<Envelope<Thread>>({
       method: 'openhuman.threads_update_labels',
       params: { thread_id: threadId, labels },
+    });
+    return unwrapEnvelope(response);
+  },
+
+  /**
+   * Bind (absolute path) or clear (`''`) the working folder of a thread that
+   * has no messages yet. The core validates the folder and refuses once the
+   * conversation has started.
+   */
+  updateWorkingDir: async (threadId: string, actionDir: string): Promise<Thread> => {
+    const response = await callCoreRpc<Envelope<Thread>>({
+      method: 'openhuman.threads_update_working_dir',
+      params: { thread_id: threadId, action_dir: actionDir },
     });
     return unwrapEnvelope(response);
   },

@@ -1,8 +1,8 @@
 //! Classification of agent-job failures into static, leak-safe user copy and
 //! the permanent-halt predicates that stop the retry loop early.
 
-use crate::agent::error::AgentError;
-use crate::cron::JobType;
+use tinyagents_harness::agent_error::AgentError;
+use tinyflows_bus::schedule::types::JobType;
 
 pub(super) const AGENT_JOB_USER_FAILURE_MESSAGE: &str = "Something went wrong. Please try again.";
 // Actionable, static failure copy for the three permanent cron halt states
@@ -87,7 +87,7 @@ pub(super) fn classify_agent_anyhow_for_user(err: &anyhow::Error) -> &'static st
 /// Did this failed agent-job attempt hit the backend session-expired state?
 ///
 /// When the OpenHuman backend returns 401 because the user's app JWT has
-/// lapsed, [`inference::provider::ops::api_error`] already publishes
+/// lapsed, [`inference::provider::http_error::api_error`] already publishes
 /// [`crate::core::events::DomainEvent::SessionExpired`] (via
 /// `publish_backend_session_expired`) and the credentials subscriber clears
 /// the stored session + flips the scheduler-gate `signed_out` override. The
@@ -186,7 +186,7 @@ pub(super) fn is_budget_exhausted_failure(
         return false;
     }
     let signal = last_agent_error.unwrap_or(last_output);
-    crate::backend::classify::is_budget_exhausted_message(signal)
+    tinyinference_providers::is_budget_exhausted_message(signal)
 }
 
 /// TAURI-RUST-HCK — a cron **agent** job pinned to a provider with no
@@ -255,7 +255,7 @@ pub(super) fn is_local_provider_unreachable_failure(
 pub(super) fn is_local_provider_no_model_loaded_message(signal: &str) -> bool {
     let lower = signal.to_ascii_lowercase();
     (lower.contains("local inference server") && lower.contains("no model loaded"))
-        || lower.contains("no models loaded")
+        || tinyinference_llm::failure::body_indicates_no_model_loaded(signal)
 }
 
 /// Static, leak-safe actionable alert copy for a permanent cron halt state.

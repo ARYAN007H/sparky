@@ -15,7 +15,7 @@
 //! network on something nobody has asked for yet.
 
 use super::types::LoadPolicy;
-use super::{host, ops, registry};
+use super::{ops, registry, runtime};
 use crate::config::Config;
 
 /// Load the modules that should be serving before the first request.
@@ -24,13 +24,12 @@ use crate::config::Config;
 /// unavailable, and the feature says so at the point of use. Taking the core
 /// down because an optional codec is missing would be a worse trade.
 pub async fn load_declared_modules(config: &Config) {
-    super::memory::set_modules_policy(std::sync::Arc::new(config.clone()));
     if !config.modules.enabled {
         log::debug!("[modules] boot load skipped: modules are disabled in configuration");
         return;
     }
 
-    let runtime = match host::runtime().await {
+    let runtime = match runtime::runtime().await {
         Ok(runtime) => runtime,
         Err(err) => {
             log::warn!("[modules] boot load skipped: the module bus could not start: {err}");
@@ -41,7 +40,11 @@ pub async fn load_declared_modules(config: &Config) {
     // Search paths first: an artifact an operator has placed deliberately should
     // win over a download, and `ensure_loaded` below then finds it already
     // serving rather than fetching a second copy.
-    for outcome in runtime.host().load_search_paths() {
+    for outcome in
+        super::search_path::load_enabled(runtime.host(), &ops::disabled_lib_stems(config), |id| {
+            ops::module_config(config, id)
+        })
+    {
         match outcome {
             Ok(info) => log::info!(
                 "[modules] loaded '{}' {} from the module search path",
@@ -58,28 +61,12 @@ pub async fn load_declared_modules(config: &Config) {
         if record.load != LoadPolicy::Eager {
             continue;
         }
-        if !should_eager_load(record, config) {
-            log::debug!(
-                "[modules] eager module '{}' skipped: the memory driver is not module-backed",
+        if let Some(component) = ops::disabled_component(config, record.id) {
+            log::info!(
+                "[modules] eager module '{}' skipped: component '{component}' is disabled",
                 record.id
             );
             continue;
-        }
-        // TinyMemory resolves its embedding provider while the library is
-        // admitted, through callbacks this host serves on the module bus. The
-        // lazy path installs them before loading; the eager path must too, or
-        // the module comes up without an embedder and every memory write fails
-        // from then on.
-        if record.id == super::memory::MODULE_ID {
-            if let Err(reason) =
-                super::memory::install_host_callbacks(std::sync::Arc::new(config.clone())).await
-            {
-                log::warn!(
-                    "[modules] eager module '{}' skipped: host callbacks are unavailable: {reason}",
-                    record.id
-                );
-                continue;
-            }
         }
         log::info!("[modules] eager module '{}' resolving at boot", record.id);
         if let Err(reason) = ops::ensure_loaded(config, record.id).await {
@@ -87,39 +74,80 @@ pub async fn load_declared_modules(config: &Config) {
                 "[modules] eager module '{}' did not load: {reason}",
                 record.id
             );
-            continue;
-        }
-        // The first retrieval after boot pays the Python server start, the
-        // model load and the embedder's first connection — several seconds the
-        // user's first question would otherwise wait on, or lose its memory
-        // block to. Pay it now, off the request path (#6040).
-        if record.id == super::memory::MODULE_ID {
-            crate::memory::auto_recall::warm::spawn_at_boot(std::sync::Arc::new(config.clone()));
         }
     }
+
+    warm_connector_catalogs(config);
+    #[cfg(feature = "inbound-queues")]
+    warm_inbound_queues(config);
 }
 
-/// Whether `record` should be loaded eagerly at boot, given `config`.
-///
-/// Every `LoadPolicy::Eager` record is eager unconditionally, except
-/// TinyMemory: it is eager only when this host's memory subsystem actually
-/// selected the module-backed driver. Eager-loading it for every
-/// `modules.enabled` host — regardless of which memory driver is bound —
-/// would mean a host on the (default) `Embedded` driver pays a startup
-/// download and native `dlopen` for a module it never binds, breaking the
-/// module driver's opt-in contract.
-///
-/// [`crate::memory::binding::admit`] is the same pure,
-/// side-effect-free check `memory::binding::build` itself uses to decide what
-/// actually gets bound, so this can never disagree with the real binding.
-fn should_eager_load(record: &super::types::ModuleRecord, config: &Config) -> bool {
-    if record.id != super::memory::MODULE_ID {
-        return true;
+/// Load the inbound event queues in the background when inbound events are
+/// routed through them. The module runs its own pass timer, so loading it is
+/// what resumes delivering the work a previous run left queued — a deferral
+/// waiting for its time, a retry in back-off — instead of waiting for the
+/// next inbound event to load it. Off the boot path, like the connector
+/// warm-up; a failed load is logged and the next event tries again.
+#[cfg(feature = "inbound-queues")]
+fn warm_inbound_queues(config: &Config) {
+    if !crate::inbound::active(config) {
+        log::debug!("[modules] inbound event queues warm-up skipped: routing is off");
+        return;
     }
-    matches!(
-        crate::memory::binding::admit(&config.subsystems.memory),
-        Ok((_, crate::core::subsystem::DriverClass::Module))
-    )
+    // Unit tests share one process-wide module slot (see the connector warm-up).
+    if cfg!(test) {
+        return;
+    }
+    let config = config.clone();
+    // Loading a module is process-wide; the host's own context carries it.
+    crate::core::runtime::DispatchCtx::host_default().spawn(async move {
+        log::debug!("[modules] inbound event queues warm-up starting");
+        // Pinned turns a previous process left running are run again; the
+        // queues acknowledged them, so nothing else would.
+        crate::inbound::pinned::resume_at_boot(&config);
+        if let Err(reason) = ops::ensure_loaded(&config, super::event_queues::MODULE_ID).await {
+            log::warn!("[modules] inbound event queues did not load at boot: {reason}");
+        }
+    });
+}
+
+/// Read the connector module's curated catalogs into the host in the
+/// background, so the synchronous lookups that gate an action (scope, approval,
+/// flow checks) never run against an empty snapshot ahead of the first
+/// connector call.
+///
+/// Off the boot path: the module may need loading (or downloading, when the
+/// configuration allows it), and a slow or failed load must not hold the core
+/// up. A failure is only logged; the next connector call primes it again. Not
+/// started when the user turned Composio off or the connector component is
+/// disabled.
+fn warm_connector_catalogs(config: &Config) {
+    if !should_warm_connector_catalogs(config) {
+        log::debug!("[modules] connector catalog warm-up skipped: connectors are off");
+        return;
+    }
+    // Unit tests share one process-wide module slot; a detached load started by
+    // every boot test would race the tests that own it.
+    if cfg!(test) {
+        return;
+    }
+    let config = config.clone();
+    tokio::spawn(async move {
+        log::debug!("[modules] connector catalog warm-up starting");
+        if let Err(reason) = ops::ensure_loaded(&config, super::connectors::MODULE_ID).await {
+            log::debug!("[modules] connector catalog warm-up: module not loaded: {reason}");
+            return;
+        }
+        super::connectors::prime_catalogs(&config).await;
+    });
+}
+
+/// Whether the connectors are on: Composio is not switched off and the
+/// connector component is not disabled.
+fn should_warm_connector_catalogs(config: &Config) -> bool {
+    use crate::config::schema::COMPOSIO_MODE_DISABLED;
+    config.composio.mode.trim() != COMPOSIO_MODE_DISABLED
+        && ops::disabled_component(config, super::connectors::MODULE_ID).is_none()
 }
 
 #[cfg(test)]

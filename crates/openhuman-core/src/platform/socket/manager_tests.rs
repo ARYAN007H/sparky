@@ -40,6 +40,70 @@ fn is_connected_tracks_status_transitions() {
 }
 
 #[test]
+fn status_for_preserves_owner_status_but_rejects_foreign_and_retired_identities() {
+    let manager = SocketManager::new();
+    let url = "https://backend-b.example/socket.io";
+    let token = "session-b";
+    *manager.shared.connection_identity.write() = Some((url.to_owned(), token.to_owned()));
+
+    for status in [
+        ConnectionStatus::Disconnected,
+        ConnectionStatus::Connecting,
+        ConnectionStatus::Connected,
+        ConnectionStatus::Reconnecting,
+        ConnectionStatus::Error,
+    ] {
+        *manager.shared.status.write() = status;
+        assert_eq!(manager.status_for(url, token), Some(status));
+        assert_eq!(
+            manager.status_for("https://backend-a.example/socket.io", token),
+            None
+        );
+        assert_eq!(manager.status_for(url, "session-a"), None);
+    }
+
+    *manager.shared.connection_identity.write() = None;
+    assert_eq!(manager.status_for(url, token), None);
+}
+
+#[test]
+fn status_for_does_not_pair_a_stale_status_with_a_new_owner() {
+    let manager = SocketManager::new();
+    let url_a = "https://backend-a.example/socket.io";
+    let token_a = "session-a";
+    let url_b = "https://backend-b.example/socket.io";
+    let token_b = "session-b";
+    *manager.shared.connection_identity.write() = Some((url_a.to_owned(), token_a.to_owned()));
+    *manager.shared.status.write() = ConnectionStatus::Connected;
+    let mut transitioned_in_observer = false;
+
+    let status = manager.status_for_with_snapshot_observer(url_b, token_b, || {
+        if let Some(mut owner) = manager.shared.connection_identity.try_write() {
+            // Model disconnect(A) followed by the start of connect(B) in the
+            // gap between reading status and attributing it to an identity.
+            *owner = Some((url_b.to_owned(), token_b.to_owned()));
+            *manager.shared.status.write() = ConnectionStatus::Disconnected;
+            transitioned_in_observer = true;
+        }
+    });
+
+    assert_eq!(
+        status, None,
+        "A's Connected state must not be reported for B"
+    );
+    if !transitioned_in_observer {
+        // The fixed implementation holds the read guard through the injected
+        // interleaving point, so complete B's simulated start after the query.
+        *manager.shared.status.write() = ConnectionStatus::Disconnected;
+        *manager.shared.connection_identity.write() = Some((url_b.to_owned(), token_b.to_owned()));
+    }
+    assert_eq!(
+        manager.status_for(url_b, token_b),
+        Some(ConnectionStatus::Disconnected)
+    );
+}
+
+#[test]
 fn get_state_reflects_stored_sid_and_status() {
     let mgr = SocketManager::new();
     *mgr.shared.status.write() = ConnectionStatus::Connected;
@@ -246,8 +310,32 @@ async fn emit_cannot_send_past_a_concurrent_teardown_drain() {
     *mgr.shared.status.write() = ConnectionStatus::Connected;
 
     // Teardown begins: take the gate before clearing it, mirroring `ws_loop`'s
-    // "clear the flag and drain under the same lock" critical section.
-    let mut teardown_guard = gate.lock();
+    // "clear the flag and drain under the same lock" critical section. The gate is
+    // a synchronous leaf lock (never held over an `.await` in production), so
+    // teardown runs on its own OS thread rather than as a guard held across the
+    // awaits below; the test task steps it through `release_tx`.
+    let (locked_tx, locked_rx) = tokio::sync::oneshot::channel::<()>();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    let teardown_gate = Arc::clone(&gate);
+    let teardown = std::thread::spawn(move || {
+        let mut teardown_guard = teardown_gate.lock();
+        locked_tx
+            .send(())
+            .expect("test task is waiting for the lock");
+        release_rx
+            .recv()
+            .expect("test task releases teardown after the pending-while-locked check");
+        // Teardown's clear + drain, under the held lock. `drain_pending_emits` lives
+        // in the sibling `ws_loop` module; the loop replicates its try_recv sweep.
+        *teardown_guard = false;
+        let mut drained = 0usize;
+        while rx.try_recv().is_ok() {
+            drained += 1;
+        }
+        drop(teardown_guard);
+        (drained, rx)
+    });
+    locked_rx.await.expect("teardown thread took the gate");
 
     // A concurrent emit starts while teardown holds the gate.
     let emit_mgr = Arc::clone(&mgr);
@@ -264,15 +352,9 @@ async fn emit_cannot_send_past_a_concurrent_teardown_drain() {
         "emit must block on the readiness gate while teardown holds it"
     );
 
-    // Teardown's clear + drain, under the held lock. `drain_pending_emits` lives
-    // in the sibling `ws_loop` module; the loop replicates its try_recv sweep.
-    *teardown_guard = false;
-    let mut drained = 0usize;
-    while rx.try_recv().is_ok() {
-        drained += 1;
-    }
+    release_tx.send(()).expect("teardown thread is waiting");
+    let (drained, mut rx) = teardown.join().expect("teardown thread must not panic");
     assert_eq!(drained, 0, "nothing was queued before teardown began");
-    drop(teardown_guard);
 
     // With the gate released and cleared, the previously-blocked emit resumes,
     // sees `ready == false`, and rejects — enqueuing nothing onto the channel

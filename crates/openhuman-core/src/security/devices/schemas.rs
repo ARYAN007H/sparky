@@ -2,13 +2,17 @@
 //!
 //! Follows the exact pattern from `cron/schemas.rs`.
 
+use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
-use crate::config::rpc as config_rpc;
-use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::all::{
+    BoundRegisteredController, ControllerEntry, ControllerFuture, ControllerTask,
+    RegisteredController,
+};
+use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use crate::rpc::RpcOutcome;
 
 // ---------------------------------------------------------------------------
 // Public registry functions
@@ -37,6 +41,19 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
             handler: handle_revoke,
         },
     ]
+}
+
+pub(crate) fn all_controller_entries() -> Vec<ControllerEntry> {
+    vec![
+        ControllerEntry::bound(create_pairing_controller()),
+        ControllerEntry::bound(list_controller()),
+        ControllerEntry::bound(revoke_controller()),
+    ]
+}
+
+#[cfg(test)]
+pub(crate) fn devices_parameter_contracts() -> Vec<crate::core::all::ControllerParamContract> {
+    tests::parameter_contracts()
 }
 
 // ---------------------------------------------------------------------------
@@ -149,27 +166,65 @@ pub fn schemas(function: &str) -> ControllerSchema {
 // Handler bridges
 // ---------------------------------------------------------------------------
 
-fn handle_create_pairing(params: Map<String, Value>) -> ControllerFuture {
+fn handle_create_pairing(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    create_pairing_controller().invoke(ctx, params)
+}
+
+fn handle_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    list_controller().invoke(ctx, params)
+}
+
+fn handle_revoke(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    revoke_controller().invoke(ctx, params)
+}
+
+fn create_pairing_controller() -> BoundRegisteredController {
+    BoundRegisteredController::after_gate(
+        schemas("create_pairing"),
+        load_config,
+        parse_create_pairing,
+        run_create_pairing,
+    )
+}
+
+fn list_controller() -> BoundRegisteredController {
+    BoundRegisteredController::after_gate(schemas("list"), load_config, parse_list, run_list)
+}
+
+fn revoke_controller() -> BoundRegisteredController {
+    BoundRegisteredController::after_gate(schemas("revoke"), load_config, parse_revoke, run_revoke)
+}
+
+fn load_config(ctx: DispatchCtx) -> ControllerTask<Config> {
+    Box::pin(async move { ctx.load_config().await })
+}
+
+fn run_create_pairing(ctx: DispatchCtx, config: Config, label: Option<String>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
-        let label = read_optional_string(&params, "label")?;
-        to_json(crate::security::devices::rpc::devices_create_pairing(&config, label).await?)
+        to_json(crate::security::devices::rpc::devices_create_pairing(&ctx, &config, label).await?)
     })
 }
 
-fn handle_list(_params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
-        to_json(crate::security::devices::rpc::devices_list(&config).await?)
-    })
+fn run_list(_ctx: DispatchCtx, config: Config, (): ()) -> ControllerFuture {
+    Box::pin(async move { to_json(crate::security::devices::rpc::devices_list(&config).await?) })
 }
 
-fn handle_revoke(params: Map<String, Value>) -> ControllerFuture {
+fn run_revoke(_ctx: DispatchCtx, config: Config, channel_id: String) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
-        let channel_id = read_required::<String>(&params, "channel_id")?;
         to_json(crate::security::devices::rpc::devices_revoke(&config, channel_id).await?)
     })
+}
+
+fn parse_create_pairing(params: Map<String, Value>) -> Result<Option<String>, String> {
+    read_optional_string(&params, "label")
+}
+
+fn parse_list(_params: Map<String, Value>) -> Result<(), String> {
+    Ok(())
+}
+
+fn parse_revoke(params: Map<String, Value>) -> Result<String, String> {
+    read_required::<String>(&params, "channel_id")
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +250,7 @@ fn read_optional_string(params: &Map<String, Value>, key: &str) -> Result<Option
     }
 }
 
-fn to_json<T: serde::Serialize>(outcome: RpcOutcome<T>) -> Result<Value, String> {
+fn to_json<T: serde::Serialize>(outcome: Outcome<T>) -> Result<Value, String> {
     outcome.into_cli_compatible_json()
 }
 

@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 
 use super::*;
+use tinyagents_harness_tools::skills::USE_SKILL;
 use tinytools::{PermissionLevel, Tool, ToolResult, ToolTimeout};
 
 struct FakeTool {
@@ -46,7 +47,12 @@ impl Tool for FakeTool {
 }
 
 /// A registry holding several real packed tools plus the two pack tools, bound.
-fn registry_with_all(names: &[&'static str]) -> Arc<Vec<Box<dyn Tool>>> {
+fn registry_with_all(
+    names: &[&'static str],
+) -> (
+    Arc<Vec<Box<dyn Tool>>>,
+    tinyagents_harness_tools::skills::PackRegistryHandle,
+) {
     let mut tools: Vec<Box<dyn Tool>> = names
         .iter()
         .map(|name| {
@@ -58,38 +64,30 @@ fn registry_with_all(names: &[&'static str]) -> Arc<Vec<Box<dyn Tool>>> {
             }) as Box<dyn Tool>
         })
         .collect();
-    append_pack_tools(&mut tools);
+    let handle = append_pack_tools(&mut tools);
     let tools = Arc::new(tools);
-    bind_pack_registry(&tools);
-    tools
+    bind_pack_registry(&handle, &tools);
+    (tools, handle)
 }
 
 /// A registry holding one real packed tool plus the two pack tools, bound.
-fn registry_with(name: &'static str, level: PermissionLevel) -> Arc<Vec<Box<dyn Tool>>> {
+fn registry_with(
+    name: &'static str,
+    level: PermissionLevel,
+) -> (
+    Arc<Vec<Box<dyn Tool>>>,
+    tinyagents_harness_tools::skills::PackRegistryHandle,
+) {
     let mut tools: Vec<Box<dyn Tool>> = vec![Box::new(FakeTool {
         name,
         level,
         external: false,
         timeout: ToolTimeout::Inherit,
     })];
-    append_pack_tools(&mut tools);
+    let handle = append_pack_tools(&mut tools);
     let tools = Arc::new(tools);
-    bind_pack_registry(&tools);
-    tools
-}
-
-/// A registry whose one packed tool is externally effectful and unbounded.
-fn external_unbounded_registry(name: &'static str) -> Arc<Vec<Box<dyn Tool>>> {
-    let mut tools: Vec<Box<dyn Tool>> = vec![Box::new(FakeTool {
-        name,
-        level: PermissionLevel::ReadOnly,
-        external: true,
-        timeout: ToolTimeout::Unbounded,
-    })];
-    append_pack_tools(&mut tools);
-    let tools = Arc::new(tools);
-    bind_pack_registry(&tools);
-    tools
+    bind_pack_registry(&handle, &tools);
+    (tools, handle)
 }
 
 fn find<'a>(tools: &'a [Box<dyn Tool>], name: &str) -> &'a dyn Tool {
@@ -98,104 +96,6 @@ fn find<'a>(tools: &'a [Box<dyn Tool>], name: &str) -> &'a dyn Tool {
         .find(|t| t.name() == name)
         .map(AsRef::as_ref)
         .unwrap_or_else(|| panic!("{name} missing"))
-}
-
-/// A registry split the way a real agent's is: the pack tool in the durable
-/// vector, the packed tool in the separate synthesised one.
-///
-/// This is not a contrived shape. Every `delegate_*` tool is synthesised into
-/// `OpenHumanSessionHost::synthesized_tools`, a different `Arc` from the durable registry
-/// (#6145), and seven delegates were already packed.
-fn split_registries(
-    name: &'static str,
-    level: PermissionLevel,
-) -> (Arc<Vec<Box<dyn Tool>>>, Arc<Vec<Box<dyn Tool>>>) {
-    let mut durable: Vec<Box<dyn Tool>> = Vec::new();
-    append_pack_tools(&mut durable);
-    let durable = Arc::new(durable);
-    let synthesized: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![Box::new(FakeTool {
-        name,
-        level,
-        external: false,
-        timeout: ToolTimeout::Inherit,
-    })]);
-    bind_pack_registry(&durable);
-    bind_synthesized_pack_registry(&durable, &synthesized);
-    (durable, synthesized)
-}
-
-/// A packed **delegate** must be reachable, not merely withheld.
-///
-/// It was not. `use_skill` was bound only to the durable registry, and no
-/// `delegate_*` tool is in it — so `manage_tasks`, `setup_skills`,
-/// `build_workflow`, `discover_workflows` and `make_presentation` were all
-/// dropped from the wire and then unreachable
-/// through the route that was supposed to replace them. Withholding a tool the
-/// model then cannot call is strictly worse than never packing it.
-#[tokio::test]
-async fn a_packed_delegate_in_the_synthesised_set_is_reachable() {
-    let (durable, _synthesized) = split_registries("manage_tasks", PermissionLevel::ReadOnly);
-    let use_skill = find(&durable, USE_SKILL);
-
-    // Disclosure half: the schema must render even though the tool is in the
-    // other registry.
-    let rendered = use_skill.execute(json!({"skill": "tasks"})).await.unwrap();
-    assert!(!rendered.is_error, "{}", rendered.text());
-    assert!(
-        format!("{:?}", rendered.content).contains("manage_tasks"),
-        "the pack listing omitted the synthesised delegate"
-    );
-
-    // Dispatch half.
-    let ran = use_skill
-        .execute(json!({"skill": "tasks", "tool": "manage_tasks", "args": {"marker": "x"}}))
-        .await
-        .unwrap();
-    assert!(
-        !ran.is_error,
-        "packed delegate was not dispatchable: {}",
-        ran.text()
-    );
-    assert!(format!("{:?}", ran.content).contains("marker"));
-}
-
-/// Replacing the synthesised `Arc` must re-point the handle at the new one.
-///
-/// `refresh_delegation_tools` rebuilds that set on every Composio reconcile. A
-/// handle left holding the old `Weak` stops upgrading once the last reader of
-/// the previous allocation goes, and every packed delegate silently becomes
-/// unreachable for the rest of the session — the same class of bug the durable
-/// `OnceLock` rebinding fix already addressed on the other registry.
-#[tokio::test]
-async fn rebinding_the_synthesised_set_repoints_the_handle() {
-    let (durable, first) = split_registries("manage_profile_memory", PermissionLevel::ReadOnly);
-    let use_skill = find(&durable, USE_SKILL);
-
-    // A reconcile: a fresh set, and the old allocation dropped.
-    let second: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![Box::new(FakeTool {
-        name: "save_preference",
-        level: PermissionLevel::ReadOnly,
-        external: false,
-        timeout: ToolTimeout::Inherit,
-    })]);
-    bind_synthesized_pack_registry(&durable, &second);
-    drop(first);
-
-    let ran = use_skill
-        .execute(json!({"skill": "profile", "tool": "save_preference", "args": {}}))
-        .await
-        .unwrap();
-    assert!(
-        !ran.is_error,
-        "handle did not follow the rebind: {}",
-        ran.text()
-    );
-    // And the retired instance is gone with its allocation.
-    let stale = use_skill
-        .execute(json!({"skill": "profile", "tool": "manage_profile_memory", "args": {}}))
-        .await
-        .unwrap();
-    assert!(stale.is_error, "a dropped delegate stayed reachable");
 }
 
 /// Closing a goal must stay directly callable.
@@ -213,7 +113,7 @@ fn closing_a_goal_is_never_packed() {
         "`goal_complete` was packed; see the carve-out note on the `goals` pack"
     );
     // And the rest of the family is, or the carve-out saved nothing.
-    for held in ["goals", "goal_get", "goal_set"] {
+    for held in ["goal_get", "goal_set"] {
         assert!(
             all_packed_tool_names().contains(&held),
             "`{held}` should be reachable through the `goals` pack, not on the wire"
@@ -237,7 +137,7 @@ fn packed_names_are_withheld_and_replaced() {
         .into_iter()
         .collect();
 
-    strip_packed_from_visible(&mut visible, "orchestrator");
+    strip_packed_from_visible(&mut visible, "unrelated_agent");
 
     assert!(!visible.contains(sample), "packed tool stayed advertised");
     assert!(visible.contains("shell"), "unpacked tool was dropped");
@@ -262,155 +162,6 @@ fn an_empty_visible_set_is_left_alone() {
     assert!(visible.is_empty());
 }
 
-#[tokio::test]
-async fn use_skill_without_a_tool_renders_the_schema_of_a_present_tool() {
-    let name = pack("web3").unwrap().tools[0];
-    let tools = registry_with(name, PermissionLevel::ReadOnly);
-    let result = find(&tools, USE_SKILL)
-        .execute(json!({"skill": "web3"}))
-        .await
-        .unwrap();
-    assert!(!result.is_error);
-    let text = format!("{:?}", result.content);
-    assert!(text.contains(name), "rendered pack omitted `{name}`");
-    assert!(
-        text.contains("marker"),
-        "rendered pack omitted the arg schema"
-    );
-}
-
-#[tokio::test]
-async fn use_skill_rejects_an_unknown_skill() {
-    let tools = registry_with("manage_tasks", PermissionLevel::ReadOnly);
-    let result = find(&tools, USE_SKILL)
-        .execute(json!({"skill": "nope"}))
-        .await
-        .unwrap();
-    assert!(result.is_error);
-}
-
-#[tokio::test]
-async fn use_skill_dispatches_to_the_packed_tool() {
-    let name = pack("web3").unwrap().tools[0];
-    let tools = registry_with(name, PermissionLevel::ReadOnly);
-    let result = find(&tools, USE_SKILL)
-        .execute(json!({"skill": "web3", "tool": name, "args": {"marker": "x"}}))
-        .await
-        .unwrap();
-    assert!(!result.is_error);
-    let text = format!("{:?}", result.content);
-    assert!(
-        text.contains("marker"),
-        "inner args were not forwarded: {text}"
-    );
-}
-
-#[tokio::test]
-async fn use_skill_refuses_a_tool_from_another_skill() {
-    // Cross-skill dispatch would make the `skill` argument decoration and let a
-    // workflow skill reach a crypto write.
-    let crypto = pack("web3").unwrap().tools[0];
-    let tools = registry_with(crypto, PermissionLevel::Dangerous);
-    let result = find(&tools, USE_SKILL)
-        .execute(json!({"skill": "workflows", "tool": crypto, "args": {}}))
-        .await
-        .unwrap();
-    assert!(result.is_error, "cross-skill dispatch was admitted");
-}
-
-#[test]
-fn use_skill_reports_the_inner_tools_permission_level() {
-    // The harness gates on this. Reporting the proxy's own level would launder
-    // a dangerous packed tool onto a channel that refuses it.
-    let name = pack("web3").unwrap().tools[0];
-    let tools = registry_with(name, PermissionLevel::Dangerous);
-    let use_skill = find(&tools, USE_SKILL);
-    assert_eq!(
-        use_skill.permission_level_with_args(&json!({"skill": "web3", "tool": name})),
-        PermissionLevel::Dangerous
-    );
-}
-
-#[test]
-fn naming_no_tool_is_read_only_even_when_the_pack_is_dangerous() {
-    // The disclosure branch renders a schema and does nothing else. Reporting
-    // the packed ceiling here would put an approval prompt in front of reading
-    // a tool list, which is the round trip merging the two tools removed.
-    let name = pack("web3").unwrap().tools[0];
-    let tools = registry_with(name, PermissionLevel::Dangerous);
-    let use_skill = find(&tools, USE_SKILL);
-    assert_eq!(
-        use_skill.permission_level_with_args(&json!({"skill": "web3"})),
-        PermissionLevel::ReadOnly
-    );
-    // An empty string is a named-nothing call, not a tool called "".
-    assert_eq!(
-        use_skill.permission_level_with_args(&json!({"skill": "web3", "tool": ""})),
-        PermissionLevel::ReadOnly
-    );
-    // Naming a real one still reports that tool's level, not this branch's.
-    assert_eq!(
-        use_skill.permission_level_with_args(&json!({"skill": "web3", "tool": name})),
-        PermissionLevel::Dangerous
-    );
-}
-
-#[test]
-fn use_skill_forwards_the_inner_tools_external_effect() {
-    // The approval gate calls external_effect_with_args on the proxy; a proxy
-    // that reported false would let an effectful packed tool skip the prompt.
-    let name = pack("web3").unwrap().tools[0];
-    let tools = external_unbounded_registry(name);
-    let use_skill = find(&tools, USE_SKILL);
-    assert!(
-        use_skill.external_effect_with_args(&json!({"skill": "web3", "tool": name})),
-        "proxy must forward the inner tool's external-effect classification"
-    );
-}
-
-#[test]
-fn use_skill_forwards_the_inner_tools_timeout_policy() {
-    // A packed scripting tool must run under its own deadline, not the proxy's.
-    let name = pack("web3").unwrap().tools[0];
-    let tools = external_unbounded_registry(name);
-    let use_skill = find(&tools, USE_SKILL);
-    assert_eq!(
-        use_skill.timeout_policy(&json!({"skill": "web3", "tool": name})),
-        ToolTimeout::Unbounded
-    );
-}
-
-#[test]
-fn an_unresolvable_call_reports_inherit_timeout() {
-    let name = pack("web3").unwrap().tools[0];
-    let tools = external_unbounded_registry(name);
-    let use_skill = find(&tools, USE_SKILL);
-    assert_eq!(
-        use_skill.timeout_policy(&json!({"skill": "web3", "tool": "nonexistent"})),
-        ToolTimeout::Inherit
-    );
-}
-
-#[test]
-fn an_unresolvable_call_reports_the_ceiling_not_a_permissive_default() {
-    let name = pack("web3").unwrap().tools[0];
-    let tools = registry_with(name, PermissionLevel::Dangerous);
-    let use_skill = find(&tools, USE_SKILL);
-    assert_eq!(
-        use_skill.permission_level_with_args(&json!({"skill": "web3", "tool": "nonexistent"})),
-        PermissionLevel::Dangerous
-    );
-}
-
-#[test]
-fn an_unbound_handle_degrades_closed() {
-    // A pack tool that never got bound must not become a permissive passthrough.
-    let mut tools: Vec<Box<dyn Tool>> = Vec::new();
-    append_pack_tools(&mut tools);
-    let use_skill = find(&tools, USE_SKILL);
-    assert_eq!(use_skill.permission_level(), PermissionLevel::Dangerous);
-}
-
 #[test]
 fn every_pack_declares_the_tools_it_is_named_for() {
     // Membership is compiled-in data, so a typo here is invisible until a
@@ -420,8 +171,6 @@ fn every_pack_declares_the_tools_it_is_named_for() {
         (
             "workflows",
             &[
-                "build_workflow",
-                "discover_workflows",
                 "run_workflow",
                 "await_workflow",
                 "describe_workflow",
@@ -506,11 +255,6 @@ fn every_pack_declares_the_tools_it_is_named_for() {
         (
             "skills",
             &[
-                // Ranked lookup over installed skills. Deliberately IN this
-                // pack rather than advertised: on its own it produced ids for
-                // skills whose `describe_workflow` / run route were still
-                // withheld — 748 B on every wildcard agent for a doorway to a
-                // locked room.
                 "skill_search",
                 "skill_registry_browse",
                 "skill_registry_search",
@@ -523,22 +267,7 @@ fn every_pack_declares_the_tools_it_is_named_for() {
                 "read_workflow_resource",
             ],
         ),
-        (
-            "documents",
-            &[
-                "generate_document",
-                "generate_presentation",
-                "make_presentation",
-            ],
-        ),
-        (
-            "audio",
-            &[
-                "audio_generate_podcast",
-                "audio_email_podcast",
-                "audio_generate_and_email_podcast",
-            ],
-        ),
+        ("documents", &["generate_document", "generate_presentation"]),
         (
             "system",
             &[
@@ -589,9 +318,6 @@ fn every_pack_declares_the_tools_it_is_named_for() {
                 "list",
                 "git_operations",
                 "edit",
-                "node_exec",
-                "npm_exec",
-                "python_exec",
                 "curl",
                 "read_diff",
                 "run_linter",
@@ -609,26 +335,14 @@ fn every_pack_declares_the_tools_it_is_named_for() {
         ),
         ("scheduling", &["cron"]),
         (
-            "profile",
-            &[
-                "save_preference",
-                "remember_preference",
-                "manage_profile_memory",
-            ],
-        ),
-        (
             "media",
             &[
-                "create_image",
-                "create_video",
-                "analyze_image",
                 "media_generate_image",
                 "media_generate_video",
                 "media_list_models",
             ],
         ),
-        ("tasks", &["manage_tasks"]),
-        ("goals", &["goals", "goal_get", "goal_set"]),
+        ("goals", &["goal_get", "goal_set"]),
         ("docs", &["gitbooks_search", "gitbooks_get_page"]),
     ];
 
@@ -722,19 +436,6 @@ fn every_owner_names_a_pack_tool_it_actually_declares() {
             pack.owners.is_empty() || !pack.tools.is_empty(),
             "pack `{}` has owners but no tools",
             pack.id
-        );
-    }
-}
-
-#[test]
-fn the_reactive_fleet_tools_are_never_packed() {
-    // Packing these would put a `use_skill` round-trip between an async
-    // worker returning and the parent being able to steer or collect it.
-    // See `DELIBERATELY_UNPACKED_FLEET_TOOLS` for the full reasoning.
-    for name in registry::DELIBERATELY_UNPACKED_FLEET_TOOLS {
-        assert!(
-            registry::pack_for_tool(name).is_none(),
-            "`{name}` is needed reactively mid-turn and must stay advertised"
         );
     }
 }

@@ -39,7 +39,19 @@ fn test_security(workspace: &Path) -> Arc<SecurityPolicy> {
 
 /// Build a tool whose security policy is rooted at `workspace`.
 fn make_tool(workspace: &Path) -> PresentationTool {
-    PresentationTool::new(workspace.to_path_buf(), test_security(workspace))
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.to_path_buf();
+    config.modules.enabled = false;
+    make_tool_with_config(workspace, config)
+}
+
+fn make_tool_with_config(workspace: &Path, config: crate::config::Config) -> PresentationTool {
+    PresentationTool::with_config(
+        workspace.to_path_buf(),
+        workspace.join("Files"),
+        test_security(workspace),
+        config,
+    )
 }
 
 fn minimal_input_json() -> serde_json::Value {
@@ -88,51 +100,6 @@ fn description_includes_router_rules() {
 }
 
 #[tokio::test]
-async fn execute_rejects_empty_title() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let args = json!({ "title": "", "slides": [{ "title": "x", "bullets": ["y"] }] });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-    assert!(result.text().contains("title"));
-}
-
-#[tokio::test]
-async fn execute_rejects_empty_slides_array() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let args = json!({ "title": "Deck", "slides": [] });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-    assert!(result.text().contains("slides"));
-}
-
-#[tokio::test]
-async fn execute_rejects_slide_with_no_content() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let args = json!({
-        "title": "Deck",
-        "slides": [{ "title": "", "body": "", "bullets": [], "speaker_notes": "" }]
-    });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-}
-
-#[tokio::test]
-async fn execute_rejects_oversize_body() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let big = "x".repeat(MAX_TEXT_CHARS + 1);
-    let args = json!({
-        "title": "Deck",
-        "slides": [{ "title": "ok", "body": big }]
-    });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-}
-
-#[tokio::test]
 async fn execute_rejects_too_many_slides() {
     let ws = workspace();
     let tool = make_tool(ws.path());
@@ -142,19 +109,158 @@ async fn execute_rejects_too_many_slides() {
     let args = json!({ "title": "Big deck", "slides": slides });
     let result = tool.execute(args).await.expect("execute returns Ok");
     assert!(result.is_error);
-    assert!(result.text().contains(&MAX_SLIDES.to_string()));
+    assert!(
+        result.text().contains("must contain ≤ 64 slides"),
+        "the tool should preserve the bus limit in its error: {}",
+        result.text()
+    );
+}
+
+async fn assert_rejected_before_image_resolution(args: serde_json::Value, expected: &str) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct CountingResolver(AtomicUsize);
+    #[async_trait]
+    impl ImageResolver for CountingResolver {
+        async fn resolve(
+            &self,
+            _tool: &PresentationTool,
+            input: &GeneratePresentationInput,
+            _ctx: &DispatchCtx,
+        ) -> (Vec<Vec<SlideImage>>, Vec<String>) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            (vec![Vec::new(); input.slides.len()], Vec::new())
+        }
+    }
+
+    let ws = workspace();
+    let tool = make_tool(ws.path());
+    let resolver = CountingResolver(AtomicUsize::new(0));
+    let result = tool
+        .run_with_resolver(args, None, &DispatchCtx::ambient(), &resolver)
+        .await
+        .expect("run returns tool result");
+
+    assert!(
+        result.is_error,
+        "invalid request should fail: {}",
+        result.text()
+    );
+    let resolution_calls = resolver.0.load(Ordering::SeqCst);
+    let files_created = ws.path().join("Files").exists();
+    assert!(
+        resolution_calls == 0 && !files_created,
+        "expected zero image resolution calls and no artifact output; got {resolution_calls} calls, Files created={files_created}"
+    );
+    assert!(result.text().contains(expected), "{}", result.text());
 }
 
 #[tokio::test]
-#[ignore = "needs a built tinydocs module (OPENHUMAN_MODULE_PATH) and its own process: \
-the module bus belongs to the runtime that creates it, so run this test alone"]
+async fn request_preflight_rejects_invalid_text_before_image_resolution() {
+    let args = json!({
+        "title": " ",
+        "slides": [{
+            "title": "Slide",
+            "bullets": ["valid"],
+            "images": [{ "source": { "type": "file", "path": "missing.png" } }]
+        }]
+    });
+    assert_rejected_before_image_resolution(args, "title").await;
+}
+
+#[tokio::test]
+async fn request_preflight_rejects_too_many_slides_before_image_resolution() {
+    let args = json!({
+        "title": "Deck",
+        "slides": (0..=MAX_SLIDES)
+            .map(|i| json!({ "title": format!("Slide {i}"), "bullets": ["valid"] }))
+            .collect::<Vec<_>>()
+    });
+    assert_rejected_before_image_resolution(args, "64 slides").await;
+}
+
+#[tokio::test]
+async fn request_preflight_counts_failed_image_references_before_resolution() {
+    let args = json!({
+        "title": "Deck",
+        "slides": [{
+            "title": "Slide",
+            "bullets": ["valid"],
+            "images": (0..9).map(|i| json!({
+                "source": { "type": "file", "path": format!("missing-{i}.png") },
+                "caption": "requested caption"
+            })).collect::<Vec<_>>()
+        }]
+    });
+    assert_rejected_before_image_resolution(args, "8 images total").await;
+}
+
+#[tokio::test]
+async fn request_preflight_checks_failed_reference_captions_before_resolution() {
+    let args = json!({
+        "title": "Deck",
+        "slides": [{
+            "title": "Slide",
+            "bullets": ["valid"],
+            "images": [{
+                "source": { "type": "file", "path": "missing.png" },
+                "caption": "x".repeat(MAX_TEXT_CHARS + 1)
+            }]
+        }]
+    });
+    assert_rejected_before_image_resolution(args, "caption").await;
+}
+
+#[test]
+fn resolved_presentation_uses_bus_validation_and_preserves_its_limit_error() {
+    let input = GeneratePresentationInput {
+        title: "Deck".to_string(),
+        artifact_id: None,
+        author: None,
+        theme: None,
+        slides: (0..=MAX_SLIDES)
+            .map(|i| super::types::SlideRequest {
+                title: format!("Slide {i}"),
+                body: None,
+                bullets: Vec::new(),
+                speaker_notes: None,
+                images: Vec::new(),
+            })
+            .collect(),
+    };
+    let images = vec![Vec::new(); input.slides.len()];
+    let spec = super::types::to_bus_spec(&input, images).expect("one image list per slide");
+
+    let error = spec
+        .validate()
+        .expect_err("the bus slide limit is enforced");
+    let error = PresentationError::from(error);
+    match error {
+        PresentationError::InvalidInput { field, reason } => {
+            assert_eq!(field, "slides");
+            assert_eq!(reason, "must contain ≤ 64 slides");
+        }
+        other => panic!("expected bus validation to map to InvalidInput, got {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn execute_happy_path_returns_artifact_metadata() {
+    if crate::util::module_test_process::run(
+        module_path!(),
+        "execute_happy_path_returns_artifact_metadata",
+    ) {
+        return;
+    }
     // End-to-end: drives the real ppt-rs engine and the artifact
     // pipeline. Asserts the tool's success contract — `slide_count`
     // excludes the synthetic title slide, the artifact is finalised
     // on disk, and the markdown reply quotes the path + size.
     let ws = workspace();
-    let tool = make_tool(ws.path());
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = ws.path().to_path_buf();
+    config.modules.allow_download = false;
+    let tool = make_tool_with_config(ws.path(), config);
     let result = tool
         .execute(minimal_input_json())
         .await
@@ -169,7 +275,7 @@ async fn execute_happy_path_returns_artifact_metadata() {
     );
 
     let payload = match result.content.first().expect("at least one content block") {
-        crate::skills::types::ToolContent::Json { data } => data.clone(),
+        tinytools::ToolContent::Json { data } => data.clone(),
         other => panic!("expected Json content block, got {other:?}"),
     };
     assert_eq!(payload["slide_count"].as_u64(), Some(1));
@@ -212,7 +318,7 @@ fn png_1x1() -> Vec<u8> {
 /// Pull the JSON payload out of a tool result.
 fn payload_of(result: &ToolResult) -> serde_json::Value {
     match result.content.first().expect("a content block") {
-        crate::skills::types::ToolContent::Json { data } => data.clone(),
+        tinytools::ToolContent::Json { data } => data.clone(),
         other => panic!("expected Json content block, got {other:?}"),
     }
 }
@@ -228,14 +334,19 @@ fn pptx_entry_names(artifact_path: &str) -> Vec<String> {
 }
 
 #[tokio::test]
-#[ignore = "needs a built tinydocs module (OPENHUMAN_MODULE_PATH) and its own process: \
-the module bus belongs to the runtime that creates it, so run this test alone"]
 async fn execute_embeds_file_image_into_deck() {
+    if crate::util::module_test_process::run(module_path!(), "execute_embeds_file_image_into_deck")
+    {
+        return;
+    }
     let ws = workspace();
     let img_path = ws.path().join("chart.png");
     std::fs::write(&img_path, png_1x1()).expect("write png");
 
-    let tool = make_tool(ws.path());
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = ws.path().to_path_buf();
+    config.modules.allow_download = false;
+    let tool = make_tool_with_config(ws.path(), config);
     let args = json!({
         "title": "Deck with image",
         "slides": [{
@@ -269,6 +380,14 @@ async fn execute_embeds_file_image_into_deck() {
 
 #[tokio::test]
 async fn execute_skips_unsupported_mime_image_with_warning() {
+    struct UnsupportedImage;
+    #[async_trait]
+    impl ImageInspector for UnsupportedImage {
+        async fn inspect(&self, bytes: &[u8]) -> Result<tinydocs_bus::ImageFacts, String> {
+            assert_eq!(bytes, b"i am plain text, not an image");
+            Err("unsupported image type (only PNG and JPEG are embeddable)".into())
+        }
+    }
     let ws = workspace();
     let txt_path = ws.path().join("notanimage.txt");
     std::fs::write(&txt_path, b"i am plain text, not an image").expect("write txt");
@@ -283,7 +402,9 @@ async fn execute_skips_unsupported_mime_image_with_warning() {
         }]
     });
     let input: GeneratePresentationInput = serde_json::from_value(args).expect("args parse");
-    let (resolved, warnings) = tool.resolve_images(&input).await;
+    let (resolved, warnings) = tool
+        .resolve_images_with_inspector(&input, &UnsupportedImage)
+        .await;
     // Partial success: the deck still renders, the bad image is reported.
     assert!(
         resolved.iter().all(Vec::is_empty),
@@ -291,10 +412,41 @@ async fn execute_skips_unsupported_mime_image_with_warning() {
     );
     assert_eq!(warnings.len(), 1, "exactly one image warning expected");
     assert!(
-        warnings[0].contains("unsupported image type"),
-        "warning should name the MIME problem: {:?}",
+        !warnings[0].is_empty(),
+        "the image rejection should be explained: {:?}",
         warnings[0]
     );
+}
+
+#[tokio::test]
+async fn image_inspection_does_not_fall_back_when_modules_are_disabled() {
+    let ws = workspace();
+    let img_path = ws.path().join("chart.png");
+    std::fs::write(&img_path, png_1x1()).expect("write png");
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = ws.path().to_path_buf();
+    config.modules.enabled = false;
+    let tool = PresentationTool::with_config(
+        ws.path().to_path_buf(),
+        ws.path().join("Files"),
+        test_security(ws.path()),
+        config,
+    );
+    let input: GeneratePresentationInput = serde_json::from_value(json!({
+        "title": "No host image parser",
+        "slides": [{
+            "title": "Chart",
+            "bullets": ["See below"],
+            "images": [{ "source": { "type": "file", "path": img_path.to_string_lossy() } }]
+        }]
+    }))
+    .expect("parse presentation input");
+    validate_image_references(&input).expect("valid host image reference");
+
+    let (resolved, warnings) = tool.resolve_images(&input, &DispatchCtx::ambient()).await;
+    assert!(resolved.iter().all(Vec::is_empty));
+    assert_eq!(warnings.len(), 1);
+    assert!(warnings[0].contains("disabled"), "{warnings:?}");
 }
 
 #[tokio::test]
@@ -315,7 +467,7 @@ async fn execute_skips_oversize_image_with_warning() {
         }]
     });
     let input: GeneratePresentationInput = serde_json::from_value(args).expect("args parse");
-    let (resolved, warnings) = tool.resolve_images(&input).await;
+    let (resolved, warnings) = tool.resolve_images(&input, &DispatchCtx::ambient()).await;
     assert!(
         resolved.iter().all(Vec::is_empty),
         "a rejected image must not reach the deck"
@@ -341,7 +493,7 @@ async fn execute_skips_missing_artifact_with_warning() {
         }]
     });
     let input: GeneratePresentationInput = serde_json::from_value(args).expect("args parse");
-    let (resolved, warnings) = tool.resolve_images(&input).await;
+    let (resolved, warnings) = tool.resolve_images(&input, &DispatchCtx::ambient()).await;
     assert!(
         resolved.iter().all(Vec::is_empty),
         "a rejected image must not reach the deck"
@@ -352,20 +504,37 @@ async fn execute_skips_missing_artifact_with_warning() {
 
 #[tokio::test]
 async fn execute_rejects_too_many_images_per_deck() {
+    if crate::util::module_test_process::run(
+        module_path!(),
+        "execute_rejects_too_many_images_per_deck",
+    ) {
+        return;
+    }
     let ws = workspace();
-    let tool = make_tool(ws.path());
-    // 9 images total across slides — exceeds the deck cap of 8. This is a
-    // hard validation reject (cheap structural check), not a skip.
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = ws.path().to_path_buf();
+    config.modules.allow_download = false;
+    let tool = make_tool_with_config(ws.path(), config);
+    let image_path = ws.path().join("one.png");
+    std::fs::write(&image_path, png_1x1()).expect("write valid image");
+    // Nine successfully resolved images exceed the bus deck cap of eight.
     let images: Vec<_> = (0..9)
-        .map(|i| json!({ "source": { "type": "artifact", "artifact_id": format!("a{i}") } }))
+        .map(|_| json!({ "source": { "type": "file", "path": image_path.to_string_lossy() } }))
         .collect();
     let args = json!({
         "title": "Deck",
         "slides": [{ "title": "Slide", "bullets": ["x"], "images": images }]
     });
     let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error, "9 images should be rejected outright");
-    assert!(result.text().contains("images"));
+    assert!(
+        result.is_error,
+        "9 resolved images should exceed the bus limit"
+    );
+    assert!(
+        result.text().contains("must contain ≤ 8 images total"),
+        "the tool should preserve the bus limit in its error: {}",
+        result.text()
+    );
 }
 
 #[test]

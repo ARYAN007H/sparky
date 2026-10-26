@@ -19,6 +19,35 @@ pub struct AuthService {
 }
 
 impl AuthService {
+    /// Reads one profile for doctor inspection without constructing the
+    /// mutable auth store or consulting process-global credential storage.
+    pub fn get_profile_read_only(
+        config: &Config,
+        provider: &str,
+        profile_override: Option<&str>,
+    ) -> Result<Option<AuthProfile>, super::profiles::ReadOnlyAuthProfileError> {
+        super::profiles::load_profile_read_only(config, provider, profile_override)
+    }
+
+    /// Reads the selected profile's bearer without opening the mutable
+    /// auth-profile store. Doctor inspection uses this for BYOK providers.
+    pub fn get_provider_bearer_token_read_only(
+        config: &Config,
+        provider: &str,
+        profile_override: Option<&str>,
+    ) -> Result<Option<String>, super::profiles::ReadOnlyAuthProfileError> {
+        let Some(profile) = Self::get_profile_read_only(config, provider, profile_override)? else {
+            return Ok(None);
+        };
+        let credential = match profile.kind {
+            super::profiles::AuthProfileKind::Token => profile.token,
+            super::profiles::AuthProfileKind::OAuth => {
+                profile.token_set.map(|tokens| tokens.access_token)
+            }
+        };
+        Ok(credential.filter(|token| !token.trim().is_empty()))
+    }
+
     pub fn from_config(config: &Config) -> Self {
         let state_dir = state_dir_from_config(config);
         Self::new(&state_dir, config.secrets.encrypt)
@@ -123,6 +152,17 @@ impl AuthService {
     }
 }
 
+/// OpenHuman's persisted credential-provider namespace for channel accounts.
+///
+/// Keeping this host-owned key stable lets managed login and provider setup
+/// reuse existing profiles independently of the loaded module's lifecycle.
+pub fn channel_credential_provider(
+    channel_id: &str,
+    mode: tinychannels_bus::controllers::ChannelAuthMode,
+) -> String {
+    format!("channel:{channel_id}:{mode}")
+}
+
 pub fn normalize_provider(provider: &str) -> Result<String> {
     let normalized = provider.trim().to_ascii_lowercase();
     if normalized.is_empty() {
@@ -136,6 +176,23 @@ pub fn state_dir_from_config(config: &Config) -> PathBuf {
         .config_path
         .parent()
         .map_or_else(|| PathBuf::from("."), PathBuf::from)
+}
+
+/// The files holding OpenHuman's own credentials for `config`, at the paths
+/// their stores write: the encrypted keyring (`secrets.enc`), the auth
+/// profiles, the HTTP credentials and the account config. A path may not
+/// exist.
+#[cfg(any(feature = "modules", test))]
+pub(crate) fn credential_files(config: &Config) -> Vec<PathBuf> {
+    let state_dir = state_dir_from_config(config);
+    vec![
+        crate::security::secret_storage::encrypted_file_backend::secrets_file(
+            &crate::security::secret_storage::store::workspace_dir_for_file_backend(),
+        ),
+        super::profiles::profiles_file(&state_dir),
+        super::http_creds::store_file(&state_dir),
+        config.config_path.clone(),
+    ]
 }
 
 pub fn default_profile_id(provider: &str) -> String {

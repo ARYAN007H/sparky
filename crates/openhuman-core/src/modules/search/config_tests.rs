@@ -1,5 +1,6 @@
 use super::*;
 use crate::config::SearchProviderSettings;
+use tinysearch_bus::PresentationMode;
 
 fn config_in(dir: &std::path::Path) -> Config {
     let mut config = Config::default();
@@ -96,7 +97,11 @@ fn role_tools_follow_provider_selection() {
         .into_iter()
         .map(|spec| spec.name)
         .collect();
-    assert_eq!(names, vec!["web_answer_tool".to_string()]);
+    // Gemini serves Search (grounded) as well as Answer.
+    assert_eq!(
+        names,
+        vec!["web_search_tool".to_string(), "web_answer_tool".to_string()]
+    );
 }
 
 #[test]
@@ -122,7 +127,7 @@ fn roles_are_passed_in_configured_order() {
 fn all_tools_presentation_maps_through() {
     let dir = tempfile::tempdir().unwrap();
     let mut config = config_in(dir.path());
-    config.search.presentation = SearchPresentation::OneProvider;
+    config.search.presentation = PresentationMode::OneProvider;
     config.search.presentation_provider = Some("exa".into());
     let payload = module_config(&config);
     assert_eq!(payload.presentation.mode, PresentationMode::OneProvider);
@@ -187,4 +192,41 @@ fn search_off_disables_the_module_and_every_provider() {
     assert!(!payload.enabled);
     assert!(payload.providers.values().all(|provider| !provider.enabled));
     assert!(configured_tool_specs(&config).is_empty());
+}
+
+#[test]
+fn a_pinned_key_reaches_the_module_config_with_its_endpoint() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = config_in(dir.path());
+    config.search.brave.api_key = Some("stored-brave".into());
+    config
+        .search
+        .pin_host_credential(
+            "brave",
+            crate::config::SearchHostCredential::new("pinned-brave")
+                .with_base_url("http://127.0.0.1:9"),
+        )
+        .unwrap();
+    let payload = module_config(&config);
+    let brave = &payload.providers["brave"];
+    assert!(brave.enabled);
+    assert_eq!(brave.route, ProviderRoute::Direct);
+    assert_eq!(brave.credential.as_deref(), Some("pinned-brave"));
+    assert_eq!(brave.base_url.as_deref(), Some("http://127.0.0.1:9"));
+    let names: Vec<String> = configured_tool_specs(&config)
+        .into_iter()
+        .map(|spec| spec.name)
+        .collect();
+    assert!(names.contains(&"web_search_tool".to_string()), "{names:?}");
+}
+
+#[test]
+fn a_stored_key_keeps_the_public_endpoint() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = config_in(dir.path());
+    select(&mut config, &[("brave", SearchProviderSettings::direct())]);
+    config.search.brave.api_key = Some("stored-brave".into());
+    let brave = &module_config(&config).providers["brave"];
+    assert_eq!(brave.credential.as_deref(), Some("stored-brave"));
+    assert_eq!(brave.base_url, None);
 }

@@ -2,8 +2,6 @@
 
 use crate::config::Config;
 
-use super::super::client::{build_composio_client, ComposioClient};
-
 /// Toolkits that honour the `tags` query param on the backend tool-list endpoint.
 /// Expand this list when a new toolkit gains tag support.
 const TAG_QUERYABLE_TOOLKITS: &[&str] = &["github"];
@@ -38,12 +36,6 @@ pub(super) type OpResult<T> = std::result::Result<T, String>;
 pub(crate) const COMPOSIO_NO_SESSION: &str =
     "composio unavailable: no backend session token. Sign in or set a TinyHumans API key.";
 
-/// Resolve a backend-mode [`ComposioClient`] from the root config, or
-/// return an error string that the caller can surface over RPC.
-pub(crate) fn resolve_client(config: &Config) -> OpResult<ComposioClient> {
-    build_composio_client(config).ok_or_else(|| COMPOSIO_NO_SESSION.to_string())
-}
-
 /// True when the user has selected Composio **direct** mode but has not yet
 /// configured an API key (neither in the keychain nor `config.toml`).
 ///
@@ -55,7 +47,7 @@ pub(crate) fn resolve_client(config: &Config) -> OpResult<ComposioClient> {
 /// Sentry on every tick (TAURI-RUST-R4).
 ///
 /// Key presence MUST mirror the factory's own resolution in
-/// [`create_composio_client`] (`client.rs`): a key counts if it is in the
+/// [`resolve_composio_route`](super::super::client::resolve_composio_route) (`client/factory.rs`): a key counts if it is in the
 /// keychain (`credentials::get_composio_api_key`) **or** in `config.toml`
 /// (`config.composio.api_key`). Checking only the keychain would wrongly
 /// short-circuit to an empty list for a user who configured their key via
@@ -87,15 +79,13 @@ pub(crate) fn direct_mode_without_key(config: &Config) -> OpResult<bool> {
 /// connector module: `modules::connectors::module_config` fails, `ensure_routed`
 /// reconfigures the module with `{"route": "none"}`, and every routed member
 /// answers "this module was loaded without a connector route" — which the op
-/// layer then reported at error level (and to Sentry) once at boot from the
-/// memory-source reconcile and again on every periodic tick, for a user who
-/// simply has not signed in (#6176). Callers answer with the quiet
+/// layer then reported at error level (and to Sentry) on every periodic tick,
+/// for a user who simply has not signed in (#6176). Callers answer with the quiet
 /// [`COMPOSIO_NO_SESSION`] error instead — deliberately not an empty list,
 /// unlike the direct-mode guard: no key means no tenant and truly no
 /// connections, whereas no session only means the connections cannot be
-/// reached yet, and `memory::sources::reconcile` /
-/// `flows::validate_connection_refs` rely on `Err` meaning "unknown" (fail
-/// open) rather than "none".
+/// reached yet, and `flows::validate_connection_refs` relies on `Err` meaning
+/// "unknown" (fail open) rather than "none".
 ///
 /// Credential presence MUST mirror the module route's own resolution:
 /// `module_config` calls `integrations::build_client`, which takes the stored
@@ -129,27 +119,28 @@ pub(crate) fn backend_mode_without_session(config: &Config) -> bool {
     }
 }
 
-/// Defense-in-depth Sentry funnel for composio op-layer errors.
+/// Report host-side Composio faults without provider content or credentials.
 ///
-/// The shared [`crate::integrations::IntegrationClient`]
-/// (which fronts every `client.list_*` / `client.execute_tool` /
-/// `client.authorize` call) already reports its own failures under
-/// `domain="integrations"` with `failure="non_2xx" | "transport"` tags,
-/// and the Sentry `before_send` filter (`is_transient_integrations_failure`)
-/// drops the transient subset. This helper re-classifies the same
-/// anyhow chain at the **op layer** under `domain="composio"` so:
-///
-/// 1. Future call sites that bypass `IntegrationClient` still funnel through
-///    the same classifier.
-/// 2. Op-layer-specific failures get tagged consistently rather than
-///    reaching Sentry as bare `Err(String)` returned via RPC.
+/// Module failures have already emitted a sanitized terminal event at the bus
+/// boundary. Recognize their established wire/presentation forms rather than
+/// modifying user-visible messages or reporting them again. Host failures keep
+/// only the existing failure/status classification and a static message.
 pub(crate) fn report_composio_op_error<E: std::fmt::Display + ?Sized>(operation: &str, err: &E) {
     let rendered = format!("{err:#}");
+    let reported_member = tinyconnectors_bus::METHODS.iter().any(|member| {
+        rendered
+            .strip_prefix(member)
+            .is_some_and(|tail| tail.starts_with(": ai.tinyhumans.tinybus.Error.Failed: "))
+    });
+    if reported_member || crate::core::observability::is_module_unavailable_message(&rendered) {
+        // Bus failures are reported once, with sanitized module metadata.
+        return;
+    }
     let failure_tag = classify_composio_failure_tag(rendered.as_str());
     if failure_tag == "non_2xx" {
         if let Some(status) = extract_backend_returned_status(&rendered) {
             crate::core::observability::report_error_or_expected(
-                rendered.as_str(),
+                "connector operation failed",
                 "composio",
                 operation,
                 &[("failure", failure_tag), ("status", status.as_str())],
@@ -158,7 +149,7 @@ pub(crate) fn report_composio_op_error<E: std::fmt::Display + ?Sized>(operation:
         }
     }
     crate::core::observability::report_error_or_expected(
-        rendered.as_str(),
+        "connector operation failed",
         "composio",
         operation,
         &[("failure", failure_tag)],

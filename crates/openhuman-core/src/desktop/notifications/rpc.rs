@@ -8,18 +8,18 @@
 //!  - `notification_mark_acted` — mark a single notification as acted upon
 //!  - `notification_stats`    — return aggregate pipeline statistics
 
+use crate::core::runtime::DispatchCtx;
 use chrono::Utc;
 use serde_json::{json, Map, Value};
 use uuid::Uuid;
 
-use crate::agent::triage::{
-    apply_decision, local_trigger_origin, run_triage, TriageOutcome, TriggerEnvelope, TriggerSource,
-};
-use crate::agent::turn_origin::with_origin;
-use crate::config::rpc as config_rpc;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::rpc::RpcOutcome;
+use crate::core::Outcome;
+use crate::security::turn_origin::with_origin;
+use crate::triage::{
+    apply_decision, local_trigger_origin, run_triage, TriageOutcome, TriggerEnvelope, TriggerSource,
+};
 
 use super::store;
 use super::types::{
@@ -35,9 +35,9 @@ use super::types::{
 ///
 /// Writes the record immediately, returns the new `id`, then spawns a
 /// background task to run the triage pipeline and back-fill the score.
-pub async fn handle_ingest(params: Map<String, Value>) -> Result<Value, String> {
+pub async fn handle_ingest(ctx: &DispatchCtx, params: Map<String, Value>) -> Result<Value, String> {
     let ingest_started_at = Utc::now();
-    let config = config_rpc::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
 
     let req: NotificationIngestRequest = serde_json::from_value(Value::Object(params.clone()))
         .map_err(|e| format!("[notification_intel] invalid ingest params: {e}"))?;
@@ -45,7 +45,7 @@ pub async fn handle_ingest(params: Map<String, Value>) -> Result<Value, String> 
     let provider_settings = store::get_settings(&config, &req.provider)
         .map_err(|e| format!("[notification_intel] get_settings failed: {e}"))?;
     if !provider_settings.enabled {
-        let outcome = RpcOutcome::new(
+        let outcome = Outcome::new(
             json!({ "skipped": true, "reason": "provider_disabled" }),
             vec![],
         );
@@ -75,7 +75,7 @@ pub async fn handle_ingest(params: Map<String, Value>) -> Result<Value, String> 
             title_chars = req.title.chars().count(),
             "[notification_intel] skipping duplicate notification"
         );
-        let outcome = RpcOutcome::new(json!({ "skipped": true, "reason": "duplicate" }), vec![]);
+        let outcome = Outcome::new(json!({ "skipped": true, "reason": "duplicate" }), vec![]);
         return outcome.into_cli_compatible_json();
     }
 
@@ -88,7 +88,8 @@ pub async fn handle_ingest(params: Map<String, Value>) -> Result<Value, String> 
     // Spawn background triage — the ingest RPC returns immediately.
     let id_for_triage = id.clone();
     let config_for_triage = config.clone();
-    tokio::spawn(async move {
+    let ctx = ctx.clone();
+    ctx.clone().spawn(async move {
         let envelope = TriggerEnvelope {
             source: TriggerSource::WebviewIntegration {
                 provider: req.provider.clone(),
@@ -108,7 +109,7 @@ pub async fn handle_ingest(params: Map<String, Value>) -> Result<Value, String> 
             received_at: ingest_started_at,
         };
 
-        match run_triage(&envelope).await {
+        match run_triage(&ctx, &envelope).await {
             Ok(TriageOutcome::Decision(triage_run)) => {
                 let action = triage_run.decision.action.as_str().to_string();
                 let reason = triage_run.decision.reason.clone();
@@ -183,7 +184,7 @@ pub async fn handle_ingest(params: Map<String, Value>) -> Result<Value, String> 
                         // (#5634).
                         let origin = local_trigger_origin();
                         if let Err(e) =
-                            with_origin(origin, apply_decision(triage_run, &envelope)).await
+                            with_origin(origin, apply_decision(&ctx, triage_run, &envelope)).await
                         {
                             tracing::warn!(
                                 id = %id_for_triage,
@@ -228,6 +229,13 @@ pub async fn handle_ingest(params: Map<String, Value>) -> Result<Value, String> 
                     "[notification_intel] triage deferred"
                 );
             }
+            Ok(TriageOutcome::Terminal { reason }) => {
+                tracing::warn!(
+                    id = %id_for_triage,
+                    reason = %reason,
+                    "[notification_intel] triage reached terminal state"
+                );
+            }
             Err(e) => {
                 tracing::warn!(
                     id = %id_for_triage,
@@ -238,7 +246,7 @@ pub async fn handle_ingest(params: Map<String, Value>) -> Result<Value, String> 
         }
     });
 
-    let outcome = RpcOutcome::new(json!({ "id": id, "skipped": false }), vec![]);
+    let outcome = Outcome::new(json!({ "id": id, "skipped": false }), vec![]);
     outcome.into_cli_compatible_json()
 }
 
@@ -250,8 +258,8 @@ pub async fn handle_ingest(params: Map<String, Value>) -> Result<Value, String> 
 ///
 /// Optional params: `provider` (string), `limit` (u64), `offset` (u64),
 /// `min_score` (f64).
-pub async fn handle_list(params: Map<String, Value>) -> Result<Value, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+pub async fn handle_list(ctx: &DispatchCtx, params: Map<String, Value>) -> Result<Value, String> {
+    let config = ctx.load_config().await?;
 
     let provider = params
         .get("provider")
@@ -278,7 +286,7 @@ pub async fn handle_list(params: Map<String, Value>) -> Result<Value, String> {
     let unread = store::unread_count(&config)
         .map_err(|e| format!("[notification_intel] unread_count failed: {e}"))?;
 
-    let outcome = RpcOutcome::new(json!({ "items": items, "unread_count": unread }), vec![]);
+    let outcome = Outcome::new(json!({ "items": items, "unread_count": unread }), vec![]);
     outcome.into_cli_compatible_json()
 }
 
@@ -287,8 +295,11 @@ pub async fn handle_list(params: Map<String, Value>) -> Result<Value, String> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Mark a single notification as read.
-pub async fn handle_mark_read(params: Map<String, Value>) -> Result<Value, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+pub async fn handle_mark_read(
+    ctx: &DispatchCtx,
+    params: Map<String, Value>,
+) -> Result<Value, String> {
+    let config = ctx.load_config().await?;
 
     let id = params
         .get("id")
@@ -301,26 +312,32 @@ pub async fn handle_mark_read(params: Map<String, Value>) -> Result<Value, Strin
 
     tracing::debug!(id = %id, "[notification_intel] marked read");
 
-    let outcome = RpcOutcome::new(json!({ "ok": true }), vec![]);
+    let outcome = Outcome::new(json!({ "ok": true }), vec![]);
     outcome.into_cli_compatible_json()
 }
 
 /// Read notification routing settings for a provider.
-pub async fn handle_settings_get(params: Map<String, Value>) -> Result<Value, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+pub async fn handle_settings_get(
+    ctx: &DispatchCtx,
+    params: Map<String, Value>,
+) -> Result<Value, String> {
+    let config = ctx.load_config().await?;
     let provider = params
         .get("provider")
         .and_then(|v| v.as_str())
         .ok_or_else(|| "[notification_intel] missing required param 'provider'".to_string())?;
     let settings = store::get_settings(&config, provider)
         .map_err(|e| format!("[notification_intel] settings_get failed: {e}"))?;
-    let outcome = RpcOutcome::new(json!({ "settings": settings }), vec![]);
+    let outcome = Outcome::new(json!({ "settings": settings }), vec![]);
     outcome.into_cli_compatible_json()
 }
 
 /// Upsert notification routing settings for a provider.
-pub async fn handle_settings_set(params: Map<String, Value>) -> Result<Value, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+pub async fn handle_settings_set(
+    ctx: &DispatchCtx,
+    params: Map<String, Value>,
+) -> Result<Value, String> {
+    let config = ctx.load_config().await?;
     let req: NotificationSettingsUpsertRequest = serde_json::from_value(Value::Object(params))
         .map_err(|e| format!("[notification_intel] invalid settings_set params: {e}"))?;
     let clamped = NotificationSettings {
@@ -331,7 +348,7 @@ pub async fn handle_settings_set(params: Map<String, Value>) -> Result<Value, St
     };
     store::upsert_settings(&config, &clamped)
         .map_err(|e| format!("[notification_intel] settings_set failed: {e}"))?;
-    let outcome = RpcOutcome::new(json!({ "ok": true, "settings": clamped }), vec![]);
+    let outcome = Outcome::new(json!({ "ok": true, "settings": clamped }), vec![]);
     outcome.into_cli_compatible_json()
 }
 
@@ -340,8 +357,11 @@ pub async fn handle_settings_set(params: Map<String, Value>) -> Result<Value, St
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Mark a single notification as dismissed.
-pub async fn handle_dismiss(params: Map<String, Value>) -> Result<Value, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+pub async fn handle_dismiss(
+    ctx: &DispatchCtx,
+    params: Map<String, Value>,
+) -> Result<Value, String> {
+    let config = ctx.load_config().await?;
     let id = params
         .get("id")
         .and_then(|v| v.as_str())
@@ -351,7 +371,7 @@ pub async fn handle_dismiss(params: Map<String, Value>) -> Result<Value, String>
     let updated = store::mark_dismissed(&config, &id)
         .map_err(|e| format!("[notification_intel] mark_dismissed failed: {e}"))?;
     tracing::debug!(id = %id, updated = updated, "[notification_intel] notification dismissed");
-    let outcome = RpcOutcome::new(json!({ "ok": updated }), vec![]);
+    let outcome = Outcome::new(json!({ "ok": updated }), vec![]);
     outcome.into_cli_compatible_json()
 }
 
@@ -360,8 +380,11 @@ pub async fn handle_dismiss(params: Map<String, Value>) -> Result<Value, String>
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Mark a single notification as acted upon.
-pub async fn handle_mark_acted(params: Map<String, Value>) -> Result<Value, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+pub async fn handle_mark_acted(
+    ctx: &DispatchCtx,
+    params: Map<String, Value>,
+) -> Result<Value, String> {
+    let config = ctx.load_config().await?;
     let id = params
         .get("id")
         .and_then(|v| v.as_str())
@@ -375,7 +398,7 @@ pub async fn handle_mark_acted(params: Map<String, Value>) -> Result<Value, Stri
         updated = updated,
         "[notification_intel] notification marked acted"
     );
-    let outcome = RpcOutcome::new(json!({ "ok": updated }), vec![]);
+    let outcome = Outcome::new(json!({ "ok": updated }), vec![]);
     outcome.into_cli_compatible_json()
 }
 
@@ -389,8 +412,11 @@ pub async fn handle_mark_acted(params: Map<String, Value>) -> Result<Value, Stri
 /// closed / disconnected — these are otherwise lost because the live channel
 /// is broadcast-only. Optional params: `only_unread` (bool, default true),
 /// `limit` (u64, default 100).
-pub async fn handle_core_list(params: Map<String, Value>) -> Result<Value, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+pub async fn handle_core_list(
+    ctx: &DispatchCtx,
+    params: Map<String, Value>,
+) -> Result<Value, String> {
+    let config = ctx.load_config().await?;
 
     let only_unread = params
         .get("only_unread")
@@ -407,14 +433,17 @@ pub async fn handle_core_list(params: Map<String, Value>) -> Result<Value, Strin
     let unread = store::unread_core_notification_count(&config)
         .map_err(|e| format!("[notification_intel] core unread_count failed: {e}"))?;
 
-    let outcome = RpcOutcome::new(json!({ "items": items, "unread_count": unread }), vec![]);
+    let outcome = Outcome::new(json!({ "items": items, "unread_count": unread }), vec![]);
     outcome.into_cli_compatible_json()
 }
 
 /// Mark a persisted core notification as read so it isn't re-surfaced on the
 /// next sync-down.
-pub async fn handle_core_mark_read(params: Map<String, Value>) -> Result<Value, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+pub async fn handle_core_mark_read(
+    ctx: &DispatchCtx,
+    params: Map<String, Value>,
+) -> Result<Value, String> {
+    let config = ctx.load_config().await?;
     let id = params
         .get("id")
         .and_then(|v| v.as_str())
@@ -424,7 +453,7 @@ pub async fn handle_core_mark_read(params: Map<String, Value>) -> Result<Value, 
     let updated = store::mark_core_notification_read(&config, &id)
         .map_err(|e| format!("[notification_intel] core_mark_read failed: {e}"))?;
     tracing::debug!(id = %id, updated = updated, "[notification_intel] core notification marked read");
-    let outcome = RpcOutcome::new(json!({ "ok": updated }), vec![]);
+    let outcome = Outcome::new(json!({ "ok": updated }), vec![]);
     outcome.into_cli_compatible_json()
 }
 
@@ -433,13 +462,13 @@ pub async fn handle_core_mark_read(params: Map<String, Value>) -> Result<Value, 
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Return aggregate pipeline statistics.
-pub async fn handle_stats(_params: Map<String, Value>) -> Result<Value, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+pub async fn handle_stats(ctx: &DispatchCtx, _params: Map<String, Value>) -> Result<Value, String> {
+    let config = ctx.load_config().await?;
     tracing::debug!("[notification_intel] stats requested");
 
     let s = store::stats(&config).map_err(|e| format!("[notification_intel] stats failed: {e}"))?;
 
-    let outcome = RpcOutcome::new(json!(s), vec![]);
+    let outcome = Outcome::new(json!(s), vec![]);
     outcome.into_cli_compatible_json()
 }
 
@@ -449,8 +478,8 @@ pub async fn handle_stats(_params: Map<String, Value>) -> Result<Value, String> 
 
 /// Map the triage decision to a 0.0–1.0 importance score so the frontend
 /// can sort/filter without understanding triage action semantics.
-fn triage_action_to_score(action: crate::agent::triage::TriageAction) -> f32 {
-    use crate::agent::triage::TriageAction;
+fn triage_action_to_score(action: crate::triage::TriageAction) -> f32 {
+    use crate::triage::TriageAction;
     match action {
         TriageAction::Drop => 0.1,
         TriageAction::Acknowledge => 0.35,

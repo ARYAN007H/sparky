@@ -1,6 +1,51 @@
 use super::*;
 
 #[test]
+fn default_model_provenance_records_environment_precedence_without_values() {
+    let mut cfg = config_from_toml_str(r#"default_model = "file-model""#).unwrap();
+    cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_DEFAULT_MODEL", "env-model"));
+
+    let entry = cfg.load_provenance().field("default_model");
+    assert_eq!(entry.source, super::ProvenanceSource::Env);
+    assert_eq!(entry.env_var.as_deref(), Some("OPENHUMAN_DEFAULT_MODEL"));
+    assert!(entry.file_also_set);
+    assert_eq!(cfg.default_model.as_deref(), Some("env-model"));
+    assert!(!format!("{:?}", cfg.load_provenance()).contains("env-model"));
+}
+
+#[test]
+fn blank_explicit_model_env_falls_back_to_legacy_alias_and_records_its_name() {
+    for explicit_model in ["", "  \t"] {
+        let mut cfg = Config::default();
+        cfg.apply_env_overlay_with(
+            &HashMapEnv::new()
+                .with("OPENHUMAN_DEFAULT_MODEL", explicit_model)
+                .with("OPENHUMAN_MODEL", "legacy-model"),
+        );
+
+        assert_eq!(cfg.default_model.as_deref(), Some("legacy-model"));
+        let provenance = cfg.load_provenance().field("default_model");
+        assert_eq!(provenance.source, super::ProvenanceSource::Env);
+        assert_eq!(provenance.env_var.as_deref(), Some("OPENHUMAN_MODEL"));
+    }
+
+    let mut cfg = Config::default();
+    cfg.apply_env_overlay_with(
+        &HashMapEnv::new()
+            .with("OPENHUMAN_DEFAULT_MODEL", "canonical-model")
+            .with("OPENHUMAN_MODEL", "legacy-model"),
+    );
+    assert_eq!(cfg.default_model.as_deref(), Some("canonical-model"));
+    assert_eq!(
+        cfg.load_provenance()
+            .field("default_model")
+            .env_var
+            .as_deref(),
+        Some("OPENHUMAN_DEFAULT_MODEL")
+    );
+}
+
+#[test]
 fn env_overlay_model_only_honours_namespaced_var() {
     // Both set → OPENHUMAN_MODEL wins; bare MODEL is ignored even when
     // OPENHUMAN_MODEL is absent.
@@ -92,69 +137,6 @@ fn env_overlay_autonomy_max_actions_per_hour_accepts_valid_u32() {
         cfg.autonomy.max_actions_per_hour, 64,
         "invalid env value must leave the configured limit unchanged"
     );
-}
-
-#[test]
-fn env_overlay_memory_sync_interval_parses_and_honours_zero() {
-    let mut cfg = Config::default();
-    assert!(cfg.memory_sync_interval_secs.is_none());
-
-    // A positive value is stored verbatim.
-    cfg.apply_env_overlay_with(&HashMapEnv::new().with(MEMORY_SYNC_INTERVAL_SECS_ENV_VAR, "14400"));
-    assert_eq!(cfg.memory_sync_interval_secs, Some(14_400));
-
-    // `0` is honoured as the "Manual only" sentinel (unlike the per-provider
-    // override which rejects it).
-    cfg.apply_env_overlay_with(&HashMapEnv::new().with(MEMORY_SYNC_INTERVAL_SECS_ENV_VAR, "0"));
-    assert_eq!(cfg.memory_sync_interval_secs, Some(0));
-
-    // A non-numeric value is ignored, leaving the previous value intact.
-    cfg.apply_env_overlay_with(&HashMapEnv::new().with(MEMORY_SYNC_INTERVAL_SECS_ENV_VAR, "nope"));
-    assert_eq!(cfg.memory_sync_interval_secs, Some(0));
-
-    // A blank value is ignored too.
-    cfg.apply_env_overlay_with(&HashMapEnv::new().with(MEMORY_SYNC_INTERVAL_SECS_ENV_VAR, "  "));
-    assert_eq!(cfg.memory_sync_interval_secs, Some(0));
-}
-
-#[test]
-fn env_overlay_subsystems_memory_driver_and_hooks_apply() {
-    let mut cfg = Config::default();
-    // The shared schema retains the persisted legacy id; binding normalizes it
-    // to the built-in `tinymemory` module id.
-    assert_eq!(cfg.subsystems.memory.driver, "tinycortex");
-    assert!(cfg.subsystems.memory.hooks.auto_recall);
-    assert!(cfg.subsystems.memory.hooks.auto_capture);
-    assert_eq!(cfg.subsystems.memory.hooks.max_context_tokens, 2000);
-    assert_eq!(cfg.subsystems.memory.hooks.recall_max_chars, 1000);
-    assert_eq!(cfg.subsystems.memory.hooks.capture_max_chars, 500);
-
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new()
-            .with("OPENHUMAN_MEMORY_DRIVER", "supermemory")
-            .with("OPENHUMAN_MEMORY_HOOKS_AUTO_RECALL", "off")
-            .with("OPENHUMAN_MEMORY_HOOKS_AUTO_CAPTURE", "false")
-            .with("OPENHUMAN_MEMORY_HOOKS_MAX_CONTEXT_TOKENS", "4000")
-            .with("OPENHUMAN_MEMORY_HOOKS_RECALL_MAX_CHARS", "2000")
-            .with("OPENHUMAN_MEMORY_HOOKS_CAPTURE_MAX_CHARS", "900"),
-    );
-
-    assert_eq!(cfg.subsystems.memory.driver, "supermemory");
-    assert!(!cfg.subsystems.memory.hooks.auto_recall);
-    assert!(!cfg.subsystems.memory.hooks.auto_capture);
-    assert_eq!(cfg.subsystems.memory.hooks.max_context_tokens, 4000);
-    assert_eq!(cfg.subsystems.memory.hooks.recall_max_chars, 2000);
-    assert_eq!(cfg.subsystems.memory.hooks.capture_max_chars, 900);
-
-    // A blank driver value is ignored, leaving the previous override intact.
-    cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_MEMORY_DRIVER", "  "));
-    assert_eq!(cfg.subsystems.memory.driver, "supermemory");
-
-    // A non-numeric budget value is ignored, leaving the previous value intact.
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new().with("OPENHUMAN_MEMORY_HOOKS_MAX_CONTEXT_TOKENS", "nope"),
-    );
-    assert_eq!(cfg.subsystems.memory.hooks.max_context_tokens, 4000);
 }
 
 #[test]
@@ -344,81 +326,6 @@ fn env_overlay_proxy_scope_invalid_value_leaves_scope_unchanged() {
 }
 
 #[test]
-fn env_overlay_node_flags_respect_bool_parser() {
-    let mut cfg = Config::default();
-    let original_version = cfg.node.version.clone();
-
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new()
-            .with("OPENHUMAN_NODE_ENABLED", "yes")
-            .with("OPENHUMAN_NODE_PREFER_SYSTEM", "off")
-            .with("OPENHUMAN_NODE_CACHE_DIR", "/tmp/oh-node"),
-    );
-    assert!(cfg.node.enabled);
-    assert!(!cfg.node.prefer_system);
-    assert_eq!(cfg.node.cache_dir, "/tmp/oh-node");
-    assert_eq!(
-        cfg.node.version, original_version,
-        "untouched keys stay at defaults"
-    );
-
-    // Unrecognised bool — ignored, keeps previous true.
-    cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_NODE_ENABLED", "perhaps"));
-    assert!(cfg.node.enabled);
-
-    // Blank version does NOT clobber.
-    cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_NODE_VERSION", "   "));
-    assert_eq!(cfg.node.version, original_version);
-}
-
-#[test]
-fn env_overlay_runtime_python_flags_respect_bool_parser() {
-    let mut cfg = Config::default();
-    let original_version = cfg.runtime_python.minimum_version.clone();
-
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new()
-            .with("OPENHUMAN_RUNTIME_PYTHON_ENABLED", "yes")
-            .with("OPENHUMAN_RUNTIME_PYTHON_PREFER_SYSTEM", "off")
-            .with("OPENHUMAN_RUNTIME_PYTHON_CACHE_DIR", "/tmp/oh-python")
-            .with("OPENHUMAN_RUNTIME_PYTHON_MANAGED_RELEASE_TAG", "20260510")
-            .with("OPENHUMAN_RUNTIME_PYTHON_PREFERRED_COMMAND", "python3.12"),
-    );
-    assert!(cfg.runtime_python.enabled);
-    assert!(!cfg.runtime_python.prefer_system);
-    assert_eq!(cfg.runtime_python.cache_dir, "/tmp/oh-python");
-    assert_eq!(cfg.runtime_python.managed_release_tag, "20260510");
-    assert_eq!(cfg.runtime_python.preferred_command, "python3.12");
-    assert_eq!(
-        cfg.runtime_python.minimum_version, original_version,
-        "untouched keys stay at defaults"
-    );
-
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new().with("OPENHUMAN_RUNTIME_PYTHON_ENABLED", "perhaps"),
-    );
-    assert!(cfg.runtime_python.enabled);
-
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new().with("OPENHUMAN_RUNTIME_PYTHON_MINIMUM_VERSION", "   "),
-    );
-    assert_eq!(cfg.runtime_python.minimum_version, original_version);
-
-    cfg.runtime_python.cache_dir = "/tmp/seed".into();
-    cfg.runtime_python.managed_release_tag = "20260510".into();
-    cfg.runtime_python.preferred_command = "python3.12".into();
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new()
-            .with("OPENHUMAN_RUNTIME_PYTHON_CACHE_DIR", "   ")
-            .with("OPENHUMAN_RUNTIME_PYTHON_MANAGED_RELEASE_TAG", "   ")
-            .with("OPENHUMAN_RUNTIME_PYTHON_PREFERRED_COMMAND", "   "),
-    );
-    assert_eq!(cfg.runtime_python.cache_dir, "");
-    assert_eq!(cfg.runtime_python.managed_release_tag, "");
-    assert_eq!(cfg.runtime_python.preferred_command, "");
-}
-
-#[test]
 fn env_overlay_sentry_dsn_trims_and_ignores_blank() {
     let mut cfg = Config::default();
     cfg.observability.sentry_dsn = None;
@@ -482,156 +389,6 @@ fn env_overlay_analytics_enabled_parses_truthy_falsy() {
 }
 
 #[test]
-fn env_overlay_learning_source_values_and_invalid_ignored() {
-    let mut cfg = Config::default();
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new().with("OPENHUMAN_LEARNING_REFLECTION_SOURCE", "local"),
-    );
-    assert_eq!(
-        cfg.learning.reflection_source,
-        crate::config::ReflectionSource::Local
-    );
-
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new().with("OPENHUMAN_LEARNING_REFLECTION_SOURCE", "cloud"),
-    );
-    assert_eq!(
-        cfg.learning.reflection_source,
-        crate::config::ReflectionSource::Cloud
-    );
-
-    // Unknown — ignored, retains cloud from previous step.
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new().with("OPENHUMAN_LEARNING_REFLECTION_SOURCE", "bogus"),
-    );
-    assert_eq!(
-        cfg.learning.reflection_source,
-        crate::config::ReflectionSource::Cloud
-    );
-}
-
-#[test]
-fn env_overlay_learning_numeric_values_parse() {
-    let mut cfg = Config::default();
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new()
-            .with("OPENHUMAN_LEARNING_MAX_REFLECTIONS_PER_SESSION", "8")
-            .with("OPENHUMAN_LEARNING_MIN_TURN_COMPLEXITY", "2"),
-    );
-    assert_eq!(cfg.learning.max_reflections_per_session, 8);
-    assert_eq!(cfg.learning.min_turn_complexity, 2);
-}
-
-#[test]
-fn env_overlay_dictation_activation_mode_only_toggle_or_push() {
-    let mut cfg = Config::default();
-
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new().with("OPENHUMAN_DICTATION_ACTIVATION_MODE", "toggle"),
-    );
-    assert_eq!(
-        cfg.dictation.activation_mode,
-        crate::config::DictationActivationMode::Toggle
-    );
-
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new().with("OPENHUMAN_DICTATION_ACTIVATION_MODE", "push"),
-    );
-    assert_eq!(
-        cfg.dictation.activation_mode,
-        crate::config::DictationActivationMode::Push
-    );
-
-    // Unknown — retains previous value (Push).
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new().with("OPENHUMAN_DICTATION_ACTIVATION_MODE", "wave"),
-    );
-    assert_eq!(
-        cfg.dictation.activation_mode,
-        crate::config::DictationActivationMode::Push
-    );
-}
-
-#[test]
-fn env_overlay_context_tool_result_budget_env_suppresses_legacy_migration() {
-    // If the env var is *present*, the `agent.tool_result_budget_bytes`
-    // migration must NOT run — even when the explicit env value equals
-    // the default. This protects users who explicitly set the env to
-    // the default.
-    let default_budget = crate::agent::context::DEFAULT_TOOL_RESULT_BUDGET_BYTES;
-    let mut cfg = Config::default();
-    cfg.context.tool_result_budget_bytes = default_budget;
-    cfg.agent.tool_result_budget_bytes = 999_999;
-
-    cfg.apply_env_overlay_with(&HashMapEnv::new().with(
-        "OPENHUMAN_CONTEXT_TOOL_RESULT_BUDGET_BYTES",
-        &default_budget.to_string(),
-    ));
-    assert_eq!(
-        cfg.context.tool_result_budget_bytes, default_budget,
-        "env presence must suppress the legacy agent→context copy"
-    );
-}
-
-#[test]
-fn env_overlay_compaction_default_off_and_switch() {
-    // Default is off (tokenjuice compaction cost more retrieval round trips
-    // than it saved context).
-    assert!(!Config::default().context.compaction_enabled);
-
-    // `OPENHUMAN_COMPACTION=0` keeps it off; `=1` turns it on.
-    let mut cfg = Config::default();
-    cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_COMPACTION", "0"));
-    assert!(!cfg.context.compaction_enabled);
-    let mut cfg = Config::default();
-    cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_COMPACTION", "1"));
-    assert!(cfg.context.compaction_enabled);
-
-    // Truthy re-enables; the namespaced alias works too.
-    let mut cfg = Config::default();
-    cfg.context.compaction_enabled = false;
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new().with("OPENHUMAN_CONTEXT_COMPACTION_ENABLED", "on"),
-    );
-    assert!(cfg.context.compaction_enabled);
-
-    // Garbage is ignored (leaves the prior value untouched).
-    let mut cfg = Config::default();
-    cfg.context.compaction_enabled = true;
-    cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_COMPACTION", "maybe"));
-    assert!(cfg.context.compaction_enabled);
-}
-
-#[test]
-fn env_overlay_context_tool_result_budget_legacy_migration_when_env_absent() {
-    // Env absent, context at default, agent customised → agent value copies forward.
-    let default_budget = crate::agent::context::DEFAULT_TOOL_RESULT_BUDGET_BYTES;
-    let mut cfg = Config::default();
-    cfg.context.tool_result_budget_bytes = default_budget;
-    cfg.agent.tool_result_budget_bytes = 777_777;
-
-    cfg.apply_env_overlay_with(&HashMapEnv::new());
-    assert_eq!(cfg.context.tool_result_budget_bytes, 777_777);
-}
-
-#[test]
-fn env_overlay_context_tool_result_budget_env_wins_over_legacy_migration() {
-    // Env present with a non-default value, and agent also customised.
-    // The env value must apply; the legacy agent→context copy must NOT
-    // overwrite it.
-    let mut cfg = Config::default();
-    cfg.agent.tool_result_budget_bytes = 111_111;
-
-    cfg.apply_env_overlay_with(
-        &HashMapEnv::new().with("OPENHUMAN_CONTEXT_TOOL_RESULT_BUDGET_BYTES", "222222"),
-    );
-    assert_eq!(
-        cfg.context.tool_result_budget_bytes, 222_222,
-        "env value wins; legacy migration suppressed"
-    );
-}
-
-#[test]
 fn env_overlay_auto_update_interval_parses_u32() {
     let mut cfg = Config::default();
     cfg.apply_env_overlay_with(
@@ -672,7 +429,7 @@ fn env_overlay_auto_update_restart_strategy_accepts_supported_values() {
 #[test]
 fn env_overlay_tool_dispatcher_overrides_the_agent_field_when_non_blank() {
     let mut cfg = Config::default();
-    assert_eq!(cfg.agent.tool_dispatcher, "python");
+    assert_eq!(cfg.agent.tool_dispatcher, "auto");
 
     cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_TOOL_DISPATCHER", " native "));
     assert_eq!(cfg.agent.tool_dispatcher, "native");
@@ -682,4 +439,193 @@ fn env_overlay_tool_dispatcher_overrides_the_agent_field_when_non_blank() {
     assert_eq!(cfg.agent.tool_dispatcher, "native");
     cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_TOOL_DISPATCHER", ""));
     assert_eq!(cfg.agent.tool_dispatcher, "native");
+}
+
+#[test]
+fn env_overlay_composio_mode_overrides_when_non_blank() {
+    let mut cfg = Config::default();
+    assert_eq!(cfg.composio.mode, "backend");
+    cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_COMPOSIO_MODE", " Disabled "));
+    assert_eq!(cfg.composio.mode, "disabled");
+    cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_COMPOSIO_MODE", "  "));
+    assert_eq!(cfg.composio.mode, "disabled");
+}
+
+#[test]
+fn env_overlay_jev_route_and_base_url_override_tool_search_when_non_blank() {
+    let mut cfg = Config::default();
+    assert_eq!(cfg.agent.tool_search.jev_route, "auto");
+    assert_eq!(cfg.agent.tool_search.jev_base_url, None);
+
+    cfg.apply_env_overlay_with(
+        &HashMapEnv::new()
+            .with("OPENHUMAN_JEV_ROUTE", " OpenRouter ")
+            .with("OPENHUMAN_JEV_BASE_URL", " http://127.0.0.1:18080 "),
+    );
+    assert_eq!(cfg.agent.tool_search.jev_route, "openrouter");
+    assert_eq!(
+        cfg.agent.tool_search.jev_base_url.as_deref(),
+        Some("http://127.0.0.1:18080")
+    );
+
+    // Blank values leave the persisted choice alone.
+    cfg.apply_env_overlay_with(
+        &HashMapEnv::new()
+            .with("OPENHUMAN_JEV_ROUTE", "  ")
+            .with("OPENHUMAN_JEV_BASE_URL", ""),
+    );
+    assert_eq!(cfg.agent.tool_search.jev_route, "openrouter");
+    assert_eq!(
+        cfg.agent.tool_search.jev_base_url.as_deref(),
+        Some("http://127.0.0.1:18080")
+    );
+}
+
+/// Local model tier presets were removed: OpenHuman no longer picks models by
+/// RAM tier. A stale `OPENHUMAN_LOCAL_AI_TIER` in the environment must be
+/// ignored rather than rewriting the user's configured local models.
+#[test]
+fn env_overlay_ignores_removed_local_ai_tier_var() {
+    let env = HashMapEnv::new().with("OPENHUMAN_LOCAL_AI_TIER", "ram_2_4gb");
+    let mut cfg = Config::default();
+    cfg.local_ai.chat_model_id = "llama3.1:8b".to_string();
+    cfg.local_ai.embedding_model_id = "nomic-embed-text:latest".to_string();
+    cfg.apply_env_overlay_with(&env);
+    assert_eq!(cfg.local_ai.chat_model_id, "llama3.1:8b");
+    assert_eq!(cfg.local_ai.embedding_model_id, "nomic-embed-text:latest");
+}
+
+/// A config.toml written while OpenHuman still downloaded local models carries
+/// tier, quantization, preload, binary-path, model-id and download-URL keys under
+/// `[local_ai]`. Those keys are no longer read, but such a file must still
+/// load with the user's endpoint and model choices intact.
+#[test]
+fn legacy_local_ai_download_keys_still_load() {
+    let legacy = r#"
+api_url = "http://127.0.0.1:9"
+
+[local_ai]
+runtime_enabled = true
+opt_in_confirmed = true
+provider = "ollama"
+base_url = "http://127.0.0.1:11434"
+chat_model_id = "llama3.1:8b"
+embedding_model_id = "bge-m3"
+selected_tier = "ram_2_4gb"
+quantization = "q4_k_m"
+preload_vision_model = true
+preload_embedding_model = true
+preload_stt_model = false
+preload_tts_voice = false
+ollama_binary_path = "/opt/openhuman/bin/ollama"
+download_url = "https://example.invalid/model.gguf"
+stt_download_url = "https://example.invalid/stt.bin"
+tts_download_url = "https://example.invalid/voice.onnx"
+tts_config_download_url = "https://example.invalid/voice.onnx.json"
+"#;
+    let cfg: Config = toml::from_str(legacy).expect("legacy local_ai keys must still parse");
+    assert!(cfg.local_ai.runtime_enabled);
+    assert!(cfg.local_ai.opt_in_confirmed);
+    assert_eq!(cfg.local_ai.provider, "ollama");
+    assert_eq!(
+        cfg.local_ai.base_url.as_deref(),
+        Some("http://127.0.0.1:11434")
+    );
+    assert_eq!(cfg.local_ai.chat_model_id, "llama3.1:8b");
+    assert_eq!(cfg.local_ai.embedding_model_id, "bge-m3");
+    let saved = toml::to_string(&cfg).expect("updated config serializes");
+    for retired in [
+        "quantization",
+        "preload_vision_model",
+        "preload_embedding_model",
+        "preload_stt_model",
+        "preload_tts_voice",
+        "download_url",
+        "stt_download_url",
+        "tts_download_url",
+        "tts_config_download_url",
+    ] {
+        assert!(
+            !saved.contains(retired),
+            "retired config key {retired} must not be written back"
+        );
+    }
+
+    // The runtime projection carries only endpoint and model settings.
+    let runtime = crate::inference::local_runtime_config(&cfg);
+    assert_eq!(runtime.local_ai.chat_model_id, "llama3.1:8b");
+    assert_eq!(
+        runtime.local_ai.base_url.as_deref(),
+        Some("http://127.0.0.1:11434")
+    );
+}
+
+#[test]
+fn env_overlay_component_switches_apply_and_ignore_garbage() {
+    let env = HashMapEnv::new()
+        .with("OPENHUMAN_COMPONENT_FLOWS", "0")
+        .with("OPENHUMAN_COMPONENT_VOICE", "off")
+        .with("OPENHUMAN_COMPONENT_MCP", "maybe");
+    let mut cfg = Config::default();
+    cfg.components.hosting = false;
+    cfg.apply_env_overlay_with(&env);
+    assert!(!cfg.components.flows);
+    assert!(!cfg.components.voice);
+    assert!(
+        cfg.components.mcp,
+        "invalid value must leave the switch alone"
+    );
+    assert!(
+        !cfg.components.hosting,
+        "unset env must not touch the config"
+    );
+
+    let env = HashMapEnv::new().with("OPENHUMAN_COMPONENT_HOSTING", "1");
+    cfg.apply_env_overlay_with(&env);
+    assert!(cfg.components.hosting, "env can switch a component back on");
+}
+
+#[test]
+fn legacy_disable_channel_listeners_env_folds_into_channels_component() {
+    let mut cfg = Config::default();
+    cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_DISABLE_CHANNEL_LISTENERS", "1"));
+    assert!(!cfg.components.channels);
+
+    let mut cfg = Config::default();
+    let env = HashMapEnv::new()
+        .with("OPENHUMAN_DISABLE_CHANNEL_LISTENERS", "true")
+        .with("OPENHUMAN_COMPONENT_CHANNELS", "1");
+    cfg.apply_env_overlay_with(&env);
+    assert!(cfg.components.channels, "explicit component env wins");
+}
+
+#[test]
+fn env_overlay_inbound_debounce_applies_and_ignores_garbage() {
+    let mut cfg = Config::default();
+    cfg.apply_env_overlay_with(
+        &HashMapEnv::new()
+            .with("OPENHUMAN_INBOUND_DEBOUNCE_ENABLED", "false")
+            .with("OPENHUMAN_INBOUND_DEBOUNCE_MS", "800")
+            .with("OPENHUMAN_INBOUND_DEBOUNCE_MEDIA_MS", " 3000 ")
+            .with("OPENHUMAN_INBOUND_DEBOUNCE_MAX_WAIT_MS", "9000"),
+    );
+    assert!(!cfg.inbound_debounce.enabled);
+    assert_eq!(cfg.inbound_debounce.debounce_ms, 800);
+    assert_eq!(cfg.inbound_debounce.media_debounce_ms, 3000);
+    assert_eq!(cfg.inbound_debounce.max_wait_ms, 9000);
+
+    cfg.apply_env_overlay_with(
+        &HashMapEnv::new()
+            .with("OPENHUMAN_INBOUND_DEBOUNCE_ENABLED", "maybe")
+            .with("OPENHUMAN_INBOUND_DEBOUNCE_MS", "-1")
+            .with("OPENHUMAN_INBOUND_DEBOUNCE_MEDIA_MS", "")
+            .with("OPENHUMAN_INBOUND_DEBOUNCE_MAX_WAIT_MS", "soon"),
+    );
+    assert!(!cfg.inbound_debounce.enabled);
+    assert_eq!(cfg.inbound_debounce.debounce_ms, 800);
+    assert_eq!(cfg.inbound_debounce.media_debounce_ms, 3000);
+    assert_eq!(cfg.inbound_debounce.max_wait_ms, 9000);
+
+    cfg.apply_env_overlay_with(&HashMapEnv::new().with("OPENHUMAN_INBOUND_DEBOUNCE_ENABLED", "on"));
+    assert!(cfg.inbound_debounce.enabled);
 }

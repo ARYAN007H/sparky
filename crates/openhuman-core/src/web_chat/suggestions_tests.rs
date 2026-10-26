@@ -6,7 +6,12 @@ use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 
 use super::*;
 use crate::inference::provider::factory::test_provider_override;
+use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
+use crate::inference::registry::ProviderContext;
 use crate::web_chat::subscribe_web_channel_events;
+use tinyinference_llm::providers::overrides::{
+    ChatModelEntry, ChatModelRequest, ProviderModelMetadata,
+};
 
 // ── parse_suggestions / strip_markdown_fence: pure unit tests ──────────────
 
@@ -85,6 +90,51 @@ struct ScriptedTextModel {
     calls: Arc<AtomicUsize>,
 }
 
+fn install_suggestions_model_fixture() {
+    crate::inference::registry::register_chat_model(
+        PROVIDER_OPENHUMAN,
+        ChatModelEntry {
+            build: Arc::new(|_request: &ChatModelRequest<'_, ProviderContext>| {
+                Ok((
+                    Arc::new(ScriptedTextModel {
+                        text: "[]".to_string(),
+                        calls: Arc::new(AtomicUsize::new(0)),
+                    }) as Arc<dyn ChatModel<()>>,
+                    "fixture/suggestions".to_string(),
+                ))
+            }),
+            probe: None,
+            models: Some(ProviderModelMetadata {
+                default_model: Arc::new(|| Some("fixture/suggestions".to_string())),
+                role_for_model: Arc::new(|_| None),
+                is_alias: Arc::new(|_| false),
+                is_raw_model: Arc::new(|_| true),
+                supports_vision: Arc::new(|_| false),
+                resolve_model: Arc::new(|_, config, model| {
+                    model
+                        .map(str::to_string)
+                        .or_else(|| config.config.default_model.clone())
+                        .or_else(|| Some("fixture/suggestions".to_string()))
+                }),
+                context_window: Arc::new(|_| None),
+                default_pricing: Arc::new(|| None),
+                without_reasoning: Arc::new(|mut request| {
+                    if !request.metadata.is_object() {
+                        request.metadata = serde_json::Value::Object(serde_json::Map::new());
+                    }
+                    if let Some(metadata) = request.metadata.as_object_mut() {
+                        metadata.insert(
+                            "fixture.no_reasoning".to_string(),
+                            serde_json::Value::Bool(true),
+                        );
+                    }
+                    request
+                }),
+            }),
+        },
+    );
+}
+
 #[async_trait]
 impl ChatModel<()> for ScriptedTextModel {
     async fn invoke(
@@ -123,6 +173,7 @@ async fn emits_chat_suggestions_for_a_well_formed_reply() {
 
     let thread_id = "sugg-thread-ok";
     generate_and_emit(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "client-1",
         thread_id,
         "req-1",
@@ -150,6 +201,7 @@ async fn drops_silently_when_the_model_returns_garbage() {
 
     let thread_id = "sugg-thread-garbage";
     generate_and_emit(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "client-1",
         thread_id,
         "req-2",
@@ -173,6 +225,7 @@ async fn skips_when_the_user_message_is_too_short() {
     }));
 
     generate_and_emit(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "client-1",
         "sugg-thread-short",
         "req-3",
@@ -186,4 +239,18 @@ async fn skips_when_the_user_message_is_too_short() {
         0,
         "the model must not be called for a trivial user message"
     );
+}
+
+#[test]
+fn suggestions_request_asks_for_no_reasoning() {
+    install_suggestions_model_fixture();
+    let request = build_suggestions_request("what is the weather in Paris", "Sunny, 21°C.");
+    assert_eq!(
+        request.metadata.get("fixture.no_reasoning"),
+        Some(&serde_json::Value::Bool(true)),
+        "suggestion calls must apply the registered provider's no-reasoning transform"
+    );
+    // The generic provider hook adds metadata only, leaving provider options
+    // untouched. The hosted wire key is covered by TinyHumans' own tests.
+    assert!(request.provider_options.is_null());
 }

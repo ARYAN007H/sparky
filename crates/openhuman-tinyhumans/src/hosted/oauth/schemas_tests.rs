@@ -13,6 +13,7 @@ fn catalog_keeps_the_auth_oauth_wire_names() {
             "auth.oauth_list_integrations",
             "auth.oauth_fetch_integration_tokens",
             "auth.oauth_revoke_integration",
+            "auth.oauth_fetch_client_key",
         ]
     );
     assert_eq!(all_oauth_registered_controllers().len(), FUNCTIONS.len());

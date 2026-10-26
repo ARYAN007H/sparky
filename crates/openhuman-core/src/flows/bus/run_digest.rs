@@ -1,184 +1,212 @@
-//! Post-run memory digest: [`FlowRunDigestSubscriber`] writes a compact,
-//! bounded summary of every successful run into the flow's private memory
-//! namespace so later runs can recall what they already did.
+//! Post-run memory digest: [`FlowRunDigestSubscriber`] stores a compact,
+//! bounded summary of every successful run as a memory document tagged with
+//! the flow ([`flow_tag`]) and [`FLOW_RUN_DIGEST_TAG`], so later runs can
+//! recall what they already did.
 
 use crate::config::Config;
 use crate::core::events::DomainEvent;
-use crate::flows::store;
-use crate::flows::{flow_namespace, FlowRun};
+use crate::flows::catalog_storage;
+use crate::memory::types::{ForgetParams, ItemsListParams, MAX_LIMIT};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tinybus::EventHandler;
-use tinymemory_api::provider::MemoryCore;
-use tinymemory_api::types::{MemoryCategory, MemoryTaint};
+use tinymemory_api::{Error, Result};
+use tinymemory_api::{ItemKind, MetaFilter, StoreItem};
+use {crate::flows::flow_meta, crate::flows::flow_tag, tinyflows_bus::catalog::FlowRun};
 
 /// Bounds a post-run memory digest to a compact, LLM-cheap size — a single
 /// run's summary must never dominate a later `flow_memory_recall`.
 pub(super) const DIGEST_MAX_CHARS: usize = 1000;
 
-/// Cap on how many `run_digest:*` entries [`FlowRunDigestSubscriber`] keeps
-/// per flow's memory namespace before pruning the oldest.
-const DIGEST_RETENTION_CAP: usize = 50;
+/// Cap on how many run digests [`FlowRunDigestSubscriber`] keeps per flow
+/// before forgetting the oldest.
+pub(super) const DIGEST_RETENTION_CAP: usize = 50;
+
+/// Tag carried by every post-run digest document.
+pub(super) const FLOW_RUN_DIGEST_TAG: &str = "flow_run_digest";
+
+/// The filter matching `flow_id`'s run digests: the flow's own source id
+/// (stamped by [`flow_meta`]) AND the digest tag.
+pub(super) fn digest_filter(flow_id: &str) -> MetaFilter {
+    MetaFilter {
+        kinds: vec![ItemKind::Document],
+        source_id: Some(flow_tag(flow_id)),
+        tags_any: vec![FLOW_RUN_DIGEST_TAG.to_string()],
+        ..MetaFilter::default()
+    }
+}
 
 /// Listens for `DomainEvent::FlowRunFinished` and, on a successful terminal
-/// status, writes a compact digest of the run into the flow's own private
-/// memory namespace ([`flow_namespace`]) — e.g. so a later run of the same
-/// scheduled digest flow can `flow_memory_recall` what it already sent
-/// without re-deriving that from the target service.
+/// status, stores a compact digest of the run in the flow's own memory —
+/// e.g. so a later run of the same scheduled digest flow can
+/// `flow_memory_recall` what it already sent without re-deriving that from
+/// the target service.
 ///
 /// Success-only: `"failed"` / `"cancelled"` / `"interrupted"` / any other
 /// terminal status is ignored, since a digest of a run that didn't actually
 /// complete its work would misleadingly look like a record of real output.
 ///
-/// Best-effort throughout: every failure here is logged via `tracing::warn!`
-/// and swallowed, never propagated — by the time this subscriber observes
-/// `FlowRunFinished`, the run has already settled its own `flow_runs` row, so
-/// a memory-layer hiccup must never retroactively affect run status.
+/// Best-effort throughout: memory off is a quiet skip, and every other
+/// failure is logged and swallowed — by the time this subscriber observes
+/// `FlowRunFinished` the run has settled its own `flow_runs` row, so a
+/// memory hiccup must never retroactively affect run status.
 pub struct FlowRunDigestSubscriber {
     config: Arc<Config>,
-    /// Test-only memory override. In production this is `None` and the digest
-    /// resolves the process-global memory client via [`active_memory_client`].
-    /// The process-global client is a one-shot `OnceLock`, so a unit test
-    /// cannot reliably rebind it to its own tempdir (an earlier test in the
-    /// same binary may already have initialised the singleton — see
-    /// `memory::global`'s own test notes). Injecting a directly-constructed
-    /// [`Memory`] here lets the digest tests write and read back through the
-    /// SAME instance deterministically, exactly as `flows::memory_tools`'
-    /// tests do with `UnifiedMemory::new`.
-    memory_override: Option<Arc<crate::memory::guard::MemoryGuard>>,
 }
 
 impl FlowRunDigestSubscriber {
     pub fn new(config: Arc<Config>) -> Self {
-        Self {
-            config,
-            memory_override: None,
-        }
+        Self { config }
     }
 
-    /// Test constructor: run the digest against an explicitly-provided memory
-    /// instance instead of the process-global client. See [`Self::memory_override`].
-    #[cfg(test)]
-    pub(super) fn with_memory(
-        config: Arc<Config>,
-        memory: Arc<crate::memory::guard::MemoryGuard>,
-    ) -> Self {
-        Self {
-            config,
-            memory_override: Some(memory),
-        }
-    }
-
-    /// Resolves the memory handle the digest writes to: the injected test
-    /// override when present, else the process-global client
-    /// ([`active_memory_client`]). Returns `None` (best-effort skip) when the
-    /// global client is unavailable.
-    async fn resolve_memory(&self) -> Option<Arc<crate::memory::guard::MemoryGuard>> {
-        if let Some(memory) = &self.memory_override {
-            return Some(memory.clone());
-        }
-        // The guarded driver, not the raw engine client. The digest writes
-        // through the policy layer like every other write.
-        match crate::memory::ops::guard::active_memory_guard().await {
-            Ok(guard) => Some(guard),
-            Err(e) => {
-                tracing::warn!(target: "flows", error = %e, "[flows] digest: memory unavailable — skipping");
-                None
-            }
-        }
-    }
-
-    async fn handle_finished(&self, flow_id: &str, run_id: &str, status: &str) {
+    pub(super) async fn handle_finished(
+        &self,
+        ctx: crate::core::runtime::DispatchCtx,
+        flow_id: &str,
+        run_id: &str,
+        status: &str,
+    ) {
+        // As the flow's owner: its own configuration (`super::owner`).
+        let config = super::owner::config_for_scope(&ctx, &self.config);
         if status != "completed" && status != "completed_with_warnings" {
             tracing::trace!(target: "flows", %flow_id, %run_id, %status, "[flows] digest: ignoring non-success terminal status");
             return;
         }
-
-        let flow_name = match store::get_flow(&self.config, flow_id) {
-            Ok(Some(flow)) => flow.name,
-            Ok(None) => {
-                tracing::debug!(target: "flows", %flow_id, %run_id, "[flows] digest: flow no longer exists — skipping");
-                return;
-            }
-            Err(e) => {
-                tracing::warn!(target: "flows", %flow_id, %run_id, error = %e, "[flows] digest: failed to load flow — skipping");
-                return;
-            }
-        };
-
-        let run = match store::get_flow_run(&self.config, run_id) {
-            Ok(Some(run)) => run,
-            Ok(None) => {
-                tracing::warn!(target: "flows", %flow_id, %run_id, "[flows] digest: run row not found — skipping");
-                return;
-            }
-            Err(e) => {
-                tracing::warn!(target: "flows", %flow_id, %run_id, error = %e, "[flows] digest: failed to load run — skipping");
-                return;
-            }
-        };
-
-        let digest = render_run_digest(&flow_name, &run);
-
-        let Some(memory) = self.resolve_memory().await else {
+        if !crate::memory::memory_is_on(&config) {
+            tracing::debug!(target: "flows", %flow_id, %run_id, "[flows] digest: memory is off — skipping");
             return;
-        };
-        let namespace = flow_namespace(flow_id);
-        let digest_key = format!("run_digest:{run_id}");
+        }
 
-        // `store` carries the taint on the contract, so the separate
-        // `store_with_taint` door the engine trait needed is gone. The guard
-        // still stamps the effective value — `ExternalSync` here is the
-        // request, and it is the honest one: a digest is machine-generated
-        // from a flow run, not user-authored.
-        if let Err(e) = memory
-            .store(
-                &namespace,
-                &digest_key,
-                &digest,
-                MemoryCategory::Core,
-                None,
-                MemoryTaint::ExternalSync,
+        let storage = match catalog_storage::register(&ctx, &config).await {
+            Ok(registration) => registration.storage(),
+            Err(error) => {
+                tracing::warn!(target: "flows", %flow_id, %run_id, %error, "[flows] digest: failed to register scoped CatalogStorage");
+                return;
+            }
+        };
+        let proxy = match crate::modules::tinyflows::catalog_proxy(&config).await {
+            Ok(proxy) => proxy,
+            Err(error) => {
+                tracing::warn!(target: "flows", %flow_id, %run_id, %error, "[flows] digest: Catalog module unavailable");
+                return;
+            }
+        };
+
+        let workflow: Option<tinyflows_bus::catalog::Workflow> = match proxy
+            .call(
+                tinyflows_bus::catalog::members::GET_WORKFLOW,
+                (storage.clone(), flow_id.to_owned()),
             )
             .await
         {
-            tracing::warn!(target: "flows", %flow_id, %run_id, %namespace, error = %e, "[flows] digest: failed to write run digest");
-            return;
-        }
-
-        self.enforce_retention_cap(&memory, &namespace).await;
-    }
-
-    /// Best-effort prune: keeps at most [`DIGEST_RETENTION_CAP`] `run_digest:*`
-    /// entries per flow namespace, evicting the oldest (by `timestamp`) first.
-    async fn enforce_retention_cap(
-        &self,
-        memory: &Arc<crate::memory::guard::MemoryGuard>,
-        namespace: &str,
-    ) {
-        let entries = match memory.list(Some(namespace), None, None).await {
-            Ok(entries) => entries,
-            Err(e) => {
-                tracing::warn!(target: "flows", %namespace, error = %e, "[flows] digest: retention sweep failed to list namespace");
+            Ok(workflow) => workflow,
+            Err(error) => {
+                tracing::warn!(target: "flows", %flow_id, %run_id, error = %error, "[flows] digest: failed to load workflow");
                 return;
             }
         };
-        let mut digests: Vec<_> = entries
-            .into_iter()
-            .filter(|entry| entry.key.starts_with("run_digest:"))
-            .collect();
-        if digests.len() <= DIGEST_RETENTION_CAP {
+        let flow_name = match workflow {
+            Some(flow) => flow.name,
+            None => {
+                tracing::debug!(target: "flows", %flow_id, %run_id, "[flows] digest: flow no longer exists — skipping");
+                return;
+            }
+        };
+
+        let wire_run: Option<tinyflows_bus::catalog::FlowRun> = match proxy
+            .call(
+                tinyflows_bus::catalog::members::GET_RUN,
+                (tinyflows_bus::catalog::RunIdRequest {
+                    storage,
+                    id: run_id.to_owned(),
+                },),
+            )
+            .await
+        {
+            Ok(run) => run,
+            Err(error) => {
+                tracing::warn!(target: "flows", %flow_id, %run_id, error = %error, "[flows] digest: failed to load run — skipping");
+                return;
+            }
+        };
+        let Some(wire_run) = wire_run else {
+            tracing::warn!(target: "flows", %flow_id, %run_id, "[flows] digest: run row not found — skipping");
             return;
+        };
+        let run: FlowRun = wire_run;
+
+        let digest = render_run_digest(&flow_name, &run);
+        let mut meta = flow_meta(flow_id, &[FLOW_RUN_DIGEST_TAG.to_string()]);
+        meta.observed_at = Some(chrono::Utc::now());
+        // A machine-written run summary: searchable, but no facts or
+        // beliefs about the user are derived from it.
+        meta.derive = Some(false);
+        match crate::memory::ops::store_item(&config, StoreItem::document(digest, meta)).await {
+            Ok(receipt) => {
+                tracing::debug!(target: "flows", %flow_id, %run_id, replayed = receipt.replayed, "[flows] digest: run digest stored");
+            }
+            Err(Error::Off(_)) => {
+                tracing::debug!(target: "flows", %flow_id, %run_id, "[flows] digest: memory is off — skipping");
+                return;
+            }
+            Err(e) => {
+                tracing::warn!(target: "flows", %flow_id, %run_id, code = e.code(), error = %e, "[flows] digest: failed to store run digest");
+                return;
+            }
         }
-        // Oldest first, so the excess taken below is the stalest entries.
-        digests.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-        let excess = digests.len() - DIGEST_RETENTION_CAP;
-        for entry in digests.into_iter().take(excess) {
-            if let Err(e) = memory.forget(namespace, &entry.key).await {
-                tracing::warn!(target: "flows", %namespace, key = %entry.key, error = %e, "[flows] digest: retention sweep failed to forget stale entry");
+
+        match enforce_retention_cap(&config, flow_id, DIGEST_RETENTION_CAP).await {
+            Ok(0) => {}
+            Ok(forgotten) => {
+                tracing::debug!(target: "flows", %flow_id, forgotten, "[flows] digest: retention sweep forgot stale digests");
+            }
+            Err(e) => {
+                tracing::warn!(target: "flows", %flow_id, code = e.code(), error = %e, "[flows] digest: retention sweep failed");
             }
         }
     }
+}
+
+/// Keeps at most `cap` run digests for `flow_id`, forgetting the oldest (by
+/// `observed_at`) first. Returns how many were forgotten.
+pub(super) async fn enforce_retention_cap(
+    config: &Config,
+    flow_id: &str,
+    cap: usize,
+) -> Result<usize> {
+    let mut digests = Vec::new();
+    let mut cursor = None;
+    loop {
+        let page = crate::memory::ops::items_list(
+            config,
+            ItemsListParams {
+                filter: Some(digest_filter(flow_id)),
+                limit: Some(MAX_LIMIT),
+                cursor,
+                path: Vec::new(),
+                preview: false,
+            },
+        )
+        .await?;
+        digests.extend(page.items);
+        match page.next_cursor {
+            Some(next) => cursor = Some(next),
+            None => break,
+        }
+    }
+    if digests.len() <= cap {
+        return Ok(0);
+    }
+    // Oldest first, so the excess taken below is the stalest digests.
+    digests.sort_by_key(|digest| digest.meta.observed_at);
+    let excess = digests.len() - cap;
+    let ids: Vec<String> = digests
+        .into_iter()
+        .take(excess)
+        .map(|hit| hit.id.0)
+        .collect();
+    let view = crate::memory::ops::forget(config, ForgetParams { ids, reach: None }).await?;
+    Ok(view.forgotten)
 }
 
 #[async_trait]
@@ -202,7 +230,14 @@ impl EventHandler<DomainEvent> for FlowRunDigestSubscriber {
             status,
         } = event
         {
-            self.handle_finished(flow_id, run_id, status).await;
+            // Settle the run as the agent its flow belongs to (`super::owner`).
+            // `FlowRunFinished` carries no tenant: the host's own, and in SaaS
+            // none (the run is then not settled here).
+            let host = crate::core::runtime::DispatchCtx::host_default();
+            super::owner::as_owner(&host, &self.config, flow_id, |ctx| {
+                self.handle_finished(ctx, flow_id, run_id, status)
+            })
+            .await;
         }
     }
 }
@@ -233,7 +268,11 @@ pub(super) fn render_run_digest(flow_name: &str, run: &FlowRun) -> String {
             break;
         }
         let status = step.status.as_deref().unwrap_or("?");
-        let output = truncate_chars(&step.output.to_string(), 120);
+        // Scrub the complete structured output before serialization and
+        // truncation, so sensitive fields are handled by the host policy
+        // even when their values fall beyond the digest's visible prefix.
+        let sanitized = crate::security::scrub::sanitize_json(&step.output);
+        let output = truncate_chars(&sanitized.value.to_string(), 120);
         let _ = writeln!(out, "- {} [{status}]: {output}", step.node_id);
     }
     truncate_chars(&out, DIGEST_MAX_CHARS)

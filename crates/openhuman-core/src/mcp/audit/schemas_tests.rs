@@ -1,4 +1,6 @@
 use super::*;
+use crate::config::rpc as config_rpc;
+use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 
 #[test]
@@ -23,9 +25,7 @@ fn domain_schema_exports_match_internal_controller() {
 
 #[tokio::test]
 async fn handle_list_returns_persisted_audit_records() {
-    let _env_lock = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|err| err.into_inner());
+    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = tempfile::tempdir().expect("tempdir");
     unsafe {
         std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path());
@@ -34,6 +34,7 @@ async fn handle_list_returns_persisted_audit_records() {
     let config = config_rpc::load_config_with_timeout()
         .await
         .expect("config");
+    crate::mcp::test_module_port::install(&config);
     crate::mcp::audit::record_write(
         &config,
         crate::mcp::audit::NewMcpWriteRecord {
@@ -46,9 +47,12 @@ async fn handle_list_returns_persisted_audit_records() {
             error_message: None,
         },
     )
+    .await
     .expect("record write");
 
-    let value = handle_list(Map::new()).await.expect("handle list");
+    let value = handle_list(DispatchCtx::process_default(), Map::new())
+        .await
+        .expect("handle list");
     let records = value["records"].as_array().expect("records array");
     assert_eq!(records.len(), 1);
     assert_eq!(records[0]["tool_name"], "memory.store");

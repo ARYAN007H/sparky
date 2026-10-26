@@ -2,25 +2,33 @@
 
 use std::collections::HashSet;
 use std::sync::Arc;
+use tinyagents_harness_tools::static_schema;
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::Value;
 
-use crate::config::rpc as config_rpc;
+use super::live_config::live_composio_config;
+use super::redact::redact_composio_outcome;
+use crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool;
 use crate::config::Config;
-use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult};
+use crate::core::runtime::DispatchCtx;
+use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult, ToolRunContext};
 
-use super::super::client::{create_composio_client, ComposioClientKind};
-use super::super::types::ComposioToolsResponse;
-use super::visibility::{
-    empty_uncurated_toolkits_message, filter_list_tools_response, normalized_scope_toolkits,
-    render_tools_markdown, retain_connected_tools,
+use super::super::client::{resolve_composio_route, ComposioRoute};
+use super::super::module_client::{self as connectors};
+use super::super::types::{
+    ComposioConnectionsResponse, ComposioListToolsRequest, ComposioToolsResponse,
 };
+use super::render::{
+    empty_uncurated_toolkits_message, normalized_scope_toolkits, render_tools_markdown,
+    retain_connected_tools,
+};
+use tinyconnectors_bus::names::methods;
 
 pub struct ComposioListToolsTool {
-    /// Held instead of a pre-baked `ComposioClient` so the
+    /// Held instead of a pre-resolved route so the
     /// [`crate::config::ComposioConfig::mode`] toggle is
-    /// honoured on every call. Resolving the client per call mirrors
+    /// honoured on every call. Resolving the route per call mirrors
     /// [`crate::integrations::composio::ops::composio_execute`] and avoids
     /// the staged-routing bug (#1710) where a long-lived backend client
     /// would survive a user switch into `direct` mode.
@@ -49,31 +57,7 @@ impl Tool for ComposioListToolsTool {
          argument when calling `composio_execute`."
     }
     fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "toolkits": {
-                    "type": "array",
-                    "items": { "type": "string" },
-                    "description": "Optional list of toolkit slugs to filter by."
-                },
-                "tags": {
-                    "type": "array",
-                    "items": { "type": "string" },
-                    "description": "Optional Composio action tags to filter by \
-                                    (OR semantics — multiple tags broaden the result, \
-                                    e.g. [\"readOnlyHint\"] or [\"repos\", \"stars\"]). \
-                                    Case-insensitive."
-                },
-                "include_unconnected": {
-                    "type": "boolean",
-                    "description": "When true, include actions from toolkits the user \
-                                    has not connected yet. Defaults to false (only \
-                                    connected toolkits)."
-                }
-            },
-            "additionalProperties": false
-        })
+        static_schema!(include_str!("parameters/composio_list_tools.json"))
     }
     fn permission_level(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
@@ -91,6 +75,38 @@ impl Tool for ComposioListToolsTool {
         args: Value,
         options: ToolCallOptions,
     ) -> anyhow::Result<ToolResult> {
+        let ctx = dispatch_ctx_for_tool(None);
+        let (config, outcome) = Box::pin(self.execute_unredacted(&ctx, args, options)).await;
+        redact_composio_outcome(&config, outcome)
+    }
+
+    async fn execute_with_context(
+        &self,
+        args: Value,
+        options: ToolCallOptions,
+        context: Option<&dyn ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        let ctx = dispatch_ctx_for_tool(context);
+        let (config, outcome) = Box::pin(self.execute_unredacted(&ctx, args, options)).await;
+        redact_composio_outcome(&config, outcome)
+    }
+
+    fn supports_markdown(&self) -> bool {
+        true
+    }
+}
+
+impl ComposioListToolsTool {
+    /// Returns the config actually used for dispatch alongside the outcome,
+    /// so [`Tool::execute_with_options`] redacts against the same
+    /// credential that ran — not the possibly-stale snapshot captured when
+    /// this tool was registered.
+    async fn execute_unredacted(
+        &self,
+        ctx: &DispatchCtx,
+        args: Value,
+        options: ToolCallOptions,
+    ) -> (Box<Config>, anyhow::Result<ToolResult>) {
         let toolkits = args.get("toolkits").and_then(|v| v.as_array()).map(|arr| {
             arr.iter()
                 .filter_map(|v| v.as_str().map(str::to_string))
@@ -130,27 +146,27 @@ impl Tool for ComposioListToolsTool {
         // pattern. Surfacing the empty list explicitly is correct
         // fail-mode: the alternative — falling through to the backend
         // path — is exactly the bug we're closing (#1710).
-        // [#1710 Wave 4] Reload config fresh per execute so a mid-session
-        // `composio.mode` toggle takes effect at the very next tool call.
-        // Anchor the reload to this tool's original config path rather
-        // than re-resolving process-global `OPENHUMAN_WORKSPACE`; the
-        // tool is scoped to the user/workspace it was created for.
-        let live_config =
-            match config_rpc::reload_config_snapshot_with_timeout(self.config.as_ref()).await {
-                Ok(c) => c,
-                Err(e) => {
-                    tracing::warn!(error = %e, "[composio] tool: load_config failed");
-                    return Ok(ToolResult::error(format!(
+        // Boxed from the moment it exists (not just at the return): held
+        // across every await point below, and `Config` is large enough that
+        // inlining it by value in the generated async state machine blows a
+        // 2 MiB worker-thread stack (the default for `cargo test` and tokio).
+        let live_config = match live_composio_config(self.config.as_ref()).await {
+            Ok(c) => Box::new(c),
+            Err(e) => {
+                tracing::warn!(error = %e, "[composio] tool: load_config failed");
+                return (
+                    Box::new(self.config.as_ref().clone()),
+                    Ok(ToolResult::error(format!(
                         "composio: failed to load live config: {e}"
-                    )));
-                }
-            };
-        let client = match create_composio_client(&live_config) {
-            Ok(ComposioClientKind::Backend(client)) => {
-                tracing::debug!("[composio] list_tools.execute: backend variant");
-                client
+                    ))),
+                );
             }
-            Ok(ComposioClientKind::Direct(_)) => {
+        };
+        match resolve_composio_route(&live_config) {
+            Ok(ComposioRoute::Backend) => {
+                tracing::debug!("[composio] list_tools.execute: backend variant");
+            }
+            Ok(ComposioRoute::Direct(_)) => {
                 tracing::info!(
                     "[composio-direct] list_tools.execute: direct mode active — \
                      returning empty tools list. Discovery is delegated to the user's \
@@ -164,21 +180,35 @@ impl Tool for ComposioListToolsTool {
                 if options.prefer_markdown {
                     result.markdown_formatted = Some(render_tools_markdown(&resp));
                 }
-                return Ok(result);
+                return (live_config, Ok(result));
             }
             Err(e) => {
-                return Ok(ToolResult::error(format!(
-                    "composio_list_tools failed: {e}"
-                )));
+                return (
+                    live_config,
+                    Ok(ToolResult::error(format!(
+                        "composio_list_tools failed: {e}"
+                    ))),
+                );
             }
         };
 
-        match client
-            .list_tools(toolkits.as_deref(), tags.as_deref())
-            .await
+        // The module owns the route's query construction and applies the
+        // user's stored scope preference to the listing (the default request),
+        // so the host does not filter a second time.
+        super::super::ops::ensure_user_scopes_migrated(ctx, &live_config).await;
+        let request = ComposioListToolsRequest {
+            toolkits: toolkits.clone().unwrap_or_default(),
+            tags: tags.clone().unwrap_or_default(),
+            ..ComposioListToolsRequest::default()
+        };
+        let outcome = match connectors::call::<_, ComposioToolsResponse>(
+            &live_config,
+            methods::LIST_TOOLS,
+            request,
+        )
+        .await
         {
             Ok(mut resp) => {
-                filter_list_tools_response(&live_config, &mut resp).await;
                 let mut connected_toolkits: Option<HashSet<String>> = None;
 
                 if !include_unconnected {
@@ -186,7 +216,12 @@ impl Tool for ComposioListToolsTool {
                     // account. Mirrors the same status allowlist used by
                     // composio_list_connections so this view and the
                     // prompt's Delegation Guide stay in sync.
-                    match client.list_connections().await {
+                    match connectors::call_bare::<ComposioConnectionsResponse>(
+                        &live_config,
+                        methods::LIST_CONNECTIONS,
+                    )
+                    .await
+                    {
                         Ok(conns) => {
                             let connected: HashSet<String> = conns
                                 .connections
@@ -208,11 +243,14 @@ impl Tool for ComposioListToolsTool {
                             // Soft-fail: surface the issue to the agent
                             // so it can retry with include_unconnected
                             // rather than silently returning [].
-                            return Ok(ToolResult::error(format!(
-                                "composio_list_tools failed to fetch connections \
-                                 (needed to filter to connected toolkits — pass \
-                                 include_unconnected=true to skip this check): {e}"
-                            )));
+                            return (
+                                live_config,
+                                Ok(ToolResult::error(format!(
+                                    "composio_list_tools failed to fetch connections \
+                                     (needed to filter to connected toolkits — pass \
+                                     include_unconnected=true to skip this check): {e}"
+                                ))),
+                            );
                         }
                     }
                 }
@@ -225,7 +263,7 @@ impl Tool for ComposioListToolsTool {
                             toolkits = ?scoped_toolkits,
                             "[composio] list_tools empty for uncurated toolkit scope"
                         );
-                        return Ok(ToolResult::error(message));
+                        return (live_config, Ok(ToolResult::error(message)));
                     }
                 }
 
@@ -240,10 +278,11 @@ impl Tool for ComposioListToolsTool {
             Err(e) => Ok(ToolResult::error(format!(
                 "composio_list_tools failed: {e}"
             ))),
-        }
-    }
-
-    fn supports_markdown(&self) -> bool {
-        true
+        };
+        (live_config, outcome)
     }
 }
+
+#[cfg(test)]
+#[path = "list_tools_schema_tests.rs"]
+mod schema_tests;

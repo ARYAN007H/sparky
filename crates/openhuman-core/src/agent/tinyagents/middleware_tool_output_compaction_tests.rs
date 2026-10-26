@@ -16,7 +16,6 @@ fn compaction_exempt_tools_contains_every_proposal_tool() {
 }
 
 #[tokio::test]
-#[ignore = "requires a built TinyJuice module"]
 async fn tool_output_tabulates_a_large_graph_for_a_non_exempt_tool() {
     // Sanity baseline proving this test's payload actually exercises real
     // tinyjuice tabulation (and isn't just below-threshold): a tool name
@@ -118,7 +117,7 @@ async fn tool_output_leaves_an_oversized_propose_workflow_byte_for_byte_intact()
     let mw = truncation_probe_mw();
     let payload = oversized_workflow_proposal_json(30);
     assert!(
-        payload.len() > DEFAULT_TOOL_RESULT_BUDGET_BYTES,
+        payload.len() > tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes,
         "test payload must exceed the shared byte budget to exercise step 4: {} bytes",
         payload.len()
     );
@@ -338,4 +337,17 @@ async fn a_run_without_a_thread_keeps_one_scope() {
     }
     assert_eq!(scopes[0], Some(format!("run-{}", ctx.instance_id())));
     assert_eq!(scopes[0], scopes[1]);
+}
+
+#[test]
+fn repl_tools_are_exempt_from_compaction_but_not_from_the_cap() {
+    // Compacting a `juice_find` answer would store it behind a second handle.
+    // The byte cap must still apply: each REPL tool declares its own limit.
+    for tool in tinyjuice_bus::tools::REPL_TOOLS {
+        assert!(is_compaction_exempt(tool), "{tool} must not be compacted");
+        assert!(
+            !is_truncation_exempt(tool),
+            "{tool}'s answer must stay size-capped"
+        );
+    }
 }

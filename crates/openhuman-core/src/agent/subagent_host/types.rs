@@ -8,8 +8,8 @@ use std::time::Duration;
 use thiserror::Error;
 use tinytools::WorkspaceDescriptor;
 
-use crate::agent::harness::definition::AgentTier;
-use crate::agent::messages::ChatMessage;
+use tinyagents_definition::AgentTier;
+use tinyagents_session::transcript::TranscriptMessage;
 
 /// Per-spawn options that override or augment what the
 /// [`AgentDefinition`] specifies. Built by `SpawnSubagentTool::execute`
@@ -20,11 +20,6 @@ pub struct SubagentRunOptions {
     /// resolved tool list is further restricted to tools whose name
     /// starts with `{skill}__`. Overrides `definition.skill_filter`.
     pub skill_filter_override: Option<String>,
-
-    /// Optional Composio toolkit scope (e.g. `"gmail"`, `"notion"`).
-    /// When set, the sub-agent's rendered `Connected Integrations`
-    /// section is narrowed to only that toolkit's entry.
-    pub toolkit_override: Option<String>,
 
     /// Optional context blob the parent wants to inject before the
     /// task prompt. Rendered as a `[Context]\n…\n` prefix.
@@ -57,23 +52,12 @@ pub struct SubagentRunOptions {
     /// system-prompt + user-message construction and uses this history
     /// directly — it already contains the system prompt and all prior
     /// turns including the clarification tool call/result.
-    pub initial_history: Option<Vec<ChatMessage>>,
+    pub initial_history: Option<Vec<TranscriptMessage>>,
 
     /// Directory for writing/reading checkpoint files when the
     /// sub-agent pauses for user input. Defaults to
     /// `{workspace_dir}/.openhuman/subagent_checkpoints/`.
     pub checkpoint_dir: Option<PathBuf>,
-
-    /// Per-worker isolated checkout for git-worktree isolation.
-    ///
-    /// When `Some`, the runner derives a [`WorkspaceDescriptor`] rooted at this
-    /// path (see `workspace_descriptor_for_subagent`) and threads it onto the
-    /// tinyagents run context, so acting tools (shell, git) resolve their CWD to
-    /// the worker's isolated worktree checkout via
-    /// `ToolExecutionContext.workspace` instead of the shared `Config.action_dir`.
-    /// When `None` (the default), behaviour is unchanged — tools fall through to
-    /// `security.action_dir`.
-    pub worktree_action_dir: Option<PathBuf>,
 
     /// SDK workspace descriptor threaded into the TinyAgents tool-execution
     /// context. When present it is attached to the run's `RunContext`
@@ -92,6 +76,11 @@ pub struct SubagentRunOptions {
             tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>,
         >,
     >,
+
+    /// Native TinyAgents message queue for a driver-backed delegated run.
+    /// Generic Jobs/Message controls inject full user messages here; this is
+    /// converted to the runtime feed by the host's graph adapter.
+    pub message_run_queue: Option<tinyagents_harness::run_queue::RunQueueHandle>,
 }
 
 /// Terminal status of a sub-agent run.
@@ -100,8 +89,8 @@ pub enum SubagentRunStatus {
     /// The sub-agent completed normally with a final response.
     Completed,
     /// The sub-agent called `ask_user_clarification` and is waiting
-    /// for the orchestrator to relay the user's answer via
-    /// `continue_subagent`.
+    /// for the orchestrator to relay the user's answer via a same-key async
+    /// spawn.
     AwaitingUser {
         question: String,
         options: Option<Vec<String>>,
@@ -113,8 +102,8 @@ pub enum SubagentRunStatus {
         /// failure in the runner was logged at `warn` and then reported as an
         /// ordinary `AwaitingUser` anyway. The orchestrator relayed a question
         /// and a `task_id`, and the failure only surfaced much later, when the
-        /// user had already answered and `continue_subagent` found nothing on
-        /// disk. Carrying the outcome here is what makes a failed write
+        /// user had already answered and the next spawn found nothing on disk.
+        /// Carrying the outcome here is what makes a failed write
         /// visible at pause time rather than at resume time (#5928).
         ///
         /// `None` does not mean resumption is impossible: a sub-agent with a
@@ -133,6 +122,9 @@ pub enum SubagentRunStatus {
     Incomplete {
         /// Short, machine-set reason the run stopped short (stuck vs. cap).
         reason: String,
+        /// Typed failure classification when the harness has one. It remains
+        /// separate from `reason`, which is user-facing summary text.
+        failure_cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
     },
     /// Cooperative cancellation won the subagent lifecycle. This is distinct
     /// from an incomplete run so callers never publish a completed result for
@@ -151,6 +143,9 @@ pub struct SubagentRunOutcome {
     pub output: String,
     /// How many LLM round-trips were performed during the run.
     pub iterations: usize,
+    /// Typed failure cause for a classified terminal halt. Kept alongside the
+    /// display status so later projections preserve class and operation.
+    pub failure_cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
     /// Total wall-clock duration of the run.
     pub elapsed: Duration,
     /// Which execution mode was used (Typed vs. Fork).
@@ -160,7 +155,7 @@ pub struct SubagentRunOutcome {
     /// Final in-memory history after the run loop exits. Durable sub-agent
     /// sessions persist this so an idle worker can resume without rebuilding
     /// its context from only the parent transcript.
-    pub final_history: Vec<ChatMessage>,
+    pub final_history: Vec<TranscriptMessage>,
     /// Token + cost accounting accumulated across every provider call this
     /// sub-agent made. Surfaced so the parent turn can roll child spend into
     /// the session totals (tokens + USD) and the global cost tracker. See
@@ -200,7 +195,33 @@ pub struct SubagentUsage {
     pub input_tokens: u64,
     pub output_tokens: u64,
     pub cached_input_tokens: u64,
+    /// Sum of the run's known call costs; read with `cost_source`.
     pub charged_amount_usd: f64,
+    /// How certain `charged_amount_usd` is. `Unknown` means some call had no
+    /// charge and no catalogued price, so the sum is incomplete.
+    #[serde(
+        default = "unknown_cost_source",
+        skip_serializing_if = "is_unknown_cost_source"
+    )]
+    pub cost_source: tinyagents_harness::cost::CostSource,
+}
+
+fn unknown_cost_source() -> tinyagents_harness::cost::CostSource {
+    tinyagents_harness::cost::CostSource::Unknown
+}
+
+fn is_unknown_cost_source(source: &tinyagents_harness::cost::CostSource) -> bool {
+    *source == tinyagents_harness::cost::CostSource::Unknown
+}
+
+impl SubagentUsage {
+    /// The run's cost as a tally, for folding into a parent's.
+    pub fn cost(&self) -> tinyagents_harness::cost::CostTally {
+        tinyagents_harness::cost::CostTally {
+            known_usd: self.charged_amount_usd,
+            source: self.cost_source,
+        }
+    }
 }
 
 /// Which prompt-construction path the runner took for a sub-agent.
@@ -234,11 +255,13 @@ pub struct SubagentCheckpointData {
     pub task_id: String,
     pub agent_id: String,
     pub worker_thread_id: Option<String>,
-    pub history: Vec<ChatMessage>,
+    #[serde(with = "crate::agent::messages::history_wire")]
+    pub history: Vec<TranscriptMessage>,
     pub question: String,
     pub options: Option<Vec<String>>,
-    /// Composio toolkit override, if the paused run was scoped to one.
-    pub toolkit_override: Option<String>,
+    // A legacy `toolkit_override` key (written before the toolkit spawn
+    // argument was retired) is ignored on load: this type does not deny
+    // unknown fields, so old checkpoints stay readable.
     /// Workflow filter override, if the paused run was scoped to one.
     pub skill_filter_override: Option<String>,
     /// Model override, if one was set for this run.
@@ -350,3 +373,7 @@ pub enum SubagentRunError {
         observed_samples: u64,
     },
 }
+
+#[cfg(test)]
+#[path = "types_tests.rs"]
+mod tests;

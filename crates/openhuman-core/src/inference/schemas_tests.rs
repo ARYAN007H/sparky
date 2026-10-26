@@ -1,29 +1,16 @@
 use super::*;
+use crate::core::all::assert_schema_controller_parity;
+use crate::core::runtime::DispatchCtx;
 
 use crate::core::TypeSchema;
 #[test]
-fn inference_catalog_counts_match_and_nonempty() {
-    let declared = all_controller_schemas();
-    let registered = all_registered_controllers();
-    assert_eq!(declared.len(), registered.len());
-    assert!(declared.len() >= 19);
-}
-
-#[test]
-fn inference_schemas_use_inference_namespace() {
-    for schema in all_controller_schemas() {
-        assert_eq!(
-            schema.namespace, "inference",
-            "function {}",
-            schema.function
-        );
-        assert!(!schema.description.is_empty());
-        assert!(!schema.outputs.is_empty());
-    }
-}
-
-#[test]
 fn inference_schema_function_names_are_stable() {
+    crate::core::all::expect_schema_namespace(&all_controller_schemas(), "inference");
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "status",
+    );
     let functions: Vec<&str> = all_controller_schemas()
         .into_iter()
         .map(|schema| schema.function)
@@ -33,9 +20,11 @@ fn inference_schema_function_names_are_stable() {
     assert!(functions.contains(&"update_model_settings"));
     assert!(functions.contains(&"update_local_settings"));
     assert!(functions.contains(&"list_models"));
-    assert!(functions.contains(&"device_profile"));
-    assert!(functions.contains(&"presets"));
-    assert!(functions.contains(&"apply_preset"));
+    // Local model presets, device profiling and tiering were removed: the
+    // user runs their own local runtime and picks models there.
+    assert!(!functions.contains(&"device_profile"));
+    assert!(!functions.contains(&"presets"));
+    assert!(!functions.contains(&"apply_preset"));
     assert!(functions.contains(&"diagnostics"));
     assert!(functions.contains(&"openai_oauth_start"));
     assert!(functions.contains(&"openai_oauth_complete"));
@@ -126,21 +115,15 @@ fn inference_openai_oauth_schemas_are_registered_with_expected_shapes() {
 #[tokio::test]
 async fn inference_openai_oauth_complete_handler_rejects_invalid_params() {
     let params = Map::from_iter([("callback_url".to_string(), Value::Bool(true))]);
-    let err = handle_inference_openai_oauth_complete(params)
+    let err = handle_inference_openai_oauth_complete(DispatchCtx::process_default(), params)
         .await
         .expect_err("invalid params");
     assert!(err.contains("invalid params"));
 }
 
-#[test]
-fn inference_unknown_schema_panics() {
-    let panic = std::panic::catch_unwind(|| schemas("no_such_function"));
-    assert!(panic.is_err());
-}
-
 #[tokio::test]
 async fn inference_status_handler_returns_cli_json() {
-    let value = handle_inference_status(Map::new())
+    let value = handle_inference_status(DispatchCtx::process_default(), Map::new())
         .await
         .expect("handler value");
     assert!(value.get("result").is_some() || value.get("logs").is_some());
@@ -149,7 +132,7 @@ async fn inference_status_handler_returns_cli_json() {
 #[tokio::test]
 async fn inference_prompt_handler_rejects_invalid_shape() {
     let params = Map::from_iter([("prompt".to_string(), Value::Bool(true))]);
-    let err = handle_inference_prompt(params)
+    let err = handle_inference_prompt(DispatchCtx::process_default(), params)
         .await
         .expect_err("invalid params");
     assert!(err.contains("invalid params"));

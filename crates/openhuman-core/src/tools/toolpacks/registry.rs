@@ -4,7 +4,7 @@
 //! could edit would let a caller move a dangerous tool out of the advertised
 //! surface (or back into it) without review. Adding a pack is a source change.
 
-use super::types::ToolPack;
+use tinyagents_harness_tools::skills::{PackCatalog, ToolPack};
 
 /// Every pack this build knows about.
 ///
@@ -21,8 +21,6 @@ pub const PACKS: &[ToolPack] = &[
         id: "workflows",
         summary: "Saved automation workflows: build, discover, run, inspect runs.",
         tools: &[
-            "build_workflow",
-            "discover_workflows",
             "run_workflow",
             "await_workflow",
             "describe_workflow",
@@ -57,6 +55,9 @@ pub const PACKS: &[ToolPack] = &[
             "list_agent_definitions",
             "list_connectable_toolkits",
         ],
+        // The orchestrator is NOT an owner: it builds and discovers through
+        // `spawn_subagent` (prompt.md) and reaches the rest via `use_skill`,
+        // so owning the pack put all of it on its wire for nothing.
         owners: &["workflow_builder", "flow_discovery"],
         guide: "",
     },
@@ -103,9 +104,10 @@ pub const PACKS: &[ToolPack] = &[
             "mcp_registry_tool_call",
             "mcp_registry_uninstall",
         ],
-        // The orchestrator owns it so the four registry tools on its belt stay
-        // advertised; the catalogue readers are `Deferred` and reached through
-        // `tool_search` or this skill.
+        // The orchestrator owns it so the four registry tools it names are not
+        // withheld; its `deferred_tools` then takes them off its wire, so they
+        // are found through `tool_search` like the catalogue readers (which are
+        // `Deferred` for every agent) and stay callable by name.
         owners: &["orchestrator", "planner"],
         guide: include_str!("guides/mcp.md"),
     },
@@ -145,11 +147,9 @@ pub const PACKS: &[ToolPack] = &[
     },
     ToolPack {
         id: "skills",
-        // The install hand-off (`setup_skills`) is not a member: it is the
-        // orchestrator's direct route into this family. See
-        // `DELIBERATELY_UNPACKED_HANDOFFS`. Running an installed skill is the
-        // orchestrator's own `run_workflow`.
-        summary: "Skills: search installed, browse and install from registries, read resources.",
+        // Skill installation and registry work are routed through
+        // `spawn_subagent` to the `skill_setup` specialist.
+        summary: "Skills: find and install agent skills, browse registries, read resources.",
         tools: &[
             // In the pack, not outside it. A search tool advertised while the
             // tool it hands off to (`describe_workflow`) stays
@@ -192,24 +192,8 @@ pub const PACKS: &[ToolPack] = &[
         tools: &[
             "generate_document",
             "generate_presentation",
-            // The delegate, not just the leaf tools: an orchestrator that can
-            // see `make_presentation` pays its schema on every turn to route a
-            // request that arrives in a small minority of them, and the pack
-            // it would route into is already withheld.
-            "make_presentation",
         ],
         owners: &["presentation_agent"],
-        guide: "",
-    },
-    ToolPack {
-        id: "audio",
-        summary: "Generate a spoken podcast from text and optionally email the audio.",
-        tools: &[
-            "audio_generate_podcast",
-            "audio_email_podcast",
-            "audio_generate_and_email_podcast",
-        ],
-        owners: &[],
         guide: "",
     },
     ToolPack {
@@ -294,18 +278,12 @@ pub const PACKS: &[ToolPack] = &[
         // `tool_search` finds one of them, and this skill hands out the whole
         // loop with its playbook. It replaced the `code_executor` / `critic` /
         // `tool_maker` specialists, whose value was that playbook.
-        // `lsp` is not listed: it registers only behind its capability gate,
-        // and every pack member must resolve in a default build. It is
-        // `Deferred` too, so `tool_search` still finds it when enabled.
         tools: &[
             "grep",
             "glob",
             "list",
             "git_operations",
             "edit",
-            "node_exec",
-            "npm_exec",
-            "python_exec",
             "curl",
             "read_diff",
             "run_linter",
@@ -313,7 +291,13 @@ pub const PACKS: &[ToolPack] = &[
         ],
         // `planner` and `critic` are workflow-run workers, not chat
         // delegates; inspecting files is their loop, so they keep the family.
-        owners: &["planner", "critic", "image_agent", "video_agent", "vision_agent"],
+        owners: &[
+            "planner",
+            "critic",
+            "image_agent",
+            "video_agent",
+            "vision_agent",
+        ],
         guide: include_str!("guides/coding.md"),
     },
     ToolPack {
@@ -336,29 +320,9 @@ pub const PACKS: &[ToolPack] = &[
         guide: include_str!("guides/scheduling.md"),
     },
     ToolPack {
-        id: "profile",
-        summary: "The user's profile: record preferences, edit persona and people graph.",
-        // The delegate and the two raw tools belong together because they are
-        // one question from the model's side — "remember this about the user" —
-        // split only by how much editing it needs.
-        tools: &[
-            "save_preference",
-            "remember_preference",
-            "manage_profile_memory",
-        ],
-        owners: &["profile_memory_agent"],
-        guide: "",
-    },
-    ToolPack {
         id: "media",
         summary: "Images and clips: generate, or read (describe, OCR, charts, UI elements).",
         tools: &[
-            "create_image",
-            "create_video",
-            // Reading an image, not making one, but it is the same belt from
-            // the model's point of view: the request that reaches for it names
-            // a picture either way.
-            "analyze_image",
             "media_generate_image",
             "media_generate_video",
             "media_list_models",
@@ -367,22 +331,11 @@ pub const PACKS: &[ToolPack] = &[
         guide: "",
     },
     ToolPack {
-        id: "tasks",
-        summary: "Task sources, workflows, artifacts: add, preview, fetch, update, remove.",
-        tools: &["manage_tasks"],
-        owners: &["task_manager_agent"],
-        guide: "",
-    },
-    ToolPack {
         id: "goals",
         // Everything about goals EXCEPT closing one.
         //
-        // Two different surfaces live here, and the pack is the seam that lets
-        // the model find either: `goals` is the user's durable long-term
-        // objectives held in memory, while `goal_get` / `goal_set` are the
-        // agent-owned completion contract for one conversation thread and are
-        // assigned to `goals_agent`. Long-term goals remain user-reachable
-        // through `memory_goals.*`.
+        // `goal_get` / `goal_set` are the agent-owned completion contract for
+        // one conversation thread.
         //
         // `goal_complete` is deliberately NOT a member. Closing a goal is the
         // one goal operation an agent reaches for reactively, at the end of
@@ -390,9 +343,9 @@ pub const PACKS: &[ToolPack] = &[
         // moment buys nothing: the alternative to a visible `goal_complete` is
         // an objective that silently stays open and keeps driving autonomous
         // continuation. Same reasoning as `DELIBERATELY_UNPACKED_FLEET_TOOLS`.
-        summary: "Long-term goals and this thread's objective: read, add, edit.",
-        tools: &["goals", "goal_get", "goal_set"],
-        owners: &["goals_agent"],
+        summary: "This thread's objective: read and set it.",
+        tools: &["goal_get", "goal_set"],
+        owners: &[],
         guide: "",
     },
     ToolPack {
@@ -404,61 +357,35 @@ pub const PACKS: &[ToolPack] = &[
     },
 ];
 
-/// The fleet tools are deliberately NOT a pack, and this is worth stating
-/// because they look like an obvious 1.6k-token candidate.
-///
-/// `steer_subagent`, `wait_subagent`, `close_subagent`, `list_subagents`,
-/// `continue_subagent`, `wait`, `wait_loop` and `spawn_parallel_agents` are
-/// needed *reactively*, mid-turn — exactly when an async worker returns or
-/// pauses on `ask_user_clarification`. A load round-trip at that moment is the
-/// worst possible time to add one, and a `continue_subagent` the model cannot
-/// see is the known infinite-re-delegation failure mode (#4291): the only
-/// continuation left is a fresh stateless sub-agent that asks the same
-/// question again.
-#[cfg(test)]
-pub(crate) const DELIBERATELY_UNPACKED_FLEET_TOOLS: &[&str] = &[
-    "steer_subagent",
-    "wait_subagent",
-    "close_subagent",
-    "list_subagents",
-    "continue_subagent",
-    "wait",
-    "wait_loop",
-    "spawn_parallel_agents",
+/// Pack families that a directly callable `spawn_subagent` owner replaces for
+/// this host. This is separate from `ToolPack::owners`: a pack may give an
+/// agent a few auxiliary tools without making that agent the route for the
+/// whole family (for example, media specialists own image helpers in the
+/// coding pack, but the Master Agent still owns ordinary coding work).
+pub const DIRECT_HANDOFF_PACK_OWNERS: &[(&str, &[&str])] = &[
+    ("workflows", &["workflow_builder", "flow_discovery"]),
+    ("skills", &["skill_setup"]),
+    ("documents", &["presentation_agent"]),
+    ("media", &["image_agent", "video_agent", "vision_agent"]),
 ];
 
-/// The skill hand-offs are deliberately not packed (#6302).
-///
-/// `setup_skills` and `run_skill` are the orchestrator's route into the
-/// skills family. Packed, they sat in the same listing as the raw
-/// `skill_registry_*` tools, one `use_skill` round trip
-/// away, and a live account showed the cost: across 11 turns the orchestrator
-/// called the raw tools itself, guessed at tool names, and never handed off.
-/// Handing off is the most common thing it does with these families, so the
-/// `collapsed_delegation.rs` argument applies: frequency of use decides, and
-/// delegation should not pay a round trip.
-///
-/// With a hand-off on the belt, `ops::closed_by_direct_handoff` closes the
-/// owning pack's raw tools to the caller, so the hand-off is its only route.
-/// The other packed hand-offs (`do_crypto`, `build_workflow`,
-/// `discover_workflows`, `make_presentation`, ...) stay packed: each is its own
-/// token-cost decision, and the same closing rule takes effect for any of them
-/// as soon as it is unpacked and listed here.
-#[cfg(test)]
-pub(crate) const DELIBERATELY_UNPACKED_HANDOFFS: &[&str] = &["setup_skills"];
+/// The lookup surface over [`PACKS`] handed to the generic `use_skill` tool
+/// (`tinyagents_harness_tools::skills`). `NOT_FOUND_MARKER` is the host's status
+/// vocabulary, so a "no such skill / tool" result classifies as `NotFound`.
+pub const CATALOG: PackCatalog = PackCatalog::new(PACKS, tinytools::status::NOT_FOUND_MARKER);
 
 pub fn pack(id: &str) -> Option<&'static ToolPack> {
-    PACKS.iter().find(|p| p.id == id)
+    CATALOG.pack(id)
 }
 
 /// The pack owning `tool`, if any.
 pub fn pack_for_tool(tool: &str) -> Option<&'static ToolPack> {
-    PACKS.iter().find(|p| p.owns(tool))
+    CATALOG.pack_for_tool(tool)
 }
 
 /// Every packed tool name across all packs.
 pub fn all_packed_tool_names() -> Vec<&'static str> {
-    PACKS.iter().flat_map(|p| p.tools.iter().copied()).collect()
+    CATALOG.all_packed_tool_names()
 }
 
 /// Every packed tool name that applies to `agent_id`.
@@ -467,45 +394,22 @@ pub fn all_packed_tool_names() -> Vec<&'static str> {
 /// [`ToolPack::owners`]. The orchestrator owns the MCP integrations pack so
 /// its small named MCP tool set remains directly callable.
 pub fn packed_tool_names_for_agent(agent_id: &str) -> Vec<&'static str> {
-    PACKS
-        .iter()
-        .filter(|p| !p.is_owner(agent_id))
-        .flat_map(|p| p.tools.iter().copied())
-        .collect()
+    CATALOG.packed_tool_names_for_agent(agent_id)
 }
 
 /// The always-on index: one line per pack, rendered into `use_skill`'s own
 /// description so the model can pick a pack without a round trip.
 pub fn pack_index_markdown() -> String {
-    pack_index_markdown_filtered(&|_| true)
+    CATALOG.pack_index_markdown()
 }
 
 /// The pack index, limited to packs this session can call at least one tool in.
-///
-/// A pack with nothing callable is not an answer to "which skills can I load",
-/// and advertising it costs a round trip: the model loads it, learns it cannot
-/// use it, and comes back. The capability does not disappear — a pack's owners
-/// reach the model through their own `delegate_*` tools, whose `when_to_use`
-/// descriptions are already on the wire and are what the model should call
-/// anyway. Keeping the pack listed here would duplicate that routing on every
-/// single turn.
 pub fn pack_index_markdown_filtered(is_callable: &dyn Fn(&str) -> bool) -> String {
-    let mut out = String::new();
-    for p in PACKS {
-        if !p.tools.iter().any(|t| is_callable(t)) {
-            continue;
-        }
-        out.push_str(&format!("- `{}` — {}\n", p.id, p.summary));
-    }
-    out
+    CATALOG.pack_index_markdown_filtered(is_callable)
 }
 
 /// Pack ids with at least one tool this session can call — the `skill` enum
-/// `load_skill` should actually offer.
+/// `use_skill` should actually offer.
 pub fn callable_pack_ids(is_callable: &dyn Fn(&str) -> bool) -> Vec<&'static str> {
-    PACKS
-        .iter()
-        .filter(|p| p.tools.iter().any(|t| is_callable(t)))
-        .map(|p| p.id)
-        .collect()
+    CATALOG.callable_pack_ids(is_callable)
 }

@@ -14,6 +14,12 @@ const host = process.env.TAURI_DEV_HOST;
 // avoid the hardcoded 1420 collision. Default 1420 preserves prior behavior;
 // HMR companion port is dev port + 1 (used only when TAURI_DEV_HOST is set).
 const devPort = Number(process.env.OPENHUMAN_DEV_PORT) || 1420;
+// Headless/automated runs (Playwright, `pnpm debug web`): serve the app
+// without a file watcher or HMR socket. A large tree can exhaust the host's
+// inotify watch limit (`ENOSPC: System limit for number of file watchers
+// reached`, fatal to the dev server), and a scripted browser has no use for
+// hot reload.
+const noWatch = process.env.OPENHUMAN_VITE_NO_WATCH === "1";
 const hmrPort = devPort + 1;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -184,7 +190,7 @@ function devConnectPlugin(): PluginOption {
       try {
         var url = ${json(rpcUrl)};
         var token = ${json(token)};
-        // A core's GET /dev/connect (crates/openhuman-core/src/core/dev_connect.rs)
+        // A core's GET /dev/connect (crates/openhuman-rpc/src/server/dev_connect.rs)
         // lands here with its URL + bearer in the fragment, which never reaches
         // a server. That wins over the dev server's own env so a browser can
         // attach to an already-running desktop core (and its session). Only a
@@ -314,7 +320,9 @@ export default defineConfig(async () => ({
     allowedHosts: [
       "frontend-runner-openhuman-git-main-vezuresxyz.vercel.app",
     ],
-    hmr: host
+    hmr: noWatch
+      ? false
+      : host
       ? {
           protocol: "ws",
           host,
@@ -329,10 +337,12 @@ export default defineConfig(async () => ({
           port: devPort,
           clientPort: devPort,
         },
-    watch: {
-      // 3. tell Vite to ignore watching `src-tauri` directory (includes src-tauri/ai)
-      ignored: ["**/src-tauri/**"],
-    },
+    watch: noWatch
+      ? null
+      : {
+          // 3. tell Vite to ignore watching `src-tauri` directory (includes src-tauri/ai)
+          ignored: ["**/src-tauri/**"],
+        },
   },
   resolve: {
     alias: {

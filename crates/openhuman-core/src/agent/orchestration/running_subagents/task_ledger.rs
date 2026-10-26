@@ -1,56 +1,69 @@
 //! Durable per-workspace task store plumbing and the typed lifecycle ledger
 //! that mirrors each detached sub-agent's status into it (issue #4249).
 //!
-//! The caching and the durable→memory fallback are TinyAgents'
-//! (`TaskStoreRegistry` / `open_jsonl_task_store_or_memory`): opening a second
-//! store over the same append log would give two writers with independently
-//! replayed state, and a workspace that cannot be written should degrade to an
-//! in-memory ledger rather than take orchestration down. What stays here is the
-//! path layout, the record shape, and the reconciliation of orphaned tasks on
-//! boot.
+//! The store is TinyAgents' `DriverTaskStore` over the storage backend's
+//! documents, cached per workspace and scope (`TaskStoreRegistry`); a backend
+//! that cannot be reached degrades to an in-memory ledger rather than taking
+//! orchestration down. What stays here is the record shape and the
+//! reconciliation of orphaned tasks on boot.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
-use tinyagents_graph::orchestration::{
-    open_jsonl_task_store_or_memory, reconcile_orphaned_tasks, InMemoryTaskStore,
-    OrchestrationTaskFilter, OrchestrationTaskKind, OrchestrationTaskRecord,
-    OrchestrationTaskResult, OrchestrationTaskSpec, OrchestrationTaskStatus, TaskStore,
-    TaskStoreRegistry,
+use tinyagents_orchestration::subagent::{
+    orphaned_subagent_reason, record_agent_id, record_parent_session, task_status_label, WaitError,
 };
-use tinyagents_harness::ids::TaskId;
+use tinyagents_tasks::{
+    open_driver_task_store_or_memory, reconcile_orphaned_tasks, InMemoryTaskStore,
+    OrchestrationTaskFilter, TaskStore, TaskStoreRegistry,
+};
 
-use super::registry::DETACHED_LEDGER_TIMEOUT_MS;
-use super::wait::{WaitError, WaitOutcome};
-use super::SubagentStatus;
+/// One cached ledger: a workspace and the storage scope it was opened for.
+type LedgerKey = (PathBuf, String);
 
-/// Where a workspace's detached-task ledger lives.
-///
-/// A product path, not a generic one: TinyAgents opens whatever file it is
-/// given, and this is where OpenHuman keeps it.
-fn task_store_path(workspace_dir: &Path) -> PathBuf {
-    workspace_dir
-        .join(".openhuman")
-        .join("orchestration_tasks.jsonl")
-}
-
-#[cfg(test)]
-fn default_task_store_workspace() -> PathBuf {
-    crate::config::default_root_openhuman_dir()
-        .map(|root| root.join("workspace"))
-        .unwrap_or_else(|_| PathBuf::from(".openhuman").join("workspace"))
-}
+const DOMAIN: &str = "running_subagents::task_ledger";
 
 /// Process-wide typed lifecycle ledger for detached sub-agents (issue #4249),
-/// one durable store per workspace.
-static TASK_STORES: OnceLock<TaskStoreRegistry<PathBuf>> = OnceLock::new();
+/// one durable store per workspace and storage scope: the `orchestration_*`
+/// document collections of the storage backend (TinyAgents' `DriverTaskStore`).
+static TASK_STORES: OnceLock<TaskStoreRegistry<LedgerKey>> = OnceLock::new();
 
-fn task_stores() -> &'static TaskStoreRegistry<PathBuf> {
+fn task_stores() -> &'static TaskStoreRegistry<LedgerKey> {
     TASK_STORES.get_or_init(|| {
-        TaskStoreRegistry::new(|workspace_dir: &PathBuf| {
-            open_jsonl_task_store_or_memory(&task_store_path(workspace_dir))
+        TaskStoreRegistry::new(|(workspace_dir, scope): &LedgerKey| {
+            match open_driver_store(workspace_dir) {
+                Ok(store) => store,
+                Err(error) => {
+                    // A backend that cannot be reached degrades to an
+                    // in-memory ledger rather than taking orchestration down.
+                    log::warn!(
+                        "[running_subagents] task ledger unavailable for scope={scope}; using memory: {error:#}"
+                    );
+                    Arc::new(InMemoryTaskStore::new())
+                }
+            }
         })
     })
+}
+
+fn open_driver_store(workspace_dir: &Path) -> anyhow::Result<Arc<dyn TaskStore>> {
+    let opened = crate::storage::local::open(DOMAIN, workspace_dir)?;
+    let scoped = opened.scoped()?;
+    Ok(open_driver_task_store_or_memory(Arc::clone(
+        scoped.documents(),
+    )))
+}
+
+/// The cache key for this call: the storage scope joins the workspace, so two
+/// agents on one workspace never share a ledger.
+fn ledger_key(workspace_dir: &Path) -> Option<LedgerKey> {
+    match crate::storage::current_scope() {
+        Ok(scope) => Some((workspace_dir.to_path_buf(), scope.to_string())),
+        Err(error) => {
+            log::warn!("[running_subagents] task ledger has no storage scope: {error}");
+            None
+        }
+    }
 }
 
 /// The ledger for `workspace_dir`, opening it on first use.
@@ -60,7 +73,9 @@ fn task_stores() -> &'static TaskStoreRegistry<PathBuf> {
 /// panic in an unrelated task must not turn sub-agent spawning into a second
 /// panic.
 pub(crate) fn task_store_for_workspace(workspace_dir: &Path) -> Arc<dyn TaskStore> {
-    let key = workspace_dir.to_path_buf();
+    let Some(key) = ledger_key(workspace_dir) else {
+        return Arc::new(InMemoryTaskStore::new());
+    };
     match task_stores().get_or_open(&key) {
         Ok(store) => store,
         Err(err) => {
@@ -74,99 +89,22 @@ pub(crate) fn task_store_for_workspace(workspace_dir: &Path) -> Arc<dyn TaskStor
     }
 }
 
-#[cfg(test)]
-fn task_store() -> Arc<dyn TaskStore> {
-    let workspace = default_task_store_workspace();
-    task_store_for_workspace(&workspace)
-}
-
-/// Record a freshly-spawned sub-agent in the store (`Pending` → `Running`).
-/// Insert errors (e.g. a re-used task id across tests) are intentionally ignored.
-pub(crate) fn record_spawned(
-    task_id: &str,
-    agent_id: &str,
-    parent_session: &str,
-    session_parent_prefix: Option<&str>,
-    subagent_session_id: Option<&str>,
+/// Open the caller's task store in its captured scope. SaaS calls without a
+/// resolved owner fail closed rather than falling back to ambient storage.
+pub(super) fn scoped_task_store(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &Path,
-    parent_thread_id: Option<&str>,
-) {
-    let store = task_store_for_workspace(workspace_dir);
-    let root_run_id = session_parent_prefix
-        .and_then(|prefix| prefix.split("__").next())
-        .filter(|root| !root.is_empty())
-        .unwrap_or(parent_session);
-    let mut spec = OrchestrationTaskSpec::new(
-        task_id.to_string(),
-        OrchestrationTaskKind::SubAgent {
-            agent: agent_id.to_string(),
-        },
-    )
-    .with_lineage(parent_session.to_string(), root_run_id.to_string())
-    .with_timeout_ms(DETACHED_LEDGER_TIMEOUT_MS)
-    .with_metadata("parentSession", parent_session.to_string())
-    .with_metadata("rootSession", root_run_id.to_string())
-    .with_metadata(
-        "defaultWaitTimeoutMs",
-        DETACHED_LEDGER_TIMEOUT_MS.to_string(),
-    )
-    .with_metadata("workspaceDir", workspace_dir.display().to_string());
-    if let Some(session_parent_prefix) = session_parent_prefix {
-        spec = spec.with_metadata("sessionParentPrefix", session_parent_prefix.to_string());
+) -> Result<Arc<dyn TaskStore>, WaitError> {
+    if let Some(context) = ctx.resolved() {
+        return Ok(crate::core::runtime::CoreContext::sync_scope(
+            context,
+            || task_store_for_workspace(workspace_dir),
+        ));
     }
-    if let Some(parent_thread_id) = parent_thread_id {
-        spec = spec
-            .with_thread(parent_thread_id.to_string())
-            .with_metadata("parentThreadId", parent_thread_id.to_string());
+    if crate::core::runtime::is_saas() {
+        return Err(WaitError::NotOwned);
     }
-    if let Some(subagent_session_id) = subagent_session_id {
-        spec = spec.with_metadata("subagentSessionId", subagent_session_id.to_string());
-    }
-    let _ = store.insert(spec);
-    let _ = store.mark_running(&TaskId::new(task_id));
-}
-
-/// Mirror a child's published [`SubagentStatus`] into the typed store. Transition
-/// errors (already terminal / cancelled) are ignored — first writer wins.
-pub(crate) fn record_status(workspace_dir: &Path, task_id: &str, status: &SubagentStatus) {
-    let store = task_store_for_workspace(workspace_dir);
-    let id = TaskId::new(task_id);
-    log::debug!(
-        "[running_subagents] recording task status task_id={} workspace_dir={} terminal={}",
-        task_id,
-        workspace_dir.display(),
-        status.is_terminal()
-    );
-    match status {
-        SubagentStatus::Completed { output, .. } => {
-            let _ = store.complete(&id, OrchestrationTaskResult::text(output.clone()));
-        }
-        SubagentStatus::Failed { error } => {
-            let _ = store.fail(&id, error.clone());
-        }
-        SubagentStatus::AwaitingUser { .. } => {
-            let _ = store.mark_awaiting(&id);
-        }
-        SubagentStatus::Running => {}
-    }
-}
-
-/// Record a cancellation (`CancelRequested` → `Cancelled`) for `task_id`.
-pub(crate) fn record_cancelled(workspace_dir: &Path, task_id: &str) {
-    let store = task_store_for_workspace(workspace_dir);
-    let id = TaskId::new(task_id);
-    log::debug!(
-        "[running_subagents] recording task cancellation task_id={} workspace_dir={}",
-        task_id,
-        workspace_dir.display()
-    );
-    let _ = store.request_cancel(&id);
-    let _ = store.mark_cancelled(&id);
-}
-
-pub(crate) fn list_task_records(workspace_dir: &Path) -> Vec<OrchestrationTaskRecord> {
-    let store = task_store_for_workspace(workspace_dir);
-    store.list(OrchestrationTaskFilter::default().with_kind("sub_agent"))
+    Ok(task_store_for_workspace(workspace_dir))
 }
 
 /// Restart/resume reconciliation for detached sub-agents (issue #4249 / 07.2
@@ -175,7 +113,7 @@ pub(crate) fn list_task_records(workspace_dir: &Path) -> Vec<OrchestrationTaskRe
 /// A detached sub-agent runs as a `tokio` task owned by the process that spawned
 /// it. When the core restarts, that task — and its live [`tokio::task::AbortHandle`] /
 /// [`tinyagents_harness::CancellationToken`] — is gone, but the durable
-/// `JsonlTaskStore` still holds a non-terminal (`Pending`/`Running`/`Awaiting`/
+/// task ledger still holds a non-terminal (`Pending`/`Running`/`Awaiting`/
 /// `CancelRequested`) record for it. Such a record is **orphaned**: there is no
 /// live executor to re-attach to (OpenHuman spawns child processes, so an
 /// in-flight run from a dead parent cannot be resumed), and the run-ledger
@@ -190,6 +128,17 @@ pub(crate) fn list_task_records(workspace_dir: &Path) -> Vec<OrchestrationTaskRe
 /// errors (e.g. a record that raced to terminal) are logged and skipped, and a
 /// store-open failure simply reconciles nothing. Returns the count reconciled.
 pub(crate) fn reconcile_orphaned_tasks_on_boot(workspace_dir: &Path) -> usize {
+    // On a backend several cores share, a non-terminal task in the ledger may
+    // belong to another live process, not to a dead one of ours; settling it
+    // would fail work that is still running. Only a backend this process owns
+    // (files, SQLite, memory) can be swept.
+    if crate::storage::installed_is_shared() {
+        log::debug!(
+            "[running_subagents] skipping orphan reconcile: storage backend is shared workspace_dir={}",
+            workspace_dir.display()
+        );
+        return 0;
+    }
     let store = task_store_for_workspace(workspace_dir);
 
     // The sweep itself — which statuses are live, and which terminal state each
@@ -240,135 +189,4 @@ pub(crate) fn reconcile_orphaned_tasks_on_boot(workspace_dir: &Path) -> usize {
         report.error_count()
     );
     reconciled
-}
-
-/// The reason an orphaned sub-agent record is settled with.
-///
-/// Built in one place because it is written twice — into the store by the
-/// reconciler, and into the lifecycle event the run ledger reads. If those two
-/// ever disagreed, the ledger would explain a failure differently from the
-/// record behind it.
-fn orphaned_subagent_reason(prior_status: OrchestrationTaskStatus) -> String {
-    format!(
-        "sub-agent orphaned by core restart (was `{}`)",
-        task_status_label(prior_status)
-    )
-}
-
-pub(crate) fn record_parent_session(record: &OrchestrationTaskRecord) -> Option<&str> {
-    record
-        .spec
-        .metadata
-        .get("parentSession")
-        .map(String::as_str)
-}
-
-pub(crate) fn record_subagent_session_id(record: &OrchestrationTaskRecord) -> Option<&str> {
-    record
-        .spec
-        .metadata
-        .get("subagentSessionId")
-        .map(String::as_str)
-}
-
-pub(crate) fn record_agent_id(record: &OrchestrationTaskRecord) -> String {
-    match &record.spec.kind {
-        OrchestrationTaskKind::SubAgent { agent } => agent.clone(),
-        _ => "subagent".to_string(),
-    }
-}
-
-pub(crate) fn task_record_for_task_in_workspace(
-    workspace_dir: &Path,
-    task_id: &str,
-    parent_session: &str,
-) -> Result<OrchestrationTaskRecord, WaitError> {
-    let id = TaskId::new(task_id);
-    let Some(record) = task_store_for_workspace(workspace_dir).get(&id) else {
-        return Err(WaitError::Unknown);
-    };
-    if !matches!(record.spec.kind, OrchestrationTaskKind::SubAgent { .. }) {
-        return Err(WaitError::Unknown);
-    }
-    if record_parent_session(&record) != Some(parent_session) {
-        return Err(WaitError::NotOwned);
-    }
-    Ok(record)
-}
-
-pub(crate) fn record_to_status(record: OrchestrationTaskRecord) -> WaitOutcome {
-    match record.status {
-        OrchestrationTaskStatus::Completed => {
-            let output = record
-                .result
-                .and_then(|result| {
-                    result
-                        .text
-                        .or_else(|| result.output.map(|output| output.to_string()))
-                })
-                .unwrap_or_default();
-            WaitOutcome::Terminal(SubagentStatus::Completed {
-                output,
-                iterations: 0,
-            })
-        }
-        OrchestrationTaskStatus::Awaiting => WaitOutcome::Terminal(SubagentStatus::AwaitingUser {
-            question: record.error.unwrap_or_else(|| {
-                "sub-agent is awaiting user input; no clarification text was available from the durable task store".to_string()
-            }),
-        }),
-        OrchestrationTaskStatus::Failed
-        | OrchestrationTaskStatus::TimedOut
-        | OrchestrationTaskStatus::Abandoned => WaitOutcome::Terminal(SubagentStatus::Failed {
-            error: record.error.unwrap_or_else(|| {
-                format!(
-                    "sub-agent reached durable task status `{}`",
-                    task_status_label(record.status)
-                )
-            }),
-        }),
-        OrchestrationTaskStatus::Cancelled => WaitOutcome::Terminal(SubagentStatus::Failed {
-            error: "sub-agent was cancelled".to_string(),
-        }),
-        OrchestrationTaskStatus::Pending
-        | OrchestrationTaskStatus::Running
-        | OrchestrationTaskStatus::CancelRequested => WaitOutcome::TimedOut(SubagentStatus::Running),
-    }
-}
-
-pub(crate) fn task_status_label(status: OrchestrationTaskStatus) -> &'static str {
-    match status {
-        OrchestrationTaskStatus::Pending => "pending",
-        OrchestrationTaskStatus::Running => "running",
-        OrchestrationTaskStatus::Awaiting => "awaiting",
-        OrchestrationTaskStatus::Completed => "completed",
-        OrchestrationTaskStatus::Failed => "failed",
-        OrchestrationTaskStatus::CancelRequested => "cancel_requested",
-        OrchestrationTaskStatus::Cancelled => "cancelled",
-        OrchestrationTaskStatus::TimedOut => "timed_out",
-        OrchestrationTaskStatus::Abandoned => "abandoned",
-    }
-}
-
-/// Snapshot the typed lifecycle records, optionally scoped to a `parent_session`.
-#[cfg(test)]
-pub(crate) fn task_records(parent_session: Option<&str>) -> Vec<OrchestrationTaskRecord> {
-    let _ = task_store();
-    let stores: Vec<Arc<dyn TaskStore>> = task_stores().values().unwrap_or_default();
-    let all: Vec<OrchestrationTaskRecord> = stores
-        .into_iter()
-        .flat_map(|store| store.list(OrchestrationTaskFilter::default()))
-        .collect();
-    log::trace!(
-        "[running_subagents] task_records loaded records={} parent_session_filter={:?}",
-        all.len(),
-        parent_session
-    );
-    match parent_session {
-        Some(ps) => all
-            .into_iter()
-            .filter(|r| r.spec.metadata.get("parentSession").map(String::as_str) == Some(ps))
-            .collect(),
-        None => all,
-    }
 }

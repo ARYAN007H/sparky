@@ -1,5 +1,59 @@
 use super::*;
+use crate::core::runtime::DispatchCtx;
 use crate::security::credentials::api_key;
+
+#[tokio::test]
+async fn same_token_refresh_preserves_issuing_backend_and_refuses_rebinding() {
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let key = crate::security::credentials::session_support::SESSION_ISSUING_BACKEND_META;
+    let mut metadata = std::collections::HashMap::new();
+    metadata.insert("user_id".into(), "test-user".into());
+    metadata.insert(key.into(), "https://issuer.example".into());
+    AuthService::from_config(&config)
+        .store_provider_token(
+            APP_SESSION_PROVIDER,
+            DEFAULT_AUTH_PROFILE_NAME,
+            "synthetic-session",
+            metadata,
+            true,
+        )
+        .unwrap();
+    let state = set_credential(
+        &DispatchCtx::process_default(),
+        &config,
+        SetCredentialRequest {
+            token: "synthetic-session".into(),
+            user_id: Some("test-user".into()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .value;
+    assert_eq!(
+        state.issuing_backend.as_deref(),
+        Some("https://issuer.example")
+    );
+    let error = set_credential(
+        &DispatchCtx::process_default(),
+        &config,
+        SetCredentialRequest {
+            token: "synthetic-session".into(),
+            user_id: Some("test-user".into()),
+            issuing_backend: Some("https://different.example".into()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(error.starts_with("SESSION_BACKEND_MISMATCH"));
+    let stored = crate::security::credentials::session_support::load_app_session_profile(&config)
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.metadata.get(key).unwrap(), "https://issuer.example");
+}
 
 // ── secret_store_for_config ────────────────────────────────────
 
@@ -45,9 +99,13 @@ async fn decrypt_secret_round_trips_noise_through_migrate_path() {
 async fn set_credential_rejects_empty_or_whitespace_token() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let err = store_session(&config, "", None, None).await.unwrap_err();
+    let err = store_session(&DispatchCtx::process_default(), &config, "", None, None)
+        .await
+        .unwrap_err();
     assert!(err.contains("token is required"));
-    let err = store_session(&config, "   ", None, None).await.unwrap_err();
+    let err = store_session(&DispatchCtx::process_default(), &config, "   ", None, None)
+        .await
+        .unwrap_err();
     assert!(err.contains("token is required"));
 }
 
@@ -56,6 +114,7 @@ async fn set_credential_rejects_unknown_kind() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let err = set_credential(
+        &DispatchCtx::process_default(),
         &config,
         SetCredentialRequest {
             token: "x".into(),
@@ -76,7 +135,7 @@ async fn set_credential_rejects_an_expired_jwt_without_storing() {
         "sub": "user-1",
         "exp": (chrono::Utc::now() - chrono::Duration::hours(1)).timestamp()
     }));
-    let err = store_session(&config, &token, None, None)
+    let err = store_session(&DispatchCtx::process_default(), &config, &token, None, None)
         .await
         .unwrap_err();
     assert!(err.starts_with("CREDENTIAL_EXPIRED:"), "{err}");
@@ -95,11 +154,12 @@ async fn set_credential_requires_a_user_id_for_a_session() {
     let token = jwt_with_payload(json!({
         "exp": (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp()
     }));
-    let err = store_session(&config, &token, None, None)
+    let err = store_session(&DispatchCtx::process_default(), &config, &token, None, None)
         .await
         .unwrap_err();
     assert!(err.contains("userId required"), "{err}");
     let err = store_session(
+        &DispatchCtx::process_default(),
         &config,
         "opaque-token",
         None,
@@ -114,12 +174,10 @@ async fn set_credential_requires_a_user_id_for_a_session() {
 
 #[tokio::test]
 async fn set_credential_installs_a_session_without_touching_the_backend() {
-    let _env_guard = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = TempDir::new().unwrap();
     std::fs::create_dir_all(tmp.path().join("workspace")).unwrap();
-    let _home = EnvVarGuard::set_to_path("HOME", tmp.path());
+    let _home = EnvVarGuard::set("HOME", tmp.path());
     let mut config = test_config(&tmp);
     // A backend that would reject everything: it must never be consulted.
     config.api_url = Some(spawn_auth_me_status(StatusCode::UNAUTHORIZED).await);
@@ -127,6 +185,7 @@ async fn set_credential_installs_a_session_without_touching_the_backend() {
     let token = jwt_with_payload(json!({ "sub": "user-42", "exp": exp.timestamp() }));
 
     let result = store_session(
+        &DispatchCtx::process_default(),
         &config,
         &token,
         None,
@@ -164,45 +223,48 @@ async fn set_credential_installs_a_session_without_touching_the_backend() {
 
 #[tokio::test]
 async fn set_credential_derives_the_user_id_from_the_jwt_subject() {
-    let _env_guard = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = TempDir::new().unwrap();
     std::fs::create_dir_all(tmp.path().join("workspace")).unwrap();
-    let _home = EnvVarGuard::set_to_path("HOME", tmp.path());
+    let _home = EnvVarGuard::set("HOME", tmp.path());
     let config = test_config(&tmp);
     let token = jwt_with_payload(json!({
         "sub": "from-claims",
         "exp": (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp()
     }));
-    let state = store_session(&config, &token, None, None)
+    let state = store_session(&DispatchCtx::process_default(), &config, &token, None, None)
         .await
         .unwrap()
         .value;
     assert_eq!(state.user_id.as_deref(), Some("from-claims"));
     // Explicit userId wins over the claim; the user payload's id wins over
     // the claim too.
-    let state = store_session(&config, &token, Some("explicit".into()), None)
-        .await
-        .unwrap()
-        .value;
+    let state = store_session(
+        &DispatchCtx::process_default(),
+        &config,
+        &token,
+        Some("explicit".into()),
+        None,
+    )
+    .await
+    .unwrap()
+    .value;
     assert_eq!(state.user_id.as_deref(), Some("explicit"));
 }
 
 #[tokio::test]
 async fn set_credential_with_the_same_token_and_user_is_a_cheap_refresh() {
-    let _env_guard = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = TempDir::new().unwrap();
     std::fs::create_dir_all(tmp.path().join("workspace")).unwrap();
-    let _home = EnvVarGuard::set_to_path("HOME", tmp.path());
+    let _home = EnvVarGuard::set("HOME", tmp.path());
     let config = test_config(&tmp);
     let token = jwt_with_payload(json!({
         "sub": "user-7",
         "exp": (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp()
     }));
     let first = store_session(
+        &DispatchCtx::process_default(),
         &config,
         &token,
         None,
@@ -215,6 +277,7 @@ async fn set_credential_with_the_same_token_and_user_is_a_cheap_refresh() {
     // The host's `/auth/me` answer arrives: same token, same user.
     let user_config = crate::config::load_config_with_timeout().await.unwrap();
     let second = store_session(
+        &DispatchCtx::process_default(),
         &user_config,
         &token,
         None,
@@ -236,15 +299,14 @@ async fn set_credential_with_the_same_token_and_user_is_a_cheap_refresh() {
 
 #[tokio::test]
 async fn set_credential_for_a_different_user_signs_the_previous_one_out_first() {
-    let _env_guard = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = TempDir::new().unwrap();
     std::fs::create_dir_all(tmp.path().join("workspace")).unwrap();
-    let _home = EnvVarGuard::set_to_path("HOME", tmp.path());
+    let _home = EnvVarGuard::set("HOME", tmp.path());
     let config = test_config(&tmp);
     let exp = (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp();
     store_session(
+        &DispatchCtx::process_default(),
         &config,
         &jwt_with_payload(json!({ "sub": "alice", "exp": exp })),
         None,
@@ -254,6 +316,7 @@ async fn set_credential_for_a_different_user_signs_the_previous_one_out_first() 
     .unwrap();
     let alice_config = crate::config::load_config_with_timeout().await.unwrap();
     let result = store_session(
+        &DispatchCtx::process_default(),
         &alice_config,
         &jwt_with_payload(json!({ "sub": "bob", "exp": exp })),
         None,
@@ -285,6 +348,7 @@ async fn set_and_clear_api_key_credential() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let state = set_credential(
+        &DispatchCtx::process_default(),
         &config,
         SetCredentialRequest {
             token: "sk-live".into(),
@@ -299,10 +363,14 @@ async fn set_and_clear_api_key_credential() {
     assert_eq!(state.credential.as_deref(), Some("api-key"));
     assert!(state.user_id.is_none());
 
-    let cleared = clear_credential(&config, Some(session_support::CredentialKind::ApiKey))
-        .await
-        .unwrap()
-        .value;
+    let cleared = clear_credential(
+        &DispatchCtx::process_default(),
+        &config,
+        Some(session_support::CredentialKind::ApiKey),
+    )
+    .await
+    .unwrap()
+    .value;
     assert_eq!(cleared["removedApiKey"], true);
     assert_eq!(cleared["removedSession"], false);
     assert!(
@@ -319,25 +387,33 @@ async fn set_and_clear_api_key_credential() {
 // directory the key was stored beside.
 #[tokio::test]
 async fn clearing_the_session_preserves_a_coexisting_api_key() {
-    let _env_guard = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    // Reaches the connector module, whose route is process-wide: hold the module
+    // lock (before TEST_ENV_LOCK, the established order) for the whole test.
+    let _module = crate::integrations::composio::module_client::module_lock_guard().await;
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = TempDir::new().unwrap();
     std::fs::create_dir_all(tmp.path().join("workspace")).unwrap();
-    let _home = EnvVarGuard::set_to_path("HOME", tmp.path());
+    let _home = EnvVarGuard::set("HOME", tmp.path());
     let config = test_config(&tmp);
 
     // Install the session first: this activates the user-scoped directory.
     let exp = chrono::Utc::now() + chrono::Duration::hours(1);
     let token = jwt_with_payload(json!({ "sub": "user-42", "exp": exp.timestamp() }));
-    store_session(&config, &token, None, Some(json!({ "id": "user-42" })))
-        .await
-        .unwrap();
+    store_session(
+        &DispatchCtx::process_default(),
+        &config,
+        &token,
+        None,
+        Some(json!({ "id": "user-42" })),
+    )
+    .await
+    .unwrap();
 
     // Store the API key against the now-active user-scoped config, exactly
     // as the dispatcher would for a follow-up `auth.set_credential` call.
     let user_scoped = crate::config::load_config_with_timeout().await.unwrap();
     set_credential(
+        &DispatchCtx::process_default(),
         &user_scoped,
         SetCredentialRequest {
             token: "sk-live".into(),
@@ -353,10 +429,14 @@ async fn clearing_the_session_preserves_a_coexisting_api_key() {
     );
 
     // Sign the session out only — the API key must not be cleared.
-    let cleared = clear_credential(&user_scoped, Some(session_support::CredentialKind::Session))
-        .await
-        .unwrap()
-        .value;
+    let cleared = clear_credential(
+        &DispatchCtx::process_default(),
+        &user_scoped,
+        Some(session_support::CredentialKind::Session),
+    )
+    .await
+    .unwrap()
+    .value;
     assert_eq!(cleared["removedSession"], true);
     assert_eq!(cleared["removedApiKey"], false);
 
@@ -392,14 +472,16 @@ async fn clearing_the_session_preserves_a_coexisting_api_key() {
 // workspace must never outrank the key that was actually the active
 // credential a moment ago. This RPC only removes the session; it must not
 // let an unrelated leftover key silently become the effective one.
-#[tokio::test]
+// Multi-thread: the sync store bridge blocks while tinyflows calls back into the host.
+#[tokio::test(flavor = "multi_thread")]
 async fn clearing_the_session_preserves_the_active_key_over_a_stale_destination_key() {
-    let _env_guard = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    // Reaches the connector module, whose route is process-wide: hold the module
+    // lock (before TEST_ENV_LOCK, the established order) for the whole test.
+    let _module = crate::integrations::composio::module_client::module_lock_guard().await;
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = TempDir::new().unwrap();
     std::fs::create_dir_all(tmp.path().join("workspace")).unwrap();
-    let _home = EnvVarGuard::set_to_path("HOME", tmp.path());
+    let _home = EnvVarGuard::set("HOME", tmp.path());
     // `test_config` also binds the memory diagnostics `store_session` below
     // needs; its own config_path is a plain tmp fixture unrelated to the real
     // pre-login layout, so it is not where the RPC dispatcher would actually
@@ -410,6 +492,7 @@ async fn clearing_the_session_preserves_the_active_key_over_a_stale_destination_
     // over from an earlier api-key-only run before any session existed.
     let pre_login = crate::config::load_config_with_timeout().await.unwrap();
     set_credential(
+        &DispatchCtx::process_default(),
         &pre_login,
         SetCredentialRequest {
             token: "sk-stale-a".into(),
@@ -428,13 +511,20 @@ async fn clearing_the_session_preserves_the_active_key_over_a_stale_destination_
     // from the pre-login one key A lives beside.
     let exp = chrono::Utc::now() + chrono::Duration::hours(1);
     let token = jwt_with_payload(json!({ "sub": "user-99", "exp": exp.timestamp() }));
-    store_session(&pre_login, &token, None, Some(json!({ "id": "user-99" })))
-        .await
-        .unwrap();
+    store_session(
+        &DispatchCtx::process_default(),
+        &pre_login,
+        &token,
+        None,
+        Some(json!({ "id": "user-99" })),
+    )
+    .await
+    .unwrap();
 
     // Key B is the one actually active while the session is up.
     let user_scoped = crate::config::load_config_with_timeout().await.unwrap();
     set_credential(
+        &DispatchCtx::process_default(),
         &user_scoped,
         SetCredentialRequest {
             token: "sk-live-b".into(),
@@ -451,9 +541,13 @@ async fn clearing_the_session_preserves_the_active_key_over_a_stale_destination_
 
     // A session-only clear must preserve key B as the effective credential,
     // not let the stale key A at the destination win by default.
-    clear_credential(&user_scoped, Some(session_support::CredentialKind::Session))
-        .await
-        .unwrap();
+    clear_credential(
+        &DispatchCtx::process_default(),
+        &user_scoped,
+        Some(session_support::CredentialKind::Session),
+    )
+    .await
+    .unwrap();
 
     let signed_out = crate::config::load_config_with_timeout().await.unwrap();
     assert_eq!(
@@ -472,22 +566,30 @@ async fn clearing_the_session_preserves_the_active_key_over_a_stale_destination_
 // location and leave it clearable/resurrectable later.
 #[tokio::test]
 async fn clearing_without_a_kind_removes_a_user_scoped_api_key_at_its_source() {
-    let _env_guard = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    // Reaches the connector module, whose route is process-wide: hold the module
+    // lock (before TEST_ENV_LOCK, the established order) for the whole test.
+    let _module = crate::integrations::composio::module_client::module_lock_guard().await;
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = TempDir::new().unwrap();
     std::fs::create_dir_all(tmp.path().join("workspace")).unwrap();
-    let _home = EnvVarGuard::set_to_path("HOME", tmp.path());
+    let _home = EnvVarGuard::set("HOME", tmp.path());
     let config = test_config(&tmp);
 
     let exp = chrono::Utc::now() + chrono::Duration::hours(1);
     let token = jwt_with_payload(json!({ "sub": "user-77", "exp": exp.timestamp() }));
-    store_session(&config, &token, None, Some(json!({ "id": "user-77" })))
-        .await
-        .unwrap();
+    store_session(
+        &DispatchCtx::process_default(),
+        &config,
+        &token,
+        None,
+        Some(json!({ "id": "user-77" })),
+    )
+    .await
+    .unwrap();
 
     let user_scoped = crate::config::load_config_with_timeout().await.unwrap();
     set_credential(
+        &DispatchCtx::process_default(),
         &user_scoped,
         SetCredentialRequest {
             token: "sk-live".into(),
@@ -499,7 +601,10 @@ async fn clearing_without_a_kind_removes_a_user_scoped_api_key_at_its_source() {
     .unwrap();
     assert!(api_key::has_api_key(&user_scoped));
 
-    let cleared = clear_credential(&user_scoped, None).await.unwrap().value;
+    let cleared = clear_credential(&DispatchCtx::process_default(), &user_scoped, None)
+        .await
+        .unwrap()
+        .value;
     assert_eq!(cleared["removed"], true);
     assert_eq!(cleared["removedSession"], true);
     assert_eq!(
@@ -526,14 +631,13 @@ async fn clearing_without_a_kind_removes_a_user_scoped_api_key_at_its_source() {
 
 #[tokio::test]
 async fn clear_credential_without_a_kind_removes_everything() {
-    let _env_guard = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = TempDir::new().unwrap();
     std::fs::create_dir_all(tmp.path().join("workspace")).unwrap();
-    let _home = EnvVarGuard::set_to_path("HOME", tmp.path());
+    let _home = EnvVarGuard::set("HOME", tmp.path());
     let config = test_config(&tmp);
     set_credential(
+        &DispatchCtx::process_default(),
         &config,
         SetCredentialRequest {
             token: "sk-live".into(),
@@ -543,7 +647,10 @@ async fn clear_credential_without_a_kind_removes_everything() {
     )
     .await
     .unwrap();
-    let cleared = clear_credential(&config, None).await.unwrap().value;
+    let cleared = clear_credential(&DispatchCtx::process_default(), &config, None)
+        .await
+        .unwrap()
+        .value;
     assert_eq!(cleared["removed"], true);
     assert_eq!(cleared["removedApiKey"], true);
     assert!(
@@ -553,88 +660,4 @@ async fn clear_credential_without_a_kind_removes_everything() {
             .value
             .is_authenticated
     );
-}
-
-// ── set_credential (local session) ─────────────────────────────
-
-/// A local session token requires a non-empty user payload — the backend
-/// fetch path is bypassed entirely, so there is no fallback to derive the
-/// user from an API response.
-#[tokio::test]
-async fn store_session_local_token_rejects_missing_user_payload() {
-    let _env_guard = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
-    let tmp = TempDir::new().unwrap();
-    std::fs::create_dir_all(tmp.path().join("workspace")).unwrap();
-    let _home = EnvVarGuard::set_to_path("HOME", tmp.path());
-    let config = test_config(&tmp);
-    let local_token = "header.payload.local";
-    let err = store_session(&config, local_token, None, None)
-        .await
-        .unwrap_err();
-    assert!(
-        err.contains("local session requires a user payload"),
-        "expected 'local session requires a user payload', got: {err}"
-    );
-}
-
-/// A local session token with a user payload must be accepted without any
-/// network call, must force a deterministic `local-<device>` user id
-/// regardless of what the caller passes, and must return a stored profile
-/// summary.
-#[tokio::test]
-async fn store_session_local_token_succeeds_without_network_and_forces_local_user_id() {
-    let _env_guard = crate::config::TEST_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
-    let tmp = TempDir::new().unwrap();
-    std::fs::create_dir_all(tmp.path().join("workspace")).unwrap();
-    let _home = EnvVarGuard::set_to_path("HOME", tmp.path());
-    let config = test_config(&tmp);
-    let local_token = "header.payload.local";
-    let user = serde_json::json!({
-        "id": "local",
-        "name": "Local User",
-        "email": "local@openhuman.local"
-    });
-    // Pass a different user_id to verify it is overridden.
-    let result = store_session(
-        &config,
-        local_token,
-        Some("should-be-overridden".to_string()),
-        Some(user),
-    )
-    .await
-    .unwrap();
-    // The credential is installed (no network call was required).
-    assert!(result.value.is_authenticated);
-    assert_eq!(result.value.credential.as_deref(), Some("local"));
-    // Logs must mention that backend validation was skipped.
-    let log_text = result.logs.join(" ");
-    assert!(
-        log_text.contains("local session accepted without backend validation"),
-        "expected log confirming no backend call, got: {log_text}"
-    );
-    let expected_local_user_id = local_session_user_id();
-    assert!(
-        log_text.contains(&format!(
-            "user directory activated for {expected_local_user_id}"
-        )),
-        "expected user-directory activation log for deterministic local uid, got: {log_text}"
-    );
-    assert!(
-        log_text.contains("onboarding left incomplete for local session setup"),
-        "expected local session to remain in onboarding, got: {log_text}"
-    );
-    // The forced local user id wins over the caller's hint, and the user
-    // payload's id fields are rewritten to match.
-    assert_eq!(
-        result.value.user_id.as_deref(),
-        Some(expected_local_user_id.as_str())
-    );
-    let user = result.value.user.unwrap();
-    assert_eq!(user["id"], expected_local_user_id);
-    assert_eq!(user["_id"], expected_local_user_id);
-    assert_eq!(user["name"], "Local User");
 }

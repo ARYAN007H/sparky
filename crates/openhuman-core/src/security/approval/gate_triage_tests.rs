@@ -40,7 +40,7 @@ fn parse_approval_reply_maps_yes_no_and_rejects_other() {
 /// audit trail, not restored function.
 #[tokio::test]
 async fn a_remote_triage_escalation_parks_with_an_audit_row_rather_than_an_unknown_denial() {
-    use crate::agent::triage::{remote_trigger_origin, TriggerEnvelope};
+    use crate::triage::{remote_trigger_origin, TriggerEnvelope};
 
     let (gate, _dir) = test_gate();
     let envelope = TriggerEnvelope::from_composio(
@@ -53,9 +53,11 @@ async fn a_remote_triage_escalation_parks_with_an_audit_row_rather_than_an_unkno
 
     // `Box::pin` + a short timeout drives the future into the park without
     // waiting out the TTL; nothing decides it, so it must still be pending.
+    let turn = ApprovalTurnContext::default();
     let mut fut = Box::pin(turn_origin::with_origin(
         remote_trigger_origin(&envelope),
         gate.intercept(
+            &turn,
             "triage.escalate",
             "escalate to orchestrator",
             serde_json::json!({}),
@@ -84,12 +86,13 @@ async fn a_remote_triage_escalation_parks_with_an_audit_row_rather_than_an_unkno
 /// simplification to one blanket label would have to break one of them.
 #[tokio::test]
 async fn a_local_triage_escalation_is_allowed_without_a_prompt() {
-    use crate::agent::triage::local_trigger_origin;
+    use crate::triage::local_trigger_origin;
 
     let (gate, _dir) = test_gate();
     let outcome = turn_origin::with_origin(
         local_trigger_origin(),
         gate.intercept(
+            &ApprovalTurnContext::default(),
             "triage.escalate",
             "escalate to orchestrator",
             serde_json::json!({}),
@@ -115,7 +118,12 @@ async fn intercept_with_unknown_origin_denies() {
     // tools from unlabelled call sites.
     let (gate, _dir) = test_gate();
     let outcome = gate
-        .intercept("shell", "run ls", serde_json::json!({}))
+        .intercept(
+            &ApprovalTurnContext::default(),
+            "shell",
+            "run ls",
+            serde_json::json!({}),
+        )
         .await;
     match outcome {
         GateOutcome::Deny { reason } => assert!(reason.contains("origin label")),
@@ -125,9 +133,8 @@ async fn intercept_with_unknown_origin_denies() {
 }
 
 #[tokio::test]
-async fn intercept_with_trusted_cron_origin_allows_without_prompt() {
-    // Cron jobs the user explicitly authorized run trusted automation;
-    // the gate allows without prompt and does not persist a row.
+async fn intercept_with_trusted_cron_origin_denies_external_effect() {
+    // Creating a cron job does not authorize its future tool effects.
     let (gate, _dir) = test_gate();
     let origin = AgentTurnOrigin::TrustedAutomation {
         job_id: "cron-42".into(),
@@ -135,13 +142,18 @@ async fn intercept_with_trusted_cron_origin_allows_without_prompt() {
     };
     let outcome = turn_origin::with_origin(
         origin,
-        gate.intercept("shell", "run ls", serde_json::json!({})),
+        gate.intercept(
+            &ApprovalTurnContext::default(),
+            "shell",
+            "run ls",
+            serde_json::json!({}),
+        ),
     )
     .await;
-    assert!(matches!(outcome, GateOutcome::Allow));
+    assert!(matches!(outcome, GateOutcome::Deny { .. }));
     assert!(
         gate.list_pending().unwrap().is_empty(),
-        "trusted cron must not persist a pending row"
+        "denied cron effects must not persist a pending row"
     );
 }
 
@@ -158,7 +170,12 @@ async fn intercept_with_workflow_origin_trust_root_allows_without_prompt() {
     };
     let outcome = turn_origin::with_origin(
         origin,
-        gate.intercept("composio", "post to slack", serde_json::json!({})),
+        gate.intercept(
+            &ApprovalTurnContext::default(),
+            "composio",
+            "post to slack",
+            serde_json::json!({}),
+        ),
     )
     .await;
     assert!(matches!(outcome, GateOutcome::Allow));
@@ -173,9 +190,9 @@ async fn intercept_with_workflow_require_approval_persists_and_ttl_denies() {
     // A per-flow `require_approval: true` toggle forces every external
     // action through the HITL gate even though the origin carries a
     // trust root — same conservative park-and-audit shape as
-    // `GoalContinuation` / `ExternalChannel`, since there is no flow
+    // `ExternalChannel`, since there is no flow
     // review surface to route the prompt to yet (B3).
-    let (gate, _dir, env) = expiry_gate();
+    let (gate, _dir, env) = expiry_gate().await;
     let gate = Arc::new(gate);
     let origin = AgentTurnOrigin::TrustedAutomation {
         job_id: "flow-2".into(),
@@ -188,7 +205,12 @@ async fn intercept_with_workflow_require_approval_persists_and_ttl_denies() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             origin,
-            g.intercept("composio", "post to slack", serde_json::json!({})),
+            g.intercept(
+                &ApprovalTurnContext::default(),
+                "composio",
+                "post to slack",
+                serde_json::json!({}),
+            ),
         )
         .await
     });
@@ -214,7 +236,7 @@ async fn intercept_with_workflow_require_approval_persists_and_ttl_denies() {
 /// A parked approval must be recoverable from its thread alone.
 ///
 /// The card is delivered to the UI as ONE fire-and-forget socket emit
-/// (`web_chat::event_bus` → `core::socketio::emit_web_channel_event`). If that
+/// (`web_chat::event_bus` → `openhuman_rpc::server::socketio::emit_web_channel_event`). If that
 /// emit misses — the addressed client's room is empty because it reloaded, the
 /// rejoining socket was not yet in the thread room, or the bridge dropped the
 /// frame on broadcast lag — nothing re-sends it, and the turn stays parked with
@@ -240,13 +262,11 @@ async fn a_parked_approval_is_recoverable_from_its_thread_for_replay() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             origin,
-            APPROVAL_CHAT_CONTEXT.scope(
-                ctx,
-                g.intercept(
-                    "create_workflow",
-                    "create a workflow",
-                    serde_json::json!({ "name": "nightly" }),
-                ),
+            g.intercept(
+                &ApprovalTurnContext::chat(ctx),
+                "create_workflow",
+                "create a workflow",
+                serde_json::json!({ "name": "nightly" }),
             ),
         )
         .await
@@ -301,14 +321,12 @@ async fn intercept_audited_for_call_threads_tool_call_id_onto_the_pending_row_an
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                g.intercept_audited_for_call(
-                    "composio",
-                    "send slack",
-                    serde_json::json!({}),
-                    Some("call-abc"),
-                ),
+            g.intercept_audited_for_call(
+                &ApprovalTurnContext::chat(chat_ctx()),
+                "composio",
+                "send slack",
+                serde_json::json!({}),
+                Some("call-abc"),
             ),
         )
         .await
@@ -338,20 +356,18 @@ async fn timeout_publishes_approval_decided_with_expired_resolution() {
         .expect("event bus initialized above")
         .receiver();
 
-    let (gate, _dir, env) = expiry_gate();
+    let (gate, _dir, env) = expiry_gate().await;
     let gate = Arc::new(gate);
     let g = gate.clone();
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                g.intercept_audited_for_call(
-                    "composio",
-                    "timed out",
-                    serde_json::json!({}),
-                    Some("call-expire"),
-                ),
+            g.intercept_audited_for_call(
+                &ApprovalTurnContext::chat(chat_ctx()),
+                "composio",
+                "timed out",
+                serde_json::json!({}),
+                Some("call-expire"),
             ),
         )
         .await

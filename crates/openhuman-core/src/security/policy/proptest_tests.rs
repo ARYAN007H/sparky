@@ -5,10 +5,16 @@
 //! handful of fail-closed invariants that must hold for *all* inputs, not just
 //! the hand-enumerated cases in `policy_tests.rs`.
 
-use super::types::{CommandClass, SecurityPolicy};
+use super::types::SecurityPolicy;
+use crate::security::policy::CommandClass;
 use proptest::prelude::*;
 
 proptest! {
+    #![proptest_config(ProptestConfig {
+        failure_persistence: None,
+        ..ProptestConfig::default()
+    })]
+
     /// The classifier + allowlist must never panic, regardless of shell
     /// metacharacters, redirects, pipes, or embedded control characters.
     #[test]
