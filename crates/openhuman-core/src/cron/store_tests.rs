@@ -120,7 +120,7 @@ fn a_stale_routing_patch_cannot_combine_with_a_newer_unvalidated_route() {
         history_key: format!("telegram-target-{target}"),
         sender: None,
         thread_id: None,
-        session_identity: None,
+        channel_session: None,
     };
     let origin_42 = channel_origin("42");
     let origin_999 = channel_origin("999");

@@ -50,6 +50,16 @@
     "verification": "agent/orchestration/background_delivery_slots_tests.rs: one_profiles_busy_turn_does_not_block_anothers_thread"
   },
   {
+    "file": "crates/openhuman-core/src/agent/tinyagents/turn_exec/root_hosted_harness.rs",
+    "scope": "",
+    "name": "ROOT_HOSTED_HARNESS",
+    "type": "LazyLock<AgentHarness<(),OpenHumanRunContext>>",
+    "count": 1,
+    "category": "A",
+    "reason": "One unconfigured harness is process infrastructure; per-invocation models, tools, middleware, progress, and host capabilities are supplied through each invocation, so the singleton carries no tenant authority or data.",
+    "verification": "agent/tinyagents/turn_exec_tests.rs: hosted_roots_share_only_an_unconfigured_process_harness"
+  },
+  {
     "file": "crates/openhuman-core/src/agent_registry/host_definition.rs",
     "scope": "",
     "name": "GLOBAL",
@@ -480,6 +490,16 @@
     "verification": "storage/sessions/rebound_tests.rs: a_registry_rebind_leaves_other_registries_alone"
   },
   {
+    "file": "crates/openhuman-core/src/storage/sessions/host_stores.rs",
+    "scope": "",
+    "name": "FALLBACKS",
+    "type": "LazyLock<Mutex<HashMap<PathBuf,Fallback>>>",
+    "count": 1,
+    "category": "D",
+    "reason": "Each entry routes one workspace path to its storage backend and DriverSessionStores provider; returned stores still require the caller's tenant session key, while authoritative session data remains in the backend.",
+    "verification": "storage/sessions/mod_tests.rs: each_workspace_keeps_its_sessions_in_its_own_database; storage/sessions/mod_tests.rs: two_profiles_default_agents_keep_separate_session_keys_and_stores; threads/ops/edit_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate"
+  },
+  {
     "file": "crates/openhuman-core/src/threads/artifact_rows.rs",
     "scope": "",
     "name": "ARTIFACT_ROW_HANDLE",
@@ -588,5 +608,45 @@
     "category": "A",
     "reason": "A debug/test-only hook flag (`cfg(any(test, debug_assertions))`) that parks `run_chat_task` after its run so the idle guard can be exercised end to end; it holds no tenant data and is off unless a test sets it.",
     "verification": "tests/agent_harness_e2e.rs: idle_guard_local::stalled_turn_is_stopped_by_the_idle_guard_and_closed_with_a_summary"
+  },
+  {
+    "file": "crates/openhuman-core/src/agent/session_lease.rs",
+    "scope": "",
+    "name": "LEASES",
+    "type": "LazyLock<Mutex<HashMap<SessionLeaseKey,Weak<AsyncMutex<()>>>>>",
+    "count": 1,
+    "category": "D",
+    "reason": "Process-local lease table keyed by the complete tenant, agent and canonical session identity; it holds only weak mutex handles that coordinate runners inside this process and stores no tenant data.",
+    "verification": "agent/session_lease_tests.rs: distinct_tenant_agent_or_session_keys_do_not_serialize"
+  },
+  {
+    "file": "crates/openhuman-core/src/web_chat/event_bus_channel.rs",
+    "scope": "",
+    "name": "EVENT_BUS",
+    "type": "Lazy<broadcast::Sender<ScopedWebEvent>>",
+    "count": 1,
+    "category": "D",
+    "reason": "Process-wide fan-out for web-channel events; every event is a ScopedWebEvent carrying its own tenant scope, and each subscriber filters by that scope rather than relying on shared state.",
+    "verification": "web_chat/event_bus_tests.rs: egress_surface_bridges_pending_with_chat_context"
+  },
+  {
+    "file": "crates/openhuman-core/src/web_chat/ops/test_hooks.rs",
+    "scope": "",
+    "name": "TEST_LAST_RUN_CHAT_TASK_ERROR",
+    "type": "Lazy<Mutex<Option<String>>>",
+    "count": 1,
+    "category": "B",
+    "reason": "Test-only #[cfg(test)] slot recording the last run_chat_task error string; it is not compiled into production builds and carries no tenant data.",
+    "verification": "channels/bus/subscriber_tests.rs: reads the slot through last_run_chat_task_error_for_test"
+  },
+  {
+    "file": "crates/openhuman-core/src/web_chat/proactive.rs",
+    "scope": "",
+    "name": "REGISTERED",
+    "type": "std::sync::Once",
+    "count": 1,
+    "category": "A",
+    "reason": "One-shot guard that subscribes the proactive web subscriber to the process-wide bus once; it stores no tenant identifiers, and per-event tenant scope arrives on each event.",
+    "verification": "web_chat/event_bus_tests.rs: egress_surface_bridges_pending_with_chat_context"
   }
 ]

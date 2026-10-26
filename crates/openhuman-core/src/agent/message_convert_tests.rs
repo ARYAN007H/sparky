@@ -3,6 +3,97 @@ use tinyagents_session::transcript::TranscriptToolCall;
 use tinyinference_llm::message::{AssistantMessage, ToolMessage};
 
 #[test]
+fn stored_typed_image_parts_build_model_input_without_staging_text() {
+    let part = tinychannels_bus::ContentPart::Image {
+        media: tinychannels_bus::MediaReference {
+            path: Some("uploads/thread/image.png".into()),
+            content_type: Some("image/png".into()),
+            opaque_id: Some("opaque-image-1".into()),
+            ..Default::default()
+        },
+        caption: None,
+        alt_text: None,
+    };
+    let Message::User(user) = user_message_from_parts("Describe this.", &[part]).unwrap() else {
+        panic!("user message expected")
+    };
+    assert_eq!(user.content.len(), 2);
+    assert!(matches!(&user.content[0], ContentBlock::Text(text) if text == "Describe this."));
+    assert!(matches!(
+        &user.content[1],
+        ContentBlock::Image(ImageRef { url, mime_type: Some(mime) })
+            if url == "uploads/thread/image.png" && mime == "image/png"
+    ));
+    assert!(!format!("{:?}", user.content).contains("[ATTACHMENT:"));
+}
+
+#[test]
+fn stored_typed_media_rejects_unresolved_paths() {
+    let part = tinychannels_bus::ContentPart::Image {
+        media: tinychannels_bus::MediaReference::default(),
+        caption: None,
+        alt_text: None,
+    };
+    assert!(user_message_from_parts("image", &[part]).is_err());
+}
+
+#[test]
+fn typed_native_parts_preserve_text_voice_transcript_and_file_order() {
+    let parts = vec![
+        tinychannels_bus::ContentPart::Text {
+            text: "before".into(),
+            markdown_dialect: None,
+        },
+        tinychannels_bus::ContentPart::VoiceNote {
+            voice_note: tinychannels_bus::VoiceNote {
+                transcript: Some(tinychannels_bus::VoiceTranscript {
+                    text: "spoken words".into(),
+                    language: Some("en".into()),
+                    state: tinychannels_bus::VoiceTranscriptState::Complete,
+                    source: tinychannels_bus::VoiceTranscriptSource::Provider,
+                }),
+                ..Default::default()
+            },
+        },
+        tinychannels_bus::ContentPart::File {
+            media: tinychannels_bus::MediaReference {
+                path: Some("uploads/thread/document.txt".into()),
+                content_type: Some("text/plain".into()),
+                ..Default::default()
+            },
+            file_name: Some("document.txt".into()),
+            caption: Some("after voice".into()),
+        },
+    ];
+    let Message::User(user) = user_message_from_parts("", &parts).unwrap() else {
+        panic!("user message expected")
+    };
+    assert!(matches!(&user.content[0], ContentBlock::Text(text) if text == "before"));
+    assert!(matches!(&user.content[1], ContentBlock::Text(text) if text == "spoken words"));
+    assert!(matches!(&user.content[2], ContentBlock::Text(text) if text == "after voice"));
+    assert!(matches!(
+        &user.content[3],
+        ContentBlock::Document(MediaRef::Path { path, .. }) if path == "uploads/thread/document.txt"
+    ));
+}
+
+#[test]
+fn typed_native_parts_reject_unavailable_voice_transcripts() {
+    let incomplete = tinychannels_bus::ContentPart::VoiceNote {
+        voice_note: tinychannels_bus::VoiceNote {
+            transcript: Some(tinychannels_bus::VoiceTranscript {
+                text: "partial".into(),
+                language: None,
+                state: tinychannels_bus::VoiceTranscriptState::Pending,
+                source: tinychannels_bus::VoiceTranscriptSource::HostStt,
+            }),
+            ..Default::default()
+        },
+    };
+    assert!(user_message_from_parts("", &[incomplete]).is_err());
+}
+
+#[test]
 fn durable_upload_parts_survive_message_row_replay_without_inline_payloads() {
     let mut text = String::from("Inspect these files");
     for (name, mime) in [

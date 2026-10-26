@@ -98,6 +98,7 @@ tinyagents-hooks = { workspace = true, features = ["goals"] }
 tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", features = [
     "sqlite",
     "multimodal",
+    "json-schema",
 ] }
 tinyagents-harness-tools = { path = "../../vendor/tinyagents/crates/tinyagents-harness-tools", default-features = false, features = [
     "goals",
@@ -105,6 +106,7 @@ tinyagents-harness-tools = { path = "../../vendor/tinyagents/crates/tinyagents-h
     "state-block",
     "subagents",
     "todos",
+    "json-schema",
     "fs",
     "net",
     "exec",

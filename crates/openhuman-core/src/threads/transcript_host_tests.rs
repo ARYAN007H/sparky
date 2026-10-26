@@ -178,6 +178,7 @@ fn text_dialect_tool_turn_projects_calls_on_their_issuing_row_as_settled() {
     let meta = transcript::TranscriptMeta {
         session_id: None,
         parent_session_id: None,
+        prefix_reset: false,
         agent_name: "orchestrator".into(),
         agent_id: Some("orchestrator".into()),
         agent_type: Some("root".into()),
@@ -188,7 +189,6 @@ fn text_dialect_tool_turn_projects_calls_on_their_issuing_row_as_settled() {
         updated: "2026-09-24T00:00:00Z".into(),
         turn_count: 1,
         prefix_message_count: None,
-        prefix_reset: false,
         input_tokens: 0,
         output_tokens: 0,
         cached_input_tokens: 0,
@@ -388,6 +388,7 @@ fn tool_failure_metadata_round_trips_write_to_display_line() {
     let meta = transcript::TranscriptMeta {
         session_id: None,
         parent_session_id: None,
+        prefix_reset: false,
         agent_name: "orchestrator".into(),
         agent_id: Some("orchestrator".into()),
         agent_type: Some("root".into()),
@@ -398,7 +399,6 @@ fn tool_failure_metadata_round_trips_write_to_display_line() {
         updated: now,
         turn_count: 1,
         prefix_message_count: None,
-        prefix_reset: false,
         input_tokens: 0,
         output_tokens: 0,
         cached_input_tokens: 0,

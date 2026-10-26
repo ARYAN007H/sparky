@@ -178,56 +178,56 @@ fn the_flows_record_serves_the_schedule_object() {
     assert_eq!(component_for("tinyflows"), Some("tinyflows"));
 }
 
-/// The pins are copied from the published v0.9.0 `checksum.toml`.
+/// The pins are copied from the published v0.9.2 `checksum.toml`.
 #[test]
 fn the_flows_record_pins_every_host_of_one_release() {
     let record = find("tinyflows").unwrap();
-    assert_eq!(record.version, "0.9.0");
+    assert_eq!(record.version, "0.9.2");
     assert_eq!(record.assets.len(), 11);
     let expected = [
         (
-            "tinyflows-module-0.9.0-macos-26-arm64.tar.gz",
-            "5b3747231ad717342a55fd51f50e51b7a0d917ea776a5631d361030b6dce53d2",
+            "tinyflows-module-0.9.2-macos-26-arm64.tar.gz",
+            "283d960f158eb237797d6a8159309e3f2c3635e9b5c93f43f265b4f5add15611",
         ),
         (
-            "tinyflows-module-0.9.0-macos-26-x86_64.tar.gz",
-            "8c51d3469a449a5819fee44f359458bc890f3af77e00318d40b6fc529e2e78e6",
+            "tinyflows-module-0.9.2-macos-26-x86_64.tar.gz",
+            "eee906fa2c97ddd7fd16b8ccef6cd0fe95f14a3352ead66590d742b7c3b7a30f",
         ),
         (
-            "tinyflows-module-0.9.0-macos-15-arm64.tar.gz",
-            "13699ad57e71a90245a889a0d3168cd2996d495d45fa8be119806396f26bfe06",
+            "tinyflows-module-0.9.2-macos-15-arm64.tar.gz",
+            "c20a68c370ae6c6184917ad136b0bde55c7a91207717960ebe3fc71f33609c0b",
         ),
         (
-            "tinyflows-module-0.9.0-macos-15-x86_64.tar.gz",
-            "4c5ee2bc248551916ba9f8b2199fbc8009a1486b89f987bdf9ba71ecd7083d6d",
+            "tinyflows-module-0.9.2-macos-15-x86_64.tar.gz",
+            "5d33229a1d4ea3b934b9a5199831d5d94c6725c51435da9e18f1493324cde728",
         ),
         (
-            "tinyflows-module-0.9.0-ubuntu-24.04-x86_64.tar.gz",
-            "9a280dc919bb3aa5631808d958aaf70fd12d0dc00cacad01f889262577cef8cc",
+            "tinyflows-module-0.9.2-ubuntu-24.04-x86_64.tar.gz",
+            "4830d646cdd866399204eb53d43ef567dcb5bfd0ea4b0a99ea33b36fdb31cc20",
         ),
         (
-            "tinyflows-module-0.9.0-ubuntu-24.04-arm64.tar.gz",
-            "833fc554c39ab6f01597cb73a6d859464bc81dfa94b3118a5cd58bbeb6484aca",
+            "tinyflows-module-0.9.2-ubuntu-24.04-arm64.tar.gz",
+            "6606505283da68b5f403e8a68abdbb1b2cf4a5f8af546cc6d32fedaadb47470b",
         ),
         (
-            "tinyflows-module-0.9.0-ubuntu-22.04-x86_64.tar.gz",
-            "77e8deb1197ecb58870e1db85c5c94d60ae9da77649c95face27a4a3dde4b146",
+            "tinyflows-module-0.9.2-ubuntu-22.04-x86_64.tar.gz",
+            "38dd32039169ac2647a16e76484d3285a36a6bdc21e66eacc3e04aee15972bc8",
         ),
         (
-            "tinyflows-module-0.9.0-ubuntu-22.04-arm64.tar.gz",
-            "67f7df072b4c25393308f06078a4f9fc7fbb0111a282d7cb26bd364d702d1d4d",
+            "tinyflows-module-0.9.2-ubuntu-22.04-arm64.tar.gz",
+            "84dabcfd8170081f79232c45a3f6662919d6b55e41018e6e8819fa0584546ac9",
         ),
         (
-            "tinyflows-module-0.9.0-windows-2025-x86_64.zip",
-            "28caaea85c38f81b7020b05c6f2ac1bd3d2d01d1be0adab7343b939103b35359",
+            "tinyflows-module-0.9.2-windows-2025-x86_64.zip",
+            "6747f1016231087770522c9e92b623c093de7f3081fd96a0fa36eee08bdfab2f",
         ),
         (
-            "tinyflows-module-0.9.0-windows-2022-x86_64.zip",
-            "8226887661e0dcf1a78858a61771f90a4256b8be3a302d5571544f97f5238ee7",
+            "tinyflows-module-0.9.2-windows-2022-x86_64.zip",
+            "b9974418d6802f6f9c32646be17a3ee58b6a73e27ae119d89cce039e6e3e2d01",
         ),
         (
-            "tinyflows-module-0.9.0-windows-11-arm64.zip",
-            "1daec664a8c6f92c13ece028c1c5311d9ef2471f12f4eedb2898d1f6ef709c6c",
+            "tinyflows-module-0.9.2-windows-11-arm64.zip",
+            "94e5bcc612b6046a1c3c8cfebb5270f28ca5048eeee452d5a0d56a132d7e32f0",
         ),
     ];
     for (asset, (archive, sha256)) in record.assets.iter().zip(expected) {

@@ -73,7 +73,6 @@ impl OpenHumanSessionHost {
             updated: now,
             turn_count: 0,
             prefix_message_count: None,
-            prefix_reset: false,
             input_tokens: 0,
             output_tokens: 0,
             cached_input_tokens: 0,
@@ -85,6 +84,7 @@ impl OpenHumanSessionHost {
                 .session
                 .as_ref()
                 .and_then(|session| session.parent_session_id()),
+            prefix_reset: false,
         }
     }
 }

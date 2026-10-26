@@ -346,7 +346,7 @@ async fn update_message_patches_metadata_and_search_finds_content() {
         "m1".to_string(),
         ConversationMessagePatch {
             extra_metadata: Some(json!({"pinned": true})),
-            merge_extra_metadata: None,
+            ..Default::default()
         },
     )
     .await

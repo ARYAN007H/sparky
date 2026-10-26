@@ -144,6 +144,100 @@ pub(crate) fn user_message_from_text(text: &str) -> Message {
     tinyagents_runtime::transcript::user_message_from_text(text)
 }
 
+/// Build the user turn from marker-free persisted text and trusted media refs.
+/// Callers must resolve opaque refs against the exact persisted message under
+/// its DispatchCtx before passing parts here; paths on these internal parts are
+/// never accepted from the RPC caller.
+pub(crate) fn user_message_from_parts(
+    text: &str,
+    parts: &[tinychannels_bus::ContentPart],
+) -> Result<Message, String> {
+    let mut content = Vec::new();
+    if !text.is_empty() {
+        content.push(ContentBlock::Text(text.to_string()));
+    }
+    for part in parts {
+        match part {
+            tinychannels_bus::ContentPart::Text { text, .. } => {
+                if !text.is_empty() {
+                    content.push(ContentBlock::Text(text.clone()));
+                }
+            }
+            tinychannels_bus::ContentPart::Image {
+                media,
+                caption,
+                alt_text,
+            } => {
+                let path = media
+                    .path
+                    .clone()
+                    .ok_or_else(|| "resolved image attachment has no trusted path".to_string())?;
+                if let Some(caption) = caption.as_ref().filter(|text| !text.is_empty()) {
+                    content.push(ContentBlock::Text(caption.clone()));
+                }
+                if let Some(alt) = alt_text.as_ref().filter(|text| !text.is_empty()) {
+                    content.push(ContentBlock::Text(alt.clone()));
+                }
+                content.push(ContentBlock::Image(ImageRef {
+                    url: path,
+                    mime_type: media.content_type.clone(),
+                }));
+            }
+            tinychannels_bus::ContentPart::File { media, caption, .. } => {
+                let path = media
+                    .path
+                    .clone()
+                    .ok_or_else(|| "resolved media attachment has no trusted path".to_string())?;
+                if let Some(caption) = caption.as_ref().filter(|text| !text.is_empty()) {
+                    content.push(ContentBlock::Text(caption.clone()));
+                }
+                content.push(ContentBlock::Document(MediaRef::Path {
+                    path,
+                    media_type: media.content_type.clone(),
+                }));
+            }
+            tinychannels_bus::ContentPart::VoiceNote { voice_note } => {
+                let transcript = voice_note
+                    .transcript
+                    .as_ref()
+                    .filter(|transcript| {
+                        transcript.state == tinychannels_bus::VoiceTranscriptState::Complete
+                    })
+                    .map(|transcript| transcript.text.trim())
+                    .filter(|text| !text.is_empty())
+                    .ok_or_else(|| "voice transcript is unavailable".to_owned())?;
+                content.push(ContentBlock::Text(transcript.to_owned()));
+            }
+            tinychannels_bus::ContentPart::Audio { media, .. }
+            | tinychannels_bus::ContentPart::Video { media, .. } => {
+                let path = media
+                    .path
+                    .clone()
+                    .ok_or_else(|| "resolved media attachment has no trusted path".to_string())?;
+                let media_ref = MediaRef::Path {
+                    path,
+                    media_type: media.content_type.clone(),
+                };
+                let block = match part {
+                    tinychannels_bus::ContentPart::Audio { .. } => ContentBlock::Audio(media_ref),
+                    _ => ContentBlock::Video(media_ref),
+                };
+                content.push(block);
+            }
+            tinychannels_bus::ContentPart::Sticker { .. }
+            | tinychannels_bus::ContentPart::Location { .. }
+            | tinychannels_bus::ContentPart::Contact { .. }
+            | tinychannels_bus::ContentPart::Buttons { .. }
+            | tinychannels_bus::ContentPart::Poll { .. }
+            | tinychannels_bus::ContentPart::Presentation { .. }
+            | tinychannels_bus::ContentPart::Native { .. } => {
+                return Err("resolved attachment has an unsupported kind".into());
+            }
+        }
+    }
+    Ok(Message::User(UserMessage { content }))
+}
+
 /// The inverse of [`user_message_from_text`]: a user message's text with each
 /// uploaded file rendered back as its `[ATTACHMENT:…]` reference and each
 /// other image block as an `[IMAGE:<url>]` marker. A text-only message is

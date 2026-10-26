@@ -32,6 +32,9 @@ Record shapes and migrations stay with their owners.
 | `subagents.sessions` |  |  |  |
 | `task_sources.ingested` | `by_source` (`source_id`, `ingested_ms`) |  |  |
 | `task_sources.sources` | `by_created` (`created_ms`) |  |  |
+| `threads.channel_messages` |  |  |  |
+| `threads.reply_viseme_timelines` |  |  |  |
+| `threads.staged_attachments` |  |  |  |
 | `threads.transcript_keys` |  |  |  |
 
 ## tinyagents-harness
