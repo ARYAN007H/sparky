@@ -58,7 +58,7 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/flows/caps_host/agent_harness.rs",
-    "line": 174,
+    "line": 177,
     "text": "Box::pin(turn_origin::with_origin(",
     "occurrence": 1
   },

@@ -252,6 +252,7 @@ async fn a_job_whose_agent_is_not_live_stays_dormant() {
     );
 }
 
+#[cfg(feature = "legacy-import")]
 fn legacy_fixture() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src/storage/import/fixtures/tinyflows/workspace/cron/jobs.db")

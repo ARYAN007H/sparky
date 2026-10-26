@@ -184,7 +184,14 @@ pub struct ChannelTurnStateSubscriber {
     workspace_dir: PathBuf,
     objects: Option<Arc<HashMap<String, ModuleObjectClient>>>,
     cancellation: tokio_util::sync::CancellationToken,
+    #[cfg(test)]
+    test_marks: Option<TurnStateMarks>,
 }
+
+/// Test record of each turn-state mark: channel, reply target, busy flag, and
+/// whether the module accepted the dispatch.
+#[cfg(test)]
+type TurnStateMarks = Arc<Mutex<Vec<(String, String, bool, bool)>>>;
 impl ChannelTurnStateSubscriber {
     pub fn with_objects(
         workspace_dir: PathBuf,
@@ -194,6 +201,8 @@ impl ChannelTurnStateSubscriber {
             workspace_dir,
             objects: Some(objects),
             cancellation: super::super::runtime::session::channel_session(),
+            #[cfg(test)]
+            test_marks: None,
         }
     }
     #[cfg(test)]
@@ -202,6 +211,8 @@ impl ChannelTurnStateSubscriber {
             workspace_dir,
             objects: None,
             cancellation: tokio_util::sync::CancellationToken::new(),
+            #[cfg(test)]
+            test_marks: None,
         }
     }
     async fn mark(&self, channel: &str, reply_target: &str, event_ws: &PathBuf, busy: bool) {
@@ -252,6 +263,18 @@ impl ChannelTurnStateSubscriber {
                     }
                 }
             };
+        #[cfg(test)]
+        if let Some(marks) = &self.test_marks {
+            marks
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .push((
+                    channel.to_owned(),
+                    reply_target.to_owned(),
+                    busy,
+                    result.is_ok(),
+                ));
+        }
         if result.is_err() {
             tracing::debug!("channel turn status unavailable");
         }

@@ -194,6 +194,7 @@ pub(crate) async fn run_message_dispatch_loop(
                 && admitting.len() + admission_order.waiting() + held < budget => {
                 match received {
                     Some(message) => {
+                        tracing::debug!(channel = %message.message.channel, message_id = %message.message.id, "[dispatch] received module inbound message");
                         let seq = next_seq;
                         next_seq += 1;
                         let handle = admitting.spawn(admit_runtime_message(Arc::clone(&ctx), message));

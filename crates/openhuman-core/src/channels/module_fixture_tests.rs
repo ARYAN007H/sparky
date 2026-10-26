@@ -178,7 +178,6 @@ async fn linked_module_prepares_legacy_inbound_facts_over_confidential_bus_call(
                 namespace: "openhuman".into(),
                 preparation_mode: Default::default(),
                 session_policy: Default::default(),
-                preparation_mode: Default::default(),
             },),
         )
         .await
@@ -195,7 +194,7 @@ async fn linked_module_prepares_legacy_inbound_facts_over_confidential_bus_call(
     );
     assert_eq!(
         response.session_key,
-        "openhuman:discord:default:unknown:room#b:thread/c"
+        "v22|namespace=p9:openhuman|channel=p7:discord|account=a|kind=p7:unknown|scope=a|conversation=p6:room#b|parent=a|topic=a|thread=p8:thread/c|participant=a"
     );
     assert_eq!(response.message.timestamp, 42);
     assert_eq!(response.message.sender_name.as_deref(), Some("Display"));

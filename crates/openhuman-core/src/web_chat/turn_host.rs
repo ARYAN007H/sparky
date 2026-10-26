@@ -329,6 +329,11 @@ impl WebHost {
             None
         };
 
+        // Keep the resolved owner alive through the complete delegated run. The
+        // run context receives only a weak handle, so stored sessions do not pin
+        // tenant contexts after the request ends; tools that open tenant-scoped
+        // persistence after the task-local scope ended still reach it.
+        let core_lease = ctx.resolved();
         // `run_single`'s future is very large; box it so the origin scope holds
         // a pointer rather than inlining it into this frame.
         let turn = Box::pin(crate::agent::turn_host::AgentTurnHost::run(
@@ -352,10 +357,11 @@ impl WebHost {
                     .map(tinytools::WorkspaceDescriptor::new)
                     .map(crate::agent::turn_host::WorkspaceBinding::Set)
                     .unwrap_or(crate::agent::turn_host::WorkspaceBinding::Clear),
-                host_env: Default::default(),
+                host_env: turn_host_env(core_lease.as_ref()),
             },
         ));
         let outcome = turn.await;
+        drop(core_lease);
         let result = match outcome {
             Ok(response) => {
                 // A successful turn proves the thread's balance is usable, so
@@ -491,6 +497,19 @@ impl WebHost {
             }
             BudgetCorrelation::PassThrough => Err(err_message),
         }
+    }
+}
+
+/// The host environment a web turn starts with: the caller's resolved
+/// [`CoreContext`](crate::core::runtime::CoreContext), held weakly so a stored
+/// session does not pin the tenant once the request ends. The caller keeps the
+/// strong lease alive for the turn's duration.
+fn turn_host_env(
+    core: Option<&Arc<crate::core::runtime::CoreContext>>,
+) -> crate::agent::turn_env::HostTurnEnv {
+    crate::agent::turn_env::HostTurnEnv {
+        core: core.map(Arc::downgrade),
+        ..Default::default()
     }
 }
 

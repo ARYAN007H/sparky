@@ -240,3 +240,27 @@ async fn the_heartbeat_beats_only_for_a_live_turn() {
     assert!(names[1..].iter().all(|name| *name == "inference_heartbeat"));
     drop(beat);
 }
+
+/// A runner-driven web turn carries its caller's owner context, so tools that
+/// open tenant-scoped persistence after the task-local scope has ended still
+/// reach it; the env holds it weakly and never pins the tenant itself.
+#[test]
+fn the_turn_env_carries_the_callers_core_context_weakly() {
+    let core =
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
+    let env = turn_host_env(Some(&core));
+    let carried = env
+        .core
+        .as_ref()
+        .and_then(std::sync::Weak::upgrade)
+        .expect("web turn carries its caller CoreContext");
+    assert!(Arc::ptr_eq(&carried, &core));
+    drop(carried);
+    let weak = env.core.clone().expect("weak handle");
+    drop(core);
+    assert!(
+        weak.upgrade().is_none(),
+        "the env must not keep the tenant alive"
+    );
+    assert!(turn_host_env(None).core.is_none());
+}

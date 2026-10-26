@@ -1,5 +1,4 @@
-type DetachedSpawnParent<'a> =
-    &'a RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>;
+type DetachedSpawnParent<'a> = &'a RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>;
 
 impl SpawnSubagentTool {
     async fn execute_with_context_inner(
