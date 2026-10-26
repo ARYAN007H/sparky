@@ -105,7 +105,7 @@ pub(crate) const TINYDOCS: ModuleRecord = ModuleRecord {
 /// The contract also exposes `ExportKey` for downstream hosts that must drive
 /// a signer locally; OpenHuman itself does not call it.
 ///
-/// The pinned v0.26.0 release (contract 1.14) carries the native wallet, Web3,
+/// The pinned v0.27.0 release (contract 1.14) carries the native wallet, Web3,
 /// and x402 bus operations, including mnemonic word-count validation. Secret-bearing
 /// operations remain confidential and require both attestation and a matching
 /// pinned digest.
