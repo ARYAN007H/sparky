@@ -131,6 +131,55 @@ fn durable_upload_parts_survive_message_row_replay_without_inline_payloads() {
         .any(|part| matches!(part, ContentBlock::Document(MediaRef::Path { .. }))));
     assert!(!serde_json::to_string(&row).unwrap().contains("base64"));
 }
+// A turn renders its user message to text and lifts it back after
+// enrichment, so every upload must come back as the same typed block, not as
+// a `[DOCUMENT:<path>]` display marker the provider wrapper never resolves.
+#[test]
+fn uploaded_files_survive_the_text_round_trip_a_turn_takes() {
+    let mut text = String::from("Current Date & Time: now\n\n");
+    for (name, mime) in [
+        ("Q3; final.pdf", "application/pdf"),
+        ("receipt.png", "image/png"),
+        ("clip.mp3", "audio/mpeg"),
+        ("video.mp4", "video/mp4"),
+    ] {
+        let attachment = crate::attachments::Attachment {
+            path: format!("uploads/thread/id/{name}"),
+            name: name.into(),
+            mime: mime.into(),
+            size_bytes: 600,
+        };
+        text.push_str(&attachment.marker());
+        text.push('\n');
+    }
+    text.push_str("summarise it");
+    let message = user_message_from_text(&text);
+
+    let rendered = user_text_with_markers(&message);
+
+    assert_eq!(rendered, text);
+    assert_eq!(user_message_from_text(&rendered), message);
+    let Message::User(user) = message else {
+        panic!("user message expected")
+    };
+    assert!(user.content.iter().any(|part| matches!(
+        part,
+        ContentBlock::Document(MediaRef::Path { path, .. }) if path == "uploads/thread/id/Q3; final.pdf"
+    )));
+}
+
+// Text that only looks like an upload's description, with no upload after
+// it, stays text: the round trip invents no attachment.
+#[test]
+fn a_typed_upload_description_without_its_file_stays_text() {
+    let text =
+        "[Uploaded file: a.pdf; application/pdf; 3 bytes; workspace path: uploads/t/i/a.pdf]";
+    let message = Message::User(UserMessage {
+        content: vec![ContentBlock::Text(text.into())],
+    });
+    assert_eq!(user_text_with_markers(&message), text);
+}
+
 use tinyinference_llm::model::ModelRequest;
 
 // #5359: a user turn whose text carries an inline `[IMAGE:data:…]` marker
