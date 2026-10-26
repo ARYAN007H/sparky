@@ -156,6 +156,15 @@ test("CI exports the staged TinyMCP library for the multi-server suite", () => {
   );
 });
 
+test("staged module paths stay valid when tests change their working directory", () => {
+  const source = readFileSync(installer, "utf8");
+  assert.match(
+    source,
+    /dest="\$\(cd "\$\{dest\}" && pwd -P\)"/,
+    "the exported module paths must be absolute for subprocesses with a different cwd",
+  );
+});
+
 test("CI exports the staged TinyChannels library for its runtime suite", () => {
   const source = readFileSync(installer, "utf8");
   assert.match(

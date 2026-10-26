@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::Arc;
 
 fn result(text: &str) -> WebChatTaskResult {
     WebChatTaskResult {
@@ -27,6 +28,40 @@ fn guarded_turn_env_carries_the_backstop_deadline() {
 fn disabled_backstop_carries_no_deadline() {
     let (env, _) = turn_host_env(None);
     assert!(env.turn_deadline.is_none());
+}
+
+/// A spawned web turn retains its caller's owner context for tools that open
+/// tenant-scoped persistence after the task-local scope has ended.
+#[tokio::test]
+async fn guarded_turn_env_carries_the_callers_core_context() {
+    let core =
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
+    let ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&core));
+    let returned = run_turn_under_cancel_and_deadline(
+        &ctx,
+        CancellationToken::new(),
+        crate::security::turn_origin::AgentTurnOrigin::WebChat {
+            thread_id: "thread".into(),
+            client_id: "client".into(),
+            request_id: None,
+        },
+        crate::security::approval::ApprovalChatContext {
+            thread_id: "thread".into(),
+            client_id: "client".into(),
+            request_id: None,
+        },
+        |env, _, _| async move {
+            let carried = env
+                .core
+                .as_ref()
+                .and_then(std::sync::Weak::upgrade)
+                .expect("guarded turn carries its caller CoreContext");
+            assert!(Arc::ptr_eq(&carried, &core));
+            Ok(result("done"))
+        },
+    )
+    .await;
+    assert!(returned.is_some());
 }
 
 /// The env's cancellation is the very token a Stop fires.

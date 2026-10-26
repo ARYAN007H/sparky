@@ -241,8 +241,13 @@ where
         request_id,
     });
     let deadline = resolve_web_turn_deadline(ctx).await;
-    let (env, turn_cancellation) = turn_host_env(deadline);
-    run_until_stopped(
+    // Keep the resolved owner alive through the complete delegated run. The
+    // run context receives only a weak handle, so stored sessions do not pin
+    // tenant contexts after the request ends.
+    let core_lease = ctx.resolved();
+    let (mut env, turn_cancellation) = turn_host_env(deadline);
+    env.core = core_lease.as_ref().map(std::sync::Arc::downgrade);
+    let result = run_until_stopped(
         cancel_token,
         turn_cancellation,
         drive_turn_with_deadline(
@@ -262,7 +267,9 @@ where
             },
         ),
     )
-    .await
+    .await;
+    drop(core_lease);
+    result
 }
 
 /// Drive `turn` until it finishes or `cancel_token` fires.

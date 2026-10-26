@@ -65,6 +65,7 @@ impl ChannelHostCallbacks {
 #[tinybus::interface(name = "ai.tinyhumans.tinychannels.ChannelsHost")]
 impl ChannelHostCallbacks {
     async fn deliver_inbound(&self, channel: String, message: serde_json::Value) -> Result<()> {
+        tracing::debug!(channel, "[channels] module invoked inbound callback");
         Self::validate_callback_size(&message)?;
         if let Ok(delivery) = serde_json::from_value::<
             tinychannels_bus::module_relay::RelayInboundDelivery,
@@ -87,6 +88,7 @@ impl ChannelHostCallbacks {
         if message.channel.id != channel {
             return Err(Error::failed("callback channel does not match message"));
         }
+        tracing::debug!(channel, message_id = %message.message_id, "[channels] module delivered inbound message");
         self.dispatch
             .send(RuntimeChannelMessage::with_inbound_envelope(message))
             .await

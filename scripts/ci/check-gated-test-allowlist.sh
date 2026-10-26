@@ -19,7 +19,6 @@ EXPECTED=$(cat <<'EOF'
 agent_registry/host_definition_tests.rs
 agent/session_host/mod.rs
 integrations/prelude_integrations.rs
-agent/session_host/runtime_session.rs
 agent/session_host/runtime_session_tool_surface.rs
 agent/session_host/runtime_session_tests.rs
 agent_registry/agents/loader.rs
