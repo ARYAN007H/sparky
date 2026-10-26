@@ -365,6 +365,13 @@
   },
   {
     "rule": "openhuman-upstream-reexport",
+    "path": "crates/openhuman-embed/src/lib.rs",
+    "line": 263,
+    "text": "pub use tinyagents_session::port::{SessionStoreLease, SessionStoreLeaseError};",
+    "occurrence": 1
+  },
+  {
+    "rule": "openhuman-upstream-reexport",
     "path": "crates/openhuman-embed/src/observe.rs",
     "line": 7,
     "text": "pub use tinyagents_harness::observability::turn_observer::{",
