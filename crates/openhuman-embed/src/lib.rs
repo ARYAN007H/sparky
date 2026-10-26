@@ -252,6 +252,9 @@ pub mod session_store {
     pub use tinyagents_harness::observability::AgentObservation;
     pub use tinyagents_harness_tools::todos::TodoList;
     pub use tinyagents_session::port::{AgentStores, SessionStoreProvider};
+    /// What a provider's `lease_for_agent` returns: stores the provider promises
+    /// stay bound to one backend for the life of the lease.
+    pub use tinyagents_session::port::{SessionStoreLease, SessionStoreLeaseError};
     pub use tinyagents_session::port::{AppendStore, Store, TurnStates};
     /// In-memory provider and contract suites for providers implemented by embedders.
     #[cfg(feature = "testkit")]
