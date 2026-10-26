@@ -174,6 +174,22 @@ test("CI exports the staged TinyChannels library for its runtime suite", () => {
   );
 });
 
+test("CI exports the staged TinyVoice library without putting it on the search path", () => {
+  const source = readFileSync(installer, "utf8");
+  assert.match(
+    source,
+    /echo "OPENHUMAN_VOICE_TEST_ARTIFACT=\$\{tinyvoice_artifact\}"/,
+    "the native Telegram voice-note E2E loads the verified TinyVoice artifact by file",
+  );
+  const searchPath = source.match(/^for id in ([^;]+); do$/m);
+  assert.ok(searchPath, "the installer lists its search-path modules");
+  assert.doesNotMatch(
+    searchPath[1],
+    /\btinyvoice\b/,
+    "staging TinyVoice must not make every other suite load it",
+  );
+});
+
 test("MCP registry Rust integration tests run serially", () => {
   const source = readFileSync(localRustRunner, "utf8");
   assert.match(
@@ -311,6 +327,7 @@ for (const id of [
   "tinychannels",
   "tinymcp",
   "tinyhosts",
+  "tinyvoice",
 ]) {
   test(`native ${id} regressions receive their pinned release fixture`, () => {
     const assets = resolveTestModuleAssets(

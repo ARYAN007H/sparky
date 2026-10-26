@@ -5,9 +5,11 @@
 //! new update for the same Telegram conversation. The second model request
 //! must contain the first user's message from the session transcript.
 //!
-//! Both Telegram and inference are loopback mocks. This target loads a locally
-//! compiled TinyChannels module so it exercises the native Telegram listener
-//! through the production TinyBus artifact path.
+//! Both Telegram and inference are loopback mocks. This target loads a real
+//! TinyChannels (and, for voice, TinyVoice) module so it exercises the native
+//! Telegram listener through the production TinyBus artifact path: the
+//! registry-pinned release the test runner staged, or a local build (see
+//! [`TestModules`]).
 
 use std::collections::VecDeque;
 use std::fs::File;
@@ -409,11 +411,65 @@ fn media_update(
     json!({ "update_id": update_id, "message": message })
 }
 
-fn write_config(home: &Path, workspace: &Path, inference: &str) {
+/// Where the child core loads TinyChannels (and TinyVoice) from.
+///
+/// CI stages the registry-pinned, digest-verified releases and names them in
+/// `OPENHUMAN_CHANNELS_TEST_ARTIFACT` / `OPENHUMAN_VOICE_TEST_ARTIFACT`
+/// (`scripts/ci/self-hosted/install-test-modules.sh`); the child loads those
+/// files through `[[modules.overrides]]`. A developer can instead point
+/// `OPENHUMAN_TEST_MODULE_SOURCE_DIR` at `scripts/modules/build.mjs` output,
+/// which takes precedence. The directory must not sit under a symlink: TinyBus
+/// refuses a module path with a non-directory ancestor.
+enum TestModules {
+    Source(std::path::PathBuf),
+    Release(Vec<(&'static str, std::path::PathBuf)>),
+}
+
+fn test_modules(voice: bool) -> TestModules {
+    let ids: &[&'static str] = if voice {
+        &["tinychannels", "tinyvoice"]
+    } else {
+        &["tinychannels"]
+    };
+    if let Some(dir) = std::env::var_os("OPENHUMAN_TEST_MODULE_SOURCE_DIR") {
+        let dir = std::path::PathBuf::from(dir);
+        for id in ids {
+            assert!(
+                dir.join(id).join("modules.toml").is_file(),
+                "compiled {id} descriptor missing from {}",
+                dir.display()
+            );
+        }
+        return TestModules::Source(dir);
+    }
+    let artifacts = ids
+        .iter()
+        .map(|&id| {
+            let var = match id {
+                "tinyvoice" => "OPENHUMAN_VOICE_TEST_ARTIFACT",
+                _ => "OPENHUMAN_CHANNELS_TEST_ARTIFACT",
+            };
+            let path = std::env::var_os(var)
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "set {var} to the staged {id} release \
+                         (scripts/ci/self-hosted/install-test-modules.sh), or \
+                         OPENHUMAN_TEST_MODULE_SOURCE_DIR to scripts/modules/build.mjs output"
+                    )
+                });
+            assert!(path.is_file(), "{var} names no file: {}", path.display());
+            (id, path)
+        })
+        .collect();
+    TestModules::Release(artifacts)
+}
+
+fn write_config(home: &Path, workspace: &Path, inference: &str, modules: &TestModules) {
     let openhuman_dir = home.join(".openhuman");
     std::fs::create_dir_all(&openhuman_dir).expect("create OpenHuman config dir");
     std::fs::create_dir_all(workspace).expect("create workspace");
-    let config = format!(
+    let mut config = format!(
         r#"default_model = "openai:gpt-4o"
 chat_provider = "openai:gpt-4o"
 api_url = "{inference}"
@@ -448,6 +504,14 @@ auth_style = "none"
 default_model = "gpt-4o"
 "#
     );
+    if let TestModules::Release(artifacts) = modules {
+        for (id, path) in artifacts {
+            let path = toml::Value::String(path.display().to_string());
+            config.push_str(&format!(
+                "\n[[modules.overrides]]\nid = \"{id}\"\npath = {path}\n"
+            ));
+        }
+    }
     std::fs::write(openhuman_dir.join("config.toml"), &config).expect("write config");
     let parsed: openhuman_core::config::Config =
         toml::from_str(&config).expect("mock config matches the core schema");
@@ -495,7 +559,7 @@ fn start_core(
     workspace: &Path,
     telegram: &str,
     inference: &str,
-    module_source_dir: &Path,
+    modules: &TestModules,
     log_path: &Path,
     voice_enabled: bool,
 ) -> (CoreProcess, String) {
@@ -506,7 +570,24 @@ fn start_core(
         .port();
     let stdout = File::create(log_path).expect("create core log");
     let stderr = stdout.try_clone().expect("clone core log handle");
-    let child = Command::new(env!("CARGO_BIN_EXE_openhuman-core"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_openhuman-core"));
+    // A per-module source env var beats the config overrides; keep it out.
+    command
+        .env_remove("OPENHUMAN_MODULE_SOURCE_TINYCHANNELS")
+        .env_remove("OPENHUMAN_MODULE_SOURCE_TINYVOICE");
+    match modules {
+        TestModules::Source(dir) => {
+            command
+                .env("OPENHUMAN_MODULE_SOURCE", "source")
+                .env("OPENHUMAN_MODULE_SOURCE_DIR", dir);
+        }
+        TestModules::Release(_) => {
+            command
+                .env("OPENHUMAN_MODULE_SOURCE", "release")
+                .env_remove("OPENHUMAN_MODULE_SOURCE_DIR");
+        }
+    }
+    let child = command
         .args(["serve", "--port", &port.to_string()])
         .current_dir(home)
         .env("HOME", home)
@@ -524,8 +605,6 @@ fn start_core(
         .env("OPENHUMAN_AUTO_UPDATE_ENABLED", "false")
         .env("OPENHUMAN_TELEGRAM_BOT_API_BASE", telegram)
         .env("OPENHUMAN_COMPONENT_CHANNELS", "1")
-        .env("OPENHUMAN_MODULE_SOURCE", "source")
-        .env("OPENHUMAN_MODULE_SOURCE_DIR", module_source_dir)
         .env(
             "OPENHUMAN_STORAGE_URL",
             format!("sqlite:{}", workspace.join("sessions.db").display()),
@@ -917,19 +996,10 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
     let workspace = home.join("workspace");
     let logs = home.join("logs");
     std::fs::create_dir_all(&logs).expect("create logs");
-    let module_source_dir = std::env::var_os("OPENHUMAN_TEST_MODULE_SOURCE_DIR")
-        .map(std::path::PathBuf::from)
-        .expect("build TinyChannels and set OPENHUMAN_TEST_MODULE_SOURCE_DIR");
-    assert!(
-        module_source_dir
-            .join("tinychannels/modules.toml")
-            .is_file(),
-        "compiled TinyChannels source descriptor is missing from {}",
-        module_source_dir.display()
-    );
+    let modules = test_modules(false);
 
     let mocks = start_mock_servers().await;
-    write_config(&home, &workspace, &mocks.inference);
+    write_config(&home, &workspace, &mocks.inference, &modules);
 
     // The first listener instance consumes one real native Telegram update.
     let (mut first, first_rpc) = start_core(
@@ -937,7 +1007,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         &workspace,
         &mocks.telegram,
         &mocks.inference,
-        &module_source_dir,
+        &modules,
         &logs.join("first.log"),
         false,
     );
@@ -1027,7 +1097,7 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         &workspace,
         &mocks.telegram,
         &mocks.inference,
-        &module_source_dir,
+        &modules,
         &logs.join("second.log"),
         false,
     );
@@ -1088,21 +1158,16 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
     let workspace = home.join("workspace");
     let logs = home.join("logs");
     std::fs::create_dir_all(&logs).expect("create logs");
-    let module_source_dir = std::env::var_os("OPENHUMAN_TEST_MODULE_SOURCE_DIR")
-        .map(std::path::PathBuf::from)
-        .expect("build TinyChannels and set OPENHUMAN_TEST_MODULE_SOURCE_DIR");
-    assert!(module_source_dir
-        .join("tinychannels/modules.toml")
-        .is_file());
+    let modules = test_modules(false);
 
     let mocks = start_mock_servers().await;
-    write_config(&home, &workspace, &mocks.inference);
+    write_config(&home, &workspace, &mocks.inference, &modules);
     let (mut core, core_rpc) = start_core(
         &home,
         &workspace,
         &mocks.telegram,
         &mocks.inference,
-        &module_source_dir,
+        &modules,
         &logs.join("typed-media.log"),
         false,
     );
@@ -1206,7 +1271,7 @@ async fn native_telegram_typed_media_reaches_the_model_without_provider_paths() 
         &workspace,
         &mocks.telegram,
         &mocks.inference,
-        &module_source_dir,
+        &modules,
         &logs.join("typed-media-restarted.log"),
         false,
     );
@@ -1247,28 +1312,16 @@ async fn telegram_voice_note_runs_scoped_stt_agent_and_mirror_tts_through_module
     let workspace = home.join("workspace");
     let logs = home.join("logs");
     std::fs::create_dir_all(&logs).expect("create logs");
-    let module_source_dir = std::env::var_os("OPENHUMAN_TEST_MODULE_SOURCE_DIR")
-        .map(std::path::PathBuf::from)
-        .expect("build TinyChannels and TinyVoice and set OPENHUMAN_TEST_MODULE_SOURCE_DIR");
-    for module in ["tinychannels", "tinyvoice"] {
-        assert!(
-            module_source_dir
-                .join(module)
-                .join("modules.toml")
-                .is_file(),
-            "compiled {module} descriptor missing from {}",
-            module_source_dir.display()
-        );
-    }
+    let modules = test_modules(true);
 
     let mocks = start_mock_servers().await;
-    write_config(&home, &workspace, &mocks.inference);
+    write_config(&home, &workspace, &mocks.inference, &modules);
     let (mut core, rpc) = start_core(
         &home,
         &workspace,
         &mocks.telegram,
         &mocks.inference,
-        &module_source_dir,
+        &modules,
         &logs.join("voice.log"),
         true,
     );

@@ -36,6 +36,19 @@ stage_release_module() {
   printf '%s\n' "$dir"
 }
 
+# stage_release_artifact <id> <host-platform> <ext>; prints the staged module
+# library itself, for tests that load a module by file rather than through
+# OPENHUMAN_MODULE_PATH.
+stage_release_artifact() {
+  local id="$1" dir
+  dir="$(stage_release_module "$id" "$2" "$3")"
+  if [ "$3" = "dll" ]; then
+    printf '%s\n' "$dir/${id}_module.dll"
+  else
+    printf '%s\n' "$dir/lib${id}_module.$3"
+  fi
+}
+
 # stage_source_modules <id>... : build from the pinned submodules into the
 # default out dir (target/module-sources/<id>/). The runners put the directories
 # they want on OPENHUMAN_MODULE_PATH themselves, so a module is visible only to
