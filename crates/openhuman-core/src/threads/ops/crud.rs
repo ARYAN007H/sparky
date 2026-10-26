@@ -408,6 +408,7 @@ pub async fn message_update(
         request.message_id.clone(),
         ConversationMessagePatch {
             extra_metadata: request.extra_metadata,
+            merge_extra_metadata: None,
         },
     )
     .await?;
