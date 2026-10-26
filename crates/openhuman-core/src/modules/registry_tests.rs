@@ -121,7 +121,7 @@ fn tinywallet_registry_matches_the_verified_v0270_release_manifest() {
 fn tinybox_registry_matches_the_published_v023_release_manifest() {
     let record = find("tinybox").expect("compiled TinyBox module");
     assert_eq!(record.version, "0.2.3");
-    assert_eq!(tinybox_bus::CONTRACT_VERSION, (2, 0));
+    assert_eq!(tinybox_bus::CONTRACT_VERSION, (2, 1));
     assert_eq!(
         record.release_url,
         "https://github.com/tinyhumansai/tinybox/releases/tag/v0.2.3"
