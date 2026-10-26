@@ -8,7 +8,7 @@ pub(crate) const TINYFLOWS: ModuleRecord = ModuleRecord {
     object_path: tinyflows_bus::OBJECT_PATH,
     version: "0.9.2",
     release_url: "https://github.com/tinyhumansai/tinyflows/releases/tag/v0.9.2",
-    // Verbatim from the published v0.9.0 checksum.toml.
+    // Verbatim from the published v0.9.2 checksum.toml.
     assets: &[
         PlatformAsset {
             host_key: "macos-26-arm64",
