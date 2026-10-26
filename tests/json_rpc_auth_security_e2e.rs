@@ -994,7 +994,7 @@ async fn telegram_bot_token_connect_reject_disconnect_and_reconnect_over_json_rp
         .unwrap_or_else(|| panic!("modules_list omitted TinyChannels: {modules_response}"));
     assert_eq!(
         tinychannels.get("version").and_then(Value::as_str),
-        Some("0.1.42")
+        Some("0.1.45")
     );
     assert_eq!(
         tinychannels.get("state").and_then(Value::as_str),

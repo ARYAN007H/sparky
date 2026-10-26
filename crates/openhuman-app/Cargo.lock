@@ -7890,7 +7890,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-bus"
-version = "0.1.44"
+version = "0.1.45"
 dependencies = [
  "base64 0.23.1",
  "schemars 1.2.2",
@@ -8193,7 +8193,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-api"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8207,7 +8207,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-integrations"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8232,7 +8232,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-tools"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "async-lock",
  "async-trait",
@@ -8252,7 +8252,7 @@ dependencies = [
 
 [[package]]
 name = "tinyredact"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "log",
  "regex",
