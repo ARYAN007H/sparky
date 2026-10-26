@@ -445,6 +445,13 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
       const boxDir = join(root, "target/test-modules/tinybox/test-digest");
       mkdirSync(boxDir, { recursive: true });
       writeFileSync(join(boxDir, "libtinybox.so"), "fixture");
+      // The E2E runner stages these releases too. Cache them as well: staging
+      // stops on a download that fails, so an uncached one fails the runner.
+      for (const id of ["tinyconnectors", "tinyflows", "tinysearch"]) {
+        const dir = join(root, `target/test-modules/${id}/test-digest`);
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(join(dir, `lib${id}_module.so`), "fixture");
+      }
       // Evaluate the real runner branches with only external commands stubbed.
       // A cached fixture avoids downloads while exercising the path export.
       const cargoStub = `cargo_test() {
