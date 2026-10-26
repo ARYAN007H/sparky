@@ -7611,7 +7611,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-definition"
-version = "3.1.0"
+version = "3.1.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7624,7 +7624,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-harness"
-version = "3.1.0"
+version = "3.1.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7666,7 +7666,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-harness-tools"
-version = "3.1.0"
+version = "3.1.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7699,7 +7699,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-hooks"
-version = "3.1.0"
+version = "3.1.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7717,7 +7717,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-live"
-version = "3.1.0"
+version = "3.1.2"
 dependencies = [
  "serde_json",
  "tinyagents-harness",
@@ -7728,7 +7728,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-orchestration"
-version = "3.1.0"
+version = "3.1.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7751,7 +7751,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-registry"
-version = "3.1.0"
+version = "3.1.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -7766,7 +7766,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-runtime"
-version = "3.1.0"
+version = "3.1.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7786,7 +7786,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-session"
-version = "3.1.0"
+version = "3.1.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7811,7 +7811,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-storage-kit"
-version = "3.1.0"
+version = "3.1.2"
 dependencies = [
  "data-encoding",
  "serde",
@@ -7825,7 +7825,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-tasks"
-version = "3.1.0"
+version = "3.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -7937,7 +7937,7 @@ dependencies = [
 
 [[package]]
 name = "tinyflows"
-version = "0.9.3"
+version = "0.9.4"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
