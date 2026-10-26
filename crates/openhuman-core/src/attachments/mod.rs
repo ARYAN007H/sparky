@@ -92,6 +92,24 @@ impl Attachment {
             self.name, self.mime, self.size_bytes, self.path
         )
     }
+
+    /// The attachment `text` is the [`description`](Self::description) of,
+    /// when it is exactly one. The name may hold anything, so the fixed
+    /// fields are read from the right and the result must describe itself
+    /// back byte for byte.
+    pub(crate) fn from_description(text: &str) -> Option<Self> {
+        let body = text.strip_prefix("[Uploaded file: ")?.strip_suffix(']')?;
+        let (head, path) = body.rsplit_once("; workspace path: ")?;
+        let (head, size) = head.strip_suffix(" bytes")?.rsplit_once("; ")?;
+        let (name, mime) = head.rsplit_once("; ")?;
+        let attachment = Self {
+            path: path.into(),
+            name: name.into(),
+            mime: mime.into(),
+            size_bytes: size.parse().ok()?,
+        };
+        (attachment.description() == text).then_some(attachment)
+    }
 }
 
 pub(crate) enum Segment {

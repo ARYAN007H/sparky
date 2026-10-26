@@ -145,15 +145,59 @@ pub(crate) fn user_message_from_text(text: &str) -> Message {
 }
 
 /// The inverse of [`user_message_from_text`]: a user message's text with each
-/// image block rendered back as an `[IMAGE:<url>]` marker. A text-only message
-/// is exactly [`Message::text`].
+/// uploaded file rendered back as its `[ATTACHMENT:…]` reference and each
+/// other image block as an `[IMAGE:<url>]` marker. A text-only message is
+/// exactly [`Message::text`].
+///
+/// An upload must come back as its reference, not as the display form of its
+/// block: a `[DOCUMENT:<path>]` marker lifts back to plain text, so a turn
+/// that renders and re-lifts its message would hand the model the path
+/// instead of the file.
 pub(crate) fn user_text_with_markers(msg: &Message) -> String {
-    match msg {
-        Message::User(_) => tinyagents_runtime::transcript::message_to_native_transcript(msg)
-            .expect("user messages have a native transcript projection")
-            .display_content(),
-        other => other.text(),
+    let Message::User(user) = msg else {
+        return msg.text();
+    };
+    let mut text = String::new();
+    let mut run = Vec::new();
+    let mut blocks = user.content.iter().peekable();
+    while let Some(block) = blocks.next() {
+        if let ContentBlock::Text(description) = block {
+            if let Some(upload) = blocks.peek().and_then(|next| uploaded(description, next)) {
+                text.push_str(&display_text(std::mem::take(&mut run)));
+                text.push_str(&upload.marker());
+                blocks.next();
+                continue;
+            }
+        }
+        run.push(block.clone());
     }
+    text.push_str(&display_text(run));
+    text
+}
+
+/// The display text of user `content`: its text, image blocks as markers.
+fn display_text(content: Vec<ContentBlock>) -> String {
+    if content.is_empty() {
+        return String::new();
+    }
+    let message = Message::User(UserMessage { content });
+    tinyagents_runtime::transcript::message_to_native_transcript(&message)
+        .expect("user messages have a native transcript projection")
+        .display_content()
+}
+
+/// The upload a `description` block followed by `block` stands for: the
+/// pair [`user_message_from_text`] makes of one `[ATTACHMENT:…]` reference.
+fn uploaded(description: &str, block: &ContentBlock) -> Option<crate::attachments::Attachment> {
+    let path = match block {
+        ContentBlock::Image(image) => &image.url,
+        ContentBlock::Audio(MediaRef::Path { path, .. })
+        | ContentBlock::Video(MediaRef::Path { path, .. })
+        | ContentBlock::Document(MediaRef::Path { path, .. }) => path,
+        _ => return None,
+    };
+    crate::attachments::Attachment::from_description(description)
+        .filter(|upload| upload.path == *path)
 }
 
 /// Build the content blocks for a user turn, lifting any `[IMAGE:…]` markers out
