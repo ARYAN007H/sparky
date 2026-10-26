@@ -137,6 +137,7 @@ async fn overlong_reply_is_rejected_without_calling_the_backend() {
     assert!(err.to_string().contains("maximum spoken duration"));
 }
 
+#[cfg(feature = "voice")]
 mod stt {
     use super::*;
     use crate::core::Outcome;
