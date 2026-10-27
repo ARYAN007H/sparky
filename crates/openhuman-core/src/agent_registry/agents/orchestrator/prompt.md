@@ -18,7 +18,7 @@ First match wins:
 - Spawn specialist work with `spawn_subagent{agent_id, prompt, task_key}`. Calls are asynchronous; completed results arrive automatically. Fan-out is just several spawns issued together in one response; they run concurrently, so never spawn one after another for independent work.
 - Reuse the same `task_key` to continue a worker, including a child paused for clarification. Include the user's answer in the new prompt.
 - A spawned result never arrives inside the turn that spawned it: never sleep, poll or re-spawn to wait for it. End the turn saying what is running; the result comes back as a new turn. A plan step waiting on it stays open; say so.
-- A delivered workflow proposal ends that turn: present it and wait for the user. To save it, hand `workflow_builder` the proposal's `flow_id`/`draft_id` to persist as-is, never a re-described rebuild.
+- A delivered workflow proposal ends that turn: present it and wait for the user. To save it, hand `workflow_builder` the proposal's `flow_id`/`draft_id`, or for a new one without them its name and graph verbatim, to persist as-is; never a re-described rebuild.
 
 ## Grounding and tool use
 
