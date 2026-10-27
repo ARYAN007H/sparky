@@ -127,7 +127,9 @@ class Rig {
     this.results = results;
     this.methods = null;
     this.core = null;
-    this.env = {};
+    // The auto-updater would otherwise ask api.github.com for a release: the
+    // run stays offline.
+    this.env = { OPENHUMAN_AUTO_UPDATE_ENABLED: "false" };
     if (masterKey) {
       const key = randomBytes(32).toString("hex");
       this.secrets.push(key);

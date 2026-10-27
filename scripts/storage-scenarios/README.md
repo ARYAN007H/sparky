@@ -128,7 +128,9 @@ when it is not, #8076), then writes the marker.
 - **No backend is reachable**: every config the run writes sets
   `api_url = "http://127.0.0.1:9"`, so a call the core makes on its own
   (notification triage, the first use of J's fictional API key) fails on a
-  closed loopback port instead of reaching a network or a model.
+  closed loopback port instead of reaching a network or a model, and
+  `OPENHUMAN_AUTO_UPDATE_ENABLED=false` keeps the auto-updater from asking
+  GitHub for a release.
 - **No background job runs** (`[scheduler_gate] mode = "off"` in every config
   the run writes, including each signed-in user's): the legacy fixture holds
   cron jobs that are due. Composio is off.
