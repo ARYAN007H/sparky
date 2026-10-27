@@ -702,11 +702,14 @@ pub(super) async fn prepare_module_callbacks(
     runtime
         .spawn(prepare_callbacks(runtime.connection(), runtime.host()))
         .await
-        .map_err(|error| {
-            tinybus::Error::Transport(format!(
-                "the module storage callbacks did not finish: {error}"
-            ))
-        })?
+        .map_err(callbacks_join_failed)?
+}
+
+/// The preparing task panicked or was cancelled before it returned a binding.
+fn callbacks_join_failed(error: tokio::task::JoinError) -> tinybus::Error {
+    tinybus::Error::Transport(format!(
+        "the module storage callbacks did not finish: {error}"
+    ))
 }
 
 /// Prepare a callback storage endpoint for a module host on `connection`.
