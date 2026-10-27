@@ -383,6 +383,21 @@ pub async fn clear_credential(
     config: &Config,
     kind: Option<CredentialKind>,
 ) -> Result<Outcome<Value>, String> {
+    clear_credential_with(ctx, config, kind, || reload_config_or(ctx, config)).await
+}
+
+/// [`clear_credential`] with the post-teardown config reload passed in, so a
+/// test can make it fail. Production passes [`reload_config_or`].
+pub(crate) async fn clear_credential_with<F, Fut>(
+    ctx: &DispatchCtx,
+    config: &Config,
+    kind: Option<CredentialKind>,
+    reload: F,
+) -> Result<Outcome<Value>, String>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<Config, String>>,
+{
     refuse_process_credential_in_saas("clear_credential")?;
     let _mutation = CREDENTIAL_MUTATION_LOCK.lock().await;
     let mut logs = Vec::new();
@@ -426,20 +441,19 @@ pub async fn clear_credential(
             cleared_source_api_key = api_key::clear_api_key(config).map_err(|e| e.to_string())?;
         }
 
-        let outcome = match clear_session_credential(ctx, config).await {
-            Ok(outcome) => outcome,
-            Err(error) => {
-                restore_api_key(config, source_api_key.as_deref(), "teardown failed");
-                return Err(error);
-            }
-        };
+        // Every step from here to the carry puts the key back if it fails,
+        // so a failed sign-out never loses it.
+        let restore = |reason| restore_api_key(config, source_api_key.as_deref(), reason);
+        let outcome = clear_session_credential(ctx, config)
+            .await
+            .inspect_err(|_| restore("teardown failed"))?;
         removed_session = outcome.value;
         logs.extend(outcome.logs);
 
         // The teardown rebinds every process global to the signed-out
         // workspace whether or not a session profile was found; follow it so
         // the api-key checks below agree with `auth.get_state`.
-        effective_config = reload_config_or(ctx, config).await?;
+        effective_config = reload().await.inspect_err(|_| restore("reload failed"))?;
         if let Some(key) = source_api_key.as_deref() {
             if matches!(
                 kind,
@@ -451,10 +465,9 @@ pub async fn clear_credential(
                 // is only removing the session — an unrelated, stale key at
                 // the pre-login workspace must never silently outrank the key
                 // that was the effective credential a moment ago (#6318).
-                if let Err(error) = api_key::store_api_key(&effective_config, key) {
-                    restore_api_key(config, Some(key), "carry failed");
-                    return Err(error.to_string());
-                }
+                api_key::store_api_key(&effective_config, key)
+                    .inspect_err(|_| restore("carry failed"))
+                    .map_err(|e| e.to_string())?;
                 logs.push("api key carried forward to the signed-out workspace".to_string());
             }
         }
