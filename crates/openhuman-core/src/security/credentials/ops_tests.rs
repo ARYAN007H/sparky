@@ -83,5 +83,8 @@ fn store_live_session(user_id: &str) -> Config {
 mod credential_local_session_tests;
 #[path = "ops_credential_tests.rs"]
 mod credential_tests;
+#[cfg(feature = "storage-sqlite")]
+#[path = "ops_credential_per_user_storage_tests.rs"]
+mod credential_per_user_storage_tests;
 #[path = "ops_provider_oauth_tests.rs"]
 mod provider_oauth_tests;
