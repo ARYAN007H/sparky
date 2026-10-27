@@ -67,6 +67,10 @@ function parseArgs(argv) {
 
 const BASE_CONFIG = [
   "schema_version = 13",
+  // Every backend-bound call (notification triage, a fictional API key's
+  // first use) goes to a closed loopback port: the run never reaches a
+  // network or a model.
+  'api_url = "http://127.0.0.1:9"',
   "onboarding_completed = true",
   "chat_onboarding_completed = true",
   "",
@@ -244,37 +248,45 @@ async function runDriver(driver, { opts, runDir, runId, findings, results }) {
     },
   });
 
-  await main.start();
-  const wanted = (s) => !opts.only.length || opts.only.some((o) => s.id.toUpperCase().startsWith(o));
-  const list = [...SCENARIOS, ...ISOLATED].filter((s) => s.drivers.includes(driver) && wanted(s));
-  for (const s of list) {
-    binding.scenario = s.id;
-    const before = findings.checks.length;
-    const notesBefore = findings.items.filter((f) => f.severity === "note").length;
-    const started = Date.now();
-    let error = null;
-    console.log(`${driver.padEnd(7)}: ${s.id}`);
-    try {
-      if (!main.alive) await main.start();
-      await s.run(ctx);
-    } catch (e) {
-      error = scrub(e.message, secrets);
-      findings.add({ engine: driver, scenario: s.id, id: "crashed", severity: "high", expected: "the scenario runs to the end", actual: error, evidence: `${driver}/core.log` });
-    } finally {
-      // Isolated cores never outlive their scenario (F restarts E's rig itself).
-      for (const r of isolated.splice(0)) await r.stop().catch(() => {});
+  const all = [...SCENARIOS, ...ISOLATED].filter((s) => s.drivers.includes(driver));
+  const picked = (s) => !opts.only.length || opts.only.some((o) => s.id.toUpperCase().startsWith(o));
+  // A scenario's prerequisites (`needs`) run with it, so `--only B` still
+  // has A's records to check.
+  const needed = new Set(all.filter(picked).flatMap((s) => [s.id, ...(s.needs ?? [])]));
+  const list = all.filter((s) => needed.has(s.id));
+  try {
+    await main.start();
+    for (const s of list) {
+      binding.scenario = s.id;
+      const before = findings.checks.length;
+      const notesBefore = findings.items.filter((f) => f.severity === "note").length;
+      const started = Date.now();
+      let error = null;
+      console.log(`${driver.padEnd(7)}: ${s.id}`);
+      try {
+        if (!main.alive) await main.start();
+        await s.run(ctx);
+      } catch (e) {
+        error = scrub(e.message, secrets);
+        findings.add({ engine: driver, scenario: s.id, id: "crashed", severity: "high", expected: "the scenario runs to the end", actual: error, evidence: `${driver}/core.log` });
+      } finally {
+        // Isolated cores never outlive their scenario (F restarts E's rig itself).
+        for (const r of isolated.splice(0)) await r.stop().catch(() => {});
+      }
+      const checks = findings.checks.slice(before).filter((c) => c.engine === driver);
+      driverResults.scenarios[s.id] = {
+        checks: checks.length,
+        failed: checks.filter((c) => !c.ok).length,
+        notes: findings.items.filter((f) => f.severity === "note").length - notesBefore,
+        ms: Date.now() - started,
+        error,
+      };
     }
-    const checks = findings.checks.slice(before).filter((c) => c.engine === driver);
-    driverResults.scenarios[s.id] = {
-      checks: checks.length,
-      failed: checks.filter((c) => !c.ok).length,
-      notes: findings.items.filter((f) => f.severity === "note").length - notesBefore,
-      ms: Date.now() - started,
-      error,
-    };
+  } finally {
+    // A failed boot or scenario never leaves a core running.
+    await main.stop().catch(() => {});
+    if (ctx.state.legacy?.rig) await ctx.state.legacy.rig.stop().catch(() => {});
   }
-  await main.stop();
-  if (ctx.state.legacy?.rig) await ctx.state.legacy.rig.stop().catch(() => {});
 }
 
 function renderReport({ runId, results, findings }) {

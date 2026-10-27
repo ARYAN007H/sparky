@@ -11,8 +11,9 @@ a person to read; **nothing is fixed during a run**.
 # every driver (sqlite, then file, then memory)
 node scripts/storage-scenarios/run.mjs
 
-# one driver, some scenarios (by id prefix)
-node scripts/storage-scenarios/run.mjs --driver sqlite --only A,B,C
+# one driver, some scenarios (by id prefix; prerequisites run too, e.g. B, C,
+# H and I bring A, F brings E)
+node scripts/storage-scenarios/run.mjs --driver sqlite --only B,C
 
 # re-render the report of an old run
 node scripts/storage-scenarios/run.mjs --grade-only target/storage-scenarios/<run-id>
@@ -124,6 +125,10 @@ when it is not, #8076), then writes the marker.
 - Each core gets a **random master key**, passed through the environment only.
   It, every token the run mints and every fixture secret are scrubbed from
   `core.log` and `rpc.jsonl`.
+- **No backend is reachable**: every config the run writes sets
+  `api_url = "http://127.0.0.1:9"`, so a call the core makes on its own
+  (notification triage, the first use of J's fictional API key) fails on a
+  closed loopback port instead of reaching a network or a model.
 - **No background job runs** (`[scheduler_gate] mode = "off"` in every config
   the run writes, including each signed-in user's): the legacy fixture holds
   cron jobs that are due. Composio is off.

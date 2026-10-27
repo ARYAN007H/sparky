@@ -254,6 +254,7 @@ const writeRead = {
 const durability = {
   id: "B-durability",
   title: "Restart keeps everything; kill -9 mid-write leaves no torn records",
+  needs: ["A-write-read"],
   drivers: ["sqlite", "file"],
   async run(ctx) {
     await ctx.restart();
@@ -335,6 +336,7 @@ const durability = {
 const onDisk = {
   id: "C-on-disk",
   title: "Records sit in the expected scope and collection; secrets are not plaintext",
+  needs: ["A-write-read"],
   drivers: ["sqlite", "file"],
   async run(ctx) {
     const a = ctx.state.a;
@@ -406,6 +408,7 @@ const onDisk = {
 const memoryRestart = {
   id: "H-memory-restart",
   title: "memory driver: everything gone after a restart, as designed",
+  needs: ["A-write-read"],
   drivers: ["memory"],
   async run(ctx) {
     const a = ctx.state.a;
@@ -421,7 +424,7 @@ const memoryRestart = {
     ctx.check({ id: "H-cron-gone", ok: control && !jobs.some((j) => j.id === a.cronId), expected: "the A cron job is gone after a restart", actual: control ? (jobs.some((j) => j.id === a.cronId) ? "still listed" : "gone") : "control failed" });
     const msgs = await ctx.tryRpc("openhuman.threads_messages_list", { thread_id: a.threadId });
     const n = listOf(msgs.value, "messages").length;
-    ctx.check({ id: "H-stream-gone", ok: control && n === 0, expected: "the A thread has no messages after a restart", actual: msgs.ok ? `${n} messages` : `error (${errText(msgs).slice(0, 120)})` });
+    ctx.check({ id: "H-stream-gone", ok: control && msgs.ok && n === 0, expected: "the A thread has no messages after a restart", actual: msgs.ok ? `${n} messages` : `error (${errText(msgs).slice(0, 120)})` });
   },
 };
 
@@ -432,6 +435,7 @@ const memoryRestart = {
 const concurrency = {
   id: "I-concurrency",
   title: "Concurrent writers: compare-and-swap has one winner; parallel appends lose nothing",
+  needs: ["A-write-read"],
   drivers: ["sqlite"],
   async run(ctx) {
     if (ctx.has("openhuman.flows_create") && ctx.has("openhuman.flows_update")) {

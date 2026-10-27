@@ -31,7 +31,9 @@ async function writeUserData(rig, user, tag) {
   await rig.tryRpc("openhuman.threads_upsert", { id: d.thread, title: d.marker, created_at: new Date().toISOString() });
   await rig.tryRpc("openhuman.threads_message_append", { thread_id: d.thread, message: { id: `${d.thread}-m0`, content: d.marker, type: "text", extraMetadata: {}, sender: "user", createdAt: new Date().toISOString() } });
   await rig.tryRpc("openhuman.channel_web_voice_note_store", { note_id: d.note, audio_base64: Buffer.from(d.marker).toString("base64") });
-  await rig.tryRpc("openhuman.auth_store_provider_credentials", { provider: d.provider, profile: "default", token: `storscen-token-${randomBytes(8).toString("hex")}` });
+  const token = `storscen-token-${randomBytes(8).toString("hex")}`;
+  rig.addSecret(token);
+  await rig.tryRpc("openhuman.auth_store_provider_credentials", { provider: d.provider, profile: "default", token });
   return d;
 }
 
@@ -170,10 +172,13 @@ const legacyImport = {
     // The imported domains' own collections in the tenant scope; storage
     // bookkeeping (tsd.*, leases, journals) and module scopes move on their own.
     const imported = (r) => r.scope === "local" && !/^tsd\.|journal|leases|admission|^storage\./.test(r.coll);
-    const delta = second.census.filter(imported).filter((r) => {
-      const was = first.census.find((x) => x.scope === r.scope && x.coll === r.coll);
-      return !was || was.n !== r.n;
-    });
+    // Both directions: a collection emptied by the second boot is absent
+    // from its census and must still count.
+    const count = (census, r) => census.find((x) => x.scope === r.scope && x.coll === r.coll)?.n ?? 0;
+    const delta = [...first.census.filter(imported), ...second.census.filter(imported)]
+      .filter((r, i, all) => all.findIndex((x) => x.scope === r.scope && x.coll === r.coll) === i)
+      .filter((r) => count(first.census, r) !== count(second.census, r))
+      .map((r) => ({ scope: r.scope, coll: r.coll, first: count(first.census, r), second: count(second.census, r) }));
     const legacyMarkers = (m) => m.filter((x) => x.startsWith("done/") && x.includes("storage_import/")).sort();
     ctx.check({ id: "E-idempotent", ok: delta.length === 0 && json(legacyMarkers(second.markers)) === json(legacyMarkers(first.markers)), expected: "a second boot adds no imported record and no import marker", actual: delta.length ? json(delta).slice(0, 300) : `unchanged; ${legacyMarkers(second.markers).length} markers` });
     const other = second.census.filter((r) => !imported(r)).filter((r) => (first.census.find((x) => x.scope === r.scope && x.coll === r.coll)?.n ?? 0) !== r.n);
@@ -184,6 +189,7 @@ const legacyImport = {
 
 const layoutMigration = {
   id: "F-layout-migration",
+  needs: ["E-legacy-import"],
   title: "Layout v2 opt-in migration: archive, data intact; no master key leaves credentials in place (#8076)",
   drivers: ["sqlite"],
   async run(ctx) {
