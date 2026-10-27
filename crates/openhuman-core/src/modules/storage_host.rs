@@ -689,14 +689,24 @@ pub(crate) async fn install(
 /// Prepare the exact per-module storage capability used by TinyMCP and
 /// TinyEventQueues. The callback endpoint reuses the live storage policy but
 /// is reachable only by the verified module instance loaded with this binding.
+///
+/// Prepared on the module runtime, not the caller's: the binding is kept for
+/// the process, so its endpoint must outlive whichever runtime loaded the
+/// module first (as the host callbacks in [`super::runtime`] do).
 pub(super) async fn prepare_module_callbacks(
-    runtime: &tinybus::module::ModuleRuntime,
+    runtime: &'static tinybus::module::ModuleRuntime,
 ) -> tinybus::Result<(
     Arc<tinybus::module::HostCallbackBinding>,
     tinystoragedrivers_busproxy::ServedStorage,
 )> {
-    let connection = runtime.connection();
-    prepare_callbacks(connection, runtime.host()).await
+    runtime
+        .spawn(prepare_callbacks(runtime.connection(), runtime.host()))
+        .await
+        .map_err(|error| {
+            tinybus::Error::Transport(format!(
+                "the module storage callbacks did not finish: {error}"
+            ))
+        })?
 }
 
 /// Prepare a callback storage endpoint for a module host on `connection`.
