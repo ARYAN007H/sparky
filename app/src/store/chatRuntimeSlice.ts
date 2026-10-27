@@ -834,6 +834,29 @@ export interface WorkflowProposal {
 }
 
 /**
+ * A proposal's identity across Redux updates and card remounts: its source
+ * message when it has one, and its name. Also the card's React key, so a
+ * replacement remounts the card and a late save/enable result from the
+ * replaced proposal is ignored instead of landing on the new one.
+ */
+export function workflowProposalKey(
+  proposal: Pick<WorkflowProposal, 'name' | 'sourceMessageId'>
+): string {
+  return `${proposal.sourceMessageId ?? ''}|${proposal.name}`;
+}
+
+/** Payload of the save/completion updates, naming the proposal they belong to. */
+interface WorkflowProposalSaveUpdate {
+  threadId: string;
+  flowId: string;
+  name: string;
+  sourceMessageId?: string;
+}
+
+const isSameProposal = (proposal: WorkflowProposal, update: WorkflowProposalSaveUpdate) =>
+  workflowProposalKey(proposal) === workflowProposalKey(update);
+
+/**
  * Lifecycle status of a single agent-generated artifact, as projected
  * onto the chat runtime per thread.
  *
@@ -2606,14 +2629,12 @@ const chatRuntimeSlice = createSlice({
      * state survives a remount (thread switch, route change) while the
      * proposal is still sitting in `pendingWorkflowProposalsByThread` — see
      * `WorkflowProposal.completedFlowId`. No-op if the proposal was already
-     * cleared (e.g. a race with `clearWorkflowProposalForThread`).
+     * cleared (e.g. a race with `clearWorkflowProposalForThread`) or replaced
+     * by another proposal (see `isSameProposal`).
      */
-    markWorkflowProposalCompleted: (
-      state,
-      action: PayloadAction<{ threadId: string; flowId: string }>
-    ) => {
+    markWorkflowProposalCompleted: (state, action: PayloadAction<WorkflowProposalSaveUpdate>) => {
       const proposal = state.pendingWorkflowProposalsByThread[action.payload.threadId];
-      if (proposal) {
+      if (proposal && isSameProposal(proposal, action.payload)) {
         proposal.completedFlowId = action.payload.flowId;
       }
     },
@@ -2624,21 +2645,9 @@ const chatRuntimeSlice = createSlice({
      * it while the save was in flight must not inherit its flow id. No-op if
      * the proposal was cleared or replaced.
      */
-    markWorkflowProposalSaved: (
-      state,
-      action: PayloadAction<{
-        threadId: string;
-        flowId: string;
-        name: string;
-        sourceMessageId?: string;
-      }>
-    ) => {
+    markWorkflowProposalSaved: (state, action: PayloadAction<WorkflowProposalSaveUpdate>) => {
       const proposal = state.pendingWorkflowProposalsByThread[action.payload.threadId];
-      if (
-        proposal &&
-        proposal.name === action.payload.name &&
-        proposal.sourceMessageId === action.payload.sourceMessageId
-      ) {
+      if (proposal && isSameProposal(proposal, action.payload)) {
         proposal.savedFlowId = action.payload.flowId;
       }
     },

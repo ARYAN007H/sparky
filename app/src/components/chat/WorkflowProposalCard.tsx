@@ -234,7 +234,14 @@ const WorkflowProposalCard: React.FC<Props> = ({ threadId, proposal, onSaved }) 
 
   const markCompleted = (flowId: string) => {
     setCompletedFlowId(flowId);
-    dispatch(markWorkflowProposalCompleted({ threadId, flowId }));
+    dispatch(
+      markWorkflowProposalCompleted({
+        threadId,
+        flowId,
+        name: proposal.name,
+        sourceMessageId: proposal.sourceMessageId,
+      })
+    );
   };
 
   // Consolidated save+enable pre-authorization (Approve all / Deny), rendered
@@ -271,6 +278,15 @@ const WorkflowProposalCard: React.FC<Props> = ({ threadId, proposal, onSaved }) 
     // what just happened in this attempt.
     let flowId = savedFlowId;
     let flowPersisted = flowId !== null;
+    // A revision without the version it was derived from (an older persisted
+    // proposal, or a flow edited after its draft was seeded) cannot be checked
+    // against newer edits, so it is never written onto the flow.
+    if (!flowId && proposal.flowId && !proposal.flowVersion) {
+      log('save: revision of %s carries no source version — refusing', proposal.flowId);
+      setErrorMsg(t('chat.flowProposal.versionConflict'));
+      setSaving(false);
+      return;
+    }
     try {
       if (!flowId) {
         // A proposal that revises a saved flow (`flow_id` on its payload) is

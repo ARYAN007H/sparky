@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import reducer, {
+  markWorkflowProposalCompleted,
   markWorkflowProposalSaved,
   setWorkflowProposalForThread,
   type WorkflowProposal,
@@ -42,5 +43,20 @@ describe('markWorkflowProposalSaved', () => {
       })
     );
     expect(state.pendingWorkflowProposalsByThread.t1?.savedFlowId).toBeUndefined();
+  });
+});
+
+describe('markWorkflowProposalCompleted', () => {
+  it('ignores a late completion from a proposal that was replaced', () => {
+    const state = reducer(
+      withPending(proposal('Digest', 'm2')),
+      markWorkflowProposalCompleted({
+        threadId: 't1',
+        flowId: 'f1',
+        name: 'Digest',
+        sourceMessageId: 'm1',
+      })
+    );
+    expect(state.pendingWorkflowProposalsByThread.t1?.completedFlowId).toBeUndefined();
   });
 });

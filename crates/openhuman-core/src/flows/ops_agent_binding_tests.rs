@@ -430,40 +430,95 @@ async fn agent_ref_gate_reads_the_registry_of_the_explicit_context() {
     );
 }
 
-#[tokio::test]
-async fn revision_proposal_carries_the_target_flow_version() {
-    // A proposal that revises a saved flow carries that flow's version, so a
-    // save onto it can refuse to overwrite a newer edit.
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let g = graph(json!({
+fn tool_call_graph() -> Value {
+    graph(json!({
         "nodes": [
             { "id": "t", "kind": "trigger", "name": "Manual" },
             { "id": "post", "kind": "tool_call", "name": "Post",
               "config": { "slug": "oh:noop" } }
         ],
         "edges": [ { "from_node": "t", "to_node": "post" } ]
-    }));
-    let flow = flows_create(&config, "Base".to_string(), g.clone(), false)
-        .await
-        .unwrap()
-        .value;
+    }))
+}
 
-    let payload = build_builder_proposal(
+async fn revision_payload(config: &Config, flow_id: &str, draft_id: Option<String>) -> Value {
+    build_builder_proposal(
         &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
+        config,
         "edit_workflow",
         "Base",
-        &g,
+        &tool_call_graph(),
         false,
         true,
         None,
-        None,
-        Some(flow.id.clone()),
+        draft_id,
+        Some(flow_id.to_string()),
     )
     .await
-    .expect("proposal must succeed for a tool_call-only graph");
+    .expect("proposal must succeed for a tool_call-only graph")
+}
+
+#[tokio::test]
+async fn revision_proposal_carries_the_version_its_draft_was_seeded_from() {
+    // The draft was seeded from the flow as it is now, so the flow's current
+    // version is the one the revision was derived from.
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let flow = flows_create(&config, "Base".to_string(), tool_call_graph(), false)
+        .await
+        .unwrap()
+        .value;
+    let draft = crate::flows::draft_store::create_draft(
+        &config,
+        Some(flow.id.clone()),
+        "Base".to_string(),
+        tool_call_graph(),
+        tinyflows_bus::catalog::DraftOrigin::Chat,
+    )
+    .unwrap();
+
+    let payload = revision_payload(&config, &flow.id, Some(draft.id)).await;
 
     assert_eq!(payload["flow_id"], json!(flow.id));
     assert_eq!(payload["flow_version"], json!(flow.updated_at));
+}
+
+#[tokio::test]
+async fn revision_proposal_omits_the_version_after_the_flow_changed_under_its_draft() {
+    // An edit after the draft was seeded makes the flow's current version a
+    // later one than the revision was derived from; stamping it would let the
+    // stale graph pass `expected_version`.
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let flow = flows_create(&config, "Base".to_string(), tool_call_graph(), false)
+        .await
+        .unwrap()
+        .value;
+    let draft = crate::flows::draft_store::create_draft(
+        &config,
+        Some(flow.id.clone()),
+        "Base".to_string(),
+        tool_call_graph(),
+        tinyflows_bus::catalog::DraftOrigin::Chat,
+    )
+    .unwrap();
+    flows_update(
+        &config,
+        &flow.id,
+        Some("Edited".to_string()),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    let payload = revision_payload(&config, &flow.id, Some(draft.id)).await;
+
+    assert_eq!(payload["flow_id"], json!(flow.id));
+    assert!(payload.get("flow_version").is_none(), "{payload:?}");
+
+    // Without a draft to date the revision, no version is claimed either.
+    let undated = revision_payload(&config, &flow.id, None).await;
+    assert!(undated.get("flow_version").is_none(), "{undated:?}");
 }
