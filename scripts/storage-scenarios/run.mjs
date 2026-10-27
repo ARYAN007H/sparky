@@ -361,8 +361,14 @@ async function main() {
   const unknown = opts.only.filter((o) => !ALL_SCENARIOS.some((s) => s.id.toUpperCase().startsWith(o)));
   if (unknown.length)
     throw new Error(`--only ${unknown.join(",")} matches no scenario (${ALL_SCENARIOS.map((s) => s.id).join(", ")})`);
+  // Every requested prefix must run somewhere: `--driver file --only A,I`
+  // would otherwise drop I without a word.
+  const runsOn = (o) => ALL_SCENARIOS.some((s) => s.id.toUpperCase().startsWith(o) && s.drivers.some((d) => opts.drivers.includes(d)));
+  const nowhere = opts.only.filter((o) => !runsOn(o));
+  if (nowhere.length)
+    throw new Error(`--only ${nowhere.join(",")} runs on no selected driver (--driver ${opts.drivers.join(",")}; ${ALL_SCENARIOS.filter((s) => nowhere.some((o) => s.id.toUpperCase().startsWith(o))).map((s) => `${s.id}: ${s.drivers.join("/")}`).join("; ")})`);
   if (!opts.drivers.some((d) => selection(opts, d).length))
-    throw new Error(`no selected scenario runs on --driver ${opts.drivers.join(",")} (${ALL_SCENARIOS.filter((s) => picked(opts, s)).map((s) => `${s.id}: ${s.drivers.join("/")}`).join("; ")})`);
+    throw new Error(`no scenario runs on --driver ${opts.drivers.join(",")}`);
   if (!fs.existsSync(opts.coreBin))
     throw new Error(`core binary not found at ${opts.coreBin}\nbuild it: cargo build -p openhuman-cli --bin openhuman-core`);
   const runId = new Date().toISOString().replace(/[:.]/g, "-");
