@@ -8,7 +8,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
-import { Core, sleep } from "../memory-scenarios/lib.mjs";
+import { sleep } from "../memory-scenarios/lib.mjs";
 
 export {
   Core,
@@ -53,6 +53,40 @@ export function mintSessionToken(userId, nonce = randomBytes(12).toString("hex")
 }
 
 export const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+
+/**
+ * The list in an RPC answer. Answers come in two envelopes: `{logs, result}`
+ * (unwrapped by Core.rpc, so the list may be the value itself) and the
+ * threads domain's `{data, meta}`; inside either, the list may sit under
+ * `key` (`{messages: [...]}`).
+ */
+export function listOf(value, key) {
+  let v = value;
+  if (v && typeof v === "object" && !Array.isArray(v) && "data" in v && "meta" in v) v = v.data;
+  if (Array.isArray(v)) return v;
+  const inner = v?.[key] ?? v?.result?.[key] ?? v?.result;
+  return Array.isArray(inner) ? inner : [];
+}
+
+/** Files under `root` whose whole content equals `bytes`. */
+export async function filesWithBytes(root, bytes) {
+  const hits = [];
+  async function walk(dir) {
+    let entries = [];
+    try {
+      entries = await fsp.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) await walk(p);
+      else if (e.isFile() && (await fsp.stat(p)).size === bytes.length && (await fsp.readFile(p)).equals(bytes)) hits.push(p);
+    }
+  }
+  await walk(root);
+  return hits;
+}
 
 /** Every file under `root` (relative path -> sha256), for before/after comparisons. */
 export async function treeDigest(root, { skip = () => false } = {}) {
@@ -148,8 +182,9 @@ export class StorageDb {
       else if (has("scope", "key", "value", "version")) this.tables.kv = t;
     }
   }
+  /** Rows as plain objects (node:sqlite returns null-prototype rows). */
   all(sql, ...args) {
-    return this.db.prepare(sql).all(...args);
+    return this.db.prepare(sql).all(...args).map((r) => ({ ...r }));
   }
   integrity() {
     return this.all("PRAGMA integrity_check").map((r) => Object.values(r)[0]);

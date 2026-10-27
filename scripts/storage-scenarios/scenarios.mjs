@@ -11,14 +11,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import {
-  pick,
-  sleep,
-  grepTree,
-  findFiles,
-  withDb,
-  sha256,
-} from "./lib.mjs";
+import { pick, sleep, grepTree, withDb, sha256, listOf, filesWithBytes } from "./lib.mjs";
 import { tinyflowsExpected } from "./legacy.mjs";
 
 const FAR_FUTURE = "2099-01-01T00:00:00Z";
@@ -44,6 +37,7 @@ function fixtures(ctx) {
     notifTitle: `storscen notification ${t}`,
     notifBody: `Body for ${t}: café ☕ <b>not html</b>`,
     flowTrustId: `storscen-flow-${t}`,
+    flowTrustTool: `storscen_tool_${t}`,
     threadId: `storscen-thread-${t}`,
     messages: contents.map((content, i) => ({ id: `storscen-${t}-m${i}`, content })),
     noteId: `storscen_${t}`,
@@ -59,8 +53,8 @@ async function readBackA(ctx, label) {
   const out = {};
   if (a.cronId) {
     const r = await ctx.tryRpc("openhuman.cron_list", {});
-    const jobs = pick(r.value, "jobs", "result.jobs") ?? [];
-    const job = jobs.find?.((j) => j.id === a.cronId);
+    const jobs = listOf(r.value, "jobs");
+    const job = jobs.find((j) => j.id === a.cronId);
     out.cron = ctx.check({
       id: `${label}-cron`,
       ok: !!job && job.name === a.cronName && job.prompt === a.cronPrompt,
@@ -70,8 +64,8 @@ async function readBackA(ctx, label) {
   }
   if (a.notifId) {
     const r = await ctx.tryRpc("openhuman.notification_list", { provider: "gmail", limit: 200 });
-    const items = pick(r.value, "items", "result.items") ?? [];
-    const n = items.find?.((x) => x.id === a.notifId);
+    const items = listOf(r.value, "items");
+    const n = items.find((x) => x.id === a.notifId);
     out.notif = ctx.check({
       id: `${label}-notification`,
       ok: !!n && n.title === a.notifTitle && n.body === a.notifBody,
@@ -83,15 +77,15 @@ async function readBackA(ctx, label) {
     const r = await ctx.tryRpc("openhuman.approval_list_recent_decisions", { limit: 200 });
     out.approval = ctx.check({
       id: `${label}-approval`,
-      ok: r.ok && json(r.value).includes(a.flowTrustId),
-      expected: `approval_list_recent_decisions names flow ${a.flowTrustId}`,
+      ok: r.ok && listOf(r.value, "decisions").some((d) => d.tool_name === a.flowTrustTool && d.decision === "approve_always_for_flow"),
+      expected: `approval_list_recent_decisions has an approve_always_for_flow decision for tool ${a.flowTrustTool} (rows carry the tool, not the flow id)`,
       actual: r.ok ? json(r.value).slice(0, 300) : errText(r),
     });
   }
   {
     const r = await ctx.tryRpc("openhuman.threads_messages_list", { thread_id: a.threadId });
-    const msgs = pick(r.value, "messages", "result.messages") ?? [];
-    const ours = msgs.filter?.((m) => String(m.id).startsWith(`storscen-${ctx.tag}-m`)) ?? [];
+    const msgs = listOf(r.value, "messages");
+    const ours = msgs.filter((m) => String(m.id).startsWith(`storscen-${ctx.tag}-m`));
     const bad = a.messages.filter((m, i) => ours[i]?.id !== m.id || ours[i]?.content !== m.content);
     out.stream = ctx.check({
       id: `${label}-stream`,
@@ -184,7 +178,7 @@ const writeRead = {
     });
     const trust = await ctx.tryRpc("openhuman.approval_preauthorize_flow", {
       flow_id: a.flowTrustId,
-      tool_names: ["storscen_tool"],
+      tool_names: [a.flowTrustTool],
     });
     a.flowTrustGranted = trust.ok;
     ctx.check({
@@ -283,7 +277,7 @@ const durability = {
 
     await ctx.start();
     const r = await ctx.tryRpc("openhuman.threads_messages_list", { thread_id: thread });
-    const msgs = pick(r.value, "messages", "result.messages") ?? [];
+    const msgs = listOf(r.value, "messages");
     const ids = msgs.map((m) => m.id);
     const lost = [...acked].filter((id) => !ids.includes(id));
     const torn = msgs.filter((m) => {
@@ -335,9 +329,10 @@ const onDisk = {
     const a = ctx.state.a;
     await ctx.stop();
     const marker0 = a.messages[0].content.split(" ")[0];
-    // Positive control first: the grep must find a plaintext value that IS stored.
-    const control = await grepTree(ctx.home, marker0);
-    ctx.check({ id: "C-grep-control", ok: control.length > 0, expected: "the plaintext grep finds a stored message marker (positive control)", actual: `${control.length} files` });
+    // Positive control first: the grep must find a plaintext value that IS stored
+    // (the cron job's prompt, a plain document field on every driver).
+    const control = await grepTree(ctx.home, a.cronPrompt);
+    ctx.check({ id: "C-grep-control", ok: control.length > 0, expected: "the plaintext grep finds the stored cron prompt (positive control)", actual: `${control.length} files` });
     for (const [what, secret] of [["provider token", a.providerToken], ["session token", a.sessionToken]]) {
       const hits = await grepTree(ctx.home, secret);
       ctx.check({
@@ -381,10 +376,8 @@ const onDisk = {
     } else {
       const docHits = await grepTree(ctx.storageDir, a.cronName);
       ctx.check({ id: "C-file-cron-scope", ok: docHits.some((p) => p.includes(`${path.sep}scopes${path.sep}local${path.sep}`)), expected: "the cron job is a JSON document under <dir>/scopes/local/", actual: docHits.map((p) => path.relative(ctx.storageDir, p)).join(", ") || "not found" });
-      const blobHits = await findFiles(ctx.storageDir, `${a.noteId}.webm`);
-      let same = false;
-      for (const p of blobHits) same ||= (await fsp.readFile(p)).equals(a.noteBytes);
-      ctx.check({ id: "C-file-blob", ok: same, expected: "the voice note is a raw file with the exact bytes", actual: blobHits.map((p) => path.relative(ctx.storageDir, p)).join(", ") || "not found" });
+      const blobHits = await filesWithBytes(ctx.storageDir, a.noteBytes);
+      ctx.check({ id: "C-file-blob", ok: blobHits.length === 1 && blobHits[0].includes(`${path.sep}scopes${path.sep}local${path.sep}`), expected: "the voice note is one raw file under <dir>/scopes/local/ holding exactly the stored bytes", actual: blobHits.map((p) => path.relative(ctx.storageDir, p)).join(", ") || "no file holds the bytes" });
     }
     await ctx.start();
   },
@@ -406,12 +399,12 @@ const memoryRestart = {
     const probeName = `storscen-probe-${ctx.tag}`;
     const add = await ctx.tryRpc("openhuman.cron_add", { name: probeName, schedule: { kind: "at", at: FAR_FUTURE }, job_type: "agent", prompt: "probe" });
     const list = await ctx.tryRpc("openhuman.cron_list", {});
-    const jobs = pick(list.value, "jobs", "result.jobs") ?? [];
+    const jobs = listOf(list.value, "jobs");
     const control = add.ok && jobs.some((j) => j.name === probeName);
     ctx.check({ id: "H-control", ok: control, expected: "a job added after the restart is listed (positive control)", actual: control ? "listed" : errText(add) || errText(list) });
     ctx.check({ id: "H-cron-gone", ok: control && !jobs.some((j) => j.id === a.cronId), expected: "the A cron job is gone after a restart", actual: control ? (jobs.some((j) => j.id === a.cronId) ? "still listed" : "gone") : "control failed" });
     const msgs = await ctx.tryRpc("openhuman.threads_messages_list", { thread_id: a.threadId });
-    const n = (pick(msgs.value, "messages", "result.messages") ?? []).length;
+    const n = listOf(msgs.value, "messages").length;
     ctx.check({ id: "H-stream-gone", ok: control && n === 0, expected: "the A thread has no messages after a restart", actual: msgs.ok ? `${n} messages` : `error (${errText(msgs).slice(0, 120)})` });
   },
 };
@@ -468,7 +461,7 @@ const concurrency = {
     );
     const ok = res.filter((r) => r.ok).length;
     const list = await ctx.tryRpc("openhuman.threads_messages_list", { thread_id: thread });
-    const ids = (pick(list.value, "messages", "result.messages") ?? []).map((m) => m.id);
+    const ids = listOf(list.value, "messages").map((m) => m.id);
     ctx.check({ id: "I-append-race", ok: ok === N && ids.length === N && new Set(ids).size === N, expected: `${N} parallel appends to one thread: all succeed, all ${N} listed once`, actual: `${ok} succeeded, ${ids.length} listed, ${new Set(ids).size} unique`, severity: "high" });
   },
 };

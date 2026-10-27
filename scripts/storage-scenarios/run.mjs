@@ -38,6 +38,11 @@ for (const k of [
 ])
   delete process.env[k];
 
+// Credential and secret paths log their store/load hits and misses at debug;
+// a secrets check that fails is explained by those lines in core.log.
+process.env.RUST_LOG ||=
+  "info,openhuman_core::security::credentials=debug,openhuman_core::security::secret_storage=debug,openhuman_core::storage::secrets=debug";
+
 function parseArgs(argv) {
   const opts = {
     only: [],

@@ -7,13 +7,13 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { pick, grepTree, findFiles, withDb, treeDigest } from "./lib.mjs";
+import { pick, grepTree, withDb, treeDigest, listOf } from "./lib.mjs";
 import { seedV1Profile, LEGACY_EXPECT, tinyflowsExpected } from "./legacy.mjs";
 
 const FAR_FUTURE = "2099-01-01T00:00:00Z";
 const json = (v) => JSON.stringify(v ?? null);
 const errText = (r) => (r.ok ? "" : json(r.error));
-const jobsOf = (r) => pick(r.value, "jobs", "result.jobs") ?? [];
+const jobsOf = (r) => listOf(r.value, "jobs");
 const exists = (p) => fs.existsSync(p);
 const userDb = (dbs, user) => dbs.filter((p) => p.includes(`${path.sep}users${path.sep}${user}${path.sep}`));
 
@@ -39,7 +39,7 @@ async function writeUserData(rig, user, tag) {
 async function sees(rig, d) {
   const cron = jobsOf(await rig.tryRpc("openhuman.cron_list", {})).some((j) => j.id === d.cronId);
   const msgs = await rig.tryRpc("openhuman.threads_messages_list", { thread_id: d.thread });
-  const thread = (pick(msgs.value, "messages", "result.messages") ?? []).some((m) => m.content === d.marker);
+  const thread = listOf(msgs.value, "messages").some((m) => m.content === d.marker);
   const nr = await rig.tryRpc("openhuman.channel_web_voice_note_read", { note_id: d.note });
   const b64 = pick(nr.value, "audio_base64", "result.audio_base64");
   const note = !!b64 && Buffer.from(b64, "base64").toString() === d.marker;
@@ -124,7 +124,8 @@ const legacyImport = {
     const exp = await tinyflowsExpected();
     const cronIds = exp.cron.jobs.map((j) => j.id);
     const jobs = jobsOf(await rig.tryRpc("openhuman.cron_list", {}));
-    ctx.check({ id: "E-cron", ok: cronIds.every((id) => jobs.some((j) => j.id === id)), expected: `cron_list has the ${cronIds.length} legacy jobs, ids kept`, actual: `${jobs.filter((j) => cronIds.includes(j.id)).length}/${cronIds.length}` });
+    const missingJobs = exp.cron.jobs.filter((e) => !jobs.some((j) => j.id === e.id));
+    ctx.check({ id: "E-cron", ok: missingJobs.length === 0, expected: `cron_list has the ${cronIds.length} legacy jobs with their ids kept`, actual: missingJobs.length ? `missing ${missingJobs.map((e) => `${e.id} (${e.name})`).join(", ")}; listed: ${jobs.map((j) => `${j.id} (${j.name})`).join(", ").slice(0, 400)}` : "all listed" });
     const notifs = await rig.tryRpc("openhuman.notification_list", { limit: 100 });
     ctx.check({ id: "E-notifications", ok: json(notifs.value).includes('"n-1"'), expected: "notification_list has legacy notification n-1", actual: notifs.ok ? json(notifs.value).slice(0, 200) : errText(notifs) });
     const decisions = await rig.tryRpc("openhuman.approval_list_recent_decisions", { limit: 100 });
@@ -141,19 +142,21 @@ const legacyImport = {
 
     await rig.stop();
     const after = await treeDigest(workspace);
-    const changed = Object.keys({ ...before, ...after }).filter(
-      (k) => before[k] !== after[k] && !/(^|\/)storage(\/|$)/.test(k) && !k.endsWith("-shm") && !k.endsWith("-wal") && !k.startsWith("state/costs.jsonl"),
+    // Only the seeded originals count: the core may add files of its own
+    // (its storage directory, built-in flow skills) beside them.
+    const changed = Object.keys(before).filter(
+      (k) => before[k] !== after[k] && !k.endsWith("-shm") && !k.endsWith("-wal") && k !== "state/costs.jsonl",
     );
-    ctx.check({ id: "E-originals-untouched", ok: changed.length === 0, expected: "every legacy file is byte-identical after import (cost ledger aside)", actual: changed.length ? changed.slice(0, 8).join(", ") : "identical" , severity: "high" });
+    ctx.check({ id: "E-originals-untouched", ok: changed.length === 0, expected: `every one of the ${Object.keys(before).length} seeded legacy files is byte-identical after import (cost ledger aside)`, actual: changed.length ? changed.slice(0, 8).map((k) => `${k}${after[k] ? " (modified)" : " (removed)"}`).join(", ") : "identical", severity: "high" });
     ctx.check({ id: "E-costs-renamed", ok: !exists(path.join(workspace, "state/costs.jsonl")) && exists(path.join(workspace, "state/costs.jsonl.migrated")), expected: "state/costs.jsonl renamed to costs.jsonl.migrated", actual: fs.readdirSync(path.join(workspace, "state")).join(", ") });
     ctx.check({ id: "E-auth-file-untouched", ok: (await fsp.readFile(path.join(profile, "auth-profiles.json"))).equals(authBefore), expected: "auth-profiles.json left in place unchanged (adoption copies, never deletes)", actual: "compared bytes" });
 
     const dbFile = path.join(workspace, "storage", "storage.db");
     ctx.check({ id: "E-db-location", ok: exists(dbFile), expected: "the v1 default database is <workspace>/storage/storage.db", actual: (await rig.dbFiles()).map((p) => path.relative(rig.oh, p)).join(", ") });
     if (!exists(dbFile)) return;
-    const first = withDb(dbFile, (db) => ({ census: db.census(), markers: db.docs("storage.import_state").map((d) => d.id) }));
+    const first = withDb(dbFile, (db) => ({ census: db.census(), markers: markerIds(db) }));
     ctx.result("E-census", first.census);
-    const missing = LEGACY_EXPECT.markerDomains.filter((d) => !first.markers.some((m) => m.includes(`${d}@`)));
+    const missing = LEGACY_EXPECT.markerDomains.filter((d) => !first.markers.some((m) => m.includes(`storage_import/${d}@`)));
     ctx.check({ id: "E-markers", ok: missing.length === 0, expected: `an import marker per domain (${LEGACY_EXPECT.markerDomains.join(", ")})`, actual: `markers: ${first.markers.join(", ") || "none"}; missing ${missing.join(", ") || "none"}` });
     const leaked = await grepTree(path.join(workspace, "storage"), token);
     ctx.check({ id: "E-secret-encrypted", ok: leaked.length === 0, expected: "the legacy plaintext token is not in the database after adoption", actual: `${leaked.length} files`, severity: "high" });
@@ -161,12 +164,18 @@ const legacyImport = {
     // A second boot imports nothing new.
     await rig.start();
     await rig.stop();
-    const second = withDb(dbFile, (db) => ({ census: db.census(), markers: db.docs("storage.import_state").map((d) => d.id) }));
-    const delta = second.census.filter((r) => {
+    const second = withDb(dbFile, (db) => ({ census: db.census(), markers: markerIds(db) }));
+    // The imported domains' own collections in the tenant scope; storage
+    // bookkeeping (tsd.*, leases, journals) and module scopes move on their own.
+    const imported = (r) => r.scope === "local" && !/^tsd\.|journal|leases|admission|^storage\./.test(r.coll);
+    const delta = second.census.filter(imported).filter((r) => {
       const was = first.census.find((x) => x.scope === r.scope && x.coll === r.coll);
       return !was || was.n !== r.n;
-    }).filter((r) => !/journal|leases|run|admission|kv/.test(r.coll));
-    ctx.check({ id: "E-idempotent", ok: delta.length === 0 && json(second.markers.sort()) === json(first.markers.sort()), expected: "a second boot adds no imported record and no marker", actual: delta.length ? json(delta).slice(0, 300) : "unchanged" });
+    });
+    const legacyMarkers = (m) => m.filter((x) => x.includes("storage_import/")).sort();
+    ctx.check({ id: "E-idempotent", ok: delta.length === 0 && json(legacyMarkers(second.markers)) === json(legacyMarkers(first.markers)), expected: "a second boot adds no imported record and no import marker", actual: delta.length ? json(delta).slice(0, 300) : `unchanged; ${legacyMarkers(second.markers).length} markers` });
+    const other = second.census.filter((r) => !imported(r)).filter((r) => (first.census.find((x) => x.scope === r.scope && x.coll === r.coll)?.n ?? 0) !== r.n);
+    if (other.length) ctx.note("E-bookkeeping-delta", `second boot changed storage bookkeeping (not imported records): ${json(other).slice(0, 400)}`);
     ctx.state.legacy.census = first.census;
   },
 };
@@ -227,6 +236,15 @@ const layoutMigration = {
     ctx.note("F2-layout", `no-master-key profile after boot: .layout ${exists(layout) ? fs.readFileSync(layout, "utf8").trim() : "absent"}; entries: ${fs.readdirSync(seeded.profile).join(", ")}`);
   },
 };
+
+/**
+ * Ids of the `storage.import_state` documents, decoded: tsd stores a key as
+ * `/`-joined hex segments (`claim/73746f72616765/...`), the step id is inside.
+ */
+function markerIds(db) {
+  const hex = (seg) => (/^([0-9a-f]{2})+$/.test(seg) ? Buffer.from(seg, "hex").toString("utf8") : seg);
+  return db.docs("storage.import_state").filter((d) => d.scope === "local").map((d) => d.id.split("/").map(hex).join("/"));
+}
 
 async function findAll(root, pred) {
   const out = [];
@@ -302,6 +320,9 @@ const signOutKeepsKey = {
     rig.addSecret(key);
     const set = await rig.tryRpc("openhuman.auth_set_credential", { token: key, kind: "api-key" });
     ctx.check({ id: "J-key-set", ok: set.ok, expected: "auth_set_credential stores the API key", actual: set.ok ? "ok" : errText(set) });
+    const credOfEarly = await rig.tryRpc("openhuman.auth_get_state", {});
+    const early = pick(credOfEarly.value, "credential", "state.credential", "result.credential");
+    ctx.check({ id: "J-control", ok: early === "api-key", expected: "before the sign-out, auth_get_state is authenticated by the API key (control)", actual: credOfEarly.ok ? json(credOfEarly.value).slice(0, 200) : errText(credOfEarly) });
     const clear = await rig.tryRpc("openhuman.auth_clear_credential", { kind: "session" });
     ctx.check({ id: "J-signout", ok: clear.ok, expected: "auth_clear_credential {kind: session} succeeds", actual: clear.ok ? json(clear.value).slice(0, 200) : errText(clear) });
     const credOf = async () => {
