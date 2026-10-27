@@ -812,6 +812,19 @@ export interface WorkflowProposal {
    * enable" click would call `createFlow` again and duplicate the flow.
    */
   completedFlowId?: string;
+  /**
+   * The saved flow this proposal revises (`flow_id` on the proposal payload,
+   * set when the builder edited an existing flow). "Save & enable" writes onto
+   * this flow with `flows_update` instead of creating another one.
+   */
+  flowId?: string;
+  /**
+   * Id of the flow once "Save & enable" persisted it, before the enable step
+   * finished (pre-authorization pending, denied, or failed). Mirrored into
+   * Redux and onto the source message's `saved_flow_id` so a remount or reload
+   * resumes the enable step instead of creating the flow again.
+   */
+  savedFlowId?: string;
 }
 
 /**
@@ -2599,6 +2612,19 @@ const chatRuntimeSlice = createSlice({
       }
     },
     /**
+     * Record that a pending proposal's flow is persisted but not yet enabled
+     * (see `WorkflowProposal.savedFlowId`). No-op if the proposal was cleared.
+     */
+    markWorkflowProposalSaved: (
+      state,
+      action: PayloadAction<{ threadId: string; flowId: string }>
+    ) => {
+      const proposal = state.pendingWorkflowProposalsByThread[action.payload.threadId];
+      if (proposal) {
+        proposal.savedFlowId = action.payload.flowId;
+      }
+    },
+    /**
      * Mark a producer-tool call as in-flight so the `ArtifactCard` can
      * render a spinner before any ready/failed event arrives. Caller
      * usually fires this off the corresponding `ChatToolCallEvent`
@@ -3309,6 +3335,7 @@ export const {
   setWorkflowProposalForThread,
   clearWorkflowProposalForThread,
   markWorkflowProposalCompleted,
+  markWorkflowProposalSaved,
   upsertArtifactInProgressForThread,
   upsertArtifactReadyForThread,
   upsertArtifactFailedForThread,

@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { markWorkflowProposalCompleted, type WorkflowProposal } from '../../store/chatRuntimeSlice';
+import {
+  markWorkflowProposalCompleted,
+  markWorkflowProposalSaved,
+  type WorkflowProposal,
+} from '../../store/chatRuntimeSlice';
 import WorkflowProposalCard from './WorkflowProposalCard';
 
 // Echo i18n keys so we can assert on the stable key string.
@@ -184,7 +188,10 @@ describe('WorkflowProposalCard', () => {
     // see `WorkflowProposal.completedFlowId`. It must not be the
     // proposal-clearing dispatch, though — that only happens on "View
     // workflow"/"Dismiss".
-    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(mockDispatch).toHaveBeenCalledTimes(2);
+    expect(mockDispatch).toHaveBeenCalledWith(
+      markWorkflowProposalSaved({ threadId: 't1', flowId: 'f1' })
+    );
     expect(mockDispatch).toHaveBeenCalledWith(
       markWorkflowProposalCompleted({ threadId: 't1', flowId: 'f1' })
     );
@@ -292,7 +299,7 @@ describe('WorkflowProposalCard', () => {
     // dispatch is the Redux-mirrored completion (survives a remount), not a
     // clear.
     await waitFor(() => expect(screen.getByTestId('workflow-proposal-saved')).toBeInTheDocument());
-    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(mockDispatch).toHaveBeenCalledTimes(2);
     expect(mockDispatch).toHaveBeenCalledWith(
       markWorkflowProposalCompleted({ threadId: 't1', flowId: 'f1' })
     );
@@ -312,7 +319,12 @@ describe('WorkflowProposalCard', () => {
     );
     // The flow was already persisted — the card must not be cleared, and a
     // retry must not re-create it (which would duplicate the flow).
-    expect(mockDispatch).not.toHaveBeenCalled();
+    // It is recorded as saved (Redux + source message) so a remount or reload
+    // resumes at the enable step instead of creating the flow again.
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(mockDispatch).toHaveBeenCalledWith(
+      markWorkflowProposalSaved({ threadId: 't1', flowId: 'f1' })
+    );
 
     mockSetFlowEnabled.mockResolvedValueOnce({ id: 'f1', enabled: true });
     fireEvent.click(screen.getByText('chat.flowProposal.save'));
@@ -324,10 +336,38 @@ describe('WorkflowProposalCard', () => {
     // Still not dispatched away — the retry lands on the same saved
     // confirmation, not an immediate clear. The only dispatch is the
     // Redux-mirrored completion once the retry succeeds.
-    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(mockDispatch).toHaveBeenCalledTimes(2);
     expect(mockDispatch).toHaveBeenCalledWith(
       markWorkflowProposalCompleted({ threadId: 't1', flowId: 'f1' })
     );
+  });
+
+  it('saves a revision onto the flow it targets instead of creating another', async () => {
+    mockUpdateFlow.mockResolvedValueOnce({
+      id: 'flow-1',
+      name: 'Daily standup summary',
+      enabled: true,
+    });
+    const p = proposal({ flowId: 'flow-1' });
+    render(<WorkflowProposalCard threadId="t1" proposal={p} />);
+    fireEvent.click(screen.getByText('chat.flowProposal.save'));
+    await waitFor(() =>
+      expect(mockUpdateFlow).toHaveBeenCalledWith('flow-1', {
+        name: p.name,
+        graph: p.graph,
+        requireApproval: p.requireApproval,
+      })
+    );
+    expect(mockCreateFlow).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByTestId('workflow-proposal-saved')).toBeInTheDocument());
+  });
+
+  it('resumes at the enable step for a proposal whose flow was already saved', async () => {
+    render(<WorkflowProposalCard threadId="t1" proposal={proposal({ savedFlowId: 'f1' })} />);
+    fireEvent.click(screen.getByText('chat.flowProposal.save'));
+    await waitFor(() => expect(mockSetFlowEnabled).toHaveBeenCalledWith('f1', true));
+    expect(mockCreateFlow).not.toHaveBeenCalled();
+    expect(mockUpdateFlow).not.toHaveBeenCalled();
   });
 
   it('opens the proposed graph in the canvas as an unsaved draft without persisting', () => {
@@ -407,7 +447,12 @@ describe('WorkflowProposalCard pre-authorization', () => {
       expect(screen.getByTestId('flow-preauthorization-card')).toBeInTheDocument()
     );
     // Not completed yet — the decision is still pending.
-    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalledWith(
+      markWorkflowProposalCompleted({ threadId: 't1', flowId: 'f1' })
+    );
+    expect(mockDispatch).toHaveBeenCalledWith(
+      markWorkflowProposalSaved({ threadId: 't1', flowId: 'f1' })
+    );
     expect(screen.queryByTestId('workflow-proposal-saved')).not.toBeInTheDocument();
   });
 
