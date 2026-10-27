@@ -229,6 +229,20 @@ class Rig {
   }
 }
 
+const ALL_SCENARIOS = [...SCENARIOS, ...ISOLATED];
+const picked = (opts, s) => !opts.only.length || opts.only.some((o) => s.id.toUpperCase().startsWith(o));
+
+/**
+ * The scenarios to run on `driver`, in declaration order. A scenario's
+ * prerequisites (`needs`) run with it, so `--only B` still has A's records
+ * to check.
+ */
+function selection(opts, driver) {
+  const all = ALL_SCENARIOS.filter((s) => s.drivers.includes(driver));
+  const needed = new Set(all.filter((s) => picked(opts, s)).flatMap((s) => [s.id, ...(s.needs ?? [])]));
+  return all.filter((s) => needed.has(s.id));
+}
+
 async function runDriver(driver, { opts, runDir, runId, findings, results }) {
   const dir = path.join(runDir, driver);
   const secrets = [];
@@ -250,12 +264,14 @@ async function runDriver(driver, { opts, runDir, runId, findings, results }) {
     },
   });
 
-  const all = [...SCENARIOS, ...ISOLATED].filter((s) => s.drivers.includes(driver));
-  const picked = (s) => !opts.only.length || opts.only.some((o) => s.id.toUpperCase().startsWith(o));
-  // A scenario's prerequisites (`needs`) run with it, so `--only B` still
-  // has A's records to check.
-  const needed = new Set(all.filter(picked).flatMap((s) => [s.id, ...(s.needs ?? [])]));
-  const list = all.filter((s) => needed.has(s.id));
+  const list = selection(opts, driver);
+  if (!list.length) {
+    // `main()` already refused a selection that runs nowhere; this driver
+    // simply has none of the selected scenarios.
+    console.log(`${driver.padEnd(7)}: no selected scenario runs on this driver; skipped`);
+    driverResults.skipped = true;
+    return;
+  }
   try {
     await main.start();
     for (const s of list) {
@@ -294,6 +310,10 @@ async function runDriver(driver, { opts, runDir, runId, findings, results }) {
 function renderReport({ runId, results, findings }) {
   const lines = [`# Storage scenarios ${runId}`, ""];
   for (const [driver, dr] of Object.entries(results.drivers)) {
+    if (dr.skipped) {
+      lines.push(`## ${driver}`, "", "Skipped: no selected scenario runs on this driver.", "");
+      continue;
+    }
     lines.push(`## ${driver}`, "", "| scenario | checks passed | notes | time | crashed |", "| --- | --- | --- | --- | --- |");
     for (const [id, s] of Object.entries(dr.scenarios))
       lines.push(`| ${id} | ${s.checks - s.failed}/${s.checks} | ${s.notes} | ${((s.ms ?? 0) / 1000).toFixed(0)}s | ${s.error ? "yes" : ""} |`);
@@ -337,6 +357,12 @@ async function main() {
     console.log(md);
     return;
   }
+  // A selection that runs nothing must not read as a completed run.
+  const unknown = opts.only.filter((o) => !ALL_SCENARIOS.some((s) => s.id.toUpperCase().startsWith(o)));
+  if (unknown.length)
+    throw new Error(`--only ${unknown.join(",")} matches no scenario (${ALL_SCENARIOS.map((s) => s.id).join(", ")})`);
+  if (!opts.drivers.some((d) => selection(opts, d).length))
+    throw new Error(`no selected scenario runs on --driver ${opts.drivers.join(",")} (${ALL_SCENARIOS.filter((s) => picked(opts, s)).map((s) => `${s.id}: ${s.drivers.join("/")}`).join("; ")})`);
   if (!fs.existsSync(opts.coreBin))
     throw new Error(`core binary not found at ${opts.coreBin}\nbuild it: cargo build -p openhuman-cli --bin openhuman-core`);
   const runId = new Date().toISOString().replace(/[:.]/g, "-");

@@ -282,6 +282,13 @@ const durability = {
     };
     const workers = Array.from({ length: 4 }, worker);
     while (acked.size < 40 && next < 400) await sleep(5);
+    if (acked.size < 40) {
+      // Without enough acknowledged appends there is no in-flight window to
+      // test, and the loss and tear checks below would pass on nothing.
+      await Promise.allSettled(workers);
+      ctx.check({ id: "B2-in-flight-window", ok: false, expected: "at least 40 appends are acknowledged before the kill", actual: `${acked.size} acknowledged after ${attempted.size} attempts`, severity: "high" });
+      return;
+    }
     killed = true;
     await ctx.kill9();
     await Promise.allSettled(workers);
