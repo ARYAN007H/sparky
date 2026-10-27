@@ -76,11 +76,12 @@ async fn signed_in_with_key() -> Config {
     user_scoped
 }
 
-// A session sign-out whose config reload fails after the teardown returns the
-// error with the API key back at its source, not removed.
+// The carry into the signed-out workspace failing returns the error with the
+// API key back at its source. With file-backed profiles the source stays
+// reachable after the teardown, so it is put back.
 #[tokio::test]
 #[allow(clippy::await_holding_lock)] // Serializes the process-wide storage slot.
-async fn a_failed_reload_during_sign_out_puts_the_api_key_back() {
+async fn a_failed_carry_during_sign_out_puts_the_api_key_back() {
     let _module = crate::integrations::composio::module_client::module_lock_guard().await;
     let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let _slot = crate::storage::test_support::lock_storage_slot();
@@ -96,50 +97,12 @@ async fn a_failed_reload_during_sign_out_puts_the_api_key_back() {
         &DispatchCtx::process_default(),
         &user_scoped,
         Some(CredentialKind::Session),
-        || async { Err::<Config, String>("injected reload failure".into()) },
+        |_, _| Err(anyhow::anyhow!("injected carry failure")),
     )
     .await
     .unwrap_err();
-    assert!(error.contains("injected reload failure"), "{error}");
-    assert_eq!(
-        api_key::get_api_key(&user_scoped).unwrap().as_deref(),
-        Some("sk-keep"),
-        "a failed reload must put the API key back where it was"
-    );
-}
-
-// The carry into the signed-out workspace failing (its state directory cannot
-// be written) also returns the error with the API key back at its source.
-#[tokio::test]
-#[allow(clippy::await_holding_lock)] // Serializes the process-wide storage slot.
-async fn a_failed_carry_during_sign_out_puts_the_api_key_back() {
-    let _module = crate::integrations::composio::module_client::module_lock_guard().await;
-    let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
-    let _slot = crate::storage::test_support::lock_storage_slot();
-    assert!(
-        crate::storage::installed().is_none(),
-        "file-backed profiles in this test"
-    );
-    let tmp = tempfile::TempDir::new().unwrap();
-    let _home = crate::config::test_env::EnvVarGuard::set("HOME", tmp.path());
-    let user_scoped = signed_in_with_key().await;
-
-    // The "signed-out" state directory sits under a regular file.
-    let blocker = tmp.path().join("blocker");
-    std::fs::write(&blocker, "").unwrap();
-    let unwritable = Config {
-        workspace_dir: blocker.join("workspace"),
-        config_path: blocker.join("config.toml"),
-        ..Config::default()
-    };
-    clear_credential_with(
-        &DispatchCtx::process_default(),
-        &user_scoped,
-        Some(CredentialKind::Session),
-        move || async move { Ok(unwritable) },
-    )
-    .await
-    .unwrap_err();
+    assert!(error.contains("injected carry failure"), "{error}");
+    assert!(!error.contains("must be entered again"), "{error}");
     assert_eq!(
         api_key::get_api_key(&user_scoped).unwrap().as_deref(),
         Some("sk-keep"),
