@@ -151,6 +151,42 @@ async fn proposal_omits_inference_status_for_tool_call_only_graph() {
     );
 }
 
+#[tokio::test]
+async fn proposal_graph_carries_the_proposal_name() {
+    // The builder resolves the name from its `name` argument; a graph authored
+    // without one used to reach the card (and a save) with an empty name.
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+
+    let g = graph(json!({
+        "name": "",
+        "nodes": [
+            { "id": "t", "kind": "trigger", "name": "Manual" },
+            { "id": "post", "kind": "tool_call", "name": "Post",
+              "config": { "slug": "oh:noop" } }
+        ],
+        "edges": [ { "from_node": "t", "to_node": "post" } ]
+    }));
+
+    let payload = build_builder_proposal(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "edit_workflow",
+        "Daily Tech Digest",
+        &g,
+        false,
+        true,
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("proposal must succeed for a tool_call-only graph");
+
+    assert_eq!(payload["name"], json!("Daily Tech Digest"));
+    assert_eq!(payload["graph"]["name"], json!("Daily Tech Digest"));
+}
+
 /// B45 run-time preflight (design correction, judge finding on live run
 /// 104aab90): since authoring no longer hard-blocks on inference readiness, a
 /// flow whose `agent` node cannot currently reach a working LLM provider can

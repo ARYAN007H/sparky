@@ -171,7 +171,13 @@ pub(crate) async fn build_builder_proposal(
     // in `run_flow_body`) consumes, so a run right after this proposal reads
     // the cached result instead of re-probing the network.
     let inference_readiness = evaluate_inference_readiness(ctx, config, graph).await;
-    let graph_value = graph.clone();
+    // The proposal's name is the one the builder resolved (its `name` argument,
+    // else the base graph's). A graph without its own name carried "" into the
+    // card and onto a save, so stamp the resolved name into the graph too.
+    let mut graph_value = graph.clone();
+    if let Some(graph_object) = graph_value.as_object_mut() {
+        graph_object.insert("name".to_string(), json!(name));
+    }
 
     tracing::info!(
         target: "flows",
