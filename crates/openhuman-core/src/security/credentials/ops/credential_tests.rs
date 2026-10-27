@@ -14,7 +14,10 @@ fn process_wide_credentials_are_single_user_only() {
 async fn restore_api_key_puts_the_key_back_and_tolerates_a_failed_store() {
     let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let _slot = crate::storage::test_support::lock_storage_slot();
-    assert!(crate::storage::installed().is_none(), "file-backed profiles in this test");
+    assert!(
+        crate::storage::installed().is_none(),
+        "file-backed profiles in this test"
+    );
     let tmp = tempfile::TempDir::new().unwrap();
     let _home = crate::config::test_env::EnvVarGuard::set("HOME", tmp.path());
     let config = Config {
@@ -81,7 +84,10 @@ async fn a_failed_reload_during_sign_out_puts_the_api_key_back() {
     let _module = crate::integrations::composio::module_client::module_lock_guard().await;
     let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let _slot = crate::storage::test_support::lock_storage_slot();
-    assert!(crate::storage::installed().is_none(), "file-backed profiles in this test");
+    assert!(
+        crate::storage::installed().is_none(),
+        "file-backed profiles in this test"
+    );
     let tmp = tempfile::TempDir::new().unwrap();
     let _home = crate::config::test_env::EnvVarGuard::set("HOME", tmp.path());
     let user_scoped = signed_in_with_key().await;
@@ -110,7 +116,10 @@ async fn a_failed_carry_during_sign_out_puts_the_api_key_back() {
     let _module = crate::integrations::composio::module_client::module_lock_guard().await;
     let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let _slot = crate::storage::test_support::lock_storage_slot();
-    assert!(crate::storage::installed().is_none(), "file-backed profiles in this test");
+    assert!(
+        crate::storage::installed().is_none(),
+        "file-backed profiles in this test"
+    );
     let tmp = tempfile::TempDir::new().unwrap();
     let _home = crate::config::test_env::EnvVarGuard::set("HOME", tmp.path());
     let user_scoped = signed_in_with_key().await;
