@@ -18,3 +18,31 @@ async fn an_unreachable_store_is_reported_as_a_tool_error() {
         .unwrap();
     assert!(res.is_error);
 }
+
+fn echoing_tool() -> RetrieveToolOutputTool {
+    RetrieveToolOutputTool::new(Arc::new(|key| {
+        Box::pin(async move { Ok(Some(format!("original for {key}"))) })
+    }))
+}
+
+#[tokio::test]
+async fn the_advertised_token_key_retrieves_the_original() {
+    let schema = echoing_tool().parameters_schema();
+    assert_eq!(schema["required"], json!(["token"]));
+    let res = echoing_tool()
+        .execute(json!({ "token": "abc123" }))
+        .await
+        .unwrap();
+    assert!(!res.is_error);
+    assert_eq!(res.output(), "original for abc123");
+}
+
+#[tokio::test]
+async fn the_legacy_hash_key_still_retrieves_the_original() {
+    let res = echoing_tool()
+        .execute(json!({ "hash": "abc123" }))
+        .await
+        .unwrap();
+    assert!(!res.is_error);
+    assert_eq!(res.output(), "original for abc123");
+}

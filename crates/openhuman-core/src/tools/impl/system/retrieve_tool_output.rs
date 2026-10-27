@@ -52,14 +52,16 @@ impl Tool for RetrieveToolOutputTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
-        let hash = args
-            .get("hash")
-            .and_then(|v| v.as_str())
+        // The advertised schema is TinyJuice's, which names the key `token`;
+        // `hash` is the legacy spelling from the Stage 1a sentinel.
+        let hash = ["token", "hash"]
+            .iter()
+            .filter_map(|key| args.get(*key).and_then(|v| v.as_str()))
             .map(str::trim)
-            .filter(|s| !s.is_empty());
+            .find(|s| !s.is_empty());
         let Some(hash) = hash else {
             return Ok(ToolResult::error(
-                "retrieve_tool_output: missing required 'hash' argument".to_string(),
+                "retrieve_tool_output: missing required 'token' argument".to_string(),
             ));
         };
 
