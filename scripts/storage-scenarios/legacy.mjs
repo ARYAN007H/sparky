@@ -26,7 +26,7 @@ export const LEGACY_EXPECT = {
   costs: ["storscen-cost-1", "storscen-cost-2", "storscen-cost-3"],
   provider: "storscen-legacy-provider",
   // The import markers (`storage.import_state`, `storage_import/<domain>@<digest>`).
-  markerDomains: ["approvals", "devices", "notifications", "task_sources", "cron", "flows", "sessions"],
+  markerDomains: ["approval", "devices", "notifications", "task_sources", "cron", "flows", "sessions"],
 };
 
 async function copyTree(from, to) {

@@ -82,7 +82,9 @@ async function readBackA(ctx, label) {
       actual: r.ok ? json(r.value).slice(0, 300) : errText(r),
     });
   }
-  {
+  if (a.appended === 0) {
+    // Nothing was accepted (A-thread-append is the finding); a read-back adds nothing.
+  } else {
     const r = await ctx.tryRpc("openhuman.threads_messages_list", { thread_id: a.threadId });
     const msgs = listOf(r.value, "messages");
     const ours = msgs.filter((m) => String(m.id).startsWith(`storscen-${ctx.tag}-m`));
@@ -129,6 +131,14 @@ async function readBackA(ctx, label) {
       severity: "high",
     });
   }
+  return out;
+}
+
+/** Secret document ids per scope, hex segments decoded (`secrets` collection). */
+function secretIds(db) {
+  const hex = (seg) => (/^([0-9a-f]{2})+$/.test(seg) ? Buffer.from(seg, "hex").toString("utf8") : seg);
+  const out = {};
+  for (const d of db.docs("secrets")) (out[d.scope] ??= []).push(d.id.split("/").map(hex).join("/"));
   return out;
 }
 
@@ -204,6 +214,7 @@ const writeRead = {
       if (r.ok) appended += 1;
       else ctx.state.appendError ??= errText(r);
     }
+    a.appended = appended;
     ctx.check({
       id: "A-thread-append",
       ok: appended === a.messages.length,
@@ -346,6 +357,10 @@ const onDisk = {
 
     if (ctx.driver === "sqlite") {
       const dbs = await ctx.dbFiles();
+      // Which database holds which secret: a session written before the
+      // profile's backend is bound would sit in another file.
+      for (const f of dbs)
+        ctx.note(`C-secrets-${path.basename(path.dirname(f))}`, `${path.relative(ctx.oh, f)}: ${json(withDb(f, secretIds))}`);
       const own = dbs.filter((p) => p.includes(`${path.sep}users${path.sep}${a.sessionUser}${path.sep}`));
       ctx.check({ id: "C-db-location", ok: own.length === 1, expected: `one storage.db under users/${a.sessionUser}/ (layout v2 profile)`, actual: dbs.map((p) => path.relative(ctx.oh, p)).join(", ") || "none" });
       const file = own[0] ?? dbs[0];
@@ -369,6 +384,7 @@ const onDisk = {
           const leak = secrets.filter((s) => s.body.includes(a.providerToken) || s.body.includes(a.sessionToken));
           ctx.check({ id: "C-secret-docs", ok: secrets.length > 0 && leak.length === 0, expected: "secrets are encrypted documents (collection `secrets`), no plaintext in their bodies", actual: `${secrets.length} secret docs in ${[...new Set(secrets.map((s) => s.scope))].join(",") || "-"}; ${leak.length} with plaintext` , severity: "high" });
           ctx.result("census", db.census());
+          ctx.result("secret-ids", secretIds(db));
           ctx.result("scopes", db.scopes());
           ctx.note("C-census", `scopes on disk: ${db.scopes().join(", ")}; KV rows: ${db.kvRows().length}; tables: ${json(db.tables)}`);
         });

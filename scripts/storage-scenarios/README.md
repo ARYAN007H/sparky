@@ -117,6 +117,10 @@ when it is not, #8076), then writes the marker.
   `target/storage-scenarios/<run-id>/<driver>/`; the operator's
   `OPENHUMAN_STORAGE_URL`, workspace, master key and backend credentials are
   removed from the environment before anything starts.
+- The run directory is resolved with `realpath` first: the secrets backend
+  refuses a directory with a symlinked ancestor, so a symlinked `target/`
+  would otherwise fail every secrets check for a reason that is not the
+  product's.
 - Each core gets a **random master key**, passed through the environment only.
   It, every token the run mints and every fixture secret are scrubbed from
   `core.log` and `rpc.jsonl`.
@@ -139,7 +143,7 @@ when it is not, #8076), then writes the marker.
 | B-durability | sqlite, file | everything from A survives a restart; appends in flight when the core is SIGKILLed: every acked message present after reboot, none torn, duplicated or phantom; `PRAGMA integrity_check` = ok (sqlite) or every JSON/JSONL record parses (file) |
 | C-on-disk | sqlite, file | the database opened read-only: each record in the expected collection and scope (`local`); the blob's bytes; secrets are `secrets` documents with no plaintext; neither the provider token nor the session token appears anywhere under HOME |
 | D-isolation | sqlite | two users: separate `storage.db` files; neither sees the other's cron job, thread, voice note or credential over RPC; neither profile directory holds the other's marker; switching back restores the first user's records |
-| E-legacy-import | sqlite | a v1 profile seeded with every legacy store: imported (cron jobs with ids kept, flows, notification, approvals, costs, auth profile), one marker per domain, originals byte-identical, the cost ledger renamed, the plaintext legacy token not in the database, and a second boot imports nothing |
+| E-legacy-import | sqlite | a v1 profile seeded with every legacy store: imported (cron jobs, shell and agent ones with their ids and a flow-schedule job keyed `flow:<flow id>`; flows, notification, approvals, costs, auth profile), one marker per domain, originals byte-identical, the cost ledger renamed, the plaintext legacy token not in the database, and a second boot imports nothing |
 | F-layout-migration | sqlite | E's profile moved to v2 by `auto_migrate_layout`: `storage_status` says 2, the marker, `storage.db` and `files/`, a non-empty `.tar.zst` backup, no collection shrank, the credential imported and the file archived; then a second v1 profile with **no master key**: the credential file stays byte-identical and its token reaches no database (#8076) |
 | G-clear-app-data | sqlite | `config_reset_local_data` removes the active user's folder and `active_user.toml`, and leaves the other user's folder byte-identical (#8248); with an explicit storage URL, what survives the reset is reported |
 | H-memory-restart | memory | A passes on the memory driver, and after a restart everything is gone, as designed |

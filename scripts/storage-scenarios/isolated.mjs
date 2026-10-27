@@ -122,10 +122,10 @@ const legacyImport = {
 
     await rig.start();
     const exp = await tinyflowsExpected();
-    const cronIds = exp.cron.jobs.map((j) => j.id);
+    const cronIds = exp.cron.jobs.map(expectedJobId);
     const jobs = jobsOf(await rig.tryRpc("openhuman.cron_list", {}));
-    const missingJobs = exp.cron.jobs.filter((e) => !jobs.some((j) => j.id === e.id));
-    ctx.check({ id: "E-cron", ok: missingJobs.length === 0, expected: `cron_list has the ${cronIds.length} legacy jobs with their ids kept`, actual: missingJobs.length ? `missing ${missingJobs.map((e) => `${e.id} (${e.name})`).join(", ")}; listed: ${jobs.map((j) => `${j.id} (${j.name})`).join(", ").slice(0, 400)}` : "all listed" });
+    const missingJobs = exp.cron.jobs.filter((e) => !jobs.some((j) => j.id === expectedJobId(e)));
+    ctx.check({ id: "E-cron", ok: missingJobs.length === 0, expected: `cron_list has the ${cronIds.length} legacy jobs: shell and agent jobs keep their ids, a flow-schedule job is keyed flow:<flow id> (tinyflows-drivers schedule/jobs.rs flow_job_id)`, actual: missingJobs.length ? `missing ${missingJobs.map((e) => `${expectedJobId(e)} (${e.name})`).join(", ")}; listed: ${jobs.map((j) => `${j.id} (${j.name})`).join(", ").slice(0, 400)}` : "all listed" });
     const notifs = await rig.tryRpc("openhuman.notification_list", { limit: 100 });
     ctx.check({ id: "E-notifications", ok: json(notifs.value).includes('"n-1"'), expected: "notification_list has legacy notification n-1", actual: notifs.ok ? json(notifs.value).slice(0, 200) : errText(notifs) });
     const decisions = await rig.tryRpc("openhuman.approval_list_recent_decisions", { limit: 100 });
@@ -156,7 +156,9 @@ const legacyImport = {
     if (!exists(dbFile)) return;
     const first = withDb(dbFile, (db) => ({ census: db.census(), markers: markerIds(db) }));
     ctx.result("E-census", first.census);
-    const missing = LEGACY_EXPECT.markerDomains.filter((d) => !first.markers.some((m) => m.includes(`storage_import/${d}@`)));
+    // A finished import leaves `done/storage/storage_import/<domain>@<digest>`;
+    // `claim/...` is the lease taken while it ran.
+    const missing = LEGACY_EXPECT.markerDomains.filter((d) => !first.markers.some((m) => m.startsWith("done/") && m.includes(`storage_import/${d}@`)));
     ctx.check({ id: "E-markers", ok: missing.length === 0, expected: `an import marker per domain (${LEGACY_EXPECT.markerDomains.join(", ")})`, actual: `markers: ${first.markers.join(", ") || "none"}; missing ${missing.join(", ") || "none"}` });
     const leaked = await grepTree(path.join(workspace, "storage"), token);
     ctx.check({ id: "E-secret-encrypted", ok: leaked.length === 0, expected: "the legacy plaintext token is not in the database after adoption", actual: `${leaked.length} files`, severity: "high" });
@@ -172,7 +174,7 @@ const legacyImport = {
       const was = first.census.find((x) => x.scope === r.scope && x.coll === r.coll);
       return !was || was.n !== r.n;
     });
-    const legacyMarkers = (m) => m.filter((x) => x.includes("storage_import/")).sort();
+    const legacyMarkers = (m) => m.filter((x) => x.startsWith("done/") && x.includes("storage_import/")).sort();
     ctx.check({ id: "E-idempotent", ok: delta.length === 0 && json(legacyMarkers(second.markers)) === json(legacyMarkers(first.markers)), expected: "a second boot adds no imported record and no import marker", actual: delta.length ? json(delta).slice(0, 300) : `unchanged; ${legacyMarkers(second.markers).length} markers` });
     const other = second.census.filter((r) => !imported(r)).filter((r) => (first.census.find((x) => x.scope === r.scope && x.coll === r.coll)?.n ?? 0) !== r.n);
     if (other.length) ctx.note("E-bookkeeping-delta", `second boot changed storage bookkeeping (not imported records): ${json(other).slice(0, 400)}`);
@@ -196,7 +198,7 @@ const layoutMigration = {
     const status = await rig.tryRpc("openhuman.storage_status", {});
     ctx.check({ id: "F-status", ok: json(status.value).includes('"layout_version":2') || pick(status.value, "layout_version", "result.layout_version") === 2, expected: "storage_status reports layout_version 2", actual: status.ok ? json(status.value).slice(0, 200) : errText(status) });
     const jobs = jobsOf(await rig.tryRpc("openhuman.cron_list", {}));
-    const cronIds = (await tinyflowsExpected()).cron.jobs.map((j) => j.id);
+    const cronIds = (await tinyflowsExpected()).cron.jobs.map(expectedJobId);
     ctx.check({ id: "F-data-intact-rpc", ok: cronIds.every((id) => jobs.some((j) => j.id === id)), expected: "the imported cron jobs are still listed after the move", actual: `${jobs.filter((j) => cronIds.includes(j.id)).length}/${cronIds.length}` });
     const creds = json((await rig.tryRpc("openhuman.auth_list_provider_credentials", {})).value);
     ctx.check({ id: "F-credential-intact", ok: creds.includes(LEGACY_EXPECT.provider), expected: "the legacy credential is still listed after the move", actual: creds.slice(0, 200) });
@@ -236,6 +238,9 @@ const layoutMigration = {
     ctx.note("F2-layout", `no-master-key profile after boot: .layout ${exists(layout) ? fs.readFileSync(layout, "utf8").trim() : "absent"}; entries: ${fs.readdirSync(seeded.profile).join(", ")}`);
   },
 };
+
+/** A legacy job's id after import: a flow's schedule job is keyed by its flow. */
+const expectedJobId = (job) => (job.job_type === "flow" ? `flow:${job.command}` : job.id);
 
 /**
  * Ids of the `storage.import_state` documents, decoded: tsd stores a key as

@@ -326,7 +326,10 @@ async function main() {
   if (!fs.existsSync(opts.coreBin))
     throw new Error(`core binary not found at ${opts.coreBin}\nbuild it: cargo build -p openhuman-cli --bin openhuman-core`);
   const runId = new Date().toISOString().replace(/[:.]/g, "-");
-  const runDir = path.join(opts.runRoot, runId);
+  // Resolved: the secrets backend refuses a directory with a symlinked
+  // ancestor, and a symlinked target/ must not decide a secrets check.
+  await fsp.mkdir(opts.runRoot, { recursive: true });
+  const runDir = path.join(fs.realpathSync(opts.runRoot), runId);
   await fsp.mkdir(runDir, { recursive: true });
   console.log(`run dir : ${runDir}`);
   const findings = new Findings();
