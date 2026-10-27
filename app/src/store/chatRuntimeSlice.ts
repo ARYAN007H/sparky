@@ -819,6 +819,12 @@ export interface WorkflowProposal {
    */
   flowId?: string;
   /**
+   * `flowId`'s `updated_at` when the builder produced this revision
+   * (`flow_version` on the payload). Sent as `flows_update`'s
+   * `expected_version`, so a save refuses to overwrite a newer edit.
+   */
+  flowVersion?: string;
+  /**
    * Id of the flow once "Save & enable" persisted it, before the enable step
    * finished (pre-authorization pending, denied, or failed). Mirrored into
    * Redux and onto the source message's `saved_flow_id` so a remount or reload
@@ -2613,14 +2619,26 @@ const chatRuntimeSlice = createSlice({
     },
     /**
      * Record that a pending proposal's flow is persisted but not yet enabled
-     * (see `WorkflowProposal.savedFlowId`). No-op if the proposal was cleared.
+     * (see `WorkflowProposal.savedFlowId`). Applied only to the proposal that
+     * was saved (same name and source message): a newer proposal that replaced
+     * it while the save was in flight must not inherit its flow id. No-op if
+     * the proposal was cleared or replaced.
      */
     markWorkflowProposalSaved: (
       state,
-      action: PayloadAction<{ threadId: string; flowId: string }>
+      action: PayloadAction<{
+        threadId: string;
+        flowId: string;
+        name: string;
+        sourceMessageId?: string;
+      }>
     ) => {
       const proposal = state.pendingWorkflowProposalsByThread[action.payload.threadId];
-      if (proposal) {
+      if (
+        proposal &&
+        proposal.name === action.payload.name &&
+        proposal.sourceMessageId === action.payload.sourceMessageId
+      ) {
         proposal.savedFlowId = action.payload.flowId;
       }
     },

@@ -37,6 +37,10 @@ const {
 vi.mock('../../services/api/flowsApi', () => ({
   createFlow: (...args: unknown[]) => mockCreateFlow(...args),
   updateFlow: (...args: unknown[]) => mockUpdateFlow(...args),
+  parseFlowVersionConflict: (err: unknown) =>
+    err instanceof Error && err.message.includes('version_conflict')
+      ? { code: 'version_conflict' }
+      : null,
   setFlowEnabled: (...args: unknown[]) => mockSetFlowEnabled(...args),
   getApprovalManifest: (...args: unknown[]) => mockGetApprovalManifest(...args),
 }));
@@ -190,7 +194,7 @@ describe('WorkflowProposalCard', () => {
     // workflow"/"Dismiss".
     expect(mockDispatch).toHaveBeenCalledTimes(2);
     expect(mockDispatch).toHaveBeenCalledWith(
-      markWorkflowProposalSaved({ threadId: 't1', flowId: 'f1' })
+      markWorkflowProposalSaved({ threadId: 't1', flowId: 'f1', name: 'Daily standup summary' })
     );
     expect(mockDispatch).toHaveBeenCalledWith(
       markWorkflowProposalCompleted({ threadId: 't1', flowId: 'f1' })
@@ -323,7 +327,7 @@ describe('WorkflowProposalCard', () => {
     // resumes at the enable step instead of creating the flow again.
     expect(mockDispatch).toHaveBeenCalledTimes(1);
     expect(mockDispatch).toHaveBeenCalledWith(
-      markWorkflowProposalSaved({ threadId: 't1', flowId: 'f1' })
+      markWorkflowProposalSaved({ threadId: 't1', flowId: 'f1', name: 'Daily standup summary' })
     );
 
     mockSetFlowEnabled.mockResolvedValueOnce({ id: 'f1', enabled: true });
@@ -348,7 +352,7 @@ describe('WorkflowProposalCard', () => {
       name: 'Daily standup summary',
       enabled: true,
     });
-    const p = proposal({ flowId: 'flow-1' });
+    const p = proposal({ flowId: 'flow-1', flowVersion: 'v-7' });
     render(<WorkflowProposalCard threadId="t1" proposal={p} />);
     fireEvent.click(screen.getByText('chat.flowProposal.save'));
     await waitFor(() =>
@@ -356,10 +360,29 @@ describe('WorkflowProposalCard', () => {
         name: p.name,
         graph: p.graph,
         requireApproval: p.requireApproval,
+        expectedVersion: 'v-7',
       })
     );
     expect(mockCreateFlow).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByTestId('workflow-proposal-saved')).toBeInTheDocument());
+  });
+
+  it('refuses a stale revision and says the flow changed instead of overwriting it', async () => {
+    mockUpdateFlow.mockRejectedValueOnce(
+      new Error(JSON.stringify({ code: 'version_conflict', message: 'stale', current: {} }))
+    );
+    render(
+      <WorkflowProposalCard
+        threadId="t1"
+        proposal={proposal({ flowId: 'flow-1', flowVersion: 'v-old' })}
+      />
+    );
+    fireEvent.click(screen.getByText('chat.flowProposal.save'));
+    await waitFor(() =>
+      expect(screen.getByText(/chat\.flowProposal\.versionConflict/)).toBeInTheDocument()
+    );
+    expect(mockSetFlowEnabled).not.toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalled();
   });
 
   it('resumes at the enable step for a proposal whose flow was already saved', async () => {
@@ -451,7 +474,7 @@ describe('WorkflowProposalCard pre-authorization', () => {
       markWorkflowProposalCompleted({ threadId: 't1', flowId: 'f1' })
     );
     expect(mockDispatch).toHaveBeenCalledWith(
-      markWorkflowProposalSaved({ threadId: 't1', flowId: 'f1' })
+      markWorkflowProposalSaved({ threadId: 't1', flowId: 'f1', name: 'Daily standup summary' })
     );
     expect(screen.queryByTestId('workflow-proposal-saved')).not.toBeInTheDocument();
   });

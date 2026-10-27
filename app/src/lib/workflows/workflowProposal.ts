@@ -46,6 +46,9 @@ export function coerceWorkflowProposal(parsed: unknown): WorkflowProposal | null
     requireApproval: obj.require_approval !== false,
     summary: { trigger: typeof summary.trigger === 'string' ? summary.trigger : '', steps },
     ...(typeof obj.flow_id === 'string' && obj.flow_id ? { flowId: obj.flow_id } : {}),
+    ...(typeof obj.flow_version === 'string' && obj.flow_version
+      ? { flowVersion: obj.flow_version }
+      : {}),
   };
 }
 

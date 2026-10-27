@@ -429,3 +429,41 @@ async fn agent_ref_gate_reads_the_registry_of_the_explicit_context() {
         "tenant B must not see tenant A's agent: {for_b:?}"
     );
 }
+
+#[tokio::test]
+async fn revision_proposal_carries_the_target_flow_version() {
+    // A proposal that revises a saved flow carries that flow's version, so a
+    // save onto it can refuse to overwrite a newer edit.
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let g = graph(json!({
+        "nodes": [
+            { "id": "t", "kind": "trigger", "name": "Manual" },
+            { "id": "post", "kind": "tool_call", "name": "Post",
+              "config": { "slug": "oh:noop" } }
+        ],
+        "edges": [ { "from_node": "t", "to_node": "post" } ]
+    }));
+    let flow = flows_create(&config, "Base".to_string(), g.clone(), false)
+        .await
+        .unwrap()
+        .value;
+
+    let payload = build_builder_proposal(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "edit_workflow",
+        "Base",
+        &g,
+        false,
+        true,
+        None,
+        None,
+        Some(flow.id.clone()),
+    )
+    .await
+    .expect("proposal must succeed for a tool_call-only graph");
+
+    assert_eq!(payload["flow_id"], json!(flow.id));
+    assert_eq!(payload["flow_version"], json!(flow.updated_at));
+}

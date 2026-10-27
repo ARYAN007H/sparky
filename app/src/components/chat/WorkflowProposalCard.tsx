@@ -6,7 +6,7 @@ import { useFlowPreauthorization } from '../../hooks/useFlowPreauthorization';
 import { FLOW_CANVAS_DRAFT_ROUTE, type FlowCanvasDraftState } from '../../lib/flows/canvasDraft';
 import type { WorkflowGraph } from '../../lib/flows/types';
 import { useT } from '../../lib/i18n/I18nContext';
-import { createFlow, updateFlow } from '../../services/api/flowsApi';
+import { createFlow, parseFlowVersionConflict, updateFlow } from '../../services/api/flowsApi';
 import { threadApi } from '../../services/api/threadApi';
 import {
   clearWorkflowProposalForThread,
@@ -123,9 +123,7 @@ const WorkflowProposalCard: React.FC<Props> = ({ threadId, proposal, onSaved }) 
   // Seeded from `proposal.savedFlowId` (Redux, or the source message's
   // `saved_flow_id` after a reload) so a remount resumes the enable step
   // instead of persisting the flow a second time.
-  const [savedFlowId, setSavedFlowId] = useState<string | null>(
-    () => proposal.savedFlowId ?? null
-  );
+  const [savedFlowId, setSavedFlowId] = useState<string | null>(() => proposal.savedFlowId ?? null);
   // Set once the flow is fully persisted AND enabled — the terminal success
   // state. Non-null swaps the card's body from the editable proposal (name/
   // trigger/steps/buttons) to a compact saved confirmation with a link into
@@ -217,7 +215,14 @@ const WorkflowProposalCard: React.FC<Props> = ({ threadId, proposal, onSaved }) 
    */
   const markSaved = (flowId: string) => {
     setSavedFlowId(flowId);
-    dispatch(markWorkflowProposalSaved({ threadId, flowId }));
+    dispatch(
+      markWorkflowProposalSaved({
+        threadId,
+        flowId,
+        name: proposal.name,
+        sourceMessageId: proposal.sourceMessageId,
+      })
+    );
     if (!proposal.sourceMessageId) return;
     threadApi
       .updateMessage(threadId, proposal.sourceMessageId, {
@@ -275,6 +280,8 @@ const WorkflowProposalCard: React.FC<Props> = ({ threadId, proposal, onSaved }) 
               name: proposal.name,
               graph: proposal.graph,
               requireApproval: proposal.requireApproval,
+              // Refuse to overwrite an edit made after the builder read the flow.
+              expectedVersion: proposal.flowVersion,
             })
           : await createFlow(proposal.name, proposal.graph, proposal.requireApproval);
         flowId = flow.id;
@@ -314,9 +321,13 @@ const WorkflowProposalCard: React.FC<Props> = ({ threadId, proposal, onSaved }) 
         onSaved?.();
       }
     } catch (e) {
-      log('save failed (createFlow/enable): %o', e);
+      log('save failed (createFlow/updateFlow/enable): %o', e);
       setErrorMsg(
-        flowPersisted ? t('chat.flowProposal.enableError') : t('chat.flowProposal.error')
+        flowPersisted
+          ? t('chat.flowProposal.enableError')
+          : parseFlowVersionConflict(e)
+            ? t('chat.flowProposal.versionConflict')
+            : t('chat.flowProposal.error')
       );
       setSaving(false);
     }

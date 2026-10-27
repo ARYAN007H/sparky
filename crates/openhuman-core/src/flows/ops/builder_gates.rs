@@ -218,6 +218,19 @@ pub(crate) async fn build_builder_proposal(
         payload["draft_id"] = json!(draft_id);
     }
     if let Some(flow_id) = flow_id {
+        // The version this revision was built against, so a save onto the
+        // flow can refuse to overwrite a newer edit (`flows_update`'s
+        // `expected_version`). Best-effort: without it the save is
+        // last-write-wins, as before.
+        match store::get_flow(config, &flow_id) {
+            Ok(Some(flow)) => payload["flow_version"] = json!(flow.updated_at),
+            Ok(None) => {
+                tracing::debug!(target: "flows", %flow_id, "[flows] build_builder_proposal: target flow not found; no version")
+            }
+            Err(error) => {
+                tracing::warn!(target: "flows", %flow_id, %error, "[flows] build_builder_proposal: could not read target flow version")
+            }
+        }
         payload["flow_id"] = json!(flow_id);
     }
     Ok(payload)
